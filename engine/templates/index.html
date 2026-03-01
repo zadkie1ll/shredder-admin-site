@@ -69,28 +69,66 @@
 <body class="antialiased">
 
     <div class="hero-bg">
-        <nav class="container mx-auto px-6 py-8 flex justify-between items-center">
+        <nav class="container mx-auto px-6 py-8 flex justify-between items-center relative z-10">
             <div class="text-2xl font-black uppercase tracking-tighter">
-                MONKEY ISLAND<span class="text-[#ffc700]"> VPN</span>
+                MONKEY <span class="text-[#ffc700]">ISLAND VPN</span>
             </div>
-            <div class="hidden md:flex space-x-8 font-bold text-sm uppercase items-center">
+            <div class="hidden md:flex items-center space-x-10 font-bold text-sm uppercase">
                 <a href="#prices" class="hover:text-[#ffc700] transition">Тарифы</a>
-                <a href="/login/" class="px-4 py-2 border border-[#ffc700] text-[#ffc700] rounded-full hover:bg-[#ffc700] hover:text-black transition">
+                <a href="/login/" class="px-6 py-2 border border-[#ffc700] text-[#ffc700] rounded-full hover:bg-[#ffc700] hover:text-black transition">
                     Войти
                 </a>
             </div>
         </nav>
 
-        <section class="container mx-auto px-6 py-20 text-center">
-            <h1 class="hero-title text-5xl md:text-8xl mb-8 uppercase">
-                ОСТРОВ <br><span class="text-yellow-500"> СВОБОДЫ В СЕТИ </span>
-            </h1>
-            <p class="text-gray-400 text-xl md:text-2xl max-w-2xl mx-auto mb-12">
-                Скоростной VPN, который невозможно заблокировать. <br> Работает там, где другие сдаются.
-            </p>
-            <a href="#prices" class="tilda-yellow px-12 py-5 rounded-full font-black uppercase text-lg inline-block shadow-lg">
-                ПОДКЛЮЧИТЬ VPN
-            </a>
+        <section class="container mx-auto px-6 pt-16 md:pt-24 pb-20 flex justify-end">
+            <div class="flex flex-col items-end text-right max-w-3xl">
+                <h1 class="hero-title text-5xl md:text-7xl mb-6 uppercase leading-tight drop-shadow-2xl">
+                    ОСТРОВ <br>
+                    <span class="text-[#ffc700] whitespace-nowrap">СВОБОДЫ В СЕТИ</span>
+                </h1>
+                
+                <p class="text-gray-100 text-lg md:text-xl mb-10 font-medium drop-shadow-lg max-w-lg">
+                    Ваш личный VPN на базе протоколов нового поколения.
+                    Работает там, где другие сдаются.
+                </p>
+                
+                <a href="#prices" class="tilda-yellow px-14 py-5 rounded-full font-black uppercase text-lg shadow-2xl transition transform hover:scale-105 active:scale-95 mb-24">
+                    ПОДКЛЮЧИТЬ VPN
+                </a>
+
+                <div class="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-12 border-t border-white/10 pt-12">
+                    <div class="flex flex-col items-center">
+                        <div class="text-[#ffc700] mb-3">
+                            <i class="fas fa-globe-americas text-2xl"></i>
+                        </div>
+                        <h4 class="font-bold uppercase text-xs tracking-[0.2em] mb-2">МНОЖЕСТВО ЛОКАЦИЙ</h4>
+                        <p class="text-gray-400 text-xs leading-relaxed max-w-[250px] text-center">
+                            Переключайтесь между странами в один клик. Скорость до 1 Гбит/с.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col items-center md:border-x border-white/10 px-6">
+                        <div class="text-[#ffc700] mb-3">
+                            <i class="fas fa-bolt text-2xl"></i>
+                        </div>
+                        <h4 class="font-bold uppercase text-xs tracking-[0.2em] mb-2">В ОДИН КЛИК</h4>
+                        <p class="text-gray-400 text-xs leading-relaxed max-w-[250px] text-center">
+                            Никаких сложных настроек. Скачал, нажал кнопку — и ты в сети.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col items-center">
+                        <div class="text-[#ffc700] mb-3">
+                            <i class="fas fa-shield-alt text-2xl"></i>
+                        </div>
+                        <h4 class="font-bold uppercase text-xs tracking-[0.2em] mb-2">ДЛЯ ВСЕХ УСТРОЙСТВ</h4>
+                        <p class="text-gray-400 text-xs leading-relaxed max-w-[250px] text-center">
+                            Одна подписка работает на iPhone, Android, Windows и Mac.
+                        </p>
+                    </div>
+                </div>
+            </div>
         </section>
     </div>
 

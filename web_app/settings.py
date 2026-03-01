@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'engine',
 ]
 
+ALLOWED_HOSTS = ['*']  # Разрешаем все хосты для разработки, но не используйте это в продакшене!
+
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
