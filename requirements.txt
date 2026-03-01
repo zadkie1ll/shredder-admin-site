@@ -1,0 +1,6 @@
+django
+sqlalchemy
+psycopg2-binary
+yookassa
+pydantic
+python-dotenv

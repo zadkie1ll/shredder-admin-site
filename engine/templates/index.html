@@ -1,0 +1,136 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monkey Island VPN — Твой остров свободы</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+        
+        body { 
+            font-family: 'Montserrat', sans-serif; 
+            background-color: #111111; 
+            color: #ffffff;
+        }
+
+        .hero-bg {
+            /* 1. Накладываем темный градиент поверх */
+            background-image: linear-gradient(180deg, rgba(17,17,17,0.45) 0%, #111111 100%), 
+                            url("{% static 'img/header-no-logo.png' %}");
+            
+            /* 2. Важные параметры позиционирования: */
+            background-size: cover; /* Заполнить блок целиком */
+            background-position: top center; /* Прижать картинку к верху (чтобы надписи были видны) */
+            background-repeat: no-repeat;
+            
+            /* 3. Убираем fixed эффект, чтобы картинка скроллилась вместе с контентом */
+            background-attachment: scroll;
+
+            aspect-ratio: 1920 / 1080;
+        }
+
+        .tilda-yellow { background-color: #ffc700; color: #000000; }
+        .tilda-yellow:hover { background-color: #e6b400; }
+        
+        .tariff-card {
+            background-color: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 15px;
+            transition: transform 0.3s ease;
+        }
+        
+        .tariff-card:hover {
+            transform: translateY(-5px);
+            border-color: #ffc700;
+        }
+
+        .input-field {
+            background-color: #222222;
+            border: 1px solid #333333;
+            color: white;
+            border-radius: 8px;
+        }
+
+        .input-field:focus {
+            border-color: #ffc700;
+            outline: none;
+        }
+
+        .hero-title {
+            font-weight: 900;
+            letter-spacing: -1px;
+            line-height: 1.1;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="hero-bg">
+        <nav class="container mx-auto px-6 py-8 flex justify-between items-center">
+            <div class="text-2xl font-black uppercase tracking-tighter">
+                MONKEY ISLAND<span class="text-[#ffc700]"> VPN</span>
+            </div>
+            <div class="hidden md:flex space-x-8 font-bold text-sm uppercase items-center">
+                <a href="#prices" class="hover:text-[#ffc700] transition">Тарифы</a>
+                <a href="/login/" class="px-4 py-2 border border-[#ffc700] text-[#ffc700] rounded-full hover:bg-[#ffc700] hover:text-black transition">
+                    Войти
+                </a>
+            </div>
+        </nav>
+
+        <section class="container mx-auto px-6 py-20 text-center">
+            <h1 class="hero-title text-5xl md:text-8xl mb-8 uppercase">
+                ОСТРОВ <br><span class="text-yellow-500"> СВОБОДЫ В СЕТИ </span>
+            </h1>
+            <p class="text-gray-400 text-xl md:text-2xl max-w-2xl mx-auto mb-12">
+                Скоростной VPN, который невозможно заблокировать. <br> Работает там, где другие сдаются.
+            </p>
+            <a href="#prices" class="tilda-yellow px-12 py-5 rounded-full font-black uppercase text-lg inline-block shadow-lg">
+                ПОДКЛЮЧИТЬ VPN
+            </a>
+        </section>
+    </div>
+
+    <section id="prices" class="container mx-auto px-6 py-24 bg-[#0a0a0a] rounded-[40px]">
+        <div class="text-center mb-16">
+            <h2 class="text-4xl md:text-6xl font-black uppercase mb-4">ТАРИФЫ</h2>
+            <div class="w-24 h-2 bg-[#ffc700] mx-auto"></div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {% for tariff in tariffs %}
+            <div class="tariff-card p-10 flex flex-col justify-between">
+                <div>
+                    <h3 class="text-[#ffc700] font-bold text-xl uppercase mb-2">{{ tariff.description }}</h3>
+                    <div class="text-5xl font-black mb-8">{{ tariff.price }} ₽</div>
+                    
+                    <ul class="text-gray-400 space-y-3 mb-10 text-sm">
+                        <li class="flex items-center"><i class="fas fa-bolt mr-2 text-[#ffc700]"></i> Высокая скорость</li>
+                        <li class="flex items-center"><i class="fas fa-lock mr-2 text-[#ffc700]"></i> Шифрование VLESS/Shadowsocks</li>
+                        <li class="flex items-center"><i class="fas fa-infinity mr-2 text-[#ffc700]"></i> Безлимитный трафик</li>
+                    </ul>
+                </div>
+
+                <form action="/pay/" method="POST" class="space-y-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
+                    <input type="email" name="email" placeholder="ТВОЙ EMAIL" required 
+                           class="w-full input-field px-4 py-4 font-bold text-sm uppercase tracking-wider">
+                    <button type="submit" class="w-full tilda-yellow py-4 rounded-xl font-black uppercase tracking-widest transition transform active:scale-95">
+                        ОПЛАТИТЬ
+                    </button>
+                </form>
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <footer class="container mx-auto px-6 py-12 text-center text-gray-600 uppercase text-xs tracking-widest">
+        &copy; 2026 MONKEY ISLAND VPN | СДЕЛАНО ДЛЯ СВОБОДНЫХ ЛЮДЕЙ
+    </footer>
+
+</body>
+</html>
