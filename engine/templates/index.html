@@ -14,22 +14,41 @@
             font-family: 'Montserrat', sans-serif; 
             background-color: #111111; 
             color: #ffffff;
+            overflow-x: hidden;
         }
 
         .hero-bg {
-            /* 1. Накладываем темный градиент поверх */
-            background-image: linear-gradient(180deg, rgba(17,17,17,0.45) 0%, #111111 100%), 
+            background-image: linear-gradient(180deg, rgba(17,17,17,0.3) 0%, #111111 100%), 
                             url("{% static 'img/header-no-logo.png' %}");
-            
-            /* 2. Важные параметры позиционирования: */
-            background-size: cover; /* Заполнить блок целиком */
-            background-position: top center; /* Прижать картинку к верху (чтобы надписи были видны) */
+            background-image: 
+                linear-gradient(270deg, rgba(17,17,17,0.85) 0%, rgba(17,17,17,0.4) 60%, rgba(17,17,17,0) 100%),
+                linear-gradient(180deg, rgba(17,17,17,0.0) 60%, #111111 100%),
+                url("{% static 'img/header-no-logo.png' %}");
+            background-size: cover;
+            background-position: center;
             background-repeat: no-repeat;
-            
-            /* 3. Убираем fixed эффект, чтобы картинка скроллилась вместе с контентом */
-            background-attachment: scroll;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
 
-            aspect-ratio: 1920 / 1080;
+        /* Добавим тень для всей навигации, чтобы буквы не сливались с небом */
+        nav {
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+
+        .benefit-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .benefit-card:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: #ffc700;
         }
 
         .tilda-yellow { background-color: #ffc700; color: #000000; }
@@ -38,31 +57,72 @@
         .tariff-card {
             background-color: #1a1a1a;
             border: 1px solid #2a2a2a;
-            border-radius: 15px;
-            transition: transform 0.3s ease;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            position: relative;
         }
         
         .tariff-card:hover {
-            transform: translateY(-5px);
+            transform: translateY(-10px);
             border-color: #ffc700;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
 
         .input-field {
             background-color: #222222;
             border: 1px solid #333333;
             color: white;
-            border-radius: 8px;
-        }
-
-        .input-field:focus {
-            border-color: #ffc700;
-            outline: none;
+            border-radius: 12px;
         }
 
         .hero-title {
             font-weight: 900;
-            letter-spacing: -1px;
-            line-height: 1.1;
+            letter-spacing: -2px;
+            /* Тень для читаемости на фоне облаков */
+            text-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+
+        .drop-shadow-custom {
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+
+        .discount-badge {
+            position: absolute;
+            top: -15px;
+            right: 20px;
+            background: #ffc700;
+            color: #000;
+            padding: 5px 15px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 900;
+            text-transform: uppercase;
+            box-shadow: 0 10px 20px rgba(255, 199, 0, 0.3);
+            z-index: 10;
+        }
+
+        /* Убираем стандартный маркер списка у details */
+        details summary::-webkit-details-marker {
+            display: none;
+        }
+        details summary {
+            list-style: none;
+        }
+
+        /* Плавный поворот стрелки при открытии */
+        details[open] .faq-icon {
+            transform: rotate(180deg);
+            color: #ffc700;
+        }
+
+        /* Плавное появление текста */
+        details[open] summary ~ * {
+            animation: sweep .3s ease-in-out;
+        }
+
+        @keyframes sweep {
+            0%    {opacity: 0; transform: translateY(-10px)}
+            100%  {opacity: 1; transform: translateY(0)}
         }
     </style>
 </head>
@@ -70,61 +130,61 @@
 
     <div class="hero-bg">
         <nav class="container mx-auto px-6 py-8 flex justify-between items-center relative z-10">
-            <div class="text-2xl font-black uppercase tracking-tighter">
-                MONKEY <span class="text-[#ffc700]">ISLAND VPN</span>
+            <div class="text-xl md:text-2xl font-black uppercase tracking-tighter">
+                MONKEY ISLAND<span class="text-[#ffc700]"> VPN</span>
             </div>
-            <div class="hidden md:flex items-center space-x-10 font-bold text-sm uppercase">
-                <a href="#prices" class="hover:text-[#ffc700] transition">Тарифы</a>
-                <a href="/login/" class="px-6 py-2 border border-[#ffc700] text-[#ffc700] rounded-full hover:bg-[#ffc700] hover:text-black transition">
+            <div class="flex items-center space-x-4 md:space-x-10 font-bold text-xs md:text-sm uppercase">
+                <a href="#prices" class="hover:text-[#ffc700] transition hidden sm:inline">Тарифы</a>
+                <a href="/login/" class="px-5 py-2 border border-[#ffc700] text-[#ffc700] rounded-full hover:bg-[#ffc700] hover:text-black transition">
                     Войти
                 </a>
             </div>
         </nav>
 
-        <section class="container mx-auto px-6 pt-16 md:pt-24 pb-20 flex justify-end">
-            <div class="flex flex-col items-end text-right max-w-3xl">
-                <h1 class="hero-title text-5xl md:text-7xl mb-6 uppercase leading-tight drop-shadow-2xl">
+        <section class="container mx-auto px-6 flex-grow flex items-center justify-center md:justify-end">
+            <div class="flex flex-col items-center text-center md:items-end md:text-right max-w-3xl">
+                <h1 class="hero-title text-4xl sm:text-6xl md:text-8xl mb-6 uppercase leading-[0.9]">
                     ОСТРОВ <br>
                     <span class="text-[#ffc700] whitespace-nowrap">СВОБОДЫ В СЕТИ</span>
                 </h1>
                 
-                <p class="text-gray-100 text-lg md:text-xl mb-10 font-medium drop-shadow-lg max-w-lg">
+                <p class="text-gray-100 text-base md:text-2xl mb-10 font-medium drop-shadow-custom max-w-2xl">
                     Ваш личный VPN на базе протоколов нового поколения.
                     Работает там, где другие сдаются.
                 </p>
                 
-                <a href="#prices" class="tilda-yellow px-14 py-5 rounded-full font-black uppercase text-lg shadow-2xl transition transform hover:scale-105 active:scale-95 mb-24">
+                <a href="#prices" class="tilda-yellow px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95 mb-16 md:mb-24">
                     ПОДКЛЮЧИТЬ VPN
                 </a>
 
-                <div class="w-full max-w-5xl grid grid-cols-1 md:grid-cols-3 gap-12 border-t border-white/10 pt-12">
-                    <div class="flex flex-col items-center">
-                        <div class="text-[#ffc700] mb-3">
-                            <i class="fas fa-globe-americas text-2xl"></i>
+                <div class="w-full grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 pt-10 border-t border-white/10">
+                    <div class="benefit-card flex flex-col items-center">
+                        <div class="text-[#ffc700] mb-3 text-2xl">
+                            <i class="fas fa-globe-americas"></i>
                         </div>
-                        <h4 class="font-bold uppercase text-xs tracking-[0.2em] mb-2">МНОЖЕСТВО ЛОКАЦИЙ</h4>
-                        <p class="text-gray-400 text-xs leading-relaxed max-w-[250px] text-center">
-                            Переключайтесь между странами в один клик. Скорость до 1 Гбит/с.
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">50+ Локаций</h4>
+                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
+                            Скорость до 1 Гбит/с в любой точке мира.
                         </p>
                     </div>
 
-                    <div class="flex flex-col items-center md:border-x border-white/10 px-6">
-                        <div class="text-[#ffc700] mb-3">
-                            <i class="fas fa-bolt text-2xl"></i>
+                    <div class="benefit-card flex flex-col items-center">
+                        <div class="text-[#ffc700] mb-3 text-2xl">
+                            <i class="fas fa-bolt"></i>
                         </div>
-                        <h4 class="font-bold uppercase text-xs tracking-[0.2em] mb-2">В ОДИН КЛИК</h4>
-                        <p class="text-gray-400 text-xs leading-relaxed max-w-[250px] text-center">
-                            Никаких сложных настроек. Скачал, нажал кнопку — и ты в сети.
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">В один клик</h4>
+                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
+                            Никаких настроек. Скачал и сразу в сети.
                         </p>
                     </div>
 
-                    <div class="flex flex-col items-center">
-                        <div class="text-[#ffc700] mb-3">
-                            <i class="fas fa-shield-alt text-2xl"></i>
+                    <div class="benefit-card flex flex-col items-center">
+                        <div class="text-[#ffc700] mb-3 text-2xl">
+                            <i class="fas fa-shield-alt"></i>
                         </div>
-                        <h4 class="font-bold uppercase text-xs tracking-[0.2em] mb-2">ДЛЯ ВСЕХ УСТРОЙСТВ</h4>
-                        <p class="text-gray-400 text-xs leading-relaxed max-w-[250px] text-center">
-                            Одна подписка работает на iPhone, Android, Windows и Mac.
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">Все устройства</h4>
+                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
+                            Одна подписка на телефон и компьютер.
                         </p>
                     </div>
                 </div>
@@ -132,42 +192,210 @@
         </section>
     </div>
 
-    <section id="prices" class="container mx-auto px-6 py-24 bg-[#0a0a0a] rounded-[40px]">
-        <div class="text-center mb-16">
-            <h2 class="text-4xl md:text-6xl font-black uppercase mb-4">ТАРИФЫ</h2>
-            <div class="w-24 h-2 bg-[#ffc700] mx-auto"></div>
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {% for tariff in tariffs %}
-            <div class="tariff-card p-10 flex flex-col justify-between">
-                <div>
-                    <h3 class="text-[#ffc700] font-bold text-xl uppercase mb-2">{{ tariff.description }}</h3>
-                    <div class="text-5xl font-black mb-8">{{ tariff.price }} ₽</div>
-                    
-                    <ul class="text-gray-400 space-y-3 mb-10 text-sm">
-                        <li class="flex items-center"><i class="fas fa-bolt mr-2 text-[#ffc700]"></i> Высокая скорость</li>
-                        <li class="flex items-center"><i class="fas fa-lock mr-2 text-[#ffc700]"></i> Шифрование VLESS/Shadowsocks</li>
-                        <li class="flex items-center"><i class="fas fa-infinity mr-2 text-[#ffc700]"></i> Безлимитный трафик</li>
-                    </ul>
-                </div>
-
-                <form action="/pay/" method="POST" class="space-y-4">
-                    {% csrf_token %}
-                    <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
-                    <input type="email" name="email" placeholder="ТВОЙ EMAIL" required 
-                           class="w-full input-field px-4 py-4 font-bold text-sm uppercase tracking-wider">
-                    <button type="submit" class="w-full tilda-yellow py-4 rounded-xl font-black uppercase tracking-widest transition transform active:scale-95">
-                        ОПЛАТИТЬ
-                    </button>
-                </form>
-            </div>
-            {% endfor %}
+    <section class="py-12 bg-[#0d0d0d] border-y border-white/5">
+        <div class="container mx-auto px-6 flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition duration-500">
+            <div class="flex items-center gap-2"><i class="fab fa-apple text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">iOS / macOS</span></div>
+            <div class="flex items-center gap-2"><i class="fab fa-android text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Android</span></div>
+            <div class="flex items-center gap-2"><i class="fab fa-windows text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Windows</span></div>
+            <div class="flex items-center gap-2"><i class="fab fa-linux text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Linux</span></div>
+            <div class="flex items-center gap-2"><i class="fas fa-tv text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Smart TV</span></div>
         </div>
     </section>
 
-    <footer class="container mx-auto px-6 py-12 text-center text-gray-600 uppercase text-xs tracking-widest">
-        &copy; 2026 MONKEY ISLAND VPN | СДЕЛАНО ДЛЯ СВОБОДНЫХ ЛЮДЕЙ
+    <section class="py-24 relative overflow-hidden">
+        <div class="container mx-auto px-6 relative z-10">
+            <div class="text-center mb-20">
+                <h2 class="text-3xl md:text-5xl font-black uppercase mb-4">Больше чем <span class="text-[#ffc700]">просто VPN</span></h2>
+                <p class="text-gray-500 max-w-2xl mx-auto">Мы объединили пиратскую свободу с технологиями военного уровня.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition group">
+                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
+                        <i class="fas fa-shield-halved text-black text-xl"></i>
+                    </div>
+                    <h3 class="font-black uppercase text-sm mb-4 tracking-wider">Протокол Reality</h3>
+                    <p class="text-gray-500 text-xs leading-relaxed">Самая современная маскировка трафика. Провайдер видит обычный сайт, а не VPN-туннель.</p>
+                </div>
+
+                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition group">
+                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
+                        <i class="fas fa-bolt text-black text-xl"></i>
+                    </div>
+                    <h3 class="font-black uppercase text-sm mb-4 tracking-wider">Low Latency</h3>
+                    <p class="text-gray-500 text-xs leading-relaxed">Оптимизированные маршруты для гейминга и звонков. Минимальный пинг в любой точке мира.</p>
+                </div>
+
+                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition group">
+                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
+                        <i class="fas fa-eye-slash text-black text-xl"></i>
+                    </div>
+                    <h3 class="font-black uppercase text-sm mb-4 tracking-wider">No-Log Policy</h3>
+                    <p class="text-gray-500 text-xs leading-relaxed">Мы не храним историю ваших посещений. Ваша активность на острове — только ваша тайна.</p>
+                </div>
+
+                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition group">
+                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
+                        <i class="fas fa-unlock text-black text-xl"></i>
+                    </div>
+                    <h3 class="font-black uppercase text-sm mb-4 tracking-wider">Обход Deep Packet Inspection</h3>
+                    <p class="text-gray-500 text-xs leading-relaxed">Работает даже через самые жесткие государственные файрволы без потерь скорости.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="prices" class="py-24 bg-[#0a0a0a] rounded-t-[60px] border-t border-white/5">
+        <div class="container mx-auto px-6">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-6xl font-black uppercase mb-4 tracking-tighter">ТАРИФЫ</h2>
+                <div class="w-20 h-1.5 bg-[#ffc700] mx-auto"></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-6xl mx-auto">
+                {% for tariff in tariffs %}
+                <div class="tariff-card p-10 flex flex-col justify-between">
+                    
+                    {% if "3 месяца" in tariff.description %}
+                        <div class="discount-badge">Экономия 25%</div>
+                    {% elif "1 год" in tariff.description %}
+                        <div class="discount-badge">Выгода 40%</div>
+                    {% endif %}
+
+                    <div>
+                        <h3 class="text-[#ffc700] font-black text-xl uppercase mb-2">{{ tariff.description }}</h3>
+                        <div class="text-5xl font-black mb-8">{{ tariff.price }} ₽</div>
+                        
+                        <ul class="text-gray-400 space-y-4 mb-10 text-sm font-medium">
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Обход "белых списков"</li>
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> YouTube без рекламы</li>
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Безлимитный трафик</li>
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Безлимитное количество устройств для подключения</li>
+                        </ul>
+                    </div>
+                    
+                    <form action="/pay/" method="POST" class="space-y-4">
+                        {% csrf_token %}
+                        <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
+                        <input type="email" name="email" placeholder="ТВОЙ EMAIL" required 
+                            class="w-full input-field px-4 py-4 font-bold text-xs uppercase tracking-widest focus:border-[#ffc700] outline-none transition">
+                        <button type="submit" class="w-full tilda-yellow py-4 rounded-xl font-black uppercase text-sm tracking-widest transition shadow-lg">
+                            ОПЛАТИТЬ
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <section class="py-24 bg-[#111111]">
+        <div class="container mx-auto px-6 max-w-4xl">
+            <h2 class="text-4xl md:text-6xl font-black uppercase text-center mb-20">
+                ВОПРОСЫ <span class="text-[#ffc700]">И ОТВЕТЫ</span>
+            </h2>
+            
+            <div class="space-y-4">
+                <details class="faq-card group">
+                    <summary class="p-8 cursor-pointer flex justify-between items-center outline-none">
+                        <h4 class="font-black uppercase text-sm md:text-base tracking-wider">
+                            Будет ли работать YouTube и соцсети?
+                        </h4>
+                        <span class="faq-icon transition-transform duration-300 text-gray-500">
+                            <i class="fas fa-chevron-down"></i>
+                        </span>
+                    </summary>
+                    <div class="px-8 pb-8">
+                        <p class="text-gray-400 text-sm md:text-base leading-relaxed border-t border-white/5 pt-4">
+                            Да, наш VPN использует технологию Reality, которая маскирует трафик под обычное посещение сайтов. Это позволяет смотреть YouTube в 4K и пользоваться любыми сервисами без ограничений.
+                        </p>
+                    </div>
+                </details>
+
+                <details class="faq-card group">
+                    <summary class="p-8 cursor-pointer flex justify-between items-center outline-none">
+                        <h4 class="font-black uppercase text-sm md:text-base tracking-wider">
+                            Что делать после оплаты?
+                        </h4>
+                        <span class="faq-icon transition-transform duration-300 text-gray-500">
+                            <i class="fas fa-chevron-down"></i>
+                        </span>
+                    </summary>
+                    <div class="px-8 pb-8">
+                        <p class="text-gray-400 text-sm md:text-base leading-relaxed border-t border-white/5 pt-4">
+                            Система автоматически создаст аккаунт. Вам придет письмо на почту и сообщение в Telegram-бот с ключом и инструкциями по установке для вашего устройства.
+                        </p>
+                    </div>
+                </details>
+
+                <details class="faq-card group">
+                    <summary class="p-8 cursor-pointer flex justify-between items-center outline-none">
+                        <h4 class="font-black uppercase text-sm md:text-base tracking-wider">
+                            Нужно ли настраивать что-то вручную?
+                        </h4>
+                        <span class="faq-icon transition-transform duration-300 text-gray-500">
+                            <i class="fas fa-chevron-down"></i>
+                        </span>
+                    </summary>
+                    <div class="px-8 pb-8">
+                        <p class="text-gray-400 text-sm md:text-base leading-relaxed border-t border-white/5 pt-4">
+                            Нет! Для Android и iOS у нас есть кнопки "Подключиться в 1 клик". Приложение откроется и само импортирует все настройки.
+                        </p>
+                    </div>
+                </details>
+            </div>
+        </div>
+    </section>
+
+    <section id="how-it-works" class="py-24 bg-[#111111]">
+        <div class="container mx-auto px-6">
+            <h2 class="text-4xl md:text-6xl font-black uppercase text-center mb-20">3 ШАГА К <span class="text-[#ffc700]">СВОБОДЕ</span></h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-lg shadow-[#ffc700]/20">1</div>
+                    <h3 class="font-black uppercase mb-4 tracking-wider">Выбери тариф</h3>
+                    <p class="text-gray-500 text-sm">Оплати подписку на сайте. Ты сразу получишь доступ в личный кабинет и уведомление в Telegram-боте.</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-lg shadow-[#ffc700]/20">2</div>
+                    <h3 class="font-black uppercase mb-4 tracking-wider">Скачай приложение</h3>
+                    <p class="text-gray-500 text-sm">Мы используем современный клиент <span class="text-white">Happ</span> для Android/iOS или v2rayNG. Ссылки будут в инструкции.</p>
+                </div>
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-lg shadow-[#ffc700]/20">3</div>
+                    <h3 class="font-black uppercase mb-4 tracking-wider">Жми "Подключить"</h3>
+                    <p class="text-gray-500 text-sm">Просто нажми кнопку "Подключиться в 1 клик" в нашем боте. Ключ добавится автоматически. Готово!</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-[#0a0a0a] border-t border-white/5 pt-20 pb-10">
+        <div class="container mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+                <div class="col-span-1 md:col-span-2">
+                    <div class="text-2xl font-black uppercase mb-6">MONKEY ISLAND<span class="text-[#ffc700]"> VPN</span></div>
+                    <p class="text-gray-500 text-sm max-w-xs leading-relaxed">Твой личный остров свободы в цифровом океане. Надежные технологии маскировки трафика и высокая скорость.</p>
+                </div>
+                <div>
+                    <h4 class="font-bold uppercase text-xs tracking-widest mb-6 text-white">Навигация</h4>
+                    <ul class="text-gray-500 text-sm space-y-4 font-medium">
+                        <li><a href="#how-it-works" class="hover:text-[#ffc700] transition">Как подключить</a></li>
+                        <li><a href="#prices" class="hover:text-[#ffc700] transition">Тарифы</a></li>
+                        <li><a href="/login/" class="hover:text-[#ffc700] transition">Личный кабинет</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold uppercase text-xs tracking-widest mb-6 text-white">Поддержка</h4>
+                    <div class="flex space-x-4">
+                        <a href="#" class="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center hover:bg-[#ffc700] transition group"><i class="fab fa-telegram-plane group-hover:text-black"></i></a>
+                        <a href="#" class="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center hover:bg-[#ffc700] transition group"><i class="fas fa-envelope group-hover:text-black"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-white/5 pt-10 text-center text-gray-600 text-[10px] uppercase tracking-[0.3em]">
+                &copy; 2026 MONKEY ISLAND VPN | Сделано для свободных людей
+            </div>
+        </div>
     </footer>
 
 </body>

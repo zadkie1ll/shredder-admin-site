@@ -1,0 +1,143 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Личный кабинет — Monkey Island</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+        body { font-family: 'Montserrat', sans-serif; background-color: #0d0d0d; color: #ffffff; }
+        
+        .glass-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 24px;
+        }
+        
+        .status-online { color: #00ff88; text-shadow: 0 0 10px rgba(0,255,136,0.3); }
+        .tilda-yellow { background-color: #ffc700; color: #000; }
+        
+        /* Стили для кода ключа */
+        .key-box {
+            background: #1a1a1a;
+            border: 1px dashed #333;
+            word-break: break-all;
+            font-family: monospace;
+        }
+    </style>
+</head>
+<body class="antialiased bg-[#0d0d0d]">
+
+    <nav class="border-b border-white/5 py-4 mb-8">
+        <div class="container mx-auto px-6 flex justify-between items-center">
+            <a href="/" class="text-xl font-black uppercase italic">
+                MONKEY <span class="text-[#ffc700]">ISLAND</span>
+            </a>
+            <div class="flex items-center gap-4">
+                <span class="text-xs text-gray-500 hidden md:inline">{{ user.email }}</span>
+                <a href="/logout/" class="text-xs font-bold uppercase hover:text-[#ffc700] transition">Выйти</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container mx-auto px-6 pb-20">
+        
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            
+            <div class="lg:col-span-1 space-y-6">
+                <div class="glass-card p-8 text-center">
+                    <div class="w-20 h-20 bg-[#ffc700]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                        <i class="fas fa-user-shield text-[#ffc700] text-3xl"></i>
+                    </div>
+                    <h2 class="text-xl font-black uppercase mb-1">Статус подписки</h2>
+                    <p class="status-online font-bold uppercase text-sm mb-6 italic">Активна</p>
+                    
+                    <div class="text-left space-y-4 border-t border-white/5 pt-6">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-500">Осталось:</span>
+                            <span class="font-bold">14 дней</span>
+                        </div>
+                        <div class="flex justify-between text-sm">
+                            <span class="text-gray-500">Тариф:</span>
+                            <span class="font-bold text-[#ffc700]">ОПТИМАЛЬНЫЙ</span>
+                        </div>
+                    </div>
+                    
+                    <a href="/#prices" class="block w-full mt-8 py-3 rounded-xl border border-[#ffc700] text-[#ffc700] font-bold uppercase text-xs hover:bg-[#ffc700] hover:text-black transition text-center">
+                        Продлить доступ
+                    </a>
+                </div>
+
+                <div class="glass-card p-6 flex items-center gap-4">
+                    <div class="text-2xl text-[#ffc700]"><i class="fab fa-telegram"></i></div>
+                    <div>
+                        <h4 class="text-xs font-black uppercase">Уведомления в TG</h4>
+                        <p class="text-[10px] text-gray-500">Бот напомнит об окончании</p>
+                    </div>
+                    <a href="https://t.me/your_bot" class="ml-auto text-[10px] font-bold text-[#ffc700] uppercase underline">Привязать</a>
+                </div>
+            </div>
+
+            <div class="lg:col-span-2 space-y-6">
+                
+                <div class="glass-card p-8">
+                    <h2 class="text-2xl font-black uppercase mb-6 italic">Твой ключ доступа</h2>
+                    
+                    <div class="key-box p-4 rounded-xl text-xs text-gray-400 mb-6 relative group">
+                        <div id="vpnKey">vless://777bb-c23-44-88-999@1.1.1.1:443?encryption=none&security=reality&sni=google.com&fp=chrome&type=grpc&serviceName=grpc&sid=123456#MonkeyIsland_User</div>
+                        <button onclick="copyKey()" class="absolute top-2 right-2 bg-[#ffc700] text-black p-2 rounded-lg opacity-0 group-hover:opacity-100 transition shadow-xl">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+
+                    <div class="flex flex-wrap gap-4">
+                        <button onclick="copyKey()" class="tilda-yellow px-8 py-4 rounded-xl font-black uppercase text-xs flex items-center gap-2">
+                            <i class="fas fa-copy"></i> Скопировать ключ
+                        </button>
+                        <a href="happ://crypt/a/{{ config_base64 }}" class="bg-white/5 hover:bg-white/10 px-8 py-4 rounded-xl font-black uppercase text-xs flex items-center gap-2 transition">
+                            <i class="fas fa-bolt text-[#ffc700]"></i> Подключить в 1 клик
+                        </a>
+                    </div>
+                    <p class="mt-4 text-[10px] text-gray-500 uppercase tracking-widest italic">* Кнопка «1 клик» работает, если установлен клиент Happ</p>
+                </div>
+
+                <h3 class="text-xl font-black uppercase italic mt-10">Быстрая установка</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="glass-card p-6 flex items-start gap-4">
+                        <div class="text-2xl mt-1"><i class="fab fa-android"></i></div>
+                        <div>
+                            <h4 class="font-bold uppercase text-sm mb-1 text-[#ffc700]">Android</h4>
+                            <p class="text-[11px] text-gray-500 mb-3">Скачайте Happ из Google Play или APK.</p>
+                            <div class="flex gap-3">
+                                <a href="#" class="text-[10px] font-bold underline uppercase">Play Store</a>
+                                <a href="#" class="text-[10px] font-bold underline uppercase">Скачать APK</a>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="glass-card p-6 flex items-start gap-4">
+                        <div class="text-2xl mt-1"><i class="fab fa-apple"></i></div>
+                        <div>
+                            <h4 class="font-bold uppercase text-sm mb-1 text-[#ffc700]">iPhone / Mac</h4>
+                            <p class="text-[11px] text-gray-500 mb-3">Используйте FoXray или V2Box из AppStore.</p>
+                            <a href="#" class="text-[10px] font-bold underline uppercase">App Store</a>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function copyKey() {
+            const keyText = document.getElementById('vpnKey').innerText;
+            navigator.clipboard.writeText(keyText);
+            alert('Ключ скопирован! Теперь вставьте его в приложение.');
+        }
+    </script>
+</body>
+</html>

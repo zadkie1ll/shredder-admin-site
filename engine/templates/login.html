@@ -1,0 +1,163 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Вход — Monkey Island VPN</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+        
+        body { 
+            font-family: 'Montserrat', sans-serif; 
+            background-image: 
+                linear-gradient(rgba(13, 13, 13, 0.85), rgba(13, 13, 13, 0.85)), 
+                url("{% static 'img/bg-login.png' %}"); 
+            background-size: cover;
+            background-position: center;
+            background-attachment: fixed;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            margin: 0;
+        }
+
+        .login-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 40px;
+            width: 100%;
+            max-width: 420px;
+            padding: 50px 40px;
+            box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+        }
+
+        .input-field {
+            background-color: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.1);
+            color: white;
+            transition: all 0.3s ease;
+        }
+
+        .input-field:focus {
+            border-color: #ffc700;
+            background-color: rgba(0,0,0,0.5);
+            outline: none;
+        }
+
+        .tilda-yellow { 
+            background-color: #ffc700; 
+            color: #000; 
+            box-shadow: 0 15px 30px rgba(255, 199, 0, 0.2);
+        }
+        
+        .tilda-yellow:hover { 
+            background-color: #e6b400; 
+            transform: translateY(-2px); 
+        }
+
+        /* Анимация для состояния отправки */
+        .hidden-step { display: none; }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="login-card text-center">
+        
+        <div id="step-input">
+            <div class="mb-10">
+                <div class="w-16 h-16 bg-[#ffc700]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <i class="fas fa-magic text-[#ffc700] text-2xl"></i>
+                </div>
+                <h2 class="text-2xl font-black uppercase italic tracking-tighter">Вход без пароля</h2>
+                <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-2">Введите почту, и мы пришлем ссылку</p>
+            </div>
+
+            <form id="magicLinkForm" class="space-y-6">
+                <div class="text-left">
+                    <label class="text-[10px] font-black uppercase text-gray-400 ml-4 mb-2 block tracking-widest">Ваш Email</label>
+                    <input type="email" id="email" placeholder="pirate@monkey-island.com" required 
+                           class="w-full input-field px-6 py-4 rounded-2xl font-bold text-sm outline-none">
+                </div>
+
+                <button type="submit" class="w-full tilda-yellow py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition">
+                    Получить ссылку для входа
+                </button>
+            </form>
+        </div>
+
+        <div id="step-success" class="hidden-step animate-pulse">
+            <div class="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                <i class="fas fa-paper-plane text-green-500 text-3xl"></i>
+            </div>
+            <h2 class="text-xl font-black uppercase italic mb-4">Письмо в пути!</h2>
+            <p class="text-gray-400 text-sm leading-relaxed">
+                Мы отправили магическую ссылку на <br>
+                <span id="target-email" class="text-white font-bold">вашу почту</span>. <br>
+                Проверьте папку «Входящие» (или Спам).
+            </p>
+            <button onclick="location.reload()" class="mt-8 text-[10px] font-black uppercase text-[#ffc700] tracking-widest hover:underline">
+                Я не получил письмо
+            </button>
+        </div>
+
+        <div class="mt-12 pt-8 border-t border-white/5">
+            <a href="/" class="text-gray-500 text-[10px] font-black uppercase tracking-widest hover:text-white transition">
+                <i class="fas fa-arrow-left mr-2"></i> Назад на остров
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // login.html
+        document.getElementById('magicLinkForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const emailInput = document.getElementById('email');
+            const submitBtn = e.target.querySelector('button');
+            const email = emailInput.value;
+            
+            // Состояние загрузки
+            const originalBtnText = submitBtn.innerHTML;
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="fas fa-circle-notch animate-spin"></i> Отправка...';
+
+            try {
+                // Отправляем данные на Django
+                const response = await fetch('/login/send-link/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/x-www-form-urlencoded',
+                        'X-CSRFToken': '{{ csrf_token }}' // Не забудь про CSRF!
+                    },
+                    body: new URLSearchParams({ 'email': email })
+                });
+
+                if (response.ok) {
+                    // Успех: переключаем экран
+                    document.getElementById('target-email').innerText = email;
+                    document.getElementById('step-input').classList.add('hidden-step');
+                    document.getElementById('step-success').classList.remove('hidden-step');
+                    
+                    // Если есть TG, можно добавить надпись: "Проверьте почту или Telegram"
+                } else {
+                    alert("Что-то пошло не так. Попробуйте позже.");
+                    submitBtn.disabled = false;
+                    submitBtn.innerHTML = originalBtnText;
+                }
+            } catch (error) {
+                console.error("Error:", error);
+                alert("Ошибка сети.");
+                submitBtn.disabled = false;
+                submitBtn.innerHTML = originalBtnText;
+            }
+        });
+    </script>
+
+</body>
+</html>
