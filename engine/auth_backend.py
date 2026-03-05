@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Session
 from database import session_factory
-from .models import User
+from common.models.db import User
 
 class SQLAlchemyBackend:
     def authenticate(self, request, user_id=None):

@@ -126,3 +126,8 @@ EMAIL_USE_SSL = True
 EMAIL_HOST_USER = 'monkeyislandservice@yandex.ru'
 EMAIL_HOST_PASSWORD = 'eefgyykfiseylfhr'  # Пароль приложения
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend', # Оставляем для админки (sqlite)
+    'engine.auth_backend.SQLAlchemyBackend',    # Мостик к SQLAlchemy
+]
