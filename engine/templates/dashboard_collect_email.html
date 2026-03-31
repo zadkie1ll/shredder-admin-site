@@ -1,0 +1,52 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Привязка Email — Monkey Island</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+        body { 
+            font-family: 'Montserrat', sans-serif; 
+            background: #0d0d0d;
+            color: white;
+            display: flex; align-items: center; justify-content: center; min-height: 100vh;
+        }
+        .card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 40px;
+            padding: 50px;
+            max-width: 500px;
+            text-align: center;
+        }
+        .tilda-yellow { background-color: #ffc700; color: #000; }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="mb-6">
+            <i class="fas fa-anchor text-[#ffc700] text-4xl mb-4"></i>
+            <h2 class="text-2xl font-black uppercase italic italic tracking-tighter">Почти на месте, капитан!</h2>
+            <p class="text-gray-400 text-sm mt-4">
+                Вы вошли через Telegram. Чтобы не потерять доступ к подписке и получать уведомления об оплате, привяжите вашу почту.
+            </p>
+        </div>
+
+        <form action="{% url 'update_email' %}" method="POST" class="space-y-6">
+            {% csrf_token %}
+            <div class="text-left">
+                <label class="text-[10px] font-black uppercase text-gray-500 ml-4 mb-2 block">Ваш Email</label>
+                <input type="email" name="email" placeholder="pirate@monkey-island.com" required 
+                       class="w-full bg-black/30 border border-white/10 px-6 py-4 rounded-2xl text-white outline-none focus:border-[#ffc700]">
+            </div>
+            <button type="submit" class="w-full tilda-yellow py-5 rounded-2xl font-black uppercase text-xs tracking-widest hover:scale-[1.02] transition">
+                Привязать почту и войти
+            </button>
+        </form>
+    </div>
+</body>
+</html>

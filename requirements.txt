@@ -4,3 +4,8 @@ psycopg2-binary
 yookassa
 pydantic
 python-dotenv
+grpcio
+grpcio-tools
+orjson
+black
+cryptography

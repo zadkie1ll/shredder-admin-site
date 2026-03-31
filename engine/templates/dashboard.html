@@ -21,12 +21,40 @@
         .status-online { color: #00ff88; text-shadow: 0 0 10px rgba(0,255,136,0.3); }
         .tilda-yellow { background-color: #ffc700; color: #000; }
         
-        /* Стили для кода ключа */
         .key-box {
             background: #1a1a1a;
             border: 1px dashed #333;
             word-break: break-all;
             font-family: monospace;
+        }
+
+        /* Стили кнопок выбора */
+        .platform-btn { color: rgba(255,255,255,0.4); background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); }
+        .platform-btn:hover { color: #fff; background: rgba(255,255,255,0.08); }
+        .platform-btn.active { background: #ffc700; color: #000; border-color: #ffc700; font-weight: 900; }
+        
+        .app-btn { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #ccc; }
+        .app-btn.active { border-color: #ffc700; color: #ffc700; background: rgba(255,199,0,0.1); }
+
+        .app-text-highlight { color: #e5e5e5; font-size: 13px; line-height: 1.6; }
+
+        /* Делаем заголовки шагов яркими и читаемыми */
+        .step-label {
+            display: block;
+            font-size: 13px; /* Чуть увеличили */
+            font-weight: 800; /* Сделали жирнее */
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: #ffffff; /* Чистый белый вместо серого */
+            opacity: 0.9;   /* Легкая прозрачность для стиля */
+            margin-bottom: 12px;
+        }
+
+        /* Точка-акцент перед текстом */
+        .step-dot {
+            color: #ffc700;
+            margin-right: 8px;
+            font-size: 14px;
         }
     </style>
 </head>
@@ -34,7 +62,7 @@
 
     <nav class="border-b border-white/5 py-4 mb-8">
         <div class="container mx-auto px-6 flex justify-between items-center">
-            <a href="/" class="text-xl font-black uppercase italic">
+            <a href="/" class="text-xl font-black uppercase">
                 MONKEY <span class="text-[#ffc700]">ISLAND</span>
             </a>
             <div class="flex items-center gap-4">
@@ -45,7 +73,6 @@
     </nav>
 
     <main class="container mx-auto px-6 pb-20">
-        
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
             
             <div class="lg:col-span-1 space-y-6">
@@ -59,7 +86,7 @@
                     <div class="text-left space-y-4 border-t border-white/5 pt-6">
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-500">Осталось:</span>
-                            <span class="font-bold">14 дней</span>
+                            <span class="font-bold">{{ user.time_until_expiration.days }} дней</span>
                         </div>
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-500">Тариф:</span>
@@ -75,55 +102,92 @@
                 <div class="glass-card p-6 flex items-center gap-4">
                     <div class="text-2xl text-[#ffc700]"><i class="fab fa-telegram"></i></div>
                     <div>
-                        <h4 class="text-xs font-black uppercase">Уведомления в TG</h4>
-                        <p class="text-[10px] text-gray-500">Бот напомнит об окончании</p>
+                        <h4 class="text-xs font-black uppercase">Телеграм Бот</h4>
+                        <p class="text-[10px] text-gray-500">
+                            {% if user.telegram_id %}Аккаунт привязан{% else %}Привяжи и получи +7 дней{% endif %}
+                        </p>
                     </div>
-                    <a href="https://t.me/your_bot" class="ml-auto text-[10px] font-bold text-[#ffc700] uppercase underline">Привязать</a>
+                    {% if not user.telegram_id %}
+                        <a href="{{ tg_bind_link }}" class="ml-auto text-[10px] font-bold text-[#ffc700] uppercase underline italic animate-pulse">Привязать ТГ</a>
+                    {% else %}
+                        <div class="ml-auto text-green-500 text-xs"><i class="fas fa-check-circle"></i></div>
+                    {% endif %}
                 </div>
             </div>
 
             <div class="lg:col-span-2 space-y-6">
                 
                 <div class="glass-card p-8">
-                    <h2 class="text-2xl font-black uppercase mb-6 italic">Твой ключ доступа</h2>
-                    
-                    <div class="key-box p-4 rounded-xl text-xs text-gray-400 mb-6 relative group">
-                        <div id="vpnKey">vless://777bb-c23-44-88-999@1.1.1.1:443?encryption=none&security=reality&sni=google.com&fp=chrome&type=grpc&serviceName=grpc&sid=123456#MonkeyIsland_User</div>
-                        <button onclick="copyKey()" class="absolute top-2 right-2 bg-[#ffc700] text-black p-2 rounded-lg opacity-0 group-hover:opacity-100 transition shadow-xl">
+                    <h2 class="text-xl font-black uppercase mb-6">Ключ для белых списков — только в Happ</h2>
+                    <div class="key-box p-4 rounded-xl text-xs text-gray-400 mb-8 relative group">
+                        <div id="happVpnKey">{{ happ_subscription_url }}</div>
+                        <button onclick="copyHappKey()" class="absolute top-2 right-2 bg-[#ffc700] text-black p-2 rounded-lg opacity-0 group-hover:opacity-100 transition shadow-xl">
                             <i class="fas fa-copy"></i>
                         </button>
                     </div>
 
-                    <div class="flex flex-wrap gap-4">
-                        <button onclick="copyKey()" class="tilda-yellow px-8 py-4 rounded-xl font-black uppercase text-xs flex items-center gap-2">
-                            <i class="fas fa-copy"></i> Скопировать ключ
+                    <h2 class="text-xl font-black uppercase mb-6">Обычный ключ — любой клиент</h2>
+                    <div class="key-box p-4 rounded-xl text-xs text-gray-400 relative group">
+                        <div id="plainVpnKey">{{ plain_subscription_url }}</div>
+                        <button onclick="copyPlainKey()" class="absolute top-2 right-2 bg-[#ffc700] text-black p-2 rounded-lg opacity-0 group-hover:opacity-100 transition shadow-xl">
+                            <i class="fas fa-copy"></i>
                         </button>
-                        <a href="happ://crypt/a/{{ config_base64 }}" class="bg-white/5 hover:bg-white/10 px-8 py-4 rounded-xl font-black uppercase text-xs flex items-center gap-2 transition">
-                            <i class="fas fa-bolt text-[#ffc700]"></i> Подключить в 1 клик
-                        </a>
                     </div>
-                    <p class="mt-4 text-[10px] text-gray-500 uppercase tracking-widest italic">* Кнопка «1 клик» работает, если установлен клиент Happ</p>
                 </div>
 
-                <h3 class="text-xl font-black uppercase italic mt-10">Быстрая установка</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="glass-card p-6 flex items-start gap-4">
-                        <div class="text-2xl mt-1"><i class="fab fa-android"></i></div>
-                        <div>
-                            <h4 class="font-bold uppercase text-sm mb-1 text-[#ffc700]">Android</h4>
-                            <p class="text-[11px] text-gray-500 mb-3">Скачайте Happ из Google Play или APK.</p>
-                            <div class="flex gap-3">
-                                <a href="#" class="text-[10px] font-bold underline uppercase">Play Store</a>
-                                <a href="#" class="text-[10px] font-bold underline uppercase">Скачать APK</a>
+                <h3 class="text-xl font-black uppercase mt-10 mb-6 text-[#ffc700]">Установка приложения</h3>
+                <div class="glass-card overflow-hidden">
+                    
+                    <div class="p-6 md:p-8 border-b border-white/5">
+                        <div class="mb-8">
+                            <div class="step-label">
+                                <span class="step-dot">●</span> Шаг А: Выберите платформу
+                            </div>
+                            <div class="grid grid-cols-2 sm:flex sm:flex-wrap gap-2 bg-black/30 p-2 rounded-2xl border border-white/5">
+                                <button onclick="setPlatform('android')" id="btn-android" class="platform-btn px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-3">
+                                    <i class="fab fa-android text-lg"></i> Android
+                                </button>
+                                <button onclick="setPlatform('ios')" id="btn-ios" class="platform-btn px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-3">
+                                    <i class="fab fa-apple text-lg"></i> iOS
+                                </button>
+                                <button onclick="setPlatform('windows')" id="btn-windows" class="platform-btn px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-3">
+                                    <i class="fab fa-windows text-lg"></i> Windows
+                                </button>
+                                <button onclick="setPlatform('macos')" id="btn-macos" class="platform-btn px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-3">
+                                    <i class="fas fa-desktop text-lg"></i> macOS
+                                </button>
                             </div>
                         </div>
-                    </div>
-                    <div class="glass-card p-6 flex items-start gap-4">
-                        <div class="text-2xl mt-1"><i class="fab fa-apple"></i></div>
+
                         <div>
-                            <h4 class="font-bold uppercase text-sm mb-1 text-[#ffc700]">iPhone / Mac</h4>
-                            <p class="text-[11px] text-gray-500 mb-3">Используйте FoXray или V2Box из AppStore.</p>
-                            <a href="#" class="text-[10px] font-bold underline uppercase">App Store</a>
+                            <div class="step-label">
+                                <span class="step-dot">●</span> Шаг Б: Выберите приложение
+                            </div>
+                            <div id="app-selector" class="flex flex-wrap gap-3"></div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white/[0.01] p-6 md:p-8 space-y-10">
+                        
+                        <div class="relative pl-12 md:pl-16">
+                            <div class="absolute left-0 top-0 w-10 h-10 md:w-12 md:h-12 bg-[#ffc700] text-black rounded-full flex items-center justify-center font-black shadow-lg shadow-[#ffc700]/20 text-sm z-10">1</div>
+                            <div class="absolute left-5 md:left-6 top-10 w-px h-full bg-white/10 hidden md:block"></div>
+                            
+                            <h4 class="font-black uppercase text-xs mb-3 tracking-widest text-white">Установка программы</h4>
+                            <p id="app-description" class="app-text-highlight mb-6 max-w-2xl">Выберите платформу выше...</p>
+                            <div id="app-links" class="flex flex-wrap gap-3"></div>
+                        </div>
+
+                        <div class="relative pl-12 md:pl-16">
+                            <div class="absolute left-0 top-0 w-10 h-10 md:w-12 md:h-12 bg-[#ffc700] text-black rounded-full flex items-center justify-center font-black shadow-lg shadow-[#ffc700]/20 text-sm z-10">2</div>
+                            
+                            <h4 class="font-black uppercase text-xs mb-3 tracking-widest text-white">Добавление подписки</h4>
+                            <p class="app-text-highlight mb-6 max-w-2xl">
+                                Нажмите кнопку ниже, чтобы автоматически импортировать ключ в установленное приложение.
+                            </p>
+                            <a id="one-click-btn" href="#" class="inline-flex items-center gap-3 bg-[#ffc700] text-black px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#ffc700]/20">
+                                <i class="fas fa-bolt text-sm"></i> Подключить в 1 клик
+                            </a>
                         </div>
                     </div>
                 </div>
@@ -133,11 +197,105 @@
     </main>
 
     <script>
-        function copyKey() {
-            const keyText = document.getElementById('vpnKey').innerText;
+        function copyPlainKey() {
+            const keyText = document.getElementById('plainVpnKey').innerText;
             navigator.clipboard.writeText(keyText);
-            alert('Ключ скопирован! Теперь вставьте его в приложение.');
+            alert('Ключ скопирован!');
         }
+
+        function copyHappKey() {
+            const keyText = document.getElementById('happVpnKey').innerText;
+            navigator.clipboard.writeText(keyText);
+            alert('Ключ скопирован!');
+        }
+
+        const installData = {
+            android: [
+                { 
+                    name: 'Happ', 
+                    desc: 'Наше флагманское приложение с поддержкой "белых списков". Самое быстрое соединение.',
+                    links: [
+                        { text: 'Google Play', url: '#' },
+                        { text: 'Скачать APK', url: '#' }
+                    ],
+                    scheme: 'happ://crypt/a/{{ config_base64 }}'
+                },
+                { 
+                    name: 'v2rayNG', 
+                    desc: 'Классический универсальный клиент для Android.',
+                    links: [{ text: 'Google Play', url: '#' }],
+                    scheme: 'v2rayng://install-config?url={{ plain_subscription_url }}'
+                }
+            ],
+            ios: [
+                { 
+                    name: 'FoXray', 
+                    desc: 'Лучший выбор для iOS. Поддерживает импорт по ссылке и QR.',
+                    links: [{ text: 'App Store', url: '#' }],
+                    scheme: 'foxray://install-config?url={{ plain_subscription_url }}'
+                },
+                { 
+                    name: 'V2Box', 
+                    desc: 'Простой и надежный клиент для iPhone.',
+                    links: [{ text: 'App Store', url: '#' }],
+                    scheme: 'v2box://install-config?url={{ plain_subscription_url }}'
+                }
+            ],
+            windows: [
+                { 
+                    name: 'v2rayN', 
+                    desc: 'Мощный клиент для Windows. Требует .NET Desktop Runtime.',
+                    links: [{ text: 'GitHub', url: '#' }],
+                    scheme: 'v2rayn://install-config?url={{ plain_subscription_url }}'
+                }
+            ],
+            macos: [
+                { 
+                    name: 'V2Box', 
+                    desc: 'Удобный клиент для Mac на базе M1/M2/M3.',
+                    links: [{ text: 'App Store', url: '#' }],
+                    scheme: 'v2box://install-config?url={{ plain_subscription_url }}'
+                }
+            ]
+        };
+
+        function setPlatform(platform) {
+            document.querySelectorAll('.platform-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('btn-' + platform).classList.add('active');
+            
+            const selector = document.getElementById('app-selector');
+            selector.innerHTML = '';
+            
+            installData[platform].forEach((app, index) => {
+                const btn = document.createElement('button');
+                btn.className = `app-btn px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition ${index === 0 ? 'active' : ''}`;
+                btn.innerText = app.name;
+                btn.onclick = () => setApp(platform, index, btn);
+                selector.appendChild(btn);
+            });
+            setApp(platform, 0);
+        }
+
+        function setApp(platform, index, btnElement) {
+            const app = installData[platform][index];
+            if (btnElement) {
+                document.querySelectorAll('.app-btn').forEach(b => b.classList.remove('active'));
+                btnElement.classList.add('active');
+            }
+            document.getElementById('app-description').innerText = app.desc;
+            const linksCont = document.getElementById('app-links');
+            linksCont.innerHTML = '';
+            app.links.forEach(link => {
+                const a = document.createElement('a');
+                a.href = link.url;
+                a.className = "text-[10px] font-black uppercase text-black bg-[#e5e5e5] px-4 py-2.5 rounded-xl hover:bg-[#ffc700] transition-colors flex items-center";
+                a.innerHTML = `<i class="fas fa-external-link-alt mr-2"></i> ${link.text}`;
+                linksCont.appendChild(a);
+            });
+            document.getElementById('one-click-btn').href = app.scheme;
+        }
+
+        setPlatform('android');
     </script>
 </body>
 </html>
