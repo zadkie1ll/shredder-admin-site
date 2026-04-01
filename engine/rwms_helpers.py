@@ -12,7 +12,7 @@ def create_user(
     rwms_client: RwmsClientSync,
     username: str,
     from_referrer: bool = False,
-    email: str | None = None
+    email: str | None = None,
 ) -> Optional[proto.UserResponse]:
     trial_period_days = 1
 

@@ -14,7 +14,8 @@ from django.contrib.auth import BACKEND_SESSION_KEY
 from django.contrib.auth import HASH_SESSION_KEY
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
-from common.models.db import User
+from sqlalchemy import func
+from common.models.db import ReferralBonus, ReferralBonusType, User
 from common.models.db import MagicToken
 from common.models.tariff import Tariff
 from common.models.tariff import OneMonthTariff
@@ -57,11 +58,17 @@ def send_magic_link(request):
                     create_user(rwms_client=rwms_client, username=username)
                     session.add(user)
                     session.flush()
-                    logging.info(f"User with username {user.username} and email {email} was successfully created")
+                    logging.info(
+                        f"User with username {user.username} and email {email} was successfully created"
+                    )
                 else:
-                    logging.info(f"Found user with username {user.username} and email {email} to authorize")
+                    logging.info(
+                        f"Found user with username {user.username} and email {email} to authorize"
+                    )
 
-                logging.info(f"Authorizing user with username {user.username} and email {email}")
+                logging.info(
+                    f"Authorizing user with username {user.username} and email {email}"
+                )
 
                 # Создаем токен
                 magic = MagicToken(user_id=user.id)
@@ -69,7 +76,7 @@ def send_magic_link(request):
 
             # Формируем ссылку (в реальности замени на свой домен)
             link = f"http://localhost:8000/login/magic/{magic.token}/"
-            #link = f"https://7935-203-23-179-183.ngrok-free.app/login/magic/{magic.token}/"
+            link = f"https://7935-203-23-179-183.ngrok-free.app/login/magic/{magic.token}/"
 
             # Отправляем письмо
             send_mail(
@@ -142,10 +149,45 @@ def dashboard(request):
         token = hashlib.md5(f"{user.id}{settings.SECRET_KEY}".encode()).hexdigest()[:8]
         tg_bind_link = f"https://t.me/easybirdvpnbot?start=bind_{user.id}_{token}"
 
+    session = session_factory()
+
+    ref_invited_count = (
+        session.query(func.count(User.id))
+        .filter(User.referred_by_id == user.id)
+        .scalar()
+    )
+
+    ref_connected_count = (
+        session.query(func.count(ReferralBonus.id))
+        .filter(
+            (ReferralBonus.referrer_id == user.id)
+            & (ReferralBonus.bonus_type == ReferralBonusType.TRAFFIC)
+        )
+        .scalar()
+    )
+
+    ref_purchased_count = (
+        session.query(func.count(ReferralBonus.id))
+        .filter(
+            (ReferralBonus.referrer_id == user.id)
+            & (ReferralBonus.bonus_type == ReferralBonusType.PURCHASE)
+        )
+        .scalar()
+    )
+
+    bonus_days = ref_connected_count * 10 + ref_purchased_count * 30
     subscription = rwms_client.get_user_by_username(user.username)
 
-    plain_subscription_url = subscription.subscription_url if subscription else "Не удалось получить ключ доступа. Пожалуйста, свяжитесь с поддержкой."
-    happ_subscription_url = encrypt_happ_url1(subscription.subscription_url + "/custom-json") if subscription else "Не удалось получить ключ доступа. Пожалуйста, свяжитесь с поддержкой."
+    plain_subscription_url = (
+        subscription.subscription_url
+        if subscription
+        else "Не удалось получить ключ доступа. Пожалуйста, свяжитесь с поддержкой."
+    )
+    happ_subscription_url = (
+        encrypt_happ_url1(subscription.subscription_url + "/custom-json")
+        if subscription
+        else "Не удалось получить ключ доступа. Пожалуйста, свяжитесь с поддержкой."
+    )
 
     return render(
         request,
@@ -155,7 +197,11 @@ def dashboard(request):
             "tg_bind_link": tg_bind_link,
             "plain_subscription_url": plain_subscription_url,
             "happ_subscription_url": happ_subscription_url,
-        }
+            "ref_invited_count": ref_invited_count,
+            "ref_connected_count": ref_connected_count,
+            "ref_purchased_count": ref_purchased_count,
+            "bonus_days": bonus_days,
+        },
     )
 
 
