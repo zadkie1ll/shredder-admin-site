@@ -84,7 +84,15 @@
                                 <p class="text-sm md:text-base font-black">{{ ref_invited_count|default:"0" }}</p>
                             </div>
                             <div class="border border-white/5 p-3 rounded-lg bg-white/[0.01]">
-                                <p class="text-[9px] text-gray-500 uppercase font-black mb-1">Бонусные дни</p>
+                                <p class="text-[9px] text-gray-500 uppercase font-black mb-1">Подключено</p>
+                                <p class="text-sm md:text-base font-black">{{ ref_connected_count|default:"0" }}</p>
+                            </div>
+                            <div class="border border-white/5 p-3 rounded-lg bg-white/[0.01]">
+                                <p class="text-[9px] text-gray-500 uppercase font-black mb-1">Купили</p>
+                                <p class="text-sm md:text-base font-black">{{ ref_purchased_count|default:"0" }}</p>
+                            </div>
+                            <div class="border border-white/5 p-3 rounded-lg bg-white/[0.01]">
+                                <p class="text-[9px] text-gray-500 uppercase font-black mb-1">Получено бонусных дней</p>
                                 <p class="text-sm md:text-base font-black text-[#00ff88]">+{{ bonus_days|default:"0" }}</p>
                             </div>
                         </div>
@@ -97,7 +105,12 @@
 
                 <div class="glass-card p-5 flex items-center gap-4 border-l-4 border-l-[#ffc700]">
                     <i class="fab fa-telegram text-2xl text-[#ffc700] flex-shrink-0"></i>
-                    <div class="text-[10px] font-black uppercase">Телеграм Бот <br><span class="text-gray-500 font-bold">Аккаунт привязан</span></div>
+                    <div class="text-[10px] font-black uppercase">Телеграм Бот <br>
+                        <span class="text-gray-500 font-bold">{% if user.telegram_id %}Аккаунт привязан{% else %}Привяжи и получи +7 дней{% endif %}</span>
+                        {% if not user.telegram_id %}
+                            <a href="{{ tg_bind_link }}" class="ml-auto text-[10px] font-bold text-[#ffc700] uppercase underline italic animate-pulse">Привязать ТГ</a>
+                        {% endif %}
+                    </div>
                     <i class="fas fa-check-circle ml-auto text-green-500 flex-shrink-0"></i>
                 </div>
             </div>
