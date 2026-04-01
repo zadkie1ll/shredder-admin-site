@@ -41,10 +41,10 @@
         /* Делаем заголовки шагов яркими и читаемыми */
         .step-label {
             display: block;
-            font-size: 13px; /* Чуть увеличили */
+            font-size: 22px; /* Чуть увеличили */
             font-weight: 800; /* Сделали жирнее */
-            text-transform: uppercase;
-            letter-spacing: 0.15em;
+            /*text-transform: uppercase;*/
+            /*letter-spacing: 0.1em;*/
             color: #ffffff; /* Чистый белый вместо серого */
             opacity: 0.9;   /* Легкая прозрачность для стиля */
             margin-bottom: 12px;
@@ -86,7 +86,7 @@
                     <div class="text-left space-y-4 border-t border-white/5 pt-6">
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-500">Осталось:</span>
-                            <span class="font-bold">{{ user.time_until_expiration.days }} дней</span>
+                            <span class="font-bold">{% if user.time_until_expiration.days %} {{ user.time_until_expiration.days }} дней {% endif %}</span>
                         </div>
                         <div class="flex justify-between text-sm">
                             <span class="text-gray-500">Тариф:</span>
@@ -135,7 +135,7 @@
                     </div>
                 </div>
 
-                <h3 class="text-xl font-black uppercase mt-10 mb-6 text-[#ffc700]">Установка приложения</h3>
+                <h3 class="text-xl font-black uppercase mt-10 mb-6 text-[#ffc700]">Инструкция для подключения</h3>
                 <div class="glass-card overflow-hidden">
                     
                     <div class="p-6 md:p-8 border-b border-white/5">
@@ -156,6 +156,9 @@
                                 <button onclick="setPlatform('macos')" id="btn-macos" class="platform-btn px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-3">
                                     <i class="fas fa-desktop text-lg"></i> macOS
                                 </button>
+                                <button onclick="setPlatform('androidtv')" id="btn-androidtv" class="platform-btn px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition flex items-center justify-center gap-3">
+                                    <i class="fas fa-desktop text-lg"></i> Android TV
+                                </button>
                             </div>
                         </div>
 
@@ -167,28 +170,8 @@
                         </div>
                     </div>
 
-                    <div class="bg-white/[0.01] p-6 md:p-8 space-y-10">
-                        
-                        <div class="relative pl-12 md:pl-16">
-                            <div class="absolute left-0 top-0 w-10 h-10 md:w-12 md:h-12 bg-[#ffc700] text-black rounded-full flex items-center justify-center font-black shadow-lg shadow-[#ffc700]/20 text-sm z-10">1</div>
-                            <div class="absolute left-5 md:left-6 top-10 w-px h-full bg-white/10 hidden md:block"></div>
-                            
-                            <h4 class="font-black uppercase text-xs mb-3 tracking-widest text-white">Установка программы</h4>
-                            <p id="app-description" class="app-text-highlight mb-6 max-w-2xl">Выберите платформу выше...</p>
-                            <div id="app-links" class="flex flex-wrap gap-3"></div>
-                        </div>
-
-                        <div class="relative pl-12 md:pl-16">
-                            <div class="absolute left-0 top-0 w-10 h-10 md:w-12 md:h-12 bg-[#ffc700] text-black rounded-full flex items-center justify-center font-black shadow-lg shadow-[#ffc700]/20 text-sm z-10">2</div>
-                            
-                            <h4 class="font-black uppercase text-xs mb-3 tracking-widest text-white">Добавление подписки</h4>
-                            <p class="app-text-highlight mb-6 max-w-2xl">
-                                Нажмите кнопку ниже, чтобы автоматически импортировать ключ в установленное приложение.
-                            </p>
-                            <a id="one-click-btn" href="#" class="inline-flex items-center gap-3 bg-[#ffc700] text-black px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest hover:scale-105 active:scale-95 transition-all shadow-xl shadow-[#ffc700]/20">
-                                <i class="fas fa-bolt text-sm"></i> Подключить в 1 клик
-                            </a>
-                        </div>
+                    <div id="full-instructions-container" class="bg-white/[0.01] p-6 md:p-8 space-y-10">
+                        <!-- Шаги для установки приложения -->
                     </div>
                 </div>
 
@@ -209,57 +192,727 @@
             alert('Ключ скопирован!');
         }
 
+        // Функция для создания HTML шага
+        function createStep(stepNumber, title, content, hasConnector = true) {
+            return `
+                <div class="relative pl-12 md:pl-16 step-item" data-step="${stepNumber}">
+                    <div class="absolute left-0 top-0 w-10 h-10 md:w-12 md:h-12 bg-[#ffc700] text-black rounded-full flex items-center justify-center font-black shadow-lg shadow-[#ffc700]/20 text-sm z-10">${stepNumber}</div>
+                    ${hasConnector ? '<div class="absolute left-5 md:left-6 top-10 w-px h-full bg-white/10 hidden md:block step-connector"></div>' : ''}
+
+                    <h4 class="font-black uppercase text-base mb-3 tracking-widest text-white">${title}</h4>
+                    <div class="step-content text-base leading-relaxed text-gray-300 max-w-2xl">
+                        ${content}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Функция для форматирования текста с эмодзи
+        function formatText(text) {
+            return text.replace(/\n/g, '<br>').replace(/✅|⚙️|🚀|📡|🍎|🦊|📦|💻|⚠️|💡|🔧|📱|💾|🔗|🎯|✨|🔐|🔄|📋|🔑/g, match => `<span class="text-[#ffc700] text-base mr-1">${match}</span>`);
+        }
+
         const installData = {
             android: [
                 { 
-                    name: 'Happ', 
-                    desc: 'Наше флагманское приложение с поддержкой "белых списков". Самое быстрое соединение.',
-                    links: [
-                        { text: 'Google Play', url: '#' },
-                        { text: 'Скачать APK', url: '#' }
-                    ],
-                    scheme: 'happ://crypt/a/{{ config_base64 }}'
+                    name: 'Happ',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Откройте страницу в Google Play и установите приложение. Или установите приложение из APK файла напрямую, если Google Play не работает.',
+                            links: [
+                                {
+                                    text: 'Google Play',
+                                    url: 'https://play.google.com/store/apps/details?id=com.happproxy'
+                                },
+                                {
+                                    text: 'Скачать APK',
+                                    url: 'https://github.com/Happ-proxy/happ-android/releases/latest/download/Happ.apk'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: '{{ happ_subscription_url }}',
+                            oneClickText: 'Подключиться в 1 клик',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Откройте приложение и подключитесь к серверу.'
+                        }
+                    ]
                 },
                 { 
-                    name: 'v2rayNG', 
-                    desc: 'Классический универсальный клиент для Android.',
-                    links: [{ text: 'Google Play', url: '#' }],
-                    scheme: 'v2rayng://install-config?url={{ plain_subscription_url }}'
+                    name: 'FlClashX',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Скачайте и установите FlClashX APK.',
+                            links: [
+                                {
+                                    text: 'Скачать APK',
+                                    url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-android-universal.apk'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: 'flclashx://install-config?url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку.'
+                        },
+                        {
+                            title: 'Если подписка не добавилась',
+                            content: 'Если после нажатия на кнопку ничего не произошло, добавьте подписку вручную. Нажмите на этой страницу кнопку Получить ссылку в правом верхнем углу, скопируйте ссылку. В FlClashX перейдите в раздел Профили, нажмите кнопку +, выберите URL, вставьте вашу скопированную ссылку и нажмите Отправить.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Выберите добавленный профиль в разделе Профили. В Панели управления нажмите кнопку включить в правом нижнем углу. После запуска в разделе Прокси вы можете изменить выбор сервера к которому вас подключит.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'Clash Meta',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Скачайте и установите Clash Meta APK.',
+                            links: [
+                                {
+                                    text: 'Скачать APK',
+                                    url: 'https://github.com/MetaCubeX/ClashMetaForAndroid/releases/download/v2.11.20/cmfa-2.11.20-meta-universal-release.apk'
+                                },
+                                {
+                                    text: 'Открыть в F-Droid',
+                                    url: 'https://f-droid.org/packages/com.github.metacubex.clash.meta/'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: 'clashmeta://install-config?name={{ user.username }}&url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажми кнопку ниже — откроется окно создания профиля. Тебе потребуется указать период автообновления, например, 720 минут. Справа вверху нажми на кнопку Сохранить.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Перейди в пункт Профили и выбери созданный профиль, затем вернись на главную страницу. Теперь ты можешь подключиться, нажав на кнопку Остановлен.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'V2RayNG',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Скачайте и установите v2rayNG APK',
+                            links: [
+                                {
+                                    text: 'Скачать APK',
+                                    url: 'https://github.com/2dust/v2rayNG/releases/download/1.10.31/v2rayNG_1.10.31_universal.apk'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: 'v2rayng://install-config?name={{ user.username }}&url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически.'
+                        },
+                        {
+                            title: 'Обновление подписки',
+                            content: 'Нажмите на три точечки справа сверху и выберите Обновить подписку. После этого в списке появятся доступные серверы'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Выберите требуемый сервер и нажмите кнопку Включить в правом нижнем углу'
+                        }
+                    ]
                 }
             ],
             ios: [
                 { 
-                    name: 'FoXray', 
-                    desc: 'Лучший выбор для iOS. Поддерживает импорт по ссылке и QR.',
-                    links: [{ text: 'App Store', url: '#' }],
-                    scheme: 'foxray://install-config?url={{ plain_subscription_url }}'
+                    name: 'Happ', 
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Откройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль.',
+                            links: [
+                                {
+                                    text: 'App Store (RU)',
+                                    url: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973'
+                                },
+                                {
+                                    text: 'App Store (Для других регионов)',
+                                    url: 'https://apps.apple.com/us/app/happ-proxy-utility/id6504287215'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: '{{ happ_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'В главном разделе нажмите большую кнопку включения в центре для подключения к VPN. Не забудьте выбрать сервер в списке серверов. При необходимости выберите другой сервер из списка серверов.'
+                        }
+                    ]
                 },
                 { 
-                    name: 'V2Box', 
-                    desc: 'Простой и надежный клиент для iPhone.',
-                    links: [{ text: 'App Store', url: '#' }],
-                    scheme: 'v2box://install-config?url={{ plain_subscription_url }}'
+                    name: 'Stash', 
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Откройте страницу в App Store и установите приложение.',
+                            links: [
+                                {
+                                    text: 'App Store (RU)',
+                                    url: 'https://apps.apple.com/us/app/stash-rule-based-proxy/id1596063349'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: 'stash://install-config?url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже — приложение Stash откроется, и конфигурация будет добавлена автоматически.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'На главном экране нажмите кнопку «Запуск». В появившемся окне разрешите добавление конфигураций VPN. После активации профиля перейдите в раздел «Политика» и выберите страну подключения.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'Shadowrocket', 
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Откройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль.',
+                            links: [
+                                { text: 'App Store', url: 'https://apps.apple.com/ru/app/shadowrocket/id932747118' }
+                            ],
+                        },
+                        {
+                            type: 'button',
+                            url: 'shadowrocket://add/{{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'В главном разделе нажмите большую кнопку включения в центре для подключения к VPN. Не забудьте выбрать сервер в списке серверов. При необходимости выберите другой сервер из списка серверов.'
+                        }
+                    ]
                 }
             ],
             windows: [
                 { 
-                    name: 'v2rayN', 
-                    desc: 'Мощный клиент для Windows. Требует .NET Desktop Runtime.',
-                    links: [{ text: 'GitHub', url: '#' }],
-                    scheme: 'v2rayn://install-config?url={{ plain_subscription_url }}'
+                    name: 'FlClashX',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            links: [
+                                { text: 'Windows (Установщик)', url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-windows-amd64-setup.exe' },
+                                { text: 'Windows на ARM (Установщик)', url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-windows-arm64-setup.exe' }
+                            ],
+                        },
+                        {
+                            type: 'button',
+                            url: 'flclashx://install-config?url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку.'
+                        },
+                        {
+                            title: 'Если подписка не добавилась',
+                            content: 'Если после нажатия на кнопку ничего не произошло, добавьте подписку вручную. Нажмите на этой страницу кнопку Получить ссылку в правом верхнем углу, скопируйте ссылку. В FlClashX перейдите в раздел Профили, нажмите кнопку +, выберите URL, вставьте вашу скопированную ссылку и нажмите Отправить.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Выберите добавленный профиль в разделе Профили. В Панели управления нажмите кнопку включить в правом нижнем углу, а затем включите переключатель у пункта TUN. После запуска в разделе Прокси вы можете изменить выбор сервера к которому вас подключит.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'Koala Clash',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            links: [
+                                {
+                                    text: 'Windows (Установщик)',
+                                    url: 'https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_x64-setup.exe'
+                                }
+                            ],
+                            note: {
+                                title: 'Предупреждение',
+                                text: 'Если вы ранее использовали Clash Verge Rev, то его требуется удалить перед установкой Koala Clash.'
+                            }
+                        },
+                        {
+                            type: 'button',
+                            url: 'koala-clash://install-config?url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку.'
+                        },
+                        {
+                            title: 'Если подписка не добавилась',
+                            content: 'Если после нажатия на кнопку ничего не произошло, добавьте подписку вручную. Нажмите на этой странице кнопку Получить ссылку в правом верхнем углу, скопируйте ссылку. В Koala Clash перейдите на главную страницу, нажмите кнопку Добавить профиль и вставьте ссылку в текстовое поле, затем нажмите на кнопку Импорт.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Выбрать сервер можно внизу на главной странице, включить VPN можно нажав на главной странице на большую кнопку по центру.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'Prizrak-Box',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Выберите архитектуру (предпочтительно установщик) и установите или распакуйте Prizrak-Box.',
+                            links: [
+                                {
+                                    text: 'Windows (Установщик)',
+                                    url: 'https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/windows-amd64.msi'
+                                },
+                                {
+                                    text: 'Windows (Установщик)',
+                                    url: 'https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/windows-arm64.msi'
+                                }
+                            ],
+                            note: {
+                                title: 'Предупреждение',
+                                text: 'Запустите программу от имени администратора.'
+                            }
+                        },
+                        {
+                            type: 'button',
+                            url: 'prizrak-box://install-config?url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку.'
+                        },
+                        {
+                            title: 'Если подписка не добавилась',
+                            content: 'Если после нажатия на кнопку ничего не произошло, добавьте подписку вручную. Нажмите на этой страницу кнопку Получить ссылку в правом верхнем углу, скопируйте ссылку. В Prizrak-Box перейдите в раздел Профили, нажмите кнопку +, вставьте вашу скопированную ссылку и нажмите Потдвердить.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Выберите добавленную подписку в разделе Профили. Выбрать страну сервера можно в разделе Прокси (🚀). Установите переключатель TUN в положение ВКЛ.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'Happ',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            links: [
+                                {
+                                    text: 'Windows (Установщик)',
+                                    url: 'https://github.com/Happ-proxy/happ-desktop/releases/latest/download/setup-Happ.x64.exe'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: '{{ happ_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'В главном разделе нажмите большую кнопку включения в центре для подключения к VPN. Не забудьте выбрать сервер в списке серверов. При необходимости выберите другой сервер из списка серверов.'
+                        }
+                    ]
                 }
             ],
             macos: [
                 { 
-                    name: 'V2Box', 
-                    desc: 'Удобный клиент для Mac на базе M1/M2/M3.',
-                    links: [{ text: 'App Store', url: '#' }],
-                    scheme: 'v2box://install-config?url={{ plain_subscription_url }}'
+                    name: 'Happ',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            links: [
+                                {
+                                    text: 'App Store (RU)',
+                                    url: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973'
+                                },
+                                {
+                                    text: 'App Store (Для других регионов)',
+                                    url: 'https://apps.apple.com/us/app/happ-proxy-utility/id6504287215'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: '{{ happ_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'В главном разделе нажмите большую кнопку включения в центре для подключения к VPN. Не забудьте выбрать сервер в списке серверов. При необходимости выберите другой сервер из списка серверов.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'FlClashX',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            links: [
+                                { text: 'macOS (Apple Silicon)', url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-macos-arm64.dmg' },
+                                { text: 'macOS (Intel)', url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-macos-amd64.dmg' }
+                            ],
+                        },
+                        {
+                            type: 'button',
+                            url: 'flclashx://install-config?url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку.'
+                        },
+                        {
+                            title: 'Если подписка не добавилась',
+                            content: 'Если после нажатия на кнопку ничего не произошло, добавьте подписку вручную. Нажмите на этой страницу кнопку Получить ссылку в правом верхнем углу, скопируйте ссылку. В FlClashX перейдите в раздел Профили, нажмите кнопку +, выберите URL, вставьте вашу скопированную ссылку и нажмите Отправить.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Выберите добавленный профиль в разделе Профили. В Панели управления нажмите кнопку включить в правом нижнем углу, а затем включите переключатель у пункта TUN. После запуска в разделе Прокси вы можете изменить выбор сервера к которому вас подключит.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'Koala Clash',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            links: [
+                                {
+                                    text: 'macOS (Apple Silicon)',
+                                    url: 'https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_aarch64.dmg'
+                                },
+                                {
+                                    text: 'macOS (Intel)',
+                                    url: 'https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_x64.dmg'
+                                }
+                            ],
+                            note: {
+                                title: 'Предупреждение',
+                                text: 'Если вы ранее использовали Clash Verge Rev, то его требуется удалить перед установкой Koala Clash. ⚠️ Предупреждение: Если при запуске приложения на macOS появляется уведомление, что приложение повреждено, выполните эту команду в терминале: sudo xattr -r -c /Applications/Koala\ Clash.app'
+                            }
+                        },
+                        {
+                            type: 'button',
+                            url: 'koala-clash://install-config?url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку.'
+                        },
+                        {
+                            title: 'Если подписка не добавилась',
+                            content: 'Если после нажатия на кнопку ничего не произошло, добавьте подписку вручную. Нажмите на этой странице кнопку Получить ссылку в правом верхнем углу, скопируйте ссылку. В Koala Clash перейдите на главную страницу, нажмите кнопку Добавить профиль и вставьте ссылку в текстовое поле, затем нажмите на кнопку Импорт.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Выбрать сервер можно внизу на главной странице, включить VPN можно нажав на главной странице на большую кнопку по центру.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'Prizrak-Box',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Скачайте архив под ваш чип (Apple Silicon или Intel), распакуйте и переместите Prizrak-Box.app в Applications.',
+                            links: [
+                                {
+                                    text: 'macOS (Apple Silicon)',
+                                    url: 'https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/macos-arm64-dmg.zip'
+                                },
+                                {
+                                    text: 'macOS (Intel)',
+                                    url: 'https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/macos-amd64-dmg.zip'
+                                }
+                            ],
+                            note: {
+                                title: 'Предупреждение',
+                                text: 'Если macOS показывает предупреждения безопасности — следуйте инструкции.'
+                            }
+                        },
+                        {
+                            type: 'button',
+                            url: 'prizrak-box://install-config?url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку.'
+                        },
+                        {
+                            title: 'Если подписка не добавилась',
+                            content: 'Если после нажатия на кнопку ничего не произошло, добавьте подписку вручную. Нажмите на этой странице кнопку «Получить ссылку» в правом верхнем углу, скопируйте ссылку. В Prizrak-Box перейдите в раздел «Профили», нажмите кнопку «+», вставьте скопированную ссылку и нажмите «Подтвердить».'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Выберите добавленную подписку в разделе Профили. Выбрать страну сервера можно в разделе Прокси (🚀). Установите переключатель TUN в положение ВКЛ.'
+                        }
+                    ]
+                }
+            ],
+            linux: [
+                { 
+                    name: 'FlClashX',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            links: [
+                                {
+                                    text: 'amd64 (.deb)',
+                                    url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-linux-amd64.deb'
+                                },
+                                {
+                                    text: 'amd64 (AppImage)',
+                                    url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-linux-amd64.AppImage'
+                                },
+                                {
+                                    text: 'amd64 (.rpm)',
+                                    url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-linux-amd64.rpm'
+                                },
+                                {
+                                    text: 'arm64 (.deb)',
+                                    url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-linux-arm64.deb'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: 'flclashx://install-config?url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку.'
+                        },
+                        {
+                            title: 'Если подписка не добавилась',
+                            content: 'Если после нажатия на кнопку ничего не произошло, добавьте подписку вручную. Нажмите на этой страницу кнопку Получить ссылку в правом верхнем углу, скопируйте ссылку. В FlClashX перейдите в раздел Профили, нажмите кнопку +, выберите URL, вставьте вашу скопированную ссылку и нажмите Отправить.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Выберите добавленный профиль в разделе Профили. В Панели управления нажмите кнопку включить в правом нижнем углу, а затем включите переключатель у пункта TUN. После запуска в разделе Прокси вы можете изменить выбор сервера к которому вас подключит.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'Koala Clash',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            links: [
+                                {
+                                    text: 'amd64 (.deb)',
+                                    url: 'https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_amd64.deb'
+                                },
+                                {
+                                    text: 'amd64 (.rpm)',
+                                    url: 'https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash.x86_64.rpm'
+                                },
+                                {
+                                    text: 'arm64 (.deb)',
+                                    url: 'https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash_arm64.deb'
+                                },
+                                {
+                                    text: 'arm64 (.rpm)',
+                                    url: 'https://github.com/coolcoala/clash-verge-rev-lite/releases/latest/download/Koala.Clash.aarch64.rpm'
+                                }
+                            ],
+                            note: {
+                                title: 'Предупреждение',
+                                text: 'Если вы ранее использовали Clash Verge Rev, то его требуется удалить перед установкой Koala Clash.'
+                            }
+                        },
+                        {
+                            type: 'button',
+                            url: 'koala-clash://install-config?url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку.'
+                        },
+                        {
+                            title: 'Если подписка не добавилась',
+                            content: 'Если после нажатия на кнопку ничего не произошло, добавьте подписку вручную. Нажмите на этой странице кнопку Получить ссылку в правом верхнем углу, скопируйте ссылку. В Koala Clash перейдите на главную страницу, нажмите кнопку Добавить профиль и вставьте ссылку в текстовое поле, затем нажмите на кнопку Импорт.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Выбрать сервер можно внизу на главной странице, включить VPN можно нажав на главной странице на большую кнопку по центру.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'Prizrak-Box',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Выберите пакет под вашу архитектуру и установите Prizrak-Box.',
+                            links: [
+                                {
+                                    text: 'amd64 (.deb)',
+                                    url: 'https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/linux-amd64.deb'
+                                },
+                                {
+                                    text: 'amd64 (.rpm)',
+                                    url: 'https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/linux-amd64.rpm'
+                                },
+                                {
+                                    text: 'arm64 (.deb)',
+                                    url: 'https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/linux-arm64.deb'
+                                },
+                                {
+                                    text: 'arm64 (.rpm)',
+                                    url: 'https://github.com/legiz-ru/Prizrak-Box/releases/latest/download/linux-arm64.rpm'
+                                }
+                            ],
+                            note: {
+                                title: 'Предупреждение',
+                                text: 'Запустите программу.'
+                            }
+                        },
+                        {
+                            type: 'button',
+                            url: 'prizrak-box://install-config?url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы автоматически добавить подписку.'
+                        },
+                        {
+                            title: 'Если подписка не добавилась',
+                            content: 'Если после нажатия на кнопку ничего не произошло, добавьте подписку вручную. Нажмите на этой странице кнопку «Получить ссылку» в правом верхнем углу, скопируйте ссылку. В Prizrak-Box перейдите в раздел «Профили», нажмите кнопку «+», вставьте скопированную ссылку и нажмите «Подтвердить».'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Выберите добавленную подписку в разделе Профили. Выбрать страну сервера можно в разделе Прокси (🚀). Установите переключатель TUN в положение ВКЛ.'
+                        }
+                    ]
+                }
+            ],
+            androidtv: [
+                { 
+                    name: 'Happ',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Откройте страницу в Google Play и установите приложение. Или установите приложение из APK файла напрямую, если Google Play не работает.',
+                            links: [
+                                {
+                                    text: 'Открыть в Google Play',
+                                    url: 'https://play.google.com/store/apps/details?id=com.happproxy'
+                                },
+                                {
+                                    text: 'Скачать APK',
+                                    url: 'https://github.com/Happ-proxy/happ-android/releases/latest/download/Happ.apk'
+                                }
+                            ]
+                        },
+                        {
+                            title: 'Инструкции по установке',
+                            content: 'Подробные инструкции, чтобы помочь вам настроить Happ на вашем устройстве.',
+                            links: [
+                                {
+                                    text: 'На русском',
+                                    url: 'https://www.happ.su/main/ru/faq/android-tv'
+                                },
+                                {
+                                    text: 'На английском',
+                                    url: 'https://www.happ.su/main/faq/android-tv'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: '{{ happ_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку, если вы открыли страницу подписки на телевизоре.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Откройте приложение и подключитесь к серверу.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'vpn4tv',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Откройте страницу в Google Play и установите приложение. Или установите приложение из APK файла напрямую, если Google Play не работает.',
+                            links: [
+                                {
+                                    text: 'Открыть в Google Play',
+                                    url: 'https://play.google.com/store/apps/details?id=com.vpn4tv.hiddify'
+                                },
+                                {
+                                    text: 'Скачать APK',
+                                    url: 'https://vpn4tv.com/download/vpn4tv.apk'
+                                }
+                            ]
+                        },
+                        {
+                            title: 'Инструкции по установке',
+                            content: 'Подробные инструкции, чтобы помочь вам настроить VPN4TV на вашем устройстве.',
+                            links: [
+                                {
+                                    text: 'Краткое руководство',
+                                    url: 'https://vpn4tv.com/quick-guide.html'
+                                },
+                                {
+                                    text: 'Инструкция для Sber Box',
+                                    url: 'https://vpn4tv.com/sber.html'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: 'hiddify://import/{{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку, если вы открыли страницу подписки на телевизоре.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Откройте приложение и подключитесь к серверу.'
+                        }
+                    ]
                 }
             ]
         };
 
+        let currentPlatform = 'android';
+        let currentAppIndex = 0;
+
         function setPlatform(platform) {
+            currentPlatform = platform;
             document.querySelectorAll('.platform-btn').forEach(btn => btn.classList.remove('active'));
             document.getElementById('btn-' + platform).classList.add('active');
             
@@ -268,7 +921,7 @@
             
             installData[platform].forEach((app, index) => {
                 const btn = document.createElement('button');
-                btn.className = `app-btn px-5 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition ${index === 0 ? 'active' : ''}`;
+                btn.className = `app-btn px-5 py-3 rounded-xl text-[13px] font-black uppercase tracking-widest transition ${index === 0 ? 'active' : ''}`;
                 btn.innerText = app.name;
                 btn.onclick = () => setApp(platform, index, btn);
                 selector.appendChild(btn);
@@ -277,24 +930,61 @@
         }
 
         function setApp(platform, index, btnElement) {
+            currentAppIndex = index;
             const app = installData[platform][index];
+            
             if (btnElement) {
                 document.querySelectorAll('.app-btn').forEach(b => b.classList.remove('active'));
                 btnElement.classList.add('active');
             }
-            document.getElementById('app-description').innerText = app.desc;
-            const linksCont = document.getElementById('app-links');
-            linksCont.innerHTML = '';
-            app.links.forEach(link => {
-                const a = document.createElement('a');
-                a.href = link.url;
-                a.className = "text-[10px] font-black uppercase text-black bg-[#e5e5e5] px-4 py-2.5 rounded-xl hover:bg-[#ffc700] transition-colors flex items-center";
-                a.innerHTML = `<i class="fas fa-external-link-alt mr-2"></i> ${link.text}`;
-                linksCont.appendChild(a);
+            
+            const container = document.getElementById('full-instructions-container');
+            container.innerHTML = ''; 
+
+            app.steps.forEach((step, idx) => {
+                const stepNum = idx + 1; 
+                const isLast = idx === app.steps.length - 1;
+                let stepHtmlContent = '';
+
+                // 1. Формируем основной контент (Кнопка или Текст)
+                if (step.type === 'button') {
+                    stepHtmlContent = `
+                        <p class="app-text-highlight mb-4">${step.content || 'Нажмите кнопку ниже для автоматической настройки:'}</p>
+                        <a href="${step.url}" class="inline-flex items-center gap-3 bg-[#ffc700] text-black px-8 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest transition-all shadow-lg shadow-[#ffc700]/20 hover:scale-105 active:scale-95">
+                            <i class="fas fa-plus mr-1"></i> ${step.oneClickText}
+                        </a>
+                    `;
+                } else {
+                    stepHtmlContent = `<div class="app-text-highlight text-base leading-relaxed">${formatText(step.content)}</div>`;
+                    
+                    if (step.links && step.links.length > 0) {
+                        const linksButtons = step.links.map(link => `
+                            <a href="${link.url}" target="_blank" class="text-[13px] font-black uppercase text-black bg-[#e5e5e5] px-4 py-2.5 rounded-xl hover:bg-[#ffc700] transition-colors flex items-center">
+                                <i class="fas fa-external-link-alt mr-2"></i> ${link.text}
+                            </a>
+                        `).join('');
+                        stepHtmlContent += `<div class="flex flex-wrap gap-3 mt-4">${linksButtons}</div>`;
+                    }
+                }
+
+                // 2. Добавляем плашку "Warning/Note", если она есть в данных шага
+                if (step.note) {
+                    stepHtmlContent += `
+                        <div class="mt-6 p-4 rounded-xl border border-[#ffc700]/20 bg-[#ffc700]/5 flex gap-4">
+                            <div class="text-[#ffc700] mt-1"><i class="fas fa-exclamation-circle"></i></div>
+                            <div>
+                                <h5 class="text-[10px] font-bold uppercase text-[#ffc700] mb-1">${step.note.title}</h5>
+                                <p class="text-xs text-gray-400 leading-relaxed">${formatText(step.note.text)}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                container.innerHTML += createStep(stepNum, step.title, stepHtmlContent, !isLast);
             });
-            document.getElementById('one-click-btn').href = app.scheme;
         }
 
+        // Инициализация
         setPlatform('android');
     </script>
 </body>
