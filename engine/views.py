@@ -76,7 +76,7 @@ def send_magic_link(request):
 
             # Формируем ссылку (в реальности замени на свой домен)
             link = f"http://localhost:8000/login/magic/{magic.token}/"
-            link = f"https://7935-203-23-179-183.ngrok-free.app/login/magic/{magic.token}/"
+            link = f"https://cf8f-31-222-238-225.ngrok-free.app/login/magic/{magic.token}/"
 
             # Отправляем письмо
             send_mail(
