@@ -273,7 +273,7 @@
                         </ul>
                     </div>
                     
-                    <form action="/pay/" method="POST" class="space-y-4">
+                    <form action="/pay/" method="POST" class="space-y-4" target="_blank">
                         {% csrf_token %}
                         <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
                         <input type="email" name="email" placeholder="ТВОЙ EMAIL" required 

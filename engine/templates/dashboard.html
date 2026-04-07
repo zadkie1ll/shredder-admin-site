@@ -196,7 +196,7 @@
                                 </div>
                             </div>
 
-                            <form id="form-{{ tariff.db_tariff_id }}" action="/pay/" method="POST" class="hidden">
+                            <form id="form-{{ tariff.db_tariff_id }}" action="/pay/" method="POST" class="hidden" target="_blank">
                                 {% csrf_token %}
                                 <input type="hidden" name="email" value="{{ user.email }}">
                                 <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
@@ -1006,6 +1006,100 @@
                         {
                             title: 'Подключение и использование',
                             content: 'Откройте приложение и подключитесь к серверу.'
+                        }
+                    ]
+                }
+            ],
+            appletv: [
+                { 
+                    name: 'Happ',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Откройте страницу в App Store на Apple TV и установите приложение. Запустите его, предоставьте разрешение на VPN-конфигурацию, если потребуется, и введите свой пароль.',
+                            links: [
+                                {
+                                    text: 'Открыть в App Store',
+                                    url: 'https://apps.apple.com/us/app/happ-proxy-utility-for-tv/id6748297274'
+                                }
+                            ]
+                        },
+                        {
+                            title: 'Инструкции по установке',
+                            content: 'Подробные инструкции, чтобы помочь вам настроить Happ на вашем устройстве.',
+                            links: [
+                                {
+                                    text: 'На русском',
+                                    url: 'https://www.happ.su/main/ru/faq/apple-tv-tvos'
+                                },
+                                {
+                                    text: 'На английском',
+                                    url: 'https://www.happ.su/main/faq/apple-tv-tvos'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: '{{ happ_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже, чтобы добавить подписку, если вы открыли страницу подписки на телевизоре.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'Откройте приложение и подключитесь к серверу.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'ShadowRocket',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Откройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль.',
+                            links: [
+                                {
+                                    text: 'Открыть в App Store',
+                                    url: 'https://apps.apple.com/ru/app/shadowrocket/id932747118'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: 'shadowrocket://add/{{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'В главном разделе нажмите большую кнопку включения в центре для подключения к VPN. Не забудьте выбрать сервер в списке серверов. При необходимости выберите другой сервер из списка серверов.'
+                        }
+                    ]
+                },
+                { 
+                    name: 'Stash',
+                    steps: [
+                        {
+                            title: 'Установка приложения',
+                            content: 'Откройте страницу в App Store и установите приложение.',
+                            links: [
+                                {
+                                    text: 'Открыть в App Store',
+                                    url: 'https://apps.apple.com/us/app/stash-rule-based-proxy/id1596063349'
+                                }
+                            ]
+                        },
+                        {
+                            type: 'button',
+                            url: 'stash://install-config?url={{ plain_subscription_url }}',
+                            oneClickText: 'Добавить подписку',
+                            title: 'Добавление подписки',
+                            content: 'Нажмите кнопку ниже — приложение Stash откроется, и конфигурация будет добавлена автоматически.'
+                        },
+                        {
+                            title: 'Подключение и использование',
+                            content: 'На главном экране нажмите кнопку «Запуск». В появившемся окне разрешите добавление конфигураций VPN. После активации профиля перейдите в раздел «Политика» и выберите страну подключения.'
                         }
                     ]
                 }
