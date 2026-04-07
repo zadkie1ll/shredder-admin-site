@@ -121,13 +121,15 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = "en-us"
-
-TIME_ZONE = "UTC"
+LANGUAGE_CODE = 'ru-RU'
 
 USE_I18N = True
 
-USE_TZ = True
+USE_L10N = True  # Localization
+
+USE_TZ = True    # Убедись, что часовые пояса тоже включены
+
+TIME_ZONE = "Europe/Moscow"
 
 
 # Static files (CSS, JavaScript, Images)
@@ -190,3 +192,6 @@ LOGGING = {
         },
     },
 }
+
+YOOKASSA_SHOP_ID = '1078713'
+YOOKASSA_SECRET_KEY = 'test_pujqLVxNtv7MotadTDRHWY1B0T60TIWOAemU2gCXjOI'

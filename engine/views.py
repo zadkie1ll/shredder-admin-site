@@ -15,7 +15,7 @@ from django.contrib.auth import HASH_SESSION_KEY
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
 from sqlalchemy import func
-from common.models.db import ReferralBonus, ReferralBonusType, User
+from common.models.db import ReferralBonus, ReferralBonusType, User, YkRecurrentPayment
 from common.models.db import MagicToken
 from common.models.tariff import Tariff
 from common.models.tariff import OneMonthTariff
@@ -23,9 +23,10 @@ from common.models.tariff import OneYearTariff
 from common.models.tariff import ThreeMonthsTariff
 from common.rwms_client_sync import RwmsClientSync
 
+from .rwms_helpers import create_user
 from .encrypt_happ_url import encrypt_happ_url1
 from database import session_factory
-from .rwms_helpers import create_user
+from engine.payments import create_payment_sync
 
 ACTUAL_TARIFFS: list[Tariff] = [
     OneMonthTariff(),
@@ -76,7 +77,7 @@ def send_magic_link(request):
 
             # Формируем ссылку (в реальности замени на свой домен)
             link = f"http://localhost:8000/login/magic/{magic.token}/"
-            link = f"https://cf8f-31-222-238-225.ngrok-free.app/login/magic/{magic.token}/"
+            #link = f"https://cf8f-31-222-238-225.ngrok-free.app/login/magic/{magic.token}/"
 
             # Отправляем письмо
             send_mail(
@@ -151,6 +152,8 @@ def dashboard(request):
 
     session = session_factory()
 
+    has_recurrent = session.query(func.count(YkRecurrentPayment.id)).filter(YkRecurrentPayment.user_id == user.id).scalar()
+
     ref_invited_count = (
         session.query(func.count(User.id))
         .filter(User.referred_by_id == user.id)
@@ -201,6 +204,8 @@ def dashboard(request):
             "ref_connected_count": ref_connected_count,
             "ref_purchased_count": ref_purchased_count,
             "bonus_days": bonus_days,
+            'tariffs': ACTUAL_TARIFFS,
+            'has_recurrent': has_recurrent
         },
     )
 
@@ -242,8 +247,41 @@ def buy(request):
         email = request.POST.get("email").lower().strip()
         tariff_id = request.POST.get("tariff_id")
 
-        # Тут будет логика создания платежа ЮKassa, которую мы обсуждали.
-        # Пока просто выведем в консоль для теста:
-        print(f"Заказ от {email} на тариф {tariff_id}")
+        # Ищем тариф в списке
+        tariff = next((t for t in ACTUAL_TARIFFS if t.db_tariff_id == tariff_id), None)
+        if not tariff:
+            return JsonResponse({"status": "error", "message": "Тариф не найден"}, status=400)
 
-        return redirect("index")  # Временно редиректим обратно
+        session = session_factory()
+        try:
+            # Ищем или создаем пользователя
+            user = session.query(User).filter(User.email == email).first()
+            if not user:
+                username = str(uuid.uuid4().hex)
+                user = User(
+                    email=email,
+                    username=username,
+                    expire_at=datetime.now(timezone.utc).replace(tzinfo=None)
+                )
+                create_user(rwms_client=rwms_client, username=username)
+                session.add(user)
+                session.flush()
+
+            # Вызываем твою логику
+            confirmation_url = create_payment_sync(
+                shop_id=settings.YOOKASSA_SHOP_ID,
+                secret=settings.YOOKASSA_SECRET_KEY,
+                tariff=tariff,
+                username=user.username,
+                telegram_id=user.telegram_id or 0
+            )
+            
+            session.commit()
+            return redirect(confirmation_url)
+
+        except Exception as e:
+            logging.error(f"Pay error: {e}")
+            return render(request, "error.html", {"message": "Ошибка платежной системы"})
+        finally:
+            session.close()
+    return redirect("index")
