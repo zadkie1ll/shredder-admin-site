@@ -77,7 +77,7 @@ def send_magic_link(request):
 
             # Формируем ссылку (в реальности замени на свой домен)
             link = f"http://localhost:8000/login/magic/{magic.token}/"
-            #link = f"https://cf8f-31-222-238-225.ngrok-free.app/login/magic/{magic.token}/"
+            link = f"https://ce43-89-23-119-21.ngrok-free.app/login/magic/{magic.token}/"
 
             # Отправляем письмо
             send_mail(
@@ -138,6 +138,13 @@ def index(request):
 @login_required(login_url="/login/")
 def dashboard(request):
     user = request.user
+
+    # Фикс выскакивающего popup окна при обновлении страницы ЛК
+    if request.method == "POST" and 'email' in request.POST:
+        user.email = request.POST.get('email')
+        user.save()
+        # КРИТИЧЕСКИ ВАЖНО: делаем редирект на этот же URL, но GET-запросом
+        return redirect('dashboard')
 
     # Если зашел из ТГ (уже есть ID), но почты нет — просим почту
     if user.telegram_id and not user.email:
