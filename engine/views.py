@@ -8,6 +8,7 @@ from django.http import JsonResponse
 from django.conf import settings
 from django.shortcuts import render
 from django.shortcuts import redirect
+from django.contrib import messages
 from django.contrib.auth import logout as auth_logout
 from django.contrib.auth import SESSION_KEY
 from django.contrib.auth import BACKEND_SESSION_KEY
@@ -15,7 +16,10 @@ from django.contrib.auth import HASH_SESSION_KEY
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
 from sqlalchemy import func
-from common.models.db import ReferralBonus, ReferralBonusType, User, YkRecurrentPayment
+from common.models.db import User
+from common.models.db import ReferralBonus
+from common.models.db import ReferralBonusType
+from common.models.db import YkRecurrentPayment
 from common.models.db import MagicToken
 from common.models.tariff import Tariff
 from common.models.tariff import OneMonthTariff
@@ -25,8 +29,11 @@ from common.rwms_client_sync import RwmsClientSync
 
 from .rwms_helpers import create_user
 from .encrypt_happ_url import encrypt_happ_url1
+from .sql_helpers import save_wata_invoice
+
 from database import session_factory
-from engine.payments import create_payment_sync
+from engine.payments import create_yk_payment_sync
+from engine.payments import create_wata_payment_sync
 
 ACTUAL_TARIFFS: list[Tariff] = [
     OneMonthTariff(),
@@ -77,7 +84,7 @@ def send_magic_link(request):
 
             # Формируем ссылку (в реальности замени на свой домен)
             link = f"http://localhost:8000/login/magic/{magic.token}/"
-            link = f"https://ce43-89-23-119-21.ngrok-free.app/login/magic/{magic.token}/"
+            link = f"https://1614-89-110-127-106.ngrok-free.app/login/magic/{magic.token}/"
 
             # Отправляем письмо
             send_mail(
@@ -138,13 +145,6 @@ def index(request):
 @login_required(login_url="/login/")
 def dashboard(request):
     user = request.user
-
-    # Фикс выскакивающего popup окна при обновлении страницы ЛК
-    if request.method == "POST" and 'email' in request.POST:
-        user.email = request.POST.get('email')
-        user.save()
-        # КРИТИЧЕСКИ ВАЖНО: делаем редирект на этот же URL, но GET-запросом
-        return redirect('dashboard')
 
     # Если зашел из ТГ (уже есть ID), но почты нет — просим почту
     if user.telegram_id and not user.email:
@@ -249,15 +249,24 @@ def logout(request):
     return redirect("index")
 
 
-def buy(request):
+def pay(request):
     if request.method == "POST":
-        email = request.POST.get("email").lower().strip()
+        email_raw = request.POST.get("email")
+        if not email_raw:
+            messages.error(request, "Email обязателен")
+            return redirect("dashboard")
+
+        email = email_raw.lower().strip()
         tariff_id = request.POST.get("tariff_id")
 
-        # Ищем тариф в списке
+        if not email or not tariff_id:
+            messages.error(request, "Не указан email или тариф")
+            return redirect("dashboard")
+
         tariff = next((t for t in ACTUAL_TARIFFS if t.db_tariff_id == tariff_id), None)
         if not tariff:
-            return JsonResponse({"status": "error", "message": "Тариф не найден"}, status=400)
+            messages.error(request, "Выбранный тариф не найден")
+            return redirect("dashboard")
 
         session = session_factory()
         try:
@@ -274,21 +283,43 @@ def buy(request):
                 session.add(user)
                 session.flush()
 
-            # Вызываем твою логику
-            confirmation_url = create_payment_sync(
-                shop_id=settings.YOOKASSA_SHOP_ID,
-                secret=settings.YOOKASSA_SECRET_KEY,
-                tariff=tariff,
-                username=user.username,
-                telegram_id=user.telegram_id or 0
-            )
+            if settings.PAYMENT_GATEWAY.lower() == "wata":
+                json = create_wata_payment_sync(
+                    wata_host=settings.WATA_HOST,
+                    wata_token=settings.WATA_TOKEN,
+                    tariff=tariff
+                )
+
+                confirmation_url = json["url"]
+
+                save_wata_invoice(
+                    session=session,
+                    invoice_json=json,
+                    tariff_id=tariff.db_tariff_id,
+                    email=email
+                )
+
+                logging.info(
+                    f"an invoice for the {tariff.db_tariff_id} tariff has been created for "
+                    f"{email}, confirmation url: {confirmation_url}"
+                )
+            else:
+                confirmation_url = create_yk_payment_sync(
+                    shop_id=settings.YOOKASSA_SHOP_ID,
+                    secret=settings.YOOKASSA_SECRET_KEY,
+                    tariff=tariff,
+                    username=user.username,
+                    telegram_id=user.telegram_id or 0
+                )
             
             session.commit()
             return redirect(confirmation_url)
 
         except Exception as e:
             logging.error(f"Pay error: {e}")
-            return render(request, "error.html", {"message": "Ошибка платежной системы"})
+            messages.error(request, "Ошибка платежной системы")
+            return redirect("dashboard")
         finally:
             session.close()
+
     return redirect("index")

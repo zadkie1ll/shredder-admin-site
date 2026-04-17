@@ -9,3 +9,4 @@ grpcio-tools
 orjson
 black
 cryptography
+httpx
