@@ -7,12 +7,11 @@ from sqlalchemy.orm import Session
 from common.models.db import User
 from common.models.db import WataInvoice
 
+
 def save_wata_invoice(
     session: Session, invoice_json: dict, tariff_id: str, email: str
 ) -> None:
-    user_id = session.scalar(
-        select(User.id).where(User.email == email).limit(1)
-    )
+    user_id = session.scalar(select(User.id).where(User.email == email).limit(1))
 
     if user_id is None:
         logging.error(f"not found user id for email {email}")

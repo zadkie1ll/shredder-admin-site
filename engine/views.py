@@ -84,7 +84,9 @@ def send_magic_link(request):
 
             # Формируем ссылку (в реальности замени на свой домен)
             link = f"http://localhost:8000/login/magic/{magic.token}/"
-            link = f"https://1614-89-110-127-106.ngrok-free.app/login/magic/{magic.token}/"
+            link = (
+                f"https://1614-89-110-127-106.ngrok-free.app/login/magic/{magic.token}/"
+            )
 
             # Отправляем письмо
             send_mail(
@@ -159,7 +161,11 @@ def dashboard(request):
 
     session = session_factory()
 
-    has_recurrent = session.query(func.count(YkRecurrentPayment.id)).filter(YkRecurrentPayment.user_id == user.id).scalar()
+    has_recurrent = (
+        session.query(func.count(YkRecurrentPayment.id))
+        .filter(YkRecurrentPayment.user_id == user.id)
+        .scalar()
+    )
 
     ref_invited_count = (
         session.query(func.count(User.id))
@@ -211,8 +217,8 @@ def dashboard(request):
             "ref_connected_count": ref_connected_count,
             "ref_purchased_count": ref_purchased_count,
             "bonus_days": bonus_days,
-            'tariffs': ACTUAL_TARIFFS,
-            'has_recurrent': has_recurrent
+            "tariffs": ACTUAL_TARIFFS,
+            "has_recurrent": has_recurrent,
         },
     )
 
@@ -277,7 +283,7 @@ def pay(request):
                 user = User(
                     email=email,
                     username=username,
-                    expire_at=datetime.now(timezone.utc).replace(tzinfo=None)
+                    expire_at=datetime.now(timezone.utc).replace(tzinfo=None),
                 )
                 create_user(rwms_client=rwms_client, username=username)
                 session.add(user)
@@ -287,7 +293,7 @@ def pay(request):
                 json = create_wata_payment_sync(
                     wata_host=settings.WATA_HOST,
                     wata_token=settings.WATA_TOKEN,
-                    tariff=tariff
+                    tariff=tariff,
                 )
 
                 confirmation_url = json["url"]
@@ -296,7 +302,7 @@ def pay(request):
                     session=session,
                     invoice_json=json,
                     tariff_id=tariff.db_tariff_id,
-                    email=email
+                    email=email,
                 )
 
                 logging.info(
@@ -309,9 +315,9 @@ def pay(request):
                     secret=settings.YOOKASSA_SECRET_KEY,
                     tariff=tariff,
                     username=user.username,
-                    telegram_id=user.telegram_id or 0
+                    telegram_id=user.telegram_id or 0,
                 )
-            
+
             session.commit()
             return redirect(confirmation_url)
 

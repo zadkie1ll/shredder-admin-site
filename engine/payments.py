@@ -8,7 +8,10 @@ from yookassa import Configuration
 from common.models.tariff import Tariff
 from common.models.tariff import TrialPromotionTariff
 
-def create_yk_payment_sync(shop_id: str, secret: str, tariff: Tariff, username: str, telegram_id: int | None) -> str:
+
+def create_yk_payment_sync(
+    shop_id: str, secret: str, tariff: Tariff, username: str, telegram_id: int | None
+) -> str:
     Configuration.account_id = shop_id
     Configuration.secret_key = secret
 
@@ -22,7 +25,7 @@ def create_yk_payment_sync(shop_id: str, secret: str, tariff: Tariff, username: 
             "confirmation": {
                 "type": "redirect",
                 # После оплаты на сайте логичнее возвращать в ЛК
-                "return_url": "https://твой-домен.com/dashboard/", 
+                "return_url": "https://твой-домен.com/dashboard/",
             },
             "metadata": {
                 "username": username,
@@ -35,10 +38,11 @@ def create_yk_payment_sync(shop_id: str, secret: str, tariff: Tariff, username: 
             "capture": True,
             "description": tariff.description,
         },
-        idempotency_key
+        idempotency_key,
     )
 
     return payment.confirmation.confirmation_url
+
 
 def create_wata_payment_sync(wata_host: str, wata_token: str, tariff: Tariff):
     url = f"{wata_host}/links"
@@ -52,7 +56,8 @@ def create_wata_payment_sync(wata_host: str, wata_token: str, tariff: Tariff):
         "currency": "RUB",
         "description": tariff.description,
         "orderId": str(uuid4()),
-        "expirationDateTime": (datetime.utcnow() + timedelta(minutes=15)).isoformat() + "Z",
+        "expirationDateTime": (datetime.utcnow() + timedelta(minutes=15)).isoformat()
+        + "Z",
     }
 
     # Используем обычный Client вместо AsyncClient

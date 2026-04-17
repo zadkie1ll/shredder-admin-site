@@ -121,13 +121,13 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/6.0/topics/i18n/
 
-LANGUAGE_CODE = 'ru-RU'
+LANGUAGE_CODE = "ru-RU"
 
 USE_I18N = True
 
 USE_L10N = True  # Localization
 
-USE_TZ = True    # Убедись, что часовые пояса тоже включены
+USE_TZ = True  # Убедись, что часовые пояса тоже включены
 
 TIME_ZONE = "Europe/Moscow"
 
@@ -193,10 +193,10 @@ LOGGING = {
     },
 }
 
-PAYMENT_GATEWAY = 'wata'
+PAYMENT_GATEWAY = "wata"
 
-YOOKASSA_SHOP_ID = '1078713'
-YOOKASSA_SECRET_KEY = 'test_pujqLVxNtv7MotadTDRHWY1B0T60TIWOAemU2gCXjOI'
+YOOKASSA_SHOP_ID = "1078713"
+YOOKASSA_SECRET_KEY = "test_pujqLVxNtv7MotadTDRHWY1B0T60TIWOAemU2gCXjOI"
 
-WATA_HOST = 'https://api-sandbox.wata.pro/api/h2h'
-WATA_TOKEN = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJQdWJsaWNJZCI6IjNhMWJmZTExLWMyODQtNWI2Mi0zNTBiLTEzNDAyNjgxMWM2OCIsIlRva2VuVmVyc2lvbiI6IjEiLCJleHAiOjE3ODc4NDAzOTIsImlzcyI6Imh0dHBzOi8vYXBpLXNhbmRib3gud2F0YS5wcm8iLCJhdWQiOiJodHRwczovL2FwaS1zYW5kYm94LndhdGEucHJvL2FwaS9oMmgifQ.9GWFXWOo5rpUrHYUPm_oXOpkWCvLW-0vtLo8H0iFGWg'
+WATA_HOST = "https://api-sandbox.wata.pro/api/h2h"
+WATA_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJQdWJsaWNJZCI6IjNhMWJmZTExLWMyODQtNWI2Mi0zNTBiLTEzNDAyNjgxMWM2OCIsIlRva2VuVmVyc2lvbiI6IjEiLCJleHAiOjE3ODc4NDAzOTIsImlzcyI6Imh0dHBzOi8vYXBpLXNhbmRib3gud2F0YS5wcm8iLCJhdWQiOiJodHRwczovL2FwaS1zYW5kYm94LndhdGEucHJvL2FwaS9oMmgifQ.9GWFXWOo5rpUrHYUPm_oXOpkWCvLW-0vtLo8H0iFGWg"
