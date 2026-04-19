@@ -85,7 +85,7 @@ def send_magic_link(request):
             # Формируем ссылку (в реальности замени на свой домен)
             link = f"http://localhost:8000/login/magic/{magic.token}/"
             link = (
-                f"https://1614-89-110-127-106.ngrok-free.app/login/magic/{magic.token}/"
+                f"https://8eaf-2-58-66-142.ngrok-free.app/login/magic/{magic.token}/"
             )
 
             # Отправляем письмо
@@ -219,6 +219,8 @@ def dashboard(request):
             "bonus_days": bonus_days,
             "tariffs": ACTUAL_TARIFFS,
             "has_recurrent": has_recurrent,
+            "seconds_left": user.time_until_expiration.total_seconds() if user.time_until_expiration else -1,
+            "referral_link": f"https://t.me/monkeyislandvpnbot?start=a{user.username}"
         },
     )
 
