@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        body { margin: 0; padding: 0; background-color: #0c0c0c; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #0c0c0c; text-align: center; }
+        .card { background-color: #161616; border: 1px solid #ffffff10; border-radius: 24px; padding: 40px; }
+        .logo { width: 80px; height: 80px; background-color: #ffc70010; border: 1px solid #ffc70020; border-radius: 20px; margin: 0 auto 24px; line-height: 80px; color: #ffc700; font-size: 32px; }
+        h1 { color: #ffffff; font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.05em; margin-bottom: 8px; }
+        p { color: #9ca3af; font-size: 14px; line-height: 1.6; margin-bottom: 32px; }
+        .btn { display: inline-block; background-color: #ffc700; color: #000000; padding: 16px 40px; border-radius: 12px; font-weight: 900; text-decoration: none; text-transform: uppercase; font-size: 12px; letter-spacing: 0.1em; }
+        .footer { margin-top: 32px; color: #4b5563; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+        .link-alt { color: #4b5563; word-break: break-all; font-size: 10px; margin-top: 20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="logo">⚓</div>
+            <h1>Добро пожаловать на борт</h1>
+            <p>Твой ключ от Острова Свободы готов. Нажми на кнопку ниже, чтобы мгновенно войти в личный кабинет без пароля.</p>
+            
+            <a href="{{ link }}" class="btn">Войти</a>
+            
+            <div class="link-alt">
+                Если кнопка не работает, скопируй ссылку:<br>
+                {{ link }}
+            </div>
+        </div>
+        <div class="footer">
+            Monkey Island VPN &copy; 2026<br>
+            Свобода — это право каждого пирата.
+        </div>
+    </div>
+</body>
+</html>

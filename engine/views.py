@@ -15,6 +15,8 @@ from django.contrib.auth import BACKEND_SESSION_KEY
 from django.contrib.auth import HASH_SESSION_KEY
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.utils.html import strip_tags
 from sqlalchemy import func
 from common.models.db import User
 from common.models.db import ReferralBonus
@@ -83,17 +85,25 @@ def send_magic_link(request):
                 session.add(magic)
 
             # Формируем ссылку (в реальности замени на свой домен)
-            link = f"http://localhost:8000/login/magic/{magic.token}/"
-            link = (
-                f"https://8eaf-2-58-66-142.ngrok-free.app/login/magic/{magic.token}/"
-            )
+            link = f"{settings.SITE_DOMAIN}/login/magic/{magic.token}/"
+
+            # Формируем контекст для шаблона
+            context = {
+                'link': link,
+            }
+
+            # Рендерим HTML
+            html_message = render_to_string('emails/magic_link.html', context)
+            # Создаем текстовую версию (на случай, если клиент не поддерживает HTML)
+            plain_message = strip_tags(html_message)
 
             # Отправляем письмо
             send_mail(
-                "Твой вход на Остров Свободы",
-                f"Нажми сюда, чтобы войти: {link}",
-                "monkeyislandservice@yandex.ru",
-                [email],
+                subject="Твой вход на Остров Свободы",
+                message=plain_message, # Обычный текст
+                from_email="monkeyislandservice@yandex.ru",
+                recipient_list=[email],
+                html_message=html_message, # HTML версия
                 fail_silently=False,
             )
 
@@ -148,6 +158,8 @@ def index(request):
 def dashboard(request):
     user = request.user
 
+    tg_bot = settings.TG_BOT_USERNAME
+
     # Если зашел из ТГ (уже есть ID), но почты нет — просим почту
     if user.telegram_id and not user.email:
         return render(request, "dashboard_collect_email.html", {"user": user})
@@ -157,7 +169,7 @@ def dashboard(request):
     if not user.telegram_id:
         # Создаем короткую подпись на основе ID пользователя и SECRET_KEY
         token = hashlib.md5(f"{user.id}{settings.SECRET_KEY}".encode()).hexdigest()[:8]
-        tg_bind_link = f"https://t.me/easybirdvpnbot?start=bind_{user.id}_{token}"
+        tg_bind_link = f"https://t.me/{tg_bot}?start=bind_{user.id}_{token}"
 
     session = session_factory()
 
@@ -219,8 +231,12 @@ def dashboard(request):
             "bonus_days": bonus_days,
             "tariffs": ACTUAL_TARIFFS,
             "has_recurrent": has_recurrent,
-            "seconds_left": user.time_until_expiration.total_seconds() if user.time_until_expiration else -1,
-            "referral_link": f"https://t.me/monkeyislandvpnbot?start=a{user.username}"
+            "seconds_left": (
+                user.time_until_expiration.total_seconds()
+                if user.time_until_expiration
+                else -1
+            ),
+            "referral_link": f"https://t.me/{tg_bot}?start=a{user.username}",
         },
     )
 

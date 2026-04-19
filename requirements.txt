@@ -10,3 +10,4 @@ orjson
 black
 cryptography
 httpx
+python-decouple

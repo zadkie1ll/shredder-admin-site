@@ -1,4 +1,6 @@
 import sys
+from pathlib import Path
+from decouple import config
 
 """
 Django settings for web_app project.
@@ -12,23 +14,43 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
-from pathlib import Path
-
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+SITE_DOMAIN = config('SITE_DOMAIN', default='https://monkeyisland.com')
+TG_BOT_USERNAME = config('TG_BOT_USERNAME', default='monkeyislandvpnbot')
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-^_)1q+n5q^-0@ik_#@7tb4szee7ju4=#tu(2%*21q1sd=97k-s"
+SECRET_KEY = config('SECRET_KEY')
+DEBUG = config('DEBUG', default=False, cast=bool)
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+PAYMENT_GATEWAY = config('PAYMENT_GATEWAY', default='wata')
+WATA_HOST = config('WATA_HOST')
+WATA_TOKEN = config('WATA_TOKEN')
+YOOKASSA_SHOP_ID = config('YOOKASSA_SHOP_ID')
+YOOKASSA_SECRET_KEY = config('YOOKASSA_SECRET_KEY')
+RWMS_HOST = config('RWMS_HOST')
+RWMS_PORT = config('RWMS_PORT')
 
-ALLOWED_HOSTS = []
+CSRF_COOKIE_SECURE = True  # Должен быть True для HTTPS
+SESSION_COOKIE_SECURE = True  # Должен быть True для HTTPS
 
+CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', 
+                              default='http://localhost:8000', 
+                              cast=lambda v: [s.strip() for s in v.split(',')])
+
+EMAIL_HOST = config('EMAIL_HOST')
+EMAIL_PORT = config('EMAIL_PORT', cast=int)
+EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=True, cast=bool)
+EMAIL_HOST_USER = config('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
+EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 
 # Application definition
 
@@ -41,22 +63,6 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "engine",
 ]
-
-CSRF_TRUSTED_ORIGINS = [
-    "https://7935-203-23-179-183.ngrok-free.app",
-    "http://localhost:8000",
-    "http://127.0.0.1:8000",
-    "https://*.ngrok-free.app",
-    "https://*.ngrok.io",
-    # Если у вас есть другие домены, добавьте их сюда
-]
-
-CSRF_COOKIE_SECURE = True  # Должен быть True для HTTPS
-SESSION_COOKIE_SECURE = True  # Должен быть True для HTTPS
-
-ALLOWED_HOSTS = [
-    "*"
-]  # Разрешаем все хосты для разработки, но не используйте это в продакшене!
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -137,14 +143,6 @@ TIME_ZONE = "Europe/Moscow"
 
 STATIC_URL = "static/"
 
-EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-EMAIL_HOST = "smtp.yandex.ru"  # или smtp.gmail.com
-EMAIL_PORT = 465
-EMAIL_USE_SSL = True
-EMAIL_HOST_USER = "monkeyislandservice@yandex.ru"
-EMAIL_HOST_PASSWORD = "eefgyykfiseylfhr"  # Пароль приложения
-DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
-
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",  # Оставляем для админки (sqlite)
     "engine.auth_backend.SQLAlchemyBackend",  # Мостик к SQLAlchemy
@@ -192,11 +190,3 @@ LOGGING = {
         },
     },
 }
-
-PAYMENT_GATEWAY = "wata"
-
-YOOKASSA_SHOP_ID = "1078713"
-YOOKASSA_SECRET_KEY = "test_pujqLVxNtv7MotadTDRHWY1B0T60TIWOAemU2gCXjOI"
-
-WATA_HOST = "https://api-sandbox.wata.pro/api/h2h"
-WATA_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJQdWJsaWNJZCI6IjNhMWJmZTExLWMyODQtNWI2Mi0zNTBiLTEzNDAyNjgxMWM2OCIsIlRva2VuVmVyc2lvbiI6IjEiLCJleHAiOjE3ODc4NDAzOTIsImlzcyI6Imh0dHBzOi8vYXBpLXNhbmRib3gud2F0YS5wcm8iLCJhdWQiOiJodHRwczovL2FwaS1zYW5kYm94LndhdGEucHJvL2FwaS9oMmgifQ.9GWFXWOo5rpUrHYUPm_oXOpkWCvLW-0vtLo8H0iFGWg"
