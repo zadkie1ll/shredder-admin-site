@@ -63,18 +63,6 @@
             opacity: 0.8;
             transform: translateZ(0);
         }
-        
-        .glass-card {
-            /* Делаем подложку темнее и плотнее (0.1 -> 0.4) */
-            background: rgba(12, 12, 12, 0.8) !important; 
-            
-            /* Усиливаем размытие фона, чтобы картинка сзади "кашалась" и не отвлекала */
-            backdrop-filter: blur(20px); 
-            
-            /* Можно добавить легкую обводку, чтобы отделить от фона */
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 1.5rem; /* твои 2.5rem или меньше */
-        }
 
         /* Логика вкладок */
         .tab-content { 
@@ -418,7 +406,7 @@
         }
 
         /* Делаем границы чуть заметнее, а фон карточек — капельку светлее */
-        .tariff-card.glass-card {
+        .tariff-card.setup-step-card {
             background: rgba(255, 255, 255, 0.02);
             backdrop-filter: blur(12px);
         }
@@ -512,68 +500,70 @@
 
                     <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
                         <div class="xl:col-span-2 space-y-6">
-                            <div class="glass-card p-6 md:p-8">
-                                <div class="flex items-center justify-between mb-8">
-                                    <h3 class="text-sm font-black uppercase tracking-widest text-[#ffc700]">Твои ключи доступа</h3>
-                                    <span class="text-[10px] bg-white/5 px-3 py-1 rounded-full text-gray-400 font-bold uppercase">VLESS + Reality</span>
+                            <div class="setup-shell">
+                                <div class="setup-toolbar p-6 md:p-8 flex items-center justify-between border-b border-white/5">
+                                    <h3 class="text-[12px] font-black text-gray-300 uppercase tracking-[0.15em] ml-2 opacity-90">Твои ключи доступа</h3>
+                                    <span class="text-[10px] bg-[#ffc700]/10 text-[#ffc700] px-3 py-1 rounded-full font-bold uppercase border border-[#ffc700]/30">VLESS + Reality</span>
                                 </div>
 
-                                <div class="key-box p-5 relative group overflow-hidden cursor-pointer mb-6 border-2 border-[#ffc700]/30 bg-[#ffc700]/5 rounded-2xl" 
-                                    onclick="copyKey('happKey', 'HAPP ключ')">
-                                    
-                                    <div class="absolute top-0 right-0 bg-[#ffc700] text-black text-[8px] font-black px-3 py-1 uppercase tracking-widest rounded-bl-xl shadow-lg">
-                                        Рекомендуем
+                                <div class="p-6 md:p-8">
+                                    <div class="setup-step-card relative group overflow-hidden cursor-pointer mb-6 border-2 border-[#ffc700]/30 bg-[#ffc700]/5" 
+                                        onclick="copyKey('happKey', 'HAPP ключ')">
+                                        
+                                        <div class="absolute top-0 right-0 bg-[#ffc700] text-black text-[8px] font-black px-3 py-1 uppercase tracking-widest rounded-bl-xl shadow-lg">
+                                            Рекомендуем
+                                        </div>
+
+                                        <div id="happKey" class="text-[11px] font-mono text-white break-all leading-relaxed pr-20">{{ happ_subscription_url }}</div>
+                                        
+                                        <div class="mt-4 flex items-center gap-2 text-[10px] font-black text-[#ffc700] uppercase">
+                                            <i class="fas fa-star animate-pulse"></i> Ключ для HAPP - рекомендуем (нажми, чтобы скопировать)
+                                        </div>
                                     </div>
 
-                                    <div id="happKey" class="text-[11px] font-mono text-white break-all leading-relaxed pr-20">{{ happ_subscription_url }}</div>
-                                    
-                                    <div class="mt-4 flex items-center gap-2 text-[10px] font-black text-[#ffc700] uppercase">
-                                        <i class="fas fa-star animate-pulse"></i> Ключ для HAPP - рекомендуем (нажми, чтобы скопировать)
-                                    </div>
-                                </div>
-
-                                <div class="key-box p-5 relative group overflow-hidden cursor-pointer border border-white/5 opacity-60 hover:opacity-100 transition-opacity" 
-                                    onclick="copyKey('plainKey', 'Обычный ключ')">
-                                    
-                                    <div id="plainKey" class="text-[11px] font-mono text-gray-500 break-all leading-relaxed">{{ plain_subscription_url }}</div>
-                                    
-                                    <div class="mt-4 flex items-center gap-2 text-[10px] font-black text-gray-600 uppercase transition-colors group-hover:text-white">
-                                        <i class="fas fa-copy"></i> Обычный ключ (нажми, чтобы скопировать)
+                                    <div class="setup-step-card relative group overflow-hidden cursor-pointer opacity-60 hover:opacity-100 transition-opacity" 
+                                        onclick="copyKey('plainKey', 'Обычный ключ')">
+                                        
+                                        <div id="plainKey" class="text-[11px] font-mono text-gray-500 break-all leading-relaxed">{{ plain_subscription_url }}</div>
+                                        
+                                        <div class="mt-4 flex items-center gap-2 text-[10px] font-black text-gray-600 uppercase transition-colors group-hover:text-white">
+                                            <i class="fas fa-copy"></i> Обычный ключ (нажми, чтобы скопировать)
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            <div class="glass-card p-6 border-white/10 flex justify-between items-center">
+                            <div class="setup-shell p-6 md:p-8 flex justify-between items-center">
                                 <div>
-                                    <h3 class="font-black uppercase text-sm text-white">Продлить подписку</h3>
-                                    <p class="text-gray-500 text-[10px] font-bold uppercase">Выбери новый тариф или добавь дней</p>
+                                    <h3 class="text-[12px] font-black text-gray-300 uppercase tracking-[0.15em] mb-1 opacity-90">Продлить подписку</h3>
+                                    <p class="text-gray-500 text-[10px] font-bold uppercase ml-1">Выбери новый тариф или добавь дней</p>
                                 </div>
-                                <button onclick="showTariffs()" class="bg-[#ffc700] text-black px-6 py-3 rounded-xl font-black uppercase text-[10px] shadow-lg shadow-[#ffc700]/10 hover:scale-105 transition-all">
+                                <button onclick="showTariffs()" class="setup-cta-btn !w-auto !py-3 !px-6 !text-[10px]">
                                     Продлить
                                 </button>
                             </div>
 
                             <div class="space-y-4 mb-8">
                                 {% if not user.telegram_id %}
-                                    <div class="glass-card p-5 flex items-center gap-4 border-l-4 border-l-[#ffc700] animate-in fade-in slide-in-from-top-4 duration-500">
+                                    <div class="setup-shell p-6 flex items-center gap-4 border-l-4 border-l-[#ffc700] animate-in fade-in slide-in-from-top-4 duration-500">
                                         <i class="fab fa-telegram text-2xl text-[#ffc700] flex-shrink-0"></i>
-                                        <div class="text-[10px] font-black uppercase tracking-tight">
+                                        <div class="text-[10px] font-black uppercase tracking-tight text-white">
                                             Телеграм Бот <br>
                                             <span class="text-gray-500 font-bold">Привяжи аккаунт и получи +7 дней</span>
                                         </div>
-                                        <a href="{{ tg_bind_link }}" class="ml-auto px-4 py-2 bg-[#ffc700]/10 border border-[#ffc700]/30 rounded-lg text-[9px] font-black text-[#ffc700] uppercase hover:bg-[#ffc700] hover:text-black transition-all animate-pulse">
+                                        <a href="{{ tg_bind_link }}" class="setup-link-btn ml-auto !bg-[#ffc700]/10 !text-[#ffc700] border border-[#ffc700]/30 hover:!bg-[#ffc700] hover:!text-black !py-2 !px-4 !text-[9px]">
                                             Привязать ТГ
                                         </a>
                                     </div>
 
                                 {% elif not user.email %}
-                                    <div class="glass-card p-5 flex items-center gap-4 border-l-4 border-l-[#ffc700]">
+                                    <div class="setup-shell p-6 flex items-center gap-4 border-l-4 border-l-[#ffc700]">
                                         <i class="fas fa-envelope text-2xl text-[#ffc700] flex-shrink-0"></i>
-                                        <div class="text-[10px] font-black uppercase tracking-tight">
+                                        <div class="text-[10px] font-black uppercase tracking-tight text-white">
                                             Электронная почта <br>
                                             <span class="text-gray-500 font-bold">Укажи почту для защиты аккаунта</span>
                                         </div>
-                                        <button onclick="showEmailInput()" class="ml-auto px-4 py-2 bg-[#ffc700]/10 border border-[#ffc700]/30 rounded-lg text-[9px] font-black text-[#ffc700] uppercase hover:bg-[#ffc700] hover:text-black transition-all">
+                                        <button onclick="showEmailInput()" class="setup-link-btn ml-auto !bg-[#ffc700]/10 !text-[#ffc700] border border-[#ffc700]/30 hover:!bg-[#ffc700] hover:!text-black !py-2 !px-4 !text-[9px]">
                                             Добавить Email
                                         </button>
                                     </div>
@@ -582,19 +572,19 @@
                         </div>
 
                         <div class="xl:col-span-1">
-                            <div class="glass-card p-8 border-[#ffc700]/20 h-full">
-                                <div class="text-center mb-8">
-                                    <div class="w-20 h-20 bg-[#ffc700]/10 rounded-3xl flex items-center justify-center mx-auto mb-4 border border-[#ffc700]/20 rotate-3">
+                            <div class="setup-shell h-full flex flex-col">
+                                <div class="setup-toolbar p-8 text-center flex-grow flex flex-col justify-center items-center">
+                                    <div class="w-20 h-20 bg-[#ffc700]/10 rounded-3xl flex items-center justify-center mb-4 border border-[#ffc700]/20 rotate-3">
                                         <i class="fas fa-shield-alt text-[#ffc700] text-3xl"></i>
                                     </div>
-                                    <h4 class="text-lg font-black uppercase">Подписка</h4>
+                                    <h4 class="text-[14px] font-black text-white uppercase tracking-widest">Подписка</h4>
                                     {% if seconds_left <= 0 %}
-                                        <p class="text-red-500 text-[10px] font-black uppercase tracking-widest mt-1">Истекла</p>
+                                        <p class="text-red-500 text-[10px] font-black uppercase tracking-widest mt-2">Истекла</p>
                                     {% else %}
-                                        <p class="text-[#00ff88] text-[10px] font-black uppercase tracking-widest mt-1">В полном порядке</p>
+                                        <p class="text-[#00ff88] text-[10px] font-black uppercase tracking-widest mt-2">В полном порядке</p>
                                     {% endif %}
                                 </div>
-                                <div class="space-y-4 border-t border-white/5 pt-6">
+                                <div class="p-6 border-t border-white/5 bg-[#0a0a0a]">
                                     <div class="flex justify-between items-center">
                                         <span class="text-[10px] font-black text-gray-500 uppercase">Осталось:</span>
                                         <span class="text-sm font-black text-[#ffc700]">{{ user.expire_at|timeuntil }}</span>
@@ -638,78 +628,97 @@
                     <h1 class="text-3xl font-black uppercase tracking-tighter mb-2">Приглашение друзей</h1>
                     <p class="text-gray-500 text-sm font-bold uppercase">Награды и бонусы за друзей</p>
                 </header>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="glass-card p-8">
-                        <h3 class="text-[14px] font-black text-gray-500 uppercase mb-6 tracking-widest">Партнерская программа</h3>
-
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
-                            <div class="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                                <i class="fas fa-user-plus text-[#ffc700] text-xs mt-1"></i>
-                                <p class="text-[14px] font-bold text-gray-200 uppercase leading-relaxed">
-                                    <span class="text-[#ffc700]">+10 дней</span> за друга<br>
-                                    <span class="text-[12px] text-white/50 font-medium normal-case">при расходе более 100 МБ</span>
-                                </p>
-                            </div>
-                            <div class="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
-                                <i class="fas fa-gem text-[#ffc700] text-xs mt-1"></i>
-                                <p class="text-[14px] font-bold text-gray-200 uppercase leading-relaxed">
-                                    <span class="text-[#ffc700]">+30 дней</span> за покупку<br>
-                                    <span class="text-[12px] text-white/50 font-medium normal-case">подписки от 1 месяца</span>
-                                </p>
-                            </div>
+                <div class="grid grid-cols-1 gap-6">
+                    <div class="setup-shell">
+                        <div class="setup-toolbar p-6 md:p-8 border-b border-white/5">
+                            <h3 class="text-[12px] font-black text-gray-300 uppercase tracking-[0.15em] ml-2 opacity-90">Партнерская программа</h3>
                         </div>
 
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="bg-white/5 p-5 rounded-2xl border border-white/5">
-                                <p class="text-[9px] font-black text-gray-400 uppercase mb-1">Приглашено</p>
-                                <p class="text-2xl font-black">{{ ref_invited_count|default:"0" }}</p>
+                        <div class="p-6 md:p-8">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
+                                <div class="setup-step-card flex items-start gap-4">
+                                    <i class="fas fa-user-plus text-[#ffc700] text-2xl mt-1"></i>
+                                    <div>
+                                        <p class="text-[14px] font-bold text-gray-200 uppercase leading-relaxed">
+                                            <span class="text-[#ffc700]">+10 дней</span> за друга
+                                        </p>
+                                        <p class="text-[12px] text-gray-500 font-medium normal-case mt-1">при расходе более 100 МБ</p>
+                                    </div>
+                                </div>
+                                <div class="setup-step-card flex items-start gap-4">
+                                    <i class="fas fa-gem text-[#ffc700] text-2xl mt-1"></i>
+                                    <div>
+                                        <p class="text-[14px] font-bold text-gray-200 uppercase leading-relaxed">
+                                            <span class="text-[#ffc700]">+30 дней</span> за покупку
+                                        </p>
+                                        <p class="text-[12px] text-gray-500 font-medium normal-case mt-1">подписки от 1 месяца</p>
+                                    </div>
+                                </div>
                             </div>
-                            <div class="bg-white/5 p-5 rounded-2xl border border-white/5">
-                                <p class="text-[9px] font-black text-gray-400 uppercase mb-1">Стали активными</p>
-                                <p class="text-2xl font-black">{{ ref_connected_count|default:"0" }}</p>
-                            </div>
-                            <div class="bg-white/5 p-5 rounded-2xl border border-white/5">
-                                <p class="text-[9px] font-black text-gray-400 uppercase mb-1">Купили подписку</p>
-                                <p class="text-2xl font-black">{{ ref_purchased_count|default:"0" }}</p>
-                            </div>
-                            <div class="bg-white/5 p-5 rounded-2xl border border-white/5">
-                                <p class="text-[9px] font-black text-gray-400 uppercase mb-1">Бонусные дни</p>
-                                <p class="text-2xl font-black text-[#00ff88]">+{{ bonus_days|default:"0" }}</p>
+
+                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                                <div class="setup-step-card p-5 text-center">
+                                    <p class="text-[9px] font-black text-gray-500 uppercase mb-2">Приглашено</p>
+                                    <p class="text-3xl font-black">{{ ref_invited_count|default:"0" }}</p>
+                                </div>
+                                <div class="setup-step-card p-5 text-center">
+                                    <p class="text-[9px] font-black text-gray-500 uppercase mb-2">Активны</p>
+                                    <p class="text-3xl font-black text-[#00ff88]">{{ ref_connected_count|default:"0" }}</p>
+                                </div>
+                                <div class="setup-step-card p-5 text-center">
+                                    <p class="text-[9px] font-black text-gray-500 uppercase mb-2">Покупок</p>
+                                    <p class="text-3xl font-black">{{ ref_purchased_count|default:"0" }}</p>
+                                </div>
+                                <div class="setup-step-card p-5 text-center border-[#ffc700]/30 bg-[#ffc700]/5">
+                                    <p class="text-[9px] font-black text-[#ffc700] uppercase mb-2">Бонусные дни</p>
+                                    <p class="text-3xl font-black text-[#ffc700]">+{{ bonus_days|default:"0" }}</p>
+                                </div>
                             </div>
                         </div>
-                        <div class="mt-10 pt-6 border-t border-white/2"> <p class="text-[13px] font-black text-white/60 uppercase tracking-[0.2em] mb-4 ml-1">
-                            Пригласительная ссылка для друзей в Telegram
-                        </p>
-                        
-                        <div class="relative group">
-                            <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                                <i class="fas fa-link text-[#ffc700] text-xs"></i>
-                            </div>
-                            <input type="text" readonly value="{{ referral_link }}" 
-                                id="ref-link-input"
-                                class="w-full bg-black/60 border border-white/10 rounded-2xl py-4 pl-10 pr-32 text-[11px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
-                            
-                            <button onclick="copyReferralLink()" 
-                                    class="absolute right-2 top-2 bottom-2 bg-[#ffc700] hover:bg-[#ffd740] text-black px-6 rounded-xl font-black uppercase text-[9px] tracking-widest transition-all active:scale-95 shadow-lg shadow-[#ffc700]/10">
-                                Копировать
-                            </button>
-                        </div>
-                        <p class="mt-3 text-[11px] text-gray-200 font-bold uppercase ml-1 tracking-tight">
-                            За каждого приглашенного пирата ты получишь <span class="text-white">+40 дней</span> к подписке
-                        </p>
                     </div>
+
+                    <div class="setup-shell">
+                        <div class="setup-toolbar p-6 md:p-8 border-b border-white/5">
+                            <p class="text-[12px] font-black text-gray-300 uppercase tracking-[0.15em] ml-2 opacity-90">
+                                Пригласительная ссылка для друзей в Telegram
+                            </p>
+                        </div>
+                        <div class="p-6 md:p-8">
+                            <div class="relative group">
+                                <div class="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
+                                    <i class="fas fa-link text-[#ffc700] text-lg"></i>
+                                </div>
+                                <input type="text" readonly value="{{ referral_link }}" 
+                                    id="ref-link-input"
+                                    class="w-full bg-black/60 border border-white/10 rounded-2xl py-5 pl-14 pr-40 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
+                                
+                                <button onclick="copyReferralLink()" 
+                                        class="absolute right-2 top-2 bottom-2 setup-cta-btn !w-auto !py-0 !px-8 !text-[10px]">
+                                    Копировать
+                                </button>
+                            </div>
+                            <p class="mt-4 text-[11px] text-gray-400 font-bold uppercase ml-2 tracking-tight">
+                                За каждого приглашенного пирата ты получишь <span class="text-white">+40 дней</span> к подписке
+                            </p>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div id="tab-support" class="tab-content text-center py-20">
-                <div class="max-w-md mx-auto">
-                    <div class="mb-8">
-                        <i class="fas fa-life-ring text-6xl text-[#ffc700] animate-spin-slow"></i>
+            <div id="tab-support" class="tab-content">
+                <header class="mb-10">
+                    <h1 class="text-3xl font-black uppercase tracking-tighter mb-2">Поддержка</h1>
+                    <p class="text-gray-500 text-sm font-bold uppercase">Помощь всегда рядом</p>
+                </header>
+                <div class="setup-shell text-center">
+                    <div class="p-10 md:p-16 max-w-xl mx-auto">
+                        <div class="mb-8">
+                            <i class="fas fa-life-ring text-6xl text-[#ffc700] animate-spin-slow"></i>
+                        </div>
+                        <h2 class="text-3xl font-black uppercase tracking-tighter mb-4">Нужна помощь?</h2>
+                        <p class="text-gray-400 text-sm font-bold uppercase mb-10 leading-relaxed">Если корабль сел на мель, наши боцманы в Telegram помогут тебе вернуться в строй!</p>
+                        <a href="https://t.me/monkeyislandsupportbot" target="_blank" class="setup-cta-btn !w-full !max-w-none !py-5 !text-sm">Связаться с боцманом</a>
                     </div>
-                    <h2 class="text-3xl font-black uppercase tracking-tighter mb-4">Нужна помощь?</h2>
-                    <p class="text-gray-400 text-sm font-bold uppercase mb-10 leading-relaxed">Если корабль сел на мель, наши боцманы в Telegram помогут тебе вернуться в строй!</p>
-                    <a href="https://t.me/monkeyislandsupportbot" target="_blank" class="block w-full py-5 bg-[#ffc700] text-black font-black uppercase rounded-2xl text-sm tracking-widest shadow-xl shadow-[#ffc700]/20 hover:scale-[1.02] transition">Связаться с боцманом</a>
                 </div>
             </div>
 
@@ -729,7 +738,7 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-12 mb-8 w-full">
                 {% for tariff in tariffs %}
-                <div class="tariff-card glass-card p-5 cursor-pointer transition-all duration-500 border-2 border-white/5 relative group 
+                <div class="tariff-card setup-step-card p-5 cursor-pointer transition-all duration-500 border-2 border-white/5 relative group 
                     {% if forloop.counter == 2 %} 
                         lg:scale-110 z-20 shadow-[0_0_30px_rgba(255,199,0,0.1)] border-[#ffc700]/40 
                     {% else %} 
