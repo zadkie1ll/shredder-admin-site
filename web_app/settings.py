@@ -1,4 +1,5 @@
 import sys
+import dj_database_url
 from pathlib import Path
 from decouple import config
 
@@ -35,7 +36,7 @@ WATA_TOKEN = config('WATA_TOKEN')
 YOOKASSA_SHOP_ID = config('YOOKASSA_SHOP_ID')
 YOOKASSA_SECRET_KEY = config('YOOKASSA_SECRET_KEY')
 RWMS_HOST = config('RWMS_HOST')
-RWMS_PORT = config('RWMS_PORT')
+RWMS_PORT = config('RWMS_PORT', cast=int)
 
 CSRF_COOKIE_SECURE = True  # Должен быть True для HTTPS
 SESSION_COOKIE_SECURE = True  # Должен быть True для HTTPS
@@ -102,6 +103,14 @@ DATABASES = {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     }
+}
+
+DATABASES = {
+    'default': config(
+        'DATABASE_URL',
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        cast=dj_database_url.parse
+    )
 }
 
 
@@ -190,3 +199,6 @@ LOGGING = {
         },
     },
 }
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

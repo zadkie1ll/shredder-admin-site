@@ -43,7 +43,7 @@ ACTUAL_TARIFFS: list[Tariff] = [
     OneYearTariff(),
 ]
 
-rwms_client = RwmsClientSync("127.0.0.1", 50052)
+rwms_client = RwmsClientSync(settings.RWMS_HOST, settings.RWMS_PORT)
 
 
 def send_magic_link(request):
@@ -347,3 +347,23 @@ def pay(request):
             session.close()
 
     return redirect("index")
+
+def dynamic_manifest(request):
+    # Определяем текущий протокол и домен
+    scheme = 'https' if request.is_secure() else 'http'
+    domain = request.get_host()
+    base_url = f"{scheme}://{domain}"
+
+    data = {
+        "name": "Monkey Island VPN",
+        "short_name": "MonkeyVPN",
+        "start_url": f"{base_url}/dashboard/", # Полный путь к ЛК
+        "display": "standalone",
+        "background_color": "#1a1a1a",
+        "theme_color": "#ff9900",
+        "icons": [
+            {"src": "/static/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png"},
+            {"src": "/static/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png"}
+        ]
+    }
+    return JsonResponse(data)

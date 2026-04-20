@@ -4,6 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#ff9900">
+    <link rel="manifest" href="/manifest.json">
     <title>Dashboard — Monkey Island</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
@@ -322,11 +324,7 @@
 
     <div class="fixed inset-0 z-0">
         <div class="absolute inset-0 bg-cover bg-center opacity-80" 
-            style="background-image: 
-                /* МЯГКОЕ ТОЧЕЧНОЕ ПЯТНО */
-                radial-gradient(circle 150px at 98.5% 98.5%, #212121 0%, #212121 60%, rgba(0, 0, 0, 0) 100%), 
-                /* ТВОЯ КАРТИНКА */
-                url('{% static 'img/bg5.png' %}');">
+            style="background-image: url('{% static 'img/bg5.png' %}');">
         </div>
     </div>
 
@@ -487,7 +485,7 @@
                 </header>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="glass-card p-8">
-                        <h3 class="text-[10px] font-black text-gray-500 uppercase mb-6 tracking-widest">Партнерская программа</h3>
+                        <h3 class="text-[14px] font-black text-gray-500 uppercase mb-6 tracking-widest">Партнерская программа</h3>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-8">
                             <div class="flex items-start gap-3 p-3 rounded-xl bg-white/5 border border-white/10">
@@ -730,6 +728,16 @@
     </div>
 
     <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').then(function(registration) {
+                    console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                }, function(err) {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+
         function showTab(tabId) {
             // Если мы были на экране тарифов, возвращаемся в интерфейс
             hideTariffs();

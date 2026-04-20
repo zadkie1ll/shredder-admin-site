@@ -7,5 +7,5 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # В .env должен быть прописан DATABASE_URL
-engine = create_engine(os.getenv("DATABASE_URL"), pool_pre_ping=True)
+engine = create_engine(os.getenv("TG_DATABASE_URL"), pool_pre_ping=True)
 session_factory = sessionmaker(bind=engine)
