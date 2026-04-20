@@ -1,6 +1,8 @@
 import sys
 import dj_database_url
 from pathlib import Path
+from urllib.parse import urlparse
+from importlib.util import find_spec
 from decouple import config
 
 """
@@ -18,8 +20,54 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SITE_DOMAIN = config('SITE_DOMAIN', default='https://monkeyisland.com')
+
+def csv_list(value):
+    return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def normalize_domain_entry(value):
+    candidate = value.strip()
+    if not candidate:
+        return ""
+
+    if "://" in candidate:
+        parsed = urlparse(candidate)
+        candidate = parsed.netloc or parsed.path
+
+    return candidate.split(":", 1)[0].lower().strip("/")
+
+
+def csv_domains(value):
+    return [
+        normalized
+        for item in value.split(",")
+        if (normalized := normalize_domain_entry(item))
+    ]
+
+
+PROMO_DOMAINS = config(
+    "PROMO_DOMAINS",
+    default="localhost,127.0.0.1",
+    cast=csv_domains,
+)
+NEUTRAL_DOMAINS = config(
+    "NEUTRAL_DOMAINS",
+    default="",
+    cast=csv_domains,
+)
+CABINET_DOMAINS = config(
+    "CABINET_DOMAINS",
+    default="localhost,127.0.0.1",
+    cast=csv_domains,
+)
+DEFAULT_CABINET_DOMAIN = config(
+    "DEFAULT_CABINET_DOMAIN",
+    default="http://localhost:8000"
+)
 TG_BOT_USERNAME = config('TG_BOT_USERNAME', default='monkeyislandvpnbot')
+EMAIL_PROVIDER = config("EMAIL_PROVIDER", default="smtp")
+RESEND_API_KEY = config("RESEND_API_KEY", default="")
+RESEND_FROM_EMAIL = config("RESEND_FROM_EMAIL", default="")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -38,8 +86,8 @@ YOOKASSA_SECRET_KEY = config('YOOKASSA_SECRET_KEY')
 RWMS_HOST = config('RWMS_HOST')
 RWMS_PORT = config('RWMS_PORT', cast=int)
 
-CSRF_COOKIE_SECURE = True  # Должен быть True для HTTPS
-SESSION_COOKIE_SECURE = True  # Должен быть True для HTTPS
+CSRF_COOKIE_SECURE = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
 
 CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', 
                               default='http://localhost:8000', 
@@ -52,6 +100,7 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
+HAS_WHITENOISE = find_spec("whitenoise") is not None
 
 # Application definition
 
@@ -74,6 +123,9 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
+
+if HAS_WHITENOISE:
+    MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
 
 ROOT_URLCONF = "web_app.urls"
 
@@ -150,7 +202,10 @@ TIME_ZONE = "Europe/Moscow"
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
+
+if HAS_WHITENOISE:
+    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",  # Оставляем для админки (sqlite)

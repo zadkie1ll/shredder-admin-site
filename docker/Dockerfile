@@ -1,26 +1,49 @@
-FROM python:3.12-slim
-
-# Устанавливаем системные зависимости для работы с БД
-RUN apt-get update && apt-get install -y libpq-dev gcc && rm -rf /var/lib/apt/lists/*
+FROM python:3.12-slim AS builder
 
 WORKDIR /app
 
-# Переменные для Python (не плодим .pyc файлы и сразу шлем логи в консоль)
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+# Переменные для Python и pip
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PATH="/opt/venv/bin:$PATH"
 
-# Ставим зависимости
+# Компилятор и dev-зависимости нужны только на этапе сборки
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev \
+    && python -m venv /opt/venv \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install -r requirements.txt
 
-# Копируем проект
-COPY . .
+FROM python:3.12-slim
 
-# Создаем папку для статики, чтобы gunicorn/nginx имели к ней доступ
-RUN mkdir -p /app/staticfiles
+WORKDIR /app
 
-# Выставляем порт
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PATH="/opt/venv/bin:$PATH"
+
+# В рантайме оставляем только библиотеку клиента Postgres
+RUN apt-get update && apt-get install -y --no-install-recommends libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /opt/venv /opt/venv
+
+# Копируем только то, что действительно нужно приложению в рантайме
+COPY manage.py database.py ./
+COPY common ./common
+COPY engine ./engine
+COPY proto ./proto
+COPY web_app ./web_app
+COPY docker/entrypoint.sh /entrypoint.sh
+
+RUN mkdir -p /app/staticfiles \
+    && chmod +x /entrypoint.sh
+
 EXPOSE 8000
 
-# Запускаем через gunicorn (в продакшене встроенный сервер Django использовать нельзя!)
-CMD ["gunicorn", "--bind", "0.0.0.0:8000", "web_app.wsgi:application"]
+CMD ["/entrypoint.sh"]

@@ -4,6 +4,7 @@ import logging
 from datetime import datetime
 from datetime import timezone
 from datetime import timedelta
+import resend
 from django.http import JsonResponse
 from django.conf import settings
 from django.shortcuts import render
@@ -46,9 +47,37 @@ ACTUAL_TARIFFS: list[Tariff] = [
 rwms_client = RwmsClientSync(settings.RWMS_HOST, settings.RWMS_PORT)
 
 
+def normalize_host(host):
+    return host.split(":", 1)[0].lower()
+
+
+def get_site_role(request):
+    host = normalize_host(request.get_host())
+    if host in settings.CABINET_DOMAINS:
+        return "cabinet"
+    if host in settings.NEUTRAL_DOMAINS:
+        return "neutral"
+    if host in settings.PROMO_DOMAINS:
+        return "promo"
+    return "promo"
+
+
+def get_cabinet_base_url(request):
+    current_host = normalize_host(request.get_host())
+    scheme = "https" if request.is_secure() else "http"
+
+    if current_host in settings.CABINET_DOMAINS:
+        return f"{scheme}://{request.get_host()}"
+
+    return f"{scheme}://{settings.DEFAULT_CABINET_DOMAIN.rstrip('/')}"
+
+
 def send_magic_link(request):
     if request.method == "POST":
-        email = request.POST.get("email")
+        email_raw = request.POST.get("email", "")
+        email = email_raw.lower().strip()
+        cabinet_base_url = get_cabinet_base_url(request)
+        entry_host = normalize_host(request.get_host())
 
         session = session_factory()
 
@@ -84,8 +113,16 @@ def send_magic_link(request):
                 magic = MagicToken(user_id=user.id)
                 session.add(magic)
 
-            # Формируем ссылку (в реальности замени на свой домен)
-            link = f"{settings.SITE_DOMAIN}/login/magic/{magic.token}/"
+            # Если почту ввели на cabinet-домене, ссылка вернет пользователя туда же.
+            # Если вход запрошен с promo-домена, письмо уводит на основной cabinet-домен.
+            link = f"{cabinet_base_url}/login/magic/{magic.token}/"
+
+            logging.info(
+                "Magic link requested from host %s, target auth host is %s for %s",
+                entry_host,
+                cabinet_base_url,
+                email,
+            )
 
             # Формируем контекст для шаблона
             context = {
@@ -97,15 +134,29 @@ def send_magic_link(request):
             # Создаем текстовую версию (на случай, если клиент не поддерживает HTML)
             plain_message = strip_tags(html_message)
 
-            # Отправляем письмо
-            send_mail(
-                subject="Твой вход на Остров Свободы",
-                message=plain_message, # Обычный текст
-                from_email="monkeyislandservice@yandex.ru",
-                recipient_list=[email],
-                html_message=html_message, # HTML версия
-                fail_silently=False,
-            )
+            subject = "Ссылка для входа в личный кабинет"
+
+            if settings.EMAIL_PROVIDER.lower() == "resend":
+                resend.api_key = settings.RESEND_API_KEY
+                resend.Emails.send(
+                    {
+                        "from": settings.RESEND_FROM_EMAIL,
+                        "to": [email],
+                        "subject": subject,
+                        "html": html_message,
+                        "text": plain_message,
+                    }
+                )
+            else:
+                # Отправляем письмо через SMTP
+                send_mail(
+                    subject=subject,
+                    message=plain_message,
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    html_message=html_message,
+                    fail_silently=False,
+                )
 
         except Exception as e:
             logging.error(f"Error during sign-up/login: {e}")
@@ -151,6 +202,16 @@ def auth_by_magic_link(request, token):
 
 
 def index(request):
+    site_role = get_site_role(request)
+
+    if site_role == "cabinet":
+        if request.user.is_authenticated:
+            return redirect("dashboard")
+        return render(request, "login.html")
+
+    if site_role == "neutral":
+        return render(request, "index_neutral.html", {"tariffs": ACTUAL_TARIFFS})
+
     return render(request, "index.html", {"tariffs": ACTUAL_TARIFFS})
 
 
@@ -265,6 +326,7 @@ def update_email(request):
 def login(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
+
     return render(request, "login.html")
 
 

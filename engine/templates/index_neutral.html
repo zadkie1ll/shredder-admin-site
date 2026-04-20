@@ -1,0 +1,326 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monkey Island Cloud — VPS для всех устройств</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #111111;
+            color: #ffffff;
+            overflow-x: hidden;
+        }
+
+        .hero-bg {
+            background-image:
+                linear-gradient(270deg, rgba(17,17,17,0.9) 0%, rgba(17,17,17,0.55) 55%, rgba(17,17,17,0.15) 100%),
+                linear-gradient(180deg, rgba(17,17,17,0.0) 60%, #111111 100%),
+                url("{% static 'img/header-no-logo.png' %}");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        nav {
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+
+        .benefit-card {
+            background: rgba(255, 255, 255, 0.03);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            padding: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .benefit-card:hover {
+            background: rgba(255, 255, 255, 0.07);
+            border-color: #ffc700;
+        }
+
+        .tilda-yellow { background-color: #ffc700; color: #000000; }
+        .tilda-yellow:hover { background-color: #e6b400; }
+
+        .tariff-card {
+            background-color: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .tariff-card:hover {
+            transform: translateY(-10px);
+            border-color: #ffc700;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+        }
+
+        .input-field {
+            background-color: #222222;
+            border: 1px solid #333333;
+            color: white;
+            border-radius: 12px;
+        }
+
+        .hero-title {
+            font-weight: 900;
+            letter-spacing: -2px;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.6);
+        }
+
+        .drop-shadow-custom {
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        }
+
+        .discount-badge {
+            position: absolute;
+            top: -15px;
+            right: 20px;
+            background: #ffc700;
+            color: #000;
+            padding: 5px 15px;
+            border-radius: 50px;
+            font-size: 14px;
+            font-weight: 900;
+            text-transform: uppercase;
+            box-shadow: 0 10px 20px rgba(255, 199, 0, 0.3);
+            z-index: 10;
+        }
+    </style>
+</head>
+<body class="antialiased">
+
+    <div class="hero-bg">
+        <nav class="container mx-auto px-6 py-8 flex justify-between items-center relative z-10">
+            <div class="text-xl md:text-2xl font-black uppercase tracking-tighter">
+                MONKEY ISLAND<span class="text-[#ffc700]"> CLOUD</span>
+            </div>
+            <div class="flex items-center space-x-4 md:space-x-10 font-bold text-xs md:text-sm uppercase">
+                <a href="#prices" class="hover:text-[#ffc700] transition hidden sm:inline">Тарифы</a>
+                <a href="/login/" class="px-5 py-2 border border-[#ffc700] text-[#ffc700] rounded-full hover:bg-[#ffc700] hover:text-black transition">
+                    Личный кабинет
+                </a>
+            </div>
+        </nav>
+
+        <section class="container mx-auto px-6 flex-grow flex items-center justify-center md:justify-end">
+            <div class="flex flex-col items-center text-center md:items-end md:text-right max-w-3xl">
+                <h1 class="hero-title text-4xl sm:text-6xl md:text-8xl mb-6 uppercase leading-[0.9]">
+                    VPS ДЛЯ <br>
+                    <span class="text-[#ffc700] whitespace-nowrap">ВСЕХ УСТРОЙСТВ</span>
+                </h1>
+
+                <p class="text-gray-100 text-base md:text-2xl mb-10 font-medium drop-shadow-custom max-w-2xl">
+                    Подключайтесь к своему серверу через приложение.
+                    Неограниченный трафик и быстрая поддержка.
+                </p>
+
+                <a href="#prices" class="tilda-yellow px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95 mb-16 md:mb-24">
+                    ВЫБРАТЬ ТАРИФ
+                </a>
+
+                <div class="w-full grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 pt-10 border-t border-white/10">
+                    <div class="benefit-card flex flex-col items-center">
+                        <div class="text-[#ffc700] mb-3 text-2xl">
+                            <i class="fas fa-rocket"></i>
+                        </div>
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">Ускорь интернет</h4>
+                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
+                            Канал 10 Гбит/с и быстрый доступ до ближайших узлов.
+                        </p>
+                    </div>
+
+                    <div class="benefit-card flex flex-col items-center">
+                        <div class="text-[#ffc700] mb-3 text-2xl">
+                            <i class="fas fa-gamepad"></i>
+                        </div>
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">Ниже пинг</h4>
+                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
+                            Стабильный маршрут для игр, стримов и голосовых чатов.
+                        </p>
+                    </div>
+
+                    <div class="benefit-card flex flex-col items-center">
+                        <div class="text-[#ffc700] mb-3 text-2xl">
+                            <i class="fas fa-server"></i>
+                        </div>
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">Свой VPS</h4>
+                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
+                            Несколько локаций и быстрый вход в кабинет по email.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <section class="py-12 bg-[#0d0d0d] border-y border-white/5">
+        <div class="container mx-auto px-6 flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition duration-500">
+            <div class="flex items-center gap-2"><i class="fab fa-apple text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">iOS / macOS</span></div>
+            <div class="flex items-center gap-2"><i class="fab fa-android text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Android</span></div>
+            <div class="flex items-center gap-2"><i class="fab fa-windows text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Windows</span></div>
+            <div class="flex items-center gap-2"><i class="fab fa-linux text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Linux</span></div>
+            <div class="flex items-center gap-2"><i class="fas fa-tv text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Smart TV</span></div>
+        </div>
+    </section>
+
+    <section class="py-24 relative overflow-hidden bg-[#111111]">
+        <div class="container mx-auto px-6 relative z-10">
+            <div class="text-center mb-20">
+                <h2 class="text-3xl md:text-5xl font-black uppercase mb-4 text-white">Возможности <span class="text-[#ffc700]">сервиса</span></h2>
+                <p class="text-white text-sm md:text-lg max-w-2xl mx-auto leading-relaxed opacity-90">Подходит для игр, приложений, медиасервисов и повседневной работы на всех ваших устройствах.</p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
+                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
+                        <i class="fas fa-gauge-high text-black text-xl"></i>
+                    </div>
+                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Высокая скорость</h3>
+                    <p class="text-white text-sm leading-relaxed opacity-80">Канал 10 Гбит/с и задержка менее 10 мс до ближайших узлов.</p>
+                </div>
+
+                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
+                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
+                        <i class="fas fa-shield-halved text-black text-xl"></i>
+                    </div>
+                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Защищённое соединение</h3>
+                    <p class="text-white text-sm leading-relaxed opacity-80">Шифрование трафика и защита от DDoS входят в каждый тариф.</p>
+                </div>
+
+                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
+                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
+                        <i class="fas fa-mobile-screen-button text-black text-xl"></i>
+                    </div>
+                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Все платформы</h3>
+                    <p class="text-white text-sm leading-relaxed opacity-80">Одна подписка для iOS, Android, Windows, macOS и Linux.</p>
+                </div>
+
+                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
+                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
+                        <i class="fas fa-earth-europe text-black text-xl"></i>
+                    </div>
+                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Множество локаций</h3>
+                    <p class="text-white text-sm leading-relaxed opacity-80">Выбирайте подходящий регион и подключайтесь к своему серверу из приложения.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="prices" class="py-24 bg-[#0a0a0a] rounded-t-[60px] border-t border-white/5">
+        <div class="container mx-auto px-6">
+            <div class="text-center mb-16">
+                <h2 class="text-4xl md:text-6xl font-black uppercase mb-4 tracking-tighter">ТАРИФЫ</h2>
+                <div class="w-20 h-1.5 bg-[#ffc700] mx-auto"></div>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-6xl mx-auto">
+                {% for tariff in tariffs %}
+                <div class="tariff-card p-10 flex flex-col justify-between">
+
+                    {% if "3 месяца" in tariff.description %}
+                        <div class="discount-badge">Экономия 25%</div>
+                    {% elif "1 год" in tariff.description %}
+                        <div class="discount-badge">Выгода 40%</div>
+                    {% endif %}
+
+                    <div>
+                        <h3 class="text-[#ffc700] font-black text-xl uppercase mb-2">{{ tariff.description }}</h3>
+                        <div class="text-5xl font-black mb-8">{{ tariff.price }} ₽</div>
+
+                        <ul class="text-gray-400 space-y-4 mb-10 text-sm font-medium">
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Высокая пропускная способность</li>
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Защищённое подключение</li>
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Безлимитный трафик</li>
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Все основные устройства</li>
+                        </ul>
+                    </div>
+
+                    <form action="/pay/" method="POST" class="space-y-4" target="_blank">
+                        {% csrf_token %}
+                        <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
+                        <input type="email" name="email" placeholder="ТВОЙ EMAIL" required
+                            class="w-full input-field px-4 py-4 font-bold text-xs uppercase tracking-widest focus:border-[#ffc700] outline-none transition">
+                        <button type="submit" class="w-full tilda-yellow py-4 rounded-xl font-black uppercase text-sm tracking-widest transition shadow-lg">
+                            АРЕНДОВАТЬ
+                        </button>
+                    </form>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </section>
+
+    <section id="how-it-works" class="py-24 bg-[#111111] relative">
+        <div class="container mx-auto px-6 relative z-10">
+            <h2 class="text-4xl md:text-6xl font-black uppercase text-center mb-20 text-white">
+                КАК ЭТО <span class="text-[#ffc700]">РАБОТАЕТ</span>
+            </h2>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
+                <div class="text-center group">
+                    <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110 group-hover:shadow-[#ffc700]/50">1</div>
+                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Выберите тариф</h3>
+                    <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
+                        Оставьте email и получите доступ в личный кабинет после оплаты.
+                    </p>
+                </div>
+
+                <div class="text-center group">
+                    <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110 group-hover:shadow-[#ffc700]/50">2</div>
+                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Войдите в кабинет</h3>
+                    <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
+                        Мы отправим magic link на почту. Без паролей и лишних действий.
+                    </p>
+                </div>
+
+                <div class="text-center group">
+                    <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110 group-hover:shadow-[#ffc700]/50">3</div>
+                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Подключите устройства</h3>
+                    <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
+                        Используйте приложение и управляйте подключением на всех своих устройствах.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <footer class="bg-[#0a0a0a] border-t border-white/5 pt-20 pb-10">
+        <div class="container mx-auto px-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+                <div class="col-span-1 md:col-span-2">
+                    <div class="text-2xl font-black uppercase mb-6">MONKEY ISLAND<span class="text-[#ffc700]"> CLOUD</span></div>
+                    <p class="text-gray-500 text-sm max-w-xs leading-relaxed">Инфраструктура для быстрого и стабильного доступа с телефона, компьютера и планшета.</p>
+                </div>
+                <div>
+                    <h4 class="font-bold uppercase text-xs tracking-widest mb-6 text-white">Навигация</h4>
+                    <ul class="text-gray-500 text-sm space-y-4 font-medium">
+                        <li><a href="#how-it-works" class="hover:text-[#ffc700] transition">Как работает</a></li>
+                        <li><a href="#prices" class="hover:text-[#ffc700] transition">Тарифы</a></li>
+                        <li><a href="/login/" class="hover:text-[#ffc700] transition">Личный кабинет</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-bold uppercase text-xs tracking-widest mb-6 text-white">Поддержка</h4>
+                    <div class="flex space-x-4">
+                        <a href="https://t.me/monkeyislandsupportbot" class="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center hover:bg-[#ffc700] transition group"><i class="fab fa-telegram-plane group-hover:text-black"></i></a>
+                        <a href="#" class="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center hover:bg-[#ffc700] transition group"><i class="fas fa-envelope group-hover:text-black"></i></a>
+                    </div>
+                </div>
+            </div>
+            <div class="border-t border-white/5 pt-10 text-center text-gray-600 text-[10px] uppercase tracking-[0.3em]">
+                &copy; 2026 MONKEY ISLAND CLOUD | Инфраструктура для быстрых подключений
+            </div>
+        </div>
+    </footer>
+
+</body>
+</html>
