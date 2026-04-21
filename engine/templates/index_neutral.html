@@ -4,22 +4,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monkey Island Cloud — VPS для всех устройств</title>
+    <title>Monkey Island Cloud — Мощный VPS для интернета и игр</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
-
-        body {
-            font-family: 'Montserrat', sans-serif;
-            background-color: #111111;
+        
+        body { 
+            font-family: 'Montserrat', sans-serif; 
+            background-color: #111111; 
             color: #ffffff;
             overflow-x: hidden;
         }
 
         .hero-bg {
-            background-image:
-                linear-gradient(270deg, rgba(17,17,17,0.9) 0%, rgba(17,17,17,0.55) 55%, rgba(17,17,17,0.15) 100%),
+            background-image: linear-gradient(180deg, rgba(17,17,17,0.3) 0%, #111111 100%), 
+                            url("{% static 'img/header-no-logo.png' %}");
+            background-image: 
+                linear-gradient(270deg, rgba(17,17,17,0.85) 0%, rgba(17,17,17,0.4) 60%, rgba(17,17,17,0) 100%),
                 linear-gradient(180deg, rgba(17,17,17,0.0) 60%, #111111 100%),
                 url("{% static 'img/header-no-logo.png' %}");
             background-size: cover;
@@ -30,6 +32,7 @@
             flex-direction: column;
         }
 
+        /* Добавим тень для всей навигации, чтобы буквы не сливались с небом */
         nav {
             text-shadow: 0 2px 10px rgba(0,0,0,0.8);
         }
@@ -50,7 +53,7 @@
 
         .tilda-yellow { background-color: #ffc700; color: #000000; }
         .tilda-yellow:hover { background-color: #e6b400; }
-
+        
         .tariff-card {
             background-color: #1a1a1a;
             border: 1px solid #2a2a2a;
@@ -58,7 +61,7 @@
             transition: all 0.3s ease;
             position: relative;
         }
-
+        
         .tariff-card:hover {
             transform: translateY(-10px);
             border-color: #ffc700;
@@ -75,6 +78,7 @@
         .hero-title {
             font-weight: 900;
             letter-spacing: -2px;
+            /* Тень для читаемости на фоне облаков */
             text-shadow: 0 4px 20px rgba(0,0,0,0.6);
         }
 
@@ -96,6 +100,30 @@
             box-shadow: 0 10px 20px rgba(255, 199, 0, 0.3);
             z-index: 10;
         }
+
+        /* Убираем стандартный маркер списка у details */
+        details summary::-webkit-details-marker {
+            display: none;
+        }
+        details summary {
+            list-style: none;
+        }
+
+        /* Плавный поворот стрелки при открытии */
+        details[open] .faq-icon {
+            transform: rotate(180deg);
+            color: #ffc700;
+        }
+
+        /* Плавное появление текста */
+        details[open] summary ~ * {
+            animation: sweep .3s ease-in-out;
+        }
+
+        @keyframes sweep {
+            0%    {opacity: 0; transform: translateY(-10px)}
+            100%  {opacity: 1; transform: translateY(0)}
+        }
     </style>
 </head>
 <body class="antialiased">
@@ -116,13 +144,12 @@
         <section class="container mx-auto px-6 flex-grow flex items-center justify-center md:justify-end">
             <div class="flex flex-col items-center text-center md:items-end md:text-right max-w-3xl">
                 <h1 class="hero-title text-4xl sm:text-6xl md:text-8xl mb-6 uppercase leading-[0.9]">
-                    VPS ДЛЯ <br>
-                    <span class="text-[#ffc700] whitespace-nowrap">ВСЕХ УСТРОЙСТВ</span>
+                    ОБЛАЧНЫЙ VPS <br>
+                    <span class="text-[#ffc700] whitespace-nowrap">ДЛЯ ЛЮБЫХ ЗАДАЧ</span>
                 </h1>
 
                 <p class="text-gray-100 text-base md:text-2xl mb-10 font-medium drop-shadow-custom max-w-2xl">
-                    Подключайтесь к своему серверу через приложение.
-                    Неограниченный трафик и быстрая поддержка.
+                    Высокоскоростные серверы для снижения пинга в играх, стабильного стриминга и безопасного доступа в интернет. Канал до 10 Гбит/с без лимитов по трафику.
                 </p>
 
                 <a href="#prices" class="tilda-yellow px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95 mb-16 md:mb-24">
@@ -134,9 +161,9 @@
                         <div class="text-[#ffc700] mb-3 text-2xl">
                             <i class="fas fa-rocket"></i>
                         </div>
-                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">Ускорь интернет</h4>
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">Ускорение сети</h4>
                         <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Канал 10 Гбит/с и быстрый доступ до ближайших узлов.
+                            Прямой пиринг с крупнейшими провайдерами для максимальной скорости загрузки.
                         </p>
                     </div>
 
@@ -144,9 +171,9 @@
                         <div class="text-[#ffc700] mb-3 text-2xl">
                             <i class="fas fa-gamepad"></i>
                         </div>
-                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">Ниже пинг</h4>
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">Минимальный пинг</h4>
                         <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Стабильный маршрут для игр, стримов и голосовых чатов.
+                            Оптимизированные маршруты до игровых серверов. Играй без лагов и задержек.
                         </p>
                     </div>
 
@@ -154,9 +181,9 @@
                         <div class="text-[#ffc700] mb-3 text-2xl">
                             <i class="fas fa-server"></i>
                         </div>
-                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">Свой VPS</h4>
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">Личный сервер</h4>
                         <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Несколько локаций и быстрый вход в кабинет по email.
+                            Вся мощность выделенного IP только для вас. Никаких «соседей», забивающих канал.
                         </p>
                     </div>
                 </div>
@@ -177,8 +204,8 @@
     <section class="py-24 relative overflow-hidden bg-[#111111]">
         <div class="container mx-auto px-6 relative z-10">
             <div class="text-center mb-20">
-                <h2 class="text-3xl md:text-5xl font-black uppercase mb-4 text-white">Возможности <span class="text-[#ffc700]">сервиса</span></h2>
-                <p class="text-white text-sm md:text-lg max-w-2xl mx-auto leading-relaxed opacity-90">Подходит для игр, приложений, медиасервисов и повседневной работы на всех ваших устройствах.</p>
+                <h2 class="text-3xl md:text-5xl font-black uppercase mb-4 text-white">Инфраструктура <span class="text-[#ffc700]">нового поколения</span></h2>
+                <p class="text-white text-sm md:text-lg max-w-2xl mx-auto leading-relaxed opacity-90">Мы построили сеть, которая идеально подходит для геймеров, разработчиков и тех, кому важна каждая миллисекунда.</p>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -186,32 +213,32 @@
                     <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
                         <i class="fas fa-gauge-high text-black text-xl"></i>
                     </div>
-                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Высокая скорость</h3>
-                    <p class="text-white text-sm leading-relaxed opacity-80">Канал 10 Гбит/с и задержка менее 10 мс до ближайших узлов.</p>
+                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Канал 10 Гбит/с</h3>
+                    <p class="text-white text-sm leading-relaxed opacity-80">Забудьте о буферизации. Смотрите видео в 4K/8K, скачивайте тяжелые обновления игр за считанные минуты.</p>
+                </div>
+
+                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
+                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
+                        <i class="fas fa-network-wired text-black text-xl"></i>
+                    </div>
+                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Low Latency routing</h3>
+                    <p class="text-white text-sm leading-relaxed opacity-80">Умная маршрутизация трафика в обход загруженных узлов снижает пинг в соревновательных играх на 20-50%.</p>
                 </div>
 
                 <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
                     <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
                         <i class="fas fa-shield-halved text-black text-xl"></i>
                     </div>
-                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Защищённое соединение</h3>
-                    <p class="text-white text-sm leading-relaxed opacity-80">Шифрование трафика и защита от DDoS входят в каждый тариф.</p>
+                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">DDoS Защита L3/L4/L7</h3>
+                    <p class="text-white text-sm leading-relaxed opacity-80">Аппаратная фильтрация мусорного трафика. Ваш сервер останется доступным даже под массированной атакой.</p>
                 </div>
 
                 <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
                     <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
-                        <i class="fas fa-mobile-screen-button text-black text-xl"></i>
+                        <i class="fas fa-laptop-code text-black text-xl"></i>
                     </div>
-                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Все платформы</h3>
-                    <p class="text-white text-sm leading-relaxed opacity-80">Одна подписка для iOS, Android, Windows, macOS и Linux.</p>
-                </div>
-
-                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
-                        <i class="fas fa-earth-europe text-black text-xl"></i>
-                    </div>
-                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Множество локаций</h3>
-                    <p class="text-white text-sm leading-relaxed opacity-80">Выбирайте подходящий регион и подключайтесь к своему серверу из приложения.</p>
+                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Все устройства</h3>
+                    <p class="text-white text-sm leading-relaxed opacity-80">Удобные клиенты и конфиги для Windows, macOS, Linux, iOS, Android и даже роутеров с OpenWRT.</p>
                 </div>
             </div>
         </div>
@@ -238,10 +265,10 @@
                         <div class="text-5xl font-black mb-8">{{ tariff.price }} ₽</div>
 
                         <ul class="text-gray-400 space-y-4 mb-10 text-sm font-medium">
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Высокая пропускная способность</li>
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Защищённое подключение</li>
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Канал до 10 Гбит/с</li>
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Снижение пинга в играх</li>
                             <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Безлимитный трафик</li>
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Все основные устройства</li>
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Любое количество устройств</li>
                         </ul>
                     </div>
 
@@ -268,27 +295,198 @@
             <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
                 <div class="text-center group">
                     <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110 group-hover:shadow-[#ffc700]/50">1</div>
-                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Выберите тариф</h3>
+                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Выбери тариф</h3>
                     <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                        Оставьте email и получите доступ в личный кабинет после оплаты.
+                        Оформи подписку на нужный срок. Ты сразу получишь доступ в личный кабинет со всеми настройками.
                     </p>
                 </div>
 
                 <div class="text-center group">
                     <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110 group-hover:shadow-[#ffc700]/50">2</div>
-                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Войдите в кабинет</h3>
+                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Установи приложение</h3>
                     <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                        Мы отправим magic link на почту. Без паролей и лишних действий.
+                        Мы используем надежные современные клиенты. Просто скачай рекомендованное приложение по ссылке из кабинета.
                     </p>
                 </div>
 
                 <div class="text-center group">
                     <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110 group-hover:shadow-[#ffc700]/50">3</div>
-                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Подключите устройства</h3>
+                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Начни использовать</h3>
                     <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                        Используйте приложение и управляйте подключением на всех своих устройствах.
+                        Добавь свой персональный ключ в один клик. Наслаждайся высокой скоростью и низким пингом на всех девайсах.
                     </p>
                 </div>
+            </div>
+        </div>
+
+        <div class="absolute bottom-0 left-0 w-full overflow-hidden leading-[0] transform rotate-180">
+            <svg class="relative block w-[calc(100%+1.3px)] h-[60px]" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
+                <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" fill="#0a0a0a"></path>
+            </svg>
+        </div>
+    </section>
+
+    <section class="py-24 bg-[#0a0a0a]">
+        <div class="container mx-auto px-6 max-w-4xl">
+            <h2 class="text-4xl md:text-6xl font-black uppercase text-center mb-20 text-white">
+                ВОПРОСЫ <span class="text-[#ffc700]">И ОТВЕТЫ</span>
+            </h2>
+            
+            <div class="space-y-4 max-w-4xl mx-auto">
+                
+                <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
+                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
+                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
+                            Как начать пользоваться сервисом?
+                        </h4>
+                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </span>
+                    </summary>
+                    <div class="px-6 md:px-8 pb-8">
+                        <div class="border-t border-white/10 pt-8">
+                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                <div class="bg-white/[0.03] p-6 rounded-[20px] border border-white/5 flex flex-col h-full hover:border-white/10 transition">
+                                    <h5 class="text-[#ffc700] font-black text-[11px] uppercase tracking-widest mb-5 flex items-center gap-2">
+                                        <i class="fas fa-bolt text-[12px]"></i> Прямая покупка
+                                    </h5>
+                                    <ul class="space-y-4 text-sm text-white opacity-90">
+                                        <li class="flex items-start gap-3"><span class="text-[#00ff88] font-bold">✓</span><span>Оплатите тариф на главной странице.</span></li>
+                                        <li class="flex items-start gap-3"><span class="text-[#00ff88] font-bold">✓</span><span>Получите ссылку на вход в ЛК на <b class="text-[#ffc700]">email</b>.</span></li>
+                                        <li class="flex items-start gap-3"><span class="text-[#00ff88] font-bold">✓</span><span>В кабинете вас уже ждет оплаченная инфраструктура.</span></li>
+                                    </ul>
+                                </div>
+                                <div class="bg-white/[0.03] p-6 rounded-[20px] border border-white/5 flex flex-col h-full hover:border-white/10 transition">
+                                    <h5 class="text-[#ffc700] font-black text-[11px] uppercase tracking-widest mb-5 flex items-center gap-2">
+                                        <i class="fas fa-gift text-[12px]"></i> Попробовать бесплатно
+                                    </h5>
+                                    <ul class="space-y-4 text-sm text-white opacity-90">
+                                        <li class="flex items-start gap-3"><span class="text-[#00ff88] font-bold">✓</span><span>Нажмите <b class="text-[#ffc700]">«Войти»</b> без пароля.</span></li>
+                                        <li class="flex items-start gap-3"><span class="text-[#00ff88] font-bold">✓</span><span>Получите <b class="text-[#ffc700]">1 день теста</b> сразу.</span></li>
+                                        <li class="flex items-start gap-3"><span class="text-[#00ff88] font-bold">✓</span><span>Настройте любое приложение и оплатите позже.</span></li>
+                                    </ul>
+                                </div>
+                            </div>
+                            <div class="mt-8 p-4 bg-[#ffc700]/5 rounded-xl border border-[#ffc700]/10 flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
+                                <span class="text-[#ffc700] font-black uppercase text-[10px] tracking-wider flex items-center gap-2">🚀 Универсальность:</span>
+                                <span class="text-white text-[11px] opacity-80">Инструкции доступны для iOS, Android, Windows и macOS.</span>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
+                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
+                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
+                            Вы ведете логи активности?
+                        </h4>
+                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </span>
+                    </summary>
+                    <div class="px-6 md:px-8 pb-8">
+                        <div class="border-t border-white/10 pt-8">
+                            <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
+                                Мы <span class="text-[#ffc700] font-bold">не ведем логи активности</span>, не записываем IP-адреса и не храним историю ваших посещений. Архитектура серверов устроена так, что информация о вашем трафике просто не оседает на дисках. Ваша приватность надежно защищена.
+                            </p>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
+                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
+                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
+                            Как подключение поможет уменьшить пинг в играх?
+                        </h4>
+                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </span>
+                    </summary>
+                    <div class="px-6 md:px-8 pb-8">
+                        <div class="border-t border-white/10 pt-8">
+                            <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
+                                Часто локальный интернет-провайдер пускает трафик по дешевым, но длинным и загруженным маршрутам. Подключаясь к нашему VPS, вы перенаправляете свой трафик через <span class="text-[#ffc700] font-bold">магистральные каналы премиум-класса</span>. Это позволяет сократить количество промежуточных узлов (хопов) до серверов игры и сделать задержку стабильной, устраняя "скачки" пинга и потерю пакетов.
+                            </p>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
+                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
+                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
+                            Потянет ли сервер 4K-видео и тяжелые стримы?
+                        </h4>
+                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </span>
+                    </summary>
+                    <div class="px-6 md:px-8 pb-8">
+                        <div class="border-t border-white/10 pt-8">
+                            <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
+                                Полный вперед! Наши серверы подключены к портам <span class="text-[#ffc700] font-bold">1 Гбит/с и 10 Гбит/с</span>. Этого с запасом хватает для комфортного просмотра видео в сверхвысоком разрешении, стриминга без потери кадров и мгновенной загрузки объемных файлов. Пропускная способность не режется в часы пик.
+                            </p>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
+                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
+                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
+                            Сколько устройств можно подключить?
+                        </h4>
+                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </span>
+                    </summary>
+                    <div class="px-6 md:px-8 pb-8">
+                        <div class="border-t border-white/10 pt-8">
+                            <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
+                                Мы не ограничиваем количество устройств. По одной подписке вы можете подключить <span class="text-[#ffc700] font-bold">телефон, планшет, ноутбук и даже роутер</span>. Главное — используйте ваш персональный ключ только на своих девайсах, чтобы сохранить максимальный приоритет скорости.
+                            </p>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
+                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
+                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
+                            Гарантия качества и возврат средств
+                        </h4>
+                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </span>
+                    </summary>
+                    <div class="px-6 md:px-8 pb-8">
+                        <div class="border-t border-white/10 pt-8">
+                            <div class="space-y-4 text-white text-sm md:text-base leading-relaxed opacity-90">
+                                <p>Мы уверены в качестве наших услуг, поэтому предлагаем честные условия:</p>
+                                <div class="bg-white/5 p-4 rounded-xl space-y-2">
+                                    <p>1. <span class="text-[#ffc700] font-bold">Пробный период:</span> Начните с бесплатного дня, чтобы проверить скорость.</p>
+                                    <p>2. <span class="text-[#ffc700] font-bold">Возврат средств:</span> Если в течение <span class="text-[#ffc700]">трех суток</span> после покупки вас что-то не устроит — мы вернем средства по первому требованию без лишних вопросов.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
+                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
+                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
+                            Сложно ли всё это настроить?
+                        </h4>
+                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
+                            <i class="fas fa-chevron-down text-xs"></i>
+                        </span>
+                    </summary>
+                    <div class="px-6 md:px-8 pb-8">
+                        <div class="border-t border-white/10 pt-8">
+                            <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
+                                Вам не нужно быть системным администратором. Мы уже развернули серверную часть и подготовили профили. В личном кабинете вас ждут <span class="text-[#ffc700] font-bold">готовые конфигурации и QR-коды</span>. Установите клиент на свое устройство, отсканируйте код или скопируйте ключ — и всё готово за одну минуту.
+                            </p>
+                        </div>
+                    </div>
+                </details>
+
             </div>
         </div>
     </section>

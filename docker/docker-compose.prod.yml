@@ -5,7 +5,7 @@ services:
       dockerfile: docker/Dockerfile
     image: monkey-island-website:prod
     env_file:
-      - ../.env
+      - .env
     restart: unless-stopped
     expose:
       - "8000"
