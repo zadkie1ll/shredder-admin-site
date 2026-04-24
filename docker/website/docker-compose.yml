@@ -1,8 +1,8 @@
 services:
   app:
     build:
-      context: ..
-      dockerfile: docker/Dockerfile
+      context: ../..
+      dockerfile: docker/website/Dockerfile
     image: monkey-island-website:prod
     env_file:
       - .env
@@ -11,6 +11,8 @@ services:
       - "8000"
     volumes:
       - staticfiles:/app/staticfiles
+    networks:
+      - monkey-island-network
 
   nginx:
     image: nginx:1.27-alpine
@@ -23,8 +25,15 @@ services:
     volumes:
       - ./nginx.conf:/etc/nginx/conf.d/default.conf:ro
       - staticfiles:/var/www/static:ro
-      - ./certs:/etc/nginx/certs:ro
+      - ./letsencrypt:/etc/letsencrypt:ro
+      - ./cloudflare-ips:/etc/nginx/cloudflare:ro
       - ./certbot-www:/var/www/certbot:ro
+    networks:
+      - monkey-island-network
 
 volumes:
   staticfiles:
+
+networks:
+  monkey-island-network:
+    external: true

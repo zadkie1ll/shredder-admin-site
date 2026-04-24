@@ -72,6 +72,19 @@ def get_cabinet_base_url(request):
     return f"{scheme}://{settings.DEFAULT_CABINET_DOMAIN.rstrip('/')}"
 
 
+def get_pwa_context():
+    return {
+        "pwa_mirror_source_url": settings.PWA_MIRROR_SOURCE_URL,
+    }
+
+
+def render_login(request, context=None, status=200):
+    payload = get_pwa_context()
+    if context:
+        payload.update(context)
+    return render(request, "login.html", payload, status=status)
+
+
 def send_magic_link(request):
     if request.method == "POST":
         email_raw = request.POST.get("email", "")
@@ -196,7 +209,7 @@ def auth_by_magic_link(request, token):
 
                 return redirect("dashboard")
 
-        return render(request, "login.html", {"error": "Ссылка истекла или неверна"})
+        return render_login(request, {"error": "Ссылка истекла или неверна"})
     finally:
         session.close()
 
@@ -207,7 +220,7 @@ def index(request):
     if site_role == "cabinet":
         if request.user.is_authenticated:
             return redirect("dashboard")
-        return render(request, "login.html")
+        return render_login(request)
 
     if site_role == "neutral":
         return render(request, "index_neutral.html", {"tariffs": ACTUAL_TARIFFS})
@@ -327,7 +340,7 @@ def login(request):
     if request.user.is_authenticated:
         return redirect("dashboard")
 
-    return render(request, "login.html")
+    return render_login(request)
 
 
 def logout(request):
@@ -411,15 +424,12 @@ def pay(request):
     return redirect("index")
 
 def dynamic_manifest(request):
-    # Определяем текущий протокол и домен
-    scheme = 'https' if request.is_secure() else 'http'
-    domain = request.get_host()
-    base_url = f"{scheme}://{domain}"
-
     data = {
-        "name": "Monkey Island VPN",
-        "short_name": "MonkeyVPN",
-        "start_url": f"{base_url}/dashboard/", # Полный путь к ЛК
+        "name": "VPN Monkey Island",
+        "short_name": "VPN Monkey Island",
+        "id": "/",
+        "start_url": "/dashboard/",
+        "scope": "/",
         "display": "standalone",
         "background_color": "#1a1a1a",
         "theme_color": "#ff9900",

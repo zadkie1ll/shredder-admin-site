@@ -3,27 +3,84 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#ff9900">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="VPN Monkey Island">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <title>Вход — Monkey Island VPN</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+
+        :root {
+            --vh: 1vh;
+        }
+
+        html, body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
         
         body { 
             font-family: 'Montserrat', sans-serif; 
-            background-image: 
-                linear-gradient(rgba(13, 13, 13, 0.35), rgba(13, 13, 13, 0.65)), 
-                url("{% static 'img/bg3.png' %}"); 
+            background-color: #080808;
+            color: #ffffff;
+            margin: 0;
+        }
+
+        #app-container {
+            width: 100%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            -webkit-overflow-scrolling: touch;
+            overscroll-behavior-y: none;
+            position: relative;
+            touch-action: pan-y;
+        }
+
+        .page-background {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            pointer-events: none;
+            transform: translateZ(0);
+        }
+
+        .page-background-image {
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(13, 13, 13, 0.35), rgba(13, 13, 13, 0.65)),
+                url("{% static 'img/bg3.png' %}");
             background-size: cover;
             background-position: center;
-            background-attachment: fixed;
-            color: #ffffff;
+            background-repeat: no-repeat;
+            transform: translateZ(0);
+        }
+
+        .login-shell {
+            position: relative;
+            z-index: 1;
+            min-height: calc(var(--vh, 1vh) * 100);
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 100vh;
-            margin: 0;
+            padding:
+                max(20px, env(safe-area-inset-top))
+                20px
+                max(20px, env(safe-area-inset-bottom))
+                20px;
         }
 
         .login-card {
@@ -41,6 +98,8 @@
             background-color: rgba(0,0,0,0.3);
             border: 1px solid rgba(255,255,255,0.1);
             color: white;
+            font-size: 16px;
+            -webkit-appearance: none;
             transition: all 0.3s ease;
         }
 
@@ -63,58 +122,161 @@
 
         /* Анимация для состояния отправки */
         .hidden-step { display: none; }
+
+        @media (hover: none) and (pointer: coarse) {
+            .page-background {
+                inset: -12svh 0 -12svh 0;
+                will-change: transform;
+            }
+
+            .page-background-image {
+                transform: scale(1.08) translateZ(0);
+                transform-origin: center center;
+                background-position: center top;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .login-shell {
+                align-items: stretch;
+            }
+
+            .login-card {
+                margin: auto 0;
+                padding: 36px 24px;
+                border-radius: 28px;
+            }
+        }
     </style>
 </head>
 <body class="antialiased">
+    <div class="page-background">
+        <div class="page-background-image"></div>
+    </div>
 
-    <div class="login-card text-center">
-        
-        <div id="step-input">
-            <div class="mb-10">
-                <div class="w-16 h-16 bg-[#ffc700]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <i class="fas fa-magic text-[#ffc700] text-2xl"></i>
+    <div id="app-container">
+        <div class="login-shell">
+            <div class="login-card text-center">
+                
+                <div id="step-input">
+                    <div class="mb-10">
+                        <div class="w-16 h-16 bg-[#ffc700]/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                            <i class="fas fa-magic text-[#ffc700] text-2xl"></i>
+                        </div>
+                        <h2 class="text-2xl font-black uppercase italic tracking-tighter">Вход без пароля</h2>
+                        <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-2">Введите почту, и мы пришлем ссылку</p>
+                    </div>
+
+                    <form id="magicLinkForm" class="space-y-6">
+                        {% csrf_token %}
+                        <div class="text-left">
+                            <label class="text-[10px] font-black uppercase text-gray-400 ml-4 mb-2 block tracking-widest">Ваш Email</label>
+                            <input type="email" id="email" placeholder="pirate@monkey-island.com" required 
+                                   class="w-full input-field px-6 py-4 rounded-2xl font-bold outline-none">
+                        </div>
+
+                        <button type="submit" class="w-full tilda-yellow py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition">
+                            Получить ссылку для входа
+                        </button>
+                    </form>
                 </div>
-                <h2 class="text-2xl font-black uppercase italic tracking-tighter">Вход без пароля</h2>
-                <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-2">Введите почту, и мы пришлем ссылку</p>
-            </div>
 
-            <form id="magicLinkForm" class="space-y-6">
-                <div class="text-left">
-                    <label class="text-[10px] font-black uppercase text-gray-400 ml-4 mb-2 block tracking-widest">Ваш Email</label>
-                    <input type="email" id="email" placeholder="pirate@monkey-island.com" required 
-                           class="w-full input-field px-6 py-4 rounded-2xl font-bold text-sm outline-none">
+                <div id="step-success" class="hidden-step animate-pulse">
+                    <div class="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                        <i class="fas fa-paper-plane text-green-500 text-3xl"></i>
+                    </div>
+                    <h2 class="text-xl font-black uppercase italic mb-4">Письмо в пути!</h2>
+                    <p class="text-gray-400 text-sm leading-relaxed">
+                        Мы отправили магическую ссылку на <br>
+                        <span id="target-email" class="text-white font-bold">вашу почту</span>. <br>
+                        Проверьте папку «Входящие» (или Спам).
+                    </p>
+                    <button onclick="location.reload()" class="mt-8 text-[10px] font-black uppercase text-[#ffc700] tracking-widest hover:underline">
+                        Я не получил письмо
+                    </button>
                 </div>
 
-                <button type="submit" class="w-full tilda-yellow py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition">
-                    Получить ссылку для входа
-                </button>
-            </form>
-        </div>
-
-        <div id="step-success" class="hidden-step animate-pulse">
-            <div class="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                <i class="fas fa-paper-plane text-green-500 text-3xl"></i>
+                <div class="mt-12 pt-8 border-t border-white/5">
+                    <a href="/" class="text-gray-500 text-[10px] font-black uppercase tracking-widest hover:text-white transition">
+                        <i class="fas fa-arrow-left mr-2"></i> Назад на остров
+                    </a>
+                </div>
             </div>
-            <h2 class="text-xl font-black uppercase italic mb-4">Письмо в пути!</h2>
-            <p class="text-gray-400 text-sm leading-relaxed">
-                Мы отправили магическую ссылку на <br>
-                <span id="target-email" class="text-white font-bold">вашу почту</span>. <br>
-                Проверьте папку «Входящие» (или Спам).
-            </p>
-            <button onclick="location.reload()" class="mt-8 text-[10px] font-black uppercase text-[#ffc700] tracking-widest hover:underline">
-                Я не получил письмо
-            </button>
-        </div>
-
-        <div class="mt-12 pt-8 border-t border-white/5">
-            <a href="/" class="text-gray-500 text-[10px] font-black uppercase tracking-widest hover:text-white transition">
-                <i class="fas fa-arrow-left mr-2"></i> Назад на остров
-            </a>
         </div>
     </div>
 
     <script>
-        // login.html
+        const mirrorSourceUrl = "{{ pwa_mirror_source_url|escapejs }}";
+
+        function setFullHeight() {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        }
+
+        function getCookie(name) {
+            const value = `; ${document.cookie}`;
+            const parts = value.split(`; ${name}=`);
+            if (parts.length === 2) {
+                return parts.pop().split(';').shift();
+            }
+            return '';
+        }
+
+        async function resolveActiveMirrorHost() {
+            if (!mirrorSourceUrl) {
+                return null;
+            }
+
+            try {
+                const response = await fetch(mirrorSourceUrl, {
+                    cache: 'no-store',
+                    mode: 'cors',
+                });
+                if (!response.ok) {
+                    return null;
+                }
+
+                const rawValue = (await response.text()).trim();
+                const normalized = rawValue
+                    .replace(/^https?:\/\//i, '')
+                    .replace(/\/.*$/, '')
+                    .trim()
+                    .toLowerCase();
+
+                return normalized || null;
+            } catch (error) {
+                console.warn('Mirror lookup failed:', error);
+                return null;
+            }
+        }
+
+        async function bootstrapMirrorRedirect() {
+            const mirrorHost = await resolveActiveMirrorHost();
+            if (!mirrorHost || mirrorHost === window.location.host.toLowerCase()) {
+                return window.location.origin;
+            }
+
+            const nextUrl = new URL(window.location.href);
+            nextUrl.protocol = 'https:';
+            nextUrl.host = mirrorHost;
+            window.location.replace(nextUrl.toString());
+            return null;
+        }
+
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', function() {
+                navigator.serviceWorker.register('/sw.js').catch(function(err) {
+                    console.log('ServiceWorker registration failed: ', err);
+                });
+            });
+        }
+
+        if (!window.matchMedia('(hover: none) and (pointer: coarse)').matches) {
+            window.addEventListener('resize', setFullHeight);
+        }
+        window.addEventListener('orientationchange', setFullHeight);
+        setFullHeight();
+
         document.getElementById('magicLinkForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
@@ -128,12 +290,17 @@
             submitBtn.innerHTML = '<i class="fas fa-circle-notch animate-spin"></i> Отправка...';
 
             try {
+                const activeOrigin = await bootstrapMirrorRedirect();
+                if (!activeOrigin) {
+                    return;
+                }
+
                 // Отправляем данные на Django
-                const response = await fetch('/login/send-link/', {
+                const response = await fetch(`${activeOrigin}/login/send-link/`, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/x-www-form-urlencoded',
-                        'X-CSRFToken': '{{ csrf_token }}' // Не забудь про CSRF!
+                        'X-CSRFToken': getCookie('csrftoken')
                     },
                     body: new URLSearchParams({ 'email': email })
                 });
@@ -157,6 +324,8 @@
                 submitBtn.innerHTML = originalBtnText;
             }
         });
+
+        bootstrapMirrorRedirect();
     </script>
 
 </body>

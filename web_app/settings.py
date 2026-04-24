@@ -64,6 +64,7 @@ DEFAULT_CABINET_DOMAIN = config(
     "DEFAULT_CABINET_DOMAIN",
     default="http://localhost:8000"
 )
+PWA_MIRROR_SOURCE_URL = config("PWA_MIRROR_SOURCE_URL", default="")
 TG_BOT_USERNAME = config('TG_BOT_USERNAME', default='monkeyislandvpnbot')
 EMAIL_PROVIDER = config("EMAIL_PROVIDER", default="smtp")
 RESEND_API_KEY = config("RESEND_API_KEY", default="")
@@ -150,11 +151,26 @@ WSGI_APPLICATION = "web_app.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
+DEFAULT_SQLITE_URL = f"sqlite:///{BASE_DIR / 'db.sqlite3'}"
+WEB_DATABASE_URL = config("WEB_DATABASE_URL", default=None)
+WEB_DATABASE_SSL_REQUIRE = config("WEB_DATABASE_SSL_REQUIRE", default=False, cast=bool)
+
+if WEB_DATABASE_URL:
+    default_database_url = WEB_DATABASE_URL
+elif DEBUG:
+    default_database_url = DEFAULT_SQLITE_URL
+else:
+    raise RuntimeError(
+        "WEB_DATABASE_URL must be set when DEBUG=False. "
+        "Use a PostgreSQL URL like "
+        "'postgresql://user:password@host:5432/web_db'."
+    )
+
 DATABASES = {
-    'default': config(
-        'WEB_DATABASE_URL',
-        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
-        cast=dj_database_url.parse
+    "default": dj_database_url.parse(
+        default_database_url,
+        conn_max_age=600,
+        ssl_require=WEB_DATABASE_SSL_REQUIRE,
     )
 }
 

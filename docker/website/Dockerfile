@@ -39,7 +39,7 @@ COPY common ./common
 COPY engine ./engine
 COPY proto ./proto
 COPY web_app ./web_app
-COPY docker/entrypoint.sh /entrypoint.sh
+COPY docker/website/entrypoint.sh /entrypoint.sh
 
 RUN mkdir -p /app/staticfiles \
     && chmod +x /entrypoint.sh
