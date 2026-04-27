@@ -257,6 +257,53 @@
             background: rgba(255, 199, 0, 0.1) !important;
         }
 
+        .overview-grid {
+            max-width: 980px;
+        }
+
+        .status-overview-card {
+            padding: 28px;
+            min-height: 250px;
+            overflow: hidden;
+        }
+
+        .status-overview-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 70% 10%, rgba(255, 199, 0, 0.14), transparent 34%);
+            pointer-events: none;
+        }
+
+        .status-progress-track {
+            height: 7px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            overflow: hidden;
+        }
+
+        .status-progress-bar {
+            height: 100%;
+            width: var(--subscription-progress, 100%);
+            max-width: 100%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, var(--brand-gold), #ffe27a);
+            box-shadow: 0 0 20px rgba(255, 199, 0, 0.35);
+            transition: width 0.4s ease;
+        }
+
+        .quick-action-card {
+            min-height: 160px;
+            cursor: pointer;
+            transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .quick-action-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(255, 199, 0, 0.35) !important;
+            background: rgba(255, 199, 0, 0.06) !important;
+        }
+
         .copy-toast {
             position: fixed;
             bottom: 30px; left: 50%; transform: translateX(-50%);
@@ -302,103 +349,120 @@
             <div id="tab-home" class="tab-content active">
                 <div id="main-dashboard-view">
                     <header class="mb-10">
-                        <h1 class="text-3xl font-black uppercase tracking-tighter mb-2">Добро пожаловать в бухту!</h1>
-                        <p class="text-gray-500 text-sm font-bold uppercase">Статус твоего подключения и ключи</p>
+                        <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Привет!</h1>
+                        <p class="text-gray-500 text-sm md:text-base font-bold">Управление твоей VPN-подпиской</p>
                     </header>
 
-                    <div class="grid grid-cols-1 xl:grid-cols-3 gap-6">
-                        <div class="xl:col-span-2 space-y-6">
-                            <div class="setup-shell">
-                                <div class="setup-toolbar p-6 md:p-8 flex items-center justify-between border-b border-white/5">
-                                    <h3 class="text-[12px] font-black text-gray-300 uppercase tracking-[0.15em] ml-2 opacity-90">Твои ключи доступа</h3>
-                                    <span class="text-[10px] bg-[#ffc700]/10 text-[#ffc700] px-3 py-1 rounded-full font-bold uppercase border border-[#ffc700]/30">VLESS + Reality</span>
-                                </div>
-
-                                <div class="p-6 md:p-8">
-                                    <div class="setup-step-card relative group overflow-hidden cursor-pointer mb-6 border-2 border-[#ffc700]/30 bg-[#ffc700]/5" 
-                                        onclick="copyKey('happKey', 'HAPP ключ')">
-                                        
-                                        <div class="absolute top-0 right-0 bg-[#ffc700] text-black text-[8px] font-black px-3 py-1 uppercase tracking-widest rounded-bl-xl shadow-lg">
-                                            Рекомендуем
-                                        </div>
-
-                                        <div id="happKey" class="text-[11px] font-mono text-white break-all leading-relaxed pr-20">{{ happ_subscription_url }}</div>
-                                        
-                                        <div class="mt-4 flex items-center gap-2 text-[10px] font-black text-[#ffc700] uppercase">
-                                            <i class="fas fa-star animate-pulse"></i> Ключ для HAPP - рекомендуем (нажми, чтобы скопировать)
-                                        </div>
-                                    </div>
-
-                                    <div class="setup-step-card relative group overflow-hidden cursor-pointer opacity-60 hover:opacity-100 transition-opacity" 
-                                        onclick="copyKey('plainKey', 'Обычный ключ')">
-                                        
-                                        <div id="plainKey" class="text-[11px] font-mono text-gray-500 break-all leading-relaxed">{{ plain_subscription_url }}</div>
-                                        
-                                        <div class="mt-4 flex items-center gap-2 text-[10px] font-black text-gray-600 uppercase transition-colors group-hover:text-white">
-                                            <i class="fas fa-copy"></i> Обычный ключ (нажми, чтобы скопировать)
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="setup-shell p-6 md:p-8 flex justify-between items-center">
-                                <div>
-                                    <h3 class="text-[12px] font-black text-gray-300 uppercase tracking-[0.15em] mb-1 opacity-90">Продлить подписку</h3>
-                                    <p class="text-gray-500 text-[10px] font-bold uppercase ml-1">Выбери новый тариф или добавь дней</p>
-                                </div>
-                                <button onclick="showTariffs()" class="setup-cta-btn !w-auto !py-3 !px-6 !text-[10px]">
-                                    Продлить
-                                </button>
-                            </div>
-
-                            <div class="space-y-4 mb-8">
-                                {% if not user.telegram_id %}
-                                    <div class="setup-shell p-6 flex items-center gap-4 border-l-4 border-l-[#ffc700] animate-in fade-in slide-in-from-top-4 duration-500">
-                                        <i class="fab fa-telegram text-2xl text-[#ffc700] flex-shrink-0"></i>
-                                        <div class="text-[10px] font-black uppercase tracking-tight text-white">
-                                            Телеграм Бот <br>
-                                            <span class="text-gray-500 font-bold">Привяжи аккаунт и получи +7 дней</span>
-                                        </div>
-                                        <a href="{{ tg_bind_link }}" class="setup-link-btn ml-auto !bg-[#ffc700]/10 !text-[#ffc700] border border-[#ffc700]/30 hover:!bg-[#ffc700] hover:!text-black !py-2 !px-4 !text-[9px]">
-                                            Привязать ТГ
-                                        </a>
-                                    </div>
-
-                                {% elif not user.email %}
-                                    <div class="setup-shell p-6 flex items-center gap-4 border-l-4 border-l-[#ffc700]">
-                                        <i class="fas fa-envelope text-2xl text-[#ffc700] flex-shrink-0"></i>
-                                        <div class="text-[10px] font-black uppercase tracking-tight text-white">
-                                            Электронная почта <br>
-                                            <span class="text-gray-500 font-bold">Укажи почту для защиты аккаунта</span>
-                                        </div>
-                                        <button onclick="showEmailInput()" class="setup-link-btn ml-auto !bg-[#ffc700]/10 !text-[#ffc700] border border-[#ffc700]/30 hover:!bg-[#ffc700] hover:!text-black !py-2 !px-4 !text-[9px]">
-                                            Добавить Email
-                                        </button>
-                                    </div>
-                                {% endif %}
-                            </div>
-                        </div>
-
-                        <div class="xl:col-span-1">
-                            <div class="setup-shell h-full flex flex-col">
-                                <div class="setup-toolbar p-8 text-center flex-grow flex flex-col justify-center items-center">
-                                    <div class="w-20 h-20 bg-[#ffc700]/10 rounded-3xl flex items-center justify-center mb-4 border border-[#ffc700]/20 rotate-3">
-                                        <i class="fas fa-shield-alt text-[#ffc700] text-3xl"></i>
-                                    </div>
-                                    <h4 class="text-[14px] font-black text-white uppercase tracking-widest">Подписка</h4>
+                    <div class="overview-grid space-y-7">
+                        <section class="setup-shell status-overview-card">
+                            <div class="relative z-10 flex flex-col gap-8">
+                                <div class="flex items-start justify-between gap-4">
                                     {% if seconds_left <= 0 %}
-                                        <p class="text-red-500 text-[10px] font-black uppercase tracking-widest mt-2">Истекла</p>
+                                        <div class="flex items-center gap-2 text-red-400 text-sm font-black">
+                                            <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>
+                                            Подписка истекла
+                                        </div>
                                     {% else %}
-                                        <p class="text-[#00ff88] text-[10px] font-black uppercase tracking-widest mt-2">В полном порядке</p>
+                                        <div class="flex items-center gap-2 text-[#00ff88] text-sm font-black">
+                                            <span class="w-2.5 h-2.5 rounded-full bg-[#00ff88]"></span>
+                                            Активна
+                                        </div>
+                                    {% endif %}
+                                    <span class="text-gray-500 text-sm font-bold">{{ user.expire_at|date:"d.m.Y" }}</span>
+                                </div>
+
+                                <div>
+                                    {% if seconds_left <= 0 %}
+                                        <div class="flex items-end gap-4 mb-3">
+                                            <span id="days-left-count" data-seconds-left="{{ seconds_left|floatformat:0 }}" class="text-6xl font-black leading-none text-red-400">0</span>
+                                            <span class="text-gray-500 text-xl font-bold mb-2">дней осталось</span>
+                                        </div>
+                                        <p class="text-gray-500 text-sm font-bold">Продли доступ, чтобы снова подключиться к VPN.</p>
+                                    {% else %}
+                                        <div class="flex flex-wrap items-end gap-x-4 gap-y-2 mb-3">
+                                            <span id="days-left-count" data-seconds-left="{{ seconds_left|floatformat:0 }}" class="text-6xl font-black leading-none text-white">—</span>
+                                            <span class="text-gray-500 text-xl font-bold mb-2">до {{ user.expire_at|date:"j E" }}</span>
+                                        </div>
+                                        <p class="text-gray-500 text-sm font-bold">дней осталось</p>
                                     {% endif %}
                                 </div>
-                                <div class="p-6 border-t border-white/5 bg-[#0a0a0a]">
-                                    <div class="flex justify-between items-center">
-                                        <span class="text-[10px] font-black text-gray-500 uppercase">Осталось:</span>
-                                        <span class="text-sm font-black text-[#ffc700]">{{ user.expire_at|timeuntil }}</span>
+
+                                <div class="space-y-5">
+                                    <div class="status-progress-track">
+                                        <div id="subscription-progress-bar" class="status-progress-bar"></div>
+                                    </div>
+
+                                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                        <div class="text-gray-500 text-sm font-bold">
+                                            Автопродление:
+                                            {% if has_recurrent %}
+                                                <span class="text-[#00ff88]">включено</span>
+                                            {% else %}
+                                                <span class="text-white">не подключено</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="flex flex-wrap items-center gap-3">
+                                            <button type="button" onclick="showTab('profile')" class="text-[#ffc700] text-xs font-bold hover:text-white transition-colors">
+                                                +40 дней за друга
+                                            </button>
+                                            <button type="button" onclick="showTab('profile')" class="bg-white/10 hover:bg-white/15 border border-white/10 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all">
+                                                Подробнее
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
+                        </section>
+
+                        <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                            <div>
+                                <h3 class="text-lg font-black mb-2">Продлить подписку</h3>
+                                <p class="text-gray-500 text-sm font-bold">Выбери новый тариф или добавь дней к текущей подписке.</p>
+                            </div>
+                            <button type="button" onclick="showTariffs()" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !mb-0 !mr-0">
+                                Продлить
+                            </button>
+                        </section>
+
+                        <section class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            <button type="button" onclick="showTab('setup')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
+                                <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
+                                    <i class="fas fa-bolt text-lg"></i>
+                                </div>
+                                <h3 class="text-sm font-black mb-2">Настройка</h3>
+                                <p class="text-gray-500 text-xs font-bold">Приложения и подключение</p>
+                            </button>
+                            <button type="button" onclick="showTab('support')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
+                                <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
+                                    <i class="fas fa-life-ring text-lg"></i>
+                                </div>
+                                <h3 class="text-sm font-black mb-2">Поддержка</h3>
+                                <p class="text-gray-500 text-xs font-bold">Помощь в Telegram</p>
+                            </button>
+                            <button type="button" onclick="showTab('profile')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
+                                <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
+                                    <i class="fas fa-user-friends text-lg"></i>
+                                </div>
+                                <h3 class="text-sm font-black mb-2">Рефералы</h3>
+                                <p class="text-gray-500 text-xs font-bold">Пригласи друга</p>
+                            </button>
+                        </section>
+
+                        <div class="space-y-4 mb-8">
+                            {% if not user.telegram_id %}
+                                <div class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center gap-5 border border-[#ffc700]/30">
+                                    <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                        <i class="fab fa-telegram text-xl"></i>
+                                    </div>
+                                    <div class="flex-1">
+                                        <h3 class="text-lg font-black mb-2">Привяжи Telegram</h3>
+                                        <p class="text-gray-500 text-sm font-bold leading-relaxed">Управляй подпиской из бота, получай уведомления и бонусные дни.</p>
+                                    </div>
+                                    <a href="{{ tg_bind_link }}" class="setup-link-btn !w-full md:!w-auto !py-4 !px-8 !text-[10px] !mb-0 !mr-0">
+                                        Привязать ТГ
+                                    </a>
+                                </div>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -1644,9 +1708,24 @@
             container.appendChild(stepperWrapper);
         }
 
+        function updateSubscriptionOverview() {
+            const daysNode = document.getElementById('days-left-count');
+            const progressNode = document.getElementById('subscription-progress-bar');
+
+            if (!daysNode || !progressNode) return;
+
+            const secondsLeft = Number(daysNode.dataset.secondsLeft || 0);
+            const daysLeft = Math.max(0, Math.ceil(secondsLeft / 86400));
+            const progress = secondsLeft <= 0 ? 0 : Math.max(8, Math.min(100, (daysLeft / 30) * 100));
+
+            daysNode.innerText = daysLeft;
+            progressNode.style.setProperty('--subscription-progress', progress + '%');
+        }
+
         // Инициализация при загрузке
         document.addEventListener('DOMContentLoaded', () => {
             setPlatform('android');
+            updateSubscriptionOverview();
         });
 
         // ЛОГИКА ТАРИФОВ (Full Page)
@@ -1738,7 +1817,7 @@
 
         // Обновленная функция копирования (чтобы text ready)
         function copyRefLink(event) {
-            const copyText = document.getElementById("ref-link-input");
+            const copyText = document.getElementById("ref-link-input-sheet");
             copyText.select();
             copyText.setSelectionRange(0, 99999); // Для мобилок
             
