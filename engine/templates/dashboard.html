@@ -9,6 +9,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="VPN Monkey Island">
     <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
+    <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <title>VPN Monkey Island</title>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -419,7 +421,7 @@
                                         <div class="text-gray-500 text-sm font-bold">
                                             Автопродление:
                                             {% if has_recurrent %}
-                                                <span class="text-[#00ff88]">включено</span>
+                                                <span class="text-[#00ff88]">не подключено</span>
                                             {% else %}
                                                 <span class="text-white">не подключено</span>
                                             {% endif %}
