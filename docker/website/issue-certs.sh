@@ -4,6 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="${SCRIPT_DIR}/.env"
+COMPOSE_FILE="${SCRIPT_DIR}/docker-compose.yml"
 
 if [[ ! -f "${ENV_FILE}" ]]; then
     echo "Missing env file: ${ENV_FILE}" >&2
@@ -33,45 +34,19 @@ read_env_value() {
     printf '%s\n' "${line}"
 }
 
-CF_DNS_API_TOKEN="$(read_env_value "CF_DNS_API_TOKEN" || true)"
 LETSENCRYPT_EMAIL="$(read_env_value "LETSENCRYPT_EMAIL" || true)"
-CERTBOT_CERT_NAME="$(read_env_value "CERTBOT_CERT_NAME" || true)"
-CERTBOT_DOMAINS="$(read_env_value "CERTBOT_DOMAINS" || true)"
-CF_DNS_PROPAGATION_SECONDS="$(read_env_value "CF_DNS_PROPAGATION_SECONDS" || true)"
+ORIGIN_CERT_NAME="$(read_env_value "ORIGIN_CERT_NAME" || true)"
+ORIGIN_CERTBOT_DOMAINS="$(read_env_value "ORIGIN_CERTBOT_DOMAINS" || true)"
 
-CERTBOT_CERT_NAME="${CERTBOT_CERT_NAME:-monkey-island-sites}"
-CERTBOT_DOMAINS="${CERTBOT_DOMAINS:-monkey-island-vps.com,monkeyislandvpn.com,monkey-island-vpn.com,mnk-island.org}"
-CF_DNS_PROPAGATION_SECONDS="${CF_DNS_PROPAGATION_SECONDS:-30}"
-
-if [[ -z "${CF_DNS_API_TOKEN}" ]]; then
-    echo "CF_DNS_API_TOKEN is required in ${ENV_FILE}" >&2
+if [[ -z "${LETSENCRYPT_EMAIL}" || -z "${ORIGIN_CERT_NAME}" || -z "${ORIGIN_CERTBOT_DOMAINS}" ]]; then
+    echo "LETSENCRYPT_EMAIL, ORIGIN_CERT_NAME and ORIGIN_CERTBOT_DOMAINS are required in ${ENV_FILE}" >&2
     exit 1
 fi
 
-if [[ -z "${LETSENCRYPT_EMAIL}" ]]; then
-    echo "LETSENCRYPT_EMAIL is required in ${ENV_FILE}" >&2
-    exit 1
-fi
-
-mkdir -p \
-    "${SCRIPT_DIR}/letsencrypt" \
-    "${SCRIPT_DIR}/certbot-work" \
-    "${SCRIPT_DIR}/certbot-logs"
-
-CREDENTIALS_FILE="$(mktemp)"
-
-cleanup() {
-    rm -f "${CREDENTIALS_FILE}"
-}
-trap cleanup EXIT
-
-chmod 600 "${CREDENTIALS_FILE}"
-cat > "${CREDENTIALS_FILE}" <<EOF
-dns_cloudflare_api_token = ${CF_DNS_API_TOKEN}
-EOF
+mkdir -p "${SCRIPT_DIR}/letsencrypt" "${SCRIPT_DIR}/certbot-work" "${SCRIPT_DIR}/certbot-logs"
 
 domain_args=()
-IFS=',' read -r -a domains <<< "${CERTBOT_DOMAINS}"
+IFS=',' read -r -a domains <<< "${ORIGIN_CERTBOT_DOMAINS}"
 for domain in "${domains[@]}"; do
     trimmed="$(echo "${domain}" | xargs)"
     [[ -n "${trimmed}" ]] || continue
@@ -79,27 +54,36 @@ for domain in "${domains[@]}"; do
 done
 
 if [[ ${#domain_args[@]} -eq 0 ]]; then
-    echo "CERTBOT_DOMAINS is empty" >&2
+    echo "ORIGIN_CERTBOT_DOMAINS is empty" >&2
     exit 1
 fi
 
+was_running=0
+if docker compose -f "${COMPOSE_FILE}" ps --status running 2>/dev/null | grep -q nginx; then
+    was_running=1
+fi
+
+docker compose -f "${COMPOSE_FILE}" down || true
+
 docker run --rm \
+    -p 80:80 \
     -v "${SCRIPT_DIR}/letsencrypt:/etc/letsencrypt" \
     -v "${SCRIPT_DIR}/certbot-work:/var/lib/letsencrypt" \
     -v "${SCRIPT_DIR}/certbot-logs:/var/log/letsencrypt" \
-    -v "${CREDENTIALS_FILE}:/cloudflare.ini:ro" \
-    certbot/dns-cloudflare:latest \
+    certbot/certbot:latest \
     certonly \
-    --dns-cloudflare \
-    --dns-cloudflare-credentials /cloudflare.ini \
-    --dns-cloudflare-propagation-seconds "${CF_DNS_PROPAGATION_SECONDS}" \
+    --standalone \
+    --preferred-challenges http-01 \
     --non-interactive \
     --agree-tos \
-    --keep-until-expiring \
-    --preferred-challenges dns-01 \
+    --expand \
     --key-type ecdsa \
     --email "${LETSENCRYPT_EMAIL}" \
-    --cert-name "${CERTBOT_CERT_NAME}" \
+    --cert-name "${ORIGIN_CERT_NAME}" \
     "${domain_args[@]}"
 
-echo "Certificate ready: ${CERTBOT_CERT_NAME}"
+if [[ "${was_running}" -eq 1 ]]; then
+    docker compose -f "${COMPOSE_FILE}" up -d
+fi
+
+echo "Certificate ready: ${ORIGIN_CERT_NAME}"

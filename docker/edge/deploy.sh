@@ -4,9 +4,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-SSH_HOST="${SSH_HOST:-}"
+SSH_HOST="${SSH_HOST:-mi.edge.retranslator}"
 REMOTE_DIR="${REMOTE_DIR:-/root/edge}"
-EDGE_PROFILE="${EDGE_PROFILE:-promo}"
 
 DRY_RUN=0
 
@@ -17,7 +16,6 @@ Usage: $(basename "$0") [options]
 Upload an edge nginx stack to a remote server and start it there.
 
 Options:
-  --profile NAME  One of: promo, neutral, cabinet
   --dry-run       Show upload plan without changing the server
   -h, --help      Show this help
 
@@ -26,16 +24,11 @@ Required env:
 
 Optional env:
   REMOTE_DIR      Remote edge directory (default: /root/edge)
-  EDGE_PROFILE    nginx profile if --profile is not passed
 EOF
 }
 
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --profile)
-            EDGE_PROFILE="$2"
-            shift 2
-            ;;
         --dry-run)
             DRY_RUN=1
             shift
@@ -57,22 +50,6 @@ if [[ -z "${SSH_HOST}" ]]; then
     exit 1
 fi
 
-case "${EDGE_PROFILE}" in
-    promo)
-        TEMPLATE_FILE="nginx-promo.conf.template"
-        ;;
-    neutral)
-        TEMPLATE_FILE="nginx-neutral.conf.template"
-        ;;
-    cabinet)
-        TEMPLATE_FILE="nginx-cabinet.conf.template"
-        ;;
-    *)
-        echo "Unsupported EDGE_PROFILE: ${EDGE_PROFILE}" >&2
-        exit 1
-        ;;
-esac
-
 require_command() {
     if ! command -v "$1" >/dev/null 2>&1; then
         echo "Required command not found: $1" >&2
@@ -85,6 +62,7 @@ require_command ssh
 
 RUNTIME_FILES=(
     "docker-compose.yml"
+    "nginx.conf.template"
     ".env.example"
     "issue-certs.sh"
     "renew-certs.sh"
@@ -113,11 +91,6 @@ for relative_path in "${RUNTIME_FILES[@]}"; do
         "${SCRIPT_DIR}/${relative_path}" \
         "${SSH_HOST}:${REMOTE_DIR}/${relative_path}"
 done
-
-echo "Uploading ${TEMPLATE_FILE} as nginx.conf.template"
-rsync "${RSYNC_ARGS[@]}" \
-    "${SCRIPT_DIR}/${TEMPLATE_FILE}" \
-    "${SSH_HOST}:${REMOTE_DIR}/nginx.conf.template"
 
 if [[ "${DRY_RUN}" -eq 1 ]]; then
     echo "Dry run complete."

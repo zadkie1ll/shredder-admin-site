@@ -19,7 +19,7 @@
         html, body {
             width: 100%;
             height: 100%;
-            overflow: hidden; /* Запрещаем скролл body для предотвращения скрытия адресной строки */
+            overflow: hidden;
         }
 
         #app-container {
@@ -36,16 +36,18 @@
         }
         
         :root {
-            --bg-color: #080808;
+            --bg-color: #0a0a0b;
+            --card-bg: rgba(22, 22, 24, 0.95); 
+            --inner-card-bg: rgba(45, 45, 48, 0.6); 
+            --card-border: rgba(255, 255, 255, 0.1);
             --brand-gold: #ffc700;
-            /* Высота мобильной панели */
             --nav-height: calc(70px + env(safe-area-inset-bottom));
         }
 
         body { 
             font-family: 'Montserrat', sans-serif; 
             background-color: var(--bg-color); 
-            color: #ffffff; 
+            color: #f5f5f5; 
             margin: 0; 
         }
 
@@ -54,7 +56,6 @@
             inset: 0;
             z-index: 0;
             pointer-events: none;
-            transform: translateZ(0);
         }
 
         .page-background-image {
@@ -63,19 +64,18 @@
             background-image: var(--dashboard-bg-image);
             background-size: cover;
             background-position: center;
-            background-repeat: no-repeat;
-            opacity: 0.8;
+            opacity: 0.25;
             transform: translateZ(0);
         }
 
-        /* Логика вкладок */
+        /* ЛОГИКА ВКЛАДОК */
         .tab-content { 
             display: none; 
-            opacity: 0;
+            opacity: 0; 
         }
-
+        
         .tab-content.active { 
-            display: block; 
+            display: block !important; 
             opacity: 1;
             animation: slideIn 0.2s ease-out forwards; 
         }
@@ -85,387 +85,191 @@
             to { opacity: 1; transform: translateY(0); } 
         }
 
-        /* ДЕСКТОП: Сайдбар слева */
+        /* Навигация */
         .sidebar-desktop { 
             width: 280px; 
             position: fixed; 
             left: 0; top: 0; bottom: 0; 
-            background: rgba(0,0,0,0.6); 
-            border-right: 1px solid rgba(255,255,255,0.05); 
+            background: rgba(13, 13, 15, 0.9); 
+            backdrop-filter: blur(15px);
+            border-right: 1px solid var(--card-border); 
             z-index: 100; 
             padding: 40px 20px;
             display: flex;
             flex-direction: column;
         }
 
-        /* МОБИЛКИ: Панель снизу */
         .nav-mobile {
             position: fixed;
             bottom: 0; left: 0; right: 0;
             height: var(--nav-height);
-            background: rgba(10, 10, 15, 0.95);
+            background: rgba(15, 15, 18, 0.98);
             backdrop-filter: blur(20px);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
-            display: none; /* Скрыта по умолчанию */
+            border-top: 1px solid var(--card-border);
+            display: none;
             justify-content: space-around;
-            align-items: flex-start; /* Прижимаем к верху панели, отступ даст safe-area */
             padding-top: 12px;
             z-index: 1000;
         }
 
-        /* Кнопки навигации (общие стили) */
         .nav-btn {
             cursor: pointer;
             transition: all 0.3s;
             color: rgba(255, 255, 255, 0.4);
-            border: none;
-            background: none;
             font-weight: 700;
             text-transform: uppercase;
             letter-spacing: 1px;
-            -webkit-tap-highlight-color: transparent;
-            outline: none !important;
-        }
-
-        .sidebar-desktop .nav-btn {
-            width: 100%;
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            padding: 16px 20px;
-            border-radius: 18px;
-            margin-bottom: 8px;
-            font-size: 13px;
-        }
-
-        .nav-mobile .nav-btn {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 4px;
-            font-size: 9px;
-            flex: 1;
+            background: none; border: none; outline: none !important;
         }
 
         .nav-btn.active { color: var(--brand-gold); }
-        .sidebar-desktop .nav-btn.active { background: rgba(255, 199, 0, 0.1); box-shadow: inset 0 0 20px rgba(255, 199, 0, 0.05); }
-        .nav-mobile .nav-btn i { font-size: 20px; }
+        
+        .sidebar-desktop .nav-btn {
+            width: 100%;
+            display: flex; align-items: center; gap: 15px;
+            padding: 16px 20px; border-radius: 18px; margin-bottom: 8px;
+        }
 
-        /* Основной контент */
-        .main-content { margin-left: 280px; padding: 40px; }
+        .sidebar-desktop .nav-btn.active { 
+            background: rgba(255, 199, 0, 0.08); 
+            border: 1px solid rgba(255, 199, 0, 0.15);
+        }
 
-        /* АДАПТИВНОСТЬ */
+        /* Контент */
+        .main-content { margin-left: 280px; padding: 40px; position: relative; z-index: 10; }
+
         @media (max-width: 1024px) {
             .sidebar-desktop { display: none !important; }
             .nav-mobile { display: flex !important; }
-            
-            .main-content { 
-                margin-left: 0 !important;
-                /* Вычисляем отступ: высота панели + 20px запаса */
-                padding-bottom: calc(var(--nav-height) + 20px) !important;
-                /* Важный фикс для некоторых браузеров */
-                min-height: calc(var(--vh, 1vh) * 100);
-                box-sizing: border-box;
-            }
+            .main-content { margin-left: 0 !important; padding-bottom: 120px !important; }
         }
 
-        /* iOS Safari часто дергает fixed background во время elastic scroll */
-        @media (hover: none) and (pointer: coarse) {
-            .page-background {
-                inset: -12svh 0 -12svh 0;
-                will-change: transform;
-            }
-
-            .page-background-image {
-                transform: scale(1.08) translateZ(0);
-                transform-origin: center center;
-                background-position: center top;
-            }
-        }
-
-        /* Эффект для ключа */
-        .key-box { background: rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.03); border-radius: 20px; padding: 20px; transition: 0.3s; }
-        .key-box:hover { border-color: var(--brand-gold); }
-        .blur-text { transition: 0.3s; cursor: pointer; }
-        .key-box:active .blur-text { filter: blur(0); }
-
-        /* Стили для отрисовки шагов */
-        .step-item { position: relative; padding-left: 60px; margin-bottom: 40px; }
-        .step-number { 
-            position: absolute; left: 0; top: 0; width: 44px; height: 44px; 
-            background: var(--brand-gold); color: #000; border-radius: 14px; 
-            display: flex; align-items: center; justify-content: center; 
-            font-weight: 900; transform: rotate(-3deg); 
-            box-shadow: 0 8px 20px rgba(255,199,0,0.15);
-        }
-        .platform-btn {
-            color: rgba(255,255,255,0.4);
-            background: rgba(255,255,255,0.02);
-            border: 1px solid rgba(255,255,255,0.05);
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-        }
-        .platform-btn.active {
-            background: var(--brand-gold);
-            color: #000;
-            border-color: var(--brand-gold);
-            font-weight: 900;
-            box-shadow: 0 10px 24px rgba(255, 199, 0, 0.16);
-        }
-        .app-btn {
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.1);
-            color: #ccc;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-        }
-        .app-btn.active {
-            border-color: var(--brand-gold);
-            color: var(--brand-gold);
-            background: rgba(255,199,0,0.1);
-            box-shadow: inset 0 0 0 1px rgba(255, 199, 0, 0.18);
-        }
-
-        /* Контейнер для линии и шагов */
-        .stepper-container {
-            position: relative;
-        }
-
+        /* Карточки */
         .setup-shell {
-            background: rgba(8, 8, 8, 0.84);
-            backdrop-filter: blur(18px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 24px;
-            overflow: hidden;
-        }
-
-        .setup-toolbar {
-            background: rgba(10, 10, 10, 0.72);
-            border-bottom: 1px solid rgba(255,255,255,0.07);
-        }
-
-        .setup-chip-group {
-            background: rgba(0,0,0,0.4);
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 18px;
-            padding: 8px;
+            background: var(--card-bg) !important;
+            border: 1px solid var(--card-border) !important;
+            border-radius: 28px;
+            padding: 24px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+            position: relative; /* Важно для линии! */
         }
 
         .setup-step-card {
-            background: rgba(18,18,18,0.92);
-            border: 1px solid rgba(255,255,255,0.08);
-            border-radius: 24px;
-            padding: 24px;
-            box-shadow: inset 0 1px 0 rgba(255,255,255,0.02);
+            background: var(--inner-card-bg) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-radius: 20px;
+            padding: 32px;
+            margin-bottom: 24px;
+            box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+            position: relative;
+            z-index: 2;
         }
 
-        .setup-step-card h4 {
-            letter-spacing: -0.02em;
+        .key-box { 
+            padding: 24px; 
+            background: rgba(0,0,0,0.4) !important; 
+            border: 1px solid var(--card-border) !important;
+            border-radius: 20px;
         }
 
-        .setup-link-btn {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 18px;
-            border-radius: 14px;
-            background: rgba(255,255,255,0.96);
-            color: #000;
-            font-size: 10px;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.12em;
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        .platform-btn, .app-btn {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            color: rgba(255, 255, 255, 0.5) !important;
+            padding: 10px 20px !important;
+            border-radius: 12px !important;
+            font-size: 11px !important;
+            font-weight: 700 !important;
+            transition: 0.2s;
         }
 
-        .setup-link-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 12px 24px rgba(255,255,255,0.08);
+        .platform-btn.active, .app-btn.active {
+            background: var(--brand-gold) !important;
+            color: #000 !important;
+            border-color: var(--brand-gold) !important;
+            box-shadow: 0 4px 15px rgba(255, 199, 0, 0.3);
         }
 
-        .setup-cta-btn {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 12px;
-            width: 100%;
-            max-width: max-content;
-            padding: 16px 28px;
-            border-radius: 18px;
-            background: #ffc700;
-            color: #000;
-            font-size: 11px;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.14em;
-            box-shadow: 0 18px 35px rgba(255,199,0,0.16);
-            transition: transform 0.2s ease, filter 0.2s ease;
+        /* ЛИНИЯ СТЕППЕРА (ИСПРАВЛЕНО) */
+        .stepper-container { 
+            position: relative; 
+            padding-left: 20px; /* Чтобы линия и цифры не липли к краю */
         }
 
-        .setup-cta-btn:hover {
-            transform: translateY(-1px);
-            filter: brightness(1.04);
-        }
-
-        .setup-note {
-            margin-top: 18px;
-            padding: 14px 16px;
-            border-radius: 16px;
-            background: rgba(255,199,0,0.05);
-            border: 1px solid rgba(255,199,0,0.12);
-        }
-
-        /* Сама исчезающая линия */
         .stepper-line {
             position: absolute;
-            left: 21px; 
-            top: 40px;
-            bottom: 40px; /* Немного приподнял снизу, чтобы не упиралась в край */
+            left: 45px; /* Выравнивание под центр кружков с номером */
+            top: 40px; 
+            bottom: 40px;
             width: 2px;
-            /* Увеличиваем яркость: 
-            0% - яркая под первой цифрой
-            70% - все еще видимая (0.3 прозрачности)
-            100% - мягко затухает, но не до нуля */
             background: linear-gradient(to bottom, 
-                rgba(255, 199, 0, 0.6) 0%, 
+                var(--brand-gold) 0%, 
                 rgba(255, 199, 0, 0.3) 70%, 
-                rgba(255, 199, 0, 0.1) 100%);
+                transparent 100%);
             z-index: 1;
         }
 
-        /* Чтобы номера шагов были поверх линии */
-        .step-number-circle {
+        .step-item {
             position: relative;
+            padding-left: 70px; /* Отступ текста от линии */
+        }
+
+        .step-number-circle {
+            position: absolute;
+            left: 0;
+            top: 0;
             z-index: 10;
-            width: 44px;
-            height: 44px;
-            background: #ffc700;
+            width: 50px; height: 50px;
+            background: var(--brand-gold);
             color: #000;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            border-radius: 14px;
+            display: flex; align-items: center; justify-content: center;
             font-weight: 900;
             box-shadow: 0 0 15px rgba(255, 199, 0, 0.3);
         }
 
-        .hidden { display: none !important; }
+        /* Кнопки */
+        .setup-link-btn, .setup-cta-btn {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 10px !important;
+            background: var(--brand-gold) !important;
+            color: #000 !important;
+            padding: 14px 28px !important;
+            border-radius: 16px !important;
+            font-size: 12px !important;
+            font-weight: 900 !important;
+            text-transform: uppercase !important;
+            transition: 0.2s !important;
+            border: none !important;
+            margin-right: 12px;
+            margin-bottom: 12px;
+        }
+
+        .setup-link-btn:hover {
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+        }
+
         .tariff-card.active-tariff {
             border-color: var(--brand-gold) !important;
-            background: rgba(255, 199, 0, 0.05);
-        }
-
-        #tariff-selection-view {
-            position: absolute; /* Вместо fixed, чтобы скролл был естественным */
-            top: 0;
-            left: 0;
-            width: 100%;
-            min-height: 100vh;
-            background: #080808;
-            z-index: 9999;
-            overflow-x: hidden; /* Убирает горизонтальный скролл */
-            padding: 20px 15px 100px 15px; /* Большой отступ снизу для кнопки */
-        }
-
-        .tariff-card.active-tariff h3 {
-            color: #ffc700;
-        }
-
-        .tariff-card {
-            width: 100%;
-            max-width: 400px; /* Чтобы не растягивались на весь экран планшета */
-            margin: 0 auto;
-            transition: transform 0.3s ease;
-        }
-
-        @media (min-width: 1024px) {
-            .tariff-card.active-tariff {
-                transform: scale(1.05) translateY(-10px);
-                border-color: #ffc700 !important;
-            }
-            .lg\:scale-110 {
-                transform: scale(1.1);
-            }
-        }
-
-        /* На мобилках просто подсвечиваем рамку, без изменения размера */
-        @media (max-width: 1023px) {
-            .tariff-card.active-tariff {
-                border-color: #ffc700 !important;
-                background: rgba(255, 199, 0, 0.05) !important;
-            }
-            /* Уменьшаем масштаб самого выгодного тарифа на мобиле, чтобы не вылезал */
-            .lg\:scale-110 {
-                transform: scale(1) !important;
-            }
-        }
-
-        .tariff-card.selected-active {
-            border-color: #ffc700 !important;
-            background: rgba(255, 199, 0, 0.05);
-            box-shadow: 0 0 20px rgba(255, 199, 0, 0.1);
-            transform: scale(1.02);
-        }
-
-        /* Делаем границы чуть заметнее, а фон карточек — капельку светлее */
-        .tariff-card.setup-step-card {
-            background: rgba(255, 255, 255, 0.02);
-            backdrop-filter: blur(12px);
-        }
-
-        /* При наведении карточка должна «оживать» */
-        .tariff-card:hover {
-            background: rgba(255, 199, 0, 0.03);
-        }
-
-        @keyframes bounce-horizontal {
-            0%, 100% { transform: translateX(0); }
-            50% { transform: translateX(-5px); } /* Было -10px, стало -5px */
-        }
-
-        .animate-bounce-horizontal {
-            animation: bounce-horizontal 3s infinite ease-in-out;
-        }
-
-        #ref-content.active {
-            transform: translateY(0);
+            background: rgba(255, 199, 0, 0.1) !important;
         }
 
         .copy-toast {
             position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #ffc700;
-            color: black;
+            bottom: 30px; left: 50%; transform: translateX(-50%);
+            background: var(--brand-gold);
+            color: #000;
             padding: 12px 24px;
             border-radius: 12px;
-            font-size: 11px;
+            z-index: 10001;
             font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.1em;
-            z-index: 10000; /* Ставим выше всех панелей */
-            display: flex;
-            align-items: center;
-            transition: all 0.3s ease;
-            pointer-events: none; /* Чтобы не мешал кликам, если не успел исчезнуть */
-        }
-
-        .bg-overlay-gradient {
-            /* Создаем градиент */
-            background:
-                /* Этот градиент "накладывается" поверх картинки */
-                linear-gradient(
-                    to top left,         /* Направление: от нижнего правого угла в верхний левый */
-                    rgba(0, 0, 0, 1) 0%,   /* Черный с 90% непрозрачности в самом углу */
-                    rgba(0, 0, 0, 0) 100%     /* Полностью прозрачный черный на 20% высоты/ширины */
-                );
         }
     </style>
 </head>
-<body style="--dashboard-bg-image: url('{% static 'img/bg5.png' %}');">
+<body style="--dashboard-bg-image: url('{% static 'img/bg6.png' %}');">
 
     <div class="page-background">
         <div class="page-background-image">

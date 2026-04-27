@@ -1,21 +1,23 @@
-# Продакшн-деплой: раздельные `website` и `postgres`
+# Origin Deploy
+
+Этот каталог теперь описывает origin-сервер с Django.
+
+Публичные домены пользователей должны смотреть не сюда, а на edge-серверы.
+Origin обслуживает только backend-трафик от edge и отвечает по техническому домену, например `origin.teaworld.uk`.
 
 ## Структура на сервере
-
-На сервере ожидается такая структура:
 
 ```text
 /root/website/
   website/
     .env
     docker-compose.yml
-    nginx.conf
+    nginx.conf.template
     monkey-island-website-amd64.tar
     letsencrypt/
     certbot-work/
     certbot-logs/
-    certbot-www/
-    cloudflare-ips/
+    origin-allowlist/
   postgres/
     .env
     docker-compose.yml
@@ -23,28 +25,35 @@
 
 `website` и `postgres` запускаются отдельными `docker compose`, но находятся в одной внешней Docker-сети `monkey-island-network`.
 
-## Что где лежит в репозитории
+## Что где лежит
 
-- `docker/website/Dockerfile` - образ Django-приложения;
-- `docker/website/entrypoint.sh` - миграции, `collectstatic`, старт `gunicorn`;
-- `docker/website/docker-compose.yml` - стек сайта;
-- `docker/website/nginx.conf` - reverse proxy и TLS;
-- `docker/website/deploy.sh` - деплой сайта;
-- `docker/postgres/docker-compose.yml` - стек PostgreSQL;
-- `docker/postgres/deploy.sh` - деплой PostgreSQL.
+- `docker/website/Dockerfile` - образ Django-приложения
+- `docker/website/entrypoint.sh` - миграции, `collectstatic`, `gunicorn`
+- `docker/website/docker-compose.yml` - origin стек
+- `docker/website/nginx.conf.template` - backend-only nginx для origin
+- `docker/website/update-origin-allowlist.sh` - генерация allowlist для edge IP
+- `docker/website/issue-certs.sh` - выпуск origin-сертификата по HTTP-01
+- `docker/website/renew-certs.sh` - renew origin-сертификата
+- `docker/website/deploy.sh` - деплой origin
 
-## Как связаны `website` и `postgres`
+## Как это работает
 
-- `postgres` поднимается в отдельном compose-проекте;
-- сервис `postgres` подключен к внешней сети `monkey-island-network`;
-- контейнер `app` из `website` подключен к той же сети;
-- Django ходит в базу по имени хоста `postgres`.
+- пользователь идет на edge-домен;
+- edge завершает пользовательский TLS;
+- edge ходит на `https://origin.teaworld.uk`;
+- origin проверяет, что запрос пришел только с IP edge-серверов;
+- origin передает запрос в Django;
+- Django различает `promo`, `neutral`, `cabinet` по заголовку `Host`, который edge сохраняет.
 
-Поэтому `WEB_DATABASE_URL` должен выглядеть так:
+## DNS
 
-```env
-WEB_DATABASE_URL=postgresql://web_user:replace-me@postgres:5432/web_db
+Технический домен должен смотреть на origin IP:
+
+```text
+origin.teaworld.uk -> A -> ORIGIN_IP
 ```
+
+Этот домен нельзя использовать в публичных ссылках, шаблонах, email и редиректах.
 
 ## Переменные для `/root/website/postgres/.env`
 
@@ -56,23 +65,21 @@ POSTGRES_USER=web_user
 POSTGRES_PASSWORD=replace-me
 ```
 
-Если `SERVICE_DATABASE_URL` тоже должен указывать в этот же PostgreSQL, используй отдельную базу или отдельного пользователя по своей схеме.
-
 ## Переменные для `/root/website/website/.env`
 
-Минимально:
+Минимум:
 
 ```env
 SECRET_KEY=replace-me
 DEBUG=False
 
-ALLOWED_HOSTS=monkeyislandvpn.com,monkey-island-vpn.com,monkey-island-vps.com,mnk-island.org
-CSRF_TRUSTED_ORIGINS=https://monkeyislandvpn.com,https://monkey-island-vpn.com,https://monkey-island-vps.com,https://mnk-island.org
+ALLOWED_HOSTS=promo.example.com,neutral.example.com,cabinet.example.com
+CSRF_TRUSTED_ORIGINS=https://promo.example.com,https://neutral.example.com,https://cabinet.example.com
 
-PROMO_DOMAINS=monkeyislandvpn.com,monkey-island-vpn.com
-NEUTRAL_DOMAINS=monkey-island-vps.com
-CABINET_DOMAINS=mnk-island.org
-DEFAULT_CABINET_DOMAIN=mnk-island.org
+PROMO_DOMAINS=promo.example.com
+NEUTRAL_DOMAINS=neutral.example.com
+CABINET_DOMAINS=cabinet.example.com
+DEFAULT_CABINET_DOMAIN=cabinet.example.com
 
 WEB_DATABASE_URL=postgresql://web_user:replace-me@postgres:5432/web_db
 WEB_DATABASE_SSL_REQUIRE=False
@@ -96,102 +103,100 @@ EMAIL_HOST_PASSWORD=replace-me
 
 TG_BOT_USERNAME=monkeyislandvpnbot
 
+ORIGIN_CERT_NAME=origin.teaworld.uk
+ORIGIN_CERTBOT_DOMAINS=origin.teaworld.uk
+ORIGIN_ALLOWED_PROXY_CIDRS=203.0.113.10/32,203.0.113.11/32
 LETSENCRYPT_EMAIL=admin@example.com
-CF_DNS_API_TOKEN=replace-me
-CERTBOT_CERT_NAME=monkey-island-sites
-CERTBOT_DOMAINS=monkey-island-vps.com,monkeyislandvpn.com,monkey-island-vpn.com,mnk-island.org
-CF_DNS_PROPAGATION_SECONDS=30
 ```
 
-Для PWA при необходимости:
+`ORIGIN_ALLOWED_PROXY_CIDRS` — список edge IP/CIDR, которым разрешено ходить на origin по HTTPS.
 
-```env
-PWA_MIRROR_SOURCE_URL=https://raw.githubusercontent.com/your-org/your-repo/main/mirror.txt
+Для удобства рядом с этим каталогом можно держать шаблон и собирать итоговый `.env` по нему:
+
+```bash
+cp docker/website/.env.example /root/website/website/.env
 ```
-
-Для одного сертификата на несколько зон нужен один `CF_DNS_API_TOKEN` с правами:
-
-- `Zone / DNS / Edit`
-- `Zone / Zone / Read`
 
 ## Порядок запуска
 
-1. Сначала положить `/root/website/postgres/.env`.
-2. Запустить деплой PostgreSQL:
+1. Положить `/root/website/postgres/.env`
+2. Запустить PostgreSQL:
 
 ```bash
 cd docker/postgres
 ./deploy.sh
 ```
 
-3. Потом положить `/root/website/website/.env`.
-4. Запустить деплой сайта:
+3. Положить `/root/website/website/.env`
+4. Запустить origin:
 
 ```bash
 cd docker/website
 ./deploy.sh
 ```
 
-Оба deploy-скрипта сами создают внешнюю сеть `monkey-island-network`, если ее еще нет.
-
-## Что делает deploy сайта
+## Что делает deploy origin
 
 `docker/website/deploy.sh`:
 
 - локально собирает `amd64` tar-образ;
-- на сервере ротирует старый tar в `.bak`;
 - загружает runtime-файлы в `/root/website/website`;
-- обновляет Cloudflare allowlist для nginx;
-- выпускает сертификат через `certbot/dns-cloudflare`;
-- ставит cron на auto-renew;
+- генерирует allowlist для edge IP;
+- выпускает сертификат на `ORIGIN_CERTBOT_DOMAINS` через standalone HTTP-01;
+- ставит cron на renew;
 - делает `docker load`;
-- запускает `docker compose -f docker-compose.yml up -d --no-build`.
+- поднимает `docker compose -f docker-compose.yml up -d --no-build`.
 
-## Сертификаты и Cloudflare
+## Origin сертификат
 
-Сайт рассчитан на работу за Cloudflare CDN:
+Origin использует отдельный сертификат на технический домен, например `origin.teaworld.uk`.
 
-- nginx принимает запросы только от Cloudflare IP ranges;
-- реальный IP клиента берется из `CF-Connecting-IP`;
-- сертификаты выпускаются через DNS-01 challenge;
-- renewal выполняется по cron.
+Пользовательские домены не должны входить в этот сертификат.
 
-Рекомендуемые настройки в Cloudflare:
+Edge должен ходить на origin так:
 
-- все боевые DNS-записи должны быть `Proxied`;
-- SSL mode: `Full (strict)`.
+```env
+EDGE_ORIGIN_UPSTREAM=https://origin.teaworld.uk
+EDGE_ORIGIN_TLS_NAME=origin.teaworld.uk
+EDGE_ORIGIN_TLS_VERIFY=on
+```
+
+## Ограничение доступа
+
+Origin должен принимать запросы только от edge.
+
+Защита в два слоя:
+
+1. `nginx` allowlist через `ORIGIN_ALLOWED_PROXY_CIDRS`
+2. firewall на сервере origin
+
+Примерно так:
+
+```bash
+ufw allow 80/tcp
+ufw allow from EDGE_IP_1 to any port 443
+ufw allow from EDGE_IP_2 to any port 443
+ufw deny 443
+```
+
+Порт `80` нужен для HTTP-01 challenge certbot и должен быть доступен снаружи во время первичного выпуска и renew.
+Порт `443` можно и нужно ограничивать только edge IP.
 
 ## Полезные команды
-
-Сайт:
 
 ```bash
 cd /root/website/website
 docker compose -f docker-compose.yml ps
 docker compose -f docker-compose.yml logs -f app
 docker compose -f docker-compose.yml logs -f nginx
-```
-
-База:
-
-```bash
-cd /root/website/postgres
-docker compose -f docker-compose.yml ps
-docker compose -f docker-compose.yml logs -f postgres
-```
-
-Ручной renew сертификатов:
-
-```bash
-cd /root/website/website
 ./renew-certs.sh
+./update-origin-allowlist.sh
 ```
 
-## Что проверить перед выкладкой
+## Что проверить
 
-1. что в `/root/website/postgres/.env` заполнены `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD`;
-2. что в `/root/website/website/.env` `WEB_DATABASE_URL` указывает на `postgres:5432`;
-3. что `WEB_DATABASE_SSL_REQUIRE=False`, если используется локальный self-hosted Postgres без TLS;
-4. что все домены добавлены в `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, `PROMO_DOMAINS`, `NEUTRAL_DOMAINS`, `CABINET_DOMAINS`;
-5. что `CF_DNS_API_TOKEN` имеет доступ ко всем четырем зонам;
-6. что все нужные DNS-записи в Cloudflare включены как `Proxied`.
+1. что `origin.teaworld.uk` смотрит на origin IP;
+2. что `ORIGIN_CERT_NAME` и `ORIGIN_CERTBOT_DOMAINS` совпадают с техническим доменом;
+3. что `ORIGIN_ALLOWED_PROXY_CIDRS` содержит все edge IP;
+4. что пользовательские домены смотрят только на edge, а не на origin;
+5. что `WEB_DATABASE_SSL_REQUIRE=False` для локального self-hosted Postgres без TLS.

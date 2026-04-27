@@ -26,8 +26,8 @@ server {
 
     add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
     add_header X-Content-Type-Options nosniff;
-    add_header X-Frame-Options SAMEORIGIN;
-    add_header Referrer-Policy strict-origin-when-cross-origin;
+    add_header X-Frame-Options ${EDGE_FRAME_OPTIONS};
+    add_header Referrer-Policy ${EDGE_REFERRER_POLICY};
 
     client_max_body_size 10m;
 
@@ -36,14 +36,18 @@ server {
         proxy_http_version 1.1;
 
         proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header Connection "";
 
         proxy_ssl_server_name on;
-        proxy_ssl_verify off;
+        proxy_ssl_name ${EDGE_ORIGIN_TLS_NAME};
+        proxy_ssl_verify ${EDGE_ORIGIN_TLS_VERIFY};
+        proxy_ssl_trusted_certificate /etc/ssl/certs/ca-certificates.crt;
 
+        proxy_buffering ${EDGE_PROXY_BUFFERING};
         proxy_connect_timeout 5s;
         proxy_send_timeout 60s;
         proxy_read_timeout 60s;

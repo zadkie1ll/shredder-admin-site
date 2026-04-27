@@ -6,9 +6,7 @@
 
 - `docker-compose.yml` - стек edge nginx
 - `deploy.sh` - деплой edge-конфига на удаленный сервер
-- `nginx-promo.conf.template` - профиль для VPN/promo доменов
-- `nginx-neutral.conf.template` - профиль для нейтрального лендинга
-- `nginx-cabinet.conf.template` - профиль для кабинета
+- `nginx.conf.template` - общий шаблон nginx для любого edge
 - `issue-certs.sh` - выпуск сертификатов через Cloudflare DNS-01
 - `renew-certs.sh` - renew сертификатов и reload nginx
 - `install-renew-cron.sh` - установка cron на авто-renew
@@ -23,12 +21,24 @@
 - проксирует запросы на origin
 - сохраняет исходный `Host`, чтобы Django сам понял, это `promo`, `neutral` или `cabinet`
 
+Для схемы с техническим origin-доменом вроде `origin.teaworld.uk`:
+
+- пользовательские домены должны смотреть только на edge IP;
+- технический домен должен смотреть только на origin IP;
+- edge ходит на origin по `https://origin.teaworld.uk`;
+- upstream TLS на edge проверяется отдельно от пользовательского TLS.
+
 ## Пример `.env`
 
 ```env
 EDGE_SERVER_NAMES=monkey-island-vpn.com www.monkey-island-vpn.com
 EDGE_CERT_NAME=monkey-island-vpn.com
-EDGE_ORIGIN_UPSTREAM=http://ORIGIN_IP_OR_DOMAIN
+EDGE_ORIGIN_UPSTREAM=https://origin.teaworld.uk
+EDGE_ORIGIN_TLS_NAME=origin.teaworld.uk
+EDGE_ORIGIN_TLS_VERIFY=on
+EDGE_FRAME_OPTIONS=SAMEORIGIN
+EDGE_REFERRER_POLICY=strict-origin-when-cross-origin
+EDGE_PROXY_BUFFERING=on
 
 LETSENCRYPT_EMAIL=admin@example.com
 CF_DNS_API_TOKEN=replace-me
@@ -48,9 +58,9 @@ CF_DNS_PROPAGATION_SECONDS=30
 
 ```bash
 cd docker/edge
-SSH_HOST=edge-promo ./deploy.sh --profile promo
-SSH_HOST=edge-neutral ./deploy.sh --profile neutral
-SSH_HOST=edge-cabinet-1 ./deploy.sh --profile cabinet
+SSH_HOST=edge-promo ./deploy.sh
+SSH_HOST=edge-neutral ./deploy.sh
+SSH_HOST=edge-cabinet-1 ./deploy.sh
 ```
 
 ## Что нужно сделать на сервере заранее
@@ -69,11 +79,18 @@ Origin должен принимать трафик только от edge IP.
 
 - открыть `80/443` на origin только для IP edge-серверов;
 - закрыть `80/443` для всех остальных.
+- выпустить отдельный сертификат на технический origin-домен, например `origin.teaworld.uk`;
+- не использовать этот технический домен в публичных URL, редиректах и шаблонах.
 
-## Как выбирать профиль
+## Что можно менять через `.env`
 
-- `promo` - для VPN/агрессивных лендингов
-- `neutral` - для нейтральных страниц
-- `cabinet` - для личного кабинета
+- `EDGE_SERVER_NAMES` - какие домены принимает этот edge
+- `EDGE_CERT_NAME` - имя сертификата в certbot
+- `EDGE_ORIGIN_UPSTREAM` - куда проксировать запросы
+- `EDGE_ORIGIN_TLS_NAME` - hostname для upstream TLS-проверки
+- `EDGE_ORIGIN_TLS_VERIFY` - проверять ли upstream сертификат (`on`/`off`)
+- `EDGE_FRAME_OPTIONS` - значение заголовка `X-Frame-Options`
+- `EDGE_REFERRER_POLICY` - значение заголовка `Referrer-Policy`
+- `EDGE_PROXY_BUFFERING` - `on` или `off`
 
-Профили отличаются в основном заголовками безопасности и поведением прокси. Все они сохраняют `Host` и `X-Forwarded-*`.
+То есть один и тот же шаблон можно использовать и для `promo`, и для `neutral`, и для `cabinet`, меняя только `.env` на каждом edge-сервере.

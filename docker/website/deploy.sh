@@ -83,9 +83,9 @@ fi
 
 RUNTIME_FILES=(
     "docker-compose.yml"
-    "nginx.conf"
+    "nginx.conf.template"
     "PRODUCTION.md"
-    "update-cloudflare-allowlist.sh"
+    "update-origin-allowlist.sh"
     "issue-certs.sh"
     "renew-certs.sh"
     "install-renew-cron.sh"
@@ -96,11 +96,10 @@ echo "Preparing remote directory ${SSH_HOST}:${REMOTE_DIR}"
 
 if [[ "${DRY_RUN}" -eq 0 ]]; then
     ssh "${SSH_HOST}" "mkdir -p \
-        '${REMOTE_DIR}/certbot-www' \
         '${REMOTE_DIR}/letsencrypt' \
         '${REMOTE_DIR}/certbot-work' \
         '${REMOTE_DIR}/certbot-logs' \
-        '${REMOTE_DIR}/cloudflare-ips'"
+        '${REMOTE_DIR}/origin-allowlist'"
 fi
 
 RSYNC_ARGS=(
@@ -153,8 +152,8 @@ if [ ! -f '.env' ]; then
     echo "Remote .env file not found at ${REMOTE_DIR}/.env" >&2
     exit 1
 fi
-chmod +x update-cloudflare-allowlist.sh issue-certs.sh renew-certs.sh install-renew-cron.sh
-./update-cloudflare-allowlist.sh
+chmod +x update-origin-allowlist.sh issue-certs.sh renew-certs.sh install-renew-cron.sh
+./update-origin-allowlist.sh
 ./issue-certs.sh
 ./install-renew-cron.sh
 docker compose -f docker-compose.yml down || true
