@@ -144,6 +144,40 @@
             .sidebar-desktop { display: none !important; }
             .nav-mobile { display: flex !important; }
             .main-content { margin-left: 0 !important; padding-bottom: 120px !important; }
+
+            .nav-mobile {
+                align-items: flex-start;
+                gap: 2px;
+                padding-left: 6px;
+                padding-right: 6px;
+            }
+
+            .nav-mobile .nav-btn {
+                flex: 1 1 0;
+                min-width: 0;
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                gap: 6px;
+                font-size: 10px;
+                line-height: 1;
+                letter-spacing: 0;
+                text-transform: none;
+                white-space: nowrap;
+                overflow: hidden;
+            }
+
+            .nav-mobile .nav-btn i {
+                font-size: 19px;
+                line-height: 1;
+            }
+
+            .nav-mobile .nav-btn span {
+                display: block;
+                max-width: 100%;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
         }
 
         /* Карточки */
@@ -327,6 +361,38 @@
             background: rgba(0, 0, 0, 0.55);
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 16px;
+        }
+
+        .bottom-sheet-content {
+            max-height: min(88vh, 760px);
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            padding-bottom: calc(20px + env(safe-area-inset-bottom));
+            -webkit-overflow-scrolling: touch;
+        }
+
+        @media (max-width: 640px) {
+            .bottom-sheet-content {
+                max-height: calc(100dvh - 88px);
+                border-top-left-radius: 24px;
+                border-top-right-radius: 24px;
+            }
+
+            .bottom-sheet-content .overview-hero-card {
+                padding: 18px !important;
+            }
+
+            .bottom-sheet-content .setup-step-card {
+                border-radius: 18px;
+            }
+
+            .bottom-sheet-content input {
+                padding-right: 124px !important;
+            }
+
+            .bottom-sheet-copy-btn {
+                max-width: 116px;
+            }
         }
 
         .copy-toast {
@@ -785,8 +851,8 @@
     <div id="ref-sheet" class="fixed inset-0 z-[9999] hidden flex items-end justify-center">
         <div class="absolute inset-0 bg-black/70 backdrop-blur-sm z-[9998]" onclick="toggleRefSheet()"></div>
         
-        <div class="fixed inset-x-0 bottom-0 bg-[#111113] rounded-t-[2rem] border-t border-white/10 p-5 md:p-8 transform translate-y-full transition-transform duration-300 ease-out z-[9999]
-                    lg:left-1/2 lg:-translate-x-1/2 lg:max-w-3xl touch-none" id="ref-content">
+        <div class="bottom-sheet-content fixed inset-x-0 bottom-0 bg-[#111113] rounded-t-[2rem] border-t border-white/10 p-5 md:p-8 transform translate-y-full transition-transform duration-300 ease-out z-[9999]
+                    lg:left-1/2 lg:-translate-x-1/2 lg:max-w-3xl" id="ref-content">
             
             <div class="setup-shell overview-hero-card !p-5 md:!p-6 !mb-5">
                 <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
@@ -854,7 +920,7 @@
                 <div class="relative">
                     <input type="text" readonly value="{{ referral_link }}" id="ref-link-input-sheet" 
                         class="w-full bg-black/60 border border-white/10 rounded-2xl py-5 pl-5 pr-36 text-[11px] font-mono text-white focus:outline-none focus:border-[#ffc700]/40 transition-all shadow-inner">
-                    <button onclick="copyRefLink(event)" class="absolute right-2 top-2 bottom-2 bg-[#ffc700] hover:bg-[#ffd740] text-black px-6 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-[#ffc700]/20">
+                    <button onclick="copyRefLink(event)" class="bottom-sheet-copy-btn absolute right-2 top-2 bottom-2 bg-[#ffc700] hover:bg-[#ffd740] text-black px-6 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-[#ffc700]/20">
                         Копировать
                     </button>
                 </div>
