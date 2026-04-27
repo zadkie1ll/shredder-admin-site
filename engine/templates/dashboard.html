@@ -10,7 +10,7 @@
     <meta name="apple-mobile-web-app-title" content="VPN Monkey Island">
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
-    <title>Dashboard — Monkey Island</title>
+    <title>VPN Monkey Island</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -620,40 +620,80 @@
 
             <div id="tab-support" class="tab-content">
                 <header class="mb-10">
-                    <h1 class="text-3xl font-black uppercase tracking-tighter mb-2">Поддержка</h1>
-                    <p class="text-gray-500 text-sm font-bold uppercase">Помощь всегда рядом</p>
+                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Поддержка</h1>
+                    <p class="text-gray-500 text-sm md:text-base font-bold">Поможем с подключением, оплатой и приложениями</p>
                 </header>
-                <div class="setup-shell text-center">
-                    <div class="p-10 md:p-16 max-w-xl mx-auto">
-                        <div class="mb-8">
-                            <i class="fas fa-life-ring text-6xl text-[#ffc700] animate-spin-slow"></i>
+                <div class="overview-grid space-y-7">
+                    <section class="setup-shell overview-hero-card">
+                        <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-7">
+                            <div class="flex items-start gap-5">
+                                <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                    <i class="fas fa-life-ring text-2xl"></i>
+                                </div>
+                                <div>
+                                    <h2 class="text-2xl font-black mb-2">Нужна помощь?</h2>
+                                    <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">Напиши в Telegram, если не получается подключиться, оплатить подписку или выбрать приложение для устройства.</p>
+                                </div>
+                            </div>
+                            <a href="https://t.me/monkeyislandsupportbot" target="_blank" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !mb-0 !mr-0">
+                                Написать
+                            </a>
                         </div>
-                        <h2 class="text-3xl font-black uppercase tracking-tighter mb-4">Нужна помощь?</h2>
-                        <p class="text-gray-400 text-sm font-bold uppercase mb-10 leading-relaxed">Если корабль сел на мель, наши боцманы в Telegram помогут тебе вернуться в строй!</p>
-                        <a href="https://t.me/monkeyislandsupportbot" target="_blank" class="setup-cta-btn !w-full !max-w-none !py-5 !text-sm">Связаться с боцманом</a>
-                    </div>
+                    </section>
+
+                    <section class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        <div class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
+                            <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
+                                <i class="fas fa-bolt text-lg"></i>
+                            </div>
+                            <h3 class="text-lg font-black mb-2">Подключение</h3>
+                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Поможем добавить подписку в приложение</p>
+                        </div>
+                        <div class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
+                            <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
+                                <i class="fas fa-credit-card text-lg"></i>
+                            </div>
+                            <h3 class="text-lg font-black mb-2">Оплата</h3>
+                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Разберемся с продлением и платежами</p>
+                        </div>
+                        <div class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
+                            <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
+                                <i class="fas fa-mobile-alt text-lg"></i>
+                            </div>
+                            <h3 class="text-lg font-black mb-2">Устройства</h3>
+                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Подскажем клиент для телефона, ПК или ТВ</p>
+                        </div>
+                    </section>
                 </div>
             </div>
 
         </main>
     </div>
 
-    <div id="tariff-selection-view" class="hidden min-h-screen p-4 md:p-6 flex flex-col items-center" style="background: radial-gradient(circle at 50% 40%, #1a1a1a 0%, #080808 100%);">
-        <div class="w-full max-w-6xl">
-            <button onclick="hideTariffs()" class="group mb-6 flex items-center gap-3 px-4 py-2 rounded-full border border-white/5 hover:border-[#ffc700]/30 hover:bg-[#ffc700]/5 transition-all">
+    <div id="tariff-selection-view" class="hidden min-h-screen p-4 md:p-8 flex flex-col items-center">
+        <div class="w-full max-w-6xl space-y-7">
+            <button onclick="hideTariffs()" class="group flex items-center gap-3 px-4 py-2 rounded-full border border-white/10 hover:border-[#ffc700]/30 hover:bg-[#ffc700]/5 transition-all">
                 <i class="fas fa-chevron-left text-gray-500 group-hover:text-[#ffc700]"></i>
-                <span class="text-[9px] font-black uppercase tracking-widest text-gray-500 group-hover:text-white">Назад</span>
+                <span class="text-sm font-bold text-gray-500 group-hover:text-white">Назад в кабинет</span>
             </button>
 
-            <h2 class="text-center text-2xl md:text-3xl font-black uppercase mb-8 tracking-tighter">
-                Выберите свою <span class="text-[#ffc700]">добычу</span>
-            </h2>
+            <section class="setup-shell overview-hero-card">
+                <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
+                    <div>
+                        <h2 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Продлить подписку</h2>
+                        <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed max-w-2xl">Выбери срок доступа. Дни добавятся к текущей подписке после оплаты.</p>
+                    </div>
+                    <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                        <i class="fas fa-crown text-2xl"></i>
+                    </div>
+                </div>
+            </section>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-12 mb-8 w-full">
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-7 w-full">
                 {% for tariff in tariffs %}
-                <div class="tariff-card setup-step-card p-5 cursor-pointer transition-all duration-500 border-2 border-white/5 relative group 
+                <div class="tariff-card setup-step-card p-6 cursor-pointer transition-all duration-300 border-2 border-white/5 relative group !mb-0
                     {% if forloop.counter == 2 %} 
-                        lg:scale-110 z-20 shadow-[0_0_30px_rgba(255,199,0,0.1)] border-[#ffc700]/40 
+                        z-20 shadow-[0_0_30px_rgba(255,199,0,0.1)] border-[#ffc700]/40 
                     {% else %} 
                         z-10 
                     {% endif %} 
@@ -673,54 +713,61 @@
                         </div>
                     {% endif %}
 
-                    <div class="relative z-10 text-center">
-                        <div class="mb-3">
+                    <div class="relative z-10">
+                        <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-6 mx-auto">
                             {% if forloop.counter == 1 %}
-                                <i class="fas fa-map-marked-alt text-xl text-gray-600 group-hover:text-[#ffc700] transition-colors"></i>
+                                <i class="fas fa-map-marked-alt text-lg"></i>
                             {% elif forloop.counter == 2 %}
-                                <i class="fas fa-crown text-2xl text-[#ffc700]"></i>
+                                <i class="fas fa-crown text-lg"></i>
                             {% else %}
-                                <i class="fas fa-anchor text-xl text-gray-600 group-hover:text-[#ffc700] transition-colors"></i>
+                                <i class="fas fa-anchor text-lg"></i>
                             {% endif %}
                         </div>
 
-                        <h3 class="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">{{ tariff.description }}</h3>
-                        <div class="flex items-center justify-center gap-1 mb-4">
-                            <span class="text-3xl font-black tracking-tighter">{{ tariff.price }}</span>
-                            <span class="text-xl font-black text-[#ffc700]">₽</span>
+                        <h3 class="text-lg font-black text-center mb-3">{{ tariff.description }}</h3>
+                        <div class="flex items-baseline justify-center gap-1 mb-6">
+                            <span class="text-5xl font-black tracking-tighter">{{ tariff.price }}</span>
+                            <span class="text-2xl font-black text-[#ffc700]">₽</span>
                         </div>
                         
-                        <div class="flex justify-center gap-4 py-3 border-t border-white/5 opacity-60">
-                            <i class="fas fa-bolt text-[#ffc700] text-[10px]"></i>
-                            <i class="fas fa-infinity text-[#ffc700] text-[10px]"></i>
-                            <i class="fas fa-shield-alt text-[#ffc700] text-[10px]"></i>
+                        <div class="grid grid-cols-3 gap-2 border-t border-white/5 pt-5">
+                            <div class="text-center">
+                                <i class="fas fa-bolt text-[#ffc700] text-sm mb-2"></i>
+                                <p class="text-gray-500 text-[10px] font-bold">Быстро</p>
+                            </div>
+                            <div class="text-center">
+                                <i class="fas fa-infinity text-[#ffc700] text-sm mb-2"></i>
+                                <p class="text-gray-500 text-[10px] font-bold">Безлимит</p>
+                            </div>
+                            <div class="text-center">
+                                <i class="fas fa-shield-alt text-[#ffc700] text-sm mb-2"></i>
+                                <p class="text-gray-500 text-[10px] font-bold">Защита</p>
+                            </div>
                         </div>
                     </div>
                 </div>
                 {% endfor %}
             </div>
-        </div>
 
-        <div class="max-w-2xl mx-auto w-full mb-8">
-            <div class="bg-[#0c0c0c] border border-white/5 rounded-3xl p-4 md:p-6 relative overflow-hidden flex flex-col md:flex-row items-center justify-between gap-4 md:gap-8">
-                <div class="absolute top-0 left-0 w-full h-1 md:w-1 md:h-full bg-[#ffc700]"></div>
-                
-                <div class="text-center md:text-left">
-                    <p class="text-[9px] font-black text-gray-500 uppercase tracking-widest">К оплате</p>
-                    <div class="flex items-baseline justify-center md:justify-start gap-2">
-                        <span id="display-final-price" class="text-3xl md:text-4xl font-black text-white">0 ₽</span>
-                        <span id="display-tariff-name" class="text-[9px] font-bold text-[#ffc700] uppercase tracking-tighter whitespace-nowrap">—</span>
+            <div class="setup-shell p-5 md:p-6 sticky bottom-4 z-30">
+                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                    <div>
+                        <p class="text-gray-500 text-sm font-bold mb-1">К оплате</p>
+                        <div class="flex flex-wrap items-baseline gap-2">
+                            <span id="display-final-price" class="text-4xl font-black text-white">0 ₽</span>
+                            <span id="display-tariff-name" class="text-sm font-bold text-[#ffc700]">—</span>
+                        </div>
                     </div>
-                </div>
                 
-                <form id="payment-form" method="POST" action="/pay/" target="_blank" class="w-full md:flex-1">
-                    {% csrf_token %}
-                    <input type="hidden" name="tariff_id" id="selected-tariff-id">
-                    <input type="hidden" name="email" value="{{ user.email }}">
-                    <button type="submit" class="w-full bg-[#ffc700] hover:bg-[#ffd740] text-black py-4 rounded-xl font-black uppercase text-[11px] tracking-widest transition-all hover:scale-[1.02] active:scale-95 shadow-lg shadow-[#ffc700]/10">
-                        Оплатить доступ <i class="fas fa-arrow-right ml-2"></i>
-                    </button>
-                </form>
+                    <form id="payment-form" method="POST" action="/pay/" target="_blank" class="w-full md:w-auto md:min-w-[260px]">
+                        {% csrf_token %}
+                        <input type="hidden" name="tariff_id" id="selected-tariff-id">
+                        <input type="hidden" name="email" value="{{ user.email }}">
+                        <button type="submit" class="w-full bg-[#ffc700] hover:bg-[#ffd740] text-black py-4 px-8 rounded-xl font-black text-sm transition-all hover:scale-[1.02] active:scale-95 shadow-lg shadow-[#ffc700]/10">
+                            Оплатить доступ <i class="fas fa-arrow-right ml-2"></i>
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </div>
@@ -736,71 +783,83 @@
     <div id="ref-sheet" class="fixed inset-0 z-[9999] hidden flex items-end justify-center">
         <div class="absolute inset-0 bg-black/70 backdrop-blur-sm z-[9998]" onclick="toggleRefSheet()"></div>
         
-        <div class="fixed inset-x-0 bottom-0 bg-[#0c0c0c] rounded-t-[2.5rem] border-t border-white/10 p-8 pt-10 transform translate-y-full transition-transform duration-300 ease-out z-[9999]
+        <div class="fixed inset-x-0 bottom-0 bg-[#111113] rounded-t-[2rem] border-t border-white/10 p-5 md:p-8 transform translate-y-full transition-transform duration-300 ease-out z-[9999]
                     lg:left-1/2 lg:-translate-x-1/2 lg:max-w-3xl touch-none" id="ref-content">
             
-            <div class="flex items-center gap-4 mb-8">
-                <div class="w-12 h-12 bg-[#ffc700]/10 rounded-2xl flex items-center justify-center text-[#ffc700]">
-                    <i class="fas fa-gift text-xl"></i>
-                </div>
-                <div>
-                    <h4 class="text-white font-black uppercase text-sm tracking-tight">Добыча за друзей</h4>
-                    <p class="text-gray-400 text-[10px] font-bold uppercase tracking-widest">Твоя партнерская программа</p>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-2 gap-2 mb-8">
-                <div class="flex items-start gap-2 p-3 rounded-2xl bg-white/5 border border-white/10">
-                    <i class="fas fa-user-plus text-[#ffc700] text-[10px] mt-1"></i>
-                    <p class="text-[11px] font-bold text-gray-200 uppercase leading-none">
-                        <span class="text-[#ffc700]">+10 дней</span><br>
-                        <span class="text-[8px] text-white/40 font-medium normal-case block mt-1">за друга (100MB+)</span>
-                    </p>
-                </div>
-                <div class="flex items-start gap-2 p-3 rounded-2xl bg-white/5 border border-white/10">
-                    <i class="fas fa-gem text-[#ffc700] text-[10px] mt-1"></i>
-                    <p class="text-[11px] font-bold text-gray-200 uppercase leading-none">
-                        <span class="text-[#ffc700]">+30 дней</span><br>
-                        <span class="text-[8px] text-white/40 font-medium normal-case block mt-1">за покупку (1 мес.+)</span>
-                    </p>
+            <div class="setup-shell overview-hero-card !p-5 md:!p-6 !mb-5">
+                <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                    <div class="flex items-start gap-4">
+                        <div class="w-12 h-12 bg-[#ffc700]/10 border border-[#ffc700]/20 rounded-2xl flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                            <i class="fas fa-gift text-xl"></i>
+                        </div>
+                        <div>
+                            <h4 class="text-xl font-black mb-2">Добыча за друзей</h4>
+                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Отправь ссылку другу и получай дни к подписке автоматически.</p>
+                        </div>
+                    </div>
+                    <div class="md:text-right">
+                        <p class="text-gray-500 text-sm font-bold mb-1">Бонус</p>
+                        <p class="text-4xl font-black text-[#ffc700]">+{{ bonus_days|default:"0" }}</p>
+                    </div>
                 </div>
             </div>
 
-            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-8">
-                <div class="bg-white/5 p-4 rounded-2xl text-center border border-white/5">
-                    <div class="text-white font-black text-xl mb-1">{{ ref_invited_count|default:"0" }}</div>
-                    <div class="text-[9px] text-gray-400 uppercase font-black tracking-tighter">Приглашено</div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+                <div class="setup-step-card !p-4 !mb-0 flex items-start gap-3">
+                    <div class="w-10 h-10 bg-[#ffc700]/10 border border-[#ffc700]/20 rounded-xl flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                        <i class="fas fa-user-plus text-sm"></i>
+                    </div>
+                    <div>
+                        <h5 class="text-sm font-black mb-1">+10 дней за друга</h5>
+                        <p class="text-gray-500 text-xs font-bold leading-relaxed">после 100 МБ трафика</p>
+                    </div>
+                </div>
+                <div class="setup-step-card !p-4 !mb-0 flex items-start gap-3">
+                    <div class="w-10 h-10 bg-[#ffc700]/10 border border-[#ffc700]/20 rounded-xl flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                        <i class="fas fa-gem text-sm"></i>
+                    </div>
+                    <div>
+                        <h5 class="text-sm font-black mb-1">+30 дней за покупку</h5>
+                        <p class="text-gray-500 text-xs font-bold leading-relaxed">если друг оплатит месяц</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                <div class="bg-white/5 p-4 rounded-2xl border border-white/5">
+                    <div class="text-gray-500 text-xs font-bold mb-1">Приглашено</div>
+                    <div class="text-white font-black text-2xl">{{ ref_invited_count|default:"0" }}</div>
                 </div>
                 
-                <div class="bg-white/5 p-4 rounded-2xl text-center border border-white/5">
-                    <div class="text-[#00ff88] font-black text-xl mb-1">{{ ref_connected_count|default:"0" }}</div>
-                    <div class="text-[9px] text-gray-400 uppercase font-black tracking-tighter">Активны</div>
+                <div class="bg-white/5 p-4 rounded-2xl border border-white/5">
+                    <div class="text-gray-500 text-xs font-bold mb-1">Активны</div>
+                    <div class="text-[#00ff88] font-black text-2xl">{{ ref_connected_count|default:"0" }}</div>
                 </div>
 
-                <div class="bg-white/5 p-4 rounded-2xl text-center border border-white/5">
-                    <div class="text-[#00ff88] font-black text-xl mb-1">{{ ref_purchased_count|default:"0" }}</div>
-                    <div class="text-[9px] text-gray-400 uppercase font-black tracking-tighter">Покупок</div>
+                <div class="bg-white/5 p-4 rounded-2xl border border-white/5">
+                    <div class="text-gray-500 text-xs font-bold mb-1">Покупок</div>
+                    <div class="text-white font-black text-2xl">{{ ref_purchased_count|default:"0" }}</div>
                 </div>
 
-                <div class="bg-white/5 p-4 rounded-2xl text-center border border-[#ffc700]/30 bg-[#ffc700]/5">
-                    <div class="text-[#ffc700] font-black text-xl mb-1">+{{ bonus_days|default:"0" }}</div>
-                    <div class="text-[9px] text-[#ffc700] uppercase font-black tracking-tighter">Дней бонуса</div>
+                <div class="bg-[#ffc700]/5 p-4 rounded-2xl border border-[#ffc700]/30">
+                    <div class="text-[#ffc700] text-xs font-bold mb-1">Бонус</div>
+                    <div class="text-[#ffc700] font-black text-2xl">+{{ bonus_days|default:"0" }}</div>
                 </div>
             </div>
 
-            <div class="space-y-3 mb-8">
-                <p class="text-[11px] font-black text-white/60 uppercase tracking-[0.15em] ml-2">Твоя черная метка:</p>
+            <div class="space-y-3 mb-5">
+                <p class="text-lg font-black">Пригласительная ссылка</p>
                 <div class="relative">
                     <input type="text" readonly value="{{ referral_link }}" id="ref-link-input-sheet" 
                         class="w-full bg-black/60 border border-white/10 rounded-2xl py-5 pl-5 pr-36 text-[11px] font-mono text-white focus:outline-none focus:border-[#ffc700]/40 transition-all shadow-inner">
-                    <button onclick="copyRefLink(event)" class="absolute right-2 top-2 bottom-2 bg-[#ffc700] hover:bg-[#ffd740] text-black px-6 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all active:scale-95 shadow-lg shadow-[#ffc700]/20">
+                    <button onclick="copyRefLink(event)" class="absolute right-2 top-2 bottom-2 bg-[#ffc700] hover:bg-[#ffd740] text-black px-6 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-[#ffc700]/20">
                         Копировать
                     </button>
                 </div>
             </div>
 
-            <button onclick="toggleRefSheet()" class="w-full py-4 text-gray-500 font-black uppercase text-[10px] tracking-[0.3em] hover:text-[#ffc700] transition-colors">
-                Закрыть бухту
+            <button onclick="toggleRefSheet()" class="w-full py-4 text-gray-500 font-black text-sm hover:text-[#ffc700] transition-colors">
+                Закрыть
             </button>
         </div>
     </div>
