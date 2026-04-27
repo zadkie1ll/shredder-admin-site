@@ -304,6 +304,29 @@
             background: rgba(255, 199, 0, 0.06) !important;
         }
 
+        .overview-hero-card {
+            padding: 28px;
+            overflow: hidden;
+        }
+
+        .overview-hero-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(circle at 78% 8%, rgba(255, 199, 0, 0.13), transparent 35%);
+            pointer-events: none;
+        }
+
+        .metric-card {
+            min-height: 132px;
+        }
+
+        .referral-link-input {
+            background: rgba(0, 0, 0, 0.55);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+        }
+
         .copy-toast {
             position: fixed;
             bottom: 30px; left: 50%; transform: translateX(-50%);
@@ -436,15 +459,15 @@
                                 <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
                                     <i class="fas fa-life-ring text-lg"></i>
                                 </div>
-                                <h3 class="text-sm font-black mb-2">Поддержка</h3>
-                                <p class="text-gray-500 text-xs font-bold">Помощь в Telegram</p>
+                                <h3 class="text-lg font-black mb-2">Поддержка</h3>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Помощь в Telegram</p>
                             </button>
                             <button type="button" onclick="showTab('profile')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
                                 <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
                                     <i class="fas fa-user-friends text-lg"></i>
                                 </div>
-                                <h3 class="text-sm font-black mb-2">Рефералы</h3>
-                                <p class="text-gray-500 text-xs font-bold">Пригласи друга</p>
+                                <h3 class="text-lg font-black mb-2">Рефералы</h3>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Пригласи друга</p>
                             </button>
                         </section>
 
@@ -470,110 +493,128 @@
 
             <div id="tab-setup" class="tab-content">
                 <header class="mb-10">
-                    <h1 class="text-3xl font-black uppercase tracking-tighter mb-2">Настройка связи</h1>
-                    <p class="text-gray-500 text-sm font-bold uppercase">Следуй по шагам, чтобы выйти в море</p>
+                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Настройка</h1>
+                    <p class="text-gray-500 text-sm md:text-base font-bold">Выбери устройство и подключись по готовой инструкции</p>
                 </header>
-                <div class="setup-shell">
-                    <div id="setup-logic-placeholder">
-                        <div class="setup-toolbar p-6 md:p-10">
-                        <h3 class="text-lg font-black mb-3">1. Выберите платформу</h3>
-                        <div class="setup-chip-group flex flex-wrap gap-3 mb-8">
-                            <button onclick="setPlatform('android')" id="btn-android" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase active">Android</button>
-                            <button onclick="setPlatform('ios')" id="btn-ios" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">iOS</button>
-                            <button onclick="setPlatform('windows')" id="btn-windows" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">Windows</button>
-                            <button onclick="setPlatform('macos')" id="btn-macos" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">macOS</button>
-                            <button onclick="setPlatform('androidtv')" id="btn-androidtv" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">Android TV</button>
-                            <button onclick="setPlatform('appletv')" id="btn-appletv" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">Apple TV</button>
+                <div class="overview-grid space-y-7">
+                    <section class="setup-shell overview-hero-card">
+                        <div class="relative z-10 flex flex-col md:flex-row md:items-center gap-6">
+                            <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                <i class="fas fa-bolt text-2xl"></i>
+                            </div>
+                            <div class="flex-1">
+                                <h2 class="text-2xl font-black mb-2">Подключение за пару минут</h2>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">Сначала выбери платформу, затем приложение. Ниже появятся ссылки для установки и кнопка быстрого добавления подписки.</p>
+                            </div>
                         </div>
-                        <div id="app-selector-container">
-                            <h3 class="text-lg font-black mb-3">2. Выберите приложение</h3>
-                            <div id="app-selector" class="flex flex-wrap gap-2 mb-2"></div>
-                        </div>
-                        </div>
-                        <div id="full-instructions-container" class="p-6 md:p-10"></div>
+                    </section>
+
+                    <div id="setup-logic-placeholder" class="space-y-7">
+                        <section class="setup-shell p-6 md:p-8">
+                            <h3 class="text-lg font-black mb-3">1. Выберите платформу</h3>
+                            <div class="setup-chip-group flex flex-wrap gap-3 mb-8">
+                                <button onclick="setPlatform('android')" id="btn-android" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase active">Android</button>
+                                <button onclick="setPlatform('ios')" id="btn-ios" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">iOS</button>
+                                <button onclick="setPlatform('windows')" id="btn-windows" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">Windows</button>
+                                <button onclick="setPlatform('macos')" id="btn-macos" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">macOS</button>
+                                <button onclick="setPlatform('androidtv')" id="btn-androidtv" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">Android TV</button>
+                                <button onclick="setPlatform('appletv')" id="btn-appletv" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">Apple TV</button>
+                            </div>
+                            <div id="app-selector-container">
+                                <h3 class="text-lg font-black mb-3">2. Выберите приложение</h3>
+                                <div id="app-selector" class="flex flex-wrap gap-2 mb-2"></div>
+                            </div>
+                        </section>
+                        <div id="full-instructions-container" class="space-y-5"></div>
                     </div>
                 </div>
             </div>
 
             <div id="tab-profile" class="tab-content">
                 <header class="mb-10">
-                    <h1 class="text-3xl font-black uppercase tracking-tighter mb-2">Приглашение друзей</h1>
-                    <p class="text-gray-500 text-sm font-bold uppercase">Награды и бонусы за друзей</p>
+                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Рефералы</h1>
+                    <p class="text-gray-500 text-sm md:text-base font-bold">Приглашай друзей и получай дни к подписке</p>
                 </header>
-                <div class="grid grid-cols-1 gap-6">
-                    <div class="setup-shell">
-                        <div class="setup-toolbar p-6 md:p-8 border-b border-white/5">
-                            <h3 class="text-[12px] font-black text-gray-300 uppercase tracking-[0.15em] ml-2 opacity-90">Партнерская программа</h3>
-                        </div>
-
-                        <div class="p-6 md:p-8">
-                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-                                <div class="setup-step-card flex items-start gap-4">
-                                    <i class="fas fa-user-plus text-[#ffc700] text-2xl mt-1"></i>
-                                    <div>
-                                        <p class="text-[14px] font-bold text-gray-200 uppercase leading-relaxed">
-                                            <span class="text-[#ffc700]">+10 дней</span> за друга
-                                        </p>
-                                        <p class="text-[12px] text-gray-500 font-medium normal-case mt-1">при расходе более 100 МБ</p>
-                                    </div>
+                <div class="overview-grid space-y-7">
+                    <section class="setup-shell overview-hero-card">
+                        <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-7">
+                            <div class="flex items-start gap-5">
+                                <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                    <i class="fas fa-gift text-2xl"></i>
                                 </div>
-                                <div class="setup-step-card flex items-start gap-4">
-                                    <i class="fas fa-gem text-[#ffc700] text-2xl mt-1"></i>
-                                    <div>
-                                        <p class="text-[14px] font-bold text-gray-200 uppercase leading-relaxed">
-                                            <span class="text-[#ffc700]">+30 дней</span> за покупку
-                                        </p>
-                                        <p class="text-[12px] text-gray-500 font-medium normal-case mt-1">подписки от 1 месяца</p>
-                                    </div>
+                                <div>
+                                    <h2 class="text-2xl font-black mb-2">Добыча за друзей</h2>
+                                    <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">Друг получает доступ по твоей ссылке, а ты получаешь бонусные дни, когда он начинает пользоваться VPN и оформляет подписку.</p>
                                 </div>
                             </div>
-
-                            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                                <div class="setup-step-card p-5 text-center">
-                                    <p class="text-[9px] font-black text-gray-500 uppercase mb-2">Приглашено</p>
-                                    <p class="text-3xl font-black">{{ ref_invited_count|default:"0" }}</p>
-                                </div>
-                                <div class="setup-step-card p-5 text-center">
-                                    <p class="text-[9px] font-black text-gray-500 uppercase mb-2">Активны</p>
-                                    <p class="text-3xl font-black text-[#00ff88]">{{ ref_connected_count|default:"0" }}</p>
-                                </div>
-                                <div class="setup-step-card p-5 text-center">
-                                    <p class="text-[9px] font-black text-gray-500 uppercase mb-2">Покупок</p>
-                                    <p class="text-3xl font-black">{{ ref_purchased_count|default:"0" }}</p>
-                                </div>
-                                <div class="setup-step-card p-5 text-center border-[#ffc700]/30 bg-[#ffc700]/5">
-                                    <p class="text-[9px] font-black text-[#ffc700] uppercase mb-2">Бонусные дни</p>
-                                    <p class="text-3xl font-black text-[#ffc700]">+{{ bonus_days|default:"0" }}</p>
-                                </div>
+                            <div class="md:text-right">
+                                <p class="text-gray-500 text-sm font-bold mb-1">Бонусные дни</p>
+                                <p class="text-5xl font-black text-[#ffc700]">+{{ bonus_days|default:"0" }}</p>
                             </div>
                         </div>
-                    </div>
+                    </section>
 
-                    <div class="setup-shell">
-                        <div class="setup-toolbar p-6 md:p-8 border-b border-white/5">
-                            <p class="text-[12px] font-black text-gray-300 uppercase tracking-[0.15em] ml-2 opacity-90">
-                                Пригласительная ссылка для друзей в Telegram
-                            </p>
+                    <section class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div class="setup-step-card metric-card flex items-start gap-4 !mb-0">
+                            <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                <i class="fas fa-user-plus text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-black mb-2">+10 дней за друга</h3>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Начислим, когда приглашенный друг израсходует больше 100 МБ.</p>
+                            </div>
                         </div>
-                        <div class="p-6 md:p-8">
+                        <div class="setup-step-card metric-card flex items-start gap-4 !mb-0">
+                            <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                <i class="fas fa-gem text-lg"></i>
+                            </div>
+                            <div>
+                                <h3 class="text-lg font-black mb-2">+30 дней за покупку</h3>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Добавим сверху, если друг оплатит подписку от 1 месяца.</p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div class="setup-step-card metric-card p-5 !mb-0">
+                            <p class="text-gray-500 text-sm font-bold mb-2">Приглашено</p>
+                            <p class="text-4xl font-black">{{ ref_invited_count|default:"0" }}</p>
+                        </div>
+                        <div class="setup-step-card metric-card p-5 !mb-0">
+                            <p class="text-gray-500 text-sm font-bold mb-2">Активны</p>
+                            <p class="text-4xl font-black text-[#00ff88]">{{ ref_connected_count|default:"0" }}</p>
+                        </div>
+                        <div class="setup-step-card metric-card p-5 !mb-0">
+                            <p class="text-gray-500 text-sm font-bold mb-2">Покупок</p>
+                            <p class="text-4xl font-black">{{ ref_purchased_count|default:"0" }}</p>
+                        </div>
+                        <div class="setup-step-card metric-card p-5 border-[#ffc700]/30 bg-[#ffc700]/5 !mb-0">
+                            <p class="text-[#ffc700] text-sm font-bold mb-2">Бонусные дни</p>
+                            <p class="text-4xl font-black text-[#ffc700]">+{{ bonus_days|default:"0" }}</p>
+                        </div>
+                    </section>
+
+                    <section class="setup-shell p-6 md:p-8">
+                        <div class="flex flex-col gap-5">
+                            <div>
+                                <h3 class="text-lg font-black mb-2">Пригласительная ссылка</h3>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Отправь ее другу в Telegram. Бонусы начислятся автоматически.</p>
+                            </div>
                             <div class="relative group">
-                                <div class="absolute inset-y-0 left-0 pl-6 flex items-center pointer-events-none">
+                                <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                     <i class="fas fa-link text-[#ffc700] text-lg"></i>
                                 </div>
                                 <input type="text" readonly value="{{ referral_link }}" 
                                     id="ref-link-input"
-                                    class="w-full bg-black/60 border border-white/10 rounded-2xl py-5 pl-14 pr-40 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
+                                    class="referral-link-input w-full py-5 pl-14 pr-40 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
                                 
                                 <button onclick="copyReferralLink()" 
-                                        class="absolute right-2 top-2 bottom-2 setup-cta-btn !w-auto !py-0 !px-8 !text-[10px]">
+                                        class="absolute right-2 top-2 bottom-2 setup-cta-btn !w-auto !py-0 !px-8 !text-[10px] !mb-0 !mr-0">
                                     Копировать
                                 </button>
                             </div>
-                            <p class="mt-4 text-[11px] text-gray-400 font-bold uppercase ml-2 tracking-tight">
-                                За каждого приглашенного пирата ты получишь <span class="text-white">+40 дней</span> к подписке
-                            </p>
                         </div>
-                    </div>
+                    </section>
                 </div>
             </div>
 
@@ -1655,23 +1696,20 @@
             container.innerHTML = '';
             
             const stepperWrapper = document.createElement('div');
-            stepperWrapper.className = 'stepper-container mt-2';
-            
-            const line = document.createElement('div');
-            line.className = 'stepper-line';
-            stepperWrapper.appendChild(line);
+            stepperWrapper.className = 'space-y-5';
 
             app.steps.forEach((step, idx) => {
                 const stepRow = document.createElement('div');
-                stepRow.className = "relative pl-20 mb-12 last:mb-0";
+                stepRow.className = "setup-step-card !mb-0";
                 
                 let html = `
-                    <div class="absolute left-0 top-0 step-number-circle">
-                        ${idx + 1}
-                    </div>
-                    <div class="setup-step-card">
-                        <h4 class="text-lg font-black mb-2">${step.title}</h4>
-                        <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">${step.content}</p>
+                    <div class="flex flex-col md:flex-row gap-5">
+                        <div class="w-12 h-12 rounded-2xl bg-[#ffc700] text-black flex items-center justify-center font-black flex-shrink-0">
+                            ${idx + 1}
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="text-lg font-black mb-2">${step.title}</h4>
+                            <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">${step.content}</p>
                 `;
 
                 if (step.links) {
@@ -1694,13 +1732,13 @@
 
                 if (step.note) {
                     html += `
-                        <div class="setup-note">
+                        <div class="mt-5 rounded-2xl border border-[#ffc700]/20 bg-[#ffc700]/5 p-4">
                             <h5 class="text-[9px] font-black uppercase text-[#ffc700] mb-1 tracking-widest">${step.note.title}</h5>
                             <p class="text-[12px] md:text-[13px] text-gray-400 leading-relaxed">${step.note.text}</p>
                         </div>`;
                 }
 
-                html += `</div>`;
+                html += `</div></div>`;
                 stepRow.innerHTML = html;
                 stepperWrapper.appendChild(stepRow);
             });
