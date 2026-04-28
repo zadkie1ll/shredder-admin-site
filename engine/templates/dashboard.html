@@ -759,15 +759,14 @@
 
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-7 w-full">
                 {% for tariff in tariffs %}
-                <div class="tariff-card setup-step-card p-6 cursor-pointer transition-all duration-300 border-2 border-white/5 relative group !mb-0
+                <div class="tariff-card setup-step-card p-6 transition-all duration-300 border-2 border-white/5 relative group !mb-0
                     {% if forloop.counter == 2 %} 
                         z-20 shadow-[0_0_30px_rgba(255,199,0,0.1)] border-[#ffc700]/40 
                     {% else %} 
                         z-10 
                     {% endif %} 
                     hover:z-30 hover:border-[#ffc700]/30" 
-                    id="card-{{ tariff.db_tariff_id }}"
-                    onclick="selectTariff('{{ tariff.price }}', '{{ tariff.description }}', '{{ tariff.db_tariff_id }}')">
+                    id="card-{{ tariff.db_tariff_id }}">
                     
                     {% if forloop.counter == 2 %}
                         <div class="absolute -top-3 left-1/2 -translate-x-1/2 bg-[#ffc700] text-black text-[9px] font-black px-3 py-1 rounded-full uppercase tracking-widest whitespace-nowrap">
@@ -812,30 +811,18 @@
                                 <p class="text-gray-500 text-[10px] font-bold">Защита</p>
                             </div>
                         </div>
+
+                        <form method="POST" action="/pay/" target="_blank" class="mt-6">
+                            {% csrf_token %}
+                            <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
+                            <input type="hidden" name="email" value="{{ user.email }}">
+                            <button type="submit" class="w-full bg-[#ffc700] hover:bg-[#ffd740] text-black py-4 px-6 rounded-xl font-black text-sm transition-all hover:scale-[1.02] active:scale-95 shadow-lg shadow-[#ffc700]/10">
+                                Оплатить <i class="fas fa-arrow-right ml-2"></i>
+                            </button>
+                        </form>
                     </div>
                 </div>
                 {% endfor %}
-            </div>
-
-            <div class="setup-shell p-5 md:p-6 sticky bottom-4 z-30">
-                <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-                    <div>
-                        <p class="text-gray-500 text-sm font-bold mb-1">К оплате</p>
-                        <div class="flex flex-wrap items-baseline gap-2">
-                            <span id="display-final-price" class="text-4xl font-black text-white">0 ₽</span>
-                            <span id="display-tariff-name" class="text-sm font-bold text-[#ffc700]">—</span>
-                        </div>
-                    </div>
-                
-                    <form id="payment-form" method="POST" action="/pay/" target="_blank" class="w-full md:w-auto md:min-w-[260px]">
-                        {% csrf_token %}
-                        <input type="hidden" name="tariff_id" id="selected-tariff-id">
-                        <input type="hidden" name="email" value="{{ user.email }}">
-                        <button type="submit" class="w-full bg-[#ffc700] hover:bg-[#ffd740] text-black py-4 px-8 rounded-xl font-black text-sm transition-all hover:scale-[1.02] active:scale-95 shadow-lg shadow-[#ffc700]/10">
-                            Оплатить доступ <i class="fas fa-arrow-right ml-2"></i>
-                        </button>
-                    </form>
-                </div>
             </div>
         </div>
     </div>
@@ -1899,38 +1886,6 @@
             const view = document.getElementById('tariff-selection-view');
             view.classList.remove('hidden');
             document.getElementById('app-container').scrollTo(0, 0);
-
-            // АВТОВЫБОР: выбираем второй тариф (обычно самый выгодный)
-            const allCards = document.querySelectorAll('.tariff-card');
-            if (allCards.length >= 2) {
-                allCards[1].click(); // Кликаем по второй карточке (3 месяца)
-            } else if (allCards.length > 0) {
-                allCards[0].click(); // Или по первой, если она одна
-            }
-        }
-
-        function selectTariff(price, name, id) {
-            const priceDisplay = document.getElementById('display-final-price');
-            
-            // Эффект "тикающей" цены
-            priceDisplay.style.opacity = '0';
-            setTimeout(() => {
-                priceDisplay.innerText = price + ' ₽';
-                document.getElementById('display-tariff-name').innerText = name;
-                document.getElementById('selected-tariff-id').value = id;
-                priceDisplay.style.opacity = '1';
-            }, 150);
-            
-            document.querySelectorAll('.tariff-card').forEach(c => c.classList.remove('active-tariff'));
-            const card = document.getElementById('card-' + id);
-            if (card) card.classList.add('active-tariff');
-
-            setTimeout(() => {
-                document.getElementById('payment-form').scrollIntoView({ 
-                    behavior: 'smooth', 
-                    block: 'center' 
-                });
-            }, 100);
         }
 
         function hideTariffs() {

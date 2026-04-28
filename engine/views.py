@@ -62,14 +62,9 @@ def get_site_role(request):
     return "promo"
 
 
-def get_cabinet_base_url(request):
-    current_host = normalize_host(request.get_host())
+def get_current_base_url(request):
     scheme = "https" if request.is_secure() else "http"
-
-    if current_host in settings.CABINET_DOMAINS:
-        return f"{scheme}://{request.get_host()}"
-
-    return f"{scheme}://{settings.DEFAULT_CABINET_DOMAIN.rstrip('/')}"
+    return f"{scheme}://{request.get_host()}"
 
 
 def get_pwa_context():
@@ -89,7 +84,7 @@ def send_magic_link(request):
     if request.method == "POST":
         email_raw = request.POST.get("email", "")
         email = email_raw.lower().strip()
-        cabinet_base_url = get_cabinet_base_url(request)
+        auth_base_url = get_current_base_url(request)
         entry_host = normalize_host(request.get_host())
 
         session = session_factory()
@@ -126,14 +121,13 @@ def send_magic_link(request):
                 magic = MagicToken(user_id=user.id)
                 session.add(magic)
 
-            # Если почту ввели на cabinet-домене, ссылка вернет пользователя туда же.
-            # Если вход запрошен с promo-домена, письмо уводит на основной cabinet-домен.
-            link = f"{cabinet_base_url}/login/magic/{magic.token}/"
+            # Возвращаем пользователя в кабинет на том же домене, где он начал вход.
+            link = f"{auth_base_url}/login/magic/{magic.token}/"
 
             logging.info(
                 "Magic link requested from host %s, target auth host is %s for %s",
                 entry_host,
-                cabinet_base_url,
+                auth_base_url,
                 email,
             )
 

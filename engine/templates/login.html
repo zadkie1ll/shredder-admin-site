@@ -290,10 +290,7 @@
             submitBtn.innerHTML = '<i class="fas fa-circle-notch animate-spin"></i> Отправка...';
 
             try {
-                const activeOrigin = await bootstrapMirrorRedirect();
-                if (!activeOrigin) {
-                    return;
-                }
+                const activeOrigin = window.location.origin;
 
                 // Отправляем данные на Django
                 const response = await fetch(`${activeOrigin}/login/send-link/`, {
@@ -324,8 +321,6 @@
                 submitBtn.innerHTML = originalBtnText;
             }
         });
-
-        bootstrapMirrorRedirect();
     </script>
 
 </body>
