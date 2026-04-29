@@ -1,10 +1,9 @@
 import uuid
 import hashlib
 import logging
-from datetime import datetime
-from datetime import timezone
-from datetime import timedelta
 import resend
+from datetime import datetime
+from datetime import timedelta
 from django.http import JsonResponse
 from django.conf import settings
 from django.shortcuts import render
@@ -19,11 +18,17 @@ from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from sqlalchemy import func
+from sqlalchemy import update
+from sqlalchemy.exc import IntegrityError
 from common.models.db import User
+from common.models.db import EventLog
 from common.models.db import ReferralBonus
 from common.models.db import ReferralBonusType
+from common.models.db import ReferralType
+from common.models.db import UserTrafficProgress
 from common.models.db import YkRecurrentPayment
 from common.models.db import MagicToken
+from common.models import analytics_event
 from common.models.tariff import Tariff
 from common.models.tariff import OneMonthTariff
 from common.models.tariff import OneYearTariff
@@ -37,6 +42,7 @@ from .sql_helpers import save_wata_invoice
 from database import session_factory
 from engine.payments import create_yk_payment_sync
 from engine.payments import create_wata_payment_sync
+import proto.rwmanager_pb2 as proto
 
 ACTUAL_TARIFFS: list[Tariff] = [
     OneMonthTariff(),
@@ -51,6 +57,15 @@ def normalize_host(host):
     return host.split(":", 1)[0].lower()
 
 
+def is_known_site_host(host):
+    normalized_host = normalize_host(host)
+    return (
+        normalized_host in settings.CABINET_DOMAINS
+        or normalized_host in settings.NEUTRAL_DOMAINS
+        or normalized_host in settings.PROMO_DOMAINS
+    )
+
+
 def get_site_role(request):
     host = normalize_host(request.get_host())
     if host in settings.CABINET_DOMAINS:
@@ -63,6 +78,12 @@ def get_site_role(request):
 
 
 def get_current_base_url(request):
+    if not is_known_site_host(request.get_host()):
+        fallback_url = settings.DEFAULT_CABINET_DOMAIN.rstrip("/")
+        if "://" not in fallback_url:
+            fallback_url = f"https://{fallback_url}"
+        return fallback_url
+
     scheme = "https" if request.is_secure() else "http"
     return f"{scheme}://{request.get_host()}"
 
@@ -73,42 +94,214 @@ def get_pwa_context():
     }
 
 
+def parse_int(value):
+    if value in (None, ""):
+        return None
+
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        logging.warning(f"failed to parse integer tracking value {value}")
+        return None
+
+
+def capture_tracking_params(request):
+    for key in ("ymid", "ts", "a"):
+        value = request.GET.get(key)
+        if value:
+            request.session[f"tracking_{key}"] = value
+
+
+def get_tracking_value(request, *keys):
+    for source in (request.POST, request.GET):
+        for key in keys:
+            value = source.get(key)
+            if value:
+                return value
+
+    for key in keys:
+        value = request.session.get(f"tracking_{key}")
+        if value:
+            return value
+
+    return None
+
+
+def get_registration_context(request, db_session):
+    referrer_username = get_tracking_value(request, "a")
+    referrer = None
+
+    if referrer_username:
+        referrer = (
+            db_session.query(User).filter(User.username == referrer_username).first()
+        )
+
+    return {
+        "referrer": referrer,
+        "traffic_source": parse_int(get_tracking_value(request, "ts")),
+        "ymid": parse_int(get_tracking_value(request, "ymid")),
+    }
+
+
+def add_user_to_traffic_progress(db_session, user):
+    exists = (
+        db_session.query(UserTrafficProgress.id)
+        .filter(UserTrafficProgress.user_id == user.id)
+        .first()
+    )
+
+    if not exists:
+        db_session.add(UserTrafficProgress(user_id=user.id))
+
+
+def add_event_log(db_session, user, event):
+    db_session.add(
+        EventLog(
+            user_id=user.id,
+            event_type=event.event_type,
+            event_payload=event.model_dump(),
+        )
+    )
+
+
+def get_last_traffic_source(db_session, user):
+    event = (
+        db_session.query(EventLog)
+        .filter(
+            (EventLog.user_id == user.id)
+            & (
+                EventLog.event_type.in_(
+                    ["subscription_created", "traffic_source_changed"]
+                )
+            )
+        )
+        .order_by(EventLog.timestamp.desc())
+        .first()
+    )
+
+    if not event:
+        return False, None
+
+    return True, event.event_payload.get("traffic_source")
+
+
+def sync_existing_user_tracking(db_session, user, traffic_source, ymid):
+    if ymid is not None:
+        user.ymid = ymid
+
+    found_event, prev_traffic_source = get_last_traffic_source(db_session, user)
+    if found_event and traffic_source != prev_traffic_source:
+        logging.info(
+            f"for site user {user.username} detected change of traffic source, "
+            f"previous {'Direct' if prev_traffic_source is None else prev_traffic_source} "
+            f"new {'Direct' if traffic_source is None else traffic_source}"
+        )
+        add_event_log(
+            db_session,
+            user,
+            analytics_event.TrafficSourceChanged(traffic_source=traffic_source),
+        )
+
+
+def create_site_user(db_session, email, request):
+    context = get_registration_context(request, db_session)
+    referrer = context["referrer"]
+    username = str(uuid.uuid4().hex)
+    trial_period_days = (
+        settings.SITE_REFERRAL_TRIAL_PERIOD_DAYS
+        if referrer
+        else settings.SITE_TRIAL_PERIOD_DAYS
+    )
+
+    rw_user = create_user(
+        rwms_client=rwms_client,
+        username=username,
+        trial_period_days=trial_period_days,
+        from_referrer=referrer is not None,
+        email=email,
+    )
+
+    if rw_user is None:
+        raise RuntimeError(f"creating subscription for site user {email} was failed")
+
+    expire_at = None
+    if rw_user.HasField("expire_at"):
+        expire_at = rw_user.expire_at.ToDatetime().replace(tzinfo=None)
+
+    user = User(
+        email=email,
+        username=username,
+        expire_at=expire_at,
+        ymid=context["ymid"],
+        referred_by_id=referrer.id if referrer else None,
+        referral_type=ReferralType.STANDARD if referrer else None,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    add_user_to_traffic_progress(db_session, user)
+    add_event_log(
+        db_session,
+        user,
+        analytics_event.SubscriptionCreated(
+            traffic_source=context["traffic_source"]
+        ),
+    )
+
+    logging.info(
+        f"User with username {user.username} and email {email} was successfully created"
+    )
+
+    return user
+
+
 def render_login(request, context=None, status=200):
+    capture_tracking_params(request)
     payload = get_pwa_context()
     if context:
         payload.update(context)
     return render(request, "login.html", payload, status=status)
 
 
+def render_collect_email(request, user, error=None, email=""):
+    return render(
+        request,
+        "dashboard_collect_email.html",
+        {
+            "user": user,
+            "error": error,
+            "email": email,
+        },
+    )
+
+
 def send_magic_link(request):
     if request.method == "POST":
+        capture_tracking_params(request)
         email_raw = request.POST.get("email", "")
         email = email_raw.lower().strip()
         auth_base_url = get_current_base_url(request)
         entry_host = normalize_host(request.get_host())
 
-        session = session_factory()
+        if not email:
+            return JsonResponse({"status": "ok"})
+
+        db_session = session_factory()
 
         try:
-            with session.begin():
-                user = session.query(User).filter(User.email == email).first()
+            with db_session.begin():
+                user = db_session.query(User).filter(User.email == email).first()
 
                 if not user:
-                    username = str(uuid.uuid4().hex)
-
-                    user = User(
-                        email=email,
-                        username=username,
-                        expire_at=datetime.now(timezone.utc).replace(tzinfo=None)
-                        + timedelta(days=1),
-                    )
-                    create_user(rwms_client=rwms_client, username=username)
-                    session.add(user)
-                    session.flush()
-                    logging.info(
-                        f"User with username {user.username} and email {email} was successfully created"
-                    )
+                    user = create_site_user(db_session, email, request)
                 else:
+                    registration_context = get_registration_context(request, db_session)
+                    sync_existing_user_tracking(
+                        db_session,
+                        user,
+                        registration_context["traffic_source"],
+                        registration_context["ymid"],
+                    )
                     logging.info(
                         f"Found user with username {user.username} and email {email} to authorize"
                     )
@@ -119,7 +312,7 @@ def send_magic_link(request):
 
                 # Создаем токен
                 magic = MagicToken(user_id=user.id)
-                session.add(magic)
+                db_session.add(magic)
 
             # Возвращаем пользователя в кабинет на том же домене, где он начал вход.
             link = f"{auth_base_url}/login/magic/{magic.token}/"
@@ -169,7 +362,7 @@ def send_magic_link(request):
             logging.error(f"Error during sign-up/login: {e}")
 
         finally:
-            session.close()
+            db_session.close()
 
         # Мы всегда возвращаем успех, чтобы не "палить" наличие email в базе (защита от парсинга)
         return JsonResponse({"status": "ok"})
@@ -178,30 +371,43 @@ def send_magic_link(request):
 def auth_by_magic_link(request, token):
     session = session_factory()
     try:
-        magic = session.query(MagicToken).filter(MagicToken.token == token).first()
+        expires_after = datetime.utcnow() - timedelta(minutes=15)
+        user_id = session.execute(
+            update(MagicToken)
+            .where(
+                MagicToken.token == token,
+                MagicToken.is_used.is_(False),
+                MagicToken.created_at > expires_after,
+            )
+            .values(is_used=True)
+            .returning(MagicToken.user_id)
+        ).scalar_one_or_none()
 
-        if magic and magic.is_valid():
-            user = session.query(User).filter(User.id == magic.user_id).first()
+        if user_id:
+            user = session.query(User).filter(User.id == user_id).first()
+            if not user:
+                session.rollback()
+                logging.warning(f"magic token {token} points to missing user {user_id}")
+                return render_login(request, {"error": "Ссылка истекла или неверна"})
 
-            if user:
-                # Вручную авторизуем пользователя в сессии Django
-                # (Это то, что делает login(), но без проверки _meta)
-                request.session[SESSION_KEY] = str(user.id)  # ID пользователя
-                request.session[BACKEND_SESSION_KEY] = (
-                    "engine.auth_backend.SQLAlchemyBackend"
-                )
-                # Хэш пароля нам не нужен, так как вход по ссылке,
-                # но если Django будет его требовать, можно поставить заглушку:
-                request.session[HASH_SESSION_KEY] = ""
+            session.commit()
 
-                # Помечаем токен использованным
-                magic.is_used = True
-                session.commit()
+            # Вручную авторизуем пользователя в сессии Django
+            # (Это то, что делает login(), но без проверки _meta)
+            request.session[SESSION_KEY] = str(user.id)  # ID пользователя
+            request.session[BACKEND_SESSION_KEY] = (
+                "engine.auth_backend.SQLAlchemyBackend"
+            )
+            # Хэш пароля нам не нужен, так как вход по ссылке,
+            # но если Django будет его требовать, можно поставить заглушку:
+            request.session[HASH_SESSION_KEY] = ""
 
-                # Важно: после ручного обновления сессии ее нужно сохранить
-                request.session.modified = True
+            # Важно: после ручного обновления сессии ее нужно сохранить
+            request.session.modified = True
 
-                return redirect("dashboard")
+            return redirect("dashboard")
+
+        session.rollback()
 
         return render_login(request, {"error": "Ссылка истекла или неверна"})
     finally:
@@ -209,6 +415,7 @@ def auth_by_magic_link(request, token):
 
 
 def index(request):
+    capture_tracking_params(request)
     site_role = get_site_role(request)
 
     if site_role == "cabinet":
@@ -230,7 +437,7 @@ def dashboard(request):
 
     # Если зашел из ТГ (уже есть ID), но почты нет — просим почту
     if user.telegram_id and not user.email:
-        return render(request, "dashboard_collect_email.html", {"user": user})
+        return render_collect_email(request, user)
 
     # Если зашел по почте и ТГ еще не привязан — готовим ссылку для привязки
     tg_bind_link = None
@@ -240,36 +447,38 @@ def dashboard(request):
         tg_bind_link = f"https://t.me/{tg_bot}?start=bind_{user.id}_{token}"
 
     session = session_factory()
-
-    has_recurrent = (
-        session.query(func.count(YkRecurrentPayment.id))
-        .filter(YkRecurrentPayment.user_id == user.id)
-        .scalar()
-    )
-
-    ref_invited_count = (
-        session.query(func.count(User.id))
-        .filter(User.referred_by_id == user.id)
-        .scalar()
-    )
-
-    ref_connected_count = (
-        session.query(func.count(ReferralBonus.id))
-        .filter(
-            (ReferralBonus.referrer_id == user.id)
-            & (ReferralBonus.bonus_type == ReferralBonusType.TRAFFIC)
+    try:
+        has_recurrent = (
+            session.query(func.count(YkRecurrentPayment.id))
+            .filter(YkRecurrentPayment.user_id == user.id)
+            .scalar()
         )
-        .scalar()
-    )
 
-    ref_purchased_count = (
-        session.query(func.count(ReferralBonus.id))
-        .filter(
-            (ReferralBonus.referrer_id == user.id)
-            & (ReferralBonus.bonus_type == ReferralBonusType.PURCHASE)
+        ref_invited_count = (
+            session.query(func.count(User.id))
+            .filter(User.referred_by_id == user.id)
+            .scalar()
         )
-        .scalar()
-    )
+
+        ref_connected_count = (
+            session.query(func.count(ReferralBonus.id))
+            .filter(
+                (ReferralBonus.referrer_id == user.id)
+                & (ReferralBonus.bonus_type == ReferralBonusType.TRAFFIC)
+            )
+            .scalar()
+        )
+
+        ref_purchased_count = (
+            session.query(func.count(ReferralBonus.id))
+            .filter(
+                (ReferralBonus.referrer_id == user.id)
+                & (ReferralBonus.bonus_type == ReferralBonusType.PURCHASE)
+            )
+            .scalar()
+        )
+    finally:
+        session.close()
 
     bonus_days = ref_connected_count * 10 + ref_purchased_count * 30
     subscription = rwms_client.get_user_by_username(user.username)
@@ -305,29 +514,90 @@ def dashboard(request):
                 else -1
             ),
             "referral_link": f"https://t.me/{tg_bot}?start=a{user.username}",
+            "site_referral_link": f"{get_current_base_url(request)}/?a={user.username}",
         },
     )
 
 
 def update_email(request):
-    if request.method == "POST" and request.user.is_authenticated:
-        new_email = request.POST.get("email").lower().strip()
+    if request.method != "POST" or not request.user.is_authenticated:
+        return redirect("login")
 
-        session = session_factory()
-        try:
-            db_user = session.query(User).filter(User.id == request.user.id).first()
-            if db_user:
-                db_user.email = new_email
-                session.commit()
+    new_email = request.POST.get("email", "").lower().strip()
+    if not new_email:
+        return render_collect_email(
+            request,
+            request.user,
+            error="Введите email.",
+            email=new_email,
+        )
 
-                # Обновляем email в текущем объекте пользователя в памяти
-                request.user.email = new_email
+    session = session_factory()
+    db_user = None
+    try:
+        db_user = session.query(User).filter(User.id == request.user.id).first()
+        if not db_user:
+            logging.warning(f"user {request.user.id} not found while updating email")
+            auth_logout(request)
+            return redirect("login")
 
-            return redirect("dashboard")
-        finally:
-            session.close()
+        existing_user = (
+            session.query(User)
+            .filter(User.email == new_email, User.id != db_user.id)
+            .first()
+        )
+        if existing_user:
+            return render_collect_email(
+                request,
+                request.user,
+                error="Этот email уже привязан к другому аккаунту.",
+                email=new_email,
+            )
 
-    return redirect("login")
+        db_user.email = new_email
+        session.commit()
+
+        # Обновляем email в текущем объекте пользователя в памяти
+        request.user.email = new_email
+        username = db_user.username
+
+    except IntegrityError:
+        session.rollback()
+        logging.warning(
+            f"email {new_email} already exists while updating user {request.user.id}"
+        )
+        return render_collect_email(
+            request,
+            request.user,
+            error="Этот email уже привязан к другому аккаунту.",
+            email=new_email,
+        )
+    except Exception as e:
+        session.rollback()
+        logging.exception(f"failed to update email for user {request.user.id}: {e}")
+        return render_collect_email(
+            request,
+            request.user,
+            error="Не удалось привязать email. Попробуйте еще раз.",
+            email=new_email,
+        )
+    finally:
+        session.close()
+
+    try:
+        subscription = rwms_client.get_user_by_username(username)
+        if subscription:
+            response = rwms_client.update_user(
+                proto.UpdateUserRequest(uuid=subscription.uuid, email=new_email)
+            )
+            if response is None:
+                logging.warning(
+                    f"failed to update rwms email for user {request.user.id}"
+                )
+    except Exception as e:
+        logging.exception(f"failed to sync rwms email for user {request.user.id}: {e}")
+
+    return redirect("dashboard")
 
 
 def login(request):
@@ -344,6 +614,7 @@ def logout(request):
 
 def pay(request):
     if request.method == "POST":
+        capture_tracking_params(request)
         email_raw = request.POST.get("email")
         if not email_raw:
             messages.error(request, "Email обязателен")
@@ -361,20 +632,20 @@ def pay(request):
             messages.error(request, "Выбранный тариф не найден")
             return redirect("dashboard")
 
-        session = session_factory()
+        db_session = session_factory()
         try:
             # Ищем или создаем пользователя
-            user = session.query(User).filter(User.email == email).first()
+            user = db_session.query(User).filter(User.email == email).first()
             if not user:
-                username = str(uuid.uuid4().hex)
-                user = User(
-                    email=email,
-                    username=username,
-                    expire_at=datetime.now(timezone.utc).replace(tzinfo=None),
+                user = create_site_user(db_session, email, request)
+            else:
+                registration_context = get_registration_context(request, db_session)
+                sync_existing_user_tracking(
+                    db_session,
+                    user,
+                    registration_context["traffic_source"],
+                    registration_context["ymid"],
                 )
-                create_user(rwms_client=rwms_client, username=username)
-                session.add(user)
-                session.flush()
 
             if settings.PAYMENT_GATEWAY.lower() == "wata":
                 json = create_wata_payment_sync(
@@ -386,7 +657,7 @@ def pay(request):
                 confirmation_url = json["url"]
 
                 save_wata_invoice(
-                    session=session,
+                    session=db_session,
                     invoice_json=json,
                     tariff_id=tariff.db_tariff_id,
                     email=email,
@@ -405,15 +676,16 @@ def pay(request):
                     telegram_id=user.telegram_id or 0,
                 )
 
-            session.commit()
+            db_session.commit()
             return redirect(confirmation_url)
 
         except Exception as e:
+            db_session.rollback()
             logging.error(f"Pay error: {e}")
             messages.error(request, "Ошибка платежной системы")
             return redirect("dashboard")
         finally:
-            session.close()
+            db_session.close()
 
     return redirect("index")
 

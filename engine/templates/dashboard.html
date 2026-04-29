@@ -666,20 +666,39 @@
                         <div class="flex flex-col gap-5">
                             <div>
                                 <h3 class="text-lg font-black mb-2">Пригласительная ссылка</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Отправь ее другу в Telegram. Бонусы начислятся автоматически.</p>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Отправь другу ссылку на сайт или в Telegram. Бонусы начислятся автоматически.</p>
                             </div>
-                            <div class="relative group">
-                                <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                    <i class="fas fa-link text-[#ffc700] text-lg"></i>
+                            <div>
+                                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Ссылка на сайт</p>
+                                <div class="relative group">
+                                    <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                                        <i class="fas fa-globe text-[#ffc700] text-lg"></i>
+                                    </div>
+                                    <input type="text" readonly value="{{ site_referral_link }}"
+                                        id="site-ref-link-input"
+                                        class="referral-link-input w-full py-5 pl-14 pr-40 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
+
+                                    <button onclick="copyReferralLink('site-ref-link-input')"
+                                            class="absolute right-2 top-2 bottom-2 setup-cta-btn !w-auto !py-0 !px-8 !text-[10px] !mb-0 !mr-0">
+                                        Копировать
+                                    </button>
                                 </div>
-                                <input type="text" readonly value="{{ referral_link }}" 
-                                    id="ref-link-input"
-                                    class="referral-link-input w-full py-5 pl-14 pr-40 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
-                                
-                                <button onclick="copyReferralLink()" 
-                                        class="absolute right-2 top-2 bottom-2 setup-cta-btn !w-auto !py-0 !px-8 !text-[10px] !mb-0 !mr-0">
-                                    Копировать
-                                </button>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Ссылка в Telegram</p>
+                                <div class="relative group">
+                                    <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
+                                        <i class="fab fa-telegram-plane text-[#ffc700] text-lg"></i>
+                                    </div>
+                                    <input type="text" readonly value="{{ referral_link }}"
+                                        id="ref-link-input"
+                                        class="referral-link-input w-full py-5 pl-14 pr-40 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
+
+                                    <button onclick="copyReferralLink('ref-link-input')"
+                                            class="absolute right-2 top-2 bottom-2 setup-cta-btn !w-auto !py-0 !px-8 !text-[10px] !mb-0 !mr-0">
+                                        Копировать
+                                    </button>
+                                </div>
                             </div>
                         </div>
                     </section>
@@ -905,10 +924,17 @@
             <div class="space-y-3 mb-5">
                 <p class="text-lg font-black">Пригласительная ссылка</p>
                 <div class="relative">
+                    <input type="text" readonly value="{{ site_referral_link }}" id="site-ref-link-input-sheet"
+                        class="w-full bg-black/60 border border-white/10 rounded-2xl py-5 pl-5 pr-36 text-[11px] font-mono text-white focus:outline-none focus:border-[#ffc700]/40 transition-all shadow-inner">
+                    <button onclick="copyRefLink(event, 'site-ref-link-input-sheet')" class="bottom-sheet-copy-btn absolute right-2 top-2 bottom-2 bg-[#ffc700] hover:bg-[#ffd740] text-black px-6 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-[#ffc700]/20">
+                        Сайт
+                    </button>
+                </div>
+                <div class="relative">
                     <input type="text" readonly value="{{ referral_link }}" id="ref-link-input-sheet" 
                         class="w-full bg-black/60 border border-white/10 rounded-2xl py-5 pl-5 pr-36 text-[11px] font-mono text-white focus:outline-none focus:border-[#ffc700]/40 transition-all shadow-inner">
-                    <button onclick="copyRefLink(event)" class="bottom-sheet-copy-btn absolute right-2 top-2 bottom-2 bg-[#ffc700] hover:bg-[#ffd740] text-black px-6 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-[#ffc700]/20">
-                        Копировать
+                    <button onclick="copyRefLink(event, 'ref-link-input-sheet')" class="bottom-sheet-copy-btn absolute right-2 top-2 bottom-2 bg-[#ffc700] hover:bg-[#ffd740] text-black px-6 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-[#ffc700]/20">
+                        Telegram
                     </button>
                 </div>
             </div>
@@ -1936,8 +1962,8 @@
         }
 
         // Обновленная функция копирования (чтобы text ready)
-        function copyRefLink(event) {
-            const copyText = document.getElementById("ref-link-input-sheet");
+        function copyRefLink(event, inputId) {
+            const copyText = document.getElementById(inputId);
             copyText.select();
             copyText.setSelectionRange(0, 99999); // Для мобилок
             
@@ -1955,8 +1981,8 @@
             });
         }
 
-        function copyReferralLink() {
-            const copyText = document.getElementById("ref-link-input");
+        function copyReferralLink(inputId) {
+            const copyText = document.getElementById(inputId);
             copyText.select();
             copyText.setSelectionRange(0, 99999);
             navigator.clipboard.writeText(copyText.value);

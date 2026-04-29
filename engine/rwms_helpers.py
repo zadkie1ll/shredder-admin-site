@@ -11,14 +11,17 @@ import proto.rwmanager_pb2 as proto
 def create_user(
     rwms_client: RwmsClientSync,
     username: str,
+    trial_period_days: int,
     from_referrer: bool = False,
     email: str | None = None,
 ) -> Optional[proto.UserResponse]:
-    trial_period_days = 1
-
     if from_referrer:
         logging.info(
             f"creating subscription {username} with referral bonus, trial period {trial_period_days} days"
+        )
+    else:
+        logging.info(
+            f"creating subscription {username}, trial period {trial_period_days} days"
         )
 
     squads_uuids_value = os.getenv("INTERNAL_SQUADS_UUIDS")

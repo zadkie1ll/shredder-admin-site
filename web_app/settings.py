@@ -66,6 +66,12 @@ DEFAULT_CABINET_DOMAIN = config(
 )
 PWA_MIRROR_SOURCE_URL = config("PWA_MIRROR_SOURCE_URL", default="")
 TG_BOT_USERNAME = config('TG_BOT_USERNAME', default='monkeyislandvpnbot')
+SITE_TRIAL_PERIOD_DAYS = config("SITE_TRIAL_PERIOD_DAYS", default=7, cast=int)
+SITE_REFERRAL_TRIAL_PERIOD_DAYS = config(
+    "SITE_REFERRAL_TRIAL_PERIOD_DAYS",
+    default=15,
+    cast=int,
+)
 EMAIL_PROVIDER = config("EMAIL_PROVIDER", default="smtp")
 RESEND_API_KEY = config("RESEND_API_KEY", default="")
 RESEND_FROM_EMAIL = config("RESEND_FROM_EMAIL", default="")
