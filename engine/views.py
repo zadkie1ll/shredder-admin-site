@@ -448,6 +448,12 @@ def dashboard(request):
 
     session = session_factory()
     try:
+        traffic_progress = (
+            session.query(UserTrafficProgress)
+            .filter(UserTrafficProgress.user_id == user.id)
+            .first()
+        )
+
         has_recurrent = (
             session.query(func.count(YkRecurrentPayment.id))
             .filter(YkRecurrentPayment.user_id == user.id)
@@ -482,6 +488,64 @@ def dashboard(request):
 
     bonus_days = ref_connected_count * 10 + ref_purchased_count * 30
     subscription = rwms_client.get_user_by_username(user.username)
+    seconds_left = (
+        user.time_until_expiration.total_seconds()
+        if user.time_until_expiration
+        else -1
+    )
+    days_left = int((seconds_left + 86399) // 86400) if seconds_left > 0 else 0
+    show_expiring_banner = 0 < seconds_left <= 3 * 24 * 60 * 60
+    show_telegram_bind_banner = not user.telegram_id
+    show_not_connected_banner = False
+
+    if (
+        seconds_left > 0
+        and not show_expiring_banner
+        and subscription
+        and subscription.HasField("created_at")
+        and traffic_progress
+        and not traffic_progress.passed_0
+    ):
+        created_at = subscription.created_at.ToDatetime()
+        show_not_connected_banner = (
+            datetime.utcnow().date() - created_at.date()
+        ) == timedelta(days=1)
+
+    if settings.DEBUG:
+        debug_seconds_left = parse_int(request.GET.get("debug_seconds_left"))
+        if debug_seconds_left is not None:
+            seconds_left = debug_seconds_left
+
+        show_telegram_bind_banner = (
+            request.GET.get("debug_no_tg") == "1" or show_telegram_bind_banner
+        )
+        show_expiring_banner = (
+            request.GET.get("debug_expiring") == "1" or show_expiring_banner
+        )
+        show_not_connected_banner = (
+            request.GET.get("debug_nc") == "1" or show_not_connected_banner
+        )
+
+        if request.GET.get("debug_expired") == "1":
+            seconds_left = -1
+
+        days_left = int((seconds_left + 86399) // 86400) if seconds_left > 0 else 0
+
+    if seconds_left <= 0:
+        show_expiring_banner = False
+        show_not_connected_banner = False
+    elif show_expiring_banner:
+        show_not_connected_banner = False
+
+    if seconds_left <= 0:
+        time_left_value = 0
+        time_left_label = "дней осталось"
+    elif seconds_left < 24 * 60 * 60:
+        time_left_value = max(1, int((seconds_left + 3599) // 3600))
+        time_left_label = "часов осталось"
+    else:
+        time_left_value = days_left
+        time_left_label = "дней осталось"
 
     plain_subscription_url = (
         subscription.subscription_url
@@ -508,11 +572,13 @@ def dashboard(request):
             "bonus_days": bonus_days,
             "tariffs": ACTUAL_TARIFFS,
             "has_recurrent": has_recurrent,
-            "seconds_left": (
-                user.time_until_expiration.total_seconds()
-                if user.time_until_expiration
-                else -1
-            ),
+            "seconds_left": seconds_left,
+            "days_left": days_left,
+            "time_left_value": time_left_value,
+            "time_left_label": time_left_label,
+            "show_telegram_bind_banner": show_telegram_bind_banner,
+            "show_expiring_banner": show_expiring_banner,
+            "show_not_connected_banner": show_not_connected_banner,
             "referral_link": f"https://t.me/{tg_bot}?start=a{user.username}",
             "site_referral_link": f"{get_current_base_url(request)}/?a={user.username}",
         },
