@@ -5,6 +5,7 @@ import logging
 import resend
 from datetime import datetime
 from datetime import timedelta
+from urllib.parse import urlsplit
 from django.http import JsonResponse
 from django.conf import settings
 from django.shortcuts import render
@@ -16,6 +17,7 @@ from django.contrib.auth import BACKEND_SESSION_KEY
 from django.contrib.auth import HASH_SESSION_KEY
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
+from django.templatetags.static import static
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from sqlalchemy import func
@@ -308,6 +310,45 @@ def hash_telegram_login_token(token):
     return hashlib.sha256(payload).hexdigest()
 
 
+def send_magic_link_email(email, link, *, subject=None, template_context=None):
+    context = {"link": link}
+    if template_context:
+        context.update(template_context)
+
+    if "icon_url" not in context:
+        parsed_link = urlsplit(link)
+        if parsed_link.scheme and parsed_link.netloc:
+            context["icon_url"] = (
+                f"{parsed_link.scheme}://{parsed_link.netloc}"
+                f"{static('icons/icon-192x192.png')}"
+            )
+
+    html_message = render_to_string("emails/magic_link.html", context)
+    plain_message = strip_tags(html_message)
+    subject = subject or "Ссылка для входа в личный кабинет"
+
+    if settings.EMAIL_PROVIDER.lower() == "resend":
+        resend.api_key = settings.RESEND_API_KEY
+        resend.Emails.send(
+            {
+                "from": settings.RESEND_FROM_EMAIL,
+                "to": [email],
+                "subject": subject,
+                "html": html_message,
+                "text": plain_message,
+            }
+        )
+    else:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+
+
 def send_magic_link(request):
     if request.method == "POST":
         capture_tracking_params(request)
@@ -357,39 +398,7 @@ def send_magic_link(request):
                 email,
             )
 
-            # Формируем контекст для шаблона
-            context = {
-                'link': link,
-            }
-
-            # Рендерим HTML
-            html_message = render_to_string('emails/magic_link.html', context)
-            # Создаем текстовую версию (на случай, если клиент не поддерживает HTML)
-            plain_message = strip_tags(html_message)
-
-            subject = "Ссылка для входа в личный кабинет"
-
-            if settings.EMAIL_PROVIDER.lower() == "resend":
-                resend.api_key = settings.RESEND_API_KEY
-                resend.Emails.send(
-                    {
-                        "from": settings.RESEND_FROM_EMAIL,
-                        "to": [email],
-                        "subject": subject,
-                        "html": html_message,
-                        "text": plain_message,
-                    }
-                )
-            else:
-                # Отправляем письмо через SMTP
-                send_mail(
-                    subject=subject,
-                    message=plain_message,
-                    from_email=settings.DEFAULT_FROM_EMAIL,
-                    recipient_list=[email],
-                    html_message=html_message,
-                    fail_silently=False,
-                )
+            send_magic_link_email(email, link)
 
         except Exception as e:
             logging.error(f"Error during sign-up/login: {e}")
@@ -807,7 +816,36 @@ def pay(request):
                     telegram_id=user.telegram_id or 0,
                 )
 
+            magic = MagicToken(user_id=user.id)
+            db_session.add(magic)
+            db_session.flush()
+            magic_link = f"{get_current_base_url(request)}/login/magic/{magic.token}/"
+
             db_session.commit()
+
+            try:
+                send_magic_link_email(
+                    email,
+                    magic_link,
+                    subject="Ссылка на личный кабинет Monkey Island",
+                    template_context={
+                        "title": "Кабинет уже готов",
+                        "intro": "Мы создали для вас личный кабинет Monkey Island.",
+                        "note": (
+                            "После оплаты зайдите по кнопке ниже: ссылка действует "
+                            "15 минут и откроет VPN-подписку, инструкции для "
+                            "устройств и поддержку."
+                        ),
+                        "button_text": "Открыть кабинет",
+                        "footer": (
+                            "Если вы не оформляли VPN Monkey Island, просто "
+                            "проигнорируйте это письмо."
+                        ),
+                    },
+                )
+            except Exception as e:
+                logging.exception(f"failed to send payment magic link to {email}: {e}")
+
             return redirect(confirmation_url)
 
         except Exception as e:
