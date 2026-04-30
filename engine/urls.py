@@ -10,6 +10,7 @@ urlpatterns = [
     path("login/", views.login, name="login"),
     path("login/send-link/", views.send_magic_link, name="send_magic_link"),
     path("login/magic/<uuid:token>/", views.auth_by_magic_link, name="magic_auth"),
+    path("login/telegram/<str:token>/", views.auth_by_telegram_link, name="telegram_auth"),
     path("logout/", views.logout, name="logout"),
     path('manifest.json', views.dynamic_manifest),
     # Путь к сервис-воркеру

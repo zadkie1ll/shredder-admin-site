@@ -1,4 +1,5 @@
 import uuid
+import hmac
 import hashlib
 import logging
 import resend
@@ -28,6 +29,7 @@ from common.models.db import ReferralType
 from common.models.db import UserTrafficProgress
 from common.models.db import YkRecurrentPayment
 from common.models.db import MagicToken
+from common.models.db import TelegramLoginToken
 from common.models import analytics_event
 from common.models.tariff import Tariff
 from common.models.tariff import OneMonthTariff
@@ -275,6 +277,25 @@ def render_collect_email(request, user, error=None, email=""):
     )
 
 
+def authorize_user_session(request, user):
+    # Вручную авторизуем пользователя в сессии Django
+    # (Это то, что делает login(), но без проверки _meta)
+    request.session[SESSION_KEY] = str(user.id)
+    request.session[BACKEND_SESSION_KEY] = "engine.auth_backend.SQLAlchemyBackend"
+
+    # Хэш пароля нам не нужен, так как вход по ссылке,
+    # но если Django будет его требовать, можно поставить заглушку:
+    request.session[HASH_SESSION_KEY] = ""
+
+    # Важно: после ручного обновления сессии ее нужно сохранить
+    request.session.modified = True
+
+
+def hash_telegram_login_token(token):
+    payload = f"telegram-login:{token}:{settings.SECRET_KEY}".encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
 def send_magic_link(request):
     if request.method == "POST":
         capture_tracking_params(request)
@@ -392,24 +413,45 @@ def auth_by_magic_link(request, token):
 
             session.commit()
 
-            # Вручную авторизуем пользователя в сессии Django
-            # (Это то, что делает login(), но без проверки _meta)
-            request.session[SESSION_KEY] = str(user.id)  # ID пользователя
-            request.session[BACKEND_SESSION_KEY] = (
-                "engine.auth_backend.SQLAlchemyBackend"
-            )
-            # Хэш пароля нам не нужен, так как вход по ссылке,
-            # но если Django будет его требовать, можно поставить заглушку:
-            request.session[HASH_SESSION_KEY] = ""
-
-            # Важно: после ручного обновления сессии ее нужно сохранить
-            request.session.modified = True
-
+            authorize_user_session(request, user)
             return redirect("dashboard")
 
         session.rollback()
 
         return render_login(request, {"error": "Ссылка истекла или неверна"})
+    finally:
+        session.close()
+
+
+def auth_by_telegram_link(request, token):
+    session = session_factory()
+    try:
+        token_hash = hash_telegram_login_token(token)
+        login_token = (
+            session.query(TelegramLoginToken)
+            .filter(
+                TelegramLoginToken.token_hash == token_hash,
+                TelegramLoginToken.revoked_at.is_(None),
+            )
+            .first()
+        )
+        if not login_token or not hmac.compare_digest(
+            login_token.token_hash,
+            token_hash,
+        ):
+            logging.warning("invalid telegram login token was used")
+            return render_login(request, {"error": "Ссылка истекла или неверна"})
+
+        user = session.query(User).filter(User.id == login_token.user_id).first()
+        if not user or not user.telegram_id:
+            logging.warning("telegram login token points to missing telegram user")
+            return render_login(request, {"error": "Ссылка истекла или неверна"})
+
+        login_token.last_used_at = datetime.utcnow()
+        session.commit()
+
+        authorize_user_session(request, user)
+        return redirect("dashboard")
     finally:
         session.close()
 
@@ -494,7 +536,8 @@ def dashboard(request):
         else -1
     )
     days_left = int((seconds_left + 86399) // 86400) if seconds_left > 0 else 0
-    show_expiring_banner = 0 < seconds_left <= 3 * 24 * 60 * 60
+    expiring_banner_threshold_seconds = 3 * 24 * 60 * 60
+    show_expiring_banner = 0 < seconds_left <= expiring_banner_threshold_seconds
     show_telegram_bind_banner = not user.telegram_id
     show_not_connected_banner = False
 
@@ -512,15 +555,16 @@ def dashboard(request):
         ) == timedelta(days=1)
 
     if settings.DEBUG:
+        debug_expiring_days = parse_int(request.GET.get("debug_expiring"))
+        if debug_expiring_days is not None:
+            seconds_left = debug_expiring_days * 24 * 60 * 60
+
         debug_seconds_left = parse_int(request.GET.get("debug_seconds_left"))
         if debug_seconds_left is not None:
             seconds_left = debug_seconds_left
 
         show_telegram_bind_banner = (
             request.GET.get("debug_no_tg") == "1" or show_telegram_bind_banner
-        )
-        show_expiring_banner = (
-            request.GET.get("debug_expiring") == "1" or show_expiring_banner
         )
         show_not_connected_banner = (
             request.GET.get("debug_nc") == "1" or show_not_connected_banner
@@ -529,6 +573,7 @@ def dashboard(request):
         if request.GET.get("debug_expired") == "1":
             seconds_left = -1
 
+        show_expiring_banner = 0 < seconds_left <= expiring_banner_threshold_seconds
         days_left = int((seconds_left + 86399) // 86400) if seconds_left > 0 else 0
 
     if seconds_left <= 0:

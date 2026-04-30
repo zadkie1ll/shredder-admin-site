@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-SSH_HOST="${SSH_HOST:-mi.edge.retranslator}"
+SSH_HOST="${SSH_HOST:-mi.edge1}"
 REMOTE_DIR="${REMOTE_DIR:-/root/edge}"
 
 DRY_RUN=0
