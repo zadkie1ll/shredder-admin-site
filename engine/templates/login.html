@@ -169,9 +169,12 @@
 
                     <form id="magicLinkForm" class="space-y-6">
                         {% csrf_token %}
+                        {% for key, value in tracking_params.items %}
+                            <input type="hidden" name="{{ key }}" value="{{ value }}">
+                        {% endfor %}
                         <div class="text-left">
                             <label class="text-[10px] font-black uppercase text-gray-400 ml-4 mb-2 block tracking-widest">Ваш Email</label>
-                            <input type="email" id="email" placeholder="pirate@monkey-island.com" required 
+                            <input type="email" id="email" name="email" placeholder="pirate@monkey-island.com" required 
                                    class="w-full input-field px-6 py-4 rounded-2xl font-bold outline-none">
                         </div>
 
@@ -283,6 +286,7 @@
             const emailInput = document.getElementById('email');
             const submitBtn = e.target.querySelector('button');
             const email = emailInput.value;
+            const formData = new FormData(e.target);
 
             // Состояние загрузки
             const originalBtnText = submitBtn.innerHTML;
@@ -299,7 +303,7 @@
                         'Content-Type': 'application/x-www-form-urlencoded',
                         'X-CSRFToken': getCookie('csrftoken')
                     },
-                    body: new URLSearchParams({ 'email': email })
+                    body: new URLSearchParams(formData)
                 });
 
                 if (response.ok) {

@@ -51,6 +51,7 @@ ACTUAL_TARIFFS: list[Tariff] = [
     ThreeMonthsTariff(),
     OneYearTariff(),
 ]
+TRACKING_PARAM_KEYS = ("ymid", "ts", "a")
 
 rwms_client = RwmsClientSync(settings.RWMS_HOST, settings.RWMS_PORT)
 
@@ -108,10 +109,20 @@ def parse_int(value):
 
 
 def capture_tracking_params(request):
-    for key in ("ymid", "ts", "a"):
+    for key in TRACKING_PARAM_KEYS:
         value = request.GET.get(key)
         if value:
             request.session[f"tracking_{key}"] = value
+
+
+def get_tracking_params(request):
+    tracking_params = {}
+    for key in TRACKING_PARAM_KEYS:
+        value = get_tracking_value(request, key)
+        if value:
+            tracking_params[key] = value
+
+    return tracking_params
 
 
 def get_tracking_value(request, *keys):
@@ -260,6 +271,7 @@ def create_site_user(db_session, email, request):
 def render_login(request, context=None, status=200):
     capture_tracking_params(request)
     payload = get_pwa_context()
+    payload["tracking_params"] = get_tracking_params(request)
     if context:
         payload.update(context)
     return render(request, "login.html", payload, status=status)
@@ -466,9 +478,17 @@ def index(request):
         return render_login(request)
 
     if site_role == "neutral":
-        return render(request, "index_neutral.html", {"tariffs": ACTUAL_TARIFFS})
+        return render(
+            request,
+            "index_neutral.html",
+            {"tariffs": ACTUAL_TARIFFS, "tracking_params": get_tracking_params(request)},
+        )
 
-    return render(request, "index.html", {"tariffs": ACTUAL_TARIFFS})
+    return render(
+        request,
+        "index.html",
+        {"tariffs": ACTUAL_TARIFFS, "tracking_params": get_tracking_params(request)},
+    )
 
 
 @login_required(login_url="/login/")

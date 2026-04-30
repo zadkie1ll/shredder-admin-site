@@ -276,6 +276,9 @@
                     <form action="/pay/" method="POST" class="space-y-4" target="_blank">
                         {% csrf_token %}
                         <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
+                        {% for key, value in tracking_params.items %}
+                            <input type="hidden" name="{{ key }}" value="{{ value }}">
+                        {% endfor %}
                         <input type="email" name="email" placeholder="ТВОЙ EMAIL" required 
                             class="w-full input-field px-4 py-4 font-bold text-xs uppercase tracking-widest focus:border-[#ffc700] outline-none transition">
                         <button type="submit" class="w-full tilda-yellow py-4 rounded-xl font-black uppercase text-sm tracking-widest transition shadow-lg">
