@@ -99,6 +99,22 @@ def get_pwa_context():
     }
 
 
+def format_days_ru(days):
+    if days % 10 == 1 and days % 100 != 11:
+        return f"{days} день"
+    if days % 10 in (2, 3, 4) and days % 100 not in (12, 13, 14):
+        return f"{days} дня"
+    return f"{days} дней"
+
+
+def get_display_trial_period_days_for_request(request):
+    return (
+        settings.SITE_REFERRAL_TRIAL_PERIOD_DAYS
+        if get_tracking_value(request, "a")
+        else settings.SITE_TRIAL_PERIOD_DAYS
+    )
+
+
 def parse_int(value):
     if value in (None, ""):
         return None
@@ -487,10 +503,15 @@ def index(request):
         return render_login(request)
 
     if site_role == "neutral":
+        trial_period_days = get_display_trial_period_days_for_request(request)
         return render(
             request,
             "index_neutral.html",
-            {"tariffs": ACTUAL_TARIFFS, "tracking_params": get_tracking_params(request)},
+            {
+                "tariffs": ACTUAL_TARIFFS,
+                "tracking_params": get_tracking_params(request),
+                "trial_period_days_label": format_days_ru(trial_period_days),
+            },
         )
 
     return render(
