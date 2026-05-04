@@ -521,6 +521,20 @@ def index(request):
     )
 
 
+def offer(request):
+    return render(
+        request,
+        "offer.html",
+        {
+            "tariffs": ACTUAL_TARIFFS,
+            "trial_period_days_label": format_days_ru(settings.SITE_TRIAL_PERIOD_DAYS),
+            "referral_trial_period_days_label": format_days_ru(
+                settings.SITE_REFERRAL_TRIAL_PERIOD_DAYS
+            ),
+        },
+    )
+
+
 @login_required(login_url="/login/")
 def dashboard(request):
     user = request.user
