@@ -6,6 +6,7 @@ import resend
 from datetime import datetime
 from datetime import timedelta
 from urllib.parse import urlsplit
+from django.http import HttpResponse
 from django.http import JsonResponse
 from django.conf import settings
 from django.shortcuts import render
@@ -792,20 +793,17 @@ def pay(request):
         capture_tracking_params(request)
         email_raw = request.POST.get("email")
         if not email_raw:
-            messages.error(request, "Email обязателен")
-            return redirect("dashboard")
+            return HttpResponse("Email обязателен", status=400)
 
         email = email_raw.lower().strip()
         tariff_id = request.POST.get("tariff_id")
 
         if not email or not tariff_id:
-            messages.error(request, "Не указан email или тариф")
-            return redirect("dashboard")
+            return HttpResponse("Не указан email или тариф", status=400)
 
         tariff = next((t for t in ACTUAL_TARIFFS if t.db_tariff_id == tariff_id), None)
         if not tariff:
-            messages.error(request, "Выбранный тариф не найден")
-            return redirect("dashboard")
+            return HttpResponse("Выбранный тариф не найден", status=400)
 
         db_session = session_factory()
         try:
@@ -892,6 +890,20 @@ def pay(request):
             db_session.close()
 
     return redirect("index")
+
+
+def robots_txt(request):
+    lines = [
+        "User-agent: *",
+        "Allow: /",
+        "Disallow: /dashboard/",
+        "Disallow: /pay/",
+        "Disallow: /login/magic/",
+        "Disallow: /login/telegram/",
+        "",
+    ]
+    return HttpResponse("\n".join(lines), content_type="text/plain")
+
 
 def dynamic_manifest(request):
     data = {
