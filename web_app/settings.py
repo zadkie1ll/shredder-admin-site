@@ -76,6 +76,9 @@ USE_NEW_SETUP_FLOW = config("USE_NEW_SETUP_FLOW", default=True, cast=bool)
 EMAIL_PROVIDER = config("EMAIL_PROVIDER", default="smtp")
 RESEND_API_KEY = config("RESEND_API_KEY", default="")
 RESEND_FROM_EMAIL = config("RESEND_FROM_EMAIL", default="")
+GOOGLE_OAUTH_CLIENT_ID = config("GOOGLE_OAUTH_CLIENT_ID", default="")
+GOOGLE_OAUTH_CLIENT_SECRET = config("GOOGLE_OAUTH_CLIENT_SECRET", default="")
+GOOGLE_OAUTH_REDIRECT_URI = config("GOOGLE_OAUTH_REDIRECT_URI", default="")
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/

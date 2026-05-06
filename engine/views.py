@@ -3,8 +3,11 @@ import hmac
 import hashlib
 import logging
 import resend
+import secrets
+import httpx
 from datetime import datetime
 from datetime import timedelta
+from urllib.parse import urlencode
 from urllib.parse import urlsplit
 from django.http import HttpResponse
 from django.http import JsonResponse
@@ -55,6 +58,9 @@ ACTUAL_TARIFFS: list[Tariff] = [
     OneYearTariff(),
 ]
 TRACKING_PARAM_KEYS = ("ymid", "ts", "a")
+GOOGLE_OAUTH_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
+GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token"
+GOOGLE_OAUTH_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 
 rwms_client = RwmsClientSync(settings.RWMS_HOST, settings.RWMS_PORT)
 
@@ -309,6 +315,9 @@ def render_login(request, context=None, status=200):
     capture_tracking_params(request)
     payload = get_pwa_context()
     payload["tracking_params"] = get_tracking_params(request)
+    payload["google_oauth_enabled"] = bool(
+        settings.GOOGLE_OAUTH_CLIENT_ID and settings.GOOGLE_OAUTH_CLIENT_SECRET
+    )
     if context:
         payload.update(context)
     return render(request, "login.html", payload, status=status)
@@ -443,6 +452,137 @@ def send_magic_link(request):
 
         # Мы всегда возвращаем успех, чтобы не "палить" наличие email в базе (защита от парсинга)
         return JsonResponse({"status": "ok"})
+
+
+def get_google_oauth_redirect_uri(request):
+    if settings.GOOGLE_OAUTH_REDIRECT_URI:
+        return settings.GOOGLE_OAUTH_REDIRECT_URI
+
+    return f"{get_current_base_url(request)}/login/google/callback/"
+
+
+def login_with_google(request):
+    if not settings.GOOGLE_OAUTH_CLIENT_ID or not settings.GOOGLE_OAUTH_CLIENT_SECRET:
+        logging.warning("google oauth login requested but credentials are missing")
+        return render_login(
+            request,
+            {"error": "Вход через Google временно недоступен"},
+            status=503,
+        )
+
+    capture_tracking_params(request)
+    state = secrets.token_urlsafe(32)
+    request.session["google_oauth_state"] = state
+    request.session.modified = True
+
+    auth_url = (
+        GOOGLE_OAUTH_AUTH_URL
+        + "?"
+        + urlencode(
+            {
+                "client_id": settings.GOOGLE_OAUTH_CLIENT_ID,
+                "redirect_uri": get_google_oauth_redirect_uri(request),
+                "response_type": "code",
+                "scope": "openid email profile",
+                "state": state,
+                "access_type": "online",
+                "prompt": "select_account",
+            }
+        )
+    )
+
+    return redirect(auth_url)
+
+
+def auth_by_google_callback(request):
+    error = request.GET.get("error")
+    if error:
+        logging.warning(f"google oauth returned error: {error}")
+        return render_login(request, {"error": "Вход через Google отменен"})
+
+    code = request.GET.get("code")
+    state = request.GET.get("state")
+    expected_state = request.session.pop("google_oauth_state", None)
+    request.session.modified = True
+
+    if not code or not state or not hmac.compare_digest(state, expected_state or ""):
+        logging.warning("invalid google oauth callback state")
+        return render_login(request, {"error": "Сессия входа истекла. Попробуйте еще раз."})
+
+    redirect_uri = get_google_oauth_redirect_uri(request)
+
+    try:
+        with httpx.Client(timeout=10) as client:
+            token_response = client.post(
+                GOOGLE_OAUTH_TOKEN_URL,
+                data={
+                    "code": code,
+                    "client_id": settings.GOOGLE_OAUTH_CLIENT_ID,
+                    "client_secret": settings.GOOGLE_OAUTH_CLIENT_SECRET,
+                    "redirect_uri": redirect_uri,
+                    "grant_type": "authorization_code",
+                },
+            )
+            token_response.raise_for_status()
+            access_token = token_response.json().get("access_token")
+
+            if not access_token:
+                raise RuntimeError("google oauth token response has no access_token")
+
+            userinfo_response = client.get(
+                GOOGLE_OAUTH_USERINFO_URL,
+                headers={"Authorization": f"Bearer {access_token}"},
+            )
+            userinfo_response.raise_for_status()
+            userinfo = userinfo_response.json()
+    except Exception as e:
+        logging.exception(f"google oauth login failed: {e}")
+        return render_login(
+            request,
+            {"error": "Не удалось войти через Google. Попробуйте еще раз."},
+        )
+
+    if not userinfo.get("email_verified"):
+        logging.warning("google oauth user email is not verified")
+        return render_login(request, {"error": "Google не подтвердил этот email."})
+
+    email = (userinfo.get("email") or "").lower().strip()
+    if not email:
+        logging.warning("google oauth userinfo has no email")
+        return render_login(request, {"error": "Google не вернул email аккаунта."})
+
+    db_session = session_factory()
+    try:
+        with db_session.begin():
+            user = db_session.query(User).filter(User.email == email).first()
+
+            if not user:
+                user = create_site_user(db_session, email, request)
+            else:
+                registration_context = get_registration_context(request, db_session)
+                sync_existing_user_tracking(
+                    db_session,
+                    user,
+                    registration_context["traffic_source"],
+                    registration_context["ymid"],
+                )
+
+            add_event_log_once(
+                db_session,
+                user,
+                analytics_event.FirstSuccessfulLogin(login_method="google_oauth"),
+            )
+
+        authorize_user_session(request, user)
+        return redirect("dashboard")
+    except Exception as e:
+        logging.exception(f"google oauth user authorization failed for {email}: {e}")
+        return render_login(
+            request,
+            {"error": "Не удалось подготовить личный кабинет. Напишите в поддержку."},
+        )
+    finally:
+        db_session.close()
 
 
 def auth_by_magic_link(request, token):
