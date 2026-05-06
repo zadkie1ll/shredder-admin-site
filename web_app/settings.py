@@ -72,6 +72,7 @@ SITE_REFERRAL_TRIAL_PERIOD_DAYS = config(
     default=15,
     cast=int,
 )
+USE_NEW_SETUP_FLOW = config("USE_NEW_SETUP_FLOW", default=True, cast=bool)
 EMAIL_PROVIDER = config("EMAIL_PROVIDER", default="smtp")
 RESEND_API_KEY = config("RESEND_API_KEY", default="")
 RESEND_FROM_EMAIL = config("RESEND_FROM_EMAIL", default="")

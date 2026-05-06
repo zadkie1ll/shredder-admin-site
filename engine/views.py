@@ -711,6 +711,7 @@ def dashboard(request):
             "show_telegram_bind_banner": show_telegram_bind_banner,
             "show_expiring_banner": show_expiring_banner,
             "show_not_connected_banner": show_not_connected_banner,
+            "use_new_setup_flow": settings.USE_NEW_SETUP_FLOW,
             "referral_link": f"https://t.me/{tg_bot}?start=a{user.username}",
             "site_referral_link": f"{get_current_base_url(request)}/?a={user.username}",
         },

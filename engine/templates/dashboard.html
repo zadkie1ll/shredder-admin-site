@@ -191,6 +191,94 @@
             }
         }
 
+        .setup-wizard-shell {
+            display: flex;
+            align-items: flex-start;
+            justify-content: flex-start;
+            padding-top: 0;
+        }
+
+        .setup-wizard-stage {
+            width: 100%;
+            max-width: 980px;
+            margin: 0;
+        }
+
+        .setup-wizard-orb {
+            width: 150px;
+            height: 150px;
+            border-radius: 999px;
+            background: conic-gradient(
+                var(--setup-progress-color, #00ff88) var(--setup-progress, 25%),
+                rgba(255, 255, 255, 0.08) 0
+            );
+            padding: 5px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 38px;
+            position: relative;
+        }
+
+        .setup-wizard-orb::before {
+            content: "";
+            position: absolute;
+            inset: 5px;
+            border-radius: inherit;
+            background: rgba(17, 17, 19, 0.96);
+        }
+
+        .setup-wizard-icon {
+            width: 62px;
+            height: 62px;
+            border-radius: 999px;
+            background: rgba(0, 255, 136, 0.12);
+            color: #00ff88;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 26px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .setup-wizard-action-row {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            gap: 12px;
+        }
+
+        .setup-link-btn.setup-secondary-btn,
+        .setup-cta-btn.setup-secondary-btn {
+            background: rgba(255, 255, 255, 0.05) !important;
+            color: #fff !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            box-shadow: none !important;
+        }
+
+        @media (max-width: 640px) {
+            .setup-wizard-shell {
+                min-height: auto;
+                align-items: flex-start;
+            }
+
+            .setup-wizard-orb {
+                width: 118px;
+                height: 118px;
+                margin-bottom: 28px;
+            }
+
+            .setup-wizard-icon {
+                width: 52px;
+                height: 52px;
+                font-size: 22px;
+            }
+
+            .setup-wizard-action-row {
+                grid-template-columns: minmax(0, 1fr);
+            }
+        }
+
         /* Карточки */
         .setup-shell {
             background: var(--card-bg) !important;
@@ -489,7 +577,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <button type="button" onclick="showTab('subscription')" class="setup-cta-btn !w-full lg:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
+                                    <button type="button" onclick="showTab('setup')" class="setup-cta-btn !w-full lg:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
                                         Подключить VPN
                                     </button>
                                 </div>
@@ -730,12 +818,12 @@
             </div>
 
             <div id="tab-setup" class="tab-content">
-                <header class="mb-10">
+                <header class="mb-10 {% if use_new_setup_flow %}hidden{% endif %}">
                     <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Настройка</h1>
                     <p class="text-gray-500 text-sm md:text-base font-bold">Выбери устройство и подключись по готовой инструкции</p>
                 </header>
                 <div class="overview-grid space-y-7">
-                    <section class="setup-shell overview-hero-card">
+                    <section class="setup-shell overview-hero-card {% if use_new_setup_flow %}hidden{% endif %}">
                         <div class="relative z-10 flex flex-col md:flex-row md:items-center gap-6">
                             <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                                 <i class="fas fa-bolt text-2xl"></i>
@@ -747,7 +835,22 @@
                         </div>
                     </section>
 
-                    <div id="setup-logic-placeholder" class="space-y-7">
+                    <div id="new-setup-flow" class="{% if not use_new_setup_flow %}hidden{% endif %}">
+                        <section class="setup-wizard-shell">
+                            <div class="setup-wizard-stage">
+                                <div id="new-setup-device-picker" class="setup-shell p-6 md:p-8 mb-7 hidden">
+                                    <h3 class="text-lg font-black mb-3">Выбери устройство</h3>
+                                    <div id="new-setup-platforms" class="setup-chip-group flex flex-wrap gap-3"></div>
+                                </div>
+
+                                <section class="setup-shell p-6 md:p-10 text-center">
+                                    <div id="new-setup-content"></div>
+                                </section>
+                            </div>
+                        </section>
+                    </div>
+
+                    <div id="setup-logic-placeholder" class="space-y-7 {% if use_new_setup_flow %}hidden{% endif %}">
                         <section class="setup-shell p-6 md:p-8">
                             <h3 class="text-lg font-black mb-3">1. Выберите платформу</h3>
                             <div class="setup-chip-group flex flex-wrap gap-3 mb-8">
@@ -1960,6 +2063,274 @@
             ]
         };
 
+        const newSetupPlatforms = [
+            { id: 'android', label: 'Android', icon: 'fab fa-android' },
+            { id: 'ios', label: 'iOS', icon: 'fab fa-apple' },
+            { id: 'windows', label: 'Windows', icon: 'fab fa-windows' },
+            { id: 'macos', label: 'macOS', icon: 'fab fa-apple' },
+            { id: 'linux', label: 'Linux', icon: 'fab fa-linux' },
+            { id: 'androidtv', label: 'Android TV', icon: 'fas fa-tv' },
+            { id: 'appletv', label: 'Apple TV', icon: 'fab fa-apple' },
+        ];
+
+        const newSetupApps = {
+            android: {
+                platformLabel: 'Android',
+                appName: 'Happ',
+                installText: 'Скачать Happ',
+                installUrl: 'https://play.google.com/store/apps/details?id=com.happproxy',
+                fallbackText: 'Скачать APK',
+                fallbackUrl: 'https://github.com/Happ-proxy/happ-android/releases/latest/download/Happ.apk',
+                addText: 'Добавить подписку в Happ',
+                keyInputId: 'new-setup-happ-key',
+                subscriptionUrl: '{{ happ_subscription_url }}',
+            },
+            ios: {
+                platformLabel: 'iOS',
+                appName: 'Happ',
+                installText: 'Скачать Happ из App Store',
+                installUrl: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973',
+                fallbackText: 'App Store для других регионов',
+                fallbackUrl: 'https://apps.apple.com/us/app/happ-proxy-utility/id6504287215',
+                addText: 'Добавить подписку в Happ',
+                keyInputId: 'new-setup-happ-key',
+                subscriptionUrl: '{{ happ_subscription_url }}',
+            },
+            windows: {
+                platformLabel: 'Windows',
+                appName: 'Happ',
+                installText: 'Скачать Happ',
+                installUrl: 'https://github.com/Happ-proxy/happ-desktop/releases/latest/download/setup-Happ.x64.exe',
+                addText: 'Добавить подписку в Happ',
+                keyInputId: 'new-setup-happ-key',
+                subscriptionUrl: '{{ happ_subscription_url }}',
+            },
+            macos: {
+                platformLabel: 'macOS',
+                appName: 'Happ',
+                installText: 'Скачать Happ из App Store',
+                installUrl: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973',
+                fallbackText: 'App Store для других регионов',
+                fallbackUrl: 'https://apps.apple.com/us/app/happ-proxy-utility/id6504287215',
+                addText: 'Добавить подписку в Happ',
+                keyInputId: 'new-setup-happ-key',
+                subscriptionUrl: '{{ happ_subscription_url }}',
+            },
+            linux: {
+                platformLabel: 'Linux',
+                appName: 'FlClashX',
+                installText: 'Скачать FlClashX',
+                installUrl: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-linux-amd64.AppImage',
+                fallbackText: 'Скачать .deb',
+                fallbackUrl: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-linux-amd64.deb',
+                addText: 'Добавить подписку в FlClashX',
+                keyInputId: 'new-setup-plain-key',
+                subscriptionUrl: 'flclashx://install-config?url={{ plain_subscription_url }}',
+                copyValue: '{{ plain_subscription_url }}',
+            },
+            androidtv: {
+                platformLabel: 'Android TV',
+                appName: 'Happ',
+                installText: 'Скачать Happ APK',
+                installUrl: 'https://github.com/Happ-proxy/happ-android/releases/latest/download/Happ.apk',
+                addText: 'Добавить подписку в Happ',
+                keyInputId: 'new-setup-happ-key',
+                subscriptionUrl: '{{ happ_subscription_url }}',
+            },
+            appletv: {
+                platformLabel: 'Apple TV',
+                appName: 'Happ',
+                installText: 'Скачать Happ в App Store',
+                installUrl: 'https://apps.apple.com/us/app/happ-proxy-utility-for-tv/id6748297274',
+                addText: 'Добавить подписку в Happ',
+                keyInputId: 'new-setup-happ-key',
+                subscriptionUrl: '{{ happ_subscription_url }}',
+            },
+        };
+
+        let selectedNewSetupPlatform = null;
+        let newSetupStep = 'start';
+
+        function detectNewSetupPlatform() {
+            const ua = navigator.userAgent || '';
+            const platform = navigator.platform || '';
+            const uaDataPlatform = navigator.userAgentData?.platform || '';
+            const marker = `${ua} ${platform} ${uaDataPlatform}`.toLowerCase();
+
+            if (/iphone|ipad|ipod/.test(marker)) return 'ios';
+            if (/android/.test(marker) && /tv|aft|bravia|shield/.test(marker)) return 'androidtv';
+            if (/android/.test(marker)) return 'android';
+            if (/mac/.test(marker)) return 'macos';
+            if (/win/.test(marker)) return 'windows';
+            if (/linux|x11/.test(marker)) return 'linux';
+            return 'android';
+        }
+
+        function getNewSetupApp() {
+            return newSetupApps[selectedNewSetupPlatform] || newSetupApps.android;
+        }
+
+        function renderNewSetupPlatforms() {
+            const container = document.getElementById('new-setup-platforms');
+            if (!container) return;
+
+            container.innerHTML = '';
+            newSetupPlatforms.forEach(platform => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = `platform-btn px-5 py-3 rounded-xl text-[10px] font-black uppercase ${platform.id === selectedNewSetupPlatform ? 'active' : ''}`;
+                btn.innerHTML = `<i class="${platform.icon} mr-2"></i>${platform.label}`;
+                btn.onclick = () => {
+                    selectedNewSetupPlatform = platform.id;
+                    newSetupStep = 'start';
+                    renderNewSetupWizard();
+                };
+                container.appendChild(btn);
+            });
+        }
+
+        function setNewSetupDevicePickerVisible(isVisible) {
+            const picker = document.getElementById('new-setup-device-picker');
+            if (!picker) return;
+            picker.classList.toggle('hidden', !isVisible);
+        }
+
+        function newSetupButton(label, onclick, extraClass = '', iconClass = '') {
+            return `
+                <button type="button" onclick="${onclick}" class="setup-cta-btn !w-full !py-5 !px-6 !text-sm !mb-0 !mr-0 ${extraClass}">
+                    ${iconClass ? `<i class="${iconClass}"></i>` : ''}
+                    ${label}
+                </button>
+            `;
+        }
+
+        function newSetupLink(label, url, extraClass = '', iconClass = '') {
+            return `
+                <a href="${url}" target="_blank" rel="noopener" class="setup-cta-btn !w-full !py-5 !px-6 !text-sm !mb-0 !mr-0 ${extraClass}">
+                    ${iconClass ? `<i class="${iconClass}"></i>` : ''}
+                    ${label}
+                </a>
+            `;
+        }
+
+        function newSetupOrb(iconClass, progress) {
+            return `
+                <div class="setup-wizard-orb" style="--setup-progress: ${progress}%; --setup-progress-color: #00ff88;">
+                    <div class="setup-wizard-icon"><i class="${iconClass}"></i></div>
+                </div>
+            `;
+        }
+
+        function renderNewSetupWizard() {
+            const root = document.getElementById('new-setup-content');
+            if (!root) return;
+
+            const app = getNewSetupApp();
+            renderNewSetupPlatforms();
+            setNewSetupDevicePickerVisible(newSetupStep === 'devices');
+
+            const copyValue = app.copyValue || (
+                app.keyInputId === 'new-setup-happ-key'
+                    ? '{{ happ_subscription_url }}'
+                    : '{{ plain_subscription_url }}'
+            );
+
+            if (newSetupStep === 'start' || newSetupStep === 'devices') {
+                root.innerHTML = `
+                    <h2 class="text-3xl md:text-4xl font-black mb-3">Настройка на ${app.platformLabel}</h2>
+                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Подключение проходит в 3 шага и занимает пару минут</p>
+                    ${newSetupOrb('fas fa-link', 25)}
+                    <div class="space-y-4">
+                        ${newSetupButton(`Начать настройку на этом устройстве`, "startNewSetupInstall()", "", "fas fa-play")}
+                        ${newSetupButton(`Настроить другое устройство`, "showNewSetupDevices()", "setup-secondary-btn", "fas fa-mobile-alt")}
+                    </div>
+                `;
+                return;
+            }
+
+            if (newSetupStep === 'install') {
+                root.innerHTML = `
+                    <h2 class="text-3xl md:text-4xl font-black mb-3">Приложение</h2>
+                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Установи ${app.appName} и вернись к этому экрану</p>
+                    ${newSetupOrb('fas fa-download', 50)}
+                    <div class="space-y-4">
+                        ${newSetupLink(app.installText, app.installUrl, "", "fas fa-download")}
+                        ${app.fallbackUrl ? newSetupLink(app.fallbackText, app.fallbackUrl, "setup-secondary-btn", "fas fa-external-link-alt") : ''}
+                        ${newSetupButton(`Далее: приложение установлено`, "startNewSetupSubscription()", "setup-secondary-btn", "fas fa-arrow-right")}
+                        <button type="button" onclick="backNewSetupStart()" class="mt-4 text-gray-500 text-sm font-black hover:text-[#ffc700] transition-colors">← Предыдущий шаг</button>
+                    </div>
+                `;
+                return;
+            }
+
+            if (newSetupStep === 'subscription') {
+                root.innerHTML = `
+                    <h2 class="text-3xl md:text-4xl font-black mb-3">Подписка</h2>
+                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Добавь подписку в ${app.appName} кнопкой ниже</p>
+                    ${newSetupOrb('fas fa-plus-circle', 75)}
+                    <input type="text" readonly value="${copyValue}" id="new-setup-copy-input" class="sr-only">
+                    <div class="space-y-4">
+                        ${newSetupLink(app.addText, app.subscriptionUrl, "", "fas fa-plus-circle")}
+                        <div class="setup-wizard-action-row">
+                            ${newSetupButton(`Скопировать ссылку подписки`, "copyInputValue('new-setup-copy-input', 'Ссылка подписки скопирована')", "setup-secondary-btn", "fas fa-copy")}
+                            <button type="button" onclick="copyInputValue('new-setup-copy-input', 'Ссылка подписки скопирована')" class="setup-cta-btn !w-full !py-5 !px-5 !text-sm !mb-0 !mr-0 setup-secondary-btn" aria-label="Скопировать ссылку">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                        ${newSetupButton(`Далее: подписка добавлена`, "finishNewSetup()", "setup-secondary-btn", "fas fa-arrow-right")}
+                        <button type="button" onclick="backNewSetupInstall()" class="mt-4 text-gray-500 text-sm font-black hover:text-[#ffc700] transition-colors">← Предыдущий шаг</button>
+                    </div>
+                `;
+                return;
+            }
+
+            root.innerHTML = `
+                <h2 class="text-3xl md:text-4xl font-black mb-3">Готово!</h2>
+                <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Теперь включи VPN в приложении ${app.appName}</p>
+                ${newSetupOrb('fas fa-check', 100)}
+                <div class="space-y-4">
+                    ${newSetupButton(`Перейти в личный кабинет`, "showTab('home')", "", "fas fa-th-large")}
+                    ${newSetupButton(`Настроить другое устройство`, "showNewSetupDevices()", "setup-secondary-btn", "fas fa-mobile-alt")}
+                    <button type="button" onclick="backNewSetupSubscription()" class="mt-4 text-gray-500 text-sm font-black hover:text-[#ffc700] transition-colors">← Предыдущий шаг</button>
+                </div>
+            `;
+        }
+
+        function startNewSetupInstall() {
+            newSetupStep = 'install';
+            renderNewSetupWizard();
+        }
+
+        function startNewSetupSubscription() {
+            newSetupStep = 'subscription';
+            renderNewSetupWizard();
+        }
+
+        function finishNewSetup() {
+            newSetupStep = 'done';
+            renderNewSetupWizard();
+        }
+
+        function showNewSetupDevices() {
+            newSetupStep = 'devices';
+            renderNewSetupWizard();
+        }
+
+        function backNewSetupStart() {
+            newSetupStep = 'start';
+            renderNewSetupWizard();
+        }
+
+        function backNewSetupInstall() {
+            newSetupStep = 'install';
+            renderNewSetupWizard();
+        }
+
+        function backNewSetupSubscription() {
+            newSetupStep = 'subscription';
+            renderNewSetupWizard();
+        }
+
         function setPlatform(platform) {
             document.querySelectorAll('.platform-btn').forEach(btn => btn.classList.remove('active'));
             const activeBtn = document.getElementById('btn-' + platform);
@@ -2076,6 +2447,8 @@
 
         // Инициализация при загрузке
         document.addEventListener('DOMContentLoaded', () => {
+            selectedNewSetupPlatform = detectNewSetupPlatform();
+            renderNewSetupWizard();
             setPlatform('android');
             updateSubscriptionOverview();
         });
