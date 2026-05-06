@@ -636,16 +636,10 @@ def dashboard(request):
 
     if (
         seconds_left > 0
-        and not show_expiring_banner
-        and subscription
-        and subscription.HasField("created_at")
         and traffic_progress
         and not traffic_progress.passed_0
     ):
-        created_at = subscription.created_at.ToDatetime()
-        show_not_connected_banner = (
-            datetime.utcnow().date() - created_at.date()
-        ) == timedelta(days=1)
+        show_not_connected_banner = True
 
     if settings.DEBUG:
         debug_expiring_days = parse_int(request.GET.get("debug_expiring"))
@@ -672,8 +666,8 @@ def dashboard(request):
     if seconds_left <= 0:
         show_expiring_banner = False
         show_not_connected_banner = False
-    elif show_expiring_banner:
-        show_not_connected_banner = False
+    elif show_not_connected_banner:
+        show_expiring_banner = False
 
     if seconds_left <= 0:
         time_left_value = 0

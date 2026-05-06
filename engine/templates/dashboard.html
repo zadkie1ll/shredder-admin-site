@@ -440,11 +440,49 @@
             <div id="tab-home" class="tab-content active">
                 <div id="main-dashboard-view">
                     <header class="mb-10">
-                        <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Привет!</h1>
-                        <p class="text-gray-500 text-sm md:text-base font-bold">Управление твоей VPN-подпиской</p>
+                        {% if show_not_connected_banner %}
+                            <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Подключи VPN</h1>
+                            <p class="text-gray-500 text-sm md:text-base font-bold">Подписка готова, осталось добавить ее в приложение</p>
+                        {% else %}
+                            <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Привет!</h1>
+                            <p class="text-gray-500 text-sm md:text-base font-bold">Управление твоей VPN-подпиской</p>
+                        {% endif %}
                     </header>
 
                     <div class="overview-grid space-y-7">
+                        {% if show_not_connected_banner %}
+                            <section class="setup-shell p-6 md:p-8 border border-[#00ff88]/30 bg-[#00ff88]/5">
+                                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-7">
+                                    <div class="flex items-start gap-4">
+                                        <div class="w-12 h-12 rounded-2xl bg-[#00ff88]/10 flex items-center justify-center text-[#00ff88] flex-shrink-0">
+                                            <i class="fas fa-bolt text-lg"></i>
+                                        </div>
+                                        <div>
+                                            <h3 class="text-xl md:text-2xl font-black mb-3">Начни с подключения</h3>
+                                            <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">Выбери свое устройство, установи приложение и нажми кнопку добавления подписки. После этого VPN можно включить в приложении.</p>
+                                            <div class="mt-5 flex flex-col sm:flex-row gap-x-6 gap-y-2 text-sm font-black text-white">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-[#00ff88]">1.</span>
+                                                    <span>Выбери устройство</span>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-[#00ff88]">2.</span>
+                                                    <span>Установи приложение</span>
+                                                </div>
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-[#00ff88]">3.</span>
+                                                    <span>Добавь подписку</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button type="button" onclick="showTab('setup')" class="setup-cta-btn !w-full lg:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
+                                        Подключить VPN
+                                    </button>
+                                </div>
+                            </section>
+                        {% endif %}
+
                         {% if show_telegram_bind_banner %}
                             <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-[#ffc700]/40 bg-[#ffc700]/5">
                                 <div class="flex items-start gap-4">
@@ -459,23 +497,6 @@
                                 <a href="{{ tg_bind_link }}" class="setup-link-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
                                     Забрать +7 дней
                                 </a>
-                            </section>
-                        {% endif %}
-
-                        {% if show_not_connected_banner %}
-                            <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-[#00ff88]/30 bg-[#00ff88]/5">
-                                <div class="flex items-start gap-4">
-                                    <div class="w-12 h-12 rounded-2xl bg-[#00ff88]/10 flex items-center justify-center text-[#00ff88] flex-shrink-0">
-                                        <i class="fas fa-bolt text-lg"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="text-lg font-black mb-2">Подключение еще не завершено</h3>
-                                        <p class="text-gray-500 text-sm font-bold leading-relaxed">Подписка уже готова. Выбери устройство и добавь VPN в приложение за пару минут.</p>
-                                    </div>
-                                </div>
-                                <button type="button" onclick="showTab('setup')" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !mb-0 !mr-0">
-                                    Подключить
-                                </button>
                             </section>
                         {% endif %}
 
@@ -561,7 +582,7 @@
                             </div>
                         </section>
 
-                        {% if not show_expiring_banner and seconds_left > 0 %}
+                        {% if not show_expiring_banner and not show_not_connected_banner and seconds_left > 0 %}
                             <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
                                 <div>
                                     <h3 class="text-lg font-black mb-2">Продлить подписку</h3>
