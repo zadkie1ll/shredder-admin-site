@@ -178,6 +178,17 @@
                 overflow: hidden;
                 text-overflow: ellipsis;
             }
+
+            @media (max-width: 380px) {
+                .nav-mobile .nav-btn {
+                    font-size: 9px;
+                    gap: 5px;
+                }
+
+                .nav-mobile .nav-btn i {
+                    font-size: 17px;
+                }
+            }
         }
 
         /* Карточки */
@@ -422,6 +433,7 @@
             </div>
             <nav>
                 <button type="button" onclick="showTab('home')" class="nav-btn active" data-tab="home"><i class="fas fa-th-large"></i> Главная</button>
+                <button type="button" onclick="showTab('subscription')" class="nav-btn" data-tab="subscription"><i class="fas fa-key"></i> Подписка</button>
                 <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i> Настройка</button>
                 <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-circle"></i> Рефералы</button>
                 <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-anchor"></i> Поддержка</button>
@@ -430,6 +442,7 @@
 
         <nav class="nav-mobile">
             <button type="button" onclick="showTab('home')" class="nav-btn active" data-tab="home"><i class="fas fa-th-large"></i><span>Главная</span></button>
+            <button type="button" onclick="showTab('subscription')" class="nav-btn" data-tab="subscription"><i class="fas fa-key"></i><span>Ключи</span></button>
             <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i><span>Настройка</span></button>
             <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-circle"></i><span>Рефералы</span></button>
             <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-anchor"></i><span>Помощь</span></button>
@@ -476,7 +489,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    <button type="button" onclick="showTab('setup')" class="setup-cta-btn !w-full lg:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
+                                    <button type="button" onclick="showTab('subscription')" class="setup-cta-btn !w-full lg:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
                                         Подключить VPN
                                     </button>
                                 </div>
@@ -619,6 +632,100 @@
                         </section>
 
                     </div>
+                </div>
+            </div>
+
+            <div id="tab-subscription" class="tab-content">
+                <header class="mb-10">
+                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Подписка</h1>
+                    <p class="text-gray-500 text-sm md:text-base font-bold">Ключи подключения и статус доступа</p>
+                </header>
+                <div class="overview-grid space-y-7">
+                    <section class="setup-shell p-6 md:p-8">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                            <div>
+                                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2">Статус</p>
+                                {% if seconds_left <= 0 %}
+                                    <p class="text-red-400 text-xl font-black">Истекла</p>
+                                {% else %}
+                                    <p class="text-[#00ff88] text-xl font-black">Активна</p>
+                                {% endif %}
+                            </div>
+                            <div>
+                                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2">Окончание</p>
+                                <p class="text-white text-xl font-black">{{ user.expire_at|date:"d.m.Y" }}</p>
+                            </div>
+                            <div>
+                                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2">Автопродление</p>
+                                {% if has_recurrent %}
+                                    <p class="text-[#00ff88] text-xl font-black">Включено</p>
+                                {% else %}
+                                    <p class="text-white text-xl font-black">Не подключено</p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setup-shell p-6 md:p-8">
+                        <div class="mb-6">
+                            <h2 class="text-2xl font-black mb-2">Ключи подключения</h2>
+                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Скопируй ключ для своего приложения. Для Happ используй отдельный Happ-ключ, для остальных клиентов — обычный.</p>
+                        </div>
+
+                        <div class="space-y-5">
+                            <div>
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-10 h-10 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                        <i class="fas fa-bolt text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-black">Happ-ключ</h3>
+                                        <p class="text-gray-500 text-xs font-bold">Для приложения Happ</p>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col sm:flex-row gap-3">
+                                    <input type="text" readonly value="{{ happ_subscription_url }}" id="happ-subscription-key-input" class="referral-link-input min-w-0 flex-1 py-4 px-5 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
+                                    <button type="button" onclick="copyInputValue('happ-subscription-key-input', 'Happ-ключ скопирован')" class="setup-cta-btn !w-full sm:!w-auto !py-4 !px-6 !text-[10px] !whitespace-nowrap !mb-0 !mr-0">
+                                        Копировать
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div class="flex items-center gap-3 mb-3">
+                                    <div class="w-10 h-10 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                        <i class="fas fa-link text-sm"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-black">Обычный ключ</h3>
+                                        <p class="text-gray-500 text-xs font-bold">Для Clash, Hiddify, Shadowrocket и других клиентов</p>
+                                    </div>
+                                </div>
+                                <div class="flex flex-col sm:flex-row gap-3">
+                                    <input type="text" readonly value="{{ plain_subscription_url }}" id="plain-subscription-key-input" class="referral-link-input min-w-0 flex-1 py-4 px-5 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
+                                    <button type="button" onclick="copyInputValue('plain-subscription-key-input', 'Обычный ключ скопирован')" class="setup-cta-btn !w-full sm:!w-auto !py-4 !px-6 !text-[10px] !whitespace-nowrap !mb-0 !mr-0">
+                                        Копировать
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="setup-shell p-6 md:p-8">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                            <div>
+                                <h2 class="text-2xl font-black mb-3">Что делать дальше</h2>
+                                <div class="flex flex-col sm:flex-row gap-x-6 gap-y-2 text-sm font-black text-white">
+                                    <div class="flex items-center gap-2"><span class="text-[#ffc700]">1.</span><span>Выбери устройство</span></div>
+                                    <div class="flex items-center gap-2"><span class="text-[#ffc700]">2.</span><span>Установи приложение</span></div>
+                                    <div class="flex items-center gap-2"><span class="text-[#ffc700]">3.</span><span>Добавь нужный ключ</span></div>
+                                </div>
+                            </div>
+                            <button type="button" onclick="showTab('setup')" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
+                                Открыть настройку
+                            </button>
+                        </div>
+                    </section>
                 </div>
             </div>
 
@@ -2056,6 +2163,15 @@
             
             // Можно вызвать твой стандартный тост уведомления
             showToast('Ссылка скопирована!'); 
+        }
+
+        function copyInputValue(inputId, message) {
+            const copyText = document.getElementById(inputId);
+            copyText.select();
+            copyText.setSelectionRange(0, 99999);
+            navigator.clipboard.writeText(copyText.value).then(() => {
+                showToast(message);
+            });
         }
 
         // 4. Инициализация при загрузке (чтобы была открыта первая вкладка)
