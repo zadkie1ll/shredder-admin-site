@@ -196,6 +196,23 @@ def add_event_log(db_session, user, event):
     )
 
 
+def add_event_log_once(db_session, user, event):
+    exists = (
+        db_session.query(EventLog.id)
+        .filter(
+            (EventLog.user_id == user.id)
+            & (EventLog.event_type == event.event_type)
+        )
+        .first()
+    )
+
+    if exists:
+        return False
+
+    add_event_log(db_session, user, event)
+    return True
+
+
 def get_last_traffic_source(db_session, user):
     event = (
         db_session.query(EventLog)
@@ -276,7 +293,8 @@ def create_site_user(db_session, email, request):
         db_session,
         user,
         analytics_event.SubscriptionCreated(
-            traffic_source=context["traffic_source"]
+            traffic_source=context["traffic_source"],
+            creation_channel="site",
         ),
     )
 
@@ -449,6 +467,11 @@ def auth_by_magic_link(request, token):
                 logging.warning(f"magic token {token} points to missing user {user_id}")
                 return render_login(request, {"error": "Ссылка истекла или неверна"})
 
+            add_event_log_once(
+                session,
+                user,
+                analytics_event.FirstSuccessfulLogin(login_method="magic_link"),
+            )
             session.commit()
 
             authorize_user_session(request, user)
@@ -486,6 +509,11 @@ def auth_by_telegram_link(request, token):
             return render_login(request, {"error": "Ссылка истекла или неверна"})
 
         login_token.last_used_at = datetime.utcnow()
+        add_event_log_once(
+            session,
+            user,
+            analytics_event.FirstSuccessfulLogin(login_method="telegram_link"),
+        )
         session.commit()
 
         authorize_user_session(request, user)
