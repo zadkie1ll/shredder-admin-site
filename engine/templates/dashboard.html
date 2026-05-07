@@ -613,6 +613,138 @@
             .subscription-next-card .flex {
                 gap: 12px !important;
             }
+
+            .setup-wizard-stage .setup-link-btn,
+            .setup-wizard-stage .setup-cta-btn {
+                min-height: 54px;
+                padding: 13px 16px !important;
+                border-radius: 16px !important;
+                font-size: 10px !important;
+                line-height: 1.2 !important;
+                letter-spacing: 0.02em !important;
+            }
+
+            .setup-wizard-stage h2 {
+                font-size: 30px !important;
+                line-height: 1 !important;
+            }
+
+            .setup-wizard-stage p {
+                margin-bottom: 22px !important;
+            }
+
+            .referral-mobile-header {
+                margin-bottom: 22px !important;
+            }
+
+            .referral-mobile-header h1 {
+                font-size: 34px !important;
+                line-height: 0.95 !important;
+            }
+
+            .referral-hero-card .relative {
+                gap: 14px !important;
+            }
+
+            .referral-hero-card .w-16 {
+                width: 44px !important;
+                height: 44px !important;
+                border-radius: 14px !important;
+            }
+
+            .referral-hero-card h2 {
+                font-size: 22px !important;
+                line-height: 1.05 !important;
+            }
+
+            .referral-hero-card p {
+                font-size: 12px !important;
+                line-height: 1.35 !important;
+            }
+
+            .referral-hero-card .text-5xl {
+                font-size: 34px !important;
+                line-height: 1 !important;
+            }
+
+            .referral-rule-grid {
+                gap: 10px !important;
+            }
+
+            .referral-rule-card {
+                padding: 14px !important;
+                gap: 10px !important;
+                min-height: auto !important;
+            }
+
+            .referral-rule-card .w-12 {
+                width: 36px !important;
+                height: 36px !important;
+                border-radius: 12px !important;
+            }
+
+            .referral-rule-card h3 {
+                font-size: 15px !important;
+                line-height: 1.15 !important;
+                margin-bottom: 4px !important;
+            }
+
+            .referral-rule-card p {
+                font-size: 11px !important;
+                line-height: 1.3 !important;
+            }
+
+            .referral-stat-grid {
+                gap: 10px !important;
+            }
+
+            .referral-stat-card {
+                padding: 14px !important;
+                min-height: auto !important;
+            }
+
+            .referral-stat-card p:first-child {
+                font-size: 11px !important;
+                margin-bottom: 4px !important;
+            }
+
+            .referral-stat-card p:last-child {
+                font-size: 28px !important;
+                line-height: 1 !important;
+            }
+
+            .referral-link-card h3 {
+                font-size: 20px !important;
+                margin-bottom: 4px !important;
+            }
+
+            .referral-link-card p {
+                font-size: 11px !important;
+                line-height: 1.35 !important;
+            }
+
+            .referral-link-field input {
+                padding-top: 14px !important;
+                padding-bottom: 14px !important;
+                padding-left: 42px !important;
+                padding-right: 112px !important;
+                font-size: 10px !important;
+                border-radius: 14px !important;
+            }
+
+            .referral-link-field .absolute.inset-y-0.left-0 {
+                padding-left: 14px !important;
+            }
+
+            .referral-link-field .setup-cta-btn {
+                right: 6px !important;
+                top: 6px !important;
+                bottom: 6px !important;
+                padding-left: 14px !important;
+                padding-right: 14px !important;
+                font-size: 8px !important;
+                border-radius: 12px !important;
+            }
         }
     </style>
 </head>
@@ -914,13 +1046,13 @@
                             <div>
                                 <h2 class="text-2xl font-black mb-3">Что делать дальше</h2>
                                 <div class="flex flex-col sm:flex-row gap-x-6 gap-y-2 text-sm font-black text-white">
-                                    <div class="flex items-center gap-2"><span class="text-[#ffc700]">1.</span><span>Выбери устройство</span></div>
-                                    <div class="flex items-center gap-2"><span class="text-[#ffc700]">2.</span><span>Установи приложение</span></div>
-                                    <div class="flex items-center gap-2"><span class="text-[#ffc700]">3.</span><span>Добавь нужный ключ</span></div>
+                                    <div class="flex items-center gap-2"><span class="text-[#ffc700]">1.</span><span>Открой настройку</span></div>
+                                    <div class="flex items-center gap-2"><span class="text-[#ffc700]">2.</span><span>Следуй виджету</span></div>
+                                    <div class="flex items-center gap-2"><span class="text-[#ffc700]">3.</span><span>Включи VPN</span></div>
                                 </div>
                             </div>
                             <button type="button" onclick="showTab('setup')" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
-                                Открыть настройку
+                                Открыть виджет настройки
                             </button>
                         </div>
                     </section>
@@ -982,12 +1114,12 @@
             </div>
 
             <div id="tab-profile" class="tab-content">
-                <header class="mb-10">
+                <header class="mb-10 referral-mobile-header">
                     <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Рефералы</h1>
                     <p class="text-gray-500 text-sm md:text-base font-bold">Приглашай друзей и получай дни к подписке</p>
                 </header>
                 <div class="overview-grid space-y-7">
-                    <section class="setup-shell overview-hero-card">
+                    <section class="setup-shell overview-hero-card referral-hero-card">
                         <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-7">
                             <div class="flex items-start gap-5">
                                 <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
@@ -1005,8 +1137,8 @@
                         </div>
                     </section>
 
-                    <section class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div class="setup-step-card metric-card flex items-start gap-4 !mb-0">
+                    <section class="grid grid-cols-1 md:grid-cols-2 gap-5 referral-rule-grid">
+                        <div class="setup-step-card metric-card flex items-start gap-4 !mb-0 referral-rule-card">
                             <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                                 <i class="fas fa-user-plus text-lg"></i>
                             </div>
@@ -1015,7 +1147,7 @@
                                 <p class="text-gray-500 text-sm font-bold leading-relaxed">Начислим, когда приглашенный друг израсходует больше 100 МБ.</p>
                             </div>
                         </div>
-                        <div class="setup-step-card metric-card flex items-start gap-4 !mb-0">
+                        <div class="setup-step-card metric-card flex items-start gap-4 !mb-0 referral-rule-card">
                             <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                                 <i class="fas fa-gem text-lg"></i>
                             </div>
@@ -1026,26 +1158,26 @@
                         </div>
                     </section>
 
-                    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="setup-step-card metric-card p-5 !mb-0">
+                    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4 referral-stat-grid">
+                        <div class="setup-step-card metric-card p-5 !mb-0 referral-stat-card">
                             <p class="text-gray-500 text-sm font-bold mb-2">Приглашено</p>
                             <p class="text-4xl font-black">{{ ref_invited_count|default:"0" }}</p>
                         </div>
-                        <div class="setup-step-card metric-card p-5 !mb-0">
+                        <div class="setup-step-card metric-card p-5 !mb-0 referral-stat-card">
                             <p class="text-gray-500 text-sm font-bold mb-2">Активны</p>
                             <p class="text-4xl font-black text-[#00ff88]">{{ ref_connected_count|default:"0" }}</p>
                         </div>
-                        <div class="setup-step-card metric-card p-5 !mb-0">
+                        <div class="setup-step-card metric-card p-5 !mb-0 referral-stat-card">
                             <p class="text-gray-500 text-sm font-bold mb-2">Покупок</p>
                             <p class="text-4xl font-black">{{ ref_purchased_count|default:"0" }}</p>
                         </div>
-                        <div class="setup-step-card metric-card p-5 border-[#ffc700]/30 bg-[#ffc700]/5 !mb-0">
+                        <div class="setup-step-card metric-card p-5 border-[#ffc700]/30 bg-[#ffc700]/5 !mb-0 referral-stat-card">
                             <p class="text-[#ffc700] text-sm font-bold mb-2">Бонусные дни</p>
                             <p class="text-4xl font-black text-[#ffc700]">+{{ bonus_days|default:"0" }}</p>
                         </div>
                     </section>
 
-                    <section class="setup-shell p-6 md:p-8">
+                    <section class="setup-shell p-6 md:p-8 referral-link-card">
                         <div class="flex flex-col gap-5">
                             <div>
                                 <h3 class="text-lg font-black mb-2">Пригласительная ссылка</h3>
@@ -1053,7 +1185,7 @@
                             </div>
                             <div>
                                 <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Ссылка на сайт</p>
-                                <div class="relative group">
+                                <div class="relative group referral-link-field">
                                     <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                         <i class="fas fa-globe text-[#ffc700] text-lg"></i>
                                     </div>
@@ -1069,7 +1201,7 @@
                             </div>
                             <div>
                                 <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Ссылка в Telegram</p>
-                                <div class="relative group">
+                                <div class="relative group referral-link-field">
                                     <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
                                         <i class="fab fa-telegram-plane text-[#ffc700] text-lg"></i>
                                     </div>
