@@ -504,6 +504,116 @@
             z-index: 10001;
             font-weight: 900;
         }
+
+        @media (max-width: 640px) {
+            .main-content {
+                padding: 22px 16px 110px !important;
+            }
+
+            .mobile-compact-header {
+                margin-bottom: 22px !important;
+            }
+
+            .mobile-compact-header h1 {
+                font-size: 34px !important;
+                line-height: 0.95 !important;
+            }
+
+            .mobile-compact-header p {
+                font-size: 13px !important;
+                line-height: 1.35 !important;
+            }
+
+            .overview-grid {
+                max-width: 100%;
+            }
+
+            .overview-grid.space-y-7 > :not([hidden]) ~ :not([hidden]) {
+                margin-top: 18px !important;
+            }
+
+            .setup-shell {
+                border-radius: 22px;
+                padding: 18px !important;
+            }
+
+            .subscription-status-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr)) !important;
+                gap: 10px !important;
+            }
+
+            .subscription-status-grid p:first-child {
+                font-size: 8px !important;
+                letter-spacing: 0.08em !important;
+                margin-bottom: 6px !important;
+            }
+
+            .subscription-status-grid p:last-child {
+                font-size: 15px !important;
+                line-height: 1.1 !important;
+                word-break: break-word;
+            }
+
+            .subscription-keys-card h2,
+            .subscription-next-card h2 {
+                font-size: 24px !important;
+                line-height: 1.05 !important;
+            }
+
+            .subscription-keys-intro {
+                display: none;
+            }
+
+            .subscription-key-list {
+                gap: 18px !important;
+            }
+
+            .subscription-key-title-row {
+                gap: 10px !important;
+                margin-bottom: 10px !important;
+            }
+
+            .subscription-key-icon {
+                width: 36px !important;
+                height: 36px !important;
+                border-radius: 12px !important;
+            }
+
+            .subscription-key-title-row h3 {
+                font-size: 17px !important;
+                line-height: 1.1 !important;
+            }
+
+            .subscription-key-title-row p {
+                font-size: 10px !important;
+                line-height: 1.25 !important;
+            }
+
+            .subscription-key-row {
+                flex-direction: row !important;
+                gap: 8px !important;
+            }
+
+            .subscription-key-row input {
+                min-width: 0;
+                padding: 13px 14px !important;
+                font-size: 11px !important;
+                border-radius: 14px !important;
+            }
+
+            .subscription-key-row .setup-cta-btn {
+                width: auto !important;
+                min-width: 106px;
+                padding: 13px 12px !important;
+                border-radius: 14px !important;
+                font-size: 9px !important;
+                letter-spacing: 0.03em !important;
+            }
+
+            .subscription-next-card .flex {
+                gap: 12px !important;
+            }
+        }
     </style>
 </head>
 <body style="--dashboard-bg-image: url('{% static 'img/bg6.png' %}');">
@@ -724,13 +834,13 @@
             </div>
 
             <div id="tab-subscription" class="tab-content">
-                <header class="mb-10">
+                <header class="mb-10 mobile-compact-header">
                     <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Подписка</h1>
                     <p class="text-gray-500 text-sm md:text-base font-bold">Ключи подключения и статус доступа</p>
                 </header>
                 <div class="overview-grid space-y-7">
                     <section class="setup-shell p-6 md:p-8">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 subscription-status-grid">
                             <div>
                                 <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2">Статус</p>
                                 {% if seconds_left <= 0 %}
@@ -754,16 +864,16 @@
                         </div>
                     </section>
 
-                    <section class="setup-shell p-6 md:p-8">
+                    <section class="setup-shell p-6 md:p-8 subscription-keys-card">
                         <div class="mb-6">
                             <h2 class="text-2xl font-black mb-2">Ключи подключения</h2>
-                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Скопируй ключ для своего приложения. Для Happ используй отдельный Happ-ключ, для остальных клиентов — обычный.</p>
+                            <p class="text-gray-500 text-sm font-bold leading-relaxed subscription-keys-intro">Скопируй ключ для своего приложения. Для Happ используй отдельный Happ-ключ, для остальных клиентов — обычный.</p>
                         </div>
 
-                        <div class="space-y-5">
+                        <div class="space-y-5 subscription-key-list">
                             <div>
-                                <div class="flex items-center gap-3 mb-3">
-                                    <div class="w-10 h-10 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                <div class="flex items-center gap-3 mb-3 subscription-key-title-row">
+                                    <div class="w-10 h-10 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0 subscription-key-icon">
                                         <i class="fas fa-bolt text-sm"></i>
                                     </div>
                                     <div>
@@ -771,7 +881,7 @@
                                         <p class="text-gray-500 text-xs font-bold">Для приложения Happ (все локации в белом списке)</p>
                                     </div>
                                 </div>
-                                <div class="flex flex-col sm:flex-row gap-3">
+                                <div class="flex flex-col sm:flex-row gap-3 subscription-key-row">
                                     <input type="text" readonly value="{{ happ_subscription_url }}" id="happ-subscription-key-input" class="referral-link-input min-w-0 flex-1 py-4 px-5 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
                                     <button type="button" onclick="copyInputValue('happ-subscription-key-input', 'Happ-ключ скопирован')" class="setup-cta-btn !w-full sm:!w-auto !py-4 !px-6 !text-[10px] !whitespace-nowrap !mb-0 !mr-0">
                                         Копировать
@@ -780,8 +890,8 @@
                             </div>
 
                             <div>
-                                <div class="flex items-center gap-3 mb-3">
-                                    <div class="w-10 h-10 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                <div class="flex items-center gap-3 mb-3 subscription-key-title-row">
+                                    <div class="w-10 h-10 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0 subscription-key-icon">
                                         <i class="fas fa-link text-sm"></i>
                                     </div>
                                     <div>
@@ -789,7 +899,7 @@
                                         <p class="text-gray-500 text-xs font-bold">Для Clash, Hiddify, Shadowrocket и других клиентов</p>
                                     </div>
                                 </div>
-                                <div class="flex flex-col sm:flex-row gap-3">
+                                <div class="flex flex-col sm:flex-row gap-3 subscription-key-row">
                                     <input type="text" readonly value="{{ plain_subscription_url }}" id="plain-subscription-key-input" class="referral-link-input min-w-0 flex-1 py-4 px-5 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
                                     <button type="button" onclick="copyInputValue('plain-subscription-key-input', 'Обычный ключ скопирован')" class="setup-cta-btn !w-full sm:!w-auto !py-4 !px-6 !text-[10px] !whitespace-nowrap !mb-0 !mr-0">
                                         Копировать
@@ -799,7 +909,7 @@
                         </div>
                     </section>
 
-                    <section class="setup-shell p-6 md:p-8">
+                    <section class="setup-shell p-6 md:p-8 subscription-next-card">
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
                             <div>
                                 <h2 class="text-2xl font-black mb-3">Что делать дальше</h2>
