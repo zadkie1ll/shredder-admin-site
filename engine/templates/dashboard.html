@@ -768,7 +768,7 @@
                                     </div>
                                     <div>
                                         <h3 class="text-lg font-black">Happ-ключ</h3>
-                                        <p class="text-gray-500 text-xs font-bold">Для приложения Happ</p>
+                                        <p class="text-gray-500 text-xs font-bold">Для приложения Happ (все локации в белом списке)</p>
                                     </div>
                                 </div>
                                 <div class="flex flex-col sm:flex-row gap-3">
@@ -2271,12 +2271,7 @@
                     <input type="text" readonly value="${copyValue}" id="new-setup-copy-input" class="sr-only">
                     <div class="space-y-4">
                         ${newSetupLink(app.addText, app.subscriptionUrl, "", "fas fa-plus-circle")}
-                        <div class="setup-wizard-action-row">
-                            ${newSetupButton(`Скопировать ссылку подписки`, "copyInputValue('new-setup-copy-input', 'Ссылка подписки скопирована')", "setup-secondary-btn", "fas fa-copy")}
-                            <button type="button" onclick="copyInputValue('new-setup-copy-input', 'Ссылка подписки скопирована')" class="setup-cta-btn !w-full !py-5 !px-5 !text-sm !mb-0 !mr-0 setup-secondary-btn" aria-label="Скопировать ссылку">
-                                <i class="fas fa-copy"></i>
-                            </button>
-                        </div>
+                        ${newSetupButton(`Скопировать ссылку подписки`, "copyInputValue('new-setup-copy-input', 'Ссылка подписки скопирована')", "setup-secondary-btn", "fas fa-copy")}
                         ${newSetupButton(`Далее: подписка добавлена`, "finishNewSetup()", "setup-secondary-btn", "fas fa-arrow-right")}
                         <button type="button" onclick="backNewSetupInstall()" class="mt-4 text-gray-500 text-sm font-black hover:text-[#ffc700] transition-colors">← Предыдущий шаг</button>
                     </div>

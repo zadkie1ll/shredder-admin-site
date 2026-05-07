@@ -14,6 +14,7 @@ def create_user(
     trial_period_days: int,
     from_referrer: bool = False,
     email: str | None = None,
+    telegram_id: int | None = None,
 ) -> Optional[proto.UserResponse]:
     if from_referrer:
         logging.info(
@@ -40,7 +41,7 @@ def create_user(
         proto.AddUserRequest(
             username=username,
             email=email,
-            telegram_id=None,
+            telegram_id=telegram_id,
             expire_at=datetime.now(timezone.utc) + timedelta(days=trial_period_days),
             status=proto.UserStatus.ACTIVE,
             traffic_limit_strategy=proto.TrafficLimitStrategy.NO_RESET,

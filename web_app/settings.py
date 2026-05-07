@@ -66,6 +66,10 @@ DEFAULT_CABINET_DOMAIN = config(
 )
 PWA_MIRROR_SOURCE_URL = config("PWA_MIRROR_SOURCE_URL", default="")
 TG_BOT_USERNAME = config('TG_BOT_USERNAME', default='monkeyislandvpnbot')
+TELEGRAM_AUTH_BOT_TOKEN = config(
+    "TELEGRAM_AUTH_BOT_TOKEN",
+    default=config("MI_VPN_BOT_TOKEN", default=""),
+)
 SITE_TRIAL_PERIOD_DAYS = config("SITE_TRIAL_PERIOD_DAYS", default=7, cast=int)
 SITE_REFERRAL_TRIAL_PERIOD_DAYS = config(
     "SITE_REFERRAL_TRIAL_PERIOD_DAYS",

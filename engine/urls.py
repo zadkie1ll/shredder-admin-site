@@ -12,6 +12,7 @@ urlpatterns = [
     path("login/send-link/", views.send_magic_link, name="send_magic_link"),
     path("login/google/", views.login_with_google, name="google_login"),
     path("login/google/callback/", views.auth_by_google_callback, name="google_auth"),
+    path("login/telegram-auth/", views.auth_by_telegram_widget, name="telegram_widget_auth"),
     path("login/magic/<uuid:token>/", views.auth_by_magic_link, name="magic_auth"),
     path("login/telegram/<str:token>/", views.auth_by_telegram_link, name="telegram_auth"),
     path("logout/", views.logout, name="logout"),

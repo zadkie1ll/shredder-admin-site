@@ -21,6 +21,7 @@ from django.contrib.auth import BACKEND_SESSION_KEY
 from django.contrib.auth import HASH_SESSION_KEY
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
+from django.urls import reverse
 from django.templatetags.static import static
 from django.template.loader import render_to_string
 from django.utils.html import strip_tags
@@ -258,7 +259,13 @@ def sync_existing_user_tracking(db_session, user, traffic_source, ymid):
         )
 
 
-def create_site_user(db_session, email, request):
+def create_site_user(
+    db_session,
+    email,
+    request,
+    telegram_id=None,
+    creation_channel="site",
+):
     context = get_registration_context(request, db_session)
     referrer = context["referrer"]
     username = str(uuid.uuid4().hex)
@@ -274,10 +281,12 @@ def create_site_user(db_session, email, request):
         trial_period_days=trial_period_days,
         from_referrer=referrer is not None,
         email=email,
+        telegram_id=telegram_id,
     )
 
+    user_label = email or f"telegram_id={telegram_id}"
     if rw_user is None:
-        raise RuntimeError(f"creating subscription for site user {email} was failed")
+        raise RuntimeError(f"creating subscription for site user {user_label} was failed")
 
     expire_at = None
     if rw_user.HasField("expire_at"):
@@ -285,6 +294,7 @@ def create_site_user(db_session, email, request):
 
     user = User(
         email=email,
+        telegram_id=telegram_id,
         username=username,
         expire_at=expire_at,
         ymid=context["ymid"],
@@ -300,12 +310,12 @@ def create_site_user(db_session, email, request):
         user,
         analytics_event.SubscriptionCreated(
             traffic_source=context["traffic_source"],
-            creation_channel="site",
+            creation_channel=creation_channel,
         ),
     )
 
     logging.info(
-        f"User with username {user.username} and email {email} was successfully created"
+        f"User with username {user.username} and {user_label} was successfully created"
     )
 
     return user
@@ -314,9 +324,21 @@ def create_site_user(db_session, email, request):
 def render_login(request, context=None, status=200):
     capture_tracking_params(request)
     payload = get_pwa_context()
+    telegram_bot_id = ""
+    if settings.TELEGRAM_AUTH_BOT_TOKEN:
+        telegram_bot_id = settings.TELEGRAM_AUTH_BOT_TOKEN.split(":", 1)[0]
+
     payload["tracking_params"] = get_tracking_params(request)
     payload["google_oauth_enabled"] = bool(
         settings.GOOGLE_OAUTH_CLIENT_ID and settings.GOOGLE_OAUTH_CLIENT_SECRET
+    )
+    payload["telegram_auth_enabled"] = bool(
+        settings.TG_BOT_USERNAME and telegram_bot_id
+    )
+    payload["telegram_bot_username"] = settings.TG_BOT_USERNAME
+    payload["telegram_bot_id"] = telegram_bot_id
+    payload["telegram_auth_url"] = (
+        f"{get_current_base_url(request)}{reverse('telegram_widget_auth')}"
     )
     if context:
         payload.update(context)
@@ -352,6 +374,39 @@ def authorize_user_session(request, user):
 def hash_telegram_login_token(token):
     payload = f"telegram-login:{token}:{settings.SECRET_KEY}".encode()
     return hashlib.sha256(payload).hexdigest()
+
+
+def verify_telegram_widget_auth(auth_data):
+    received_hash = auth_data.get("hash")
+    auth_date = auth_data.get("auth_date")
+
+    if not received_hash or not auth_date:
+        return False
+
+    try:
+        auth_date_int = int(auth_date)
+    except (TypeError, ValueError):
+        return False
+
+    if datetime.utcnow().timestamp() - auth_date_int > 86400:
+        return False
+
+    check_data = {
+        key: value
+        for key, value in auth_data.items()
+        if key != "hash" and value not in (None, "")
+    }
+    data_check_string = "\n".join(
+        f"{key}={check_data[key]}" for key in sorted(check_data)
+    )
+    secret_key = hashlib.sha256(settings.TELEGRAM_AUTH_BOT_TOKEN.encode()).digest()
+    calculated_hash = hmac.new(
+        secret_key,
+        data_check_string.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+    return hmac.compare_digest(calculated_hash, received_hash)
 
 
 def send_magic_link_email(email, link, *, subject=None, template_context=None):
@@ -411,7 +466,12 @@ def send_magic_link(request):
                 user = db_session.query(User).filter(User.email == email).first()
 
                 if not user:
-                    user = create_site_user(db_session, email, request)
+                    user = create_site_user(
+                        db_session,
+                        email,
+                        request,
+                        creation_channel="site_magic_link",
+                    )
                 else:
                     registration_context = get_registration_context(request, db_session)
                     sync_existing_user_tracking(
@@ -557,7 +617,12 @@ def auth_by_google_callback(request):
             user = db_session.query(User).filter(User.email == email).first()
 
             if not user:
-                user = create_site_user(db_session, email, request)
+                user = create_site_user(
+                    db_session,
+                    email,
+                    request,
+                    creation_channel="site_google_oauth",
+                )
             else:
                 registration_context = get_registration_context(request, db_session)
                 sync_existing_user_tracking(
@@ -660,6 +725,74 @@ def auth_by_telegram_link(request, token):
         return redirect("dashboard")
     finally:
         session.close()
+
+
+def auth_by_telegram_widget(request):
+    if not settings.TELEGRAM_AUTH_BOT_TOKEN:
+        logging.warning("telegram widget auth requested but bot token is missing")
+        return render_login(
+            request,
+            {"error": "Вход через Telegram временно недоступен"},
+            status=503,
+        )
+
+    auth_data = request.GET.dict()
+    if not verify_telegram_widget_auth(auth_data):
+        logging.warning("telegram widget auth failed signature check")
+        return render_login(request, {"error": "Не удалось подтвердить вход через Telegram."})
+
+    try:
+        telegram_id = int(auth_data["id"])
+    except (KeyError, TypeError, ValueError):
+        logging.warning("telegram widget auth returned invalid telegram id")
+        return render_login(request, {"error": "Telegram не вернул ID аккаунта."})
+
+    db_session = session_factory()
+    try:
+        with db_session.begin():
+            user = (
+                db_session.query(User)
+                .filter(User.telegram_id == telegram_id)
+                .first()
+            )
+
+            if not user:
+                logging.info(
+                    "creating site subscription from telegram widget auth for telegram id %s",
+                    telegram_id,
+                )
+                user = create_site_user(
+                    db_session,
+                    None,
+                    request,
+                    telegram_id=telegram_id,
+                    creation_channel="site_telegram_widget",
+                )
+            else:
+                registration_context = get_registration_context(request, db_session)
+                sync_existing_user_tracking(
+                    db_session,
+                    user,
+                    registration_context["traffic_source"],
+                    registration_context["ymid"],
+                )
+
+            add_event_log_once(
+                db_session,
+                user,
+                analytics_event.FirstSuccessfulLogin(login_method="telegram_widget"),
+            )
+
+        authorize_user_session(request, user)
+        return redirect("dashboard")
+    except Exception as e:
+        logging.exception(f"telegram widget auth failed for {telegram_id}: {e}")
+        return render_login(
+            request,
+            {"error": "Не удалось войти через Telegram. Напишите в поддержку."},
+        )
+    finally:
+        db_session.close()
 
 
 def index(request):

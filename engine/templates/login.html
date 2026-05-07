@@ -151,6 +151,36 @@
             flex-shrink: 0;
         }
 
+        .telegram-login-shell {
+            width: 100%;
+            min-height: 64px;
+            border-radius: 22px;
+            background: #2aabee;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            box-shadow: 0 12px 30px rgba(42, 171, 238, 0.22);
+            transition: all 0.2s ease;
+            border: 0;
+            color: #fff;
+            font-weight: 900;
+            font-size: 13px;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            gap: 14px;
+            cursor: pointer;
+        }
+
+        .telegram-login-shell:hover {
+            transform: translateY(-2px);
+            background: #229ed9;
+        }
+
+        .telegram-login-shell i {
+            font-size: 28px;
+        }
+
         /* Анимация для состояния отправки */
         .hidden-step { display: none; }
 
@@ -195,8 +225,22 @@
                             <i class="fas fa-magic text-[#ffc700] text-2xl"></i>
                         </div>
                         <h2 class="text-2xl font-black uppercase tracking-tighter">Вход в кабинет</h2>
-                        <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-2">Быстрее всего через Google</p>
+                        <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-2">
+                            {% if google_oauth_enabled and telegram_auth_enabled %}
+                                Быстрее всего через Google или Telegram
+                            {% elif google_oauth_enabled %}
+                                Быстрее всего через Google
+                            {% elif telegram_auth_enabled %}
+                                Быстрее всего через Telegram
+                            {% else %}
+                                Введите почту, и мы пришлем ссылку
+                            {% endif %}
+                        </p>
                     </div>
+
+                    {% if google_oauth_enabled or telegram_auth_enabled %}
+                        <div class="space-y-3">
+                    {% endif %}
 
                     {% if google_oauth_enabled %}
                         <a href="{% url 'google_login' %}{% if tracking_params %}?{% for key, value in tracking_params.items %}{% if not forloop.first %}&{% endif %}{{ key }}={{ value|urlencode }}{% endfor %}{% endif %}"
@@ -211,6 +255,21 @@
                             </svg>
                             Войти через Google
                         </a>
+                    {% endif %}
+
+                    {% if telegram_auth_enabled %}
+                        <button type="button"
+                                class="telegram-login-shell"
+                                onclick="loginWithTelegram()"
+                                aria-label="Войти через Telegram"
+                                title="Войти через Telegram">
+                            <i class="fab fa-telegram-plane"></i>
+                            Войти через Telegram
+                        </button>
+                    {% endif %}
+
+                    {% if google_oauth_enabled or telegram_auth_enabled %}
+                        </div>
 
                         <div class="flex items-center gap-4 my-6">
                             <div class="h-px flex-1 bg-white/10"></div>
@@ -264,6 +323,10 @@
             </div>
         </div>
     </div>
+
+    {% if telegram_auth_enabled %}
+        <script async src="https://telegram.org/js/telegram-widget.js?22"></script>
+    {% endif %}
 
     <script>
         const mirrorSourceUrl = "{{ pwa_mirror_source_url|escapejs }}";
@@ -336,6 +399,33 @@
         }
         window.addEventListener('orientationchange', setFullHeight);
         setFullHeight();
+
+        {% if telegram_auth_enabled %}
+        function loginWithTelegram() {
+            if (!window.Telegram || !window.Telegram.Login) {
+                alert('Telegram вход еще загружается. Попробуйте еще раз.');
+                return;
+            }
+
+            window.Telegram.Login.auth(
+                {
+                    bot_id: '{{ telegram_bot_id }}',
+                    request_access: 'write'
+                },
+                function(user) {
+                    if (!user) {
+                        return;
+                    }
+
+                    const authUrl = new URL('{{ telegram_auth_url|escapejs }}');
+                    Object.keys(user).forEach(function(key) {
+                        authUrl.searchParams.set(key, user[key]);
+                    });
+                    window.location.href = authUrl.toString();
+                }
+            );
+        }
+        {% endif %}
 
         document.getElementById('magicLinkForm').addEventListener('submit', async function(e) {
             e.preventDefault();
