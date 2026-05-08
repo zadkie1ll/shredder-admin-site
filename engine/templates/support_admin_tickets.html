@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тикеты поддержки</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Montserrat', sans-serif; background: #080808; color: #fff; }
+        .card { background: rgba(22,22,24,.96); border: 1px solid rgba(255,255,255,.1); border-radius: 22px; }
+    </style>
+</head>
+<body>
+    <main class="min-h-screen p-5 md:p-8">
+        <div class="max-w-6xl mx-auto space-y-6">
+            <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <div>
+                    <h1 class="text-3xl md:text-4xl font-black uppercase">Тикеты</h1>
+                    <p class="text-gray-500 text-sm font-bold mt-1">Открытые: {{ open_count }} · Закрытые: {{ closed_count }}</p>
+                </div>
+                <a href="{% url 'support_admin_logout' %}" class="rounded-xl border border-white/10 px-4 py-3 text-gray-300 text-xs font-black uppercase hover:border-red-400/30 hover:text-red-200">
+                    Выйти
+                </a>
+            </header>
+
+            <nav class="flex flex-wrap gap-3">
+                <a href="{% url 'support_admin_tickets' %}?status=open" class="rounded-xl px-4 py-3 text-xs font-black uppercase {% if status_filter == 'open' %}bg-[#ffc700] text-black{% else %}bg-white/5 text-gray-300 border border-white/10{% endif %}">Открытые</a>
+                <a href="{% url 'support_admin_tickets' %}?status=closed" class="rounded-xl px-4 py-3 text-xs font-black uppercase {% if status_filter == 'closed' %}bg-[#ffc700] text-black{% else %}bg-white/5 text-gray-300 border border-white/10{% endif %}">Закрытые</a>
+                <a href="{% url 'support_admin_tickets' %}?status=all" class="rounded-xl px-4 py-3 text-xs font-black uppercase {% if status_filter == 'all' %}bg-[#ffc700] text-black{% else %}bg-white/5 text-gray-300 border border-white/10{% endif %}">Все</a>
+            </nav>
+
+            <section class="space-y-3">
+                {% for ticket, ticket_user in tickets %}
+                    <a href="{% url 'support_admin_ticket_detail' ticket.id %}" class="card block p-5 hover:border-[#ffc700]/30 transition-colors">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                            <div class="min-w-0">
+                                <div class="flex flex-wrap items-center gap-3 mb-2">
+                                    <span class="text-[#ffc700] text-xs font-black uppercase">#{{ ticket.id }}</span>
+                                    {% if ticket.status == support_status_open %}
+                                        <span class="text-[#00ff88] text-xs font-black uppercase">Открыт</span>
+                                    {% else %}
+                                        <span class="text-gray-500 text-xs font-black uppercase">Закрыт</span>
+                                    {% endif %}
+                                    <span class="text-gray-600 text-xs font-bold">{{ ticket.updated_at|date:"d.m.Y H:i" }}</span>
+                                </div>
+                                <h2 class="text-xl font-black truncate">{{ ticket.subject }}</h2>
+                                <p class="text-gray-500 text-sm font-bold mt-1">
+                                    user_id={{ ticket_user.id }}
+                                    {% if ticket_user.email %} · {{ ticket_user.email }}{% endif %}
+                                    {% if ticket_user.telegram_id %} · tg {{ ticket_user.telegram_id }}{% endif %}
+                                </p>
+                            </div>
+                            <i class="fas fa-chevron-right text-gray-600"></i>
+                        </div>
+                    </a>
+                {% empty %}
+                    <div class="card p-10 text-center text-gray-500 font-bold">
+                        Тикетов в этом фильтре нет.
+                    </div>
+                {% endfor %}
+            </section>
+        </div>
+    </main>
+</body>
+</html>

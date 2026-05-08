@@ -83,6 +83,12 @@ RESEND_FROM_EMAIL = config("RESEND_FROM_EMAIL", default="")
 GOOGLE_OAUTH_CLIENT_ID = config("GOOGLE_OAUTH_CLIENT_ID", default="")
 GOOGLE_OAUTH_CLIENT_SECRET = config("GOOGLE_OAUTH_CLIENT_SECRET", default="")
 GOOGLE_OAUTH_REDIRECT_URI = config("GOOGLE_OAUTH_REDIRECT_URI", default="")
+SUPPORT_ADMIN_PASSWORD = config("SUPPORT_ADMIN_PASSWORD", default="")
+SUPPORT_ATTACHMENT_MAX_BYTES = config(
+    "SUPPORT_ATTACHMENT_MAX_BYTES",
+    default=50 * 1024 * 1024,
+    cast=int,
+)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
@@ -279,4 +285,7 @@ LOGGING = {
 }
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
+MEDIA_ROOT = BASE_DIR / "mediafiles"
+FILE_UPLOAD_MAX_MEMORY_SIZE = SUPPORT_ATTACHMENT_MAX_BYTES
+DATA_UPLOAD_MAX_MEMORY_SIZE = SUPPORT_ATTACHMENT_MAX_BYTES + 1024 * 1024
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

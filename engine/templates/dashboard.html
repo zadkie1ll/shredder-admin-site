@@ -746,6 +746,124 @@
                 border-radius: 12px !important;
             }
         }
+
+        .support-chat-card {
+            min-height: min(62vh, 680px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .support-chat-scroll {
+            flex: 1;
+            min-height: 340px;
+            max-height: 520px;
+            overflow-y: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .support-message {
+            max-width: min(78%, 640px);
+            border-radius: 20px;
+            padding: 14px 16px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .support-message-user {
+            margin-left: auto;
+            background: rgba(255, 199, 0, 0.12);
+            border-color: rgba(255, 199, 0, 0.22);
+        }
+
+        .support-message-support {
+            margin-right: auto;
+            background: rgba(0, 255, 136, 0.08);
+            border-color: rgba(0, 255, 136, 0.16);
+        }
+
+        .support-input {
+            resize: none;
+            min-height: 58px;
+            max-height: 150px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            border-radius: 16px;
+        }
+
+        .support-input:focus {
+            outline: none;
+            border-color: rgba(255, 199, 0, 0.35);
+        }
+
+        .support-attachment-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 10px;
+            margin-top: 12px;
+        }
+
+        .support-attachment {
+            display: block;
+            overflow: hidden;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(0, 0, 0, 0.28);
+        }
+
+        .support-attachment img,
+        .support-attachment video {
+            width: 100%;
+            max-height: 220px;
+            object-fit: cover;
+            display: block;
+        }
+
+        .support-file-btn {
+            width: 58px;
+            height: 58px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.06);
+            color: #9ca3af;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .support-file-btn:hover {
+            color: #ffc700;
+            border-color: rgba(255, 199, 0, 0.28);
+        }
+
+        @media (max-width: 640px) {
+            .support-chat-card {
+                min-height: calc(100dvh - 260px);
+            }
+
+            .support-chat-scroll {
+                min-height: 260px;
+                max-height: calc(100dvh - 430px);
+            }
+
+            .support-message {
+                max-width: 90%;
+                padding: 12px 13px;
+                border-radius: 16px;
+            }
+
+            .support-input {
+                min-height: 50px;
+                border-radius: 14px;
+                font-size: 13px;
+            }
+
+            .support-attachment-grid {
+                grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+            }
+        }
     </style>
 </head>
 <body style="--dashboard-bg-image: url('{% static 'img/bg6.png' %}');">
@@ -1221,27 +1339,152 @@
             </div>
 
             <div id="tab-support" class="tab-content">
-                <header class="mb-10">
+                <header class="mb-10 mobile-compact-header">
                     <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Поддержка</h1>
-                    <p class="text-gray-500 text-sm md:text-base font-bold">Поможем с подключением, оплатой и приложениями</p>
+                    {% if support_ticket %}
+                        <p class="text-gray-500 text-sm md:text-base font-bold">
+                            Тикет #{{ support_ticket.id }}
+                            {% if support_ticket.status == support_status_open %}
+                                <span class="text-[#00ff88]">— открыт</span>
+                            {% else %}
+                                <span class="text-gray-400">— закрыт</span>
+                            {% endif %}
+                        </p>
+                    {% else %}
+                        <p class="text-gray-500 text-sm md:text-base font-bold">Напиши нам прямо здесь, без перехода в Telegram</p>
+                    {% endif %}
                 </header>
                 <div class="overview-grid space-y-7">
-                    <section class="setup-shell overview-hero-card">
-                        <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-7">
-                            <div class="flex items-start gap-5">
-                                <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
-                                    <i class="fas fa-life-ring text-2xl"></i>
+                    <section class="setup-shell support-chat-card">
+                        <div class="flex items-center justify-between gap-4 mb-5">
+                            <div>
+                                <h2 class="text-2xl font-black mb-1">
+                                    {% if support_ticket %}
+                                        {{ support_ticket.subject }}
+                                    {% else %}
+                                        Новое обращение
+                                    {% endif %}
+                                </h2>
+                                <p class="text-gray-500 text-sm font-bold">
+                                    {% if support_ticket and support_ticket.status == support_status_open %}
+                                        Мы ответим в этом чате. Страница сама сохранит историю.
+                                    {% elif support_ticket %}
+                                        Этот тикет закрыт. Можно создать новое обращение ниже.
+                                    {% else %}
+                                        Опиши проблему: подключение, оплата, приложение или устройство.
+                                    {% endif %}
+                                </p>
+                            </div>
+                            {% if support_ticket and support_ticket.status == support_status_open %}
+                                <form method="post" action="{% url 'close_support_ticket' support_ticket.id %}">
+                                    {% csrf_token %}
+                                    <button type="submit" class="border border-red-400/25 bg-red-400/10 text-red-200 px-4 py-3 rounded-xl text-[10px] font-black uppercase hover:bg-red-400/15 transition-colors whitespace-nowrap">
+                                        Закрыть
+                                    </button>
+                                </form>
+                            {% endif %}
+                        </div>
+
+                        {% if support_ticket %}
+                            <div class="support-chat-scroll space-y-4 pr-1 mb-5" id="support-chat-scroll">
+                                {% for message in support_messages %}
+                                    <div class="support-message {% if message.sender_type == support_sender_user %}support-message-user{% else %}support-message-support{% endif %}">
+                                        <div class="flex items-center justify-between gap-3 mb-2">
+                                            <span class="text-[10px] font-black uppercase tracking-widest {% if message.sender_type == support_sender_user %}text-[#ffc700]{% else %}text-[#00ff88]{% endif %}">
+                                                {% if message.sender_type == support_sender_user %}Вы{% else %}Поддержка{% endif %}
+                                            </span>
+                                            <span class="text-[10px] text-gray-500 font-bold">{{ message.created_at|date:"d.m H:i" }}</span>
+                                        </div>
+                                        <p class="text-sm text-white/90 font-bold leading-relaxed whitespace-pre-wrap">{{ message.message }}</p>
+                                        {% if message.attachments %}
+                                            <div class="support-attachment-grid">
+                                                {% for attachment in message.attachments %}
+                                                    <a href="{% url 'support_attachment' attachment.id %}" target="_blank" class="support-attachment" title="{{ attachment.file_name }}">
+                                                        {% if attachment.is_image %}
+                                                            <img src="{% url 'support_attachment' attachment.id %}" alt="{{ attachment.file_name }}">
+                                                        {% elif attachment.is_video %}
+                                                            <video src="{% url 'support_attachment' attachment.id %}" controls preload="metadata"></video>
+                                                        {% else %}
+                                                            <div class="p-3 text-xs font-bold text-gray-300">
+                                                                <i class="fas fa-paperclip mr-2 text-[#ffc700]"></i>{{ attachment.file_name }}
+                                                            </div>
+                                                        {% endif %}
+                                                    </a>
+                                                {% endfor %}
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% empty %}
+                                    <div class="h-full min-h-[260px] flex flex-col items-center justify-center text-center text-gray-600">
+                                        <i class="far fa-comment-dots text-4xl mb-4"></i>
+                                        <p class="text-sm font-bold">Напишите сообщение, чтобы начать</p>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        {% else %}
+                            <div class="flex-1 min-h-[260px] flex flex-col items-center justify-center text-center text-gray-600 mb-5">
+                                <i class="far fa-comment-dots text-5xl mb-4"></i>
+                                <p class="text-sm font-bold">Первое сообщение создаст тикет поддержки</p>
+                            </div>
+                        {% endif %}
+
+                        {% if support_ticket and support_ticket.status == support_status_open %}
+                            <form method="post" action="{% url 'create_support_ticket_message' support_ticket.id %}" enctype="multipart/form-data" class="flex items-end gap-3" id="support-message-form" data-messages-url="{% url 'support_ticket_messages_json' support_ticket.id %}">
+                                {% csrf_token %}
+                                <textarea name="message" rows="1" required placeholder="Ваш ответ..." class="support-input flex-1 px-5 py-4 font-bold"></textarea>
+                                <label class="support-file-btn" title="Прикрепить скриншот или видео">
+                                    <input type="file" name="attachments" accept="image/*,video/*" multiple class="hidden">
+                                    <i class="fas fa-paperclip"></i>
+                                </label>
+                                <button type="submit" class="setup-cta-btn !w-auto !min-w-[58px] !h-[58px] !p-0 !mb-0 !mr-0" aria-label="Отправить">
+                                    <i class="far fa-paper-plane"></i>
+                                </button>
+                            </form>
+                        {% elif not support_ticket %}
+                            <form method="post" action="{% url 'create_support_ticket' %}" enctype="multipart/form-data" class="space-y-3" id="support-create-form">
+                                {% csrf_token %}
+                                <input type="text" name="subject" placeholder="Тема обращения" class="support-input w-full px-5 py-4 font-bold">
+                                <div class="flex items-end gap-3">
+                                    <textarea name="message" rows="2" required placeholder="Опишите проблему..." class="support-input flex-1 px-5 py-4 font-bold"></textarea>
+                                    <label class="support-file-btn" title="Прикрепить скриншот или видео">
+                                        <input type="file" name="attachments" accept="image/*,video/*" multiple class="hidden">
+                                        <i class="fas fa-paperclip"></i>
+                                    </label>
+                                    <button type="submit" class="setup-cta-btn !w-auto !min-w-[58px] !h-[58px] !p-0 !mb-0 !mr-0" aria-label="Отправить">
+                                        <i class="far fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                            </form>
+                        {% endif %}
+                    </section>
+
+                    {% if support_ticket and support_ticket.status != support_status_open %}
+                        <section class="setup-shell">
+                            <div class="flex items-start gap-5 mb-6">
+                                <div class="w-14 h-14 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                    <i class="far fa-comment-dots text-xl"></i>
                                 </div>
                                 <div>
-                                    <h2 class="text-2xl font-black mb-2">Нужна помощь?</h2>
-                                    <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">Напиши в Telegram, если не получается подключиться, оплатить подписку или выбрать приложение для устройства.</p>
+                                    <h2 class="text-2xl font-black mb-2">Новое обращение</h2>
+                                    <p class="text-gray-500 text-sm font-bold leading-relaxed">Если вопрос остался или появилась новая проблема, создай отдельный тикет.</p>
                                 </div>
                             </div>
-                            <a href="https://t.me/monkeyislandsupportbot" target="_blank" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !mb-0 !mr-0">
-                                Написать
-                            </a>
-                        </div>
-                    </section>
+                            <form method="post" action="{% url 'create_support_ticket' %}" enctype="multipart/form-data" class="space-y-3" id="support-create-form">
+                                {% csrf_token %}
+                                <input type="text" name="subject" placeholder="Тема обращения" class="support-input w-full px-5 py-4 font-bold">
+                                <div class="flex items-end gap-3">
+                                    <textarea name="message" rows="2" required placeholder="Опишите проблему..." class="support-input flex-1 px-5 py-4 font-bold"></textarea>
+                                    <label class="support-file-btn" title="Прикрепить скриншот или видео">
+                                        <input type="file" name="attachments" accept="image/*,video/*" multiple class="hidden">
+                                        <i class="fas fa-paperclip"></i>
+                                    </label>
+                                    <button type="submit" class="setup-cta-btn !w-auto !min-w-[58px] !h-[58px] !p-0 !mb-0 !mr-0" aria-label="Отправить">
+                                        <i class="far fa-paper-plane"></i>
+                                    </button>
+                                </div>
+                            </form>
+                        </section>
+                    {% endif %}
 
                     <section class="grid grid-cols-1 md:grid-cols-3 gap-5">
                         <button type="button" onclick="showTab('setup')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
@@ -2682,12 +2925,165 @@
             progressNode.style.setProperty('--subscription-progress', progress + '%');
         }
 
+        function supportEscapeHtml(value) {
+            return String(value || '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function supportAttachmentHtml(attachment) {
+            const url = supportEscapeHtml(attachment.url);
+            const fileName = supportEscapeHtml(attachment.file_name);
+
+            if (attachment.is_image) {
+                return `
+                    <a href="${url}" target="_blank" class="support-attachment" title="${fileName}">
+                        <img src="${url}" alt="${fileName}">
+                    </a>
+                `;
+            }
+
+            if (attachment.is_video) {
+                return `
+                    <a href="${url}" target="_blank" class="support-attachment" title="${fileName}">
+                        <video src="${url}" controls preload="metadata"></video>
+                    </a>
+                `;
+            }
+
+            return `
+                <a href="${url}" target="_blank" class="support-attachment" title="${fileName}">
+                    <div class="p-3 text-xs font-bold text-gray-300">
+                        <i class="fas fa-paperclip mr-2 text-[#ffc700]"></i>${fileName}
+                    </div>
+                </a>
+            `;
+        }
+
+        function supportMessageHtml(message) {
+            const senderLabel = message.is_user ? 'Вы' : 'Поддержка';
+            const senderClass = message.is_user ? 'text-[#ffc700]' : 'text-[#00ff88]';
+            const bubbleClass = message.is_user ? 'support-message-user' : 'support-message-support';
+            const attachments = message.attachments && message.attachments.length
+                ? `<div class="support-attachment-grid">${message.attachments.map(supportAttachmentHtml).join('')}</div>`
+                : '';
+
+            return `
+                <div class="support-message ${bubbleClass}" data-message-id="${message.id}">
+                    <div class="flex items-center justify-between gap-3 mb-2">
+                        <span class="text-[10px] font-black uppercase tracking-widest ${senderClass}">${senderLabel}</span>
+                        <span class="text-[10px] text-gray-500 font-bold">${supportEscapeHtml(message.created_at)}</span>
+                    </div>
+                    <p class="text-sm text-white/90 font-bold leading-relaxed whitespace-pre-wrap">${supportEscapeHtml(message.message)}</p>
+                    ${attachments}
+                </div>
+            `;
+        }
+
+        function renderSupportMessages(messages) {
+            const chat = document.getElementById('support-chat-scroll');
+            if (!chat) return;
+
+            const shouldStickToBottom = chat.scrollTop + chat.clientHeight >= chat.scrollHeight - 80;
+            if (!messages.length) {
+                chat.innerHTML = `
+                    <div class="h-full min-h-[260px] flex flex-col items-center justify-center text-center text-gray-600">
+                        <i class="far fa-comment-dots text-4xl mb-4"></i>
+                        <p class="text-sm font-bold">Напишите сообщение, чтобы начать</p>
+                    </div>
+                `;
+                return;
+            }
+
+            chat.innerHTML = messages.map(supportMessageHtml).join('');
+            if (shouldStickToBottom) {
+                chat.scrollTop = chat.scrollHeight;
+            }
+        }
+
+        async function refreshSupportMessages() {
+            const form = document.getElementById('support-message-form');
+            if (!form || !form.dataset.messagesUrl) return;
+
+            try {
+                const response = await fetch(form.dataset.messagesUrl, {
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                });
+                if (!response.ok) return;
+                const payload = await response.json();
+                if (payload.status === 'ok') {
+                    renderSupportMessages(payload.messages || []);
+                }
+            } catch (error) {
+                console.warn('Не удалось обновить чат поддержки', error);
+            }
+        }
+
+        function setupSupportAjaxForm(form) {
+            if (!form) return;
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const submitButton = form.querySelector('button[type="submit"]');
+                const originalDisabled = submitButton ? submitButton.disabled : false;
+
+                if (submitButton) submitButton.disabled = true;
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    });
+
+                    if (!response.ok) {
+                        showToast('Не удалось отправить сообщение');
+                        return;
+                    }
+
+                    const payload = await response.json();
+                    if (payload.ticket_id) {
+                        window.location.href = '/dashboard/?tab=support';
+                        return;
+                    }
+
+                    form.reset();
+                    await refreshSupportMessages();
+                    const textarea = form.querySelector('textarea[name="message"]');
+                    if (textarea) textarea.focus();
+                } catch (error) {
+                    console.warn('Не удалось отправить сообщение поддержки', error);
+                    showToast('Не удалось отправить сообщение');
+                } finally {
+                    if (submitButton) submitButton.disabled = originalDisabled;
+                }
+            });
+        }
+
         // Инициализация при загрузке
         document.addEventListener('DOMContentLoaded', () => {
             selectedNewSetupPlatform = detectNewSetupPlatform();
             renderNewSetupWizard();
             setPlatform('android');
             updateSubscriptionOverview();
+            setupSupportAjaxForm(document.getElementById('support-message-form'));
+            setupSupportAjaxForm(document.getElementById('support-create-form'));
+
+            const initialTab = new URLSearchParams(window.location.search).get('tab');
+            if (initialTab) {
+                showTab(initialTab);
+            }
+
+            const supportChat = document.getElementById('support-chat-scroll');
+            if (supportChat) {
+                supportChat.scrollTop = supportChat.scrollHeight;
+            }
+
+            if (document.getElementById('support-message-form')) {
+                setInterval(refreshSupportMessages, 4000);
+            }
         });
 
         // ЛОГИКА ТАРИФОВ (Full Page)

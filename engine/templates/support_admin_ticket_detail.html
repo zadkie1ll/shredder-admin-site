@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Тикет #{{ ticket.id }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Montserrat', sans-serif; background: #080808; color: #fff; }
+        .card { background: rgba(22,22,24,.96); border: 1px solid rgba(255,255,255,.1); border-radius: 24px; }
+        .msg { max-width: min(78%, 720px); border-radius: 20px; padding: 14px 16px; border: 1px solid rgba(255,255,255,.08); }
+        .msg-user { margin-right: auto; background: rgba(255,255,255,.05); }
+        .msg-support { margin-left: auto; background: rgba(255,199,0,.12); border-color: rgba(255,199,0,.22); }
+        .attachment-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 12px; }
+        .attachment { display: block; overflow: hidden; border-radius: 14px; border: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.28); }
+        .attachment img, .attachment video { width: 100%; max-height: 240px; object-fit: cover; display: block; }
+        .file-btn { width: 58px; height: 58px; border-radius: 16px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.06); color: #9ca3af; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+        .file-btn:hover { color: #ffc700; border-color: rgba(255,199,0,.3); }
+    </style>
+</head>
+<body>
+    <main class="min-h-screen p-5 md:p-8">
+        <div class="max-w-5xl mx-auto space-y-6">
+            <header class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                <div>
+                    <a href="{% url 'support_admin_tickets' %}" class="text-gray-500 text-sm font-black hover:text-[#ffc700]">← К списку</a>
+                    <h1 class="text-3xl md:text-4xl font-black mt-3">Тикет #{{ ticket.id }}</h1>
+                    <p class="text-gray-500 text-sm font-bold mt-1">
+                        {{ ticket.subject }}
+                        {% if ticket.status == support_status_open %}
+                            <span class="text-[#00ff88]">— открыт</span>
+                        {% else %}
+                            <span class="text-gray-400">— закрыт</span>
+                        {% endif %}
+                    </p>
+                </div>
+                <div class="flex flex-wrap gap-3">
+                    {% if ticket.status == support_status_open %}
+                        <form method="post" action="{% url 'support_admin_close_ticket' ticket.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-red-200 text-xs font-black uppercase">
+                                Закрыть тикет
+                            </button>
+                        </form>
+                    {% else %}
+                        <form method="post" action="{% url 'support_admin_reopen_ticket' ticket.id %}">
+                            {% csrf_token %}
+                            <button type="submit" class="rounded-xl border border-[#00ff88]/25 bg-[#00ff88]/10 px-4 py-3 text-[#00ff88] text-xs font-black uppercase">
+                                Переоткрыть
+                            </button>
+                        </form>
+                    {% endif %}
+                    <form method="post" action="{% url 'support_admin_delete_ticket' ticket.id %}" onsubmit="return confirm('Удалить тикет #{{ ticket.id }} и все вложения?')">
+                        {% csrf_token %}
+                        <button type="submit" class="rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-red-300 text-xs font-black uppercase">
+                            Удалить тикет
+                        </button>
+                    </form>
+                </div>
+            </header>
+
+            <section class="card p-5">
+                <h2 class="text-lg font-black mb-2">Пользователь</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm font-bold">
+                    <div class="rounded-2xl bg-white/5 p-4"><span class="text-gray-500">ID</span><br>{{ ticket_user.id }}</div>
+                    <div class="rounded-2xl bg-white/5 p-4"><span class="text-gray-500">Email</span><br>{{ ticket_user.email|default:"—" }}</div>
+                    <div class="rounded-2xl bg-white/5 p-4"><span class="text-gray-500">Telegram</span><br>{{ ticket_user.telegram_id|default:"—" }}</div>
+                </div>
+            </section>
+
+            <section class="card p-5">
+                <div class="h-[52vh] min-h-[360px] overflow-y-auto space-y-4 pr-1 mb-5" id="admin-chat-scroll">
+                    {% for message in support_messages %}
+                        <div class="msg {% if message.sender_type == support_sender_user %}msg-user{% else %}msg-support{% endif %}">
+                            <div class="flex items-center justify-between gap-3 mb-2">
+                                <span class="text-[10px] font-black uppercase tracking-widest {% if message.sender_type == support_sender_user %}text-gray-400{% else %}text-[#ffc700]{% endif %}">
+                                    {% if message.sender_type == support_sender_user %}Пользователь{% else %}Поддержка{% endif %}
+                                </span>
+                                <span class="text-[10px] text-gray-500 font-bold">{{ message.created_at|date:"d.m.Y H:i" }}</span>
+                            </div>
+                            <p class="text-sm text-white/90 font-bold leading-relaxed whitespace-pre-wrap">{{ message.message }}</p>
+                            {% if message.attachments %}
+                                <div class="attachment-grid">
+                                    {% for attachment in message.attachments %}
+                                        <a href="{% url 'support_admin_attachment' attachment.id %}" target="_blank" class="attachment" title="{{ attachment.file_name }}">
+                                            {% if attachment.is_image %}
+                                                <img src="{% url 'support_admin_attachment' attachment.id %}" alt="{{ attachment.file_name }}">
+                                            {% elif attachment.is_video %}
+                                                <video src="{% url 'support_admin_attachment' attachment.id %}" controls preload="metadata"></video>
+                                            {% else %}
+                                                <div class="p-3 text-xs font-bold text-gray-300">
+                                                    <i class="fas fa-paperclip mr-2 text-[#ffc700]"></i>{{ attachment.file_name }}
+                                                </div>
+                                            {% endif %}
+                                        </a>
+                                    {% endfor %}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <div class="h-full flex items-center justify-center text-gray-600 font-bold">
+                            Сообщений пока нет.
+                        </div>
+                    {% endfor %}
+                </div>
+
+                <form method="post" action="{% url 'support_admin_create_message' ticket.id %}" enctype="multipart/form-data" class="flex items-end gap-3" id="admin-support-message-form" data-messages-url="{% url 'support_admin_ticket_messages_json' ticket.id %}">
+                    {% csrf_token %}
+                    <textarea name="message" rows="2" required placeholder="Ответ поддержки..." class="flex-1 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-white font-bold outline-none focus:border-[#ffc700]/40"></textarea>
+                    <label class="file-btn" title="Прикрепить скриншот или видео">
+                        <input type="file" name="attachments" accept="image/*,video/*" multiple class="hidden">
+                        <i class="fas fa-paperclip"></i>
+                    </label>
+                    <button type="submit" class="h-[58px] min-w-[58px] rounded-2xl bg-[#ffc700] text-black font-black">
+                        <i class="far fa-paper-plane"></i>
+                    </button>
+                </form>
+            </section>
+        </div>
+    </main>
+    <script>
+        const adminChat = document.getElementById('admin-chat-scroll');
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replaceAll('&', '&amp;')
+                .replaceAll('<', '&lt;')
+                .replaceAll('>', '&gt;')
+                .replaceAll('"', '&quot;')
+                .replaceAll("'", '&#039;');
+        }
+
+        function attachmentHtml(attachment) {
+            const url = escapeHtml(attachment.url);
+            const fileName = escapeHtml(attachment.file_name);
+
+            if (attachment.is_image) {
+                return `
+                    <a href="${url}" target="_blank" class="attachment" title="${fileName}">
+                        <img src="${url}" alt="${fileName}">
+                    </a>
+                `;
+            }
+
+            if (attachment.is_video) {
+                return `
+                    <a href="${url}" target="_blank" class="attachment" title="${fileName}">
+                        <video src="${url}" controls preload="metadata"></video>
+                    </a>
+                `;
+            }
+
+            return `
+                <a href="${url}" target="_blank" class="attachment" title="${fileName}">
+                    <div class="p-3 text-xs font-bold text-gray-300">
+                        <i class="fas fa-paperclip mr-2 text-[#ffc700]"></i>${fileName}
+                    </div>
+                </a>
+            `;
+        }
+
+        function messageHtml(message) {
+            const senderLabel = message.is_user ? 'Пользователь' : 'Поддержка';
+            const senderClass = message.is_user ? 'text-gray-400' : 'text-[#ffc700]';
+            const bubbleClass = message.is_user ? 'msg-user' : 'msg-support';
+            const attachments = message.attachments && message.attachments.length
+                ? `<div class="attachment-grid">${message.attachments.map(attachmentHtml).join('')}</div>`
+                : '';
+
+            return `
+                <div class="msg ${bubbleClass}" data-message-id="${message.id}">
+                    <div class="flex items-center justify-between gap-3 mb-2">
+                        <span class="text-[10px] font-black uppercase tracking-widest ${senderClass}">${senderLabel}</span>
+                        <span class="text-[10px] text-gray-500 font-bold">${escapeHtml(message.created_at_full || message.created_at)}</span>
+                    </div>
+                    <p class="text-sm text-white/90 font-bold leading-relaxed whitespace-pre-wrap">${escapeHtml(message.message)}</p>
+                    ${attachments}
+                </div>
+            `;
+        }
+
+        function renderMessages(messages) {
+            if (!adminChat) return;
+
+            const shouldStickToBottom = adminChat.scrollTop + adminChat.clientHeight >= adminChat.scrollHeight - 80;
+            if (!messages.length) {
+                adminChat.innerHTML = `
+                    <div class="h-full flex items-center justify-center text-gray-600 font-bold">
+                        Сообщений пока нет.
+                    </div>
+                `;
+                return;
+            }
+
+            adminChat.innerHTML = messages.map(messageHtml).join('');
+            if (shouldStickToBottom) {
+                adminChat.scrollTop = adminChat.scrollHeight;
+            }
+        }
+
+        async function refreshMessages() {
+            const form = document.getElementById('admin-support-message-form');
+            if (!form || !form.dataset.messagesUrl) return;
+
+            try {
+                const response = await fetch(form.dataset.messagesUrl, {
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                });
+                if (!response.ok) return;
+                const payload = await response.json();
+                if (payload.status === 'ok') {
+                    renderMessages(payload.messages || []);
+                }
+            } catch (error) {
+                console.warn('Не удалось обновить тикет', error);
+            }
+        }
+
+        function setupAdminMessageForm() {
+            const form = document.getElementById('admin-support-message-form');
+            if (!form) return;
+
+            form.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const submitButton = form.querySelector('button[type="submit"]');
+                const originalDisabled = submitButton ? submitButton.disabled : false;
+
+                if (submitButton) submitButton.disabled = true;
+                try {
+                    const response = await fetch(form.action, {
+                        method: 'POST',
+                        body: new FormData(form),
+                        headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    });
+                    if (!response.ok) return;
+
+                    form.reset();
+                    await refreshMessages();
+                    const textarea = form.querySelector('textarea[name="message"]');
+                    if (textarea) textarea.focus();
+                } catch (error) {
+                    console.warn('Не удалось отправить ответ поддержки', error);
+                } finally {
+                    if (submitButton) submitButton.disabled = originalDisabled;
+                }
+            });
+        }
+
+        if (adminChat) adminChat.scrollTop = adminChat.scrollHeight;
+        setupAdminMessageForm();
+        setInterval(refreshMessages, 4000);
+    </script>
+</body>
+</html>

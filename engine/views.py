@@ -5,12 +5,15 @@ import logging
 import resend
 import secrets
 import httpx
+from pathlib import Path
 from datetime import datetime
 from datetime import timedelta
 from urllib.parse import urlencode
 from urllib.parse import urlsplit
 from django.http import HttpResponse
 from django.http import JsonResponse
+from django.http import FileResponse
+from django.http import Http404
 from django.conf import settings
 from django.shortcuts import render
 from django.shortcuts import redirect
@@ -24,9 +27,11 @@ from django.core.mail import send_mail
 from django.urls import reverse
 from django.templatetags.static import static
 from django.template.loader import render_to_string
+from django.utils.text import get_valid_filename
 from django.utils.html import strip_tags
 from sqlalchemy import func
 from sqlalchemy import update
+from sqlalchemy import delete as sa_delete
 from sqlalchemy.exc import IntegrityError
 from common.models.db import User
 from common.models.db import EventLog
@@ -37,6 +42,11 @@ from common.models.db import UserTrafficProgress
 from common.models.db import YkRecurrentPayment
 from common.models.db import MagicToken
 from common.models.db import TelegramLoginToken
+from common.models.db import SupportTicket
+from common.models.db import SupportTicketMessage
+from common.models.db import SupportTicketMessageSender
+from common.models.db import SupportTicketStatus
+from common.models.db import SupportTicketAttachment
 from common.models import analytics_event
 from common.models.tariff import Tariff
 from common.models.tariff import OneMonthTariff
@@ -64,6 +74,8 @@ GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_OAUTH_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
 
 rwms_client = RwmsClientSync(settings.RWMS_HOST, settings.RWMS_PORT)
+SUPPORT_ADMIN_SESSION_KEY = "support_admin_authenticated"
+SUPPORT_ATTACHMENT_ALLOWED_PREFIXES = ("image/", "video/")
 
 
 def normalize_host(host):
@@ -218,6 +230,224 @@ def add_event_log_once(db_session, user, event):
 
     add_event_log(db_session, user, event)
     return True
+
+
+def dashboard_support_redirect():
+    return redirect("/dashboard/?tab=support")
+
+
+def get_support_ticket_for_user(db_session, user_id, ticket_id):
+    return (
+        db_session.query(SupportTicket)
+        .filter(
+            (SupportTicket.id == ticket_id)
+            & (SupportTicket.user_id == user_id)
+        )
+        .first()
+    )
+
+
+def add_support_message(db_session, ticket, sender_type, message):
+    clean_message = message.strip()
+    if not clean_message:
+        return None
+
+    ticket.updated_at = datetime.utcnow()
+    support_message = SupportTicketMessage(
+        ticket_id=ticket.id,
+        sender_type=sender_type,
+        message=clean_message,
+    )
+    db_session.add(support_message)
+    return support_message
+
+
+def attach_support_attachments(db_session, support_message, uploaded_files):
+    saved_attachments = []
+    if not uploaded_files:
+        return saved_attachments
+
+    db_session.flush()
+    base_dir = Path(settings.MEDIA_ROOT) / "support_attachments"
+    message_dir = base_dir / str(support_message.id)
+    message_dir.mkdir(parents=True, exist_ok=True)
+
+    for uploaded_file in uploaded_files:
+        content_type = uploaded_file.content_type or "application/octet-stream"
+        if not content_type.startswith(SUPPORT_ATTACHMENT_ALLOWED_PREFIXES):
+            logging.warning("unsupported support attachment content type %s", content_type)
+            continue
+
+        if uploaded_file.size > settings.SUPPORT_ATTACHMENT_MAX_BYTES:
+            logging.warning("support attachment %s is too large", uploaded_file.name)
+            continue
+
+        safe_name = get_valid_filename(uploaded_file.name) or "attachment"
+        storage_name = f"{uuid.uuid4().hex}_{safe_name}"
+        absolute_path = message_dir / storage_name
+
+        with absolute_path.open("wb") as destination:
+            for chunk in uploaded_file.chunks():
+                destination.write(chunk)
+
+        relative_path = absolute_path.relative_to(settings.MEDIA_ROOT).as_posix()
+        attachment = SupportTicketAttachment(
+            message_id=support_message.id,
+            file_name=safe_name[:512],
+            content_type=content_type[:128],
+            file_size=uploaded_file.size,
+            storage_path=relative_path,
+        )
+        db_session.add(attachment)
+        saved_attachments.append(attachment)
+
+    return saved_attachments
+
+
+def load_support_messages_with_attachments(db_session, ticket_id):
+    support_messages = (
+        db_session.query(SupportTicketMessage)
+        .filter(SupportTicketMessage.ticket_id == ticket_id)
+        .order_by(SupportTicketMessage.created_at.asc())
+        .all()
+    )
+    message_ids = [message.id for message in support_messages]
+    attachments_by_message_id = {message.id: [] for message in support_messages}
+
+    if message_ids:
+        attachments = (
+            db_session.query(SupportTicketAttachment)
+            .filter(SupportTicketAttachment.message_id.in_(message_ids))
+            .order_by(SupportTicketAttachment.created_at.asc())
+            .all()
+        )
+        for attachment in attachments:
+            attachment.is_image = is_image_attachment(attachment)
+            attachment.is_video = is_video_attachment(attachment)
+            attachments_by_message_id.setdefault(attachment.message_id, []).append(
+                attachment
+            )
+
+    for message in support_messages:
+        message.attachments = attachments_by_message_id.get(message.id, [])
+
+    return support_messages
+
+
+def is_image_attachment(attachment):
+    return attachment.content_type.startswith("image/")
+
+
+def is_video_attachment(attachment):
+    return attachment.content_type.startswith("video/")
+
+
+def support_attachment_payload(attachment, admin=False):
+    route_name = "support_admin_attachment" if admin else "support_attachment"
+    return {
+        "id": attachment.id,
+        "file_name": attachment.file_name,
+        "content_type": attachment.content_type,
+        "file_size": attachment.file_size,
+        "url": reverse(route_name, args=[attachment.id]),
+        "is_image": bool(getattr(attachment, "is_image", is_image_attachment(attachment))),
+        "is_video": bool(getattr(attachment, "is_video", is_video_attachment(attachment))),
+    }
+
+
+def support_message_payload(message, admin=False):
+    return {
+        "id": message.id,
+        "sender_type": message.sender_type.value,
+        "is_user": message.sender_type == SupportTicketMessageSender.USER,
+        "message": message.message,
+        "created_at": message.created_at.strftime("%d.%m %H:%M"),
+        "created_at_full": message.created_at.strftime("%d.%m.%Y %H:%M"),
+        "attachments": [
+            support_attachment_payload(attachment, admin=admin)
+            for attachment in getattr(message, "attachments", [])
+        ],
+    }
+
+
+def support_messages_payload(db_session, ticket_id, admin=False):
+    return [
+        support_message_payload(message, admin=admin)
+        for message in load_support_messages_with_attachments(db_session, ticket_id)
+    ]
+
+
+def is_ajax(request):
+    return request.headers.get("x-requested-with") == "XMLHttpRequest"
+
+
+def delete_support_ticket_with_files(db_session, ticket):
+    messages = (
+        db_session.query(SupportTicketMessage)
+        .filter(SupportTicketMessage.ticket_id == ticket.id)
+        .all()
+    )
+    message_ids = [message.id for message in messages]
+    attachments = []
+
+    if message_ids:
+        attachments = (
+            db_session.query(SupportTicketAttachment)
+            .filter(SupportTicketAttachment.message_id.in_(message_ids))
+            .all()
+        )
+
+    media_root = Path(settings.MEDIA_ROOT).resolve()
+    for attachment in attachments:
+        path = (Path(settings.MEDIA_ROOT) / attachment.storage_path).resolve()
+        if media_root in path.parents and path.exists():
+            try:
+                path.unlink()
+            except OSError as e:
+                logging.warning("failed to delete support attachment %s: %s", path, e)
+            else:
+                try:
+                    path.parent.rmdir()
+                except OSError:
+                    pass
+
+    if message_ids:
+        db_session.execute(
+            sa_delete(SupportTicketAttachment).where(
+                SupportTicketAttachment.message_id.in_(message_ids)
+            )
+        )
+        db_session.execute(
+            sa_delete(SupportTicketMessage).where(
+                SupportTicketMessage.id.in_(message_ids)
+            )
+        )
+
+    db_session.execute(
+        sa_delete(SupportTicket).where(SupportTicket.id == ticket.id)
+    )
+
+
+def support_admin_is_authenticated(request):
+    return bool(request.session.get(SUPPORT_ADMIN_SESSION_KEY))
+
+
+def require_support_admin(request):
+    if not settings.SUPPORT_ADMIN_PASSWORD:
+        logging.warning("support admin requested but SUPPORT_ADMIN_PASSWORD is missing")
+        return render(
+            request,
+            "support_admin_login.html",
+            {
+                "error": "Админка поддержки не настроена: задайте SUPPORT_ADMIN_PASSWORD.",
+            },
+            status=503,
+        )
+
+    if not support_admin_is_authenticated(request):
+        return redirect("support_admin_login")
+
+    return None
 
 
 def get_last_traffic_source(db_session, user):
@@ -891,6 +1121,37 @@ def dashboard(request):
             )
             .scalar()
         )
+
+        support_open_ticket = (
+            session.query(SupportTicket)
+            .filter(
+                (SupportTicket.user_id == user.id)
+                & (SupportTicket.status == SupportTicketStatus.OPEN)
+            )
+            .order_by(SupportTicket.updated_at.desc())
+            .first()
+        )
+        support_ticket = support_open_ticket or (
+            session.query(SupportTicket)
+            .filter(SupportTicket.user_id == user.id)
+            .order_by(SupportTicket.updated_at.desc())
+            .first()
+        )
+        support_messages = []
+        if support_ticket:
+            support_messages = load_support_messages_with_attachments(
+                session,
+                support_ticket.id,
+            )
+
+        support_open_count = (
+            session.query(func.count(SupportTicket.id))
+            .filter(
+                (SupportTicket.user_id == user.id)
+                & (SupportTicket.status == SupportTicketStatus.OPEN)
+            )
+            .scalar()
+        )
     finally:
         session.close()
 
@@ -985,6 +1246,11 @@ def dashboard(request):
             "show_expiring_banner": show_expiring_banner,
             "show_not_connected_banner": show_not_connected_banner,
             "use_new_setup_flow": settings.USE_NEW_SETUP_FLOW,
+            "support_ticket": support_ticket,
+            "support_messages": support_messages,
+            "support_open_count": support_open_count,
+            "support_status_open": SupportTicketStatus.OPEN,
+            "support_sender_user": SupportTicketMessageSender.USER,
             "referral_link": f"https://t.me/{tg_bot}?start=a{user.username}",
             "site_referral_link": f"{get_current_base_url(request)}/?a={user.username}",
         },
@@ -1070,6 +1336,455 @@ def update_email(request):
         logging.exception(f"failed to sync rwms email for user {request.user.id}: {e}")
 
     return redirect("dashboard")
+
+
+@login_required(login_url="/login/")
+def create_support_ticket(request):
+    if request.method != "POST":
+        return dashboard_support_redirect()
+
+    subject = request.POST.get("subject", "").strip()
+    message = request.POST.get("message", "").strip()
+
+    if not message:
+        return dashboard_support_redirect()
+
+    if not subject:
+        subject = message[:80]
+
+    db_session = session_factory()
+    try:
+        with db_session.begin():
+            ticket = SupportTicket(
+                user_id=request.user.id,
+                status=SupportTicketStatus.OPEN,
+                subject=subject[:256],
+                updated_at=datetime.utcnow(),
+            )
+            db_session.add(ticket)
+            db_session.flush()
+            support_message = add_support_message(
+                db_session,
+                ticket,
+                SupportTicketMessageSender.USER,
+                message,
+            )
+            attach_support_attachments(
+                db_session,
+                support_message,
+                request.FILES.getlist("attachments"),
+            )
+            ticket_id = ticket.id
+    finally:
+        db_session.close()
+
+    if is_ajax(request):
+        return JsonResponse({"status": "ok", "ticket_id": ticket_id})
+
+    return dashboard_support_redirect()
+
+
+@login_required(login_url="/login/")
+def create_support_ticket_message(request, ticket_id):
+    if request.method != "POST":
+        return dashboard_support_redirect()
+
+    message = request.POST.get("message", "").strip()
+    if not message:
+        return dashboard_support_redirect()
+
+    db_session = session_factory()
+    try:
+        with db_session.begin():
+            ticket = get_support_ticket_for_user(db_session, request.user.id, ticket_id)
+            if not ticket:
+                if is_ajax(request):
+                    return JsonResponse({"status": "not_found"}, status=404)
+                return dashboard_support_redirect()
+
+            if ticket.status == SupportTicketStatus.CLOSED:
+                ticket.status = SupportTicketStatus.OPEN
+                ticket.closed_at = None
+
+            support_message = add_support_message(
+                db_session,
+                ticket,
+                SupportTicketMessageSender.USER,
+                message,
+            )
+            attach_support_attachments(
+                db_session,
+                support_message,
+                request.FILES.getlist("attachments"),
+            )
+    finally:
+        db_session.close()
+
+    if is_ajax(request):
+        return JsonResponse({"status": "ok"})
+
+    return dashboard_support_redirect()
+
+
+@login_required(login_url="/login/")
+def close_support_ticket(request, ticket_id):
+    if request.method != "POST":
+        return dashboard_support_redirect()
+
+    db_session = session_factory()
+    try:
+        with db_session.begin():
+            ticket = get_support_ticket_for_user(db_session, request.user.id, ticket_id)
+            if ticket and ticket.status == SupportTicketStatus.OPEN:
+                ticket.status = SupportTicketStatus.CLOSED
+                ticket.closed_at = datetime.utcnow()
+                ticket.updated_at = datetime.utcnow()
+    finally:
+        db_session.close()
+
+    return dashboard_support_redirect()
+
+
+@login_required(login_url="/login/")
+def support_ticket_messages_json(request, ticket_id):
+    db_session = session_factory()
+    try:
+        ticket = get_support_ticket_for_user(db_session, request.user.id, ticket_id)
+        if not ticket:
+            return JsonResponse({"status": "not_found"}, status=404)
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "ticket_status": ticket.status.value,
+                "messages": support_messages_payload(db_session, ticket.id),
+            }
+        )
+    finally:
+        db_session.close()
+
+
+@login_required(login_url="/login/")
+def support_attachment(request, attachment_id):
+    db_session = session_factory()
+    try:
+        row = (
+            db_session.query(SupportTicketAttachment, SupportTicketMessage, SupportTicket)
+            .join(
+                SupportTicketMessage,
+                SupportTicketAttachment.message_id == SupportTicketMessage.id,
+            )
+            .join(SupportTicket, SupportTicketMessage.ticket_id == SupportTicket.id)
+            .filter(
+                (SupportTicketAttachment.id == attachment_id)
+                & (SupportTicket.user_id == request.user.id)
+            )
+            .first()
+        )
+        if not row:
+            raise Http404("Attachment not found")
+
+        attachment = row[0]
+        path = (Path(settings.MEDIA_ROOT) / attachment.storage_path).resolve()
+        media_root = Path(settings.MEDIA_ROOT).resolve()
+        if media_root not in path.parents or not path.exists():
+            raise Http404("Attachment not found")
+
+        return FileResponse(
+            path.open("rb"),
+            content_type=attachment.content_type,
+            filename=attachment.file_name,
+        )
+    finally:
+        db_session.close()
+
+
+def support_admin_login(request):
+    if support_admin_is_authenticated(request):
+        return redirect("support_admin_tickets")
+
+    if request.method == "POST":
+        password = request.POST.get("password", "")
+        if settings.SUPPORT_ADMIN_PASSWORD and hmac.compare_digest(
+            password,
+            settings.SUPPORT_ADMIN_PASSWORD,
+        ):
+            request.session[SUPPORT_ADMIN_SESSION_KEY] = True
+            request.session.modified = True
+            return redirect("support_admin_tickets")
+
+        return render(
+            request,
+            "support_admin_login.html",
+            {"error": "Неверный пароль."},
+            status=403,
+        )
+
+    return render(request, "support_admin_login.html")
+
+
+def support_admin_logout(request):
+    request.session.pop(SUPPORT_ADMIN_SESSION_KEY, None)
+    request.session.modified = True
+    return redirect("support_admin_login")
+
+
+def support_admin_tickets(request):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    status_filter = request.GET.get("status", "open")
+    db_session = session_factory()
+    try:
+        query = db_session.query(SupportTicket, User).join(
+            User,
+            SupportTicket.user_id == User.id,
+        )
+        if status_filter == "closed":
+            query = query.filter(SupportTicket.status == SupportTicketStatus.CLOSED)
+        elif status_filter != "all":
+            status_filter = "open"
+            query = query.filter(SupportTicket.status == SupportTicketStatus.OPEN)
+
+        tickets = query.order_by(SupportTicket.updated_at.desc()).all()
+        open_count = (
+            db_session.query(func.count(SupportTicket.id))
+            .filter(SupportTicket.status == SupportTicketStatus.OPEN)
+            .scalar()
+        )
+        closed_count = (
+            db_session.query(func.count(SupportTicket.id))
+            .filter(SupportTicket.status == SupportTicketStatus.CLOSED)
+            .scalar()
+        )
+    finally:
+        db_session.close()
+
+    return render(
+        request,
+        "support_admin_tickets.html",
+        {
+            "tickets": tickets,
+            "status_filter": status_filter,
+            "open_count": open_count,
+            "closed_count": closed_count,
+            "support_status_open": SupportTicketStatus.OPEN,
+        },
+    )
+
+
+def support_admin_ticket_detail(request, ticket_id):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        row = (
+            db_session.query(SupportTicket, User)
+            .join(User, SupportTicket.user_id == User.id)
+            .filter(SupportTicket.id == ticket_id)
+            .first()
+        )
+        if not row:
+            return redirect("support_admin_tickets")
+
+        ticket, user = row
+        support_messages = load_support_messages_with_attachments(
+            db_session,
+            ticket.id,
+        )
+    finally:
+        db_session.close()
+
+    return render(
+        request,
+        "support_admin_ticket_detail.html",
+        {
+            "ticket": ticket,
+            "ticket_user": user,
+            "support_messages": support_messages,
+            "support_status_open": SupportTicketStatus.OPEN,
+            "support_sender_user": SupportTicketMessageSender.USER,
+        },
+    )
+
+
+def support_admin_create_message(request, ticket_id):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    if request.method != "POST":
+        return redirect("support_admin_ticket_detail", ticket_id=ticket_id)
+
+    message = request.POST.get("message", "").strip()
+    if not message:
+        return redirect("support_admin_ticket_detail", ticket_id=ticket_id)
+
+    db_session = session_factory()
+    try:
+        with db_session.begin():
+            ticket = (
+                db_session.query(SupportTicket)
+                .filter(SupportTicket.id == ticket_id)
+                .first()
+            )
+            if not ticket:
+                return redirect("support_admin_tickets")
+
+            if ticket.status == SupportTicketStatus.CLOSED:
+                ticket.status = SupportTicketStatus.OPEN
+                ticket.closed_at = None
+
+            support_message = add_support_message(
+                db_session,
+                ticket,
+                SupportTicketMessageSender.SUPPORT,
+                message,
+            )
+            attach_support_attachments(
+                db_session,
+                support_message,
+                request.FILES.getlist("attachments"),
+            )
+    finally:
+        db_session.close()
+
+    if is_ajax(request):
+        return JsonResponse({"status": "ok"})
+
+    return redirect("support_admin_ticket_detail", ticket_id=ticket_id)
+
+
+def support_admin_ticket_messages_json(request, ticket_id):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        ticket = (
+            db_session.query(SupportTicket)
+            .filter(SupportTicket.id == ticket_id)
+            .first()
+        )
+        if not ticket:
+            return JsonResponse({"status": "not_found"}, status=404)
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "ticket_status": ticket.status.value,
+                "messages": support_messages_payload(
+                    db_session,
+                    ticket.id,
+                    admin=True,
+                ),
+            }
+        )
+    finally:
+        db_session.close()
+
+
+def support_admin_close_ticket(request, ticket_id):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    if request.method == "POST":
+        db_session = session_factory()
+        try:
+            with db_session.begin():
+                ticket = (
+                    db_session.query(SupportTicket)
+                    .filter(SupportTicket.id == ticket_id)
+                    .first()
+                )
+                if ticket:
+                    ticket.status = SupportTicketStatus.CLOSED
+                    ticket.closed_at = datetime.utcnow()
+                    ticket.updated_at = datetime.utcnow()
+        finally:
+            db_session.close()
+
+    return redirect("support_admin_ticket_detail", ticket_id=ticket_id)
+
+
+def support_admin_reopen_ticket(request, ticket_id):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    if request.method == "POST":
+        db_session = session_factory()
+        try:
+            with db_session.begin():
+                ticket = (
+                    db_session.query(SupportTicket)
+                    .filter(SupportTicket.id == ticket_id)
+                    .first()
+                )
+                if ticket:
+                    ticket.status = SupportTicketStatus.OPEN
+                    ticket.closed_at = None
+                    ticket.updated_at = datetime.utcnow()
+        finally:
+            db_session.close()
+
+    return redirect("support_admin_ticket_detail", ticket_id=ticket_id)
+
+
+def support_admin_delete_ticket(request, ticket_id):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    if request.method == "POST":
+        db_session = session_factory()
+        try:
+            with db_session.begin():
+                ticket = (
+                    db_session.query(SupportTicket)
+                    .filter(SupportTicket.id == ticket_id)
+                    .first()
+                )
+                if ticket:
+                    delete_support_ticket_with_files(db_session, ticket)
+        finally:
+            db_session.close()
+
+    return redirect("support_admin_tickets")
+
+
+def support_admin_attachment(request, attachment_id):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        attachment = (
+            db_session.query(SupportTicketAttachment)
+            .filter(SupportTicketAttachment.id == attachment_id)
+            .first()
+        )
+        if not attachment:
+            raise Http404("Attachment not found")
+
+        path = (Path(settings.MEDIA_ROOT) / attachment.storage_path).resolve()
+        media_root = Path(settings.MEDIA_ROOT).resolve()
+        if media_root not in path.parents or not path.exists():
+            raise Http404("Attachment not found")
+
+        return FileResponse(
+            path.open("rb"),
+            content_type=attachment.content_type,
+            filename=attachment.file_name,
+        )
+    finally:
+        db_session.close()
 
 
 def login(request):
