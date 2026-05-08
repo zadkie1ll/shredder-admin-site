@@ -181,6 +181,22 @@
             font-size: 28px;
         }
 
+        .yandex-logo-mark {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #fc3f1d;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 22px;
+            line-height: 1;
+            font-family: Arial, sans-serif;
+            flex-shrink: 0;
+        }
+
         /* Анимация для состояния отправки */
         .hidden-step { display: none; }
 
@@ -226,10 +242,12 @@
                         </div>
                         <h2 class="text-2xl font-black uppercase tracking-tighter">Вход в кабинет</h2>
                         <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-2">
-                            {% if google_oauth_enabled and telegram_auth_enabled %}
-                                Быстрее всего через Google или Telegram
+                            {% if social_login_enabled %}
+                                Быстрее всего через аккаунт в один клик
                             {% elif google_oauth_enabled %}
                                 Быстрее всего через Google
+                            {% elif yandex_oauth_enabled %}
+                                Быстрее всего через Яндекс
                             {% elif telegram_auth_enabled %}
                                 Быстрее всего через Telegram
                             {% else %}
@@ -238,7 +256,7 @@
                         </p>
                     </div>
 
-                    {% if google_oauth_enabled or telegram_auth_enabled %}
+                    {% if social_login_enabled %}
                         <div class="space-y-3">
                     {% endif %}
 
@@ -257,6 +275,16 @@
                         </a>
                     {% endif %}
 
+                    {% if yandex_oauth_enabled %}
+                        <a href="{% url 'yandex_login' %}{% if tracking_params %}?{% for key, value in tracking_params.items %}{% if not forloop.first %}&{% endif %}{{ key }}={{ value|urlencode }}{% endfor %}{% endif %}"
+                           class="social-login-btn"
+                           aria-label="Войти через Яндекс"
+                           title="Войти через Яндекс">
+                            <span class="yandex-logo-mark" aria-hidden="true">Я</span>
+                            Войти через Яндекс
+                        </a>
+                    {% endif %}
+
                     {% if telegram_auth_enabled %}
                         <button type="button"
                                 class="telegram-login-shell"
@@ -268,7 +296,7 @@
                         </button>
                     {% endif %}
 
-                    {% if google_oauth_enabled or telegram_auth_enabled %}
+                    {% if social_login_enabled %}
                         </div>
 
                         <div class="flex items-center gap-4 my-6">

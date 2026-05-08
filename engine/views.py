@@ -72,6 +72,9 @@ TRACKING_PARAM_KEYS = ("ymid", "ts", "a")
 GOOGLE_OAUTH_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_OAUTH_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
+YANDEX_OAUTH_AUTH_URL = "https://oauth.yandex.com/authorize"
+YANDEX_OAUTH_TOKEN_URL = "https://oauth.yandex.com/token"
+YANDEX_OAUTH_USERINFO_URL = "https://login.yandex.ru/info"
 
 rwms_client = RwmsClientSync(settings.RWMS_HOST, settings.RWMS_PORT)
 SUPPORT_ADMIN_SESSION_KEY = "support_admin_authenticated"
@@ -559,11 +562,19 @@ def render_login(request, context=None, status=200):
         telegram_bot_id = settings.TELEGRAM_AUTH_BOT_TOKEN.split(":", 1)[0]
 
     payload["tracking_params"] = get_tracking_params(request)
-    payload["google_oauth_enabled"] = bool(
+    google_oauth_enabled = bool(
         settings.GOOGLE_OAUTH_CLIENT_ID and settings.GOOGLE_OAUTH_CLIENT_SECRET
     )
-    payload["telegram_auth_enabled"] = bool(
-        settings.TG_BOT_USERNAME and telegram_bot_id
+    yandex_oauth_enabled = bool(
+        settings.YANDEX_OAUTH_CLIENT_ID and settings.YANDEX_OAUTH_CLIENT_SECRET
+    )
+    telegram_auth_enabled = bool(settings.TG_BOT_USERNAME and telegram_bot_id)
+
+    payload["google_oauth_enabled"] = google_oauth_enabled
+    payload["yandex_oauth_enabled"] = yandex_oauth_enabled
+    payload["telegram_auth_enabled"] = telegram_auth_enabled
+    payload["social_login_enabled"] = any(
+        [google_oauth_enabled, yandex_oauth_enabled, telegram_auth_enabled]
     )
     payload["telegram_bot_username"] = settings.TG_BOT_USERNAME
     payload["telegram_bot_id"] = telegram_bot_id
@@ -872,6 +883,144 @@ def auth_by_google_callback(request):
         return redirect("dashboard")
     except Exception as e:
         logging.exception(f"google oauth user authorization failed for {email}: {e}")
+        return render_login(
+            request,
+            {"error": "Не удалось подготовить личный кабинет. Напишите в поддержку."},
+        )
+    finally:
+        db_session.close()
+
+
+def get_yandex_oauth_redirect_uri(request):
+    if settings.YANDEX_OAUTH_REDIRECT_URI:
+        return settings.YANDEX_OAUTH_REDIRECT_URI
+
+    return f"{get_current_base_url(request)}/login/yandex/callback/"
+
+
+def login_with_yandex(request):
+    if not settings.YANDEX_OAUTH_CLIENT_ID or not settings.YANDEX_OAUTH_CLIENT_SECRET:
+        logging.warning("yandex oauth login requested but credentials are missing")
+        return render_login(
+            request,
+            {"error": "Вход через Яндекс временно недоступен"},
+            status=503,
+        )
+
+    capture_tracking_params(request)
+    state = secrets.token_urlsafe(32)
+    request.session["yandex_oauth_state"] = state
+    request.session.modified = True
+
+    auth_url = (
+        YANDEX_OAUTH_AUTH_URL
+        + "?"
+        + urlencode(
+            {
+                "client_id": settings.YANDEX_OAUTH_CLIENT_ID,
+                "redirect_uri": get_yandex_oauth_redirect_uri(request),
+                "response_type": "code",
+                "state": state,
+                "force_confirm": "yes",
+            }
+        )
+    )
+
+    return redirect(auth_url)
+
+
+def auth_by_yandex_callback(request):
+    error = request.GET.get("error")
+    if error:
+        logging.warning(f"yandex oauth returned error: {error}")
+        return render_login(request, {"error": "Вход через Яндекс отменен"})
+
+    code = request.GET.get("code")
+    state = request.GET.get("state")
+    expected_state = request.session.pop("yandex_oauth_state", None)
+    request.session.modified = True
+
+    if not code or not state or not hmac.compare_digest(state, expected_state or ""):
+        logging.warning("invalid yandex oauth callback state")
+        return render_login(request, {"error": "Сессия входа истекла. Попробуйте еще раз."})
+
+    redirect_uri = get_yandex_oauth_redirect_uri(request)
+
+    try:
+        with httpx.Client(timeout=10) as client:
+            token_response = client.post(
+                YANDEX_OAUTH_TOKEN_URL,
+                data={
+                    "grant_type": "authorization_code",
+                    "code": code,
+                    "client_id": settings.YANDEX_OAUTH_CLIENT_ID,
+                    "client_secret": settings.YANDEX_OAUTH_CLIENT_SECRET,
+                    "redirect_uri": redirect_uri,
+                },
+            )
+            token_response.raise_for_status()
+            access_token = token_response.json().get("access_token")
+
+            if not access_token:
+                raise RuntimeError("yandex oauth token response has no access_token")
+
+            userinfo_response = client.get(
+                YANDEX_OAUTH_USERINFO_URL,
+                params={"format": "json"},
+                headers={"Authorization": f"OAuth {access_token}"},
+            )
+            userinfo_response.raise_for_status()
+            userinfo = userinfo_response.json()
+    except Exception as e:
+        logging.exception(f"yandex oauth login failed: {e}")
+        return render_login(
+            request,
+            {"error": "Не удалось войти через Яндекс. Попробуйте еще раз."},
+        )
+
+    email = (
+        userinfo.get("default_email")
+        or (userinfo.get("emails") or [None])[0]
+        or ""
+    ).lower().strip()
+    if not email:
+        logging.warning("yandex oauth userinfo has no email")
+        return render_login(
+            request,
+            {"error": "Яндекс не вернул email аккаунта. Проверьте права приложения."},
+        )
+
+    db_session = session_factory()
+    try:
+        with db_session.begin():
+            user = db_session.query(User).filter(User.email == email).first()
+
+            if not user:
+                user = create_site_user(
+                    db_session,
+                    email,
+                    request,
+                    creation_channel="site_yandex_oauth",
+                )
+            else:
+                registration_context = get_registration_context(request, db_session)
+                sync_existing_user_tracking(
+                    db_session,
+                    user,
+                    registration_context["traffic_source"],
+                    registration_context["ymid"],
+                )
+
+            add_event_log_once(
+                db_session,
+                user,
+                analytics_event.FirstSuccessfulLogin(login_method="yandex_oauth"),
+            )
+
+        authorize_user_session(request, user)
+        return redirect("dashboard")
+    except Exception as e:
+        logging.exception(f"yandex oauth user authorization failed for {email}: {e}")
         return render_login(
             request,
             {"error": "Не удалось подготовить личный кабинет. Напишите в поддержку."},
