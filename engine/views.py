@@ -2,6 +2,8 @@ import uuid
 import hmac
 import hashlib
 import logging
+import base64
+import json
 import resend
 import secrets
 import httpx
@@ -581,6 +583,19 @@ def render_login(request, context=None, status=200):
     payload["telegram_auth_url"] = (
         f"{get_current_base_url(request)}{reverse('telegram_widget_auth')}"
     )
+    payload["telegram_direct_auth_url"] = (
+        "https://oauth.telegram.org/auth?"
+        + urlencode(
+            {
+                "bot_id": telegram_bot_id,
+                "origin": get_current_base_url(request),
+                "return_to": payload["telegram_auth_url"],
+                "request_access": "write",
+            }
+        )
+        if telegram_auth_enabled
+        else ""
+    )
     if context:
         payload.update(context)
     return render(request, "login.html", payload, status=status)
@@ -648,6 +663,23 @@ def verify_telegram_widget_auth(auth_data):
     ).hexdigest()
 
     return hmac.compare_digest(calculated_hash, received_hash)
+
+
+def decode_telegram_auth_result(raw_result):
+    if not raw_result:
+        return None
+
+    try:
+        normalized = raw_result.replace("-", "+").replace("_", "/")
+        normalized += "=" * (-len(normalized) % 4)
+        decoded = base64.b64decode(normalized).decode()
+        result = json.loads(decoded)
+        if isinstance(result, dict):
+            return {str(key): str(value) for key, value in result.items()}
+    except Exception as e:
+        logging.warning("failed to decode telegram auth result: %s", e)
+
+    return None
 
 
 def send_magic_link_email(email, link, *, subject=None, template_context=None):
@@ -1116,8 +1148,16 @@ def auth_by_telegram_widget(request):
         )
 
     auth_data = request.GET.dict()
+    telegram_auth_result = auth_data.get("tgAuthResult")
+    decoded_auth_data = decode_telegram_auth_result(telegram_auth_result)
+    if decoded_auth_data:
+        auth_data = decoded_auth_data
+
     if not verify_telegram_widget_auth(auth_data):
-        logging.warning("telegram widget auth failed signature check")
+        logging.warning(
+            "telegram widget auth failed signature check, keys=%s",
+            sorted(auth_data.keys()),
+        )
         return render_login(request, {"error": "Не удалось подтвердить вход через Telegram."})
 
     try:

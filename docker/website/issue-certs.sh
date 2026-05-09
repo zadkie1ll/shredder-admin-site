@@ -45,6 +45,18 @@ fi
 
 mkdir -p "${SCRIPT_DIR}/letsencrypt" "${SCRIPT_DIR}/certbot-work" "${SCRIPT_DIR}/certbot-logs"
 
+CERT_PATH="${SCRIPT_DIR}/letsencrypt/live/${ORIGIN_CERT_NAME}/fullchain.pem"
+if [[ -f "${CERT_PATH}" ]] && openssl x509 -checkend 0 -noout -in "${CERT_PATH}" >/dev/null 2>&1; then
+    echo "Certificate ${ORIGIN_CERT_NAME} already exists and is not expired. Skipping issue."
+    exit 0
+fi
+
+if [[ -f "${CERT_PATH}" ]]; then
+    echo "Certificate ${ORIGIN_CERT_NAME} exists but is expired. Issuing a new certificate."
+else
+    echo "Certificate ${ORIGIN_CERT_NAME} not found. Issuing a new certificate."
+fi
+
 domain_args=()
 IFS=',' read -r -a domains <<< "${ORIGIN_CERTBOT_DOMAINS}"
 for domain in "${domains[@]}"; do

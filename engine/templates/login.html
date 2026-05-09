@@ -64,7 +64,7 @@
             inset: 0;
             background-image:
                 linear-gradient(rgba(13, 13, 13, 0.35), rgba(13, 13, 13, 0.65)),
-                url("{% static 'img/bg3.png' %}");
+                url("{% static 'img/bg10.png' %}");
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
@@ -286,14 +286,13 @@
                     {% endif %}
 
                     {% if telegram_auth_enabled %}
-                        <button type="button"
-                                class="telegram-login-shell"
-                                onclick="loginWithTelegram()"
-                                aria-label="Войти через Telegram"
-                                title="Войти через Telegram">
+                        <a href="{{ telegram_direct_auth_url }}"
+                           class="telegram-login-shell"
+                           aria-label="Войти через Telegram"
+                           title="Войти через Telegram">
                             <i class="fab fa-telegram-plane"></i>
                             Войти через Telegram
-                        </button>
+                        </a>
                     {% endif %}
 
                     {% if social_login_enabled %}
@@ -318,7 +317,7 @@
                         {% endif %}
                         <div class="text-left">
                             <label class="text-[10px] font-black uppercase text-gray-400 ml-4 mb-2 block tracking-widest">Ваш Email</label>
-                            <input type="email" id="email" name="email" placeholder="pirate@monkey-island.com" required 
+                            <input type="email" id="email" name="email" placeholder="Введите Ваш email" required 
                                    class="w-full input-field px-6 py-4 rounded-2xl font-bold outline-none">
                         </div>
 
@@ -352,12 +351,18 @@
         </div>
     </div>
 
-    {% if telegram_auth_enabled %}
-        <script async src="https://telegram.org/js/telegram-widget.js?22"></script>
-    {% endif %}
-
     <script>
         const mirrorSourceUrl = "{{ pwa_mirror_source_url|escapejs }}";
+
+        (function handleTelegramAuthFragment() {
+            const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+            const tgAuthResult = hashParams.get('tgAuthResult');
+            if (!tgAuthResult) return;
+
+            const callbackUrl = new URL('{{ telegram_auth_url|escapejs }}');
+            callbackUrl.searchParams.set('tgAuthResult', tgAuthResult);
+            window.location.replace(callbackUrl.toString());
+        })();
 
         function setFullHeight() {
             const vh = window.innerHeight * 0.01;
@@ -427,33 +432,6 @@
         }
         window.addEventListener('orientationchange', setFullHeight);
         setFullHeight();
-
-        {% if telegram_auth_enabled %}
-        function loginWithTelegram() {
-            if (!window.Telegram || !window.Telegram.Login) {
-                alert('Telegram вход еще загружается. Попробуйте еще раз.');
-                return;
-            }
-
-            window.Telegram.Login.auth(
-                {
-                    bot_id: '{{ telegram_bot_id }}',
-                    request_access: 'write'
-                },
-                function(user) {
-                    if (!user) {
-                        return;
-                    }
-
-                    const authUrl = new URL('{{ telegram_auth_url|escapejs }}');
-                    Object.keys(user).forEach(function(key) {
-                        authUrl.searchParams.set(key, user[key]);
-                    });
-                    window.location.href = authUrl.toString();
-                }
-            );
-        }
-        {% endif %}
 
         document.getElementById('magicLinkForm').addEventListener('submit', async function(e) {
             e.preventDefault();
