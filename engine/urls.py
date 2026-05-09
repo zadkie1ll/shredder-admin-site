@@ -15,6 +15,7 @@ urlpatterns = [
     path("support-admin/login/", views.support_admin_login, name="support_admin_login"),
     path("support-admin/logout/", views.support_admin_logout, name="support_admin_logout"),
     path("support-admin/", views.support_admin_tickets, name="support_admin_tickets"),
+    path("support-admin/tickets-json/", views.support_admin_tickets_json, name="support_admin_tickets_json"),
     path("support-admin/tickets/<int:ticket_id>/", views.support_admin_ticket_detail, name="support_admin_ticket_detail"),
     path("support-admin/tickets/<int:ticket_id>/messages/", views.support_admin_create_message, name="support_admin_create_message"),
     path("support-admin/tickets/<int:ticket_id>/messages-json/", views.support_admin_ticket_messages_json, name="support_admin_ticket_messages_json"),

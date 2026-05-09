@@ -2983,6 +2983,63 @@
             `;
         }
 
+        let supportKnownMessageIds = new Set();
+        let supportSoundReady = false;
+        let supportAudioContext = null;
+
+        async function unlockSupportSound(playTest = false) {
+            supportSoundReady = true;
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+
+            supportAudioContext = supportAudioContext || new AudioContextClass();
+            if (supportAudioContext.state === 'suspended') {
+                await supportAudioContext.resume().catch(() => {});
+            }
+            const button = document.getElementById('support-sound-enable');
+            if (button) button.remove();
+            if (playTest) {
+                playSupportMessageSound();
+            }
+        }
+
+        function installSupportSoundButton() {
+            if (supportSoundReady || document.getElementById('support-sound-enable')) return;
+
+            const button = document.createElement('button');
+            button.type = 'button';
+            button.id = 'support-sound-enable';
+            button.className = 'fixed right-5 bottom-24 z-[70] rounded-2xl border border-[#ffc700]/30 bg-[#ffc700] px-4 py-3 text-[10px] font-black uppercase text-black shadow-2xl';
+            button.innerHTML = '<i class="fas fa-volume-up mr-2"></i>Включить звук';
+            button.addEventListener('click', () => unlockSupportSound(true));
+            document.body.appendChild(button);
+        }
+
+        function playSupportMessageSound() {
+            if (!supportSoundReady) return;
+
+            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+            if (!AudioContextClass) return;
+
+            const audioContext = supportAudioContext || new AudioContextClass();
+            supportAudioContext = audioContext;
+            const now = audioContext.currentTime;
+            const gain = audioContext.createGain();
+            gain.connect(audioContext.destination);
+            gain.gain.setValueAtTime(0.0001, now);
+            gain.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
+
+            [880, 1174].forEach((frequency, index) => {
+                const oscillator = audioContext.createOscillator();
+                oscillator.type = 'sine';
+                oscillator.frequency.setValueAtTime(frequency, now + index * 0.09);
+                oscillator.connect(gain);
+                oscillator.start(now + index * 0.09);
+                oscillator.stop(now + index * 0.09 + 0.16);
+            });
+        }
+
         function renderSupportMessages(messages) {
             const chat = document.getElementById('support-chat-scroll');
             if (!chat) return;
@@ -3015,7 +3072,15 @@
                 if (!response.ok) return;
                 const payload = await response.json();
                 if (payload.status === 'ok') {
-                    renderSupportMessages(payload.messages || []);
+                    const messages = payload.messages || [];
+                    const hasNewSupportMessage = messages.some((message) => (
+                        !message.is_user && !supportKnownMessageIds.has(String(message.id))
+                    ));
+                    renderSupportMessages(messages);
+                    supportKnownMessageIds = new Set(messages.map((message) => String(message.id)));
+                    if (hasNewSupportMessage) {
+                        playSupportMessageSound();
+                    }
                 }
             } catch (error) {
                 console.warn('Не удалось обновить чат поддержки', error);
@@ -3070,6 +3135,9 @@
             updateSubscriptionOverview();
             setupSupportAjaxForm(document.getElementById('support-message-form'));
             setupSupportAjaxForm(document.getElementById('support-create-form'));
+            if (document.getElementById('tab-support')) {
+                installSupportSoundButton();
+            }
 
             const initialTab = new URLSearchParams(window.location.search).get('tab');
             if (initialTab) {
@@ -3079,12 +3147,18 @@
             const supportChat = document.getElementById('support-chat-scroll');
             if (supportChat) {
                 supportChat.scrollTop = supportChat.scrollHeight;
+                supportChat.querySelectorAll('[data-message-id]').forEach((node) => {
+                    supportKnownMessageIds.add(String(node.dataset.messageId));
+                });
             }
 
             if (document.getElementById('support-message-form')) {
-                setInterval(refreshSupportMessages, 4000);
+                setInterval(refreshSupportMessages, 2000);
             }
         });
+
+        window.addEventListener('pointerdown', () => unlockSupportSound(false), {once: true});
+        window.addEventListener('keydown', () => unlockSupportSound(false), {once: true});
 
         // ЛОГИКА ТАРИФОВ (Full Page)
         function showTariffs() {

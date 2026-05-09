@@ -1724,6 +1724,37 @@ def support_admin_tickets(request):
         return auth_response
 
     status_filter = request.GET.get("status", "open")
+    tickets_data = load_support_admin_tickets(status_filter)
+
+    return render(
+        request,
+        "support_admin_tickets.html",
+        {
+            "tickets": tickets_data["tickets"],
+            "status_filter": tickets_data["status_filter"],
+            "open_count": tickets_data["open_count"],
+            "closed_count": tickets_data["closed_count"],
+            "support_status_open": SupportTicketStatus.OPEN,
+        },
+    )
+
+
+def support_admin_ticket_payload(ticket, user):
+    return {
+        "id": ticket.id,
+        "status": ticket.status.value,
+        "is_open": ticket.status == SupportTicketStatus.OPEN,
+        "subject": ticket.subject,
+        "updated_at": ticket.updated_at.strftime("%d.%m.%Y %H:%M"),
+        "updated_at_iso": ticket.updated_at.isoformat() if ticket.updated_at else "",
+        "user_id": user.id,
+        "email": user.email or "",
+        "telegram_id": str(user.telegram_id or ""),
+        "url": reverse("support_admin_ticket_detail", args=[ticket.id]),
+    }
+
+
+def load_support_admin_tickets(status_filter):
     db_session = session_factory()
     try:
         query = db_session.query(SupportTicket, User).join(
@@ -1747,19 +1778,35 @@ def support_admin_tickets(request):
             .filter(SupportTicket.status == SupportTicketStatus.CLOSED)
             .scalar()
         )
-    finally:
-        db_session.close()
 
-    return render(
-        request,
-        "support_admin_tickets.html",
-        {
+        return {
             "tickets": tickets,
+            "ticket_payloads": [
+                support_admin_ticket_payload(ticket, user)
+                for ticket, user in tickets
+            ],
             "status_filter": status_filter,
             "open_count": open_count,
             "closed_count": closed_count,
-            "support_status_open": SupportTicketStatus.OPEN,
-        },
+        }
+    finally:
+        db_session.close()
+
+
+def support_admin_tickets_json(request):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    tickets_data = load_support_admin_tickets(request.GET.get("status", "open"))
+    return JsonResponse(
+        {
+            "status": "ok",
+            "status_filter": tickets_data["status_filter"],
+            "open_count": tickets_data["open_count"],
+            "closed_count": tickets_data["closed_count"],
+            "tickets": tickets_data["ticket_payloads"],
+        }
     )
 
 
