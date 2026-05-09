@@ -1,4 +1,5 @@
 import sys
+import json
 import dj_database_url
 from pathlib import Path
 from urllib.parse import urlparse
@@ -45,6 +46,49 @@ def csv_domains(value):
     ]
 
 
+def telegram_auth_bots(value):
+    value = value.strip()
+    if not value:
+        return {}
+
+    if value.startswith("{"):
+        parsed = json.loads(value)
+        bots = {}
+        for domain, bot in parsed.items():
+            normalized_domain = normalize_domain_entry(domain)
+            username = str(bot.get("username", "")).strip().lstrip("@")
+            token = str(bot.get("token", "")).strip()
+            if normalized_domain and username and token:
+                bots[normalized_domain] = {
+                    "username": username,
+                    "token": token,
+                }
+        return bots
+
+    bots = {}
+    for item in value.split(","):
+        if not item.strip():
+            continue
+
+        parts = [part.strip() for part in item.split("|", 2)]
+        if len(parts) != 3:
+            raise ValueError(
+                "TELEGRAM_AUTH_BOTS entries must use "
+                "domain|bot_username|bot_token format"
+            )
+
+        domain, username, token = parts
+        normalized_domain = normalize_domain_entry(domain)
+        username = username.lstrip("@")
+        if normalized_domain and username and token:
+            bots[normalized_domain] = {
+                "username": username,
+                "token": token,
+            }
+
+    return bots
+
+
 PROMO_DOMAINS = config(
     "PROMO_DOMAINS",
     default="localhost,127.0.0.1",
@@ -70,6 +114,7 @@ TELEGRAM_AUTH_BOT_TOKEN = config(
     "TELEGRAM_AUTH_BOT_TOKEN",
     default=config("MI_VPN_BOT_TOKEN", default=""),
 )
+TELEGRAM_AUTH_BOTS = config("TELEGRAM_AUTH_BOTS", default="", cast=telegram_auth_bots)
 SITE_TRIAL_PERIOD_DAYS = config("SITE_TRIAL_PERIOD_DAYS", default=7, cast=int)
 SITE_REFERRAL_TRIAL_PERIOD_DAYS = config(
     "SITE_REFERRAL_TRIAL_PERIOD_DAYS",

@@ -118,6 +118,25 @@ def get_current_base_url(request):
     return f"{scheme}://{request.get_host()}"
 
 
+def get_telegram_auth_bot(host):
+    normalized_host = normalize_host(host)
+    configured_bot = settings.TELEGRAM_AUTH_BOTS.get(normalized_host)
+    if configured_bot:
+        return configured_bot
+
+    if settings.TG_BOT_USERNAME and settings.TELEGRAM_AUTH_BOT_TOKEN:
+        return {
+            "username": settings.TG_BOT_USERNAME.lstrip("@"),
+            "token": settings.TELEGRAM_AUTH_BOT_TOKEN,
+        }
+
+    return None
+
+
+def get_telegram_bot_id(bot):
+    return bot["token"].split(":", 1)[0]
+
+
 def get_pwa_context():
     return {
         "pwa_mirror_source_url": settings.PWA_MIRROR_SOURCE_URL,
@@ -559,9 +578,12 @@ def create_site_user(
 def render_login(request, context=None, status=200):
     capture_tracking_params(request)
     payload = get_pwa_context()
+    telegram_bot = get_telegram_auth_bot(request.get_host())
     telegram_bot_id = ""
-    if settings.TELEGRAM_AUTH_BOT_TOKEN:
-        telegram_bot_id = settings.TELEGRAM_AUTH_BOT_TOKEN.split(":", 1)[0]
+    telegram_bot_username = ""
+    if telegram_bot:
+        telegram_bot_id = get_telegram_bot_id(telegram_bot)
+        telegram_bot_username = telegram_bot["username"]
 
     payload["tracking_params"] = get_tracking_params(request)
     google_oauth_enabled = bool(
@@ -570,7 +592,7 @@ def render_login(request, context=None, status=200):
     yandex_oauth_enabled = bool(
         settings.YANDEX_OAUTH_CLIENT_ID and settings.YANDEX_OAUTH_CLIENT_SECRET
     )
-    telegram_auth_enabled = bool(settings.TG_BOT_USERNAME and telegram_bot_id)
+    telegram_auth_enabled = bool(telegram_bot_username and telegram_bot_id)
 
     payload["google_oauth_enabled"] = google_oauth_enabled
     payload["yandex_oauth_enabled"] = yandex_oauth_enabled
@@ -578,18 +600,19 @@ def render_login(request, context=None, status=200):
     payload["social_login_enabled"] = any(
         [google_oauth_enabled, yandex_oauth_enabled, telegram_auth_enabled]
     )
-    payload["telegram_bot_username"] = settings.TG_BOT_USERNAME
+    payload["telegram_bot_username"] = telegram_bot_username
     payload["telegram_bot_id"] = telegram_bot_id
     payload["telegram_auth_url"] = (
         f"{get_current_base_url(request)}{reverse('telegram_widget_auth')}"
     )
+    payload["telegram_return_url"] = f"{get_current_base_url(request)}{reverse('login')}"
     payload["telegram_direct_auth_url"] = (
         "https://oauth.telegram.org/auth?"
         + urlencode(
             {
                 "bot_id": telegram_bot_id,
                 "origin": get_current_base_url(request),
-                "return_to": payload["telegram_auth_url"],
+                "return_to": payload["telegram_return_url"],
                 "request_access": "write",
             }
         )
@@ -632,7 +655,7 @@ def hash_telegram_login_token(token):
     return hashlib.sha256(payload).hexdigest()
 
 
-def verify_telegram_widget_auth(auth_data):
+def verify_telegram_widget_auth(auth_data, bot_token):
     received_hash = auth_data.get("hash")
     auth_date = auth_data.get("auth_date")
 
@@ -655,7 +678,7 @@ def verify_telegram_widget_auth(auth_data):
     data_check_string = "\n".join(
         f"{key}={check_data[key]}" for key in sorted(check_data)
     )
-    secret_key = hashlib.sha256(settings.TELEGRAM_AUTH_BOT_TOKEN.encode()).digest()
+    secret_key = hashlib.sha256(bot_token.encode()).digest()
     calculated_hash = hmac.new(
         secret_key,
         data_check_string.encode(),
@@ -1139,7 +1162,8 @@ def auth_by_telegram_link(request, token):
 
 
 def auth_by_telegram_widget(request):
-    if not settings.TELEGRAM_AUTH_BOT_TOKEN:
+    telegram_bot = get_telegram_auth_bot(request.get_host())
+    if not telegram_bot:
         logging.warning("telegram widget auth requested but bot token is missing")
         return render_login(
             request,
@@ -1153,7 +1177,10 @@ def auth_by_telegram_widget(request):
     if decoded_auth_data:
         auth_data = decoded_auth_data
 
-    if not verify_telegram_widget_auth(auth_data):
+    if not auth_data:
+        return render_login(request)
+
+    if not verify_telegram_widget_auth(auth_data, telegram_bot["token"]):
         logging.warning(
             "telegram widget auth failed signature check, keys=%s",
             sorted(auth_data.keys()),

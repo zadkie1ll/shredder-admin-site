@@ -102,6 +102,10 @@ EMAIL_HOST_USER=login@example.com
 EMAIL_HOST_PASSWORD=replace-me
 
 TG_BOT_USERNAME=monkeyislandvpnbot
+TELEGRAM_AUTH_BOT_TOKEN=replace-me
+# Опционально: разные Telegram Login-боты для разных доменов.
+# Формат: domain|bot_username|bot_token,domain2|bot_username2|bot_token2
+TELEGRAM_AUTH_BOTS=monkey-island-vps.com|monkeyislandvpsauthbot|replace-me,monkey-island-vpn.com|monkeyislandvpnauthbot|replace-me
 
 ORIGIN_CERT_NAME=origin.teaworld.uk
 ORIGIN_CERTBOT_DOMAINS=origin.teaworld.uk
