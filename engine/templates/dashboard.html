@@ -961,6 +961,23 @@
                             </section>
                         {% endif %}
 
+                        {% if show_email_bind_banner %}
+                            <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-[#ffc700]/40 bg-[#ffc700]/5">
+                                <div class="flex items-start gap-4">
+                                    <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                        <i class="fas fa-envelope text-lg"></i>
+                                    </div>
+                                    <div>
+                                        <h3 class="text-lg font-black mb-2">Привяжи email, чтобы не потерять доступ</h3>
+                                        <p class="text-gray-500 text-sm font-bold leading-relaxed">Почта поможет не потерять доступ к подписке, получать письма об оплате и быстро входить в кабинет без Telegram.</p>
+                                    </div>
+                                </div>
+                                <button type="button" onclick="openEmailBindSheet()" class="setup-link-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
+                                    Привязать email
+                                </button>
+                            </section>
+                        {% endif %}
+
                         {% if show_expiring_banner %}
                             <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-red-400/30 bg-red-400/5">
                                 <div class="flex items-start gap-4">
@@ -1703,6 +1720,51 @@
             <button onclick="toggleRefSheet()" class="w-full py-4 text-gray-500 font-black text-sm hover:text-[#ffc700] transition-colors">
                 Закрыть
             </button>
+        </div>
+    </div>
+
+    <div id="email-bind-sheet" class="fixed inset-0 z-[9999] hidden flex items-end justify-center">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm z-[9998]" onclick="closeEmailBindSheet()"></div>
+
+        <div class="bottom-sheet-content fixed inset-x-0 bottom-0 bg-[#111113] rounded-t-[2rem] border-t border-white/10 p-5 md:p-8 transform translate-y-full transition-transform duration-300 ease-out z-[9999]
+                    lg:left-1/2 lg:-translate-x-1/2 lg:max-w-xl" id="email-bind-content">
+            <div class="setup-shell overview-hero-card !p-5 md:!p-6 !mb-5">
+                <div class="relative z-10 flex items-start gap-4">
+                    <div class="w-12 h-12 bg-[#ffc700]/10 border border-[#ffc700]/20 rounded-2xl flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                        <i class="fas fa-envelope text-lg"></i>
+                    </div>
+                    <div>
+                        <h4 class="text-xl font-black mb-2">Подтвердить email</h4>
+                        <p class="text-gray-500 text-sm font-bold leading-relaxed">Отправим письмо со ссылкой. После подтверждения почта привяжется к кабинету.</p>
+                    </div>
+                </div>
+            </div>
+
+            {% if email_bind_modal.info %}
+                <div class="mb-5 rounded-2xl border border-[#ffc700]/30 bg-[#ffc700]/10 px-5 py-4">
+                    <p class="text-[#ffc700] text-xs font-bold leading-relaxed">{{ email_bind_modal.info }}</p>
+                </div>
+            {% endif %}
+
+            <form action="{% url 'update_email' %}" method="POST" class="space-y-5">
+                {% csrf_token %}
+                <div>
+                    <label class="text-[10px] font-black uppercase text-gray-500 ml-4 mb-2 block tracking-widest">Ваш Email</label>
+                    <input type="email" name="email" placeholder="pirate@monkey-island.com" value="{{ email_bind_modal.email|default:'' }}" required
+                           class="w-full bg-black/60 border border-white/10 rounded-2xl px-6 py-5 text-white outline-none focus:border-[#ffc700]/50 transition">
+                    {% if email_bind_modal.error %}
+                        <p class="text-red-400 text-xs font-bold mt-3 ml-4">{{ email_bind_modal.error }}</p>
+                    {% endif %}
+                </div>
+
+                <button type="submit" class="w-full bg-[#ffc700] hover:bg-[#ffd740] text-black py-5 rounded-2xl font-black uppercase text-xs tracking-widest transition-all active:scale-95 shadow-lg shadow-[#ffc700]/20">
+                    Отправить письмо подтверждения
+                </button>
+
+                <button type="button" onclick="closeEmailBindSheet()" class="w-full py-3 text-gray-500 font-black text-sm hover:text-[#ffc700] transition-colors">
+                    Закрыть
+                </button>
+            </form>
         </div>
     </div>
 
@@ -3214,6 +3276,32 @@
                 setTimeout(() => sheet.classList.add('hidden'), 300);
             }
         }
+
+        function openEmailBindSheet() {
+            const sheet = document.getElementById('email-bind-sheet');
+            const content = document.getElementById('email-bind-content');
+            if (!sheet || !content) return;
+
+            sheet.classList.remove('hidden');
+            setTimeout(() => content.classList.replace('translate-y-full', 'translate-y-0'), 10);
+            const input = sheet.querySelector('input[name="email"]');
+            if (input) {
+                setTimeout(() => input.focus(), 320);
+            }
+        }
+
+        function closeEmailBindSheet() {
+            const sheet = document.getElementById('email-bind-sheet');
+            const content = document.getElementById('email-bind-content');
+            if (!sheet || !content) return;
+
+            content.classList.replace('translate-y-0', 'translate-y-full');
+            setTimeout(() => sheet.classList.add('hidden'), 300);
+        }
+
+        {% if email_bind_modal.open %}
+            document.addEventListener('DOMContentLoaded', openEmailBindSheet);
+        {% endif %}
 
         // Обновленная функция копирования (чтобы text ready)
         function copyRefLink(event, inputId) {

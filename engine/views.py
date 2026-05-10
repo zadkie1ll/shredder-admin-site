@@ -26,6 +26,9 @@ from django.contrib.auth import BACKEND_SESSION_KEY
 from django.contrib.auth import HASH_SESSION_KEY
 from django.contrib.auth.decorators import login_required
 from django.core.mail import send_mail
+from django.core import signing
+from django.core.signing import BadSignature
+from django.core.signing import SignatureExpired
 from django.urls import reverse
 from django.templatetags.static import static
 from django.template.loader import render_to_string
@@ -81,6 +84,8 @@ YANDEX_OAUTH_USERINFO_URL = "https://login.yandex.ru/info"
 rwms_client = RwmsClientSync(settings.RWMS_HOST, settings.RWMS_PORT)
 SUPPORT_ADMIN_SESSION_KEY = "support_admin_authenticated"
 SUPPORT_ATTACHMENT_ALLOWED_PREFIXES = ("image/", "video/")
+EMAIL_CONFIRMATION_SALT = "dashboard-email-confirmation"
+EMAIL_CONFIRMATION_MAX_AGE_SECONDS = 15 * 60
 
 
 def normalize_host(host):
@@ -628,7 +633,7 @@ def render_login(request, context=None, status=200):
     return render(request, "login.html", payload, status=status)
 
 
-def render_collect_email(request, user, error=None, email=""):
+def render_collect_email(request, user, error=None, email="", info=None):
     return render(
         request,
         "dashboard_collect_email.html",
@@ -636,6 +641,7 @@ def render_collect_email(request, user, error=None, email=""):
             "user": user,
             "error": error,
             "email": email,
+            "info": info,
         },
     )
 
@@ -746,6 +752,39 @@ def send_magic_link_email(email, link, *, subject=None, template_context=None):
             html_message=html_message,
             fail_silently=False,
         )
+
+
+def build_email_confirmation_token(user_id, email):
+    return signing.dumps(
+        {
+            "user_id": user_id,
+            "email": email,
+        },
+        salt=EMAIL_CONFIRMATION_SALT,
+    )
+
+
+def load_email_confirmation_token(token):
+    return signing.loads(
+        token,
+        salt=EMAIL_CONFIRMATION_SALT,
+        max_age=EMAIL_CONFIRMATION_MAX_AGE_SECONDS,
+    )
+
+
+def send_email_confirmation_email(email, link):
+    send_magic_link_email(
+        email,
+        link,
+        subject="Подтверждение email в Monkey Island",
+        template_context={
+            "title": "Подтвердите email",
+            "intro": "Вы привязываете этот email к личному кабинету Monkey Island.",
+            "note": "Нажмите кнопку ниже, чтобы подтвердить почту. Ссылка действует 15 минут.",
+            "button_text": "Подтвердить почту",
+            "footer": "Если вы не привязывали почту, просто проигнорируйте это письмо.",
+        },
+    )
 
 
 def send_magic_link(request):
@@ -1297,10 +1336,6 @@ def dashboard(request):
 
     tg_bot = settings.TG_BOT_USERNAME
 
-    # Если зашел из ТГ (уже есть ID), но почты нет — просим почту
-    if user.telegram_id and not user.email:
-        return render_collect_email(request, user)
-
     # Если зашел по почте и ТГ еще не привязан — готовим ссылку для привязки
     tg_bind_link = None
     if not user.telegram_id:
@@ -1388,6 +1423,7 @@ def dashboard(request):
     expiring_banner_threshold_seconds = 3 * 24 * 60 * 60
     show_expiring_banner = 0 < seconds_left <= expiring_banner_threshold_seconds
     show_telegram_bind_banner = not user.telegram_id
+    show_email_bind_banner = not user.email
     show_not_connected_banner = False
 
     if seconds_left > 0 and traffic_progress and not traffic_progress.passed_0:
@@ -1405,6 +1441,9 @@ def dashboard(request):
         show_telegram_bind_banner = (
             request.GET.get("debug_no_tg") == "1" or show_telegram_bind_banner
         )
+        show_email_bind_banner = (
+            request.GET.get("debug_no_email") == "1" or show_email_bind_banner
+        )
         show_not_connected_banner = (
             request.GET.get("debug_nc") == "1" or show_not_connected_banner
         )
@@ -1420,6 +1459,10 @@ def dashboard(request):
         show_not_connected_banner = False
     elif show_not_connected_banner:
         show_expiring_banner = False
+
+    email_bind_modal = request.session.pop("email_bind_modal", None)
+    if email_bind_modal:
+        request.session.modified = True
 
     if seconds_left <= 0:
         time_left_value = 0
@@ -1461,8 +1504,10 @@ def dashboard(request):
             "time_left_value": time_left_value,
             "time_left_label": time_left_label,
             "show_telegram_bind_banner": show_telegram_bind_banner,
+            "show_email_bind_banner": show_email_bind_banner,
             "show_expiring_banner": show_expiring_banner,
             "show_not_connected_banner": show_not_connected_banner,
+            "email_bind_modal": email_bind_modal,
             "use_new_setup_flow": settings.USE_NEW_SETUP_FLOW,
             "support_ticket": support_ticket,
             "support_messages": support_messages,
@@ -1481,15 +1526,15 @@ def update_email(request):
 
     new_email = request.POST.get("email", "").lower().strip()
     if not new_email:
-        return render_collect_email(
-            request,
-            request.user,
-            error="Введите email.",
-            email=new_email,
-        )
+        request.session["email_bind_modal"] = {
+            "open": True,
+            "error": "Введите email.",
+            "email": new_email,
+        }
+        request.session.modified = True
+        return redirect("dashboard")
 
     session = session_factory()
-    db_user = None
     try:
         db_user = session.query(User).filter(User.id == request.user.id).first()
         if not db_user:
@@ -1503,46 +1548,129 @@ def update_email(request):
             .first()
         )
         if existing_user:
-            return render_collect_email(
-                request,
-                request.user,
-                error="Этот email уже привязан к другому аккаунту.",
-                email=new_email,
-            )
+            request.session["email_bind_modal"] = {
+                "open": True,
+                "error": "Этот email уже привязан к другому аккаунту.",
+                "email": new_email,
+            }
+            request.session.modified = True
+            return redirect("dashboard")
+
+        token = build_email_confirmation_token(db_user.id, new_email)
+        link = f"{get_current_base_url(request)}{reverse('confirm_email', args=[token])}"
+        send_email_confirmation_email(new_email, link)
+
+        request.session["email_bind_modal"] = {
+            "open": True,
+            "email": new_email,
+            "info": (
+                "Мы отправили письмо с подтверждением. "
+                "Откройте ссылку из письма, чтобы завершить привязку."
+            ),
+        }
+        request.session.modified = True
+        return redirect("dashboard")
+    except Exception as e:
+        session.rollback()
+        logging.exception(
+            f"failed to send email confirmation for user {request.user.id}: {e}"
+        )
+        request.session["email_bind_modal"] = {
+            "open": True,
+            "error": "Не удалось отправить письмо подтверждения. Попробуйте еще раз.",
+            "email": new_email,
+        }
+        request.session.modified = True
+        return redirect("dashboard")
+    finally:
+        session.close()
+
+
+def confirm_email(request, token):
+    try:
+        payload = load_email_confirmation_token(token)
+    except SignatureExpired:
+        request.session["email_bind_modal"] = {
+            "open": True,
+            "error": "Ссылка подтверждения истекла. Введите email еще раз.",
+        }
+        request.session.modified = True
+        return redirect("dashboard" if request.user.is_authenticated else "login")
+    except BadSignature:
+        request.session["email_bind_modal"] = {
+            "open": True,
+            "error": "Ссылка подтверждения неверна. Введите email еще раз.",
+        }
+        request.session.modified = True
+        return redirect("dashboard" if request.user.is_authenticated else "login")
+
+    user_id = payload.get("user_id")
+    new_email = (payload.get("email") or "").lower().strip()
+    if not user_id or not new_email:
+        request.session["email_bind_modal"] = {
+            "open": True,
+            "error": "Ссылка подтверждения неверна. Введите email еще раз.",
+        }
+        request.session.modified = True
+        return redirect("dashboard" if request.user.is_authenticated else "login")
+
+    session = session_factory()
+    username = None
+    try:
+        db_user = session.query(User).filter(User.id == user_id).first()
+        if not db_user:
+            logging.warning(f"missing user {user_id} while confirming email")
+            return redirect("login")
+
+        existing_user = (
+            session.query(User)
+            .filter(User.email == new_email, User.id != db_user.id)
+            .first()
+        )
+        if existing_user:
+            request.session["email_bind_modal"] = {
+                "open": True,
+                "error": "Этот email уже привязан к другому аккаунту.",
+                "email": new_email,
+            }
+            request.session.modified = True
+            return redirect("dashboard" if request.user.is_authenticated else "login")
 
         db_user.email = new_email
+        username = db_user.username
         session.commit()
 
-        # Обновляем email в текущем объекте пользователя в памяти
-        request.user.email = new_email
-        username = db_user.username
-
+        if request.user.is_authenticated and request.user.id == db_user.id:
+            request.user.email = new_email
+        else:
+            authorize_user_session(request, db_user)
     except IntegrityError:
         session.rollback()
         logging.warning(
-            f"email {new_email} already exists while updating user {request.user.id}"
+            f"email {new_email} already exists while confirming user {user_id}"
         )
-        return render_collect_email(
-            request,
-            request.user,
-            error="Этот email уже привязан к другому аккаунту.",
-            email=new_email,
-        )
+        request.session["email_bind_modal"] = {
+            "open": True,
+            "error": "Этот email уже привязан к другому аккаунту.",
+            "email": new_email,
+        }
+        request.session.modified = True
+        return redirect("dashboard" if request.user.is_authenticated else "login")
     except Exception as e:
         session.rollback()
-        logging.exception(f"failed to update email for user {request.user.id}: {e}")
-        return render_collect_email(
-            request,
-            request.user,
-            error="Не удалось привязать email. Попробуйте еще раз.",
-            email=new_email,
-        )
+        logging.exception(f"failed to confirm email for user {user_id}: {e}")
+        request.session["email_bind_modal"] = {
+            "open": True,
+            "error": "Не удалось подтвердить email. Попробуйте еще раз.",
+            "email": new_email,
+        }
+        request.session.modified = True
+        return redirect("dashboard" if request.user.is_authenticated else "login")
     finally:
         session.close()
 
     try:
-        # вот здесь критическая ошибка
-        # после привязки email у пользователя сбрасывается squad uuid
+        # После привязки email нельзя терять активные internal squads в RWMS.
         subscription = rwms_client.get_user_by_username(username)
         if subscription:
             response = rwms_client.update_user(
@@ -1553,11 +1681,9 @@ def update_email(request):
                 )
             )
             if response is None:
-                logging.warning(
-                    f"failed to update rwms email for user {request.user.id}"
-                )
+                logging.warning(f"failed to update rwms email for user {user_id}")
     except Exception as e:
-        logging.exception(f"failed to sync rwms email for user {request.user.id}: {e}")
+        logging.exception(f"failed to sync rwms email for user {user_id}: {e}")
 
     return redirect("dashboard")
 
