@@ -243,8 +243,7 @@ def add_event_log_once(db_session, user, event):
     exists = (
         db_session.query(EventLog.id)
         .filter(
-            (EventLog.user_id == user.id)
-            & (EventLog.event_type == event.event_type)
+            (EventLog.user_id == user.id) & (EventLog.event_type == event.event_type)
         )
         .first()
     )
@@ -263,10 +262,7 @@ def dashboard_support_redirect():
 def get_support_ticket_for_user(db_session, user_id, ticket_id):
     return (
         db_session.query(SupportTicket)
-        .filter(
-            (SupportTicket.id == ticket_id)
-            & (SupportTicket.user_id == user_id)
-        )
+        .filter((SupportTicket.id == ticket_id) & (SupportTicket.user_id == user_id))
         .first()
     )
 
@@ -299,7 +295,9 @@ def attach_support_attachments(db_session, support_message, uploaded_files):
     for uploaded_file in uploaded_files:
         content_type = uploaded_file.content_type or "application/octet-stream"
         if not content_type.startswith(SUPPORT_ATTACHMENT_ALLOWED_PREFIXES):
-            logging.warning("unsupported support attachment content type %s", content_type)
+            logging.warning(
+                "unsupported support attachment content type %s", content_type
+            )
             continue
 
         if uploaded_file.size > settings.SUPPORT_ATTACHMENT_MAX_BYTES:
@@ -374,8 +372,12 @@ def support_attachment_payload(attachment, admin=False):
         "content_type": attachment.content_type,
         "file_size": attachment.file_size,
         "url": reverse(route_name, args=[attachment.id]),
-        "is_image": bool(getattr(attachment, "is_image", is_image_attachment(attachment))),
-        "is_video": bool(getattr(attachment, "is_video", is_video_attachment(attachment))),
+        "is_image": bool(
+            getattr(attachment, "is_image", is_image_attachment(attachment))
+        ),
+        "is_video": bool(
+            getattr(attachment, "is_video", is_video_attachment(attachment))
+        ),
     }
 
 
@@ -447,9 +449,7 @@ def delete_support_ticket_with_files(db_session, ticket):
             )
         )
 
-    db_session.execute(
-        sa_delete(SupportTicket).where(SupportTicket.id == ticket.id)
-    )
+    db_session.execute(sa_delete(SupportTicket).where(SupportTicket.id == ticket.id))
 
 
 def support_admin_is_authenticated(request):
@@ -540,7 +540,9 @@ def create_site_user(
 
     user_label = email or f"telegram_id={telegram_id}"
     if rw_user is None:
-        raise RuntimeError(f"creating subscription for site user {user_label} was failed")
+        raise RuntimeError(
+            f"creating subscription for site user {user_label} was failed"
+        )
 
     expire_at = None
     if rw_user.HasField("expire_at"):
@@ -605,7 +607,9 @@ def render_login(request, context=None, status=200):
     payload["telegram_auth_url"] = (
         f"{get_current_base_url(request)}{reverse('telegram_widget_auth')}"
     )
-    payload["telegram_return_url"] = f"{get_current_base_url(request)}{reverse('login')}"
+    payload["telegram_return_url"] = (
+        f"{get_current_base_url(request)}{reverse('login')}"
+    )
     payload["telegram_direct_auth_url"] = (
         "https://oauth.telegram.org/auth?"
         + urlencode(
@@ -863,7 +867,9 @@ def auth_by_google_callback(request):
 
     if not code or not state or not hmac.compare_digest(state, expected_state or ""):
         logging.warning("invalid google oauth callback state")
-        return render_login(request, {"error": "Сессия входа истекла. Попробуйте еще раз."})
+        return render_login(
+            request, {"error": "Сессия входа истекла. Попробуйте еще раз."}
+        )
 
     redirect_uri = get_google_oauth_redirect_uri(request)
 
@@ -997,7 +1003,9 @@ def auth_by_yandex_callback(request):
 
     if not code or not state or not hmac.compare_digest(state, expected_state or ""):
         logging.warning("invalid yandex oauth callback state")
-        return render_login(request, {"error": "Сессия входа истекла. Попробуйте еще раз."})
+        return render_login(
+            request, {"error": "Сессия входа истекла. Попробуйте еще раз."}
+        )
 
     redirect_uri = get_yandex_oauth_redirect_uri(request)
 
@@ -1034,10 +1042,10 @@ def auth_by_yandex_callback(request):
         )
 
     email = (
-        userinfo.get("default_email")
-        or (userinfo.get("emails") or [None])[0]
-        or ""
-    ).lower().strip()
+        (userinfo.get("default_email") or (userinfo.get("emails") or [None])[0] or "")
+        .lower()
+        .strip()
+    )
     if not email:
         logging.warning("yandex oauth userinfo has no email")
         return render_login(
@@ -1185,7 +1193,9 @@ def auth_by_telegram_widget(request):
             "telegram widget auth failed signature check, keys=%s",
             sorted(auth_data.keys()),
         )
-        return render_login(request, {"error": "Не удалось подтвердить вход через Telegram."})
+        return render_login(
+            request, {"error": "Не удалось подтвердить вход через Telegram."}
+        )
 
     try:
         telegram_id = int(auth_data["id"])
@@ -1197,9 +1207,7 @@ def auth_by_telegram_widget(request):
     try:
         with db_session.begin():
             user = (
-                db_session.query(User)
-                .filter(User.telegram_id == telegram_id)
-                .first()
+                db_session.query(User).filter(User.telegram_id == telegram_id).first()
             )
 
             if not user:
@@ -1374,9 +1382,7 @@ def dashboard(request):
     bonus_days = ref_connected_count * 10 + ref_purchased_count * 30
     subscription = rwms_client.get_user_by_username(user.username)
     seconds_left = (
-        user.time_until_expiration.total_seconds()
-        if user.time_until_expiration
-        else -1
+        user.time_until_expiration.total_seconds() if user.time_until_expiration else -1
     )
     days_left = int((seconds_left + 86399) // 86400) if seconds_left > 0 else 0
     expiring_banner_threshold_seconds = 3 * 24 * 60 * 60
@@ -1384,11 +1390,7 @@ def dashboard(request):
     show_telegram_bind_banner = not user.telegram_id
     show_not_connected_banner = False
 
-    if (
-        seconds_left > 0
-        and traffic_progress
-        and not traffic_progress.passed_0
-    ):
+    if seconds_left > 0 and traffic_progress and not traffic_progress.passed_0:
         show_not_connected_banner = True
 
     if settings.DEBUG:
@@ -1539,10 +1541,16 @@ def update_email(request):
         session.close()
 
     try:
+        # вот здесь критическая ошибка
+        # после привязки email у пользователя сбрасывается squad uuid
         subscription = rwms_client.get_user_by_username(username)
         if subscription:
             response = rwms_client.update_user(
-                proto.UpdateUserRequest(uuid=subscription.uuid, email=new_email)
+                proto.UpdateUserRequest(
+                    uuid=subscription.uuid,
+                    email=new_email,
+                    active_internal_squads=subscription.active_internal_squads,
+                )
             )
             if response is None:
                 logging.warning(
@@ -1685,7 +1693,9 @@ def support_attachment(request, attachment_id):
     db_session = session_factory()
     try:
         row = (
-            db_session.query(SupportTicketAttachment, SupportTicketMessage, SupportTicket)
+            db_session.query(
+                SupportTicketAttachment, SupportTicketMessage, SupportTicket
+            )
             .join(
                 SupportTicketMessage,
                 SupportTicketAttachment.message_id == SupportTicketMessage.id,
@@ -1809,8 +1819,7 @@ def load_support_admin_tickets(status_filter):
         return {
             "tickets": tickets,
             "ticket_payloads": [
-                support_admin_ticket_payload(ticket, user)
-                for ticket, user in tickets
+                support_admin_ticket_payload(ticket, user) for ticket, user in tickets
             ],
             "status_filter": status_filter,
             "open_count": open_count,
@@ -2190,8 +2199,16 @@ def dynamic_manifest(request):
         "background_color": "#1a1a1a",
         "theme_color": "#ff9900",
         "icons": [
-            {"src": "/static/icons/icon-192x192.png", "sizes": "192x192", "type": "image/png"},
-            {"src": "/static/icons/icon-512x512.png", "sizes": "512x512", "type": "image/png"}
-        ]
+            {
+                "src": "/static/icons/icon-192x192.png",
+                "sizes": "192x192",
+                "type": "image/png",
+            },
+            {
+                "src": "/static/icons/icon-512x512.png",
+                "sizes": "512x512",
+                "type": "image/png",
+            },
+        ],
     }
     return JsonResponse(data)

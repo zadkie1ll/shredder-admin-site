@@ -105,11 +105,10 @@ CABINET_DOMAINS = config(
     cast=csv_domains,
 )
 DEFAULT_CABINET_DOMAIN = config(
-    "DEFAULT_CABINET_DOMAIN",
-    default="http://localhost:8000"
+    "DEFAULT_CABINET_DOMAIN", default="http://localhost:8000"
 )
 PWA_MIRROR_SOURCE_URL = config("PWA_MIRROR_SOURCE_URL", default="")
-TG_BOT_USERNAME = config('TG_BOT_USERNAME', default='monkeyislandvpnbot')
+TG_BOT_USERNAME = config("TG_BOT_USERNAME", default="monkeyislandvpnbot")
 TELEGRAM_AUTH_BOT_TOKEN = config(
     "TELEGRAM_AUTH_BOT_TOKEN",
     default=config("MI_VPN_BOT_TOKEN", default=""),
@@ -142,31 +141,33 @@ SUPPORT_ATTACHMENT_MAX_BYTES = config(
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = config('SECRET_KEY')
-DEBUG = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='*').split(',')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+SECRET_KEY = config("SECRET_KEY")
+DEBUG = config("DEBUG", default=False, cast=bool)
+ALLOWED_HOSTS = config("ALLOWED_HOSTS", default="*").split(",")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
 
-PAYMENT_GATEWAY = config('PAYMENT_GATEWAY', default='wata')
-WATA_HOST = config('WATA_HOST')
-WATA_TOKEN = config('WATA_TOKEN')
-YOOKASSA_SHOP_ID = config('YOOKASSA_SHOP_ID')
-YOOKASSA_SECRET_KEY = config('YOOKASSA_SECRET_KEY')
-RWMS_HOST = config('RWMS_HOST')
-RWMS_PORT = config('RWMS_PORT', cast=int)
+PAYMENT_GATEWAY = config("PAYMENT_GATEWAY", default="wata")
+WATA_HOST = config("WATA_HOST")
+WATA_TOKEN = config("WATA_TOKEN")
+YOOKASSA_SHOP_ID = config("YOOKASSA_SHOP_ID")
+YOOKASSA_SECRET_KEY = config("YOOKASSA_SECRET_KEY")
+RWMS_HOST = config("RWMS_HOST")
+RWMS_PORT = config("RWMS_PORT", cast=int)
 
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
 
-CSRF_TRUSTED_ORIGINS = config('CSRF_TRUSTED_ORIGINS', 
-                              default='http://localhost:8000', 
-                              cast=lambda v: [s.strip() for s in v.split(',')])
+CSRF_TRUSTED_ORIGINS = config(
+    "CSRF_TRUSTED_ORIGINS",
+    default="http://localhost:8000",
+    cast=lambda v: [s.strip() for s in v.split(",")],
+)
 
-EMAIL_HOST = config('EMAIL_HOST')
-EMAIL_PORT = config('EMAIL_PORT', cast=int)
-EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=True, cast=bool)
-EMAIL_HOST_USER = config('EMAIL_HOST_USER')
-EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+EMAIL_HOST = config("EMAIL_HOST")
+EMAIL_PORT = config("EMAIL_PORT", cast=int)
+EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=True, cast=bool)
+EMAIL_HOST_USER = config("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 HAS_WHITENOISE = find_spec("whitenoise") is not None
@@ -336,4 +337,4 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_ROOT = BASE_DIR / "mediafiles"
 FILE_UPLOAD_MAX_MEMORY_SIZE = SUPPORT_ATTACHMENT_MAX_BYTES
 DATA_UPLOAD_MAX_MEMORY_SIZE = SUPPORT_ATTACHMENT_MAX_BYTES + 1024 * 1024
-SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")

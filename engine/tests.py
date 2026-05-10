@@ -124,4 +124,6 @@ class TelegramAuthBotTests(SimpleTestCase):
         response = render_login(request)
         content = response.content.decode()
 
-        self.assertIn("return_to=https%3A%2F%2Fmonkey-island-vpn.com%2Flogin%2F", content)
+        self.assertIn(
+            "return_to=https%3A%2F%2Fmonkey-island-vpn.com%2Flogin%2F", content
+        )
