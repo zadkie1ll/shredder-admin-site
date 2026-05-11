@@ -4,6 +4,7 @@ from . import views
 
 urlpatterns = [
     path("", views.index, name="index"),
+    path("direct-sale/", views.direct_sale, name="direct_sale"),
     path("offer/", views.offer, name="offer"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("update-email/", views.update_email, name="update_email"),
@@ -91,6 +92,11 @@ urlpatterns = [
         name="telegram_widget_auth",
     ),
     path("login/magic/<uuid:token>/", views.auth_by_magic_link, name="magic_auth"),
+    path(
+        "login/purchase/<str:token>/",
+        views.auth_by_purchase_link,
+        name="purchase_auth",
+    ),
     path(
         "login/telegram/<str:token>/", views.auth_by_telegram_link, name="telegram_auth"
     ),

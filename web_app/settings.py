@@ -99,6 +99,11 @@ NEUTRAL_DOMAINS = config(
     default="",
     cast=csv_domains,
 )
+DIRECT_SALE_DOMAINS = config(
+    "DIRECT_SALE_DOMAINS",
+    default="",
+    cast=csv_domains,
+)
 CABINET_DOMAINS = config(
     "CABINET_DOMAINS",
     default="localhost,127.0.0.1",

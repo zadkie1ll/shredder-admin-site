@@ -47,6 +47,7 @@ from common.models.db import UserTrafficProgress
 from common.models.db import YkRecurrentPayment
 from common.models.db import MagicToken
 from common.models.db import TelegramLoginToken
+from common.models.db import PurchaseLoginToken
 from common.models.db import SupportTicket
 from common.models.db import SupportTicketMessage
 from common.models.db import SupportTicketMessageSender
@@ -97,6 +98,7 @@ def is_known_site_host(host):
     return (
         normalized_host in settings.CABINET_DOMAINS
         or normalized_host in settings.NEUTRAL_DOMAINS
+        or normalized_host in settings.DIRECT_SALE_DOMAINS
         or normalized_host in settings.PROMO_DOMAINS
     )
 
@@ -107,6 +109,8 @@ def get_site_role(request):
         return "cabinet"
     if host in settings.NEUTRAL_DOMAINS:
         return "neutral"
+    if host in settings.DIRECT_SALE_DOMAINS:
+        return "direct_sale"
     if host in settings.PROMO_DOMAINS:
         return "promo"
     return "promo"
@@ -665,6 +669,22 @@ def hash_telegram_login_token(token):
     return hashlib.sha256(payload).hexdigest()
 
 
+def hash_purchase_login_token(token):
+    payload = f"purchase-login:{token}:{settings.SECRET_KEY}".encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def create_purchase_login_link(db_session, request, user):
+    raw_token = secrets.token_urlsafe(48)
+    db_session.add(
+        PurchaseLoginToken(
+            user_id=user.id,
+            token_hash=hash_purchase_login_token(raw_token),
+        )
+    )
+    return f"{get_current_base_url(request)}/login/purchase/{raw_token}/"
+
+
 def verify_telegram_widget_auth(auth_data, bot_token):
     received_hash = auth_data.get("hash")
     auth_date = auth_data.get("auth_date")
@@ -1208,6 +1228,44 @@ def auth_by_telegram_link(request, token):
         session.close()
 
 
+def auth_by_purchase_link(request, token):
+    session = session_factory()
+    try:
+        token_hash = hash_purchase_login_token(token)
+        login_token = (
+            session.query(PurchaseLoginToken)
+            .filter(
+                PurchaseLoginToken.token_hash == token_hash,
+                PurchaseLoginToken.revoked_at.is_(None),
+            )
+            .first()
+        )
+        if not login_token or not hmac.compare_digest(
+            login_token.token_hash,
+            token_hash,
+        ):
+            logging.warning("invalid purchase login token was used")
+            return render_login(request, {"error": "Ссылка истекла или неверна"})
+
+        user = session.query(User).filter(User.id == login_token.user_id).first()
+        if not user:
+            logging.warning("purchase login token points to missing user")
+            return render_login(request, {"error": "Ссылка истекла или неверна"})
+
+        login_token.last_used_at = datetime.utcnow()
+        add_event_log_once(
+            session,
+            user,
+            analytics_event.FirstSuccessfulLogin(login_method="purchase_link"),
+        )
+        session.commit()
+
+        authorize_user_session(request, user)
+        return redirect("dashboard")
+    finally:
+        session.close()
+
+
 def auth_by_telegram_widget(request):
     telegram_bot = get_telegram_auth_bot(request.get_host())
     if not telegram_bot:
@@ -1309,9 +1367,25 @@ def index(request):
             },
         )
 
+    if site_role == "direct_sale":
+        return render_direct_sale(request)
+
     return render(
         request,
         "index.html",
+        {"tariffs": ACTUAL_TARIFFS, "tracking_params": get_tracking_params(request)},
+    )
+
+
+def direct_sale(request):
+    capture_tracking_params(request)
+    return render_direct_sale(request)
+
+
+def render_direct_sale(request):
+    return render(
+        request,
+        "index_direct_sale.html",
         {"tariffs": ACTUAL_TARIFFS, "tracking_params": get_tracking_params(request)},
     )
 
@@ -2258,31 +2332,55 @@ def pay(request):
                     telegram_id=user.telegram_id or 0,
                 )
 
-            magic = MagicToken(user_id=user.id)
-            db_session.add(magic)
-            db_session.flush()
-            magic_link = f"{get_current_base_url(request)}/login/magic/{magic.token}/"
+            use_permanent_purchase_link = (
+                request.POST.get("login_link_kind") == "purchase_permanent"
+            )
+            if use_permanent_purchase_link:
+                login_link = create_purchase_login_link(db_session, request, user)
+                email_subject = "Ссылка доступа Monkey Island VPS"
+                email_title = "Доступ готов"
+                email_intro = "Мы подготовили для вас доступ Monkey Island VPS."
+                login_link_note = (
+                    "После оплаты зайдите по кнопке ниже: ссылка постоянная и "
+                    "откроет оплаченный доступ, инструкции для устройств и поддержку."
+                )
+                email_button_text = "Открыть доступ"
+                email_footer = (
+                    "Если вы не оформляли Monkey Island VPS, просто "
+                    "проигнорируйте это письмо."
+                )
+            else:
+                magic = MagicToken(user_id=user.id)
+                db_session.add(magic)
+                db_session.flush()
+                login_link = f"{get_current_base_url(request)}/login/magic/{magic.token}/"
+                email_subject = "Ссылка на личный кабинет Monkey Island"
+                email_title = "Кабинет уже готов"
+                email_intro = "Мы создали для вас личный кабинет Monkey Island."
+                login_link_note = (
+                    "После оплаты зайдите по кнопке ниже: ссылка действует "
+                    "15 минут и откроет VPN-подписку, инструкции для "
+                    "устройств и поддержку."
+                )
+                email_button_text = "Открыть кабинет"
+                email_footer = (
+                    "Если вы не оформляли VPN Monkey Island, просто "
+                    "проигнорируйте это письмо."
+                )
 
             db_session.commit()
 
             try:
                 send_magic_link_email(
                     email,
-                    magic_link,
-                    subject="Ссылка на личный кабинет Monkey Island",
+                    login_link,
+                    subject=email_subject,
                     template_context={
-                        "title": "Кабинет уже готов",
-                        "intro": "Мы создали для вас личный кабинет Monkey Island.",
-                        "note": (
-                            "После оплаты зайдите по кнопке ниже: ссылка действует "
-                            "15 минут и откроет VPN-подписку, инструкции для "
-                            "устройств и поддержку."
-                        ),
-                        "button_text": "Открыть кабинет",
-                        "footer": (
-                            "Если вы не оформляли VPN Monkey Island, просто "
-                            "проигнорируйте это письмо."
-                        ),
+                        "title": email_title,
+                        "intro": email_intro,
+                        "note": login_link_note,
+                        "button_text": email_button_text,
+                        "footer": email_footer,
                     },
                 )
             except Exception as e:
@@ -2308,6 +2406,7 @@ def robots_txt(request):
         "Disallow: /dashboard/",
         "Disallow: /pay/",
         "Disallow: /login/magic/",
+        "Disallow: /login/purchase/",
         "Disallow: /login/telegram/",
         "",
     ]
@@ -2315,11 +2414,14 @@ def robots_txt(request):
 
 
 def dynamic_manifest(request):
+    site_role = get_site_role(request)
+    app_name = "Monkey Island VPS" if site_role == "direct_sale" else "VPN Monkey Island"
+    start_url = "/" if site_role == "direct_sale" else "/dashboard/"
     data = {
-        "name": "VPN Monkey Island",
-        "short_name": "VPN Monkey Island",
+        "name": app_name,
+        "short_name": app_name,
         "id": "/",
-        "start_url": "/dashboard/",
+        "start_url": start_url,
         "scope": "/",
         "display": "standalone",
         "background_color": "#1a1a1a",

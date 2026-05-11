@@ -1,0 +1,923 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monkey Island VPS — личный сервер без сложной настройки</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
+    <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
+    <style>
+        :root {
+            --bg: #080b0b;
+            --bg-soft: #101613;
+            --ink: #f5f0df;
+            --muted: #a9b1a5;
+            --muted-strong: #c8cfbc;
+            --line: rgba(245, 240, 223, 0.14);
+            --gold: #ffc700;
+            --gold-dark: #b8860b;
+            --reef: #2ec4b6;
+            --leaf: #4f8f4b;
+            --panel: rgba(18, 25, 22, 0.88);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            margin: 0;
+            background: var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            overflow-x: hidden;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        .shell {
+            min-height: 100vh;
+            background:
+                linear-gradient(180deg, rgba(8, 11, 11, 0.78) 0%, rgba(8, 11, 11, 0.94) 48%, #080b0b 100%),
+                url("{% static 'img/header-monkey-island.png' %}") top center / cover no-repeat;
+        }
+
+        .wrap {
+            width: min(1160px, calc(100% - 40px));
+            margin: 0 auto;
+        }
+
+        .nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 24px;
+            padding: 28px 0;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .brand-mark {
+            width: 40px;
+            height: 40px;
+            display: grid;
+            place-items: center;
+            border: 2px solid rgba(255, 199, 0, 0.28);
+            border-radius: 8px;
+            background: #17120a;
+            color: var(--gold);
+            font-size: 24px;
+            font-weight: 950;
+            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+        }
+
+        .brand-title {
+            display: block;
+            font-size: 19px;
+            line-height: 1.05;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .brand-subtitle {
+            display: block;
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 28px;
+            color: var(--muted-strong);
+            font-size: 15px;
+            font-weight: 750;
+        }
+
+        .nav-links a:hover {
+            color: var(--ink);
+        }
+
+        .btn {
+            display: inline-flex;
+            min-height: 48px;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 0 18px;
+            background: rgba(245, 240, 223, 0.06);
+            color: var(--ink);
+            font-weight: 850;
+            cursor: pointer;
+            transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255, 199, 0, 0.5);
+            background: rgba(245, 240, 223, 0.1);
+        }
+
+        .btn-primary {
+            border-color: transparent;
+            background: linear-gradient(100deg, var(--gold), #ffef80);
+            color: #161108;
+            box-shadow: 0 18px 44px rgba(255, 199, 0, 0.18);
+        }
+
+        .btn-primary:hover {
+            background: linear-gradient(100deg, #ffd22a, #fff2a0);
+        }
+
+        .hero {
+            display: grid;
+            grid-template-columns: minmax(0, 1.06fr) minmax(340px, 0.94fr);
+            gap: 46px;
+            align-items: stretch;
+            padding: 74px 0 86px;
+        }
+
+        .hero-copy {
+            align-self: center;
+            max-width: 690px;
+        }
+
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            min-height: 34px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(255, 199, 0, 0.28);
+            border-radius: 999px;
+            padding: 0 13px;
+            background: rgba(16, 22, 19, 0.74);
+            color: #ffe78a;
+            font-size: 13px;
+            font-weight: 850;
+        }
+
+        .eyebrow::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--reef);
+            box-shadow: 0 0 0 5px rgba(46, 196, 182, 0.14);
+        }
+
+        h1,
+        h2,
+        h3,
+        p {
+            margin-top: 0;
+        }
+
+        h1 {
+            margin-bottom: 22px;
+            font-size: clamp(42px, 6vw, 78px);
+            line-height: 0.98;
+            letter-spacing: 0;
+            font-weight: 950;
+        }
+
+        .lead {
+            max-width: 650px;
+            margin-bottom: 28px;
+            color: var(--muted-strong);
+            font-size: clamp(18px, 2vw, 23px);
+            line-height: 1.34;
+            font-weight: 650;
+        }
+
+        .hero-actions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .trust-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .trust {
+            display: inline-flex;
+            min-height: 36px;
+            align-items: center;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 0 11px;
+            background: rgba(8, 11, 11, 0.48);
+            color: var(--muted-strong);
+            font-size: 13px;
+            font-weight: 780;
+        }
+
+        .hero-board {
+            position: relative;
+            min-height: 560px;
+            border: 1px solid rgba(245, 240, 223, 0.16);
+            border-radius: 8px;
+            background:
+                linear-gradient(145deg, rgba(18, 25, 22, 0.92), rgba(14, 24, 25, 0.82)),
+                radial-gradient(circle at 24% 24%, rgba(46, 196, 182, 0.18), transparent 36%);
+            overflow: hidden;
+            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
+        }
+
+        .hero-board::before {
+            content: "";
+            position: absolute;
+            inset: 22px;
+            border: 1px solid rgba(255, 199, 0, 0.18);
+            border-radius: 6px;
+        }
+
+        .map-lines {
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(90deg, rgba(245, 240, 223, 0.05) 1px, transparent 1px),
+                linear-gradient(0deg, rgba(245, 240, 223, 0.05) 1px, transparent 1px);
+            background-size: 46px 46px;
+            mask-image: linear-gradient(180deg, transparent, #000 16%, #000 84%, transparent);
+        }
+
+        .island-card {
+            position: absolute;
+            right: 38px;
+            bottom: 38px;
+            left: 38px;
+            border: 1px solid rgba(245, 240, 223, 0.14);
+            border-radius: 8px;
+            padding: 22px;
+            background: rgba(8, 11, 11, 0.72);
+            backdrop-filter: blur(12px);
+        }
+
+        .route {
+            position: absolute;
+            width: 12px;
+            height: 12px;
+            border-radius: 999px;
+            background: var(--gold);
+            box-shadow: 0 0 0 7px rgba(255, 199, 0, 0.14);
+        }
+
+        .route-one {
+            top: 102px;
+            left: 92px;
+        }
+
+        .route-two {
+            top: 210px;
+            right: 98px;
+            background: var(--reef);
+            box-shadow: 0 0 0 7px rgba(46, 196, 182, 0.14);
+        }
+
+        .route-three {
+            top: 318px;
+            left: 190px;
+        }
+
+        .route-line {
+            position: absolute;
+            top: 152px;
+            left: 102px;
+            width: 330px;
+            height: 190px;
+            border-top: 2px dashed rgba(255, 199, 0, 0.4);
+            border-right: 2px dashed rgba(255, 199, 0, 0.34);
+            border-radius: 0 120px 0 0;
+            transform: rotate(-7deg);
+        }
+
+        .board-title {
+            margin-bottom: 10px;
+            font-size: 23px;
+            line-height: 1.15;
+            font-weight: 900;
+        }
+
+        .board-text {
+            margin-bottom: 16px;
+            color: var(--muted);
+            font-size: 16px;
+            line-height: 1.36;
+            font-weight: 650;
+        }
+
+        .mini-stats {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .mini-stat {
+            min-height: 70px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 11px;
+            background: rgba(245, 240, 223, 0.05);
+        }
+
+        .mini-stat strong {
+            display: block;
+            margin-bottom: 4px;
+            color: var(--gold);
+            font-size: 20px;
+            line-height: 1;
+        }
+
+        .mini-stat span {
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.2;
+            font-weight: 700;
+        }
+
+        .section {
+            padding: 0 0 74px;
+        }
+
+        .section-head {
+            display: flex;
+            align-items: end;
+            justify-content: space-between;
+            gap: 24px;
+            margin-bottom: 22px;
+        }
+
+        .section h2 {
+            margin-bottom: 0;
+            font-size: clamp(30px, 4vw, 46px);
+            line-height: 1.08;
+            font-weight: 950;
+        }
+
+        .section-note {
+            max-width: 390px;
+            margin: 0;
+            color: var(--muted);
+            font-size: 16px;
+            line-height: 1.34;
+            font-weight: 650;
+        }
+
+        .grid-3,
+        .tariffs,
+        .steps,
+        .faq-grid {
+            display: grid;
+            gap: 16px;
+        }
+
+        .grid-3,
+        .tariffs {
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .steps,
+        .faq-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .card {
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            background: var(--panel);
+            box-shadow: 0 22px 64px rgba(0, 0, 0, 0.16);
+        }
+
+        .feature {
+            min-height: 180px;
+            padding: 22px;
+        }
+
+        .feature-kicker {
+            display: block;
+            margin-bottom: 22px;
+            color: var(--reef);
+            font-size: 13px;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .feature h3,
+        .step h3,
+        .faq-card h3 {
+            margin-bottom: 10px;
+            font-size: 22px;
+            line-height: 1.16;
+        }
+
+        .feature p,
+        .step p,
+        .faq-card p,
+        .cta p {
+            margin-bottom: 0;
+            color: var(--muted);
+            font-size: 16px;
+            line-height: 1.36;
+            font-weight: 650;
+        }
+
+        .tariff {
+            position: relative;
+            display: flex;
+            min-height: 356px;
+            flex-direction: column;
+            justify-content: space-between;
+            overflow: hidden;
+            padding: 22px;
+        }
+
+        .tariff::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            opacity: 0.56;
+            pointer-events: none;
+        }
+
+        .tariff:nth-child(1)::before {
+            background: linear-gradient(150deg, rgba(46, 196, 182, 0.22), transparent 58%);
+        }
+
+        .tariff:nth-child(2)::before {
+            background: linear-gradient(150deg, rgba(255, 199, 0, 0.22), transparent 58%);
+        }
+
+        .tariff:nth-child(3)::before {
+            background: linear-gradient(150deg, rgba(79, 143, 75, 0.32), transparent 58%);
+        }
+
+        .tariff > * {
+            position: relative;
+        }
+
+        .badge {
+            display: inline-flex;
+            width: fit-content;
+            min-height: 32px;
+            align-items: center;
+            border: 1px solid rgba(255, 199, 0, 0.28);
+            border-radius: 999px;
+            padding: 0 12px;
+            background: rgba(255, 199, 0, 0.08);
+            color: #ffe58a;
+            font-size: 13px;
+            font-weight: 850;
+        }
+
+        .tariff h3 {
+            margin: 18px 0 10px;
+            font-size: 25px;
+            line-height: 1.1;
+        }
+
+        .price {
+            margin-bottom: 18px;
+        }
+
+        .price strong {
+            font-size: 42px;
+            line-height: 1;
+            font-weight: 850;
+        }
+
+        .price span {
+            display: block;
+            margin-top: 8px;
+            color: var(--muted);
+            font-weight: 800;
+        }
+
+        .pay-form {
+            display: grid;
+            gap: 10px;
+        }
+
+        .email {
+            width: 100%;
+            min-height: 48px;
+            border: 1px solid var(--line);
+            border-radius: 8px;
+            padding: 0 13px;
+            outline: none;
+            background: rgba(8, 11, 11, 0.68);
+            color: var(--ink);
+            font-size: 15px;
+            font-weight: 750;
+        }
+
+        .email:focus {
+            border-color: rgba(255, 199, 0, 0.62);
+        }
+
+        .form-note {
+            color: rgba(245, 240, 223, 0.66);
+            font-size: 12px;
+            line-height: 1.35;
+            font-weight: 650;
+        }
+
+        .form-note a {
+            color: #fff0a7;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .step,
+        .faq-card {
+            padding: 20px;
+        }
+
+        .code-box {
+            margin-top: 18px;
+            border: 1px solid rgba(46, 196, 182, 0.26);
+            border-radius: 8px;
+            background: rgba(5, 12, 12, 0.68);
+            color: #c9fff8;
+            padding: 15px;
+            font: 750 16px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+            overflow-wrap: anywhere;
+        }
+
+        .locations {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        .location {
+            display: inline-flex;
+            min-height: 38px;
+            align-items: center;
+            border: 1px solid rgba(46, 196, 182, 0.3);
+            border-radius: 8px;
+            padding: 0 12px;
+            background: rgba(46, 196, 182, 0.12);
+            color: #ccfff8;
+            font-size: 14px;
+            font-weight: 800;
+        }
+
+        .cta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 22px;
+            padding: 26px;
+            background:
+                linear-gradient(100deg, rgba(255, 199, 0, 0.1), transparent 48%),
+                var(--panel);
+        }
+
+        .cta h2 {
+            margin-bottom: 8px;
+        }
+
+        .footer {
+            display: flex;
+            justify-content: space-between;
+            gap: 22px;
+            padding: 0 0 42px;
+            color: var(--muted);
+            font-size: 14px;
+            font-weight: 650;
+        }
+
+        .footer-links {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            color: var(--muted-strong);
+        }
+
+        @media (max-width: 960px) {
+            .nav {
+                align-items: flex-start;
+            }
+
+            .nav-links {
+                gap: 14px;
+                font-size: 14px;
+            }
+
+            .hero,
+            .grid-3,
+            .tariffs,
+            .steps,
+            .faq-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .hero-board {
+                min-height: 460px;
+            }
+
+            .section-head,
+            .cta,
+            .footer {
+                align-items: flex-start;
+                flex-direction: column;
+            }
+        }
+
+        @media (max-width: 700px) {
+            .wrap {
+                width: min(100% - 24px, 1160px);
+            }
+
+            .nav {
+                padding: 20px 0;
+            }
+
+            .brand-subtitle,
+            .nav-links a:not(.btn-primary) {
+                display: none;
+            }
+
+            .brand-title {
+                font-size: 16px;
+            }
+
+            .hero {
+                gap: 28px;
+                padding: 38px 0 58px;
+            }
+
+            .hero-actions,
+            .hero-actions .btn,
+            .cta .btn {
+                width: 100%;
+            }
+
+            .hero-board {
+                min-height: 390px;
+            }
+
+            .island-card {
+                right: 16px;
+                bottom: 16px;
+                left: 16px;
+                padding: 16px;
+            }
+
+            .mini-stats {
+                grid-template-columns: 1fr;
+            }
+
+            .section {
+                padding-bottom: 54px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="shell">
+        <div class="wrap">
+            <nav class="nav" aria-label="Главная навигация">
+                <a class="brand" href="#top" aria-label="Monkey Island VPS">
+                    <span class="brand-mark">M</span>
+                    <span>
+                        <span class="brand-title">Monkey Island VPS</span>
+                        <span class="brand-subtitle">Персональный виртуальный сервер</span>
+                    </span>
+                </a>
+                <div class="nav-links">
+                    <a href="#features">Возможности</a>
+                    <a href="#prices">Тарифы</a>
+                    <a href="#how">Как работает</a>
+                    <a href="#faq">FAQ</a>
+                    <a class="btn btn-primary" href="#prices">Выбрать тариф</a>
+                </div>
+            </nav>
+
+            <section id="top" class="hero">
+                <div class="hero-copy">
+                    <div class="eyebrow">доступ готов через несколько минут</div>
+                    <h1>Личный остров для быстрого и приватного интернета</h1>
+                    <p class="lead">
+                        Получите персональный ключ, выберите удобную локацию и подключите телефон, компьютер или роутер без ручной настройки серверов.
+                    </p>
+                    <div class="hero-actions">
+                        <a class="btn btn-primary" href="#prices">Купить от 249 ₽</a>
+                        <a class="btn" href="#how">Посмотреть подключение</a>
+                    </div>
+                    <div class="trust-row">
+                        <span class="trust">без автосписаний</span>
+                        <span class="trust">до 10 Гбит/с</span>
+                        <span class="trust">iOS, Android, Windows, macOS, Linux</span>
+                    </div>
+                </div>
+
+                <div class="hero-board" aria-label="Карта подключений Monkey Island">
+                    <div class="map-lines"></div>
+                    <div class="route route-one"></div>
+                    <div class="route route-two"></div>
+                    <div class="route route-three"></div>
+                    <div class="route-line"></div>
+                    <div class="island-card">
+                        <div class="board-title">Ваш маршрут уже проложен</div>
+                        <p class="board-text">После оплаты мы создаем страницу доступа, выдаем ключ и показываем готовые инструкции для всех популярных устройств.</p>
+                        <div class="mini-stats">
+                            <div class="mini-stat"><strong>1 клик</strong><span>импорт профиля</span></div>
+                            <div class="mini-stat"><strong>24/7</strong><span>доступ к настройкам</span></div>
+                            <div class="mini-stat"><strong>0 ₽</strong><span>скрытых списаний</span></div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="features" class="section">
+                <div class="section-head">
+                    <h2>Что входит в доступ</h2>
+                    <p class="section-note">Страница остается простой и прямой: объясняем ценность, показываем тарифы и сразу ведем к оплате.</p>
+                </div>
+                <div class="grid-3">
+                    <article class="card feature">
+                        <span class="feature-kicker">личный ключ</span>
+                        <h3>Один доступ для ваших устройств</h3>
+                        <p>Подключайте телефон, ноутбук, планшет и роутер. Кабинет хранит профиль и инструкции под каждую систему.</p>
+                    </article>
+                    <article class="card feature">
+                        <span class="feature-kicker">маршруты</span>
+                        <h3>Локации под задачу</h3>
+                        <p>Выбирайте ближайшую точку для низкой задержки или другую страну для рабочих сервисов и поездок.</p>
+                    </article>
+                    <article class="card feature">
+                        <span class="feature-kicker">скорость</span>
+                        <h3>Стабильный канал без лимита трафика</h3>
+                        <p>Смотрите видео, созванивайтесь и работайте без сложных настроек и без ручного администрирования.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section id="prices" class="section">
+                <div class="section-head">
+                    <h2>Тарифы</h2>
+                    <p class="section-note">Пока автосписаний нет, поэтому показываем обычные тарифы с ручным продлением.</p>
+                </div>
+                <div class="tariffs">
+                    {% for tariff in tariffs %}
+                    <article class="card tariff">
+                        <div>
+                            {% if "1 месяц" in tariff.description %}
+                                <span class="badge">Старт</span>
+                                <h3>1 месяц</h3>
+                            {% elif "3 месяца" in tariff.description %}
+                                <span class="badge">Оптимально</span>
+                                <h3>3 месяца</h3>
+                            {% elif "1 год" in tariff.description %}
+                                <span class="badge">Лучшая цена</span>
+                                <h3>12 месяцев</h3>
+                            {% else %}
+                                <span class="badge">Тариф</span>
+                                <h3>{{ tariff.description }}</h3>
+                            {% endif %}
+                            <div class="price">
+                                <strong>{{ tariff.price }} ₽</strong>
+                                {% if "3 месяца" in tariff.description %}
+                                    <span>около 200 ₽ в месяц</span>
+                                {% elif "1 год" in tariff.description %}
+                                    <span>около 150 ₽ в месяц</span>
+                                {% else %}
+                                    <span>без автоматического продления</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <form action="/pay/" method="POST" class="pay-form" target="_blank">
+                            {% csrf_token %}
+                            <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
+                            <input type="hidden" name="login_link_kind" value="purchase_permanent">
+                            {% for key, value in tracking_params.items %}
+                                <input type="hidden" name="{{ key }}" value="{{ value }}">
+                            {% endfor %}
+                            <input class="email" type="email" name="email" placeholder="Ваш email" required>
+                            <button class="btn btn-primary" type="submit">Купить</button>
+                            <div class="form-note">
+                                Нажимая «Купить», вы принимаете <a href="/offer/" target="_blank">условия оферты</a>. Постоянная ссылка доступа придет на email.
+                            </div>
+                        </form>
+                    </article>
+                    {% endfor %}
+                </div>
+            </section>
+
+            <section id="how" class="section">
+                <div class="section-head">
+                    <h2>Как это работает</h2>
+                    <p class="section-note">Фокус не на пробном периоде, а на быстром оформлении и понятном первом запуске.</p>
+                </div>
+                <div class="steps">
+                    <article class="card step">
+                        <h3>1. Оплатите доступ</h3>
+                        <p>Выберите тариф, укажите email и перейдите на защищенную страницу оплаты.</p>
+                        <div class="code-box">invoice -> account -> access key</div>
+                    </article>
+                    <article class="card step">
+                        <h3>2. Откройте страницу доступа</h3>
+                        <p>После оплаты мы отправим постоянную ссылку для входа. Внутри будут ключ, QR-код и инструкции.</p>
+                        <div class="code-box">ssconf://personal-access-key</div>
+                    </article>
+                    <article class="card step">
+                        <h3>3. Выберите локацию</h3>
+                        <p>Используйте ближайший узел для скорости или нужную страну для конкретных сервисов.</p>
+                        <div class="locations">
+                            <span class="location">Нидерланды</span>
+                            <span class="location">Германия</span>
+                            <span class="location">Франция</span>
+                            <span class="location">США</span>
+                        </div>
+                    </article>
+                    <article class="card step">
+                        <h3>4. Подключите устройства</h3>
+                        <p>Импортируйте профиль в приложение и используйте один доступ на своих основных устройствах.</p>
+                        <div class="code-box">phone + laptop + router</div>
+                    </article>
+                </div>
+            </section>
+
+            <section id="faq" class="section">
+                <div class="section-head">
+                    <h2>Частые вопросы</h2>
+                    <p class="section-note">Короткие ответы снимают основные возражения перед покупкой.</p>
+                </div>
+                <div class="faq-grid">
+                    <article class="card faq-card">
+                        <h3>Это полноценный VPS?</h3>
+                        <p>Это готовый персональный серверный доступ на нашей инфраструктуре. Администрировать железо вручную не нужно.</p>
+                    </article>
+                    <article class="card faq-card">
+                        <h3>Есть ли автосписания?</h3>
+                        <p>Нет. Сейчас вы покупаете выбранный период, а продление делаете вручную, когда доступ понадобится снова.</p>
+                    </article>
+                    <article class="card faq-card">
+                        <h3>Какие устройства поддерживаются?</h3>
+                        <p>iOS, Android, Windows, macOS, Linux и часть роутеров. Для каждой платформы будут готовые инструкции.</p>
+                    </article>
+                    <article class="card faq-card">
+                        <h3>Когда придет доступ?</h3>
+                        <p>После успешной оплаты мы создадим страницу доступа и отправим постоянную ссылку на указанный email.</p>
+                    </article>
+                    <article class="card faq-card">
+                        <h3>Можно менять локации?</h3>
+                        <p>Да. Доступные профили можно переключать на странице доступа, чтобы подобрать лучший маршрут под вашу задачу.</p>
+                    </article>
+                    <article class="card faq-card">
+                        <h3>Можно оплатить картой?</h3>
+                        <p>Да. Форма оплаты открывается после выбора тарифа. Условия оплаты и сервиса описаны в оферте.</p>
+                    </article>
+                </div>
+            </section>
+
+            <section class="section">
+                <div class="card cta">
+                    <div>
+                        <h2>Готовы подключиться?</h2>
+                        <p>Выберите тариф, оплатите доступ и получите ключ с инструкциями на email.</p>
+                    </div>
+                    <a class="btn btn-primary" href="#prices">Перейти к тарифам</a>
+                </div>
+            </section>
+
+            <footer class="footer">
+                <div>© Monkey Island VPS. Персональный виртуальный сервер для быстрого и приватного подключения.</div>
+                <div class="footer-links">
+                    <a href="/offer/">Пользовательское соглашение</a>
+                </div>
+            </footer>
+        </div>
+    </main>
+</body>
+</html>
