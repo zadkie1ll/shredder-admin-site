@@ -245,8 +245,9 @@
             border: 1px solid rgba(245, 240, 223, 0.16);
             border-radius: 8px;
             background:
-                linear-gradient(145deg, rgba(18, 25, 22, 0.92), rgba(14, 24, 25, 0.82)),
-                radial-gradient(circle at 24% 24%, rgba(46, 196, 182, 0.18), transparent 36%);
+                linear-gradient(180deg, rgba(8, 11, 11, 0.16), rgba(8, 11, 11, 0.46)),
+                url("{% static 'img/direct-sale-island-map.png' %}") center / cover no-repeat,
+                linear-gradient(145deg, rgba(18, 25, 22, 0.92), rgba(14, 24, 25, 0.82));
             overflow: hidden;
             box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
         }
@@ -263,9 +264,8 @@
             position: absolute;
             inset: 0;
             background:
-                linear-gradient(90deg, rgba(245, 240, 223, 0.05) 1px, transparent 1px),
-                linear-gradient(0deg, rgba(245, 240, 223, 0.05) 1px, transparent 1px);
-            background-size: 46px 46px;
+                linear-gradient(180deg, rgba(8, 11, 11, 0.04), rgba(8, 11, 11, 0.34)),
+                radial-gradient(circle at 50% 34%, transparent 0 34%, rgba(8, 11, 11, 0.34) 78%);
             mask-image: linear-gradient(180deg, transparent, #000 16%, #000 84%, transparent);
         }
 
@@ -288,6 +288,7 @@
             border-radius: 999px;
             background: var(--gold);
             box-shadow: 0 0 0 7px rgba(255, 199, 0, 0.14);
+            display: none;
         }
 
         .route-one {
@@ -317,6 +318,7 @@
             border-right: 2px dashed rgba(255, 199, 0, 0.34);
             border-radius: 0 120px 0 0;
             transform: rotate(-7deg);
+            display: none;
         }
 
         .board-title {
@@ -726,7 +728,7 @@
             <section id="top" class="hero">
                 <div class="hero-copy">
                     <div class="eyebrow">доступ готов через несколько минут</div>
-                    <h1>Личный остров для быстрого и приватного интернета</h1>
+                    <h1>Личный VPS для быстрого и приватного интернета</h1>
                     <p class="lead">
                         Получите персональный ключ, выберите удобную локацию и подключите телефон, компьютер или роутер без ручной настройки серверов.
                     </p>
@@ -762,13 +764,12 @@
             <section id="features" class="section">
                 <div class="section-head">
                     <h2>Что входит в доступ</h2>
-                    <p class="section-note">Страница остается простой и прямой: объясняем ценность, показываем тарифы и сразу ведем к оплате.</p>
                 </div>
                 <div class="grid-3">
                     <article class="card feature">
                         <span class="feature-kicker">личный ключ</span>
-                        <h3>Один доступ для ваших устройств</h3>
-                        <p>Подключайте телефон, ноутбук, планшет и роутер. Кабинет хранит профиль и инструкции под каждую систему.</p>
+                        <h3>Сколько угодно устройств</h3>
+                        <p>Подключайте телефон, ноутбук, планшет, роутер и другие свои устройства по одной подписке.</p>
                     </article>
                     <article class="card feature">
                         <span class="feature-kicker">маршруты</span>
@@ -786,7 +787,6 @@
             <section id="prices" class="section">
                 <div class="section-head">
                     <h2>Тарифы</h2>
-                    <p class="section-note">Пока автосписаний нет, поэтому показываем обычные тарифы с ручным продлением.</p>
                 </div>
                 <div class="tariffs">
                     {% for tariff in tariffs %}
@@ -837,33 +837,32 @@
             <section id="how" class="section">
                 <div class="section-head">
                     <h2>Как это работает</h2>
-                    <p class="section-note">Фокус не на пробном периоде, а на быстром оформлении и понятном первом запуске.</p>
                 </div>
                 <div class="steps">
                     <article class="card step">
                         <h3>1. Оплатите доступ</h3>
                         <p>Выберите тариф, укажите email и перейдите на защищенную страницу оплаты.</p>
-                        <div class="code-box">invoice -> account -> access key</div>
+                        <div class="code-box">тариф -> email -> оплата</div>
                     </article>
                     <article class="card step">
-                        <h3>2. Откройте страницу доступа</h3>
-                        <p>После оплаты мы отправим постоянную ссылку для входа. Внутри будут ключ, QR-код и инструкции.</p>
-                        <div class="code-box">ssconf://personal-access-key</div>
+                        <h3>2. Откройте ссылку из почты</h3>
+                        <p>После оплаты на email придет постоянная ссылка. Откройте ее и попадете в ЛК.</p>
+                        <div class="code-box">email -> постоянная ссылка -> ЛК</div>
                     </article>
                     <article class="card step">
-                        <h3>3. Выберите локацию</h3>
-                        <p>Используйте ближайший узел для скорости или нужную страну для конкретных сервисов.</p>
+                        <h3>3. Подключите устройство</h3>
+                        <p>Проследуйте простой инструкции для вашего телефона, компьютера, планшета или роутера.</p>
+                        <div class="code-box">выберите устройство -> следуйте шагам</div>
+                    </article>
+                    <article class="card step">
+                        <h3>4. Наслаждайтесь</h3>
+                        <p>Пользуйтесь быстрым приватным подключением на всех своих устройствах без автосписаний.</p>
                         <div class="locations">
-                            <span class="location">Нидерланды</span>
-                            <span class="location">Германия</span>
-                            <span class="location">Франция</span>
-                            <span class="location">США</span>
+                            <span class="location">телефон</span>
+                            <span class="location">ноутбук</span>
+                            <span class="location">планшет</span>
+                            <span class="location">роутер</span>
                         </div>
-                    </article>
-                    <article class="card step">
-                        <h3>4. Подключите устройства</h3>
-                        <p>Импортируйте профиль в приложение и используйте один доступ на своих основных устройствах.</p>
-                        <div class="code-box">phone + laptop + router</div>
                     </article>
                 </div>
             </section>
@@ -871,7 +870,6 @@
             <section id="faq" class="section">
                 <div class="section-head">
                     <h2>Частые вопросы</h2>
-                    <p class="section-note">Короткие ответы снимают основные возражения перед покупкой.</p>
                 </div>
                 <div class="faq-grid">
                     <article class="card faq-card">
@@ -889,6 +887,10 @@
                     <article class="card faq-card">
                         <h3>Когда придет доступ?</h3>
                         <p>После успешной оплаты мы создадим страницу доступа и отправим постоянную ссылку на указанный email.</p>
+                    </article>
+                    <article class="card faq-card">
+                        <h3>Работает ли на мобильной сети?</h3>
+                        <p>Да. Доступ работает как через домашний интернет, так и через мобильную сеть вашего оператора.</p>
                     </article>
                     <article class="card faq-card">
                         <h3>Можно менять локации?</h3>
