@@ -1370,10 +1370,15 @@ def index(request):
     if site_role == "vps_direct_sale":
         return render_vps_direct_sale(request)
 
+    trial_period_days = get_display_trial_period_days_for_request(request)
     return render(
         request,
         "index_vpn.html",
-        {"tariffs": ACTUAL_TARIFFS, "tracking_params": get_tracking_params(request)},
+        {
+            "tariffs": ACTUAL_TARIFFS,
+            "tracking_params": get_tracking_params(request),
+            "trial_period_days_label": format_days_ru(trial_period_days),
+        },
     )
 
 

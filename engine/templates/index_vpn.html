@@ -158,9 +158,16 @@
                     Работает там, где другие сдаются.
                 </p>
                 
-                <a href="#prices" class="tilda-yellow px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95 mb-16 md:mb-24">
-                    ПОДКЛЮЧИТЬ VPN
-                </a>
+                <div class="flex flex-col sm:flex-row items-center justify-center md:justify-end gap-4 mb-16 md:mb-24">
+                    <a href="#prices" class="tilda-yellow w-full sm:w-auto px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95">
+                        ПОДКЛЮЧИТЬ VPN
+                    </a>
+                    {% if not user.is_authenticated %}
+                    <a href="/login/" class="w-full sm:w-auto px-10 md:px-12 py-4 md:py-6 rounded-full border border-[#ffc700] bg-black/30 text-[#ffc700] font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 hover:bg-[#ffc700] hover:text-black active:scale-95">
+                        ПОПРОБОВАТЬ БЕСПЛАТНО
+                    </a>
+                    {% endif %}
+                </div>
 
                 <div class="w-full grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 pt-10 border-t border-white/10">
                     <div class="benefit-card flex flex-col items-center">
@@ -206,6 +213,39 @@
             <div class="flex items-center gap-2"><i class="fas fa-tv text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Smart TV</span></div>
         </div>
     </section>
+
+    {% if not user.is_authenticated %}
+    <section class="py-20 bg-[#111111] border-b border-white/5">
+        <div class="container mx-auto px-6">
+            <div class="relative overflow-hidden rounded-[32px] border border-[#ffc700]/25 bg-[#ffc700]/5 p-8 md:p-12 shadow-[0_0_50px_rgba(255,199,0,0.08)]">
+                <div class="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-10">
+                    <div class="max-w-3xl">
+                        <div class="inline-flex items-center gap-2 rounded-full border border-[#ffc700]/30 bg-black/30 px-4 py-2 text-[#ffc700] text-[10px] font-black uppercase tracking-widest mb-6">
+                            <i class="fas fa-gift"></i>
+                            Пробный доступ
+                        </div>
+                        <h2 class="text-3xl md:text-5xl font-black uppercase mb-5 text-white leading-tight">
+                            Попробуйте <span class="text-[#ffc700]">бесплатно</span>
+                        </h2>
+                        <p class="text-white text-sm md:text-lg leading-relaxed opacity-90 max-w-2xl">
+                            Авторизуйтесь в личном кабинете, и мы сразу откроем VPN-доступ на <span class="text-[#ffc700] font-black">{{ trial_period_days_label }}</span>. Без оплаты на старте: проверьте скорость, стабильность и подключение на своих устройствах.
+                        </p>
+                    </div>
+
+                    <div class="flex flex-col items-stretch sm:items-start lg:items-end gap-4">
+                        <a href="/login/" class="tilda-yellow inline-flex items-center justify-center gap-3 px-8 md:px-10 py-5 rounded-full font-black uppercase text-sm md:text-base shadow-2xl transition transform hover:scale-105 active:scale-95 whitespace-nowrap">
+                            <i class="fas fa-right-to-bracket"></i>
+                            Войти в личный кабинет
+                        </a>
+                        <p class="text-gray-400 text-xs md:text-sm text-center sm:text-left lg:text-right max-w-sm">
+                            Если аккаунта еще нет, он создастся при входе, а пробный доступ появится автоматически.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+    {% endif %}
 
     <section class="py-24 relative overflow-hidden bg-[#111111]">
         <div class="container mx-auto px-6 relative z-10">
