@@ -97,9 +97,9 @@ def is_known_site_host(host):
     normalized_host = normalize_host(host)
     return (
         normalized_host in settings.CABINET_DOMAINS
-        or normalized_host in settings.NEUTRAL_DOMAINS
+        or normalized_host in settings.VPS_DOMAINS
         or normalized_host in settings.VPS_DIRECT_SALE_DOMAINS
-        or normalized_host in settings.PROMO_DOMAINS
+        or normalized_host in settings.VPN_DOMAINS
     )
 
 
@@ -107,13 +107,13 @@ def get_site_role(request):
     host = normalize_host(request.get_host())
     if host in settings.CABINET_DOMAINS:
         return "cabinet"
-    if host in settings.NEUTRAL_DOMAINS:
-        return "neutral"
+    if host in settings.VPS_DOMAINS:
+        return "vps"
     if host in settings.VPS_DIRECT_SALE_DOMAINS:
         return "vps_direct_sale"
-    if host in settings.PROMO_DOMAINS:
-        return "promo"
-    return "promo"
+    if host in settings.VPN_DOMAINS:
+        return "vpn"
+    return "vpn"
 
 
 def get_current_base_url(request):
@@ -1355,11 +1355,11 @@ def index(request):
             return redirect("dashboard")
         return render_login(request)
 
-    if site_role == "neutral":
+    if site_role == "vps":
         trial_period_days = get_display_trial_period_days_for_request(request)
         return render(
             request,
-            "index_neutral.html",
+            "index_vps.html",
             {
                 "tariffs": ACTUAL_TARIFFS,
                 "tracking_params": get_tracking_params(request),
@@ -1372,7 +1372,7 @@ def index(request):
 
     return render(
         request,
-        "index.html",
+        "index_vpn.html",
         {"tariffs": ACTUAL_TARIFFS, "tracking_params": get_tracking_params(request)},
     )
 
@@ -1559,9 +1559,13 @@ def dashboard(request):
         else "Не удалось получить ключ доступа. Пожалуйста, свяжитесь с поддержкой."
     )
 
+    dashboard_template = (
+        "dashboard.html" if request.GET.get("ui") == "v1" else "dashboard_v2.html"
+    )
+
     return render(
         request,
-        "dashboard.html",
+        dashboard_template,
         {
             "user": user,
             "tg_bind_link": tg_bind_link,
@@ -2275,18 +2279,50 @@ def pay(request):
     if request.method == "POST":
         capture_tracking_params(request)
         email_raw = request.POST.get("email")
+        tariff_id = request.POST.get("tariff_id")
+        tracking_params = get_tracking_params(request)
+
+        logging.info(
+            "payment request started: host=%s referer=%s tariff_id=%s "
+            "email_present=%s gateway=%s tracking=%s permanent_link=%s",
+            request.get_host(),
+            request.headers.get("referer", ""),
+            tariff_id,
+            bool(email_raw),
+            settings.PAYMENT_GATEWAY,
+            tracking_params,
+            request.POST.get("login_link_kind") == "purchase_permanent",
+        )
+
         if not email_raw:
+            logging.warning("payment request rejected: missing email, tariff_id=%s", tariff_id)
             return HttpResponse("Email обязателен", status=400)
 
         email = email_raw.lower().strip()
-        tariff_id = request.POST.get("tariff_id")
 
         if not email or not tariff_id:
+            logging.warning(
+                "payment request rejected: email_or_tariff_missing email_present=%s tariff_id=%s",
+                bool(email),
+                tariff_id,
+            )
             return HttpResponse("Не указан email или тариф", status=400)
 
         tariff = next((t for t in ACTUAL_TARIFFS if t.db_tariff_id == tariff_id), None)
         if not tariff:
+            logging.warning(
+                "payment request rejected: tariff not found tariff_id=%s email=%s",
+                tariff_id,
+                email,
+            )
             return HttpResponse("Выбранный тариф не найден", status=400)
+
+        logging.info(
+            "payment request accepted: email=%s tariff_id=%s price=%s",
+            email,
+            tariff.db_tariff_id,
+            tariff.price,
+        )
 
         db_session = session_factory()
         try:
@@ -2294,6 +2330,13 @@ def pay(request):
             user = db_session.query(User).filter(User.email == email).first()
             if not user:
                 user = create_site_user(db_session, email, request)
+                logging.info(
+                    "payment user created: email=%s user_id=%s username=%s tariff_id=%s",
+                    email,
+                    user.id,
+                    user.username,
+                    tariff.db_tariff_id,
+                )
             else:
                 registration_context = get_registration_context(request, db_session)
                 sync_existing_user_tracking(
@@ -2302,8 +2345,21 @@ def pay(request):
                     registration_context["traffic_source"],
                     registration_context["ymid"],
                 )
+                logging.info(
+                    "payment existing user found: email=%s user_id=%s username=%s tariff_id=%s",
+                    email,
+                    user.id,
+                    user.username,
+                    tariff.db_tariff_id,
+                )
 
             if settings.PAYMENT_GATEWAY.lower() == "wata":
+                logging.info(
+                    "creating wata invoice: email=%s user_id=%s tariff_id=%s",
+                    email,
+                    user.id,
+                    tariff.db_tariff_id,
+                )
                 json = create_wata_payment_sync(
                     wata_host=settings.WATA_HOST,
                     wata_token=settings.WATA_TOKEN,
@@ -2324,6 +2380,12 @@ def pay(request):
                     f"{email}, confirmation url: {confirmation_url}"
                 )
             else:
+                logging.info(
+                    "creating yookassa payment: email=%s user_id=%s tariff_id=%s",
+                    email,
+                    user.id,
+                    tariff.db_tariff_id,
+                )
                 confirmation_url = create_yk_payment_sync(
                     shop_id=settings.YOOKASSA_SHOP_ID,
                     secret=settings.YOOKASSA_SECRET_KEY,
@@ -2337,6 +2399,12 @@ def pay(request):
             )
             if use_permanent_purchase_link:
                 login_link = create_purchase_login_link(db_session, request, user)
+                logging.info(
+                    "created permanent purchase login link: email=%s user_id=%s tariff_id=%s",
+                    email,
+                    user.id,
+                    tariff.db_tariff_id,
+                )
                 email_subject = "Ссылка доступа Monkey Island VPS"
                 email_title = "Доступ готов"
                 email_intro = "Мы подготовили для вас доступ Monkey Island VPS."
@@ -2354,6 +2422,12 @@ def pay(request):
                 db_session.add(magic)
                 db_session.flush()
                 login_link = f"{get_current_base_url(request)}/login/magic/{magic.token}/"
+                logging.info(
+                    "created short payment magic link: email=%s user_id=%s tariff_id=%s",
+                    email,
+                    user.id,
+                    tariff.db_tariff_id,
+                )
                 email_subject = "Ссылка на личный кабинет Monkey Island"
                 email_title = "Кабинет уже готов"
                 email_intro = "Мы создали для вас личный кабинет Monkey Island."
@@ -2369,6 +2443,12 @@ def pay(request):
                 )
 
             db_session.commit()
+            logging.info(
+                "payment db transaction committed: email=%s user_id=%s tariff_id=%s",
+                email,
+                user.id,
+                tariff.db_tariff_id,
+            )
 
             try:
                 send_magic_link_email(
@@ -2383,9 +2463,22 @@ def pay(request):
                         "footer": email_footer,
                     },
                 )
+                logging.info(
+                    "payment login email sent: email=%s user_id=%s tariff_id=%s permanent_link=%s",
+                    email,
+                    user.id,
+                    tariff.db_tariff_id,
+                    use_permanent_purchase_link,
+                )
             except Exception as e:
                 logging.exception(f"failed to send payment magic link to {email}: {e}")
 
+            logging.info(
+                "payment redirecting to confirmation_url: email=%s user_id=%s tariff_id=%s",
+                email,
+                user.id,
+                tariff.db_tariff_id,
+            )
             return redirect(confirmation_url)
 
         except Exception as e:

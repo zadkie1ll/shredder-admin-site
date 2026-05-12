@@ -89,14 +89,14 @@ def telegram_auth_bots(value):
     return bots
 
 
-PROMO_DOMAINS = config(
-    "PROMO_DOMAINS",
-    default="localhost,127.0.0.1",
+VPN_DOMAINS = config(
+    "VPN_DOMAINS",
+    default=config("PROMO_DOMAINS", default="localhost,127.0.0.1"),
     cast=csv_domains,
 )
-NEUTRAL_DOMAINS = config(
-    "NEUTRAL_DOMAINS",
-    default="",
+VPS_DOMAINS = config(
+    "VPS_DOMAINS",
+    default=config("NEUTRAL_DOMAINS", default=""),
     cast=csv_domains,
 )
 VPS_DIRECT_SALE_DOMAINS = config(
