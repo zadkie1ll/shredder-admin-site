@@ -44,6 +44,8 @@ fi
 
 mkdir -p "${SCRIPT_DIR}/letsencrypt" "${SCRIPT_DIR}/certbot-work" "${SCRIPT_DIR}/certbot-logs"
 
+"${SCRIPT_DIR}/issue-certs.sh"
+
 CREDENTIALS_FILE="$(mktemp)"
 cleanup() {
     rm -f "${CREDENTIALS_FILE}"
