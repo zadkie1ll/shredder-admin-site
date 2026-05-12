@@ -80,15 +80,11 @@
         .brand-mark {
             width: 40px;
             height: 40px;
-            display: grid;
-            place-items: center;
-            border: 2px solid rgba(255, 199, 0, 0.28);
+            border: 1px solid rgba(255, 199, 0, 0.18);
             border-radius: 8px;
-            background: #17120a;
-            color: var(--gold);
-            font-size: 24px;
-            font-weight: 950;
-            box-shadow: 0 14px 34px rgba(0, 0, 0, 0.28);
+            background: rgba(23, 18, 10, 0.62);
+            object-fit: cover;
+            box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22);
         }
 
         .brand-title {
@@ -246,7 +242,7 @@
             border-radius: 8px;
             background:
                 linear-gradient(180deg, rgba(8, 11, 11, 0.16), rgba(8, 11, 11, 0.46)),
-                url("{% static 'img/direct-sale-island-map.png' %}") center / cover no-repeat,
+                url("{% static 'img/vps-direct-sale-island-map.png' %}") center / cover no-repeat,
                 linear-gradient(145deg, rgba(18, 25, 22, 0.92), rgba(14, 24, 25, 0.82));
             overflow: hidden;
             box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
@@ -710,7 +706,7 @@
         <div class="wrap">
             <nav class="nav" aria-label="Главная навигация">
                 <a class="brand" href="#top" aria-label="Monkey Island VPS">
-                    <span class="brand-mark">M</span>
+                    <img class="brand-mark" src="{% static 'icons/icon-192x192.png' %}" alt="">
                     <span>
                         <span class="brand-title">Monkey Island VPS</span>
                         <span class="brand-subtitle">Персональный виртуальный сервер</span>

@@ -98,7 +98,7 @@ def is_known_site_host(host):
     return (
         normalized_host in settings.CABINET_DOMAINS
         or normalized_host in settings.NEUTRAL_DOMAINS
-        or normalized_host in settings.DIRECT_SALE_DOMAINS
+        or normalized_host in settings.VPS_DIRECT_SALE_DOMAINS
         or normalized_host in settings.PROMO_DOMAINS
     )
 
@@ -109,8 +109,8 @@ def get_site_role(request):
         return "cabinet"
     if host in settings.NEUTRAL_DOMAINS:
         return "neutral"
-    if host in settings.DIRECT_SALE_DOMAINS:
-        return "direct_sale"
+    if host in settings.VPS_DIRECT_SALE_DOMAINS:
+        return "vps_direct_sale"
     if host in settings.PROMO_DOMAINS:
         return "promo"
     return "promo"
@@ -1367,8 +1367,8 @@ def index(request):
             },
         )
 
-    if site_role == "direct_sale":
-        return render_direct_sale(request)
+    if site_role == "vps_direct_sale":
+        return render_vps_direct_sale(request)
 
     return render(
         request,
@@ -1377,15 +1377,15 @@ def index(request):
     )
 
 
-def direct_sale(request):
+def vps_direct_sale(request):
     capture_tracking_params(request)
-    return render_direct_sale(request)
+    return render_vps_direct_sale(request)
 
 
-def render_direct_sale(request):
+def render_vps_direct_sale(request):
     return render(
         request,
-        "index_direct_sale.html",
+        "index_vps_direct_sale.html",
         {"tariffs": ACTUAL_TARIFFS, "tracking_params": get_tracking_params(request)},
     )
 
@@ -2415,8 +2415,10 @@ def robots_txt(request):
 
 def dynamic_manifest(request):
     site_role = get_site_role(request)
-    app_name = "Monkey Island VPS" if site_role == "direct_sale" else "VPN Monkey Island"
-    start_url = "/" if site_role == "direct_sale" else "/dashboard/"
+    app_name = (
+        "Monkey Island VPS" if site_role == "vps_direct_sale" else "VPN Monkey Island"
+    )
+    start_url = "/" if site_role == "vps_direct_sale" else "/dashboard/"
     data = {
         "name": app_name,
         "short_name": app_name,

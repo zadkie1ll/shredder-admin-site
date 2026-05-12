@@ -99,8 +99,8 @@ NEUTRAL_DOMAINS = config(
     default="",
     cast=csv_domains,
 )
-DIRECT_SALE_DOMAINS = config(
-    "DIRECT_SALE_DOMAINS",
+VPS_DIRECT_SALE_DOMAINS = config(
+    "VPS_DIRECT_SALE_DOMAINS",
     default="",
     cast=csv_domains,
 )
