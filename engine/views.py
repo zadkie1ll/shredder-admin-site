@@ -75,6 +75,7 @@ ACTUAL_TARIFFS: list[Tariff] = [
     OneYearTariff(),
 ]
 TRACKING_PARAM_KEYS = ("ymid", "ts", "a")
+TRACKING_COOKIE_MAX_AGE = 30 * 24 * 60 * 60
 GOOGLE_OAUTH_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth"
 GOOGLE_OAUTH_TOKEN_URL = "https://oauth2.googleapis.com/token"
 GOOGLE_OAUTH_USERINFO_URL = "https://openidconnect.googleapis.com/v1/userinfo"
@@ -180,10 +181,29 @@ def parse_int(value):
 
 
 def capture_tracking_params(request):
+    captured = {}
     for key in TRACKING_PARAM_KEYS:
         value = request.GET.get(key)
         if value:
             request.session[f"tracking_{key}"] = value
+            captured[key] = value
+
+    return captured
+
+
+def set_tracking_cookies(request, response, tracking_params):
+    for key, value in tracking_params.items():
+        response.set_cookie(
+            f"tracking_{key}",
+            value,
+            max_age=TRACKING_COOKIE_MAX_AGE,
+            path="/",
+            secure=request.is_secure(),
+            httponly=True,
+            samesite="Lax",
+        )
+
+    return response
 
 
 def get_tracking_params(request):
@@ -196,6 +216,14 @@ def get_tracking_params(request):
     return tracking_params
 
 
+def append_query_params(url, params):
+    if not params:
+        return url
+
+    separator = "&" if "?" in url else "?"
+    return f"{url}{separator}{urlencode(params)}"
+
+
 def get_tracking_value(request, *keys):
     for source in (request.POST, request.GET):
         for key in keys:
@@ -205,6 +233,11 @@ def get_tracking_value(request, *keys):
 
     for key in keys:
         value = request.session.get(f"tracking_{key}")
+        if value:
+            return value
+
+    for key in keys:
+        value = request.COOKIES.get(f"tracking_{key}")
         if value:
             return value
 
@@ -587,7 +620,7 @@ def create_site_user(
 
 
 def render_login(request, context=None, status=200):
-    capture_tracking_params(request)
+    captured_tracking_params = capture_tracking_params(request)
     payload = get_pwa_context()
     telegram_bot = get_telegram_auth_bot(request.get_host())
     telegram_bot_id = ""
@@ -613,11 +646,13 @@ def render_login(request, context=None, status=200):
     )
     payload["telegram_bot_username"] = telegram_bot_username
     payload["telegram_bot_id"] = telegram_bot_id
-    payload["telegram_auth_url"] = (
-        f"{get_current_base_url(request)}{reverse('telegram_widget_auth')}"
+    payload["telegram_auth_url"] = append_query_params(
+        f"{get_current_base_url(request)}{reverse('telegram_widget_auth')}",
+        payload["tracking_params"],
     )
-    payload["telegram_return_url"] = (
-        f"{get_current_base_url(request)}{reverse('login')}"
+    payload["telegram_return_url"] = append_query_params(
+        f"{get_current_base_url(request)}{reverse('login')}",
+        payload["tracking_params"],
     )
     payload["telegram_direct_auth_url"] = (
         "https://oauth.telegram.org/auth?"
@@ -634,7 +669,8 @@ def render_login(request, context=None, status=200):
     )
     if context:
         payload.update(context)
-    return render(request, "login.html", payload, status=status)
+    response = render(request, "login.html", payload, status=status)
+    return set_tracking_cookies(request, response, captured_tracking_params)
 
 
 def render_collect_email(request, user, error=None, email="", info=None):
@@ -889,7 +925,7 @@ def login_with_google(request):
             status=503,
         )
 
-    capture_tracking_params(request)
+    captured_tracking_params = capture_tracking_params(request)
     state = secrets.token_urlsafe(32)
     request.session["google_oauth_state"] = state
     request.session.modified = True
@@ -910,7 +946,8 @@ def login_with_google(request):
         )
     )
 
-    return redirect(auth_url)
+    response = redirect(auth_url)
+    return set_tracking_cookies(request, response, captured_tracking_params)
 
 
 def auth_by_google_callback(request):
@@ -1027,7 +1064,7 @@ def login_with_yandex(request):
             status=503,
         )
 
-    capture_tracking_params(request)
+    captured_tracking_params = capture_tracking_params(request)
     state = secrets.token_urlsafe(32)
     request.session["yandex_oauth_state"] = state
     request.session.modified = True
@@ -1046,7 +1083,8 @@ def login_with_yandex(request):
         )
     )
 
-    return redirect(auth_url)
+    response = redirect(auth_url)
+    return set_tracking_cookies(request, response, captured_tracking_params)
 
 
 def auth_by_yandex_callback(request):
@@ -1347,7 +1385,7 @@ def auth_by_telegram_widget(request):
 
 
 def index(request):
-    capture_tracking_params(request)
+    captured_tracking_params = capture_tracking_params(request)
     site_role = get_site_role(request)
 
     if site_role == "cabinet":
@@ -1357,7 +1395,7 @@ def index(request):
 
     if site_role == "vps":
         trial_period_days = get_display_trial_period_days_for_request(request)
-        return render(
+        response = render(
             request,
             "index_vps.html",
             {
@@ -1366,12 +1404,14 @@ def index(request):
                 "trial_period_days_label": format_days_ru(trial_period_days),
             },
         )
+        return set_tracking_cookies(request, response, captured_tracking_params)
 
     if site_role == "vps_direct_sale":
-        return render_vps_direct_sale(request)
+        response = render_vps_direct_sale(request)
+        return set_tracking_cookies(request, response, captured_tracking_params)
 
     trial_period_days = get_display_trial_period_days_for_request(request)
-    return render(
+    response = render(
         request,
         "index_vpn.html",
         {
@@ -1380,11 +1420,13 @@ def index(request):
             "trial_period_days_label": format_days_ru(trial_period_days),
         },
     )
+    return set_tracking_cookies(request, response, captured_tracking_params)
 
 
 def vps_direct_sale(request):
-    capture_tracking_params(request)
-    return render_vps_direct_sale(request)
+    captured_tracking_params = capture_tracking_params(request)
+    response = render_vps_direct_sale(request)
+    return set_tracking_cookies(request, response, captured_tracking_params)
 
 
 def render_vps_direct_sale(request):
@@ -2286,6 +2328,19 @@ def pay(request):
         email_raw = request.POST.get("email")
         tariff_id = request.POST.get("tariff_id")
         tracking_params = get_tracking_params(request)
+        tracking_cookies = {
+            key: request.COOKIES.get(f"tracking_{key}") for key in TRACKING_PARAM_KEYS
+        }
+
+        logging.info(
+            "payment tracking diagnostics: post_ts=%s get_ts=%s session_ts=%s "
+            "tracking_cookies=%s cookie_keys=%s",
+            request.POST.get("ts"),
+            request.GET.get("ts"),
+            request.session.get("tracking_ts"),
+            tracking_cookies,
+            sorted(request.COOKIES.keys()),
+        )
 
         logging.info(
             "payment request started: host=%s referer=%s tariff_id=%s "
@@ -2343,13 +2398,27 @@ def pay(request):
                     tariff.db_tariff_id,
                 )
             else:
-                registration_context = get_registration_context(request, db_session)
-                sync_existing_user_tracking(
-                    db_session,
-                    user,
-                    registration_context["traffic_source"],
-                    registration_context["ymid"],
+                is_authenticated_payment = (
+                    request.user.is_authenticated
+                    and str(request.user.id) == str(user.id)
                 )
+                if is_authenticated_payment:
+                    logging.info(
+                        "payment existing authenticated user tracking preserved: "
+                        "email=%s user_id=%s username=%s tariff_id=%s",
+                        email,
+                        user.id,
+                        user.username,
+                        tariff.db_tariff_id,
+                    )
+                else:
+                    registration_context = get_registration_context(request, db_session)
+                    sync_existing_user_tracking(
+                        db_session,
+                        user,
+                        registration_context["traffic_source"],
+                        registration_context["ymid"],
+                    )
                 logging.info(
                     "payment existing user found: email=%s user_id=%s username=%s tariff_id=%s",
                     email,
