@@ -6,47 +6,69 @@
     <title>Админка Monkey Island</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        :root { --brand-gold: #ffc700; --card-bg: rgba(22,22,24,.95); --card-border: rgba(255,255,255,.1); --muted: #7b8190; --green: #00ff88; --red: #ff9ba1; }
+        :root { --brand-gold: #ffc700; --bg-color: #0b0f12; --card-bg: rgba(17, 23, 28, .96); --inner-card-bg: rgba(21, 29, 35, .82); --card-border: rgba(148, 163, 184, .16); --muted: #8d99a6; --green: #38d996; --red: #ff5c67; --text-main: #e8edf2; --panel-border: #24303a; }
         * { box-sizing: border-box; }
-        body { margin: 0; font-family: 'Montserrat', sans-serif; background: #0a0a0b; color: #f5f5f5; }
-        .page-bg { position: fixed; inset: 0; background: radial-gradient(circle at 78% 6%, rgba(255,199,0,.12), transparent 32%), #0a0a0b; pointer-events: none; }
-        .sidebar { position: fixed; inset: 0 auto 0 0; width: 280px; padding: 34px 20px; border-right: 1px solid var(--card-border); background: rgba(13,13,15,.92); backdrop-filter: blur(15px); z-index: 20; }
-        .main { position: relative; z-index: 10; margin-left: 280px; padding: 34px; max-width: 1720px; }
-        .card { position: relative; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 18px; }
-        .tab-btn { width: 100%; display: flex; align-items: center; gap: 13px; padding: 13px 16px; margin-bottom: 7px; border-radius: 14px; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,.48); font-size: 11px; line-height: 1.25; font-weight: 900; text-transform: uppercase; text-align: left; outline: none; transition: .18s; }
+        body { margin: 0; overflow-x: hidden; font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg-color); color: var(--text-main); }
+        .page-bg { position: fixed; inset: 0; background: radial-gradient(circle at 78% 6%, rgba(255,199,0,.10), transparent 30%), linear-gradient(180deg, rgba(12,16,19,.96), #0b0f12); pointer-events: none; }
+        .sidebar { position: fixed; inset: 0 auto 0 0; width: 280px; padding: 40px 20px; border-right: 1px solid var(--card-border); background: rgba(13,13,15,.9); backdrop-filter: blur(15px); z-index: 20; }
+        .main { position: relative; z-index: 10; margin-left: 280px; padding: 40px; max-width: 1720px; }
+        .card { position: relative; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 16px; box-shadow: 0 18px 50px rgba(0,0,0,.12); }
+        .tab-btn { width: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin-bottom: 8px; border-radius: 14px; border: 1px solid transparent; background: transparent; color: rgba(232,237,242,.54); font-size: 13px; line-height: 1.25; font-weight: 800; text-transform: none; text-align: left; outline: none; transition: .18s; }
         .tab-btn:focus { outline: none; box-shadow: none; }
         .tab-btn i { width: 18px; flex: 0 0 18px; text-align: center; }
         .tab-btn span { min-width: 0; overflow-wrap: anywhere; }
-        .tab-btn.active { color: var(--brand-gold); background: rgba(255,199,0,.08); border: 1px solid rgba(255,199,0,.16); }
-        .brand-eyebrow { color: var(--brand-gold); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
-        .brand-title { margin-top: 8px; color: #fff; font-size: 28px; line-height: 1; font-weight: 900; }
+        .tab-btn.active { color: var(--brand-gold); background: rgba(255,199,0,.08); border: 1px solid rgba(255,199,0,.15); }
+        .brand-eyebrow { color: var(--brand-gold); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+        .brand-title { margin-top: 8px; color: var(--text-main); font-size: 26px; line-height: 1; font-weight: 900; }
         .tab-panel { display: none; }
         .tab-panel.active { display: block; animation: fadeIn .18s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-        .admin-title { margin: 0 0 8px; font-size: clamp(28px, 3vw, 44px); line-height: 1.04; font-weight: 900; text-transform: uppercase; letter-spacing: 0; }
-        .admin-subtitle { margin: 0; color: var(--muted); font-size: 14px; font-weight: 800; }
+        .admin-title { margin: 0 0 10px; color: var(--text-main); font-size: clamp(30px, 2.4vw, 40px); line-height: 1.08; font-weight: 900; letter-spacing: 0; }
+        .admin-subtitle { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.45; font-weight: 700; }
         .panel-header { margin-bottom: 24px; }
-        .form-card { padding: 18px; margin-bottom: 22px; }
+        .form-card { padding: 20px; margin-bottom: 22px; }
         .form-grid-two { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
         .form-grid-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center; }
         .subscription-actions { display: grid; grid-template-columns: 160px auto auto; gap: 12px; align-items: center; margin-top: 12px; }
-        .input { width: 100%; min-height: 46px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: white; border-radius: 14px; padding: 0 14px; font-size: 13px; font-weight: 800; outline: none; }
+        .input { width: 100%; min-width: 0; max-width: 100%; min-height: 50px; border: 1px solid rgba(148,163,184,.16); background: var(--inner-card-bg); color: var(--text-main); border-radius: 12px; padding: 0 16px; font-size: 14px; font-weight: 700; outline: none; }
         .input:focus { border-color: rgba(255,199,0,.45); }
         .input:-webkit-autofill,
         .input:-webkit-autofill:hover,
         .input:-webkit-autofill:focus { -webkit-text-fill-color: #fff; box-shadow: 0 0 0 1000px #202024 inset; transition: background-color 9999s ease-in-out 0s; caret-color: #fff; }
-        .btn { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 14px; padding: 0 18px; background: var(--brand-gold); color: #050505; font-size: 11px; font-weight: 900; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
+        .date-field { position: relative; min-width: 0; }
+        .date-trigger { width: 100%; min-height: 50px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid rgba(148,163,184,.16); background: var(--inner-card-bg); color: var(--text-main); border-radius: 12px; padding: 0 16px; font-size: 14px; font-weight: 800; cursor: pointer; }
+        .date-trigger i { color: var(--brand-gold); }
+        .date-field.open .date-trigger { border-color: rgba(255,199,0,.45); background: rgba(255,199,0,.08); }
+        .date-popover { position: absolute; top: calc(100% + 10px); left: 0; z-index: 80; width: min(330px, calc(100vw - 40px)); display: none; border: 1px solid var(--card-border); border-radius: 20px; background: #11171c; box-shadow: 0 24px 70px rgba(0,0,0,.5); padding: 14px; }
+        .date-field.open .date-popover { display: block; }
+        .date-picker-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+        .date-picker-title { color: #fff; font-size: 14px; font-weight: 800; text-transform: none; }
+        .date-nav { width: 34px; height: 34px; border: 1px solid rgba(255,255,255,.1); border-radius: 10px; background: rgba(255,255,255,.055); color: #fff; cursor: pointer; }
+        .date-nav:hover { border-color: rgba(255,199,0,.35); color: var(--brand-gold); }
+        .date-weekdays,
+        .date-days { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
+        .date-weekday { color: #8f95a3; text-align: center; font-size: 11px; font-weight: 800; text-transform: none; }
+        .date-day { height: 34px; border: 1px solid transparent; border-radius: 10px; background: transparent; color: #fff; font-size: 13px; font-weight: 700; cursor: pointer; }
+        .date-day.outside { color: #5d6370; }
+        .date-day.today { border-color: rgba(255,255,255,.18); }
+        .date-day.selected { background: var(--brand-gold); color: #050505; border-color: rgba(255,199,0,.7); }
+        .date-day:hover { background: rgba(255,255,255,.08); }
+        .date-day.selected:hover { background: var(--brand-gold); }
+        .date-picker-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+        .date-quick { border: 0; background: transparent; color: var(--brand-gold); font-size: 12px; font-weight: 800; text-transform: none; cursor: pointer; }
+        .btn { min-height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 12px; padding: 0 22px; background: var(--brand-gold); color: #050505; font-size: 14px; font-weight: 800; text-transform: none; white-space: nowrap; cursor: pointer; }
+        .btn:disabled { opacity: .42; cursor: not-allowed; }
         .btn-secondary { background: rgba(255,255,255,.08); color: white; border: 1px solid rgba(255,255,255,.1); }
         .result-stack { display: grid; gap: 18px; }
         .metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
         .metrics-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .metrics-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .metric { min-height: 112px; padding: 18px; }
-        .metric-label { color: var(--muted); font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 18px; }
+        .metric { min-height: 124px; padding: 22px; }
+        .metric-label { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: none; letter-spacing: 0; margin-bottom: 18px; }
         .metric-label i { color: var(--brand-gold); margin-right: 8px; }
-        .metric-value { min-width: 0; overflow-wrap: anywhere; color: #fff; font-size: clamp(24px, 2vw, 36px); line-height: 1.05; font-weight: 900; }
+        .metric-value { min-width: 0; overflow-wrap: anywhere; color: var(--text-main); font-size: clamp(26px, 2vw, 34px); line-height: 1.05; font-weight: 800; }
         .table-row { display: grid; gap: 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.07); font-size: 13px; font-weight: 800; }
         .table-row:last-child { border-bottom: 0; }
         .data-table { overflow-x: auto; }
@@ -55,91 +77,94 @@
         .payments-row { grid-template-columns: minmax(150px, .9fr) minmax(140px, .9fr) minmax(130px, .9fr) minmax(100px, .7fr) minmax(220px, 1.4fr); min-width: 850px; }
         .referrals-row { grid-template-columns: minmax(260px, 1.4fr) minmax(100px, .6fr) minmax(110px, .7fr) minmax(170px, .8fr); min-width: 760px; }
         .user-grid { display: grid; grid-template-columns: minmax(220px, 1.1fr) minmax(260px, 1.2fr) minmax(110px, .7fr) minmax(110px, .7fr) minmax(100px, .6fr); gap: 18px; }
-        .cell-label { color: #7b8190; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 5px; }
-        .cell-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 900; }
+        .cell-label { color: var(--muted); font-size: 11px; font-weight: 800; text-transform: none; letter-spacing: 0; margin-bottom: 6px; }
+        .cell-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 800; }
         .cell-value.wrap { white-space: normal; overflow-wrap: anywhere; }
         .muted { color: var(--muted); }
         .gold { color: var(--brand-gold); }
         .green { color: var(--green); }
         .red { color: var(--red); }
         .break-anywhere { overflow-wrap: anywhere; word-break: break-word; }
-        .info-card { padding: 20px; color: #d3d6de; font-size: 13px; font-weight: 800; }
-        .info-title { margin: 0 0 14px; color: #fff; font-size: 18px; line-height: 1.2; font-weight: 900; }
+        .info-card { padding: 24px; color: #d3d6de; font-size: 14px; line-height: 1.45; font-weight: 700; }
+        .info-title { margin: 0 0 14px; color: var(--text-main); font-size: 22px; line-height: 1.2; font-weight: 800; }
         .info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
         .info-item { min-width: 0; }
-        .sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
-        .source-card { padding: 18px; min-width: 0; overflow: hidden; }
+        .sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(310px, 1fr)); gap: 16px; }
+        .source-card { padding: 20px; min-width: 0; overflow: hidden; }
         .source-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
-        .source-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--brand-gold); font-size: 20px; line-height: 1.1; font-weight: 900; }
+        .source-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--brand-gold); font-size: 24px; line-height: 1.1; font-weight: 800; }
         .source-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
-        .source-pill { flex: 0 0 auto; border-radius: 999px; padding: 6px 9px; background: rgba(255,199,0,.1); border: 1px solid rgba(255,199,0,.18); color: var(--brand-gold); font-size: 10px; font-weight: 900; text-transform: uppercase; }
-        .source-details-btn { min-height: 30px; border: 1px solid rgba(255,199,0,.2); border-radius: 999px; padding: 0 11px; background: rgba(255,199,0,.08); color: var(--brand-gold); font-size: 9px; font-weight: 900; text-transform: uppercase; cursor: pointer; }
+        .source-pill { flex: 0 0 auto; border-radius: 999px; padding: 7px 11px; background: rgba(255,199,0,.1); border: 1px solid rgba(255,199,0,.18); color: var(--brand-gold); font-size: 11px; font-weight: 800; text-transform: none; }
+        .source-details-btn { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 999px; padding: 0 14px; background: var(--brand-gold); color: #050505; font-size: 11px; font-weight: 800; text-transform: none; cursor: pointer; box-shadow: 0 0 0 1px rgba(255,199,0,.35); }
         .source-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-        .source-metric { min-width: 0; border-radius: 12px; padding: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); }
-        .source-metric-label { margin-bottom: 6px; color: var(--muted); font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
-        .source-metric-value { color: #fff; font-size: 22px; line-height: 1; font-weight: 900; }
+        .source-metric { min-width: 0; border-radius: 14px; padding: 16px; background: var(--inner-card-bg); border: 1px solid rgba(148,163,184,.14); }
+        .source-metric-label { margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 800; text-transform: none; letter-spacing: 0; }
+        .source-metric-value { color: var(--text-main); font-size: 28px; line-height: 1; font-weight: 800; }
         .source-tariffs { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.08); }
-        .source-tariff-title { margin-bottom: 9px; color: var(--muted); font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
+        .source-tariff-title { margin-bottom: 10px; color: var(--muted); font-size: 12px; font-weight: 800; text-transform: none; letter-spacing: 0; }
         .source-tariff-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-        .source-tariff { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-radius: 10px; padding: 8px 10px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.06); font-size: 11px; font-weight: 900; }
+        .source-tariff { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-radius: 12px; padding: 10px 12px; background: var(--inner-card-bg); border: 1px solid rgba(148,163,184,.12); font-size: 12px; font-weight: 800; }
         .source-tariff-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d3d6de; }
         .source-tariff-count { flex: 0 0 auto; color: #fff; }
-        .source-users { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.08); }
-        .source-users.open { display: block; }
-        .source-users-list { display: grid; gap: 8px; }
-        .source-user-card { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(180px, 1.2fr) minmax(110px, .7fr) minmax(120px, .8fr); gap: 10px; border-radius: 12px; padding: 11px 12px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.06); }
-        .source-user-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 11px; font-weight: 900; }
+        .modal-overlay { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.72); backdrop-filter: blur(8px); }
+        .modal-overlay.open { display: flex; }
+        .modal-card { width: min(1120px, 100%); max-height: min(760px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; background: #11171c; border: 1px solid var(--panel-border); border-radius: 18px; box-shadow: 0 24px 80px rgba(0,0,0,.45); }
+        .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px; border-bottom: 1px solid rgba(255,255,255,.08); }
+        .modal-title { margin: 0; color: var(--text-main); font-size: 26px; line-height: 1.1; font-weight: 800; }
+        .modal-subtitle { margin-top: 6px; color: var(--muted); font-size: 13px; font-weight: 700; }
+        .modal-close { flex: 0 0 auto; width: 44px; height: 44px; border: 1px solid rgba(148,163,184,.16); border-radius: 14px; background: var(--inner-card-bg); color: var(--text-main); cursor: pointer; }
+        .modal-body { overflow-y: auto; padding: 18px 20px; }
+        .modal-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 20px; border-top: 1px solid rgba(255,255,255,.08); }
+        .modal-page-info { color: var(--muted); font-size: 12px; font-weight: 900; }
+        .modal-pagination { display: flex; gap: 8px; }
+        .source-users-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+        .source-user-card { min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 13px; border-radius: 18px; padding: 16px; background: var(--inner-card-bg); border: 1px solid rgba(148,163,184,.14); }
+        .source-user-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-main); font-size: 13px; font-weight: 800; }
+        .source-user-status { display: inline-flex; align-items: center; gap: 7px; width: fit-content; border-radius: 999px; padding: 7px 10px; border: 1px solid rgba(148,163,184,.16); background: rgba(255,255,255,.055); color: #a8aebb; font-size: 11px; font-weight: 800; text-transform: none; }
+        .source-user-status.ok { color: var(--green); border-color: rgba(0,255,136,.22); background: rgba(0,255,136,.08); }
+        .source-user-status.no { color: var(--red); border-color: rgba(255,155,161,.2); background: rgba(255,155,161,.075); }
         .payment-cards { display: grid; grid-template-columns: 1fr; gap: 14px; }
-        .payment-card { padding: 16px; min-width: 0; overflow: hidden; }
+        .payment-card { padding: 20px; min-width: 0; overflow: hidden; }
         .payment-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-        .payment-status { min-width: 0; font-size: 14px; line-height: 1.2; font-weight: 900; }
-        .payment-system { flex: 0 0 auto; border-radius: 999px; padding: 6px 9px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); color: #d3d6de; font-size: 10px; font-weight: 900; text-transform: uppercase; }
-        .payment-main { margin-bottom: 13px; color: #fff; font-size: 24px; line-height: 1; font-weight: 900; }
+        .payment-status { min-width: 0; font-size: 15px; line-height: 1.2; font-weight: 800; }
+        .payment-system { flex: 0 0 auto; border-radius: 999px; padding: 7px 10px; background: var(--inner-card-bg); border: 1px solid rgba(148,163,184,.14); color: #d3d6de; font-size: 11px; font-weight: 800; text-transform: none; }
+        .payment-main { margin-bottom: 13px; color: var(--text-main); font-size: 26px; line-height: 1; font-weight: 800; }
         .payment-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
         .payment-detail { min-width: 0; }
-        .payment-detail-label { margin-bottom: 4px; color: var(--muted); font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
-        .payment-detail-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 12px; font-weight: 900; }
+        .payment-detail-label { margin-bottom: 5px; color: var(--muted); font-size: 11px; font-weight: 800; text-transform: none; letter-spacing: 0; }
+        .payment-detail-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-main); font-size: 13px; font-weight: 800; }
         .payment-id { border-top: 1px solid rgba(255,255,255,.08); padding-top: 10px; color: var(--muted); font-size: 11px; line-height: 1.35; font-weight: 900; overflow-wrap: anywhere; }
-        .referral-cards { display: grid; grid-template-columns: 1fr; gap: 14px; }
-        .referral-card { padding: 16px; min-width: 0; overflow: hidden; }
+        .referral-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+        .referral-card { padding: 20px; min-width: 0; overflow: hidden; background: var(--card-bg); border-color: var(--card-border); }
         .referral-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
-        .referral-name { min-width: 0; color: #fff; font-size: 18px; line-height: 1.15; font-weight: 900; overflow-wrap: anywhere; }
-        .referral-sub { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.3; font-weight: 800; overflow-wrap: anywhere; }
-        .referral-pill { flex: 0 0 auto; border-radius: 999px; padding: 6px 9px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); color: #d3d6de; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+        .referral-name { min-width: 0; color: var(--text-main); font-size: 19px; line-height: 1.15; font-weight: 800; overflow-wrap: anywhere; }
+        .referral-sub { margin-top: 6px; color: #b8bdc8; font-size: 12px; line-height: 1.3; font-weight: 800; overflow-wrap: anywhere; }
+        .referral-pill { flex: 0 0 auto; border-radius: 999px; padding: 7px 10px; background: var(--inner-card-bg); border: 1px solid rgba(148,163,184,.14); color: #eef0f5; font-size: 11px; font-weight: 800; text-transform: none; }
         .referral-pill.paid { color: var(--green); border-color: rgba(0,255,136,.22); background: rgba(0,255,136,.08); }
         .referral-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
-        .referral-detail { min-width: 0; border-radius: 12px; padding: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); }
-        .referral-detail-label { margin-bottom: 6px; color: var(--muted); font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
-        .referral-detail-value { color: #fff; font-size: 18px; line-height: 1; font-weight: 900; overflow-wrap: anywhere; }
-        .referral-bonuses { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); color: #d3d6de; font-size: 12px; line-height: 1.45; font-weight: 800; }
-        .referral-graph-scroll { width: 100%; overflow-x: auto; padding: 4px 0 8px; }
-        .referral-tree { display: inline-flex; flex-direction: column; align-items: center; min-width: 100%; }
-        .referral-tree ul { position: relative; display: flex; justify-content: center; gap: 18px; margin: 0; padding: 28px 0 0; list-style: none; }
-        .referral-tree li { position: relative; display: flex; flex-direction: column; align-items: center; min-width: 150px; }
-        .referral-tree li::before,
-        .referral-tree li::after { content: ""; position: absolute; top: 0; width: calc(50% + 9px); height: 16px; border-top: 1px solid rgba(255,255,255,.16); }
-        .referral-tree li::before { right: 50%; border-right: 1px solid rgba(255,255,255,.16); }
-        .referral-tree li::after { left: 50%; border-left: 1px solid rgba(255,255,255,.16); }
-        .referral-tree li:only-child::before,
-        .referral-tree li:only-child::after { display: none; }
-        .referral-tree li:first-child::before,
-        .referral-tree li:last-child::after { border-top: 0; }
-        .referral-tree li:first-child::after { border-top-left-radius: 10px; }
-        .referral-tree li:last-child::before { border-top-right-radius: 10px; }
-        .referral-tree ul ul::before { content: ""; position: absolute; top: 0; left: 50%; width: 0; height: 28px; border-left: 1px solid rgba(255,255,255,.16); }
-        .graph-node { position: relative; z-index: 1; width: 150px; min-height: 48px; display: flex; flex-direction: column; justify-content: center; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: #fff; padding: 9px 10px; text-align: center; font-size: 11px; font-weight: 900; overflow: hidden; }
-        .graph-node.root { width: 180px; border-color: rgba(255,199,0,.5); background: rgba(255,199,0,.1); color: var(--brand-gold); }
-        .graph-node.child { color: #a6abb7; background: rgba(255,255,255,.03); }
-        .graph-node-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .graph-node-meta { margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.1; text-transform: uppercase; }
+        .referral-detail { min-width: 0; border-radius: 14px; padding: 14px; background: var(--inner-card-bg); border: 1px solid rgba(148,163,184,.14); }
+        .referral-detail-label { margin-bottom: 7px; color: #a8aebb; font-size: 11px; font-weight: 800; text-transform: none; letter-spacing: 0; }
+        .referral-detail-value { color: var(--text-main); font-size: 22px; line-height: 1; font-weight: 800; overflow-wrap: anywhere; }
+        .referral-bonuses { margin-top: 12px; padding: 12px; border-radius: 14px; background: rgba(0,0,0,.22); border: 1px solid rgba(148,163,184,.12); color: #dfe2e8; font-size: 13px; line-height: 1.45; font-weight: 700; }
+        .referral-graph { display: grid; gap: 16px; }
+        .referral-root-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-radius: 14px; padding: 14px 16px; background: rgba(255,199,0,.1); border: 1px solid rgba(255,199,0,.28); }
+        .graph-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 15px; font-weight: 800; }
+        .graph-label.root { color: var(--brand-gold); }
+        .graph-meta { margin-top: 4px; color: #a8aebb; font-size: 11px; font-weight: 700; text-transform: none; }
+        .graph-count { flex: 0 0 auto; border-radius: 999px; padding: 7px 10px; background: rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.1); color: #fff; font-size: 11px; font-weight: 800; }
+        .referral-map-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
+        .referral-map-card { min-width: 0; border-radius: 16px; padding: 14px; background: var(--inner-card-bg); border: 1px solid rgba(148,163,184,.14); }
+        .referral-map-card.has-children { border-color: rgba(255,199,0,.22); background: rgba(255,255,255,.08); }
+        .graph-child-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+        .graph-child-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 999px; padding: 6px 8px; background: rgba(0,0,0,.22); border: 1px solid rgba(255,255,255,.09); color: #dfe2e8; font-size: 10px; font-weight: 800; }
         .chart-card { min-height: 360px; padding: 20px; }
-        .empty-chart { min-height: 260px; display: flex; align-items: center; justify-content: center; color: #777d8c; font-weight: 900; }
+        .empty-chart { min-height: 260px; display: flex; align-items: center; justify-content: center; color: #777d8c; font-weight: 800; }
         .chat-grid { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); gap: 18px; }
         .ticket-list { max-height: calc(100vh - 230px); overflow-y: auto; }
         .ticket-link { display: block; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.07); transition: .16s; }
         .ticket-link:hover { background: rgba(255,199,0,.06); }
-        .ticket-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 10px; font-weight: 900; text-transform: uppercase; }
-        .ticket-subject { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 15px; font-weight: 900; }
+        .ticket-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 11px; font-weight: 700; text-transform: none; }
+        .ticket-subject { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 15px; font-weight: 800; }
         .ticket-user { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; font-weight: 800; }
         .support-filters { display: flex; flex-wrap: wrap; gap: 8px; }
         .btn.active-filter { background: var(--brand-gold); color: #050505; }
@@ -165,6 +190,46 @@
             .source-user-card,
             .payment-detail-grid,
             .referral-detail-grid { grid-template-columns: 1fr; }
+            .source-users-list { grid-template-columns: 1fr; }
+            .modal-overlay { padding: 12px; }
+            .modal-header,
+            .modal-footer { flex-direction: column; align-items: stretch; }
+        }
+        @media (max-width: 640px) {
+            .sidebar { width: 100vw; max-width: 100vw; gap: 8px; padding: 10px 12px; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.08); overscroll-behavior-x: contain; scroll-snap-type: x proximity; }
+            .tab-btn { flex: 0 0 132px; width: 132px; min-width: 132px; height: 58px; justify-content: flex-start; gap: 8px; padding: 10px 12px; border-radius: 14px; font-size: 11px; line-height: 1.18; text-align: left; scroll-snap-align: start; }
+            .tab-btn i { width: auto; flex: 0 0 auto; font-size: 15px; }
+            .tab-btn span { display: -webkit-box; min-width: 0; max-width: 100%; overflow: hidden; overflow-wrap: normal; word-break: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+            .main { width: 100%; max-width: none; padding: 24px 16px 120px; overflow: hidden; }
+            .admin-title { font-size: 30px; line-height: 1.08; }
+            .admin-subtitle { font-size: 13px; line-height: 1.45; }
+            .panel-header { margin-bottom: 18px; }
+            .card { border-radius: 16px; }
+            .form-card { padding: 14px; margin-bottom: 18px; overflow: visible; }
+            .form-card > * { min-width: 0; }
+            .input { min-height: 44px; border-radius: 13px; font-size: 12px; text-align: center; appearance: none; -webkit-appearance: none; }
+            .date-trigger { min-height: 44px; border-radius: 13px; font-size: 12px; }
+            .date-popover { left: 50%; transform: translateX(-50%); width: min(330px, calc(100vw - 32px)); }
+            .btn { min-height: 46px; border-radius: 15px; }
+            .result-stack { gap: 14px; }
+            .metrics-grid { gap: 12px; }
+            .metric { min-height: 118px; padding: 16px; }
+            .metric-label { margin-bottom: 18px; font-size: 12px; line-height: 1.25; }
+            .metric-value { font-size: 32px; }
+            .chart-card { min-height: 300px; padding: 14px; }
+            .source-card,
+            .info-card,
+            .payment-card,
+            .referral-card { padding: 14px; }
+            .source-header { align-items: flex-start; flex-direction: column; }
+            .source-actions { width: 100%; justify-content: space-between; }
+            .source-details-btn { min-height: 34px; padding: 0 12px; }
+            .source-pill { padding: 7px 10px; }
+            .modal-card { max-height: calc(100dvh - 24px); border-radius: 16px; }
+            .modal-title { font-size: 22px; }
+            .modal-body { padding: 14px; }
+            .modal-footer { padding: 14px; }
+            .referral-cards { grid-template-columns: 1fr; }
         }
     </style>
     {% include "includes/yandex_metrika.html" %}
@@ -205,8 +270,22 @@
                 <p class="admin-subtitle">Подписки, подключения, платежи и рекламные источники</p>
             </header>
             <form id="stats-form" class="card form-card form-grid-stats">
-                <input class="input" type="date" name="start">
-                <input class="input" type="date" name="end">
+                <div class="date-field" data-date-picker>
+                    <input type="hidden" name="start">
+                    <button type="button" class="date-trigger" data-date-trigger>
+                        <span data-date-label>Дата начала</span>
+                        <i class="fas fa-calendar-days"></i>
+                    </button>
+                    <div class="date-popover" data-date-popover></div>
+                </div>
+                <div class="date-field" data-date-picker>
+                    <input type="hidden" name="end">
+                    <button type="button" class="date-trigger" data-date-trigger>
+                        <span data-date-label>Дата конца</span>
+                        <i class="fas fa-calendar-days"></i>
+                    </button>
+                    <div class="date-popover" data-date-popover></div>
+                </div>
                 <button class="btn" type="submit"><i class="fas fa-rotate"></i>Обновить</button>
             </form>
             <div id="stats-result" class="result-stack"></div>
@@ -310,9 +389,34 @@
         </section>
     </main>
 
+    <div id="source-users-modal" class="modal-overlay" aria-hidden="true">
+        <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="source-users-modal-title">
+            <header class="modal-header">
+                <div>
+                    <h2 id="source-users-modal-title" class="modal-title">Пользователи источника</h2>
+                    <div id="source-users-modal-subtitle" class="modal-subtitle"></div>
+                </div>
+                <button type="button" class="modal-close" data-source-modal-close aria-label="Закрыть">
+                    <i class="fas fa-times"></i>
+                </button>
+            </header>
+            <div id="source-users-modal-body" class="modal-body"></div>
+            <footer class="modal-footer">
+                <div id="source-users-modal-page" class="modal-page-info"></div>
+                <div class="modal-pagination">
+                    <button type="button" class="btn btn-secondary" data-source-modal-prev>Назад</button>
+                    <button type="button" class="btn" data-source-modal-next>Дальше</button>
+                </div>
+            </footer>
+        </section>
+    </div>
+
     <script>
         const main = document.querySelector('.main');
         const csrfToken = '{{ csrf_token }}';
+        const sourceUsersModalState = {source: null, label: '', page: 1, perPage: 20, totalPages: 1};
+        let activeAdminTab = null;
+        let ticketsRefreshInFlight = false;
         const money = (value) => `${Number(value || 0).toLocaleString('ru-RU')} ₽`;
         const pct = (value) => `${Number(value || 0).toFixed(1)}%`;
 
@@ -325,7 +429,113 @@
                 .replaceAll("'", '&#039;');
         }
 
+        const monthNames = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+        const weekdayNames = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+
+        function localDateFromIso(value) {
+            if (!value) return null;
+            const [year, month, day] = value.split('-').map(Number);
+            if (!year || !month || !day) return null;
+            return new Date(year, month - 1, day);
+        }
+
+        function isoFromLocalDate(date) {
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
+        function displayDate(value) {
+            const date = localDateFromIso(value);
+            if (!date) return '';
+            return date.toLocaleDateString('ru-RU', {day: '2-digit', month: '2-digit', year: 'numeric'});
+        }
+
+        function sameDay(a, b) {
+            return a && b && a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+        }
+
+        function setDateFieldValue(field, value) {
+            const input = field.querySelector('input[type="hidden"]');
+            const label = field.querySelector('[data-date-label]');
+            input.value = value;
+            label.textContent = displayDate(value) || 'Выберите дату';
+        }
+
+        function closeDatePickers(exceptField = null) {
+            document.querySelectorAll('[data-date-picker].open').forEach((field) => {
+                if (field !== exceptField) field.classList.remove('open');
+            });
+        }
+
+        function renderDatePicker(field, viewDate) {
+            const popover = field.querySelector('[data-date-popover]');
+            const input = field.querySelector('input[type="hidden"]');
+            const selectedDate = localDateFromIso(input.value);
+            const todayDate = new Date();
+            const firstOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
+            const startOffset = (firstOfMonth.getDay() + 6) % 7;
+            const gridStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1 - startOffset);
+            const days = Array.from({length: 42}, (_, index) => new Date(gridStart.getFullYear(), gridStart.getMonth(), gridStart.getDate() + index));
+            popover.innerHTML = `
+                <div class="date-picker-head">
+                    <button type="button" class="date-nav" data-date-prev><i class="fas fa-chevron-left"></i></button>
+                    <div class="date-picker-title">${monthNames[viewDate.getMonth()]} ${viewDate.getFullYear()}</div>
+                    <button type="button" class="date-nav" data-date-next><i class="fas fa-chevron-right"></i></button>
+                </div>
+                <div class="date-weekdays">${weekdayNames.map((day) => `<div class="date-weekday">${day}</div>`).join('')}</div>
+                <div class="date-days">
+                    ${days.map((day) => {
+                        const iso = isoFromLocalDate(day);
+                        const classes = [
+                            'date-day',
+                            day.getMonth() !== viewDate.getMonth() ? 'outside' : '',
+                            sameDay(day, todayDate) ? 'today' : '',
+                            sameDay(day, selectedDate) ? 'selected' : '',
+                        ].filter(Boolean).join(' ');
+                        return `<button type="button" class="${classes}" data-date-day="${iso}">${day.getDate()}</button>`;
+                    }).join('')}
+                </div>
+                <div class="date-picker-foot">
+                    <button type="button" class="date-quick" data-date-today>Сегодня</button>
+                    <button type="button" class="date-quick" data-date-close>Закрыть</button>
+                </div>
+            `;
+            popover.querySelector('[data-date-prev]').addEventListener('click', () => renderDatePicker(field, new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1)));
+            popover.querySelector('[data-date-next]').addEventListener('click', () => renderDatePicker(field, new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1)));
+            popover.querySelector('[data-date-today]').addEventListener('click', () => {
+                setDateFieldValue(field, isoFromLocalDate(new Date()));
+                field.classList.remove('open');
+            });
+            popover.querySelector('[data-date-close]').addEventListener('click', () => field.classList.remove('open'));
+            popover.querySelectorAll('[data-date-day]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    setDateFieldValue(field, button.dataset.dateDay);
+                    field.classList.remove('open');
+                });
+            });
+        }
+
+        function setupDatePickers() {
+            document.querySelectorAll('[data-date-picker]').forEach((field) => {
+                const trigger = field.querySelector('[data-date-trigger]');
+                const input = field.querySelector('input[type="hidden"]');
+                trigger.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    const selectedDate = localDateFromIso(input.value) || new Date();
+                    const shouldOpen = !field.classList.contains('open');
+                    closeDatePickers(field);
+                    field.classList.toggle('open', shouldOpen);
+                    if (shouldOpen) renderDatePicker(field, new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
+                });
+                field.querySelector('[data-date-popover]').addEventListener('click', (event) => event.stopPropagation());
+            });
+            document.addEventListener('click', () => closeDatePickers());
+        }
+
         function showAdminTab(tabId) {
+            activeAdminTab = tabId;
             document.querySelectorAll('.tab-panel').forEach((panel) => panel.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach((button) => button.classList.toggle('active', button.dataset.tab === tabId));
             const panel = document.getElementById(`panel-${tabId}`);
@@ -338,7 +548,20 @@
         });
         document.addEventListener('click', (event) => {
             const sourceDetailsButton = event.target.closest('[data-source-details]');
-            if (sourceDetailsButton) toggleSourceDetails(sourceDetailsButton);
+            if (sourceDetailsButton) openSourceUsersModal(sourceDetailsButton);
+        });
+        document.querySelector('[data-source-modal-close]')?.addEventListener('click', closeSourceUsersModal);
+        document.querySelector('[data-source-modal-prev]')?.addEventListener('click', () => {
+            if (sourceUsersModalState.page > 1) loadSourceUsersPage(sourceUsersModalState.page - 1);
+        });
+        document.querySelector('[data-source-modal-next]')?.addEventListener('click', () => {
+            if (sourceUsersModalState.page < sourceUsersModalState.totalPages) loadSourceUsersPage(sourceUsersModalState.page + 1);
+        });
+        document.getElementById('source-users-modal')?.addEventListener('click', (event) => {
+            if (event.target.id === 'source-users-modal') closeSourceUsersModal();
+        });
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape') closeSourceUsersModal();
         });
 
         function setLoading(target, text = 'Загружаем данные...') {
@@ -394,7 +617,7 @@
             const plotWidth = width - leftPadding - rightPadding;
             const plotHeight = height - topPadding - bottomPadding;
             const barWidth = Math.max(18 * dpr, (plotWidth - gap * (rows.length - 1)) / Math.max(1, rows.length));
-            ctx.font = `${11 * dpr}px Montserrat`;
+            ctx.font = `700 ${11 * dpr}px Inter, system-ui, sans-serif`;
             rows.forEach((row, index) => {
                 const x = leftPadding + index * (barWidth + gap);
                 const barHeight = plotHeight * (row.subscriptions / max);
@@ -438,8 +661,8 @@
                     <div class="source-header">
                         <h3 class="source-title" title="${escapeHtml(source.label)}">${escapeHtml(source.label)}</h3>
                         <div class="source-actions">
-                            <button type="button" class="source-details-btn" data-source-details data-source="${escapeHtml(sourceValue)}">
-                                Подробности
+                            <button type="button" class="source-details-btn" data-source-details data-source="${escapeHtml(sourceValue)}" data-source-label="${escapeHtml(source.label)}">
+                                <i class="fas fa-list"></i>Подробности
                             </button>
                             <span class="source-pill">Источник</span>
                         </div>
@@ -481,7 +704,6 @@
                             `).join('')}</div>`
                             : '<span class="muted">Платежей по тарифам нет</span>'}
                     </div>
-                    <div class="source-users" data-source-users></div>
                 </article>
                 `;
             }).join('');
@@ -514,25 +736,42 @@
             if (hasSources) drawBarChart(document.getElementById('stats-chart'), result.sources);
         }
 
-        async function toggleSourceDetails(button) {
-            const card = button.closest('.source-card');
-            const target = card && card.querySelector('[data-source-users]');
+        function openSourceUsersModal(button) {
+            sourceUsersModalState.source = button.dataset.source || '__direct__';
+            sourceUsersModalState.label = button.dataset.sourceLabel || 'Источник';
+            sourceUsersModalState.page = 1;
+            sourceUsersModalState.totalPages = 1;
+            document.getElementById('source-users-modal-title').textContent = sourceUsersModalState.label;
+            document.getElementById('source-users-modal-subtitle').textContent = 'Пользователи, создавшие подписку из этого источника за выбранный период';
+            document.getElementById('source-users-modal').classList.add('open');
+            document.getElementById('source-users-modal').setAttribute('aria-hidden', 'false');
+            loadSourceUsersPage(1);
+        }
+
+        function closeSourceUsersModal() {
+            const modal = document.getElementById('source-users-modal');
+            if (!modal || !modal.classList.contains('open')) return;
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+        }
+
+        async function loadSourceUsersPage(page) {
+            const target = document.getElementById('source-users-modal-body');
+            const pageInfo = document.getElementById('source-users-modal-page');
+            const prevButton = document.querySelector('[data-source-modal-prev]');
+            const nextButton = document.querySelector('[data-source-modal-next]');
             const form = document.getElementById('stats-form');
             if (!target || !form) return;
 
-            if (target.classList.contains('open')) {
-                target.classList.remove('open');
-                target.innerHTML = '';
-                button.textContent = 'Подробности';
-                return;
-            }
-
-            target.classList.add('open');
             target.innerHTML = inlineLoading('Загружаем пользователей...');
-            button.textContent = 'Скрыть';
+            pageInfo.textContent = '';
+            prevButton.disabled = true;
+            nextButton.disabled = true;
 
             const params = new URLSearchParams(new FormData(form));
-            params.set('traffic_source', button.dataset.source || '__direct__');
+            params.set('traffic_source', sourceUsersModalState.source || '__direct__');
+            params.set('page', page);
+            params.set('per_page', sourceUsersModalState.perPage);
             const response = await fetch(`${main.dataset.statsSourceUsersUrl}?${params}`, {
                 headers: {'X-Requested-With': 'XMLHttpRequest'},
             });
@@ -543,8 +782,10 @@
 
             const payload = await response.json();
             const users = (payload.result && payload.result.users) || [];
+            const pagination = (payload.result && payload.result.pagination) || {page: 1, total_pages: 1, total: users.length};
+            sourceUsersModalState.page = pagination.page || 1;
+            sourceUsersModalState.totalPages = Math.max(1, pagination.total_pages || 1);
             target.innerHTML = `
-                <div class="source-tariff-title">Пользователи источника</div>
                 <div class="source-users-list">
                     ${users.map((user) => `
                         <div class="source-user-card">
@@ -564,10 +805,25 @@
                                 <div class="cell-label">Подписка до</div>
                                 <div class="source-user-value ${user.is_active ? 'green' : 'red'}">${escapeHtml(user.expire_at || '—')}</div>
                             </div>
+                            <div>
+                                <div class="cell-label">Платеж</div>
+                                <div class="source-user-status ${user.has_paid ? 'ok' : 'no'}">
+                                    <i class="fas ${user.has_paid ? 'fa-check' : 'fa-times'}"></i>${user.has_paid ? 'Платил' : 'Не платил'}
+                                </div>
+                            </div>
+                            <div>
+                                <div class="cell-label">VPN</div>
+                                <div class="source-user-status ${user.has_connected ? 'ok' : 'no'}">
+                                    <i class="fas ${user.has_connected ? 'fa-plug' : 'fa-minus'}"></i>${user.has_connected ? 'Подключался' : 'Не подключался'}
+                                </div>
+                            </div>
                         </div>
                     `).join('') || '<div class="muted">Пользователей за период нет.</div>'}
                 </div>
             `;
+            pageInfo.textContent = `Страница ${sourceUsersModalState.page} из ${sourceUsersModalState.totalPages} · всего ${pagination.total || 0}`;
+            prevButton.disabled = sourceUsersModalState.page <= 1;
+            nextButton.disabled = sourceUsersModalState.page >= sourceUsersModalState.totalPages;
         }
 
         async function loadUserPayments(event) {
@@ -712,31 +968,36 @@
                 childrenById.get(edge.from).push(edge.to);
             });
             const root = nodes.find((node) => node.root) || nodes[0];
-            const renderNode = (nodeId, level = 0, seen = new Set()) => {
+            const firstLevelIds = (childrenById.get(root.id) || []).filter((childId) => nodeById.has(childId));
+            const renderFirstLevel = (nodeId) => {
                 const node = nodeById.get(nodeId);
-                if (!node || seen.has(nodeId)) return '';
-                const nextSeen = new Set(seen);
-                nextSeen.add(nodeId);
-                const children = (childrenById.get(nodeId) || []).filter((childId) => nodeById.has(childId));
-                const childrenHtml = children.length
-                    ? `<ul>${children.map((childId) => renderNode(childId, level + 1, nextSeen)).join('')}</ul>`
-                    : '';
-                const nodeClass = node.root ? 'root' : level > 1 ? 'child' : '';
-                const meta = node.root ? 'реферер' : level === 1 ? '1 уровень' : '2 уровень';
+                const childIds = (childrenById.get(nodeId) || []).filter((childId) => nodeById.has(childId));
                 return `
-                    <li>
-                        <div class="graph-node ${nodeClass}" title="${escapeHtml(node.label)}">
-                            <div class="graph-node-label">${escapeHtml(node.label)}</div>
-                            <div class="graph-node-meta">${meta}</div>
-                        </div>
-                        ${childrenHtml}
-                    </li>
+                    <article class="referral-map-card ${childIds.length ? 'has-children' : ''}">
+                        <div class="graph-label" title="${escapeHtml(node.label)}">${escapeHtml(node.label)}</div>
+                        <div class="graph-meta">1 уровень${childIds.length ? ` · ${childIds.length} приглаш.` : ''}</div>
+                        ${childIds.length ? `
+                            <div class="graph-child-list">
+                                ${childIds.map((childId) => {
+                                    const child = nodeById.get(childId);
+                                    return `<span class="graph-child-chip" title="${escapeHtml(child.label)}">${escapeHtml(child.label)}</span>`;
+                                }).join('')}
+                            </div>
+                        ` : ''}
+                    </article>
                 `;
             };
             container.innerHTML = `
-                <div class="referral-graph-scroll">
-                    <div class="referral-tree">
-                        <ul>${renderNode(root.id)}</ul>
+                <div class="referral-graph">
+                    <div class="referral-root-card">
+                        <div class="min-w-0">
+                            <div class="graph-label root" title="${escapeHtml(root.label)}">${escapeHtml(root.label)}</div>
+                            <div class="graph-meta">Реферер</div>
+                        </div>
+                        <div class="graph-count">${firstLevelIds.length} прямых</div>
+                    </div>
+                    <div class="referral-map-grid">
+                        ${firstLevelIds.map(renderFirstLevel).join('') || '<div class="muted">Прямых рефералов нет.</div>'}
                     </div>
                 </div>
             `;
@@ -793,7 +1054,8 @@
             ticketsList.querySelectorAll('[data-ticket-id]').forEach((node) => knownTicketVersions.set(String(node.dataset.ticketId), node.dataset.ticketUpdatedAt || ''));
         }
         async function refreshTickets() {
-            if (!ticketsList) return;
+            if (!ticketsList || activeAdminTab !== 'support' || document.hidden || ticketsRefreshInFlight) return;
+            ticketsRefreshInFlight = true;
             try {
                 const response = await fetch(main.dataset.ticketsUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store'});
                 if (!response.ok) return;
@@ -809,6 +1071,8 @@
                 }).join('') : '<div class="info-card muted">Тикетов в этом фильтре нет.</div>';
             } catch (error) {
                 console.warn('Не удалось обновить список тикетов', error);
+            } finally {
+                ticketsRefreshInFlight = false;
             }
         }
 
@@ -826,9 +1090,10 @@
 
         const today = new Date();
         const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        setupDatePickers();
         if (statsForm) {
-            document.querySelector('#stats-form [name="end"]').value = today.toISOString().slice(0, 10);
-            document.querySelector('#stats-form [name="start"]').value = monthAgo.toISOString().slice(0, 10);
+            setDateFieldValue(document.querySelector('#stats-form [name="end"]').closest('[data-date-picker]'), isoFromLocalDate(today));
+            setDateFieldValue(document.querySelector('#stats-form [name="start"]').closest('[data-date-picker]'), isoFromLocalDate(monthAgo));
         }
 
         const defaultTab = document.querySelector('.tab-btn.active')?.dataset.tab || document.querySelector('.tab-btn')?.dataset.tab;
@@ -837,7 +1102,10 @@
         if (initialTab) showAdminTab(initialTab);
         if (statsForm) loadStats();
         rememberRenderedTickets();
-        setInterval(refreshTickets, 3000);
+        setInterval(refreshTickets, 15000);
+        document.addEventListener('visibilitychange', () => {
+            if (!document.hidden) refreshTickets();
+        });
     </script>
 </body>
 </html>

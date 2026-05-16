@@ -2573,16 +2573,27 @@ def support_admin_api_stats_source_users(request):
     if traffic_source == "__direct__":
         traffic_source = None
 
+    try:
+        page = max(1, int(request.GET.get("page") or "1"))
+        per_page = min(50, max(5, int(request.GET.get("per_page") or "20")))
+    except ValueError:
+        return JsonResponse(
+            {"status": "error", "message": "Неверные параметры пагинации"},
+            status=400,
+        )
+
     start_datetime = datetime.combine(start_date, time.min)
     end_datetime = datetime.combine(end_date, time.max)
     db_session = session_factory()
     try:
         query = (
-            db_session.query(EventLog.user_id)
+            db_session.query(
+                EventLog.user_id,
+                func.max(EventLog.timestamp).label("last_seen"),
+            )
             .filter(EventLog.event_type == "subscription_created")
             .filter(EventLog.timestamp >= start_datetime)
             .filter(EventLog.timestamp <= end_datetime)
-            .order_by(EventLog.timestamp.desc())
         )
         if traffic_source is None:
             query = query.filter(EventLog.event_payload["traffic_source"].astext.is_(None))
@@ -2590,26 +2601,59 @@ def support_admin_api_stats_source_users(request):
             query = query.filter(
                 EventLog.event_payload["traffic_source"].astext == str(traffic_source)
             )
-        seen_user_ids = set()
-        user_ids = []
-        for row in query.all():
-            if row.user_id in seen_user_ids:
-                continue
-            seen_user_ids.add(row.user_id)
-            user_ids.append(row.user_id)
+        query = query.group_by(EventLog.user_id).order_by(func.max(EventLog.timestamp).desc())
+        total = query.count()
+        rows = query.offset((page - 1) * per_page).limit(per_page).all()
+        user_ids = [row.user_id for row in rows]
         users_by_id = {
             user.id: user
             for user in db_session.query(User).filter(User.id.in_(user_ids or {-1})).all()
         }
+        yk_paying_user_ids = {
+            row[0]
+            for row in db_session.query(YkPayment.user_id)
+            .filter(YkPayment.status == "succeeded")
+            .filter(YkPayment.user_id.in_(user_ids or {-1}))
+            .distinct()
+            .all()
+        }
+        wata_paying_user_ids = {
+            row[0]
+            for row in db_session.query(WataInvoice.user_id)
+            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .filter(WataTransaction.transaction_status == "Paid")
+            .filter(WataInvoice.user_id.in_(user_ids or {-1}))
+            .distinct()
+            .all()
+        }
+        paying_user_ids = yk_paying_user_ids | wata_paying_user_ids
+        connected_user_ids = {
+            row[0]
+            for row in db_session.query(UserTrafficProgress.user_id)
+            .filter(UserTrafficProgress.user_id.in_(user_ids or {-1}))
+            .filter(UserTrafficProgress.passed_0.is_(True))
+            .all()
+        }
+        users_payload = []
+        for user_id in user_ids:
+            user = users_by_id.get(user_id)
+            if not user:
+                continue
+            payload = admin_user_payload(user)
+            payload["has_paid"] = user_id in paying_user_ids
+            payload["has_connected"] = user_id in connected_user_ids
+            users_payload.append(payload)
         return JsonResponse(
             {
                 "status": "ok",
                 "result": {
-                    "users": [
-                        admin_user_payload(users_by_id[user_id])
-                        for user_id in user_ids
-                        if user_id in users_by_id
-                    ],
+                    "users": users_payload,
+                    "pagination": {
+                        "page": page,
+                        "per_page": per_page,
+                        "total": total,
+                        "total_pages": (total + per_page - 1) // per_page,
+                    },
                 },
             }
         )
