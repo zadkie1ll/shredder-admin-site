@@ -45,6 +45,36 @@ urlpatterns = [
         name="support_admin_tickets_json",
     ),
     path(
+        "support-admin/api/stats/",
+        views.support_admin_api_stats,
+        name="support_admin_api_stats",
+    ),
+    path(
+        "support-admin/api/stats/source-users/",
+        views.support_admin_api_stats_source_users,
+        name="support_admin_api_stats_source_users",
+    ),
+    path(
+        "support-admin/api/user-payments/",
+        views.support_admin_api_user_payments,
+        name="support_admin_api_user_payments",
+    ),
+    path(
+        "support-admin/api/referrals/",
+        views.support_admin_api_referrals,
+        name="support_admin_api_referrals",
+    ),
+    path(
+        "support-admin/api/payment-info/",
+        views.support_admin_api_payment_info,
+        name="support_admin_api_payment_info",
+    ),
+    path(
+        "support-admin/api/subscription-manage/",
+        views.support_admin_api_subscription_manage,
+        name="support_admin_api_subscription_manage",
+    ),
+    path(
         "support-admin/tickets/<int:ticket_id>/",
         views.support_admin_ticket_detail,
         name="support_admin_ticket_detail",

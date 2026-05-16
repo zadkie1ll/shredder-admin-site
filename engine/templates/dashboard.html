@@ -165,6 +165,14 @@
                 text-transform: none;
                 white-space: nowrap;
                 overflow: hidden;
+                border-radius: 14px;
+                padding: 8px 4px;
+            }
+
+            .nav-mobile .nav-btn.active {
+                color: var(--brand-gold);
+                background: rgba(255, 199, 0, 0.11);
+                border: 1px solid rgba(255, 199, 0, 0.22);
             }
 
             .nav-mobile .nav-btn i {
@@ -3059,7 +3067,7 @@
             if (supportAudioContext.state === 'suspended') {
                 await supportAudioContext.resume().catch(() => {});
             }
-            const button = document.getElementById('support-sound-enable');
+            const button = null;
             if (button) button.remove();
             if (playTest) {
                 playSupportMessageSound();
@@ -3067,15 +3075,7 @@
         }
 
         function installSupportSoundButton() {
-            if (supportSoundReady || document.getElementById('support-sound-enable')) return;
-
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.id = 'support-sound-enable';
-            button.className = 'fixed right-5 bottom-24 z-[70] rounded-2xl border border-[#ffc700]/30 bg-[#ffc700] px-4 py-3 text-[10px] font-black uppercase text-black shadow-2xl';
-            button.innerHTML = '<i class="fas fa-volume-up mr-2"></i>Включить звук';
-            button.addEventListener('click', () => unlockSupportSound(true));
-            document.body.appendChild(button);
+            return;
         }
 
         function playSupportMessageSound() {
@@ -3198,10 +3198,6 @@
             updateSubscriptionOverview();
             setupSupportAjaxForm(document.getElementById('support-message-form'));
             setupSupportAjaxForm(document.getElementById('support-create-form'));
-            if (document.getElementById('tab-support')) {
-                installSupportSoundButton();
-            }
-
             const initialTab = new URLSearchParams(window.location.search).get('tab');
             if (initialTab) {
                 showTab(initialTab);
@@ -3220,8 +3216,6 @@
             }
         });
 
-        window.addEventListener('pointerdown', () => unlockSupportSound(false), {once: true});
-        window.addEventListener('keydown', () => unlockSupportSound(false), {once: true});
 
         // ЛОГИКА ТАРИФОВ (Full Page)
         function showTariffs() {

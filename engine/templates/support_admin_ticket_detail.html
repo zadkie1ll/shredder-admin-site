@@ -8,26 +8,48 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Montserrat', sans-serif; background: #080808; color: #fff; }
-        .card { background: rgba(22,22,24,.96); border: 1px solid rgba(255,255,255,.1); border-radius: 24px; }
-        .msg { max-width: min(78%, 720px); border-radius: 20px; padding: 14px 16px; border: 1px solid rgba(255,255,255,.08); }
+        html, body { min-height: 100%; }
+        body { font-family: 'Montserrat', sans-serif; background: #080808; color: #fff; margin: 0; }
+        .ticket-page { min-height: 100vh; min-height: 100dvh; padding: 20px 24px calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
+        .ticket-shell { width: 100%; max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; flex: 1 1 auto; min-height: 0; }
+        .card { background: rgba(22,22,24,.96); border: 1px solid rgba(255,255,255,.1); border-radius: 18px; }
+        .msg { max-width: min(78%, 720px); border-radius: 16px; padding: 10px 12px; border: 1px solid rgba(255,255,255,.08); }
         .msg-user { margin-right: auto; background: rgba(255,255,255,.05); }
         .msg-support { margin-left: auto; background: rgba(255,199,0,.12); border-color: rgba(255,199,0,.22); }
         .attachment-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 12px; }
         .attachment { display: block; overflow: hidden; border-radius: 14px; border: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.28); }
         .attachment img, .attachment video { width: 100%; max-height: 240px; object-fit: cover; display: block; }
-        .file-btn { width: 58px; height: 58px; border-radius: 16px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.06); color: #9ca3af; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+        .file-btn { width: 46px; height: 46px; border-radius: 14px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.06); color: #9ca3af; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
         .file-btn:hover { color: #ffc700; border-color: rgba(255,199,0,.3); }
+        .ticket-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
+        .ticket-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+        .ticket-user-card { padding: 14px; }
+        .ticket-user-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; font-size: 12px; font-weight: 800; }
+        .ticket-user-item { min-width: 0; border-radius: 12px; background: rgba(255,255,255,.05); padding: 11px 12px; }
+        .ticket-user-label { color: #7b8190; font-size: 10px; font-weight: 900; margin-bottom: 4px; }
+        .ticket-user-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .chat-card { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 14px; }
+        .chat-scroll { flex: 1 1 auto; min-height: 260px; overflow-y: auto; padding-right: 4px; margin-bottom: 12px; }
+        .composer { display: grid; grid-template-columns: minmax(0, 1fr) 46px 46px; gap: 8px; align-items: end; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+        .composer textarea { min-height: 46px; max-height: 120px; resize: vertical; }
+        @media (max-width: 760px) {
+            .ticket-page { padding: 14px 12px calc(16px + env(safe-area-inset-bottom)); }
+            .ticket-header { grid-template-columns: 1fr; }
+            .ticket-actions { justify-content: flex-start; }
+            .ticket-user-grid { grid-template-columns: 1fr; }
+            .composer { grid-template-columns: minmax(0, 1fr) 42px 42px; }
+            .file-btn { width: 42px; height: 42px; }
+        }
     </style>
     {% include "includes/yandex_metrika.html" %}
 </head>
 <body>
-    <main class="min-h-screen p-5 md:p-8">
-        <div class="max-w-5xl mx-auto space-y-6">
-            <header class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+    <main class="ticket-page">
+        <div class="ticket-shell">
+            <header class="ticket-header">
                 <div>
-                    <a href="{% url 'support_admin_tickets' %}" class="text-gray-500 text-sm font-black hover:text-[#ffc700]">← К списку</a>
-                    <h1 class="text-3xl md:text-4xl font-black mt-3">Тикет #{{ ticket.id }}</h1>
+                    <a href="{% url 'support_admin_tickets' %}#support" class="text-gray-500 text-xs font-black hover:text-[#ffc700]">← К списку</a>
+                    <h1 class="text-2xl md:text-3xl font-black mt-2">Тикет #{{ ticket.id }}</h1>
                     <p class="text-gray-500 text-sm font-bold mt-1">
                         {{ ticket.subject }}
                         {% if ticket.status == support_status_open %}
@@ -37,42 +59,41 @@
                         {% endif %}
                     </p>
                 </div>
-                <div class="flex flex-wrap gap-3">
+                <div class="ticket-actions">
                     {% if ticket.status == support_status_open %}
                         <form method="post" action="{% url 'support_admin_close_ticket' ticket.id %}">
                             {% csrf_token %}
-                            <button type="submit" class="rounded-xl border border-red-400/25 bg-red-400/10 px-4 py-3 text-red-200 text-xs font-black uppercase">
+                            <button type="submit" class="rounded-xl border border-red-400/25 bg-red-400/10 px-3 py-2 text-red-200 text-[10px] font-black uppercase">
                                 Закрыть тикет
                             </button>
                         </form>
                     {% else %}
                         <form method="post" action="{% url 'support_admin_reopen_ticket' ticket.id %}">
                             {% csrf_token %}
-                            <button type="submit" class="rounded-xl border border-[#00ff88]/25 bg-[#00ff88]/10 px-4 py-3 text-[#00ff88] text-xs font-black uppercase">
+                            <button type="submit" class="rounded-xl border border-[#00ff88]/25 bg-[#00ff88]/10 px-3 py-2 text-[#00ff88] text-[10px] font-black uppercase">
                                 Переоткрыть
                             </button>
                         </form>
                     {% endif %}
                     <form method="post" action="{% url 'support_admin_delete_ticket' ticket.id %}" onsubmit="return confirm('Удалить тикет #{{ ticket.id }} и все вложения?')">
                         {% csrf_token %}
-                        <button type="submit" class="rounded-xl border border-red-500/35 bg-red-500/10 px-4 py-3 text-red-300 text-xs font-black uppercase">
+                        <button type="submit" class="rounded-xl border border-red-500/35 bg-red-500/10 px-3 py-2 text-red-300 text-[10px] font-black uppercase">
                             Удалить тикет
                         </button>
                     </form>
                 </div>
             </header>
 
-            <section class="card p-5">
-                <h2 class="text-lg font-black mb-2">Пользователь</h2>
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-sm font-bold">
-                    <div class="rounded-2xl bg-white/5 p-4"><span class="text-gray-500">ID</span><br>{{ ticket_user.id }}</div>
-                    <div class="rounded-2xl bg-white/5 p-4"><span class="text-gray-500">Email</span><br>{{ ticket_user.email|default:"—" }}</div>
-                    <div class="rounded-2xl bg-white/5 p-4"><span class="text-gray-500">Telegram</span><br>{{ ticket_user.telegram_id|default:"—" }}</div>
+            <section class="card ticket-user-card">
+                <div class="ticket-user-grid">
+                    <div class="ticket-user-item"><div class="ticket-user-label">ID</div><div class="ticket-user-value">{{ ticket_user.id }}</div></div>
+                    <div class="ticket-user-item"><div class="ticket-user-label">Email</div><div class="ticket-user-value">{{ ticket_user.email|default:"—" }}</div></div>
+                    <div class="ticket-user-item"><div class="ticket-user-label">Telegram</div><div class="ticket-user-value">{{ ticket_user.telegram_id|default:"—" }}</div></div>
                 </div>
             </section>
 
-            <section class="card p-5">
-                <div class="h-[52vh] min-h-[360px] overflow-y-auto space-y-4 pr-1 mb-5" id="admin-chat-scroll">
+            <section class="card chat-card">
+                <div class="chat-scroll space-y-3" id="admin-chat-scroll">
                     {% for message in support_messages %}
                         <div class="msg {% if message.sender_type == support_sender_user %}msg-user{% else %}msg-support{% endif %}">
                             <div class="flex items-center justify-between gap-3 mb-2">
@@ -81,7 +102,7 @@
                                 </span>
                                 <span class="text-[10px] text-gray-500 font-bold">{{ message.created_at|date:"d.m.Y H:i" }}</span>
                             </div>
-                            <p class="text-sm text-white/90 font-bold leading-relaxed whitespace-pre-wrap">{{ message.message }}</p>
+                            <p class="text-xs md:text-sm text-white/90 font-bold leading-relaxed whitespace-pre-wrap">{{ message.message }}</p>
                             {% if message.attachments %}
                                 <div class="attachment-grid">
                                     {% for attachment in message.attachments %}
@@ -107,14 +128,14 @@
                     {% endfor %}
                 </div>
 
-                <form method="post" action="{% url 'support_admin_create_message' ticket.id %}" enctype="multipart/form-data" class="flex items-end gap-3" id="admin-support-message-form" data-messages-url="{% url 'support_admin_ticket_messages_json' ticket.id %}">
+                <form method="post" action="{% url 'support_admin_create_message' ticket.id %}" enctype="multipart/form-data" class="composer" id="admin-support-message-form" data-messages-url="{% url 'support_admin_ticket_messages_json' ticket.id %}">
                     {% csrf_token %}
-                    <textarea name="message" rows="2" required placeholder="Ответ поддержки..." class="flex-1 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 text-white font-bold outline-none focus:border-[#ffc700]/40"></textarea>
+                    <textarea name="message" rows="2" required placeholder="Ответ поддержки..." class="rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-sm text-white font-bold outline-none focus:border-[#ffc700]/40"></textarea>
                     <label class="file-btn" title="Прикрепить скриншот или видео">
                         <input type="file" name="attachments" accept="image/*,video/*" multiple class="hidden">
                         <i class="fas fa-paperclip"></i>
                     </label>
-                    <button type="submit" class="h-[58px] min-w-[58px] rounded-2xl bg-[#ffc700] text-black font-black">
+                    <button type="submit" class="h-[46px] min-w-[46px] rounded-xl bg-[#ffc700] text-black font-black">
                         <i class="far fa-paper-plane"></i>
                     </button>
                 </form>
@@ -195,21 +216,13 @@
             if (audioContext.state === 'suspended') {
                 await audioContext.resume().catch(() => {});
             }
-            const button = document.getElementById('support-sound-enable');
+            const button = null;
             if (button) button.remove();
             if (playTest) playMessageSound();
         }
 
         function installSoundButton() {
-            if (soundReady || document.getElementById('support-sound-enable')) return;
-
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.id = 'support-sound-enable';
-            button.className = 'fixed right-5 bottom-5 z-50 rounded-2xl border border-[#ffc700]/30 bg-[#ffc700] px-4 py-3 text-[10px] font-black uppercase text-black shadow-2xl';
-            button.innerHTML = '<i class="fas fa-volume-up mr-2"></i>Включить звук';
-            button.addEventListener('click', () => unlockSound(true));
-            document.body.appendChild(button);
+            return;
         }
 
         function playMessageSound() {
@@ -312,7 +325,6 @@
             });
         }
 
-        installSoundButton();
         if (adminChat) {
             adminChat.scrollTop = adminChat.scrollHeight;
             adminChat.querySelectorAll('[data-message-id]').forEach((node) => {
@@ -321,8 +333,6 @@
         }
         setupAdminMessageForm();
         setInterval(refreshMessages, 2000);
-        window.addEventListener('pointerdown', () => unlockSound(false), {once: true});
-        window.addEventListener('keydown', () => unlockSound(false), {once: true});
     </script>
 </body>
 </html>

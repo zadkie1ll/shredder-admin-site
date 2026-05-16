@@ -9,7 +9,10 @@ import secrets
 import httpx
 from pathlib import Path
 from datetime import datetime
+from datetime import date
+from datetime import time
 from datetime import timedelta
+from datetime import timezone
 from urllib.parse import urlencode
 from urllib.parse import urlsplit
 from django.http import HttpResponse
@@ -35,8 +38,10 @@ from django.template.loader import render_to_string
 from django.utils.text import get_valid_filename
 from django.utils.html import strip_tags
 from sqlalchemy import func
+from sqlalchemy import Integer
 from sqlalchemy import update
 from sqlalchemy import delete as sa_delete
+from sqlalchemy import or_
 from sqlalchemy.exc import IntegrityError
 from common.models.db import User
 from common.models.db import EventLog
@@ -44,7 +49,10 @@ from common.models.db import ReferralBonus
 from common.models.db import ReferralBonusType
 from common.models.db import ReferralType
 from common.models.db import UserTrafficProgress
+from common.models.db import YkPayment
 from common.models.db import YkRecurrentPayment
+from common.models.db import WataInvoice
+from common.models.db import WataTransaction
 from common.models.db import MagicToken
 from common.models.db import TelegramLoginToken
 from common.models.db import PurchaseLoginToken
@@ -85,6 +93,9 @@ YANDEX_OAUTH_USERINFO_URL = "https://login.yandex.ru/info"
 
 rwms_client = RwmsClientSync(settings.RWMS_HOST, settings.RWMS_PORT)
 SUPPORT_ADMIN_SESSION_KEY = "support_admin_authenticated"
+SUPPORT_ADMIN_ROLE_SESSION_KEY = "support_admin_role"
+SUPPORT_ADMIN_ROLE_ADMIN = "admin"
+SUPPORT_ADMIN_ROLE_SUPPORT = "support"
 SUPPORT_ATTACHMENT_ALLOWED_PREFIXES = ("image/", "video/")
 EMAIL_CONFIRMATION_SALT = "dashboard-email-confirmation"
 EMAIL_CONFIRMATION_MAX_AGE_SECONDS = 15 * 60
@@ -498,20 +509,50 @@ def support_admin_is_authenticated(request):
     return bool(request.session.get(SUPPORT_ADMIN_SESSION_KEY))
 
 
+def support_admin_role(request):
+    if not support_admin_is_authenticated(request):
+        return None
+    return request.session.get(
+        SUPPORT_ADMIN_ROLE_SESSION_KEY,
+        SUPPORT_ADMIN_ROLE_ADMIN,
+    )
+
+
+def support_admin_is_full_admin(request):
+    return support_admin_role(request) == SUPPORT_ADMIN_ROLE_ADMIN
+
+
 def require_support_admin(request):
-    if not settings.SUPPORT_ADMIN_PASSWORD:
-        logging.warning("support admin requested but SUPPORT_ADMIN_PASSWORD is missing")
+    if not settings.SUPPORT_ADMIN_PASSWORD and not settings.SUPPORT_STAFF_PASSWORD:
+        logging.warning("support admin requested but no support password is configured")
         return render(
             request,
             "support_admin_login.html",
             {
-                "error": "Админка поддержки не настроена: задайте SUPPORT_ADMIN_PASSWORD.",
+                "error": "Админка поддержки не настроена: задайте SUPPORT_ADMIN_PASSWORD или SUPPORT_STAFF_PASSWORD.",
             },
             status=503,
         )
 
     if not support_admin_is_authenticated(request):
         return redirect("support_admin_login")
+
+    return None
+
+
+def require_support_admin_role(request, role):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    if support_admin_role(request) != role:
+        return JsonResponse(
+            {
+                "status": "forbidden",
+                "message": "Недостаточно прав для этого раздела.",
+            },
+            status=403,
+        )
 
     return None
 
@@ -832,7 +873,7 @@ def send_email_confirmation_email(email, link):
     send_magic_link_email(
         email,
         link,
-        subject="Подтверждение email в Monkey Island",
+        subject="Подтвердите email в Monkey Island",
         template_context={
             "title": "Подтвердите email",
             "intro": "Вы привязываете этот email к личному кабинету Monkey Island.",
@@ -1987,9 +2028,25 @@ def support_admin_login(request):
             settings.SUPPORT_ADMIN_PASSWORD,
         ):
             request.session[SUPPORT_ADMIN_SESSION_KEY] = True
+            request.session[SUPPORT_ADMIN_ROLE_SESSION_KEY] = SUPPORT_ADMIN_ROLE_ADMIN
             request.session.modified = True
             return redirect("support_admin_tickets")
 
+        if settings.SUPPORT_STAFF_PASSWORD and hmac.compare_digest(
+            password,
+            settings.SUPPORT_STAFF_PASSWORD,
+        ):
+            request.session[SUPPORT_ADMIN_SESSION_KEY] = True
+            request.session[SUPPORT_ADMIN_ROLE_SESSION_KEY] = SUPPORT_ADMIN_ROLE_SUPPORT
+            request.session.modified = True
+            return redirect("support_admin_tickets")
+
+        logging.warning(
+            "Support admin login failed: admin_password_configured=%s, "
+            "staff_password_configured=%s",
+            bool(settings.SUPPORT_ADMIN_PASSWORD),
+            bool(settings.SUPPORT_STAFF_PASSWORD),
+        )
         return render(
             request,
             "support_admin_login.html",
@@ -2002,6 +2059,7 @@ def support_admin_login(request):
 
 def support_admin_logout(request):
     request.session.pop(SUPPORT_ADMIN_SESSION_KEY, None)
+    request.session.pop(SUPPORT_ADMIN_ROLE_SESSION_KEY, None)
     request.session.modified = True
     return redirect("support_admin_login")
 
@@ -2023,6 +2081,8 @@ def support_admin_tickets(request):
             "open_count": tickets_data["open_count"],
             "closed_count": tickets_data["closed_count"],
             "support_status_open": SupportTicketStatus.OPEN,
+            "support_admin_role": support_admin_role(request),
+            "support_admin_is_full_admin": support_admin_is_full_admin(request),
         },
     )
 
@@ -2095,6 +2155,744 @@ def support_admin_tickets_json(request):
             "tickets": tickets_data["ticket_payloads"],
         }
     )
+
+
+def admin_parse_date(value):
+    return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+def admin_money(value):
+    return int(value or 0)
+
+
+def admin_dt(value):
+    if not value:
+        return None
+    if value.tzinfo:
+        value = value.replace(tzinfo=None)
+    return value
+
+
+def admin_date_label(value, with_time=True):
+    value = admin_dt(value)
+    if not value:
+        return "Нет данных"
+    return value.strftime("%d.%m.%Y %H:%M" if with_time else "%d.%m.%Y")
+
+
+def get_tariff_display_name(tariff_id):
+    tariff_names = {
+        "threedays": "3 дня",
+        "oneday": "1 день",
+        "oneweek": "1 неделя",
+        "month": "1 месяц",
+        "threemonths": "3 месяца",
+        "sixmonths": "6 месяцев",
+        "year": "1 год",
+    }
+    return tariff_names.get(tariff_id, tariff_id or "Без тарифа")
+
+
+def get_tariff_order(tariff_name):
+    order = {
+        "3 дня": 1,
+        "1 день": 2,
+        "1 неделя": 3,
+        "1 месяц": 4,
+        "3 месяца": 5,
+        "6 месяцев": 6,
+        "1 год": 7,
+    }
+    return order.get(tariff_name, 99)
+
+
+def admin_find_user(db_session, value):
+    value = (value or "").strip()
+    if not value:
+        return None
+
+    normalized = value.lstrip("@")
+    filters = [User.username == normalized, User.email == value]
+    if normalized.isdigit():
+        filters.append(User.telegram_id == int(normalized))
+
+    return db_session.query(User).filter(or_(*filters)).first()
+
+
+def admin_user_payload(user):
+    if not user:
+        return None
+
+    now = datetime.utcnow()
+    expire_at = admin_dt(user.expire_at)
+    days_left = (expire_at - now).days if expire_at else None
+    return {
+        "id": user.id,
+        "username": user.username,
+        "email": user.email or "",
+        "telegram_id": str(user.telegram_id or ""),
+        "expire_at": admin_date_label(user.expire_at, with_time=False),
+        "days_left": days_left,
+        "is_active": bool(expire_at and expire_at > now),
+        "autopay_allow": bool(user.autopay_allow),
+    }
+
+
+def admin_traffic_status_payload(traffic):
+    if not traffic:
+        return "Нет данных"
+    if traffic.passed_100mb:
+        return "Активный: 100 MB+"
+    if traffic.passed_5mb:
+        return "Подключен: 5 MB+"
+    if traffic.passed_0:
+        return "Конфиг скачан"
+    return "Не подключался"
+
+
+def admin_payment_history(db_session, user):
+    yk_payments = (
+        db_session.query(YkPayment)
+        .filter(YkPayment.user_id == user.id)
+        .order_by(YkPayment.created_at.desc())
+        .all()
+    )
+    wata_payments = (
+        db_session.query(WataTransaction, WataInvoice)
+        .join(WataInvoice, WataInvoice.order_id == WataTransaction.order_id)
+        .filter(WataInvoice.user_id == user.id)
+        .order_by(WataTransaction.payment_time.desc())
+        .all()
+    )
+
+    history = []
+    yk_ltv = 0
+    wata_ltv = 0
+
+    for payment in yk_payments:
+        if payment.status == "succeeded":
+            yk_ltv += admin_money(payment.amount)
+        history.append(
+            {
+                "system": "YooKassa",
+                "id": payment.payment_id,
+                "date": admin_date_label(payment.created_at),
+                "date_sort": admin_dt(payment.created_at) or datetime.min,
+                "status": payment.status,
+                "success": payment.status == "succeeded",
+                "amount": admin_money(payment.amount),
+                "currency": payment.currency,
+                "tariff": get_tariff_display_name(payment.subscription_period),
+                "trial": bool(payment.is_trial_promotion),
+            }
+        )
+
+    for payment, invoice in wata_payments:
+        if payment.transaction_status == "Paid":
+            wata_ltv += admin_money(payment.amount)
+        history.append(
+            {
+                "system": "Wata",
+                "id": payment.transaction_id,
+                "date": admin_date_label(payment.payment_time),
+                "date_sort": admin_dt(payment.payment_time) or datetime.min,
+                "status": payment.transaction_status,
+                "success": payment.transaction_status == "Paid",
+                "amount": admin_money(payment.amount),
+                "currency": payment.currency,
+                "tariff": invoice.tariff_id
+                and get_tariff_display_name(invoice.tariff_id)
+                or payment.order_description,
+                "trial": False,
+            }
+        )
+
+    history.sort(key=lambda item: item["date_sort"], reverse=True)
+    for item in history:
+        item.pop("date_sort", None)
+
+    recurrent = (
+        db_session.query(YkRecurrentPayment)
+        .filter(YkRecurrentPayment.user_id == user.id)
+        .first()
+    )
+    traffic = (
+        db_session.query(UserTrafficProgress)
+        .filter(UserTrafficProgress.user_id == user.id)
+        .first()
+    )
+    first_seen = (
+        db_session.query(func.min(EventLog.timestamp))
+        .filter(EventLog.user_id == user.id)
+        .scalar()
+    )
+
+    return {
+        "user": admin_user_payload(user),
+        "ltv": yk_ltv + wata_ltv,
+        "autopay": {
+            "yk": bool(recurrent),
+            "wata": bool(user.autopay_allow),
+            "yk_tariff": get_tariff_display_name(recurrent.subscription_period)
+            if recurrent
+            else "",
+            "yk_amount": recurrent.amount if recurrent else None,
+            "yk_currency": recurrent.currency if recurrent else "",
+        },
+        "traffic": admin_traffic_status_payload(traffic),
+        "first_seen": admin_date_label(first_seen, with_time=False)
+        if first_seen
+        else "Нет данных",
+        "history": history,
+    }
+
+
+def support_admin_api_user_payments(request):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        user = admin_find_user(db_session, request.GET.get("q"))
+        if not user:
+            return JsonResponse({"status": "not_found"}, status=404)
+        return JsonResponse({"status": "ok", "result": admin_payment_history(db_session, user)})
+    finally:
+        db_session.close()
+
+
+def build_admin_interval_stats(db_session, start_date, end_date):
+    start_datetime = datetime.combine(start_date, time.min)
+    end_datetime = datetime.combine(end_date, time.max)
+    events = (
+        db_session.query(EventLog.user_id, EventLog.event_payload)
+        .filter(EventLog.event_type == "subscription_created")
+        .filter(EventLog.timestamp >= start_datetime)
+        .filter(EventLog.timestamp <= end_datetime)
+        .all()
+    )
+    user_ids_by_traffic = {}
+    all_user_ids = set()
+    for user_id, payload in events:
+        payload = payload or {}
+        traffic_source = payload.get("traffic_source")
+        user_ids_by_traffic.setdefault(traffic_source, set()).add(user_id)
+        all_user_ids.add(user_id)
+
+    referral_user_ids = [
+        row[0]
+        for row in db_session.query(User.id)
+        .filter(User.referred_by_id.isnot(None))
+        .filter(User.id.in_(all_user_ids or {-1}))
+        .all()
+    ]
+    referral_count = len(referral_user_ids)
+    bonus_rows = (
+        db_session.query(
+            ReferralBonus.bonus_type,
+            func.count(ReferralBonus.id),
+        )
+        .filter(ReferralBonus.created_at >= start_datetime)
+        .filter(ReferralBonus.created_at <= end_datetime)
+        .filter(ReferralBonus.referral_id.in_(referral_user_ids or {-1}))
+        .group_by(ReferralBonus.bonus_type)
+        .all()
+    )
+    referral_bonus_counts = {bonus_type: count for bonus_type, count in bonus_rows}
+
+    sources = []
+    total_tariffs = {}
+    totals = {
+        "subscriptions": 0,
+        "connections": 0,
+        "payments": 0,
+        "unique_paying_users": 0,
+    }
+
+    for traffic_source, user_ids in user_ids_by_traffic.items():
+        if not user_ids:
+            continue
+
+        yk_rows = (
+            db_session.query(YkPayment.subscription_period, func.count(YkPayment.id))
+            .filter(YkPayment.status == "succeeded")
+            .filter(YkPayment.user_id.in_(user_ids))
+            .group_by(YkPayment.subscription_period)
+            .all()
+        )
+        wata_rows = (
+            db_session.query(WataInvoice.tariff_id, func.count(WataTransaction.id))
+            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .filter(WataTransaction.transaction_status == "Paid")
+            .filter(WataInvoice.user_id.in_(user_ids))
+            .group_by(WataInvoice.tariff_id)
+            .all()
+        )
+
+        tariff_stats = {}
+        for tariff_id, count in [*yk_rows, *wata_rows]:
+            tariff_name = get_tariff_display_name(tariff_id)
+            tariff_stats[tariff_name] = tariff_stats.get(tariff_name, 0) + count
+            total_tariffs[tariff_name] = total_tariffs.get(tariff_name, 0) + count
+
+        yk_payers = {
+            row[0]
+            for row in db_session.query(YkPayment.user_id)
+            .filter(YkPayment.status == "succeeded")
+            .filter(YkPayment.user_id.in_(user_ids))
+            .distinct()
+            .all()
+        }
+        wata_payers = {
+            row[0]
+            for row in db_session.query(WataInvoice.user_id)
+            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .filter(WataTransaction.transaction_status == "Paid")
+            .filter(WataInvoice.user_id.in_(user_ids))
+            .distinct()
+            .all()
+        }
+        unique_payers = len(yk_payers | wata_payers)
+        connections = (
+            db_session.query(func.count(func.distinct(EventLog.user_id)))
+            .filter(EventLog.event_type == "traffic_threshold_reached")
+            .filter(EventLog.user_id.in_(user_ids))
+            .filter(EventLog.event_payload["threshold"].astext.cast(Integer) == 0)
+            .scalar()
+            or 0
+        )
+        subscriptions = len(user_ids)
+        payments = sum(tariff_stats.values())
+        source = {
+            "traffic_source": traffic_source,
+            "label": "Direct" if traffic_source is None else f"TS_{traffic_source}",
+            "subscriptions": subscriptions,
+            "connections": connections,
+            "unique_paying_users": unique_payers,
+            "payments": payments,
+            "connection_conversion": (connections / subscriptions * 100)
+            if subscriptions
+            else 0,
+            "payment_conversion": (unique_payers / subscriptions * 100)
+            if subscriptions
+            else 0,
+            "tariffs": [
+                {"name": name, "count": count}
+                for name, count in sorted(
+                    tariff_stats.items(), key=lambda item: get_tariff_order(item[0])
+                )
+            ],
+        }
+        sources.append(source)
+        totals["subscriptions"] += subscriptions
+        totals["connections"] += connections
+        totals["payments"] += payments
+        totals["unique_paying_users"] += unique_payers
+
+    sources.sort(key=lambda item: item["subscriptions"], reverse=True)
+    totals["referrals"] = referral_count
+    totals["referral_traffic"] = referral_bonus_counts.get(ReferralBonusType.TRAFFIC, 0)
+    totals["referral_purchase"] = referral_bonus_counts.get(
+        ReferralBonusType.PURCHASE, 0
+    )
+    totals["connection_conversion"] = (
+        totals["connections"] / totals["subscriptions"] * 100
+        if totals["subscriptions"]
+        else 0
+    )
+    totals["payment_conversion"] = (
+        totals["unique_paying_users"] / totals["subscriptions"] * 100
+        if totals["subscriptions"]
+        else 0
+    )
+
+    return {
+        "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+        "totals": totals,
+        "sources": sources,
+        "tariffs": [
+            {"name": name, "count": count}
+            for name, count in sorted(
+                total_tariffs.items(), key=lambda item: get_tariff_order(item[0])
+            )
+        ],
+    }
+
+
+def support_admin_api_stats(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    try:
+        today = date.today()
+        start_date = admin_parse_date(request.GET.get("start")) if request.GET.get("start") else today - timedelta(days=30)
+        end_date = admin_parse_date(request.GET.get("end")) if request.GET.get("end") else today
+        if start_date > end_date:
+            return JsonResponse({"status": "error", "message": "Начальная дата больше конечной"}, status=400)
+    except ValueError:
+        return JsonResponse({"status": "error", "message": "Неверный формат даты"}, status=400)
+
+    db_session = session_factory()
+    try:
+        return JsonResponse({"status": "ok", "result": build_admin_interval_stats(db_session, start_date, end_date)})
+    finally:
+        db_session.close()
+
+
+def support_admin_api_stats_source_users(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    try:
+        today = date.today()
+        start_date = (
+            admin_parse_date(request.GET.get("start"))
+            if request.GET.get("start")
+            else today - timedelta(days=30)
+        )
+        end_date = (
+            admin_parse_date(request.GET.get("end"))
+            if request.GET.get("end")
+            else today
+        )
+        if start_date > end_date:
+            return JsonResponse(
+                {"status": "error", "message": "Начальная дата больше конечной"},
+                status=400,
+            )
+    except ValueError:
+        return JsonResponse(
+            {"status": "error", "message": "Неверный формат даты"},
+            status=400,
+        )
+
+    traffic_source = request.GET.get("traffic_source")
+    if traffic_source == "__direct__":
+        traffic_source = None
+
+    start_datetime = datetime.combine(start_date, time.min)
+    end_datetime = datetime.combine(end_date, time.max)
+    db_session = session_factory()
+    try:
+        query = (
+            db_session.query(EventLog.user_id)
+            .filter(EventLog.event_type == "subscription_created")
+            .filter(EventLog.timestamp >= start_datetime)
+            .filter(EventLog.timestamp <= end_datetime)
+            .order_by(EventLog.timestamp.desc())
+        )
+        if traffic_source is None:
+            query = query.filter(EventLog.event_payload["traffic_source"].astext.is_(None))
+        else:
+            query = query.filter(
+                EventLog.event_payload["traffic_source"].astext == str(traffic_source)
+            )
+        seen_user_ids = set()
+        user_ids = []
+        for row in query.all():
+            if row.user_id in seen_user_ids:
+                continue
+            seen_user_ids.add(row.user_id)
+            user_ids.append(row.user_id)
+        users_by_id = {
+            user.id: user
+            for user in db_session.query(User).filter(User.id.in_(user_ids or {-1})).all()
+        }
+        return JsonResponse(
+            {
+                "status": "ok",
+                "result": {
+                    "users": [
+                        admin_user_payload(users_by_id[user_id])
+                        for user_id in user_ids
+                        if user_id in users_by_id
+                    ],
+                },
+            }
+        )
+    finally:
+        db_session.close()
+
+
+def support_admin_api_payment_info(request):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    payment_id = (request.GET.get("payment_id") or "").strip()
+    if not payment_id:
+        return JsonResponse({"status": "error", "message": "Введите ID платежа"}, status=400)
+
+    db_session = session_factory()
+    try:
+        payment = db_session.query(YkPayment).filter(YkPayment.payment_id == payment_id).first()
+        system = "YooKassa"
+        invoice = None
+        if not payment:
+            payment = db_session.query(WataTransaction).filter(WataTransaction.transaction_id == payment_id).first()
+            system = "Wata"
+            if payment:
+                invoice = db_session.query(WataInvoice).filter(WataInvoice.order_id == payment.order_id).first()
+        if not payment:
+            return JsonResponse({"status": "not_found"}, status=404)
+
+        user_id = invoice.user_id if invoice else payment.user_id
+        user = db_session.get(User, user_id)
+        if not user:
+            return JsonResponse({"status": "not_found", "message": "Пользователь не найден"}, status=404)
+
+        payment_payload = admin_payment_info_payload(db_session, payment, user, system, invoice)
+        return JsonResponse({"status": "ok", "result": payment_payload})
+    finally:
+        db_session.close()
+
+
+def admin_payment_info_payload(db_session, payment, user, system, invoice=None):
+    recurrent = db_session.query(YkRecurrentPayment).filter(YkRecurrentPayment.user_id == user.id).first()
+    yk_ltv = db_session.query(func.sum(YkPayment.amount)).filter(YkPayment.user_id == user.id, YkPayment.status == "succeeded").scalar() or 0
+    wata_ltv = (
+        db_session.query(func.sum(WataTransaction.amount))
+        .join(WataInvoice, WataInvoice.order_id == WataTransaction.order_id)
+        .filter(WataInvoice.user_id == user.id)
+        .filter(WataTransaction.transaction_status == "Paid")
+        .scalar()
+        or 0
+    )
+    yk_count = db_session.query(func.count(YkPayment.id)).filter(YkPayment.user_id == user.id).scalar() or 0
+    wata_count = (
+        db_session.query(func.count(WataTransaction.id))
+        .join(WataInvoice, WataInvoice.order_id == WataTransaction.order_id)
+        .filter(WataInvoice.user_id == user.id)
+        .scalar()
+        or 0
+    )
+
+    if system == "YooKassa":
+        status = payment.status
+        is_success = status == "succeeded"
+        payload = {
+            "id": payment.payment_id,
+            "date": admin_date_label(payment.created_at),
+            "amount": admin_money(payment.amount),
+            "currency": payment.currency,
+            "tariff": get_tariff_display_name(payment.subscription_period),
+            "type": "Пробный период" if payment.is_trial_promotion else "Обычный платеж",
+            "status": {"succeeded": "Успешен", "pending": "В обработке", "canceled": "Отменен", "waiting_for_capture": "Ожидает подтверждения"}.get(status, status),
+            "success": is_success,
+        }
+    else:
+        status = payment.transaction_status
+        payload = {
+            "id": payment.transaction_id,
+            "date": admin_date_label(payment.payment_time),
+            "amount": admin_money(payment.amount),
+            "currency": payment.currency,
+            "tariff": (invoice and get_tariff_display_name(invoice.tariff_id)) or payment.order_description,
+            "type": "Обычный платеж",
+            "status": "Успешен" if status == "Paid" else status,
+            "success": status == "Paid",
+        }
+
+    return {
+        "system": system,
+        "payment": payload,
+        "user": admin_user_payload(user),
+        "recurrent": {
+            "active": bool(recurrent or user.autopay_allow),
+            "label": (
+                f"YooKassa: {get_tariff_display_name(recurrent.subscription_period)}, {recurrent.amount} {recurrent.currency}"
+                if recurrent
+                else ("Wata разрешен" if user.autopay_allow else "Не активен")
+            ),
+        },
+        "ltv": admin_money(yk_ltv) + admin_money(wata_ltv),
+        "payments_count": yk_count + wata_count,
+    }
+
+
+def support_admin_api_referrals(request):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        user = admin_find_user(db_session, request.GET.get("q"))
+        top = admin_referral_top(db_session)
+        if not user:
+            return JsonResponse({"status": "not_found", "top": top}, status=404)
+        return JsonResponse({"status": "ok", "result": admin_referral_payload(db_session, user), "top": top})
+    finally:
+        db_session.close()
+
+
+def admin_referral_top(db_session):
+    rows = (
+        db_session.query(
+            User.username,
+            User.telegram_id,
+            func.count(ReferralBonus.id).label("ref_count"),
+            func.sum(ReferralBonus.days_added).label("total_days"),
+        )
+        .join(ReferralBonus, User.id == ReferralBonus.referrer_id)
+        .group_by(User.id, User.username, User.telegram_id)
+        .order_by(func.sum(ReferralBonus.days_added).desc())
+        .limit(10)
+        .all()
+    )
+    return [
+        {
+            "name": f"@{row.username}" if row.username else f"ID:{row.telegram_id}",
+            "username": row.username or "",
+            "telegram_id": str(row.telegram_id or ""),
+            "ref_count": row.ref_count,
+            "total_days": admin_money(row.total_days),
+        }
+        for row in rows
+    ]
+
+
+def admin_successful_payment_count(db_session, user_id):
+    yk_count = db_session.query(func.count(YkPayment.id)).filter(YkPayment.user_id == user_id, YkPayment.status == "succeeded").scalar() or 0
+    wata_count = (
+        db_session.query(func.count(WataTransaction.id))
+        .join(WataInvoice, WataInvoice.order_id == WataTransaction.order_id)
+        .filter(WataInvoice.user_id == user_id)
+        .filter(WataTransaction.transaction_status == "Paid")
+        .scalar()
+        or 0
+    )
+    return yk_count + wata_count
+
+
+def admin_referral_payload(db_session, user):
+    referrals = db_session.query(User).filter(User.referred_by_id == user.id).order_by(User.id.desc()).all()
+    bonuses = db_session.query(ReferralBonus).filter(ReferralBonus.referrer_id == user.id).all()
+    bonuses_by_referral = {}
+    for bonus in bonuses:
+        bonuses_by_referral.setdefault(bonus.referral_id, []).append(bonus)
+
+    referral_rows = []
+    nodes = [admin_referral_graph_node(user, root=True)]
+    edges = []
+    for referral in referrals:
+        user_bonuses = bonuses_by_referral.get(referral.id, [])
+        payment_count = admin_successful_payment_count(db_session, referral.id)
+        referral_rows.append(
+            {
+                "user": admin_user_payload(referral),
+                "bonus_days": sum(admin_money(b.days_added) for b in user_bonuses),
+                "bonuses": [
+                    {
+                        "type": bonus.bonus_type.value,
+                        "days": admin_money(bonus.days_added),
+                        "created_at": admin_date_label(bonus.created_at),
+                    }
+                    for bonus in user_bonuses
+                ],
+                "payments_count": payment_count,
+                "paid": payment_count > 0,
+                "children_count": db_session.query(func.count(User.id)).filter(User.referred_by_id == referral.id).scalar() or 0,
+            }
+        )
+        nodes.append(admin_referral_graph_node(referral))
+        edges.append({"from": user.id, "to": referral.id})
+        children = db_session.query(User).filter(User.referred_by_id == referral.id).order_by(User.id.desc()).limit(30).all()
+        for child in children:
+            nodes.append(admin_referral_graph_node(child))
+            edges.append({"from": referral.id, "to": child.id})
+
+    return {
+        "user": admin_user_payload(user),
+        "summary": {
+            "referrals": len(referrals),
+            "paid_referrals": sum(1 for row in referral_rows if row["paid"]),
+            "bonus_days": sum(row["bonus_days"] for row in referral_rows),
+        },
+        "referrals": referral_rows,
+        "graph": {"nodes": nodes, "edges": edges},
+    }
+
+
+def admin_referral_graph_node(user, root=False):
+    return {
+        "id": user.id,
+        "label": f"@{user.username}" if user.username else f"ID {user.telegram_id or user.id}",
+        "root": root,
+    }
+
+
+def support_admin_api_subscription_manage(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+    if request.method != "POST":
+        return JsonResponse({"status": "error"}, status=405)
+
+    action = request.POST.get("action")
+    query = request.POST.get("q")
+    db_session = session_factory()
+    try:
+        user = admin_find_user(db_session, query)
+        if not user:
+            return JsonResponse({"status": "not_found"}, status=404)
+
+        if action == "preview":
+            return JsonResponse({"status": "ok", "result": {"user": admin_user_payload(user)}})
+
+        if action == "set_trial_hour":
+            target_expire = datetime.now(timezone.utc) + timedelta(hours=1)
+        elif action == "extend":
+            try:
+                days = int(request.POST.get("days") or "0")
+            except ValueError:
+                return JsonResponse({"status": "error", "message": "Дни должны быть числом"}, status=400)
+            if days < 1:
+                return JsonResponse({"status": "error", "message": "Интервал должен быть больше нуля"}, status=400)
+            current_expire = admin_dt(user.expire_at)
+            base = max(current_expire or datetime.utcnow(), datetime.utcnow())
+            target_expire = base.replace(tzinfo=timezone.utc) + timedelta(days=days)
+        else:
+            return JsonResponse({"status": "error", "message": "Неизвестное действие"}, status=400)
+
+        old_expire = user.expire_at
+        user.expire_at = target_expire.replace(tzinfo=None)
+        db_session.commit()
+
+        rwms_user = rwms_client.get_user_by_username(user.username)
+        rwms_updated = False
+        if rwms_user:
+            user_email = rwms_user.email if rwms_user.email and "@" in rwms_user.email else None
+            active_squads = [squad.uuid for squad in rwms_user.active_internal_squads]
+            response = rwms_client.update_user(
+                proto.UpdateUserRequest(
+                    uuid=rwms_user.uuid,
+                    email=user_email,
+                    telegram_id=rwms_user.telegram_id,
+                    expire_at=target_expire,
+                    status=proto.UserStatus.ACTIVE,
+                    traffic_limit_strategy=proto.TrafficLimitStrategy.NO_RESET,
+                    active_internal_squads=active_squads,
+                )
+            )
+            rwms_updated = response is not None
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "result": {
+                    "user": admin_user_payload(user),
+                    "old_expire_at": admin_date_label(old_expire),
+                    "new_expire_at": admin_date_label(user.expire_at),
+                    "rwms_updated": rwms_updated,
+                },
+            }
+        )
+    finally:
+        db_session.close()
 
 
 def support_admin_ticket_detail(request, ticket_id):

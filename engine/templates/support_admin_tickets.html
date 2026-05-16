@@ -3,81 +3,318 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Тикеты поддержки</title>
+    <title>Админка Monkey Island</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Montserrat', sans-serif; background: #080808; color: #fff; }
-        .card { background: rgba(22,22,24,.96); border: 1px solid rgba(255,255,255,.1); border-radius: 22px; }
-        .ticket-card-new { animation: ticketPulse 1.4s ease-out; }
-        @keyframes ticketPulse {
-            0% { border-color: rgba(255,199,0,.85); box-shadow: 0 0 0 1px rgba(255,199,0,.35), 0 0 34px rgba(255,199,0,.16); }
-            100% { border-color: rgba(255,255,255,.1); box-shadow: none; }
+        :root { --brand-gold: #ffc700; --card-bg: rgba(22,22,24,.95); --card-border: rgba(255,255,255,.1); --muted: #7b8190; --green: #00ff88; --red: #ff9ba1; }
+        * { box-sizing: border-box; }
+        body { margin: 0; font-family: 'Montserrat', sans-serif; background: #0a0a0b; color: #f5f5f5; }
+        .page-bg { position: fixed; inset: 0; background: radial-gradient(circle at 78% 6%, rgba(255,199,0,.12), transparent 32%), #0a0a0b; pointer-events: none; }
+        .sidebar { position: fixed; inset: 0 auto 0 0; width: 280px; padding: 34px 20px; border-right: 1px solid var(--card-border); background: rgba(13,13,15,.92); backdrop-filter: blur(15px); z-index: 20; }
+        .main { position: relative; z-index: 10; margin-left: 280px; padding: 34px; max-width: 1720px; }
+        .card { position: relative; background: var(--card-bg); border: 1px solid var(--card-border); border-radius: 18px; }
+        .tab-btn { width: 100%; display: flex; align-items: center; gap: 13px; padding: 13px 16px; margin-bottom: 7px; border-radius: 14px; border: 1px solid transparent; background: transparent; color: rgba(255,255,255,.48); font-size: 11px; line-height: 1.25; font-weight: 900; text-transform: uppercase; text-align: left; outline: none; transition: .18s; }
+        .tab-btn:focus { outline: none; box-shadow: none; }
+        .tab-btn i { width: 18px; flex: 0 0 18px; text-align: center; }
+        .tab-btn span { min-width: 0; overflow-wrap: anywhere; }
+        .tab-btn.active { color: var(--brand-gold); background: rgba(255,199,0,.08); border: 1px solid rgba(255,199,0,.16); }
+        .brand-eyebrow { color: var(--brand-gold); font-size: 12px; font-weight: 900; text-transform: uppercase; letter-spacing: .08em; }
+        .brand-title { margin-top: 8px; color: #fff; font-size: 28px; line-height: 1; font-weight: 900; }
+        .tab-panel { display: none; }
+        .tab-panel.active { display: block; animation: fadeIn .18s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .admin-title { margin: 0 0 8px; font-size: clamp(28px, 3vw, 44px); line-height: 1.04; font-weight: 900; text-transform: uppercase; letter-spacing: 0; }
+        .admin-subtitle { margin: 0; color: var(--muted); font-size: 14px; font-weight: 800; }
+        .panel-header { margin-bottom: 24px; }
+        .form-card { padding: 18px; margin-bottom: 22px; }
+        .form-grid-two { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+        .form-grid-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+        .subscription-actions { display: grid; grid-template-columns: 160px auto auto; gap: 12px; align-items: center; margin-top: 12px; }
+        .input { width: 100%; min-height: 46px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: white; border-radius: 14px; padding: 0 14px; font-size: 13px; font-weight: 800; outline: none; }
+        .input:focus { border-color: rgba(255,199,0,.45); }
+        .input:-webkit-autofill,
+        .input:-webkit-autofill:hover,
+        .input:-webkit-autofill:focus { -webkit-text-fill-color: #fff; box-shadow: 0 0 0 1000px #202024 inset; transition: background-color 9999s ease-in-out 0s; caret-color: #fff; }
+        .btn { min-height: 46px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 14px; padding: 0 18px; background: var(--brand-gold); color: #050505; font-size: 11px; font-weight: 900; text-transform: uppercase; white-space: nowrap; cursor: pointer; }
+        .btn-secondary { background: rgba(255,255,255,.08); color: white; border: 1px solid rgba(255,255,255,.1); }
+        .result-stack { display: grid; gap: 18px; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+        .metrics-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .metrics-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .metric { min-height: 112px; padding: 18px; }
+        .metric-label { color: var(--muted); font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 18px; }
+        .metric-label i { color: var(--brand-gold); margin-right: 8px; }
+        .metric-value { min-width: 0; overflow-wrap: anywhere; color: #fff; font-size: clamp(24px, 2vw, 36px); line-height: 1.05; font-weight: 900; }
+        .table-row { display: grid; gap: 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.07); font-size: 13px; font-weight: 800; }
+        .table-row:last-child { border-bottom: 0; }
+        .data-table { overflow-x: auto; }
+        .table-head { color: var(--muted); font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
+        .stats-row { grid-template-columns: minmax(150px, 1.3fr) repeat(6, minmax(96px, .75fr)); min-width: 860px; }
+        .payments-row { grid-template-columns: minmax(150px, .9fr) minmax(140px, .9fr) minmax(130px, .9fr) minmax(100px, .7fr) minmax(220px, 1.4fr); min-width: 850px; }
+        .referrals-row { grid-template-columns: minmax(260px, 1.4fr) minmax(100px, .6fr) minmax(110px, .7fr) minmax(170px, .8fr); min-width: 760px; }
+        .user-grid { display: grid; grid-template-columns: minmax(220px, 1.1fr) minmax(260px, 1.2fr) minmax(110px, .7fr) minmax(110px, .7fr) minmax(100px, .6fr); gap: 18px; }
+        .cell-label { color: #7b8190; font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .04em; margin-bottom: 5px; }
+        .cell-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 900; }
+        .cell-value.wrap { white-space: normal; overflow-wrap: anywhere; }
+        .muted { color: var(--muted); }
+        .gold { color: var(--brand-gold); }
+        .green { color: var(--green); }
+        .red { color: var(--red); }
+        .break-anywhere { overflow-wrap: anywhere; word-break: break-word; }
+        .info-card { padding: 20px; color: #d3d6de; font-size: 13px; font-weight: 800; }
+        .info-title { margin: 0 0 14px; color: #fff; font-size: 18px; line-height: 1.2; font-weight: 900; }
+        .info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+        .info-item { min-width: 0; }
+        .sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+        .source-card { padding: 18px; min-width: 0; overflow: hidden; }
+        .source-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 16px; }
+        .source-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--brand-gold); font-size: 20px; line-height: 1.1; font-weight: 900; }
+        .source-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 8px; }
+        .source-pill { flex: 0 0 auto; border-radius: 999px; padding: 6px 9px; background: rgba(255,199,0,.1); border: 1px solid rgba(255,199,0,.18); color: var(--brand-gold); font-size: 10px; font-weight: 900; text-transform: uppercase; }
+        .source-details-btn { min-height: 30px; border: 1px solid rgba(255,199,0,.2); border-radius: 999px; padding: 0 11px; background: rgba(255,199,0,.08); color: var(--brand-gold); font-size: 9px; font-weight: 900; text-transform: uppercase; cursor: pointer; }
+        .source-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .source-metric { min-width: 0; border-radius: 12px; padding: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); }
+        .source-metric-label { margin-bottom: 6px; color: var(--muted); font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
+        .source-metric-value { color: #fff; font-size: 22px; line-height: 1; font-weight: 900; }
+        .source-tariffs { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.08); }
+        .source-tariff-title { margin-bottom: 9px; color: var(--muted); font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
+        .source-tariff-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .source-tariff { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-radius: 10px; padding: 8px 10px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.06); font-size: 11px; font-weight: 900; }
+        .source-tariff-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d3d6de; }
+        .source-tariff-count { flex: 0 0 auto; color: #fff; }
+        .source-users { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.08); }
+        .source-users.open { display: block; }
+        .source-users-list { display: grid; gap: 8px; }
+        .source-user-card { display: grid; grid-template-columns: minmax(160px, 1fr) minmax(180px, 1.2fr) minmax(110px, .7fr) minmax(120px, .8fr); gap: 10px; border-radius: 12px; padding: 11px 12px; background: rgba(255,255,255,.035); border: 1px solid rgba(255,255,255,.06); }
+        .source-user-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 11px; font-weight: 900; }
+        .payment-cards { display: grid; grid-template-columns: 1fr; gap: 14px; }
+        .payment-card { padding: 16px; min-width: 0; overflow: hidden; }
+        .payment-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+        .payment-status { min-width: 0; font-size: 14px; line-height: 1.2; font-weight: 900; }
+        .payment-system { flex: 0 0 auto; border-radius: 999px; padding: 6px 9px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); color: #d3d6de; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+        .payment-main { margin-bottom: 13px; color: #fff; font-size: 24px; line-height: 1; font-weight: 900; }
+        .payment-detail-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-bottom: 12px; }
+        .payment-detail { min-width: 0; }
+        .payment-detail-label { margin-bottom: 4px; color: var(--muted); font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
+        .payment-detail-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 12px; font-weight: 900; }
+        .payment-id { border-top: 1px solid rgba(255,255,255,.08); padding-top: 10px; color: var(--muted); font-size: 11px; line-height: 1.35; font-weight: 900; overflow-wrap: anywhere; }
+        .referral-cards { display: grid; grid-template-columns: 1fr; gap: 14px; }
+        .referral-card { padding: 16px; min-width: 0; overflow: hidden; }
+        .referral-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+        .referral-name { min-width: 0; color: #fff; font-size: 18px; line-height: 1.15; font-weight: 900; overflow-wrap: anywhere; }
+        .referral-sub { margin-top: 5px; color: var(--muted); font-size: 12px; line-height: 1.3; font-weight: 800; overflow-wrap: anywhere; }
+        .referral-pill { flex: 0 0 auto; border-radius: 999px; padding: 6px 9px; background: rgba(255,255,255,.05); border: 1px solid rgba(255,255,255,.08); color: #d3d6de; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+        .referral-pill.paid { color: var(--green); border-color: rgba(0,255,136,.22); background: rgba(0,255,136,.08); }
+        .referral-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+        .referral-detail { min-width: 0; border-radius: 12px; padding: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); }
+        .referral-detail-label { margin-bottom: 6px; color: var(--muted); font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: .05em; }
+        .referral-detail-value { color: #fff; font-size: 18px; line-height: 1; font-weight: 900; overflow-wrap: anywhere; }
+        .referral-bonuses { margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); color: #d3d6de; font-size: 12px; line-height: 1.45; font-weight: 800; }
+        .referral-graph-scroll { width: 100%; overflow-x: auto; padding: 4px 0 8px; }
+        .referral-tree { display: inline-flex; flex-direction: column; align-items: center; min-width: 100%; }
+        .referral-tree ul { position: relative; display: flex; justify-content: center; gap: 18px; margin: 0; padding: 28px 0 0; list-style: none; }
+        .referral-tree li { position: relative; display: flex; flex-direction: column; align-items: center; min-width: 150px; }
+        .referral-tree li::before,
+        .referral-tree li::after { content: ""; position: absolute; top: 0; width: calc(50% + 9px); height: 16px; border-top: 1px solid rgba(255,255,255,.16); }
+        .referral-tree li::before { right: 50%; border-right: 1px solid rgba(255,255,255,.16); }
+        .referral-tree li::after { left: 50%; border-left: 1px solid rgba(255,255,255,.16); }
+        .referral-tree li:only-child::before,
+        .referral-tree li:only-child::after { display: none; }
+        .referral-tree li:first-child::before,
+        .referral-tree li:last-child::after { border-top: 0; }
+        .referral-tree li:first-child::after { border-top-left-radius: 10px; }
+        .referral-tree li:last-child::before { border-top-right-radius: 10px; }
+        .referral-tree ul ul::before { content: ""; position: absolute; top: 0; left: 50%; width: 0; height: 28px; border-left: 1px solid rgba(255,255,255,.16); }
+        .graph-node { position: relative; z-index: 1; width: 150px; min-height: 48px; display: flex; flex-direction: column; justify-content: center; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.05); color: #fff; padding: 9px 10px; text-align: center; font-size: 11px; font-weight: 900; overflow: hidden; }
+        .graph-node.root { width: 180px; border-color: rgba(255,199,0,.5); background: rgba(255,199,0,.1); color: var(--brand-gold); }
+        .graph-node.child { color: #a6abb7; background: rgba(255,255,255,.03); }
+        .graph-node-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .graph-node-meta { margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.1; text-transform: uppercase; }
+        .chart-card { min-height: 360px; padding: 20px; }
+        .empty-chart { min-height: 260px; display: flex; align-items: center; justify-content: center; color: #777d8c; font-weight: 900; }
+        .chat-grid { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); gap: 18px; }
+        .ticket-list { max-height: calc(100vh - 230px); overflow-y: auto; }
+        .ticket-link { display: block; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.07); transition: .16s; }
+        .ticket-link:hover { background: rgba(255,199,0,.06); }
+        .ticket-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 10px; font-weight: 900; text-transform: uppercase; }
+        .ticket-subject { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 15px; font-weight: 900; }
+        .ticket-user { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; font-weight: 800; }
+        .support-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+        .btn.active-filter { background: var(--brand-gold); color: #050505; }
+        canvas { width: 100%; height: 310px; display: block; }
+        @media (max-width: 1024px) {
+            .sidebar { position: sticky; top: 0; width: 100%; height: auto; display: flex; gap: 7px; overflow-x: auto; padding: 12px; }
+            .sidebar .brand, .sidebar .logout { display: none; }
+            .tab-btn { min-width: 170px; margin: 0; justify-content: flex-start; }
+            .main { margin-left: 0; padding: 18px; }
+            .chat-grid { grid-template-columns: 1fr; }
+            .user-grid { grid-template-columns: 1fr; }
+            .metrics-grid,
+            .metrics-grid.three,
+            .metrics-grid.two,
+            .sources-grid,
+            .form-grid-two,
+            .form-grid-stats,
+            .subscription-actions,
+            .info-grid { grid-template-columns: 1fr; }
+            .btn { width: 100%; }
+            .source-metrics { grid-template-columns: 1fr; }
+            .source-tariff-list,
+            .source-user-card,
+            .payment-detail-grid,
+            .referral-detail-grid { grid-template-columns: 1fr; }
         }
     </style>
     {% include "includes/yandex_metrika.html" %}
 </head>
 <body>
-    <main class="min-h-screen p-5 md:p-8">
-        <div class="max-w-6xl mx-auto space-y-6">
-            <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                    <h1 class="text-3xl md:text-4xl font-black uppercase">Тикеты</h1>
-                    <p class="text-gray-500 text-sm font-bold mt-1">
-                        Открытые: <span id="open-count">{{ open_count }}</span> · Закрытые: <span id="closed-count">{{ closed_count }}</span>
-                    </p>
-                </div>
-                <a href="{% url 'support_admin_logout' %}" class="rounded-xl border border-white/10 px-4 py-3 text-gray-300 text-xs font-black uppercase hover:border-red-400/30 hover:text-red-200">
-                    Выйти
-                </a>
+    <div class="page-bg"></div>
+    <aside class="sidebar">
+        <div class="brand mb-8">
+            <div class="brand-eyebrow">Monkey Island</div>
+            <div class="brand-title">Админка</div>
+        </div>
+        {% if support_admin_is_full_admin %}
+            <button class="tab-btn active" data-tab="stats"><i class="fas fa-chart-line"></i><span>Статистика</span></button>
+        {% endif %}
+        <button class="tab-btn {% if not support_admin_is_full_admin %}active{% endif %}" data-tab="user-payments"><i class="fas fa-receipt"></i><span>Платежи пользователей</span></button>
+        <button class="tab-btn" data-tab="referrals"><i class="fas fa-network-wired"></i><span>Рефералы пользователей</span></button>
+        <button class="tab-btn" data-tab="payment-info"><i class="fas fa-credit-card"></i><span>Информация о платежах</span></button>
+        {% if support_admin_is_full_admin %}
+            <button class="tab-btn" data-tab="subscription-manage"><i class="fas fa-hourglass-half"></i><span>Управление сроком подписок</span></button>
+        {% endif %}
+        <button class="tab-btn" data-tab="support"><i class="fas fa-headset"></i><span>Тикеты поддержки</span></button>
+        <a href="{% url 'support_admin_logout' %}" class="logout mt-8 inline-flex text-gray-500 text-xs font-black hover:text-red-300">Выйти</a>
+    </aside>
+
+    <main class="main"
+        data-stats-url="{% url 'support_admin_api_stats' %}"
+        data-stats-source-users-url="{% url 'support_admin_api_stats_source_users' %}"
+        data-user-payments-url="{% url 'support_admin_api_user_payments' %}"
+        data-referrals-url="{% url 'support_admin_api_referrals' %}"
+        data-payment-info-url="{% url 'support_admin_api_payment_info' %}"
+        data-subscription-manage-url="{% url 'support_admin_api_subscription_manage' %}"
+        data-tickets-url="{% url 'support_admin_tickets_json' %}?status={{ status_filter }}"
+    >
+        {% if support_admin_is_full_admin %}
+        <section id="panel-stats" class="tab-panel active">
+            <header class="panel-header">
+                <h1 class="admin-title">Статистика</h1>
+                <p class="admin-subtitle">Подписки, подключения, платежи и рекламные источники</p>
             </header>
+            <form id="stats-form" class="card form-card form-grid-stats">
+                <input class="input" type="date" name="start">
+                <input class="input" type="date" name="end">
+                <button class="btn" type="submit"><i class="fas fa-rotate"></i>Обновить</button>
+            </form>
+            <div id="stats-result" class="result-stack"></div>
+        </section>
+        {% endif %}
 
-            <nav class="flex flex-wrap gap-3">
-                <a href="{% url 'support_admin_tickets' %}?status=open" class="rounded-xl px-4 py-3 text-xs font-black uppercase {% if status_filter == 'open' %}bg-[#ffc700] text-black{% else %}bg-white/5 text-gray-300 border border-white/10{% endif %}">Открытые</a>
-                <a href="{% url 'support_admin_tickets' %}?status=closed" class="rounded-xl px-4 py-3 text-xs font-black uppercase {% if status_filter == 'closed' %}bg-[#ffc700] text-black{% else %}bg-white/5 text-gray-300 border border-white/10{% endif %}">Закрытые</a>
-                <a href="{% url 'support_admin_tickets' %}?status=all" class="rounded-xl px-4 py-3 text-xs font-black uppercase {% if status_filter == 'all' %}bg-[#ffc700] text-black{% else %}bg-white/5 text-gray-300 border border-white/10{% endif %}">Все</a>
-            </nav>
+        <section id="panel-user-payments" class="tab-panel {% if not support_admin_is_full_admin %}active{% endif %}">
+            <header class="panel-header">
+                <h1 class="admin-title">Платежи пользователей</h1>
+                <p class="admin-subtitle">Поиск по username, email или Telegram ID</p>
+            </header>
+            <form id="user-payments-form" class="card form-card form-grid-two">
+                <input class="input" name="q" placeholder="username, email или telegram_id">
+                <button class="btn" type="submit"><i class="fas fa-search"></i>Найти</button>
+            </form>
+            <div id="user-payments-result"></div>
+        </section>
 
-            <section class="space-y-3" id="tickets-list" data-status-filter="{{ status_filter }}" data-json-url="{% url 'support_admin_tickets_json' %}?status={{ status_filter }}">
+        <section id="panel-referrals" class="tab-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Рефералы пользователей</h1>
+                <p class="admin-subtitle">Бонусы, оплаты рефералов и граф приглашений</p>
+            </header>
+            <form id="referrals-form" class="card form-card form-grid-two">
+                <input class="input" name="q" placeholder="username, email или telegram_id">
+                <button class="btn" type="submit"><i class="fas fa-search"></i>Показать</button>
+            </form>
+            <div id="referrals-result" class="result-stack"></div>
+        </section>
+
+        <section id="panel-payment-info" class="tab-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Информация о платежах</h1>
+                <p class="admin-subtitle">Детали платежа YooKassa или Wata по ID</p>
+            </header>
+            <form id="payment-info-form" class="card form-card form-grid-two">
+                <input class="input" name="payment_id" placeholder="payment_id или transaction_id">
+                <button class="btn" type="submit"><i class="fas fa-search"></i>Найти</button>
+            </form>
+            <div id="payment-info-result"></div>
+        </section>
+
+        {% if support_admin_is_full_admin %}
+        <section id="panel-subscription-manage" class="tab-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Управление сроком подписок</h1>
+                <p class="admin-subtitle">Проверка пользователя, продление и установка пробного часа</p>
+            </header>
+            <form id="subscription-form" class="card form-card">
+                {% csrf_token %}
+                <div class="form-grid-two">
+                    <input class="input" name="q" placeholder="username, email или telegram_id">
+                    <button class="btn btn-secondary" type="submit" name="action" value="preview"><i class="fas fa-eye"></i>Проверить</button>
+                </div>
+                <div class="subscription-actions">
+                    <input class="input" name="days" type="number" min="1" placeholder="Дни">
+                    <button class="btn" type="submit" name="action" value="extend"><i class="fas fa-plus"></i>Продлить</button>
+                    <button class="btn btn-secondary" type="submit" name="action" value="set_trial_hour"><i class="fas fa-clock"></i>Сделать 1 час с текущего момента</button>
+                </div>
+            </form>
+            <div id="subscription-result"></div>
+        </section>
+        {% endif %}
+
+        <section id="panel-support" class="tab-panel">
+            <header class="panel-header flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                <div>
+                    <h1 class="admin-title">Тикеты поддержки</h1>
+                    <p class="admin-subtitle">Открытые: <span id="open-count">{{ open_count }}</span> · Закрытые: <span id="closed-count">{{ closed_count }}</span></p>
+                </div>
+                <nav class="support-filters">
+                    <a href="{% url 'support_admin_tickets' %}?status=open#support" class="btn btn-secondary {% if status_filter == 'open' %}active-filter{% endif %}">Открытые</a>
+                    <a href="{% url 'support_admin_tickets' %}?status=closed#support" class="btn btn-secondary {% if status_filter == 'closed' %}active-filter{% endif %}">Закрытые</a>
+                    <a href="{% url 'support_admin_tickets' %}?status=all#support" class="btn btn-secondary {% if status_filter == 'all' %}active-filter{% endif %}">Все</a>
+                </nav>
+            </header>
+            <section class="card ticket-list" id="tickets-list">
                 {% for ticket, ticket_user in tickets %}
-                    <a href="{% url 'support_admin_ticket_detail' ticket.id %}" class="card block p-5 hover:border-[#ffc700]/30 transition-colors" data-ticket-id="{{ ticket.id }}" data-ticket-updated-at="{{ ticket.updated_at|date:'c' }}">
-                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                    <a href="{% url 'support_admin_ticket_detail' ticket.id %}" class="ticket-link" data-ticket-id="{{ ticket.id }}" data-ticket-updated-at="{{ ticket.updated_at|date:'c' }}">
+                        <div class="flex items-center justify-between gap-3">
                             <div class="min-w-0">
-                                <div class="flex flex-wrap items-center gap-3 mb-2">
-                                    <span class="text-[#ffc700] text-xs font-black uppercase">#{{ ticket.id }}</span>
+                                <div class="ticket-meta">
+                                    <span class="gold">#{{ ticket.id }}</span>
                                     {% if ticket.status == support_status_open %}
-                                        <span class="text-[#00ff88] text-xs font-black uppercase">Открыт</span>
+                                        <span class="green">Открыт</span>
                                     {% else %}
-                                        <span class="text-gray-500 text-xs font-black uppercase">Закрыт</span>
+                                        <span class="muted">Закрыт</span>
                                     {% endif %}
-                                    <span class="text-gray-600 text-xs font-bold">{{ ticket.updated_at|date:"d.m.Y H:i" }}</span>
+                                    <span class="muted">{{ ticket.updated_at|date:"d.m.Y H:i" }}</span>
                                 </div>
-                                <h2 class="text-xl font-black truncate">{{ ticket.subject }}</h2>
-                                <p class="text-gray-500 text-sm font-bold mt-1">
-                                    user_id={{ ticket_user.id }}
-                                    {% if ticket_user.email %} · {{ ticket_user.email }}{% endif %}
-                                    {% if ticket_user.telegram_id %} · tg {{ ticket_user.telegram_id }}{% endif %}
-                                </p>
+                                <h2 class="ticket-subject">{{ ticket.subject }}</h2>
+                                <p class="ticket-user">user_id={{ ticket_user.id }}{% if ticket_user.email %} · {{ ticket_user.email }}{% endif %}{% if ticket_user.telegram_id %} · tg {{ ticket_user.telegram_id }}{% endif %}</p>
                             </div>
-                            <i class="fas fa-chevron-right text-gray-600"></i>
+                            <i class="fas fa-chevron-right text-gray-700 text-xs"></i>
                         </div>
                     </a>
                 {% empty %}
-                    <div class="card p-10 text-center text-gray-500 font-bold" id="tickets-empty-state">
-                        Тикетов в этом фильтре нет.
-                    </div>
+                    <div class="info-card muted">Тикетов в этом фильтре нет.</div>
                 {% endfor %}
             </section>
-        </div>
+        </section>
     </main>
+
     <script>
-        const ticketsList = document.getElementById('tickets-list');
-        const openCountNode = document.getElementById('open-count');
-        const closedCountNode = document.getElementById('closed-count');
-        const knownTicketVersions = new Map();
-        let soundReady = false;
-        let audioContext = null;
+        const main = document.querySelector('.main');
+        const csrfToken = '{{ csrf_token }}';
+        const money = (value) => `${Number(value || 0).toLocaleString('ru-RU')} ₽`;
+        const pct = (value) => `${Number(value || 0).toFixed(1)}%`;
 
         function escapeHtml(value) {
             return String(value || '')
@@ -88,154 +325,519 @@
                 .replaceAll("'", '&#039;');
         }
 
-        function rememberRenderedTickets() {
-            if (!ticketsList) return;
-            ticketsList.querySelectorAll('[data-ticket-id]').forEach((node) => {
-                knownTicketVersions.set(
-                    String(node.dataset.ticketId),
-                    node.dataset.ticketUpdatedAt || ''
-                );
+        function showAdminTab(tabId) {
+            document.querySelectorAll('.tab-panel').forEach((panel) => panel.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach((button) => button.classList.toggle('active', button.dataset.tab === tabId));
+            const panel = document.getElementById(`panel-${tabId}`);
+            if (panel) panel.classList.add('active');
+            history.replaceState(null, '', `#${tabId}`);
+        }
+
+        document.querySelectorAll('.tab-btn').forEach((button) => {
+            button.addEventListener('click', () => showAdminTab(button.dataset.tab));
+        });
+        document.addEventListener('click', (event) => {
+            const sourceDetailsButton = event.target.closest('[data-source-details]');
+            if (sourceDetailsButton) toggleSourceDetails(sourceDetailsButton);
+        });
+
+        function setLoading(target, text = 'Загружаем данные...') {
+            target.innerHTML = `<div class="card info-card muted">${text}</div>`;
+        }
+
+        function setError(target, text = 'Ничего не найдено') {
+            target.innerHTML = `<div class="card info-card red">${escapeHtml(text)}</div>`;
+        }
+
+        function inlineLoading(text = 'Загружаем данные...') {
+            return `<div class="muted">${escapeHtml(text)}</div>`;
+        }
+
+        function inlineError(text = 'Ничего не найдено') {
+            return `<div class="red">${escapeHtml(text)}</div>`;
+        }
+
+        function metric(title, value, icon = 'fa-chart-simple') {
+            return `<div class="card metric"><div class="metric-label"><i class="fas ${icon}"></i>${title}</div><div class="metric-value">${value}</div></div>`;
+        }
+
+        function userCard(user) {
+            return `
+                <section class="card p-5">
+                    <div class="user-grid">
+                        <div><div class="cell-label">Username</div><div class="cell-value wrap">@${escapeHtml(user.username)}</div></div>
+                        <div><div class="cell-label">Email</div><div class="cell-value wrap">${escapeHtml(user.email || '—')}</div></div>
+                        <div><div class="cell-label">Telegram</div><div class="cell-value">${escapeHtml(user.telegram_id || '—')}</div></div>
+                        <div><div class="cell-label">Подписка</div><div class="cell-value">${escapeHtml(user.expire_at)}</div></div>
+                        <div><div class="cell-label">Статус</div><div class="cell-value ${user.is_active ? 'green' : 'red'}">${user.is_active ? 'Активна' : 'Истекла'}</div></div>
+                    </div>
+                </section>
+            `;
+        }
+
+        function drawBarChart(canvas, rows) {
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const width = canvas.clientWidth * dpr;
+            const height = canvas.clientHeight * dpr;
+            canvas.width = width;
+            canvas.height = height;
+            ctx.clearRect(0, 0, width, height);
+            if (!rows.length) return;
+            const max = Math.max(1, ...rows.map((row) => row.subscriptions));
+            const leftPadding = 44 * dpr;
+            const topPadding = 28 * dpr;
+            const rightPadding = 24 * dpr;
+            const bottomPadding = (rows.length <= 3 ? 58 : 78) * dpr;
+            const gap = 14 * dpr;
+            const plotWidth = width - leftPadding - rightPadding;
+            const plotHeight = height - topPadding - bottomPadding;
+            const barWidth = Math.max(18 * dpr, (plotWidth - gap * (rows.length - 1)) / Math.max(1, rows.length));
+            ctx.font = `${11 * dpr}px Montserrat`;
+            rows.forEach((row, index) => {
+                const x = leftPadding + index * (barWidth + gap);
+                const barHeight = plotHeight * (row.subscriptions / max);
+                const y = topPadding + plotHeight - barHeight;
+                ctx.fillStyle = '#ffc700';
+                ctx.fillRect(x, y, barWidth, barHeight);
+                ctx.fillStyle = 'rgba(255,255,255,.72)';
+                ctx.textAlign = 'center';
+                ctx.fillText(String(row.subscriptions), x + barWidth / 2, Math.max(14 * dpr, y - 8 * dpr));
+                ctx.fillStyle = 'rgba(255,255,255,.45)';
+                ctx.textBaseline = 'top';
+                if (rows.length <= 3) {
+                    ctx.fillText(row.label.slice(0, 18), x + barWidth / 2, topPadding + plotHeight + 18 * dpr);
+                } else {
+                    ctx.save();
+                    ctx.translate(x + barWidth / 2, topPadding + plotHeight + 20 * dpr);
+                    ctx.rotate(-0.45);
+                    ctx.textAlign = 'right';
+                    ctx.fillText(row.label.slice(0, 16), 0, 0);
+                    ctx.restore();
+                }
+                ctx.textBaseline = 'alphabetic';
             });
         }
 
-        async function unlockSound(playTest = false) {
-            soundReady = true;
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContextClass) return;
+        async function loadStats(event) {
+            if (event) event.preventDefault();
+            const target = document.getElementById('stats-result');
+            const form = document.getElementById('stats-form');
+            setLoading(target);
+            const params = new URLSearchParams(new FormData(form));
+            const response = await fetch(`${main.dataset.statsUrl}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            if (!response.ok) return setError(target, 'Не удалось собрать статистику');
+            const payload = await response.json();
+            const result = payload.result;
+            const hasSources = (result.sources || []).length > 0;
+            const sourceCards = result.sources.map((source, index) => {
+                const sourceValue = source.traffic_source === null || source.traffic_source === undefined ? '__direct__' : String(source.traffic_source);
+                return `
+                <article class="card source-card" data-source-card="${index}">
+                    <div class="source-header">
+                        <h3 class="source-title" title="${escapeHtml(source.label)}">${escapeHtml(source.label)}</h3>
+                        <div class="source-actions">
+                            <button type="button" class="source-details-btn" data-source-details data-source="${escapeHtml(sourceValue)}">
+                                Подробности
+                            </button>
+                            <span class="source-pill">Источник</span>
+                        </div>
+                    </div>
+                    <div class="source-metrics">
+                        <div class="source-metric">
+                            <div class="source-metric-label">Подписки</div>
+                            <div class="source-metric-value">${source.subscriptions}</div>
+                        </div>
+                        <div class="source-metric">
+                            <div class="source-metric-label">Подключения</div>
+                            <div class="source-metric-value">${source.connections}</div>
+                        </div>
+                        <div class="source-metric">
+                            <div class="source-metric-label">Покупатели</div>
+                            <div class="source-metric-value">${source.unique_paying_users}</div>
+                        </div>
+                        <div class="source-metric">
+                            <div class="source-metric-label">Платежи</div>
+                            <div class="source-metric-value">${source.payments}</div>
+                        </div>
+                        <div class="source-metric">
+                            <div class="source-metric-label">Конв. в подключение</div>
+                            <div class="source-metric-value gold">${pct(source.connection_conversion)}</div>
+                        </div>
+                        <div class="source-metric">
+                            <div class="source-metric-label">Конв. в продажу</div>
+                            <div class="source-metric-value gold">${pct(source.payment_conversion)}</div>
+                        </div>
+                    </div>
+                    <div class="source-tariffs">
+                        <div class="source-tariff-title">Платежи по тарифам</div>
+                        ${(source.tariffs || []).length
+                            ? `<div class="source-tariff-list">${source.tariffs.map((tariff) => `
+                                <div class="source-tariff">
+                                    <span class="source-tariff-name" title="${escapeHtml(tariff.name)}">${escapeHtml(tariff.name)}</span>
+                                    <span class="source-tariff-count">${tariff.count}</span>
+                                </div>
+                            `).join('')}</div>`
+                            : '<span class="muted">Платежей по тарифам нет</span>'}
+                    </div>
+                    <div class="source-users" data-source-users></div>
+                </article>
+                `;
+            }).join('');
+            target.innerHTML = `
+                <div class="metrics-grid">
+                    ${metric('Подписок', result.totals.subscriptions, 'fa-users')}
+                    ${metric('Подключений', result.totals.connections, 'fa-plug')}
+                    ${metric('Покупателей', result.totals.unique_paying_users, 'fa-ticket')}
+                    ${metric('Платежей', result.totals.payments, 'fa-coins')}
+                </div>
+                <section class="card chart-card">${hasSources ? '<canvas id="stats-chart"></canvas>' : '<div class="empty-chart">Данных за период нет.</div>'}</section>
+                <section class="sources-grid">
+                    ${sourceCards || '<div class="card info-card muted">Данных за период нет.</div>'}
+                </section>
+                <section class="metrics-grid two">
+                    <div class="card info-card">
+                        <h3 class="info-title">Итоги</h3>
+                        <p>Конверсия в подключения: <span class="gold">${pct(result.totals.connection_conversion)}</span></p>
+                        <p>Конверсия в продажи: <span class="gold">${pct(result.totals.payment_conversion)}</span></p>
+                        <p>Рефералов за период: <span class="green">${result.totals.referrals}</span></p>
+                        <p>Рефералы начали пользоваться: <span class="green">${result.totals.referral_traffic}</span></p>
+                        <p>Рефералы оплатили: <span class="green">${result.totals.referral_purchase}</span></p>
+                    </div>
+                    <div class="card info-card">
+                        <h3 class="info-title">Тарифы</h3>
+                        ${(result.tariffs || []).map((item) => `<p>${escapeHtml(item.name)}: <span class="green">${item.count}</span></p>`).join('') || 'Нет платежей'}
+                    </div>
+                </section>
+            `;
+            if (hasSources) drawBarChart(document.getElementById('stats-chart'), result.sources);
+        }
 
-            audioContext = audioContext || new AudioContextClass();
-            if (audioContext.state === 'suspended') {
-                await audioContext.resume().catch(() => {});
+        async function toggleSourceDetails(button) {
+            const card = button.closest('.source-card');
+            const target = card && card.querySelector('[data-source-users]');
+            const form = document.getElementById('stats-form');
+            if (!target || !form) return;
+
+            if (target.classList.contains('open')) {
+                target.classList.remove('open');
+                target.innerHTML = '';
+                button.textContent = 'Подробности';
+                return;
             }
-            const button = document.getElementById('support-sound-enable');
-            if (button) button.remove();
-            if (playTest) playTicketSound();
-        }
 
-        function installSoundButton() {
-            if (soundReady || document.getElementById('support-sound-enable')) return;
+            target.classList.add('open');
+            target.innerHTML = inlineLoading('Загружаем пользователей...');
+            button.textContent = 'Скрыть';
 
-            const button = document.createElement('button');
-            button.type = 'button';
-            button.id = 'support-sound-enable';
-            button.className = 'fixed right-5 bottom-5 z-50 rounded-2xl border border-[#ffc700]/30 bg-[#ffc700] px-4 py-3 text-[10px] font-black uppercase text-black shadow-2xl';
-            button.innerHTML = '<i class="fas fa-volume-up mr-2"></i>Включить звук';
-            button.addEventListener('click', () => unlockSound(true));
-            document.body.appendChild(button);
-        }
-
-        function playTicketSound() {
-            if (!soundReady) return;
-
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContextClass) return;
-
-            const context = audioContext || new AudioContextClass();
-            audioContext = context;
-            const now = context.currentTime;
-            const gain = context.createGain();
-            gain.connect(context.destination);
-            gain.gain.setValueAtTime(0.0001, now);
-            gain.gain.exponentialRampToValueAtTime(0.09, now + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
-
-            [740, 988, 1318].forEach((frequency, index) => {
-                const oscillator = context.createOscillator();
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(frequency, now + index * 0.08);
-                oscillator.connect(gain);
-                oscillator.start(now + index * 0.08);
-                oscillator.stop(now + index * 0.08 + 0.14);
+            const params = new URLSearchParams(new FormData(form));
+            params.set('traffic_source', button.dataset.source || '__direct__');
+            const response = await fetch(`${main.dataset.statsSourceUsersUrl}?${params}`, {
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
             });
+            if (!response.ok) {
+                target.innerHTML = inlineError('Не удалось загрузить пользователей');
+                return;
+            }
+
+            const payload = await response.json();
+            const users = (payload.result && payload.result.users) || [];
+            target.innerHTML = `
+                <div class="source-tariff-title">Пользователи источника</div>
+                <div class="source-users-list">
+                    ${users.map((user) => `
+                        <div class="source-user-card">
+                            <div>
+                                <div class="cell-label">Username</div>
+                                <div class="source-user-value" title="${escapeHtml(user.username || '')}">@${escapeHtml(user.username || '—')}</div>
+                            </div>
+                            <div>
+                                <div class="cell-label">Email</div>
+                                <div class="source-user-value" title="${escapeHtml(user.email || '')}">${escapeHtml(user.email || '—')}</div>
+                            </div>
+                            <div>
+                                <div class="cell-label">Telegram</div>
+                                <div class="source-user-value" title="${escapeHtml(user.telegram_id || '')}">${escapeHtml(user.telegram_id || '—')}</div>
+                            </div>
+                            <div>
+                                <div class="cell-label">Подписка до</div>
+                                <div class="source-user-value ${user.is_active ? 'green' : 'red'}">${escapeHtml(user.expire_at || '—')}</div>
+                            </div>
+                        </div>
+                    `).join('') || '<div class="muted">Пользователей за период нет.</div>'}
+                </div>
+            `;
+        }
+
+        async function loadUserPayments(event) {
+            event.preventDefault();
+            const target = document.getElementById('user-payments-result');
+            setLoading(target);
+            const params = new URLSearchParams(new FormData(event.target));
+            const response = await fetch(`${main.dataset.userPaymentsUrl}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            if (!response.ok) return setError(target, 'Пользователь не найден');
+            const {result} = await response.json();
+            target.innerHTML = `
+                <div class="result-stack">
+                    ${userCard(result.user)}
+                    <div class="metrics-grid three">
+                        ${metric('LTV', money(result.ltv), 'fa-wallet')}
+                        ${metric('Использование', escapeHtml(result.traffic), 'fa-signal')}
+                        ${metric('Регистрация', escapeHtml(result.first_seen), 'fa-calendar')}
+                    </div>
+                    <section class="payment-cards">
+                        ${(result.history || []).map((item) => `
+                            <article class="card payment-card">
+                                <div class="payment-card-head">
+                                    <div class="payment-status ${item.success ? 'green' : 'red'}">${item.success ? 'Успешен' : 'Неуспешен'}</div>
+                                    <div class="payment-system">${escapeHtml(item.system)}</div>
+                                </div>
+                                <div class="payment-main">${item.amount} ${escapeHtml(item.currency)}</div>
+                                <div class="payment-detail-grid">
+                                    <div class="payment-detail">
+                                        <div class="payment-detail-label">Дата</div>
+                                        <div class="payment-detail-value">${escapeHtml(item.date)}</div>
+                                    </div>
+                                    <div class="payment-detail">
+                                        <div class="payment-detail-label">Тариф</div>
+                                        <div class="payment-detail-value" title="${escapeHtml(item.tariff)}">${escapeHtml(item.tariff)}${item.trial ? ' · Trial' : ''}</div>
+                                    </div>
+                                </div>
+                                <div class="payment-id">${escapeHtml(item.id)}</div>
+                            </article>
+                        `).join('') || '<div class="card info-card muted">Платежей не найдено.</div>'}
+                    </section>
+                </div>
+            `;
+        }
+
+        async function loadPaymentInfo(event) {
+            event.preventDefault();
+            const target = document.getElementById('payment-info-result');
+            setLoading(target);
+            const params = new URLSearchParams(new FormData(event.target));
+            const response = await fetch(`${main.dataset.paymentInfoUrl}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            if (!response.ok) return setError(target, 'Платеж не найден');
+            const {result} = await response.json();
+            target.innerHTML = `
+                <div class="result-stack">
+                    <section class="card info-card">
+                        <div class="cell-label">Платеж через ${escapeHtml(result.system)}</div>
+                        <h2 class="info-title">${result.payment.amount} ${escapeHtml(result.payment.currency)}</h2>
+                        <div class="info-grid">
+                            <div class="info-item"><div class="cell-label">ID</div><div class="cell-value wrap">${escapeHtml(result.payment.id)}</div></div>
+                            <div class="info-item"><div class="cell-label">Дата</div><div class="cell-value">${escapeHtml(result.payment.date)}</div></div>
+                            <div class="info-item"><div class="cell-label">Статус</div><div class="cell-value ${result.payment.success ? 'green' : 'red'}">${escapeHtml(result.payment.status)}</div></div>
+                            <div class="info-item"><div class="cell-label">Тариф</div><div class="cell-value wrap">${escapeHtml(result.payment.tariff)}</div></div>
+                            <div class="info-item"><div class="cell-label">Тип</div><div class="cell-value">${escapeHtml(result.payment.type)}</div></div>
+                            <div class="info-item"><div class="cell-label">Всего платежей</div><div class="cell-value">${result.payments_count}</div></div>
+                        </div>
+                    </section>
+                    ${userCard(result.user)}
+                    <div class="metrics-grid two">
+                        ${metric('LTV пользователя', money(result.ltv), 'fa-wallet')}
+                        ${metric('Автоплатеж', escapeHtml(result.recurrent.label), 'fa-rotate')}
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadReferrals(event) {
+            event.preventDefault();
+            const target = document.getElementById('referrals-result');
+            setLoading(target);
+            const params = new URLSearchParams(new FormData(event.target));
+            const response = await fetch(`${main.dataset.referralsUrl}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            if (!response.ok) return setError(target, 'Пользователь не найден');
+            const {result, top} = await response.json();
+            target.innerHTML = `
+                ${userCard(result.user)}
+                <div class="metrics-grid three">
+                    ${metric('Рефералов', result.summary.referrals, 'fa-user-plus')}
+                    ${metric('Оплатили', result.summary.paid_referrals, 'fa-coins')}
+                    ${metric('Бонусных дней', result.summary.bonus_days, 'fa-gift')}
+                </div>
+                <section class="card info-card"><h3 class="info-title">Граф приглашений</h3><div id="referral-graph"></div></section>
+                <section class="referral-cards">
+                    ${(result.referrals || []).map((row) => `
+                        <article class="card referral-card">
+                            <div class="referral-card-head">
+                                <div>
+                                    <div class="referral-name">${escapeHtml(row.user.username ? '@' + row.user.username : 'ID ' + (row.user.telegram_id || row.user.id))}</div>
+                                    <div class="referral-sub">${escapeHtml(row.user.email || row.user.telegram_id || 'Контакты не указаны')}</div>
+                                </div>
+                                <div class="referral-pill ${row.paid ? 'paid' : ''}">${row.paid ? 'Платил' : 'Без оплат'}</div>
+                            </div>
+                            <div class="referral-detail-grid">
+                                <div class="referral-detail">
+                                    <div class="referral-detail-label">Бонусные дни</div>
+                                    <div class="referral-detail-value">${row.bonus_days}</div>
+                                </div>
+                                <div class="referral-detail">
+                                    <div class="referral-detail-label">Платежи</div>
+                                    <div class="referral-detail-value ${row.paid ? 'green' : ''}">${row.payments_count}</div>
+                                </div>
+                                <div class="referral-detail">
+                                    <div class="referral-detail-label">Второй уровень</div>
+                                    <div class="referral-detail-value">${row.children_count}</div>
+                                </div>
+                            </div>
+                            <div class="referral-bonuses">
+                                ${(row.bonuses || []).map((bonus) => `${escapeHtml(bonus.created_at)} · ${escapeHtml(bonus.type)} · +${bonus.days} дн.`).join('<br>') || 'Бонусов по этому рефералу нет.'}
+                            </div>
+                        </article>
+                    `).join('') || '<div class="info-card muted">Рефералов нет.</div>'}
+                </section>
+                <section class="card info-card">
+                    <h3 class="info-title">Топ рефереров</h3>
+                    ${(top || []).map((row, index) => `<p>${index + 1}. ${escapeHtml(row.name)} — <span class="green">${row.ref_count}</span> чел. (+${row.total_days} дн.)</p>`).join('') || '<p class="muted">Топ пока пуст.</p>'}
+                </section>
+            `;
+            drawReferralGraph(document.getElementById('referral-graph'), result.graph);
+        }
+
+        function drawReferralGraph(container, graph) {
+            if (!container) return;
+            const nodes = graph.nodes || [];
+            const edges = graph.edges || [];
+            if (!nodes.length) {
+                container.innerHTML = '<div class="muted">Нет данных для графа.</div>';
+                return;
+            }
+            const nodeById = new Map(nodes.map((node) => [node.id, node]));
+            const childrenById = new Map();
+            edges.forEach((edge) => {
+                if (!childrenById.has(edge.from)) childrenById.set(edge.from, []);
+                childrenById.get(edge.from).push(edge.to);
+            });
+            const root = nodes.find((node) => node.root) || nodes[0];
+            const renderNode = (nodeId, level = 0, seen = new Set()) => {
+                const node = nodeById.get(nodeId);
+                if (!node || seen.has(nodeId)) return '';
+                const nextSeen = new Set(seen);
+                nextSeen.add(nodeId);
+                const children = (childrenById.get(nodeId) || []).filter((childId) => nodeById.has(childId));
+                const childrenHtml = children.length
+                    ? `<ul>${children.map((childId) => renderNode(childId, level + 1, nextSeen)).join('')}</ul>`
+                    : '';
+                const nodeClass = node.root ? 'root' : level > 1 ? 'child' : '';
+                const meta = node.root ? 'реферер' : level === 1 ? '1 уровень' : '2 уровень';
+                return `
+                    <li>
+                        <div class="graph-node ${nodeClass}" title="${escapeHtml(node.label)}">
+                            <div class="graph-node-label">${escapeHtml(node.label)}</div>
+                            <div class="graph-node-meta">${meta}</div>
+                        </div>
+                        ${childrenHtml}
+                    </li>
+                `;
+            };
+            container.innerHTML = `
+                <div class="referral-graph-scroll">
+                    <div class="referral-tree">
+                        <ul>${renderNode(root.id)}</ul>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function submitSubscription(event) {
+            event.preventDefault();
+            const target = document.getElementById('subscription-result');
+            const submitter = event.submitter;
+            const formData = new FormData(event.target);
+            formData.set('action', submitter.value);
+            setLoading(target, 'Обновляем подписку...');
+            const response = await fetch(main.dataset.subscriptionManageUrl, {
+                method: 'POST',
+                body: formData,
+                headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+            });
+            if (!response.ok) return setError(target, 'Не удалось выполнить действие');
+            const {result} = await response.json();
+            target.innerHTML = `
+                <div class="result-stack">
+                    ${userCard(result.user)}
+                    <section class="card info-card">
+                        ${result.old_expire_at ? `<p>Было: <span class="green">${escapeHtml(result.old_expire_at)}</span></p>` : ''}
+                        ${result.new_expire_at ? `<p>Стало: <span class="green">${escapeHtml(result.new_expire_at)}</span></p>` : ''}
+                        ${typeof result.rwms_updated !== 'undefined' ? `<p>RWMS: <span class="${result.rwms_updated ? 'green' : 'red'}">${result.rwms_updated ? 'обновлен' : 'не обновлен'}</span></p>` : ''}
+                    </section>
+                </div>
+            `;
         }
 
         function ticketCardHtml(ticket, shouldHighlight) {
             const statusHtml = ticket.is_open
-                ? '<span class="text-[#00ff88] text-xs font-black uppercase">Открыт</span>'
-                : '<span class="text-gray-500 text-xs font-black uppercase">Закрыт</span>';
-            const email = ticket.email ? ` · ${escapeHtml(ticket.email)}` : '';
-            const telegram = ticket.telegram_id ? ` · tg ${escapeHtml(ticket.telegram_id)}` : '';
-            const highlightClass = shouldHighlight ? ' ticket-card-new' : '';
-
+                ? '<span class="green">Открыт</span>'
+                : '<span class="muted">Закрыт</span>';
             return `
-                <a href="${escapeHtml(ticket.url)}" class="card block p-5 hover:border-[#ffc700]/30 transition-colors${highlightClass}" data-ticket-id="${ticket.id}" data-ticket-updated-at="${escapeHtml(ticket.updated_at_iso)}">
-                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                <a href="${escapeHtml(ticket.url)}" class="ticket-link" data-ticket-id="${ticket.id}" data-ticket-updated-at="${escapeHtml(ticket.updated_at_iso)}">
+                    <div class="flex items-center justify-between gap-3">
                         <div class="min-w-0">
-                            <div class="flex flex-wrap items-center gap-3 mb-2">
-                                <span class="text-[#ffc700] text-xs font-black uppercase">#${ticket.id}</span>
-                                ${statusHtml}
-                                <span class="text-gray-600 text-xs font-bold">${escapeHtml(ticket.updated_at)}</span>
-                            </div>
-                            <h2 class="text-xl font-black truncate">${escapeHtml(ticket.subject)}</h2>
-                            <p class="text-gray-500 text-sm font-bold mt-1">
-                                user_id=${ticket.user_id}${email}${telegram}
-                            </p>
+                            <div class="ticket-meta"><span class="gold">#${ticket.id}</span>${statusHtml}<span class="muted">${escapeHtml(ticket.updated_at)}</span></div>
+                            <h2 class="ticket-subject">${escapeHtml(ticket.subject)}</h2>
+                            <p class="ticket-user">user_id=${ticket.user_id}${ticket.email ? ` · ${escapeHtml(ticket.email)}` : ''}${ticket.telegram_id ? ` · tg ${escapeHtml(ticket.telegram_id)}` : ''}</p>
                         </div>
-                        <i class="fas fa-chevron-right text-gray-600"></i>
+                        <i class="fas fa-chevron-right text-gray-700 text-xs"></i>
                     </div>
                 </a>
             `;
         }
 
-        function renderTickets(payload) {
+        const ticketsList = document.getElementById('tickets-list');
+        const knownTicketVersions = new Map();
+        function rememberRenderedTickets() {
             if (!ticketsList) return;
-
-            if (openCountNode) openCountNode.textContent = payload.open_count;
-            if (closedCountNode) closedCountNode.textContent = payload.closed_count;
-
-            const tickets = payload.tickets || [];
-            if (!tickets.length) {
-                ticketsList.innerHTML = `
-                    <div class="card p-10 text-center text-gray-500 font-bold" id="tickets-empty-state">
-                        Тикетов в этом фильтре нет.
-                    </div>
-                `;
-                return;
-            }
-
-            let shouldPlaySound = false;
-            ticketsList.innerHTML = tickets.map((ticket) => {
-                const key = String(ticket.id);
-                const previousUpdatedAt = knownTicketVersions.get(key);
-                const shouldHighlight = previousUpdatedAt !== undefined && previousUpdatedAt !== ticket.updated_at_iso;
-                if (ticket.is_open && (previousUpdatedAt === undefined || shouldHighlight)) {
-                    shouldPlaySound = true;
-                }
-                return ticketCardHtml(ticket, shouldHighlight);
-            }).join('');
-
-            tickets.forEach((ticket) => {
-                knownTicketVersions.set(String(ticket.id), ticket.updated_at_iso || '');
-            });
-
-            if (shouldPlaySound) {
-                playTicketSound();
-            }
+            ticketsList.querySelectorAll('[data-ticket-id]').forEach((node) => knownTicketVersions.set(String(node.dataset.ticketId), node.dataset.ticketUpdatedAt || ''));
         }
-
         async function refreshTickets() {
-            if (!ticketsList || !ticketsList.dataset.jsonUrl) return;
-
+            if (!ticketsList) return;
             try {
-                const response = await fetch(ticketsList.dataset.jsonUrl, {
-                    headers: {'X-Requested-With': 'XMLHttpRequest'},
-                    cache: 'no-store',
-                });
+                const response = await fetch(main.dataset.ticketsUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store'});
                 if (!response.ok) return;
                 const payload = await response.json();
-                if (payload.status === 'ok') {
-                    renderTickets(payload);
-                }
+                document.getElementById('open-count').textContent = payload.open_count;
+                document.getElementById('closed-count').textContent = payload.closed_count;
+                const tickets = payload.tickets || [];
+                ticketsList.innerHTML = tickets.length ? tickets.map((ticket) => {
+                    const previous = knownTicketVersions.get(String(ticket.id));
+                    const changed = previous !== undefined && previous !== ticket.updated_at_iso;
+                    knownTicketVersions.set(String(ticket.id), ticket.updated_at_iso || '');
+                    return ticketCardHtml(ticket, changed);
+                }).join('') : '<div class="info-card muted">Тикетов в этом фильтре нет.</div>';
             } catch (error) {
                 console.warn('Не удалось обновить список тикетов', error);
             }
         }
 
-        installSoundButton();
+        const statsForm = document.getElementById('stats-form');
+        const userPaymentsForm = document.getElementById('user-payments-form');
+        const paymentInfoForm = document.getElementById('payment-info-form');
+        const referralsForm = document.getElementById('referrals-form');
+        const subscriptionForm = document.getElementById('subscription-form');
+
+        if (statsForm) statsForm.addEventListener('submit', loadStats);
+        if (userPaymentsForm) userPaymentsForm.addEventListener('submit', loadUserPayments);
+        if (paymentInfoForm) paymentInfoForm.addEventListener('submit', loadPaymentInfo);
+        if (referralsForm) referralsForm.addEventListener('submit', loadReferrals);
+        if (subscriptionForm) subscriptionForm.addEventListener('submit', submitSubscription);
+
+        const today = new Date();
+        const monthAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+        if (statsForm) {
+            document.querySelector('#stats-form [name="end"]').value = today.toISOString().slice(0, 10);
+            document.querySelector('#stats-form [name="start"]').value = monthAgo.toISOString().slice(0, 10);
+        }
+
+        const defaultTab = document.querySelector('.tab-btn.active')?.dataset.tab || document.querySelector('.tab-btn')?.dataset.tab;
+        const requestedTab = (location.hash || '').slice(1);
+        const initialTab = document.querySelector(`[data-tab="${requestedTab}"]`) ? requestedTab : defaultTab;
+        if (initialTab) showAdminTab(initialTab);
+        if (statsForm) loadStats();
         rememberRenderedTickets();
-        setInterval(refreshTickets, 2000);
-        window.addEventListener('pointerdown', () => unlockSound(false), {once: true});
-        window.addEventListener('keydown', () => unlockSound(false), {once: true});
+        setInterval(refreshTickets, 3000);
     </script>
 </body>
 </html>
