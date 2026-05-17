@@ -8,20 +8,20 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        :root { --brand-gold: #ffc700; --bg-color: #0b0f12; --card-bg: rgba(17, 23, 28, .96); --inner-card-bg: rgba(21, 29, 35, .82); --card-border: rgba(148, 163, 184, .16); --panel-border: #24303a; --muted: #8d99a6; --text-main: #e8edf2; --green: #38d996; --red: #ff5c67; }
+        :root { --brand-gold: #ffc700; --bg-color: #0b0f12; --card-bg: rgba(22, 22, 24, .95); --inner-card-bg: rgba(255, 255, 255, .05); --input-bg: rgba(0, 0, 0, .4); --card-border: rgba(148, 163, 184, .16); --panel-border: #24303a; --muted: #8d99a6; --text-main: #e8edf2; --green: #38d996; --red: #ff5c67; }
         html, body { min-height: 100%; }
         body { font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; }
         body::before { content: ""; position: fixed; inset: 0; background: radial-gradient(circle at 78% 6%, rgba(255,199,0,.10), transparent 30%), linear-gradient(180deg, rgba(12,16,19,.96), #0b0f12); pointer-events: none; }
         .ticket-page { min-height: 100vh; min-height: 100dvh; padding: 20px 24px calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
         .ticket-shell { position: relative; z-index: 1; width: 100%; max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; flex: 1 1 auto; min-height: 0; }
-        .card { background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 16px; box-shadow: 0 18px 50px rgba(0,0,0,.12); }
-        .msg { max-width: min(78%, 720px); border-radius: 16px; padding: 12px 14px; border: 1px solid rgba(148,163,184,.14); }
+        .card { background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 10px; box-shadow: 0 18px 50px rgba(0,0,0,.18); }
+        .msg { max-width: min(78%, 720px); border-radius: 12px; padding: 12px 14px; border: 1px solid rgba(255,255,255,.1); }
         .msg-user { margin-right: auto; background: var(--inner-card-bg); }
         .msg-support { margin-left: auto; background: rgba(255,199,0,.12); border-color: rgba(255,199,0,.22); }
         .attachment-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 12px; }
-        .attachment { display: block; overflow: hidden; border-radius: 14px; border: 1px solid rgba(148,163,184,.14); background: rgba(0,0,0,.28); }
+        .attachment { display: block; overflow: hidden; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.28); }
         .attachment img, .attachment video { width: 100%; max-height: 240px; object-fit: cover; display: block; }
-        .file-btn { width: 46px; height: 46px; border-radius: 12px; border: 1px solid rgba(148,163,184,.16); background: var(--inner-card-bg); color: #9ca3af; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
+        .file-btn { width: 46px; height: 46px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: var(--inner-card-bg); color: #9ca3af; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
         .file-btn:hover { color: var(--brand-gold); border-color: rgba(255,199,0,.3); }
         .ticket-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
         .ticket-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
@@ -30,14 +30,14 @@
         .ticket-action-btn { min-height: 42px; border-radius: 12px; padding: 0 16px; font-size: 12px; font-weight: 800; text-transform: none; }
         .ticket-user-card { padding: 16px; }
         .ticket-user-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; font-size: 12px; font-weight: 800; }
-        .ticket-user-item { min-width: 0; border-radius: 12px; background: var(--inner-card-bg); border: 1px solid rgba(148,163,184,.12); padding: 13px 14px; }
+        .ticket-user-item { min-width: 0; border-radius: 12px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.1); padding: 13px 14px; }
         .ticket-user-label { color: var(--muted); font-size: 12px; font-weight: 800; margin-bottom: 5px; }
         .ticket-user-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .chat-card { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 16px; }
         .chat-scroll { flex: 1 1 auto; min-height: 260px; overflow-y: auto; padding-right: 4px; margin-bottom: 12px; }
-        .composer { display: grid; grid-template-columns: minmax(0, 1fr) 46px 46px; gap: 8px; align-items: end; padding-top: 12px; border-top: 1px solid rgba(148,163,184,.14); }
+        .composer { display: grid; grid-template-columns: minmax(0, 1fr) 46px 46px; gap: 8px; align-items: end; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
         .composer textarea { min-height: 46px; max-height: 120px; resize: vertical; }
-        .composer-textarea { border-radius: 12px; border: 1px solid rgba(148,163,184,.16); background: var(--inner-card-bg); color: var(--text-main); }
+        .composer-textarea { border-radius: 12px; border: 1px solid var(--card-border); background: var(--input-bg); color: var(--text-main); }
         @media (max-width: 760px) {
             .ticket-page { padding: 14px 12px calc(16px + env(safe-area-inset-bottom)); }
             .ticket-header { grid-template-columns: 1fr; }
