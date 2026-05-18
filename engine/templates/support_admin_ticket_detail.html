@@ -8,34 +8,45 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        :root { --brand-gold: #ffc700; --bg-color: #0b0f12; --card-bg: rgba(22, 22, 24, .95); --inner-card-bg: rgba(255, 255, 255, .05); --input-bg: rgba(0, 0, 0, .4); --card-border: rgba(148, 163, 184, .16); --panel-border: #24303a; --muted: #8d99a6; --text-main: #e8edf2; --green: #38d996; --red: #ff5c67; }
+        :root { --brand-gold: #ffc700; --bg-color: #0b0f12; --card-bg: rgba(22, 22, 24, .95); --inner-card-bg: rgba(255, 255, 255, .05); --input-bg: rgba(0, 0, 0, .4); --card-border: rgba(148, 163, 184, .16); --panel-border: #24303a; --muted: #8d99a6; --text-main: #e8edf2; --green: #38d996; --red: #ff5c67; --blue: #5cc8ff; --violet: #a78bfa; --coral: #fb7185; --mint: #2dd4bf; }
         html, body { min-height: 100%; }
         body { font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; }
-        body::before { content: ""; position: fixed; inset: 0; background: radial-gradient(circle at 78% 6%, rgba(255,199,0,.10), transparent 30%), linear-gradient(180deg, rgba(12,16,19,.96), #0b0f12); pointer-events: none; }
+        body::before { content: ""; position: fixed; inset: 0; background: radial-gradient(circle at 76% 4%, rgba(255,199,0,.10), transparent 28%), radial-gradient(circle at 12% 22%, rgba(92,200,255,.10), transparent 26%), radial-gradient(circle at 92% 78%, rgba(167,139,250,.10), transparent 30%), linear-gradient(180deg, rgba(12,16,19,.96), #0b0f12); pointer-events: none; }
         .ticket-page { min-height: 100vh; min-height: 100dvh; padding: 20px 24px calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
         .ticket-shell { position: relative; z-index: 1; width: 100%; max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; flex: 1 1 auto; min-height: 0; }
         .card { background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 10px; box-shadow: 0 18px 50px rgba(0,0,0,.18); }
         .msg { max-width: min(78%, 720px); border-radius: 12px; padding: 12px 14px; border: 1px solid rgba(255,255,255,.1); }
-        .msg-user { margin-right: auto; background: var(--inner-card-bg); }
-        .msg-support { margin-left: auto; background: rgba(255,199,0,.12); border-color: rgba(255,199,0,.22); }
+        .msg-user { margin-right: auto; background: linear-gradient(135deg, rgba(92,200,255,.08), var(--inner-card-bg) 55%); border-color: rgba(92,200,255,.18); }
+        .msg-support { margin-left: auto; background: linear-gradient(135deg, rgba(255,199,0,.12), rgba(167,139,250,.08)); border-color: rgba(255,199,0,.22); }
         .attachment-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 12px; }
         .attachment { display: block; overflow: hidden; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.28); }
         .attachment img, .attachment video { width: 100%; max-height: 240px; object-fit: cover; display: block; }
         .file-btn { width: 46px; height: 46px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: var(--inner-card-bg); color: #9ca3af; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
-        .file-btn:hover { color: var(--brand-gold); border-color: rgba(255,199,0,.3); }
+        .file-btn:hover { color: var(--blue); border-color: rgba(92,200,255,.32); }
         .ticket-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
         .ticket-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
         .ticket-title { margin: 8px 0 0; color: var(--text-main); font-size: clamp(28px, 2.2vw, 38px); line-height: 1.08; font-weight: 900; }
         .ticket-subtitle { color: var(--muted); font-size: 15px; line-height: 1.45; font-weight: 700; margin-top: 6px; }
         .ticket-action-btn { min-height: 42px; border-radius: 12px; padding: 0 16px; font-size: 12px; font-weight: 800; text-transform: none; }
-        .ticket-user-card { padding: 16px; }
+        .ticket-user-card { padding: 16px; background: linear-gradient(135deg, rgba(92,200,255,.06), var(--card-bg) 42%); border-color: rgba(92,200,255,.22); }
         .ticket-user-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; font-size: 12px; font-weight: 800; }
         .ticket-user-item { min-width: 0; border-radius: 12px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.1); padding: 13px 14px; }
         .ticket-user-label { color: var(--muted); font-size: 12px; font-weight: 800; margin-bottom: 5px; }
         .ticket-user-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .chat-card { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 16px; }
+        .chat-card { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 16px; background: linear-gradient(135deg, rgba(167,139,250,.06), var(--card-bg) 42%); border-color: rgba(167,139,250,.22); }
         .chat-scroll { flex: 1 1 auto; min-height: 260px; overflow-y: auto; padding-right: 4px; margin-bottom: 12px; }
-        .composer { display: grid; grid-template-columns: minmax(0, 1fr) 46px 46px; gap: 8px; align-items: end; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+        .quick-replies { position: relative; display: flex; align-items: center; justify-content: flex-start; padding: 14px 0 10px; border-top: 1px solid rgba(255,255,255,.08); }
+        .quick-replies-toggle { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(255,199,0,.28); border-radius: 12px; background: rgba(255,199,0,.09); color: var(--brand-gold); padding: 0 14px; font-size: 12px; font-weight: 800; cursor: pointer; outline: none; box-shadow: none; }
+        .quick-replies-toggle:hover { background: rgba(255,199,0,.14); border-color: rgba(255,199,0,.42); }
+        .quick-replies-toggle:focus-visible { box-shadow: 0 0 0 3px rgba(255,199,0,.16); }
+        .quick-replies-panel { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 30; display: none; max-height: 320px; overflow-y: auto; gap: 8px; padding: 10px; border: 1px solid var(--panel-border); border-radius: 14px; background: rgba(18, 18, 20, .98); box-shadow: 0 24px 70px rgba(0,0,0,.48); }
+        .quick-replies.open .quick-replies-panel { display: grid; }
+        .quick-reply-item { width: 100%; min-width: 0; display: grid; gap: 5px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: rgba(255,255,255,.05); color: var(--text-main); padding: 12px; text-align: left; cursor: pointer; }
+        .quick-reply-item:hover { border-color: rgba(255,199,0,.28); background: rgba(255,199,0,.08); }
+        .quick-reply-title { color: #fff; font-size: 13px; font-weight: 800; }
+        .quick-reply-preview { color: var(--muted); font-size: 12px; line-height: 1.35; font-weight: 700; }
+        .quick-reply-empty { padding: 12px; color: var(--muted); font-size: 12px; font-weight: 800; }
+        .composer { display: grid; grid-template-columns: minmax(0, 1fr) 46px 46px; gap: 8px; align-items: end; padding-top: 0; border-top: 0; }
         .composer textarea { min-height: 46px; max-height: 120px; resize: vertical; }
         .composer-textarea { border-radius: 12px; border: 1px solid var(--card-border); background: var(--input-bg); color: var(--text-main); }
         @media (max-width: 760px) {
@@ -48,6 +59,7 @@
             .msg { max-width: 92%; }
             .composer { grid-template-columns: minmax(0, 1fr) 42px 42px; }
             .file-btn { width: 42px; height: 42px; }
+            .quick-replies-panel { max-height: 260px; }
         }
     </style>
     {% include "includes/yandex_metrika.html" %}
@@ -135,6 +147,24 @@
                             Сообщений пока нет.
                         </div>
                     {% endfor %}
+                </div>
+
+                <div class="quick-replies" id="quick-replies">
+                    <button type="button" class="quick-replies-toggle" id="quick-replies-toggle">
+                        <i class="fas fa-bolt"></i>
+                        Заготовки
+                    </button>
+                    <div class="quick-replies-panel" id="quick-replies-panel">
+                        {% for template in reply_templates %}
+                            <button type="button" class="quick-reply-item">
+                                <span class="quick-reply-title">{{ template.title }}</span>
+                                <span class="quick-reply-preview">{{ template.body|truncatechars:120 }}</span>
+                                <span class="quick-reply-body" hidden>{{ template.body }}</span>
+                            </button>
+                        {% empty %}
+                            <div class="quick-reply-empty">Заготовок пока нет. Создать их можно в админке.</div>
+                        {% endfor %}
+                    </div>
                 </div>
 
                 <form method="post" action="{% url 'support_admin_create_message' ticket.id %}" enctype="multipart/form-data" class="composer" id="admin-support-message-form" data-messages-url="{% url 'support_admin_ticket_messages_json' ticket.id %}">
@@ -339,6 +369,35 @@
             });
         }
 
+        function setupQuickReplies() {
+            const quickReplies = document.getElementById('quick-replies');
+            const toggle = document.getElementById('quick-replies-toggle');
+            const form = document.getElementById('admin-support-message-form');
+            const textarea = form?.querySelector('textarea[name="message"]');
+            if (!quickReplies || !toggle || !textarea) return;
+
+            toggle.addEventListener('click', (event) => {
+                event.stopPropagation();
+                quickReplies.classList.toggle('open');
+            });
+
+            quickReplies.querySelectorAll('.quick-reply-item').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const body = button.querySelector('.quick-reply-body')?.textContent || '';
+                    const current = textarea.value.trim();
+                    textarea.value = current ? `${current}\n\n${body}` : body;
+                    textarea.focus();
+                    quickReplies.classList.remove('open');
+                });
+            });
+
+            document.addEventListener('click', (event) => {
+                if (!event.target.closest('#quick-replies')) {
+                    quickReplies.classList.remove('open');
+                }
+            });
+        }
+
         if (adminChat) {
             adminChat.scrollTop = adminChat.scrollHeight;
             adminChat.querySelectorAll('[data-message-id]').forEach((node) => {
@@ -346,6 +405,7 @@
             });
         }
         setupAdminMessageForm();
+        setupQuickReplies();
         setInterval(refreshMessages, 7000);
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) refreshMessages();

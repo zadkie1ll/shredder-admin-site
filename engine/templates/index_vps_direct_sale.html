@@ -511,7 +511,52 @@
             font-weight: 850;
         }
 
-        .price span {
+        .price-old {
+            width: fit-content;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+            padding: 8px 13px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 92, 103, 0.38);
+            background: rgba(255, 92, 103, 0.10);
+            color: rgba(255, 255, 255, 0.76);
+            font-size: 24px;
+            line-height: 1;
+            font-weight: 850;
+            position: relative;
+            text-decoration: none;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,.04);
+        }
+
+        .price-old-label {
+            color: #ffb5bb;
+            font-size: 10px;
+            line-height: 1;
+            font-weight: 850;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        .price-old-value {
+            position: relative;
+        }
+
+        .price-old-value::after {
+            content: "";
+            position: absolute;
+            left: -3px;
+            right: -3px;
+            top: 50%;
+            height: 4px;
+            border-radius: 999px;
+            background: #ff5c67;
+            transform: translateY(-50%) rotate(-6deg);
+            box-shadow: 0 0 14px rgba(255, 92, 103, .46);
+        }
+
+        .price > span:not(.price-old) {
             display: block;
             margin-top: 8px;
             color: var(--muted);
@@ -521,6 +566,18 @@
         .pay-form {
             display: grid;
             gap: 10px;
+        }
+
+        .pay-form .btn-primary {
+            background: linear-gradient(135deg, #ffb000, #e06400);
+            color: #fff;
+            border-color: rgba(255, 176, 0, .54);
+            box-shadow: 0 18px 38px rgba(224, 100, 0, .24), inset 0 -2px 0 rgba(0,0,0,.18);
+        }
+
+        .pay-form .btn-primary:hover {
+            background: linear-gradient(135deg, #ffc233, #f07400);
+            box-shadow: 0 22px 48px rgba(224, 100, 0, .34), inset 0 -2px 0 rgba(0,0,0,.18);
         }
 
         .email {
@@ -793,10 +850,10 @@
                                 <span class="badge">Старт</span>
                                 <h3>1 месяц</h3>
                             {% elif "3 месяца" in tariff.description %}
-                                <span class="badge">Оптимально</span>
+                                <span class="badge">Выгода 20%</span>
                                 <h3>3 месяца</h3>
                             {% elif "1 год" in tariff.description %}
-                                <span class="badge">Лучшая цена</span>
+                                <span class="badge">Выгода 40%</span>
                                 <h3>12 месяцев</h3>
                             {% else %}
                                 <span class="badge">Тариф</span>

@@ -61,6 +61,7 @@ from common.models.db import SupportTicketMessage
 from common.models.db import SupportTicketMessageSender
 from common.models.db import SupportTicketStatus
 from common.models.db import SupportTicketAttachment
+from common.models.db import SupportReplyTemplate
 from common.models import analytics_event
 from common.models.tariff import Tariff
 from common.models.tariff import OneMonthTariff
@@ -458,6 +459,30 @@ def support_messages_payload(db_session, ticket_id, admin=False):
 
 def is_ajax(request):
     return request.headers.get("x-requested-with") == "XMLHttpRequest"
+
+
+def support_reply_template_payload(template):
+    return {
+        "id": template.id,
+        "title": template.title,
+        "body": template.body,
+        "sort_order": template.sort_order,
+        "is_active": template.is_active,
+    }
+
+
+def load_support_reply_templates(db_session, active_only=True):
+    query = db_session.query(SupportReplyTemplate)
+    if active_only:
+        query = query.filter(SupportReplyTemplate.is_active.is_(True))
+    return (
+        query.order_by(
+            SupportReplyTemplate.sort_order.asc(),
+            SupportReplyTemplate.title.asc(),
+            SupportReplyTemplate.id.asc(),
+        )
+        .all()
+    )
 
 
 def delete_support_ticket_with_files(db_session, ticket):
@@ -2087,6 +2112,77 @@ def support_admin_tickets(request):
     )
 
 
+def support_admin_api_reply_templates(request):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "GET":
+            templates = load_support_reply_templates(db_session, active_only=False)
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "templates": [
+                        support_reply_template_payload(template)
+                        for template in templates
+                    ],
+                }
+            )
+
+        if request.method != "POST":
+            return JsonResponse({"status": "error"}, status=405)
+
+        action = request.POST.get("action", "save")
+        template_id = request.POST.get("template_id")
+
+        if action == "delete":
+            template = db_session.get(SupportReplyTemplate, int(template_id or 0))
+            if not template:
+                return JsonResponse({"status": "not_found"}, status=404)
+            db_session.delete(template)
+            db_session.commit()
+            return JsonResponse({"status": "ok"})
+
+        title = request.POST.get("title", "").strip()
+        body = request.POST.get("body", "").strip()
+        is_active = request.POST.get("is_active", "1") == "1"
+        try:
+            sort_order = int(request.POST.get("sort_order", "100"))
+        except ValueError:
+            sort_order = 100
+
+        if not title or not body:
+            return JsonResponse(
+                {"status": "error", "message": "Заполните название и текст ответа"},
+                status=400,
+            )
+
+        if template_id:
+            template = db_session.get(SupportReplyTemplate, int(template_id))
+            if not template:
+                return JsonResponse({"status": "not_found"}, status=404)
+        else:
+            template = SupportReplyTemplate()
+            db_session.add(template)
+
+        template.title = title[:160]
+        template.body = body
+        template.sort_order = sort_order
+        template.is_active = is_active
+        template.updated_at = datetime.utcnow()
+        db_session.commit()
+        return JsonResponse(
+            {
+                "status": "ok",
+                "template": support_reply_template_payload(template),
+            }
+        )
+    finally:
+        db_session.close()
+
+
 def support_admin_ticket_payload(ticket, user):
     return {
         "id": ticket.id,
@@ -2960,6 +3056,7 @@ def support_admin_ticket_detail(request, ticket_id):
             db_session,
             ticket.id,
         )
+        reply_templates = load_support_reply_templates(db_session, active_only=True)
     finally:
         db_session.close()
 
@@ -2970,6 +3067,7 @@ def support_admin_ticket_detail(request, ticket_id):
             "ticket": ticket,
             "ticket_user": user,
             "support_messages": support_messages,
+            "reply_templates": reply_templates,
             "support_status_open": SupportTicketStatus.OPEN,
             "support_sender_user": SupportTicketMessageSender.USER,
         },

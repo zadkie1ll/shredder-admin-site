@@ -8,10 +8,10 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        :root { --brand-gold: #ffc700; --bg-color: #0b0f12; --card-bg: rgba(22, 22, 24, .95); --inner-card-bg: rgba(255, 255, 255, .05); --input-bg: rgba(0, 0, 0, .4); --card-border: rgba(148, 163, 184, .16); --muted: #8d99a6; --green: #38d996; --red: #ff5c67; --text-main: #e8edf2; --panel-border: #24303a; }
+        :root { --brand-gold: #ffc700; --bg-color: #0b0f12; --card-bg: rgba(22, 22, 24, .95); --inner-card-bg: rgba(255, 255, 255, .05); --input-bg: rgba(0, 0, 0, .4); --card-border: rgba(148, 163, 184, .16); --muted: #8d99a6; --green: #38d996; --red: #ff5c67; --blue: #5cc8ff; --violet: #a78bfa; --coral: #fb7185; --mint: #2dd4bf; --text-main: #e8edf2; --panel-border: #24303a; }
         * { box-sizing: border-box; }
         body { margin: 0; overflow-x: hidden; font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg-color); color: var(--text-main); }
-        .page-bg { position: fixed; inset: 0; background: radial-gradient(circle at 78% 6%, rgba(255,199,0,.10), transparent 30%), linear-gradient(180deg, rgba(12,16,19,.96), #0b0f12); pointer-events: none; }
+        .page-bg { position: fixed; inset: 0; background: radial-gradient(circle at 76% 4%, rgba(255,199,0,.10), transparent 28%), radial-gradient(circle at 12% 22%, rgba(92,200,255,.10), transparent 26%), radial-gradient(circle at 92% 78%, rgba(167,139,250,.10), transparent 30%), linear-gradient(180deg, rgba(12,16,19,.96), #0b0f12); pointer-events: none; }
         .sidebar { position: fixed; inset: 0 auto 0 0; width: 280px; padding: 40px 20px; border-right: 1px solid var(--card-border); background: rgba(13,13,15,.9); backdrop-filter: blur(15px); z-index: 20; }
         .main { position: relative; z-index: 10; margin-left: 280px; padding: 40px; max-width: 1720px; }
         .card { position: relative; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 10px; box-shadow: 0 18px 50px rgba(0,0,0,.18); }
@@ -19,6 +19,12 @@
         .tab-btn:focus { outline: none; box-shadow: none; }
         .tab-btn i { width: 18px; flex: 0 0 18px; text-align: center; }
         .tab-btn span { min-width: 0; overflow-wrap: anywhere; }
+        .tab-btn:nth-of-type(1) i { color: var(--blue); }
+        .tab-btn:nth-of-type(2) i { color: var(--green); }
+        .tab-btn:nth-of-type(3) i { color: var(--violet); }
+        .tab-btn:nth-of-type(4) i { color: var(--mint); }
+        .tab-btn:nth-of-type(5) i { color: var(--brand-gold); }
+        .tab-btn:nth-of-type(6) i { color: var(--coral); }
         .tab-btn.active { color: var(--brand-gold); background: rgba(255,199,0,.08); border: 1px solid rgba(255,199,0,.15); }
         .brand-eyebrow { color: var(--brand-gold); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
         .brand-title { margin-top: 8px; color: var(--text-main); font-size: 26px; line-height: 1; font-weight: 900; }
@@ -74,6 +80,14 @@
         .metric-label { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: none; letter-spacing: 0; margin-bottom: 18px; }
         .metric-label i { color: var(--brand-gold); margin-right: 8px; }
         .metric-value { min-width: 0; overflow-wrap: anywhere; color: var(--text-main); font-size: clamp(26px, 2vw, 34px); line-height: 1.05; font-weight: 800; }
+        .metrics-grid > .metric:nth-child(4n+1) { border-color: rgba(92,200,255,.32); background: linear-gradient(135deg, rgba(92,200,255,.10), var(--card-bg) 44%); }
+        .metrics-grid > .metric:nth-child(4n+1) .metric-label i { color: var(--blue); }
+        .metrics-grid > .metric:nth-child(4n+2) { border-color: rgba(45,212,191,.28); background: linear-gradient(135deg, rgba(45,212,191,.09), var(--card-bg) 44%); }
+        .metrics-grid > .metric:nth-child(4n+2) .metric-label i { color: var(--mint); }
+        .metrics-grid > .metric:nth-child(4n+3) { border-color: rgba(167,139,250,.30); background: linear-gradient(135deg, rgba(167,139,250,.10), var(--card-bg) 44%); }
+        .metrics-grid > .metric:nth-child(4n+3) .metric-label i { color: var(--violet); }
+        .metrics-grid > .metric:nth-child(4n+4) { border-color: rgba(56,217,150,.30); background: linear-gradient(135deg, rgba(56,217,150,.10), var(--card-bg) 44%); }
+        .metrics-grid > .metric:nth-child(4n+4) .metric-label i { color: var(--green); }
         .table-row { display: grid; gap: 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.07); font-size: 13px; font-weight: 800; }
         .table-row:last-child { border-bottom: 0; }
         .data-table { overflow-x: auto; }
@@ -95,11 +109,15 @@
         .info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
         .info-item { min-width: 0; }
         .sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
-        .source-card { padding: 20px; min-width: 0; overflow: hidden; }
+        .source-card { --source-accent: var(--brand-gold); padding: 20px; min-width: 0; overflow: hidden; border-color: color-mix(in srgb, var(--source-accent) 35%, var(--panel-border)); background: linear-gradient(160deg, color-mix(in srgb, var(--source-accent) 10%, transparent), var(--card-bg) 38%); }
+        .source-card:nth-child(4n+1) { --source-accent: var(--blue); }
+        .source-card:nth-child(4n+2) { --source-accent: var(--violet); }
+        .source-card:nth-child(4n+3) { --source-accent: var(--mint); }
+        .source-card:nth-child(4n+4) { --source-accent: var(--coral); }
         .source-header { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-bottom: 16px; }
-        .source-title { min-width: 0; overflow: visible; overflow-wrap: anywhere; color: var(--brand-gold); font-size: 24px; line-height: 1.1; font-weight: 800; }
+        .source-title { min-width: 0; overflow: visible; overflow-wrap: anywhere; color: var(--source-accent); font-size: 24px; line-height: 1.1; font-weight: 800; }
         .source-actions { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-        .source-pill { flex: 0 0 auto; border-radius: 999px; padding: 7px 11px; background: rgba(255,199,0,.1); border: 1px solid rgba(255,199,0,.18); color: var(--brand-gold); font-size: 11px; font-weight: 800; text-transform: none; }
+        .source-pill { flex: 0 0 auto; border-radius: 999px; padding: 7px 11px; background: color-mix(in srgb, var(--source-accent) 13%, transparent); border: 1px solid color-mix(in srgb, var(--source-accent) 28%, transparent); color: var(--source-accent); font-size: 11px; font-weight: 800; text-transform: none; }
         .source-details-btn { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 999px; padding: 0 14px; background: var(--brand-gold); color: #050505; font-size: 11px; font-weight: 800; text-transform: none; cursor: pointer; box-shadow: 0 0 0 1px rgba(255,199,0,.35); }
         .source-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
         .source-metric { min-width: 0; border-radius: 12px; padding: 16px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.1); }
@@ -129,7 +147,9 @@
         .source-user-status.ok { color: var(--green); border-color: rgba(0,255,136,.22); background: rgba(0,255,136,.08); }
         .source-user-status.no { color: var(--red); border-color: rgba(255,155,161,.2); background: rgba(255,155,161,.075); }
         .payment-cards { display: grid; grid-template-columns: 1fr; gap: 14px; }
-        .payment-card { padding: 20px; min-width: 0; overflow: hidden; }
+        .payment-card { padding: 20px; min-width: 0; overflow: hidden; border-color: rgba(92,200,255,.22); background: linear-gradient(135deg, rgba(92,200,255,.06), var(--card-bg) 38%); }
+        .payment-card:has(.payment-status.green) { border-color: rgba(56,217,150,.25); background: linear-gradient(135deg, rgba(56,217,150,.08), var(--card-bg) 38%); }
+        .payment-card:has(.payment-status.red) { border-color: rgba(251,113,133,.25); background: linear-gradient(135deg, rgba(251,113,133,.08), var(--card-bg) 38%); }
         .payment-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
         .payment-status { min-width: 0; font-size: 15px; line-height: 1.2; font-weight: 800; }
         .payment-system { flex: 0 0 auto; border-radius: 999px; padding: 7px 10px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.1); color: #d3d6de; font-size: 11px; font-weight: 800; text-transform: none; }
@@ -140,7 +160,7 @@
         .payment-detail-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-main); font-size: 13px; font-weight: 800; }
         .payment-id { border-top: 1px solid rgba(255,255,255,.08); padding-top: 10px; color: var(--muted); font-size: 11px; line-height: 1.35; font-weight: 900; overflow-wrap: anywhere; }
         .referral-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
-        .referral-card { padding: 20px; min-width: 0; overflow: hidden; background: var(--card-bg); border-color: var(--panel-border); }
+        .referral-card { padding: 20px; min-width: 0; overflow: hidden; background: linear-gradient(135deg, rgba(167,139,250,.08), var(--card-bg) 38%); border-color: rgba(167,139,250,.24); }
         .referral-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
         .referral-name { min-width: 0; color: var(--text-main); font-size: 19px; line-height: 1.15; font-weight: 800; overflow-wrap: anywhere; }
         .referral-sub { margin-top: 6px; color: #b8bdc8; font-size: 12px; line-height: 1.3; font-weight: 800; overflow-wrap: anywhere; }
@@ -152,14 +172,14 @@
         .referral-detail-value { color: var(--text-main); font-size: 22px; line-height: 1; font-weight: 800; overflow-wrap: anywhere; }
         .referral-bonuses { margin-top: 12px; padding: 12px; border-radius: 14px; background: rgba(0,0,0,.22); border: 1px solid rgba(148,163,184,.12); color: #dfe2e8; font-size: 13px; line-height: 1.45; font-weight: 700; }
         .referral-graph { display: grid; gap: 16px; }
-        .referral-root-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-radius: 14px; padding: 14px 16px; background: rgba(255,199,0,.1); border: 1px solid rgba(255,199,0,.28); }
+        .referral-root-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-radius: 14px; padding: 14px 16px; background: linear-gradient(135deg, rgba(167,139,250,.14), rgba(255,199,0,.08)); border: 1px solid rgba(167,139,250,.30); }
         .graph-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 15px; font-weight: 800; }
         .graph-label.root { color: var(--brand-gold); }
         .graph-meta { margin-top: 4px; color: #a8aebb; font-size: 11px; font-weight: 700; text-transform: none; }
         .graph-count { flex: 0 0 auto; border-radius: 999px; padding: 7px 10px; background: rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.1); color: #fff; font-size: 11px; font-weight: 800; }
         .referral-map-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 12px; }
         .referral-map-card { min-width: 0; border-radius: 12px; padding: 14px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.1); }
-        .referral-map-card.has-children { border-color: rgba(255,199,0,.22); background: rgba(255,255,255,.08); }
+        .referral-map-card.has-children { border-color: rgba(167,139,250,.28); background: rgba(167,139,250,.08); }
         .graph-child-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
         .graph-child-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 999px; padding: 6px 8px; background: rgba(0,0,0,.22); border: 1px solid rgba(255,255,255,.09); color: #dfe2e8; font-size: 10px; font-weight: 800; }
         .chart-card { min-height: 360px; padding: 20px; }
@@ -167,12 +187,33 @@
         .chat-grid { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); gap: 18px; }
         .ticket-list { max-height: calc(100vh - 230px); overflow-y: auto; }
         .ticket-link { display: block; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.07); transition: .16s; }
-        .ticket-link:hover { background: rgba(255,199,0,.06); }
+        .ticket-link:nth-child(3n+1):hover { background: rgba(92,200,255,.06); }
+        .ticket-link:nth-child(3n+2):hover { background: rgba(167,139,250,.06); }
+        .ticket-link:nth-child(3n+3):hover { background: rgba(255,199,0,.06); }
         .ticket-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 11px; font-weight: 700; text-transform: none; }
         .ticket-subject { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 15px; font-weight: 800; }
         .ticket-user { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; font-weight: 800; }
         .support-filters { display: flex; flex-wrap: wrap; gap: 8px; }
         .btn.active-filter { background: var(--brand-gold); color: #050505; }
+        .reply-template-form { display: grid; gap: 12px; }
+        .reply-template-body { min-height: 150px; padding: 14px 16px; resize: vertical; line-height: 1.45; }
+        .reply-template-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+        .reply-template-active { display: inline-flex; align-items: center; gap: 9px; color: var(--muted); font-size: 13px; font-weight: 800; cursor: pointer; }
+        .reply-template-active input { width: 18px; height: 18px; accent-color: var(--brand-gold); }
+        .reply-template-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+        .reply-template-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; }
+        .reply-template-card { display: grid; gap: 12px; padding: 18px; border-color: rgba(92,200,255,.22); background: linear-gradient(135deg, rgba(92,200,255,.07), var(--card-bg) 42%); }
+        .reply-template-card.inactive { opacity: .62; border-color: rgba(148,163,184,.16); background: var(--card-bg); }
+        .reply-template-head { display: block; min-width: 0; }
+        .reply-template-title { min-width: 0; margin: 0; color: #fff; font-size: 18px; line-height: 1.22; font-weight: 800; overflow-wrap: anywhere; }
+        .reply-template-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; color: var(--muted); font-size: 11px; font-weight: 800; }
+        .reply-template-badge { border-radius: 999px; padding: 6px 9px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.055); }
+        .reply-template-badge.active { color: var(--green); border-color: rgba(56,217,150,.22); background: rgba(56,217,150,.08); }
+        .reply-template-text { color: #d8dde6; font-size: 13px; line-height: 1.5; font-weight: 700; white-space: pre-wrap; }
+        .reply-template-card-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+        .mini-btn { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 999px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.055); color: var(--text-main); padding: 0 12px; font-size: 11px; font-weight: 800; cursor: pointer; }
+        .mini-btn:hover { border-color: rgba(255,199,0,.28); color: var(--brand-gold); }
+        .mini-btn.danger:hover { border-color: rgba(255,92,103,.3); color: var(--red); }
         canvas { width: 100%; height: 310px; display: block; }
         @media (max-width: 1024px) {
             .sidebar { position: sticky; top: 0; width: 100%; height: auto; display: flex; gap: 7px; overflow-x: auto; padding: 12px; }
@@ -194,7 +235,8 @@
             .source-tariff-list,
             .source-user-card,
             .payment-detail-grid,
-            .referral-detail-grid { grid-template-columns: 1fr; }
+            .referral-detail-grid,
+            .reply-template-list { grid-template-columns: 1fr; }
             .source-users-list { grid-template-columns: 1fr; }
             .modal-overlay { padding: 12px; }
             .modal-header,
@@ -212,6 +254,10 @@
             .card { border-radius: 16px; }
             .form-card { padding: 14px; margin-bottom: 18px; overflow: visible; }
             .form-card > * { min-width: 0; }
+            .reply-template-toolbar,
+            .reply-template-actions { align-items: stretch; }
+            .reply-template-actions .btn,
+            .reply-template-actions .btn-secondary { width: 100%; }
             .input { min-height: 44px; border-radius: 13px; font-size: 12px; text-align: center; appearance: none; -webkit-appearance: none; }
             .date-trigger { min-height: 44px; border-radius: 13px; font-size: 12px; }
             .date-popover { left: 50%; transform: translateX(-50%); width: min(330px, calc(100vw - 32px)); }
@@ -258,6 +304,7 @@
         {% if support_admin_is_full_admin %}
             <button class="tab-btn" data-tab="subscription-manage"><i class="fas fa-hourglass-half"></i><span>Управление сроком подписок</span></button>
         {% endif %}
+        <button class="tab-btn" data-tab="reply-templates"><i class="fas fa-comments"></i><span>Заготовки ответов</span></button>
         <button class="tab-btn" data-tab="support"><i class="fas fa-headset"></i><span>Тикеты поддержки</span></button>
         <a href="{% url 'support_admin_logout' %}" class="logout mt-8 inline-flex text-gray-500 text-xs font-black hover:text-red-300">Выйти</a>
     </aside>
@@ -269,6 +316,7 @@
         data-referrals-url="{% url 'support_admin_api_referrals' %}"
         data-payment-info-url="{% url 'support_admin_api_payment_info' %}"
         data-subscription-manage-url="{% url 'support_admin_api_subscription_manage' %}"
+        data-reply-templates-url="{% url 'support_admin_api_reply_templates' %}"
         data-tickets-url="{% url 'support_admin_tickets_json' %}?status={{ status_filter }}"
     >
         {% if support_admin_is_full_admin %}
@@ -368,6 +416,34 @@
         </section>
         {% endif %}
 
+        <section id="panel-reply-templates" class="tab-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Заготовки ответов</h1>
+                <p class="admin-subtitle">Готовые ответы для тикетов поддержки</p>
+            </header>
+            <form id="reply-template-form" class="card form-card reply-template-form">
+                {% csrf_token %}
+                <input type="hidden" name="template_id">
+                <div class="form-grid-two">
+                    <input class="input" name="title" maxlength="160" placeholder="Название заготовки, например: Оплата прошла, подписка не обновилась">
+                    <input class="input" name="sort_order" type="number" value="100" placeholder="Порядок">
+                </div>
+                <textarea class="input reply-template-body" name="body" rows="5" placeholder="Текст ответа, который будет вставляться в тикет"></textarea>
+                <div class="reply-template-toolbar">
+                    <label class="reply-template-active">
+                        <input type="checkbox" name="is_active" checked>
+                        Показывать в тикетах
+                    </label>
+                    <div class="reply-template-actions">
+                        <button class="btn" type="submit"><i class="fas fa-save"></i>Сохранить</button>
+                        <button class="btn btn-secondary" type="button" id="reply-template-reset"><i class="fas fa-plus"></i>Новая заготовка</button>
+                    </div>
+                </div>
+            </form>
+            <div id="reply-template-message"></div>
+            <div id="reply-templates-result" class="reply-template-list"></div>
+        </section>
+
         <section id="panel-support" class="tab-panel">
             <header class="panel-header flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                 <div>
@@ -435,6 +511,7 @@
         const sourceUsersModalState = {source: null, label: '', page: 1, perPage: 20, totalPages: 1};
         let activeAdminTab = null;
         let ticketsRefreshInFlight = false;
+        let replyTemplatesCache = [];
         const money = (value) => `${Number(value || 0).toLocaleString('ru-RU')} ₽`;
         const pct = (value) => `${Number(value || 0).toFixed(1)}%`;
 
@@ -602,6 +679,7 @@
             document.querySelectorAll('.tab-btn').forEach((button) => button.classList.toggle('active', button.dataset.tab === tabId));
             const panel = document.getElementById(`panel-${tabId}`);
             if (panel) panel.classList.add('active');
+            if (tabId === 'reply-templates') loadReplyTemplates();
             history.replaceState(null, '', `#${tabId}`);
         }
 
@@ -611,6 +689,15 @@
         document.addEventListener('click', (event) => {
             const sourceDetailsButton = event.target.closest('[data-source-details]');
             if (sourceDetailsButton) openSourceUsersModal(sourceDetailsButton);
+
+            const editButton = event.target.closest('[data-template-edit]');
+            if (editButton) {
+                const template = replyTemplatesCache.find((item) => String(item.id) === String(editButton.dataset.templateEdit));
+                fillReplyTemplateForm(template);
+            }
+
+            const deleteButton = event.target.closest('[data-template-delete]');
+            if (deleteButton) deleteReplyTemplate(deleteButton.dataset.templateDelete);
         });
         document.querySelector('[data-source-modal-close]')?.addEventListener('click', closeSourceUsersModal);
         document.querySelector('[data-source-modal-prev]')?.addEventListener('click', () => {
@@ -640,6 +727,114 @@
 
         function inlineError(text = 'Ничего не найдено') {
             return `<div class="red">${escapeHtml(text)}</div>`;
+        }
+
+        function resetReplyTemplateForm() {
+            const form = document.getElementById('reply-template-form');
+            if (!form) return;
+            form.reset();
+            form.querySelector('[name="template_id"]').value = '';
+            form.querySelector('[name="sort_order"]').value = '100';
+            form.querySelector('[name="is_active"]').checked = true;
+            form.querySelector('button[type="submit"]').innerHTML = '<i class="fas fa-save"></i>Сохранить';
+        }
+
+        function replyTemplateCard(template) {
+            return `
+                <article class="card reply-template-card ${template.is_active ? '' : 'inactive'}" data-template-id="${template.id}">
+                    <div class="reply-template-head">
+                        <div class="min-w-0">
+                            <h3 class="reply-template-title">${escapeHtml(template.title)}</h3>
+                            <div class="reply-template-meta">
+                                <span class="reply-template-badge ${template.is_active ? 'active' : ''}">${template.is_active ? 'В тикетах' : 'Скрыта'}</span>
+                                <span class="reply-template-badge">Порядок ${template.sort_order}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="reply-template-text">${escapeHtml(template.body)}</div>
+                    <div class="reply-template-card-actions">
+                        <button type="button" class="mini-btn" data-template-edit="${template.id}"><i class="fas fa-pen"></i>Редактировать</button>
+                        <button type="button" class="mini-btn danger" data-template-delete="${template.id}"><i class="fas fa-trash"></i>Удалить</button>
+                    </div>
+                </article>
+            `;
+        }
+
+        async function loadReplyTemplates() {
+            const target = document.getElementById('reply-templates-result');
+            const message = document.getElementById('reply-template-message');
+            if (!target || !main.dataset.replyTemplatesUrl) return;
+            if (!target.innerHTML.trim()) target.innerHTML = inlineLoading('Загружаем заготовки...');
+            const response = await fetch(main.dataset.replyTemplatesUrl, {
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                cache: 'no-store',
+            });
+            if (!response.ok) {
+                target.innerHTML = `<div class="card info-card red">Не удалось загрузить заготовки</div>`;
+                return;
+            }
+            const payload = await response.json();
+            replyTemplatesCache = payload.templates || [];
+            target.innerHTML = replyTemplatesCache.length
+                ? replyTemplatesCache.map(replyTemplateCard).join('')
+                : '<div class="card info-card muted">Заготовок пока нет. Создай первую выше.</div>';
+            if (message) message.innerHTML = '';
+        }
+
+        function fillReplyTemplateForm(template) {
+            const form = document.getElementById('reply-template-form');
+            if (!form || !template) return;
+            form.querySelector('[name="template_id"]').value = template.id;
+            form.querySelector('[name="title"]').value = template.title || '';
+            form.querySelector('[name="body"]').value = template.body || '';
+            form.querySelector('[name="sort_order"]').value = template.sort_order ?? 100;
+            form.querySelector('[name="is_active"]').checked = Boolean(template.is_active);
+            form.querySelector('button[type="submit"]').innerHTML = '<i class="fas fa-save"></i>Обновить';
+            form.scrollIntoView({behavior: 'smooth', block: 'start'});
+        }
+
+        async function submitReplyTemplate(event) {
+            event.preventDefault();
+            const form = event.target;
+            const message = document.getElementById('reply-template-message');
+            const formData = new FormData(form);
+            formData.set('action', 'save');
+            formData.set('is_active', form.querySelector('[name="is_active"]').checked ? '1' : '0');
+            if (message) message.innerHTML = '';
+
+            const response = await fetch(main.dataset.replyTemplatesUrl, {
+                method: 'POST',
+                body: formData,
+                headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+            });
+
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                if (message) message.innerHTML = `<div class="card info-card red">${escapeHtml(payload.message || 'Не удалось сохранить заготовку')}</div>`;
+                return;
+            }
+
+            resetReplyTemplateForm();
+            await loadReplyTemplates();
+        }
+
+        async function deleteReplyTemplate(templateId) {
+            if (!confirm('Удалить заготовку ответа?')) return;
+            const formData = new FormData();
+            formData.set('action', 'delete');
+            formData.set('template_id', templateId);
+            const response = await fetch(main.dataset.replyTemplatesUrl, {
+                method: 'POST',
+                body: formData,
+                headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+            });
+            if (!response.ok) {
+                const message = document.getElementById('reply-template-message');
+                if (message) message.innerHTML = '<div class="card info-card red">Не удалось удалить заготовку</div>';
+                return;
+            }
+            resetReplyTemplateForm();
+            await loadReplyTemplates();
         }
 
         function metric(title, value, icon = 'fa-chart-simple') {
@@ -679,12 +874,13 @@
             const plotWidth = width - leftPadding - rightPadding;
             const plotHeight = height - topPadding - bottomPadding;
             const barWidth = Math.max(18 * dpr, (plotWidth - gap * (rows.length - 1)) / Math.max(1, rows.length));
+            const barPalette = ['#5cc8ff', '#a78bfa', '#2dd4bf', '#ffc700', '#fb7185', '#38d996'];
             ctx.font = `700 ${11 * dpr}px Inter, system-ui, sans-serif`;
             rows.forEach((row, index) => {
                 const x = leftPadding + index * (barWidth + gap);
                 const barHeight = plotHeight * (row.subscriptions / max);
                 const y = topPadding + plotHeight - barHeight;
-                ctx.fillStyle = '#ffc700';
+                ctx.fillStyle = barPalette[index % barPalette.length];
                 ctx.fillRect(x, y, barWidth, barHeight);
                 ctx.fillStyle = 'rgba(255,255,255,.72)';
                 ctx.textAlign = 'center';
@@ -1144,12 +1340,15 @@
         const paymentInfoForm = document.getElementById('payment-info-form');
         const referralsForm = document.getElementById('referrals-form');
         const subscriptionForm = document.getElementById('subscription-form');
+        const replyTemplateForm = document.getElementById('reply-template-form');
 
         if (statsForm) statsForm.addEventListener('submit', loadStats);
         if (userPaymentsForm) userPaymentsForm.addEventListener('submit', loadUserPayments);
         if (paymentInfoForm) paymentInfoForm.addEventListener('submit', loadPaymentInfo);
         if (referralsForm) referralsForm.addEventListener('submit', loadReferrals);
         if (subscriptionForm) subscriptionForm.addEventListener('submit', submitSubscription);
+        if (replyTemplateForm) replyTemplateForm.addEventListener('submit', submitReplyTemplate);
+        document.getElementById('reply-template-reset')?.addEventListener('click', resetReplyTemplateForm);
 
         const today = new Date();
         setupDatePickers();

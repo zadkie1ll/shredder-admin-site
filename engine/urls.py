@@ -75,6 +75,11 @@ urlpatterns = [
         name="support_admin_api_subscription_manage",
     ),
     path(
+        "support-admin/api/reply-templates/",
+        views.support_admin_api_reply_templates,
+        name="support_admin_api_reply_templates",
+    ),
+    path(
         "support-admin/tickets/<int:ticket_id>/",
         views.support_admin_ticket_detail,
         name="support_admin_ticket_detail",
