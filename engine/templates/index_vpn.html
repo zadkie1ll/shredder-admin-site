@@ -105,69 +105,16 @@
             z-index: 10;
         }
 
-        .discount-badge-label {
-            color: #ffb5bb;
-            font-size: 10px;
-            line-height: 1;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-        }
-
-        .old-price-badge {
-            width: fit-content;
-            display: inline-flex;
-            align-items: center;
-            gap: 12px;
-            padding: 8px 14px;
-            margin-bottom: 12px;
-            border-radius: 999px;
-            border: 1px solid rgba(255, 92, 103, 0.38);
-            background: rgba(255, 92, 103, 0.10);
-            position: relative;
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,.04), 0 10px 24px rgba(0,0,0,.18);
-        }
-
-        .old-price-value::after {
-            content: "";
-            position: absolute;
-            left: -3px;
-            right: -3px;
-            top: 50%;
-            height: 4px;
-            border-radius: 999px;
-            background: #ff5c67;
-            transform: translateY(-50%) rotate(-6deg);
-            box-shadow: 0 0 14px rgba(255, 92, 103, .46);
-        }
-
-        .old-price-label {
-            color: #ffb5bb;
-            font-size: 10px;
-            line-height: 1;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: .08em;
-        }
-
-        .old-price-value {
-            color: #dce2eb;
-            font-size: 24px;
-            line-height: 1;
-            font-weight: 900;
-            position: relative;
-        }
-
         .pay-cta {
-            background: linear-gradient(135deg, #ffb000, #e06400);
+            background: linear-gradient(135deg, #ff4fb8, #9b5cff);
             color: #fff;
-            border: 1px solid rgba(255, 176, 0, .54);
-            box-shadow: 0 18px 38px rgba(224, 100, 0, .24), inset 0 -2px 0 rgba(0,0,0,.18);
+            border: 1px solid rgba(255, 79, 184, .62);
+            box-shadow: 0 18px 38px rgba(255, 79, 184, .24), inset 0 -2px 0 rgba(0,0,0,.18);
         }
 
         .pay-cta:hover {
-            background: linear-gradient(135deg, #ffc233, #f07400);
-            box-shadow: 0 22px 48px rgba(224, 100, 0, .34), inset 0 -2px 0 rgba(0,0,0,.18);
+            background: linear-gradient(135deg, #ff70c5, #ad78ff);
+            box-shadow: 0 22px 48px rgba(255, 79, 184, .36), inset 0 -2px 0 rgba(0,0,0,.18);
         }
 
         /* Убираем стандартный маркер списка у details */
@@ -366,9 +313,9 @@
                 <div class="tariff-card p-10 flex flex-col justify-between">
                     
                     {% if "3 месяца" in tariff.description %}
-                        <div class="discount-badge">Выгода 20%</div>
+                        <div class="discount-badge">Скидка 20%</div>
                     {% elif "1 год" in tariff.description %}
-                        <div class="discount-badge">Выгода 40%</div>
+                        <div class="discount-badge">Скидка 40%</div>
                     {% endif %}
 
                     <div>

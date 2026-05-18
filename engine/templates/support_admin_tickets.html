@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Админка Monkey Island</title>
+    <title>Админ-панель Monkey Island</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
@@ -12,9 +12,10 @@
         * { box-sizing: border-box; }
         body { margin: 0; overflow-x: hidden; font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg-color); color: var(--text-main); }
         .page-bg { position: fixed; inset: 0; background: radial-gradient(circle at 76% 4%, rgba(255,199,0,.10), transparent 28%), radial-gradient(circle at 12% 22%, rgba(92,200,255,.10), transparent 26%), radial-gradient(circle at 92% 78%, rgba(167,139,250,.10), transparent 30%), linear-gradient(180deg, rgba(12,16,19,.96), #0b0f12); pointer-events: none; }
-        .sidebar { position: fixed; inset: 0 auto 0 0; width: 280px; padding: 40px 20px; border-right: 1px solid var(--card-border); background: rgba(13,13,15,.9); backdrop-filter: blur(15px); z-index: 20; }
+        .sidebar { position: fixed; inset: 0 auto 0 0; width: 280px; display: flex; flex-direction: column; padding: 36px 20px 24px; border-right: 1px solid var(--card-border); background: rgba(13,13,15,.9); backdrop-filter: blur(15px); z-index: 20; }
         .main { position: relative; z-index: 10; margin-left: 280px; padding: 40px; max-width: 1720px; }
         .card { position: relative; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 10px; box-shadow: 0 18px 50px rgba(0,0,0,.18); }
+        .sidebar-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 2px; }
         .tab-btn { width: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin-bottom: 8px; border-radius: 14px; border: 1px solid transparent; background: transparent; color: rgba(232,237,242,.54); font-size: 13px; line-height: 1.25; font-weight: 800; text-transform: none; text-align: left; outline: none; transition: .18s; }
         .tab-btn:focus { outline: none; box-shadow: none; }
         .tab-btn i { width: 18px; flex: 0 0 18px; text-align: center; }
@@ -26,8 +27,12 @@
         .tab-btn:nth-of-type(5) i { color: var(--brand-gold); }
         .tab-btn:nth-of-type(6) i { color: var(--coral); }
         .tab-btn.active { color: var(--brand-gold); background: rgba(255,199,0,.08); border: 1px solid rgba(255,199,0,.15); }
+        .brand { flex: 0 0 auto; padding-bottom: 22px; margin-bottom: 18px; border-bottom: 1px solid rgba(148,163,184,.10); }
         .brand-eyebrow { color: var(--brand-gold); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-        .brand-title { margin-top: 8px; color: var(--text-main); font-size: 26px; line-height: 1; font-weight: 900; }
+        .brand-title { margin-top: 8px; color: var(--text-main); font-size: 22px; line-height: 1.08; font-weight: 800; }
+        .logout { flex: 0 0 auto; width: 100%; min-height: 48px; display: flex; align-items: center; gap: 14px; margin-top: 18px; padding: 0 16px; border-radius: 14px; border: 1px solid rgba(251,113,133,.18); background: rgba(251,113,133,.06); color: rgba(232,237,242,.58); font-size: 13px; font-weight: 800; text-decoration: none; transition: .18s; }
+        .logout:hover { color: var(--red); border-color: rgba(251,113,133,.34); background: rgba(251,113,133,.10); }
+        .logout i { width: 18px; flex: 0 0 18px; text-align: center; color: var(--coral); }
         .tab-panel { display: none; }
         .tab-panel.active { display: block; animation: fadeIn .18s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
@@ -216,8 +221,9 @@
         .mini-btn.danger:hover { border-color: rgba(255,92,103,.3); color: var(--red); }
         canvas { width: 100%; height: 310px; display: block; }
         @media (max-width: 1024px) {
-            .sidebar { position: sticky; top: 0; width: 100%; height: auto; display: flex; gap: 7px; overflow-x: auto; padding: 12px; }
+            .sidebar { position: sticky; top: 0; width: 100%; height: auto; flex-direction: row; gap: 7px; overflow-x: auto; padding: 12px; }
             .sidebar .brand, .sidebar .logout { display: none; }
+            .sidebar-nav { flex: 1 0 auto; display: flex; gap: 7px; overflow: visible; padding-right: 0; }
             .tab-btn { min-width: 170px; margin: 0; justify-content: flex-start; }
             .main { margin-left: 0; padding: 18px; }
             .chat-grid { grid-template-columns: 1fr; }
@@ -291,22 +297,24 @@
 <body>
     <div class="page-bg"></div>
     <aside class="sidebar">
-        <div class="brand mb-8">
+        <div class="brand">
             <div class="brand-eyebrow">Monkey Island</div>
-            <div class="brand-title">Админка</div>
+            <div class="brand-title">Админ-панель</div>
         </div>
-        {% if support_admin_is_full_admin %}
-            <button class="tab-btn active" data-tab="stats"><i class="fas fa-chart-line"></i><span>Статистика</span></button>
-        {% endif %}
-        <button class="tab-btn {% if not support_admin_is_full_admin %}active{% endif %}" data-tab="user-payments"><i class="fas fa-receipt"></i><span>Платежи пользователей</span></button>
-        <button class="tab-btn" data-tab="referrals"><i class="fas fa-network-wired"></i><span>Рефералы пользователей</span></button>
-        <button class="tab-btn" data-tab="payment-info"><i class="fas fa-credit-card"></i><span>Информация о платежах</span></button>
-        {% if support_admin_is_full_admin %}
-            <button class="tab-btn" data-tab="subscription-manage"><i class="fas fa-hourglass-half"></i><span>Управление сроком подписок</span></button>
-        {% endif %}
-        <button class="tab-btn" data-tab="reply-templates"><i class="fas fa-comments"></i><span>Заготовки ответов</span></button>
-        <button class="tab-btn" data-tab="support"><i class="fas fa-headset"></i><span>Тикеты поддержки</span></button>
-        <a href="{% url 'support_admin_logout' %}" class="logout mt-8 inline-flex text-gray-500 text-xs font-black hover:text-red-300">Выйти</a>
+        <nav class="sidebar-nav" aria-label="Разделы админки">
+            {% if support_admin_is_full_admin %}
+                <button class="tab-btn active" data-tab="stats"><i class="fas fa-chart-line"></i><span>Аналитика</span></button>
+            {% endif %}
+            <button class="tab-btn {% if not support_admin_is_full_admin %}active{% endif %}" data-tab="user-payments"><i class="fas fa-receipt"></i><span>Пользователь и платежи</span></button>
+            <button class="tab-btn" data-tab="referrals"><i class="fas fa-network-wired"></i><span>Реферальная сеть</span></button>
+            <button class="tab-btn" data-tab="payment-info"><i class="fas fa-credit-card"></i><span>Платеж по ID</span></button>
+            {% if support_admin_is_full_admin %}
+                <button class="tab-btn" data-tab="subscription-manage"><i class="fas fa-hourglass-half"></i><span>Срок подписки</span></button>
+            {% endif %}
+            <button class="tab-btn" data-tab="reply-templates"><i class="fas fa-comments"></i><span>Шаблоны ответов</span></button>
+            <button class="tab-btn" data-tab="support"><i class="fas fa-headset"></i><span>Поддержка</span></button>
+        </nav>
+        <a href="{% url 'support_admin_logout' %}" class="logout"><i class="fas fa-right-from-bracket"></i><span>Выйти</span></a>
     </aside>
 
     <main class="main"
@@ -322,7 +330,7 @@
         {% if support_admin_is_full_admin %}
         <section id="panel-stats" class="tab-panel active">
             <header class="panel-header">
-                <h1 class="admin-title">Статистика</h1>
+                <h1 class="admin-title">Аналитика</h1>
                 <p class="admin-subtitle">Подписки, подключения, платежи и рекламные источники</p>
             </header>
             <form id="stats-form" class="card form-card form-grid-stats">
@@ -360,7 +368,7 @@
 
         <section id="panel-user-payments" class="tab-panel {% if not support_admin_is_full_admin %}active{% endif %}">
             <header class="panel-header">
-                <h1 class="admin-title">Платежи пользователей</h1>
+                <h1 class="admin-title">Пользователь и платежи</h1>
                 <p class="admin-subtitle">Поиск по username, email или Telegram ID</p>
             </header>
             <form id="user-payments-form" class="card form-card form-grid-two">
@@ -372,7 +380,7 @@
 
         <section id="panel-referrals" class="tab-panel">
             <header class="panel-header">
-                <h1 class="admin-title">Рефералы пользователей</h1>
+                <h1 class="admin-title">Реферальная сеть</h1>
                 <p class="admin-subtitle">Бонусы, оплаты рефералов и граф приглашений</p>
             </header>
             <form id="referrals-form" class="card form-card form-grid-two">
@@ -384,7 +392,7 @@
 
         <section id="panel-payment-info" class="tab-panel">
             <header class="panel-header">
-                <h1 class="admin-title">Информация о платежах</h1>
+                <h1 class="admin-title">Платеж по ID</h1>
                 <p class="admin-subtitle">Детали платежа YooKassa или Wata по ID</p>
             </header>
             <form id="payment-info-form" class="card form-card form-grid-two">
@@ -397,7 +405,7 @@
         {% if support_admin_is_full_admin %}
         <section id="panel-subscription-manage" class="tab-panel">
             <header class="panel-header">
-                <h1 class="admin-title">Управление сроком подписок</h1>
+                <h1 class="admin-title">Срок подписки</h1>
                 <p class="admin-subtitle">Проверка пользователя, продление и установка пробного часа</p>
             </header>
             <form id="subscription-form" class="card form-card">
@@ -409,7 +417,7 @@
                 <div class="subscription-actions">
                     <input class="input" name="days" type="number" min="1" placeholder="Дни">
                     <button class="btn" type="submit" name="action" value="extend"><i class="fas fa-plus"></i>Продлить</button>
-                    <button class="btn btn-secondary" type="submit" name="action" value="set_trial_hour"><i class="fas fa-clock"></i>Сделать 1 час с текущего момента</button>
+                    <button class="btn btn-secondary" type="submit" name="action" value="set_trial_hour"><i class="fas fa-clock"></i>Установить срок: 1 час</button>
                 </div>
             </form>
             <div id="subscription-result"></div>
@@ -418,7 +426,7 @@
 
         <section id="panel-reply-templates" class="tab-panel">
             <header class="panel-header">
-                <h1 class="admin-title">Заготовки ответов</h1>
+                <h1 class="admin-title">Шаблоны ответов</h1>
                 <p class="admin-subtitle">Готовые ответы для тикетов поддержки</p>
             </header>
             <form id="reply-template-form" class="card form-card reply-template-form">
@@ -447,7 +455,7 @@
         <section id="panel-support" class="tab-panel">
             <header class="panel-header flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                 <div>
-                    <h1 class="admin-title">Тикеты поддержки</h1>
+                    <h1 class="admin-title">Поддержка</h1>
                     <p class="admin-subtitle">Открытые: <span id="open-count">{{ open_count }}</span> · Закрытые: <span id="closed-count">{{ closed_count }}</span></p>
                 </div>
                 <nav class="support-filters">
