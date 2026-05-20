@@ -1,9 +1,13 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Админ-панель Monkey Island</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
+    <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
+    <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" rel="stylesheet">
@@ -28,6 +32,7 @@
         .tab-btn:nth-of-type(4) i { color: var(--mint); }
         .tab-btn:nth-of-type(5) i { color: var(--brand-gold); }
         .tab-btn:nth-of-type(6) i { color: var(--coral); }
+        .tab-btn[data-tab="config-templates"] i { color: var(--mint); }
         .tab-btn.active { color: var(--brand-gold); background: rgba(255,199,0,.08); border: 1px solid rgba(255,199,0,.15); }
         .brand { flex: 0 0 auto; padding-bottom: 22px; margin-bottom: 18px; border-bottom: 1px solid rgba(148,163,184,.10); }
         .brand-eyebrow { color: var(--brand-gold); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
@@ -229,6 +234,7 @@
         .config-field { display: grid; gap: 8px; }
         .config-field-label { color: var(--text-main); font-size: 13px; line-height: 1.25; font-weight: 800; }
         .config-field-hint { color: var(--muted); font-size: 12px; line-height: 1.45; font-weight: 700; }
+        .config-form-grid .config-field-hint { min-height: 42px; }
         .config-json-shell { overflow: hidden; border: 1px solid var(--panel-border); border-radius: 10px; background: #111820; }
         .config-json-head { min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.035); }
         .config-json-title { color: var(--muted); font-size: 12px; font-weight: 800; }
@@ -285,6 +291,7 @@
             .reply-template-list,
             .config-form-grid,
             .config-template-list { grid-template-columns: 1fr; }
+            .config-form-grid .config-field-hint { min-height: 0; }
             .source-users-list { grid-template-columns: 1fr; }
             .modal-overlay { padding: 12px; }
             .modal-header,
@@ -358,7 +365,7 @@
             <button class="tab-btn" data-tab="payment-info"><i class="fas fa-credit-card"></i><span>Платеж по ID</span></button>
             {% if support_admin_is_full_admin %}
                 <button class="tab-btn" data-tab="subscription-manage"><i class="fas fa-hourglass-half"></i><span>Срок подписки</span></button>
-                <button class="tab-btn" data-tab="config-templates"><i class="fas fa-code"></i><span>Шаблоны конфигов</span></button>
+                <button class="tab-btn" data-tab="config-templates"><i class="fas fa-file-code"></i><span>Шаблоны конфигов</span></button>
             {% endif %}
             <button class="tab-btn" data-tab="reply-templates"><i class="fas fa-comments"></i><span>Шаблоны ответов</span></button>
             <button class="tab-btn" data-tab="support"><i class="fas fa-headset"></i><span>Поддержка</span></button>
