@@ -6,6 +6,8 @@
     <title>Админ-панель Monkey Island</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
         :root { --brand-gold: #ffc700; --bg-color: #0b0f12; --card-bg: rgba(22, 22, 24, .95); --inner-card-bg: rgba(255, 255, 255, .05); --input-bg: rgba(0, 0, 0, .4); --card-border: rgba(148, 163, 184, .16); --muted: #8d99a6; --green: #38d996; --red: #ff5c67; --blue: #5cc8ff; --violet: #a78bfa; --coral: #fb7185; --mint: #2dd4bf; --text-main: #e8edf2; --panel-border: #24303a; }
@@ -39,6 +41,7 @@
         .admin-title { margin: 0 0 10px; color: var(--text-main); font-size: clamp(30px, 2.4vw, 40px); line-height: 1.08; font-weight: 900; letter-spacing: 0; }
         .admin-subtitle { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.45; font-weight: 700; }
         .panel-header { margin-bottom: 24px; }
+        .panel-header.config-panel-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; }
         .form-card { padding: 20px; margin-bottom: 22px; }
         .form-grid-two { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
         .form-grid-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center; }
@@ -137,6 +140,7 @@
         .modal-overlay { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.72); backdrop-filter: blur(8px); }
         .modal-overlay.open { display: flex; }
         .modal-card { width: min(1120px, 100%); max-height: min(760px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 10px; box-shadow: 0 24px 80px rgba(0,0,0,.45); }
+        .modal-card.config-template-modal-card { width: min(1320px, 100%); max-height: min(920px, calc(100vh - 48px)); }
         .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px; border-bottom: 1px solid rgba(255,255,255,.08); }
         .modal-title { margin: 0; color: var(--text-main); font-size: 26px; line-height: 1.1; font-weight: 800; }
         .modal-subtitle { margin-top: 6px; color: var(--muted); font-size: 13px; font-weight: 700; }
@@ -219,6 +223,42 @@
         .mini-btn { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; border-radius: 999px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.055); color: var(--text-main); padding: 0 12px; font-size: 11px; font-weight: 800; cursor: pointer; }
         .mini-btn:hover { border-color: rgba(255,199,0,.28); color: var(--brand-gold); }
         .mini-btn.danger:hover { border-color: rgba(255,92,103,.3); color: var(--red); }
+        .config-template-form { display: grid; gap: 12px; }
+        .config-panel-actions { flex: 0 0 auto; display: flex; align-items: center; justify-content: flex-end; }
+        .config-form-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+        .config-field { display: grid; gap: 8px; }
+        .config-field-label { color: var(--text-main); font-size: 13px; line-height: 1.25; font-weight: 800; }
+        .config-field-hint { color: var(--muted); font-size: 12px; line-height: 1.45; font-weight: 700; }
+        .config-json-shell { overflow: hidden; border: 1px solid var(--panel-border); border-radius: 10px; background: #111820; }
+        .config-json-head { min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.035); }
+        .config-json-title { color: var(--muted); font-size: 12px; font-weight: 800; }
+        .config-json-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+        .json-editor-textarea { min-height: 560px; padding: 14px 16px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; line-height: 1.5; resize: vertical; }
+        .CodeMirror { height: 560px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; line-height: 1.5; background: #111820; }
+        .CodeMirror-gutters { background: #151c25; border-right: 1px solid rgba(255,255,255,.08); }
+        .CodeMirror-linenumber { color: #728093; }
+        .CodeMirror-activeline-background { background: rgba(255,255,255,.045); }
+        .admin-toast { position: fixed; right: 24px; bottom: 24px; z-index: 120; max-width: min(420px, calc(100vw - 32px)); display: none; align-items: flex-start; gap: 10px; border-radius: 10px; padding: 13px 15px; color: #06120d; background: var(--green); box-shadow: 0 18px 50px rgba(0,0,0,.32); font-size: 13px; line-height: 1.35; font-weight: 800; }
+        .admin-toast.show { display: flex; animation: toastIn .16s ease-out; }
+        .admin-toast.error { color: #fff; background: var(--red); }
+        .admin-toast i { flex: 0 0 auto; margin-top: 2px; }
+        @keyframes toastIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        .config-message { min-height: 0; }
+        .config-message .info-card { margin-bottom: 14px; }
+        .config-template-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 14px; align-items: stretch; }
+        .config-template-card { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 14px; min-height: 440px; padding: 18px; border-color: rgba(92,200,255,.22); background: linear-gradient(135deg, rgba(92,200,255,.07), var(--card-bg) 42%); }
+        .config-template-card:has(.config-template-badge.active) { border-color: rgba(45,212,191,.28); background: linear-gradient(135deg, rgba(45,212,191,.08), var(--card-bg) 42%); }
+        .config-template-card.inactive { opacity: .62; border-color: rgba(148,163,184,.16); background: var(--card-bg); }
+        .config-template-head { display: grid; gap: 12px; min-width: 0; }
+        .config-template-title { margin: 0; color: #fff; font-size: 19px; line-height: 1.2; font-weight: 800; overflow-wrap: anywhere; }
+        .config-template-meta { display: flex; flex-wrap: wrap; gap: 8px; color: var(--muted); font-size: 11px; font-weight: 800; }
+        .config-template-badge { border-radius: 999px; padding: 6px 9px; border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.055); }
+        .config-template-badge.active { color: var(--green); border-color: rgba(56,217,150,.22); background: rgba(56,217,150,.08); }
+        .config-template-preview-block { display: grid; gap: 8px; }
+        .config-template-preview-label { color: var(--muted); font-size: 11px; font-weight: 800; }
+        .config-template-preview { height: 230px; overflow: auto; border-radius: 8px; padding: 12px; border: 1px solid rgba(255,255,255,.07); background: rgba(0,0,0,.24); color: #b9d6e8; font: 700 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; scrollbar-color: rgba(148,163,184,.42) rgba(255,255,255,.05); }
+        .config-template-card-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
+        .config-template-card-actions .mini-btn { background: rgba(255,255,255,.075); border-color: rgba(255,255,255,.14); }
         canvas { width: 100%; height: 310px; display: block; }
         @media (max-width: 1024px) {
             .sidebar { position: sticky; top: 0; width: 100%; height: auto; flex-direction: row; gap: 7px; overflow-x: auto; padding: 12px; }
@@ -242,7 +282,9 @@
             .source-user-card,
             .payment-detail-grid,
             .referral-detail-grid,
-            .reply-template-list { grid-template-columns: 1fr; }
+            .reply-template-list,
+            .config-form-grid,
+            .config-template-list { grid-template-columns: 1fr; }
             .source-users-list { grid-template-columns: 1fr; }
             .modal-overlay { padding: 12px; }
             .modal-header,
@@ -257,6 +299,8 @@
             .admin-title { font-size: 30px; line-height: 1.08; }
             .admin-subtitle { font-size: 13px; line-height: 1.45; }
             .panel-header { margin-bottom: 18px; }
+            .panel-header.config-panel-header { align-items: stretch; flex-direction: column; }
+            .config-panel-actions .btn { width: 100%; }
             .card { border-radius: 16px; }
             .form-card { padding: 14px; margin-bottom: 18px; overflow: visible; }
             .form-card > * { min-width: 0; }
@@ -264,6 +308,10 @@
             .reply-template-actions { align-items: stretch; }
             .reply-template-actions .btn,
             .reply-template-actions .btn-secondary { width: 100%; }
+            .config-json-head,
+            .config-json-actions { align-items: stretch; flex-direction: column; }
+            .CodeMirror { height: 460px; font-size: 12px; }
+            .json-editor-textarea { min-height: 460px; }
             .input { min-height: 44px; border-radius: 13px; font-size: 12px; text-align: center; appearance: none; -webkit-appearance: none; }
             .date-trigger { min-height: 44px; border-radius: 13px; font-size: 12px; }
             .date-popover { left: 50%; transform: translateX(-50%); width: min(330px, calc(100vw - 32px)); }
@@ -310,6 +358,7 @@
             <button class="tab-btn" data-tab="payment-info"><i class="fas fa-credit-card"></i><span>Платеж по ID</span></button>
             {% if support_admin_is_full_admin %}
                 <button class="tab-btn" data-tab="subscription-manage"><i class="fas fa-hourglass-half"></i><span>Срок подписки</span></button>
+                <button class="tab-btn" data-tab="config-templates"><i class="fas fa-code"></i><span>Шаблоны конфигов</span></button>
             {% endif %}
             <button class="tab-btn" data-tab="reply-templates"><i class="fas fa-comments"></i><span>Шаблоны ответов</span></button>
             <button class="tab-btn" data-tab="support"><i class="fas fa-headset"></i><span>Поддержка</span></button>
@@ -325,6 +374,7 @@
         data-payment-info-url="{% url 'support_admin_api_payment_info' %}"
         data-subscription-manage-url="{% url 'support_admin_api_subscription_manage' %}"
         data-reply-templates-url="{% url 'support_admin_api_reply_templates' %}"
+        data-config-templates-url="{% url 'support_admin_api_config_templates' %}"
         data-tickets-url="{% url 'support_admin_tickets_json' %}?status={{ status_filter }}"
     >
         {% if support_admin_is_full_admin %}
@@ -424,6 +474,21 @@
         </section>
         {% endif %}
 
+        {% if support_admin_is_full_admin %}
+        <section id="panel-config-templates" class="tab-panel">
+            <header class="panel-header config-panel-header">
+                <div>
+                    <h1 class="admin-title">Шаблоны конфигов</h1>
+                    <p class="admin-subtitle">Параметры CustomConfigTemplate и JSON шаблона</p>
+                </div>
+                <div class="config-panel-actions">
+                    <button class="btn" type="button" id="config-template-add"><i class="fas fa-plus"></i>Добавить конфиг</button>
+                </div>
+            </header>
+            <div id="config-templates-result" class="config-template-list"></div>
+        </section>
+        {% endif %}
+
         <section id="panel-reply-templates" class="tab-panel">
             <header class="panel-header">
                 <h1 class="admin-title">Шаблоны ответов</h1>
@@ -491,6 +556,82 @@
         </section>
     </main>
 
+    <div id="config-template-modal" class="modal-overlay" aria-hidden="true">
+        <section class="modal-card config-template-modal-card" role="dialog" aria-modal="true" aria-labelledby="config-template-modal-title">
+            <header class="modal-header">
+                <div>
+                    <h2 id="config-template-modal-title" class="modal-title">Добавить конфиг</h2>
+                    <div class="modal-subtitle">Заполните параметры шаблона и JSON конфига</div>
+                </div>
+                <button type="button" class="modal-close" data-config-modal-close aria-label="Закрыть">
+                    <i class="fas fa-times"></i>
+                </button>
+            </header>
+            <div class="modal-body">
+                <div id="config-template-message" class="config-message"></div>
+                <form id="config-template-form" class="config-template-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="template_id">
+                    <div class="config-field">
+                        <label class="config-field-label" for="config-template-name">Имя конфига</label>
+                        <input class="input" id="config-template-name" name="name" maxlength="160" placeholder="Например default" required>
+                    </div>
+                    <div class="config-json-shell">
+                        <div class="config-json-head">
+                            <div class="config-json-title">template_json</div>
+                            <div class="config-json-actions">
+                                <button class="mini-btn" type="button" id="config-json-validate"><i class="fas fa-check"></i>Проверить JSON</button>
+                                <button class="mini-btn" type="button" id="config-json-format"><i class="fas fa-align-left"></i>Форматировать</button>
+                            </div>
+                        </div>
+                        <textarea class="input json-editor-textarea" name="template_json" id="config-template-json" spellcheck="false" required>{
+  "log": {
+    "loglevel": "warning"
+  }
+}</textarea>
+                    </div>
+                    <div class="config-form-grid">
+                        <div class="config-field">
+                            <label class="config-field-label" for="config-entry-name">Название профиля</label>
+                            <div class="config-field-hint">Значение поля entry_name, которое будет показано в клиенте.</div>
+                            <input class="input" id="config-entry-name" name="entry_name" maxlength="256" placeholder="Например proxy">
+                        </div>
+                        <div class="config-field">
+                            <label class="config-field-label" for="config-support-url">Ссылка поддержки</label>
+                            <div class="config-field-hint">URL, который клиент сможет открыть для обращения в поддержку.</div>
+                            <input class="input" id="config-support-url" name="support_url" maxlength="512" placeholder="https://...">
+                        </div>
+                        <div class="config-field">
+                            <label class="config-field-label" for="config-profile-update-interval">Интервал автообновления</label>
+                            <div class="config-field-hint">Значение profile_update_interval для обновления профиля.</div>
+                            <input class="input" id="config-profile-update-interval" name="profile_update_interval" maxlength="32" placeholder="Например 1">
+                        </div>
+                    </div>
+                    <div class="config-field">
+                        <label class="config-field-label" for="config-announce-text">Текст объявления</label>
+                        <div class="config-field-hint">Необязательный announce_text, который можно показать вместе с конфигом.</div>
+                        <textarea class="input reply-template-body" id="config-announce-text" name="announce_text" rows="3" placeholder="Текст объявления"></textarea>
+                    </div>
+                    <div class="config-field">
+                        <label class="config-field-label" for="config-additional-headers">Дополнительные заголовки</label>
+                        <div class="config-field-hint">JSON-объект с HTTP-заголовками, которые нужно добавить к конфигу. Если заголовки не нужны, оставьте пустой объект {}.</div>
+                        <textarea class="input reply-template-body" id="config-additional-headers" name="additional_headers" rows="3" placeholder='Например {"X-App": "Monkey Island"}'>{}</textarea>
+                    </div>
+                    <div class="reply-template-toolbar">
+                        <label class="reply-template-active">
+                            <input type="checkbox" name="is_active" checked>
+                            Сделать активным шаблоном, выключив текущий активный
+                        </label>
+                        <div class="reply-template-actions">
+                            <button class="btn" type="submit"><i class="fas fa-save"></i>Сохранить</button>
+                            <button class="btn btn-secondary" type="button" data-config-modal-close>Отмена</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </section>
+    </div>
+
     <div id="source-users-modal" class="modal-overlay" aria-hidden="true">
         <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="source-users-modal-title">
             <header class="modal-header">
@@ -513,6 +654,12 @@
         </section>
     </div>
 
+    <div id="admin-toast" class="admin-toast" role="status" aria-live="polite"></div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/selection/active-line.min.js"></script>
     <script>
         const main = document.querySelector('.main');
         const csrfToken = '{{ csrf_token }}';
@@ -520,6 +667,9 @@
         let activeAdminTab = null;
         let ticketsRefreshInFlight = false;
         let replyTemplatesCache = [];
+        let configTemplatesCache = [];
+        let configJsonEditor = null;
+        let adminToastTimer = null;
         const money = (value) => `${Number(value || 0).toLocaleString('ru-RU')} ₽`;
         const pct = (value) => `${Number(value || 0).toFixed(1)}%`;
 
@@ -688,6 +838,9 @@
             const panel = document.getElementById(`panel-${tabId}`);
             if (panel) panel.classList.add('active');
             if (tabId === 'reply-templates') loadReplyTemplates();
+            if (tabId === 'config-templates') {
+                loadConfigTemplates();
+            }
             history.replaceState(null, '', `#${tabId}`);
         }
 
@@ -706,6 +859,17 @@
 
             const deleteButton = event.target.closest('[data-template-delete]');
             if (deleteButton) deleteReplyTemplate(deleteButton.dataset.templateDelete);
+
+            const configEditButton = event.target.closest('[data-config-template-edit]');
+            if (configEditButton) {
+                const template = configTemplatesCache.find((item) => String(item.id) === String(configEditButton.dataset.configTemplateEdit));
+                openConfigTemplateModal(template);
+            }
+
+            const configDeleteButton = event.target.closest('[data-config-template-delete]');
+            if (configDeleteButton) {
+                deleteConfigTemplate(configDeleteButton.dataset.configTemplateDelete);
+            }
         });
         document.querySelector('[data-source-modal-close]')?.addEventListener('click', closeSourceUsersModal);
         document.querySelector('[data-source-modal-prev]')?.addEventListener('click', () => {
@@ -717,8 +881,17 @@
         document.getElementById('source-users-modal')?.addEventListener('click', (event) => {
             if (event.target.id === 'source-users-modal') closeSourceUsersModal();
         });
+        document.getElementById('config-template-modal')?.addEventListener('click', (event) => {
+            if (event.target.id === 'config-template-modal') closeConfigTemplateModal();
+        });
+        document.querySelectorAll('[data-config-modal-close]').forEach((button) => {
+            button.addEventListener('click', closeConfigTemplateModal);
+        });
         document.addEventListener('keydown', (event) => {
-            if (event.key === 'Escape') closeSourceUsersModal();
+            if (event.key === 'Escape') {
+                closeSourceUsersModal();
+                closeConfigTemplateModal();
+            }
         });
 
         function setLoading(target, text = 'Загружаем данные...') {
@@ -727,6 +900,18 @@
 
         function setError(target, text = 'Ничего не найдено') {
             target.innerHTML = `<div class="card info-card red">${escapeHtml(text)}</div>`;
+        }
+
+        function showAdminToast(text, kind = 'success') {
+            const toast = document.getElementById('admin-toast');
+            if (!toast) return;
+            clearTimeout(adminToastTimer);
+            const isError = kind === 'error';
+            toast.className = `admin-toast show ${isError ? 'error' : ''}`;
+            toast.innerHTML = `<i class="fas ${isError ? 'fa-triangle-exclamation' : 'fa-check'}"></i><span>${escapeHtml(text)}</span>`;
+            adminToastTimer = setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2600);
         }
 
         function inlineLoading(text = 'Загружаем данные...') {
@@ -843,6 +1028,248 @@
             }
             resetReplyTemplateForm();
             await loadReplyTemplates();
+        }
+
+        function setupConfigJsonEditor() {
+            const textarea = document.getElementById('config-template-json');
+            if (!textarea || configJsonEditor || !window.CodeMirror) return;
+            configJsonEditor = CodeMirror.fromTextArea(textarea, {
+                mode: {name: 'javascript', json: true},
+                theme: 'material-darker',
+                lineNumbers: true,
+                lineWrapping: false,
+                matchBrackets: true,
+                styleActiveLine: true,
+                tabSize: 2,
+                indentUnit: 2,
+                viewportMargin: Infinity,
+                extraKeys: {
+                    Tab(cm) {
+                        if (cm.somethingSelected()) cm.indentSelection('add');
+                        else cm.replaceSelection('  ', 'end');
+                    },
+                },
+            });
+        }
+
+        function getConfigJsonValue() {
+            return configJsonEditor ? configJsonEditor.getValue() : (document.getElementById('config-template-json')?.value || '');
+        }
+
+        function setConfigJsonValue(value) {
+            setupConfigJsonEditor();
+            if (configJsonEditor) {
+                configJsonEditor.setValue(value || '');
+                configJsonEditor.refresh();
+            } else {
+                const textarea = document.getElementById('config-template-json');
+                if (textarea) textarea.value = value || '';
+            }
+        }
+
+        function parseJsonWithMessage(value, fieldName) {
+            try {
+                return {ok: true, value: JSON.parse(value)};
+            } catch (error) {
+                return {ok: false, message: `${fieldName}: ${error.message}`};
+            }
+        }
+
+        function setConfigMessage(text, kind = 'green') {
+            const message = document.getElementById('config-template-message');
+            if (message) message.innerHTML = text ? `<div class="card info-card ${kind}">${escapeHtml(text)}</div>` : '';
+        }
+
+        function validateConfigJson(showSuccess = true) {
+            const parsed = parseJsonWithMessage(getConfigJsonValue(), 'template_json');
+            if (!parsed.ok) {
+                showAdminToast(parsed.message, 'error');
+                return false;
+            }
+            if (showSuccess) showAdminToast('JSON шаблона валиден');
+            return true;
+        }
+
+        function openConfigTemplateModal(template = null) {
+            const modal = document.getElementById('config-template-modal');
+            if (!modal) return;
+            if (template) {
+                fillConfigTemplateForm(template);
+            } else {
+                resetConfigTemplateForm();
+            }
+            document.getElementById('config-template-modal-title').textContent = template ? `Редактировать конфиг: ${template.name || ''}` : 'Добавить конфиг';
+            modal.classList.add('open');
+            modal.setAttribute('aria-hidden', 'false');
+            setupConfigJsonEditor();
+            setTimeout(() => configJsonEditor?.refresh(), 60);
+        }
+
+        function closeConfigTemplateModal() {
+            const modal = document.getElementById('config-template-modal');
+            if (!modal || !modal.classList.contains('open')) return;
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+            setConfigMessage('');
+        }
+
+        function formatConfigJson() {
+            const parsed = parseJsonWithMessage(getConfigJsonValue(), 'template_json');
+            if (!parsed.ok) {
+                showAdminToast(parsed.message, 'error');
+                return;
+            }
+            setConfigJsonValue(JSON.stringify(parsed.value, null, 2));
+            showAdminToast('JSON отформатирован');
+        }
+
+        function resetConfigTemplateForm() {
+            const form = document.getElementById('config-template-form');
+            if (!form) return;
+            form.reset();
+            form.querySelector('[name="template_id"]').value = '';
+            form.querySelector('[name="name"]').value = '';
+            form.querySelector('[name="additional_headers"]').value = '{}';
+            form.querySelector('[name="is_active"]').checked = true;
+            form.querySelector('button[type="submit"]').innerHTML = '<i class="fas fa-save"></i>Сохранить';
+            setConfigJsonValue('{\n  "log": {\n    "loglevel": "warning"\n  }\n}');
+            setConfigMessage('');
+        }
+
+        function configTemplateCard(template) {
+            const prettyHeaders = JSON.stringify(template.additional_headers || {}, null, 2);
+            return `
+                <article class="card config-template-card ${template.is_active ? '' : 'inactive'}" data-config-template-id="${template.id}">
+                    <div class="config-template-head">
+                        <h3 class="config-template-title">${escapeHtml(template.name)}</h3>
+                        <div class="config-template-meta">
+                            <span class="config-template-badge ${template.is_active ? 'active' : ''}">${template.is_active ? 'Активный шаблон' : 'Неактивен'}</span>
+                            ${template.entry_name ? `<span class="config-template-badge">Профиль: ${escapeHtml(template.entry_name)}</span>` : ''}
+                            ${template.profile_update_interval ? `<span class="config-template-badge">Интервал автообновления: ${escapeHtml(template.profile_update_interval)}</span>` : ''}
+                        </div>
+                    </div>
+                    <div class="config-template-preview-block">
+                        <div class="config-template-preview-label">template_json</div>
+                        <pre class="config-template-preview">${escapeHtml((template.template_json || '').slice(0, 1800))}</pre>
+                    </div>
+                    ${Object.keys(template.additional_headers || {}).length ? `
+                        <div class="config-template-preview-block">
+                            <div class="config-template-preview-label">Дополнительные заголовки</div>
+                            <pre class="config-template-preview">${escapeHtml(prettyHeaders)}</pre>
+                        </div>
+                    ` : ''}
+                    <div class="config-template-card-actions">
+                        <button type="button" class="mini-btn" data-config-template-edit="${template.id}"><i class="fas fa-pen"></i>Редактировать</button>
+                        <button type="button" class="mini-btn danger" data-config-template-delete="${template.id}"><i class="fas fa-trash"></i>Удалить</button>
+                    </div>
+                </article>
+            `;
+        }
+
+        async function loadConfigTemplates() {
+            const target = document.getElementById('config-templates-result');
+            if (!target || !main.dataset.configTemplatesUrl) return;
+            if (!target.innerHTML.trim()) target.innerHTML = inlineLoading('Загружаем шаблоны...');
+            const response = await fetch(main.dataset.configTemplatesUrl, {
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                cache: 'no-store',
+            });
+            if (!response.ok) {
+                target.innerHTML = '<div class="card info-card red">Не удалось загрузить шаблоны конфигов</div>';
+                return;
+            }
+            const payload = await response.json();
+            configTemplatesCache = payload.templates || [];
+            target.innerHTML = configTemplatesCache.length
+                ? configTemplatesCache.map(configTemplateCard).join('')
+                : '<div class="card info-card muted">Шаблонов пока нет. Нажмите “Добавить конфиг”, чтобы создать первый.</div>';
+        }
+
+        function fillConfigTemplateForm(template) {
+            const form = document.getElementById('config-template-form');
+            if (!form || !template) return;
+            setupConfigJsonEditor();
+            form.querySelector('[name="template_id"]').value = template.id;
+            form.querySelector('[name="name"]').value = template.name || '';
+            form.querySelector('[name="entry_name"]').value = template.entry_name || '';
+            form.querySelector('[name="announce_text"]').value = template.announce_text || '';
+            form.querySelector('[name="support_url"]').value = template.support_url || '';
+            form.querySelector('[name="profile_update_interval"]').value = template.profile_update_interval || '';
+            form.querySelector('[name="additional_headers"]').value = JSON.stringify(template.additional_headers || {}, null, 2);
+            form.querySelector('[name="is_active"]').checked = Boolean(template.is_active);
+            form.querySelector('button[type="submit"]').innerHTML = '<i class="fas fa-save"></i>Обновить';
+            setConfigJsonValue(template.template_json || '{}');
+            setConfigMessage('');
+        }
+
+        async function submitConfigTemplate(event) {
+            event.preventDefault();
+            const form = event.target;
+            const templateJson = getConfigJsonValue();
+            const parsedTemplate = parseJsonWithMessage(templateJson, 'template_json');
+            if (!parsedTemplate.ok) return showAdminToast(parsedTemplate.message, 'error');
+
+            const headersRaw = form.querySelector('[name="additional_headers"]').value.trim();
+            if (headersRaw) {
+                const parsedHeaders = parseJsonWithMessage(headersRaw, 'additional_headers');
+                if (!parsedHeaders.ok) return showAdminToast(parsedHeaders.message, 'error');
+                if (!parsedHeaders.value || Array.isArray(parsedHeaders.value) || typeof parsedHeaders.value !== 'object') {
+                    return showAdminToast('additional_headers должен быть JSON-объектом', 'error');
+                }
+            }
+
+            const formData = new FormData(form);
+            formData.set('action', 'save');
+            formData.set('template_json', templateJson);
+            formData.set('is_active', form.querySelector('[name="is_active"]').checked ? '1' : '0');
+            setConfigMessage('');
+
+            const response = await fetch(main.dataset.configTemplatesUrl, {
+                method: 'POST',
+                body: formData,
+                headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+            });
+
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                showAdminToast(payload.message || 'Не удалось сохранить шаблон конфига', 'error');
+                return;
+            }
+
+            resetConfigTemplateForm();
+            closeConfigTemplateModal();
+            await loadConfigTemplates();
+            showAdminToast('Конфиг сохранен');
+        }
+
+        async function deleteConfigTemplate(templateId) {
+            const template = configTemplatesCache.find((item) => String(item.id) === String(templateId));
+            if (!template) {
+                showAdminToast('Шаблон конфига не найден', 'error');
+                return;
+            }
+            const templateName = String(template.name || '');
+            const enteredName = prompt(`Введите название конфигурации "${templateName}" чтобы подтвердить ее удаление`);
+            if (enteredName === null) return;
+            if (enteredName.trim() !== templateName) {
+                showAdminToast('Название конфигурации не совпало. Удаление отменено.', 'error');
+                return;
+            }
+            const formData = new FormData();
+            formData.set('action', 'delete');
+            formData.set('template_id', templateId);
+            const response = await fetch(main.dataset.configTemplatesUrl, {
+                method: 'POST',
+                body: formData,
+                headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+            });
+            if (!response.ok) {
+                showAdminToast('Не удалось удалить шаблон конфига', 'error');
+                return;
+            }
+            resetConfigTemplateForm();
+            await loadConfigTemplates();
+            showAdminToast('Конфиг удален');
         }
 
         function metric(title, value, icon = 'fa-chart-simple') {
@@ -1349,6 +1776,7 @@
         const referralsForm = document.getElementById('referrals-form');
         const subscriptionForm = document.getElementById('subscription-form');
         const replyTemplateForm = document.getElementById('reply-template-form');
+        const configTemplateForm = document.getElementById('config-template-form');
 
         if (statsForm) statsForm.addEventListener('submit', loadStats);
         if (userPaymentsForm) userPaymentsForm.addEventListener('submit', loadUserPayments);
@@ -1356,7 +1784,12 @@
         if (referralsForm) referralsForm.addEventListener('submit', loadReferrals);
         if (subscriptionForm) subscriptionForm.addEventListener('submit', submitSubscription);
         if (replyTemplateForm) replyTemplateForm.addEventListener('submit', submitReplyTemplate);
+        if (configTemplateForm) configTemplateForm.addEventListener('submit', submitConfigTemplate);
         document.getElementById('reply-template-reset')?.addEventListener('click', resetReplyTemplateForm);
+        document.getElementById('config-template-add')?.addEventListener('click', () => openConfigTemplateModal());
+        document.getElementById('config-template-reset')?.addEventListener('click', resetConfigTemplateForm);
+        document.getElementById('config-json-validate')?.addEventListener('click', () => validateConfigJson(true));
+        document.getElementById('config-json-format')?.addEventListener('click', formatConfigJson);
 
         const today = new Date();
         setupDatePickers();

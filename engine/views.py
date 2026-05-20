@@ -56,6 +56,7 @@ from common.models.db import WataTransaction
 from common.models.db import MagicToken
 from common.models.db import TelegramLoginToken
 from common.models.db import PurchaseLoginToken
+from common.models.db import CustomConfigTemplate
 from common.models.db import SupportTicket
 from common.models.db import SupportTicketMessage
 from common.models.db import SupportTicketMessageSender
@@ -469,6 +470,32 @@ def support_reply_template_payload(template):
         "sort_order": template.sort_order,
         "is_active": template.is_active,
     }
+
+
+def custom_config_template_payload(template):
+    return {
+        "id": template.id,
+        "name": template.name,
+        "template_json": template.template_json,
+        "entry_name": template.entry_name or "",
+        "announce_text": template.announce_text or "",
+        "support_url": template.support_url or "",
+        "profile_update_interval": template.profile_update_interval or "",
+        "additional_headers": template.additional_headers or {},
+        "is_active": template.is_active,
+    }
+
+
+def load_custom_config_templates(db_session):
+    return (
+        db_session.query(CustomConfigTemplate)
+        .order_by(
+            CustomConfigTemplate.is_active.desc(),
+            CustomConfigTemplate.name.asc(),
+            CustomConfigTemplate.id.asc(),
+        )
+        .all()
+    )
 
 
 def load_support_reply_templates(db_session, active_only=True):
@@ -2099,7 +2126,7 @@ def support_admin_tickets(request):
 
     return render(
         request,
-        "support_admin_tickets.html",
+        "admin_dashboard.html",
         {
             "tickets": tickets_data["tickets"],
             "status_filter": tickets_data["status_filter"],
@@ -2177,6 +2204,145 @@ def support_admin_api_reply_templates(request):
             {
                 "status": "ok",
                 "template": support_reply_template_payload(template),
+            }
+        )
+    finally:
+        db_session.close()
+
+
+def support_admin_api_config_templates(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "GET":
+            templates = load_custom_config_templates(db_session)
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "templates": [
+                        custom_config_template_payload(template)
+                        for template in templates
+                    ],
+                }
+            )
+
+        if request.method != "POST":
+            return JsonResponse({"status": "error"}, status=405)
+
+        action = request.POST.get("action", "save")
+        template_id = request.POST.get("template_id")
+
+        if action == "delete":
+            template = db_session.get(CustomConfigTemplate, int(template_id or 0))
+            if not template:
+                return JsonResponse({"status": "not_found"}, status=404)
+            db_session.delete(template)
+            db_session.commit()
+            return JsonResponse({"status": "ok"})
+
+        name = request.POST.get("name", "").strip()
+        template_json = request.POST.get("template_json", "").strip()
+        entry_name = request.POST.get("entry_name", "").strip() or None
+        announce_text = request.POST.get("announce_text", "").strip() or None
+        support_url = request.POST.get("support_url", "").strip() or None
+        profile_update_interval = (
+            request.POST.get("profile_update_interval", "").strip() or None
+        )
+        is_active = request.POST.get("is_active", "1") == "1"
+
+        if not name or not template_json:
+            return JsonResponse(
+                {"status": "error", "message": "Заполните имя и JSON шаблона"},
+                status=400,
+            )
+
+        try:
+            json.loads(template_json)
+        except json.JSONDecodeError as error:
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": f"Ошибка JSON шаблона: строка {error.lineno}, колонка {error.colno}: {error.msg}",
+                },
+                status=400,
+            )
+
+        raw_headers = request.POST.get("additional_headers", "").strip()
+        if raw_headers:
+            try:
+                additional_headers = json.loads(raw_headers)
+            except json.JSONDecodeError as error:
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": f"Ошибка JSON заголовков: строка {error.lineno}, колонка {error.colno}: {error.msg}",
+                    },
+                    status=400,
+                )
+            if not isinstance(additional_headers, dict):
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": "Дополнительные заголовки должны быть JSON-объектом",
+                    },
+                    status=400,
+                )
+        else:
+            additional_headers = {}
+
+        is_new_template = not template_id
+        if template_id:
+            template = db_session.get(CustomConfigTemplate, int(template_id))
+            if not template:
+                return JsonResponse({"status": "not_found"}, status=404)
+        else:
+            template = CustomConfigTemplate()
+
+        if is_active:
+            active_templates_query = db_session.query(CustomConfigTemplate).filter(
+                CustomConfigTemplate.is_active.is_(True)
+            )
+            if template_id:
+                active_templates_query = active_templates_query.filter(
+                    CustomConfigTemplate.id != int(template_id)
+                )
+            active_templates_query.update(
+                {CustomConfigTemplate.is_active: False},
+                synchronize_session=False,
+            )
+
+        template.name = name[:160]
+        template.template_json = template_json
+        template.entry_name = entry_name[:256] if entry_name else None
+        template.announce_text = announce_text
+        template.support_url = support_url[:512] if support_url else None
+        template.profile_update_interval = (
+            profile_update_interval[:32] if profile_update_interval else None
+        )
+        template.additional_headers = additional_headers
+        template.is_active = is_active
+        template.updated_at = datetime.utcnow()
+        if is_new_template:
+            db_session.add(template)
+        try:
+            db_session.commit()
+        except IntegrityError:
+            db_session.rollback()
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": "Не удалось сохранить: проверьте уникальность имени конфига",
+                },
+                status=400,
+            )
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "template": custom_config_template_payload(template),
             }
         )
     finally:
