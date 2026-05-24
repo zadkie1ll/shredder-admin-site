@@ -6,6 +6,7 @@ urlpatterns = [
     path("", views.index, name="index"),
     path("vps-direct-sale/", views.vps_direct_sale, name="vps_direct_sale"),
     path("offer/", views.offer, name="offer"),
+    path("privacy/", views.privacy, name="privacy"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("update-email/", views.update_email, name="update_email"),
     path("confirm-email/<path:token>/", views.confirm_email, name="confirm_email"),

@@ -64,7 +64,7 @@
             inset: 0;
             background-image:
                 linear-gradient(rgba(13, 13, 13, 0.35), rgba(13, 13, 13, 0.65)),
-                url("{% static 'img/bg10.png' %}");
+                url("{% static 'img/bg9.png' %}");
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
@@ -89,96 +89,139 @@
             background: rgba(255, 255, 255, 0.03);
             backdrop-filter: blur(20px);
             border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 40px;
+            border-radius: 36px;
             width: 100%;
             max-width: 420px;
-            padding: 50px 40px;
+            padding: 32px 36px 28px;
             box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+            position: relative;
+        }
+
+        .support-corner-btn {
+            flex: 0 0 auto;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: rgba(255,255,255,0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            transition: all 0.2s ease;
+            text-decoration: none;
+        }
+
+        .support-corner-btn:hover {
+            background: rgba(255,199,0,0.12);
+            border-color: rgba(255,199,0,0.3);
+            color: #ffc700;
         }
 
         .input-field {
-            background-color: rgba(0,0,0,0.3);
+            background-color: rgba(255,255,255,0.06);
             border: 1px solid rgba(255,255,255,0.1);
             color: white;
             font-size: 16px;
             -webkit-appearance: none;
+            appearance: none;
             transition: all 0.3s ease;
         }
 
+        .input-field::placeholder { color: rgba(255,255,255,0.35); }
+
         .input-field:focus {
-            border-color: #ffc700;
-            background-color: rgba(0,0,0,0.5);
+            border-color: rgba(255,199,0,0.5);
+            background-color: rgba(255,255,255,0.08);
             outline: none;
         }
 
-        .tilda-yellow { 
-            background-color: #ffc700; 
-            color: #000; 
-            box-shadow: 0 15px 30px rgba(255, 199, 0, 0.2);
+        .tilda-yellow {
+            background-color: #ffc700;
+            color: #000;
+            box-shadow: 0 12px 28px rgba(255, 199, 0, 0.25);
         }
-        
-        .tilda-yellow:hover { 
-            background-color: #e6b400; 
-            transform: translateY(-2px); 
+
+        .tilda-yellow:hover {
+            background-color: #e6b400;
+            transform: translateY(-1px);
+            box-shadow: 0 16px 36px rgba(255, 199, 0, 0.32);
         }
 
         .social-login-btn {
             width: 100%;
-            min-height: 64px;
-            border-radius: 22px;
-            background: rgba(255, 255, 255, 0.96);
-            color: #000;
+            min-height: 52px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255,255,255,0.12);
+            color: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 14px;
             font-weight: 900;
             font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
+            text-transform: none;
+            letter-spacing: 0;
             transition: all 0.2s ease;
-            box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
         }
 
         .social-login-btn:hover {
-            transform: translateY(-2px);
-            background: #fff;
+            background: rgba(255,255,255,0.13);
+            transform: translateY(-1px);
         }
 
         .social-login-btn svg {
-            width: 28px;
-            height: 28px;
+            width: 24px;
+            height: 24px;
             flex-shrink: 0;
         }
 
         .telegram-login-shell {
             width: 100%;
-            min-height: 64px;
-            border-radius: 22px;
-            background: #2aabee;
+            min-height: 52px;
+            border-radius: 999px;
+            background: rgba(42, 171, 238, 0.15);
+            border: 1px solid rgba(42, 171, 238, 0.3);
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            box-shadow: 0 12px 30px rgba(42, 171, 238, 0.22);
             transition: all 0.2s ease;
-            border: 0;
-            color: #fff;
+            color: #2aabee;
             font-weight: 900;
             font-size: 13px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            gap: 14px;
+            text-transform: none;
+            letter-spacing: 0;
+            gap: 12px;
             cursor: pointer;
         }
 
         .telegram-login-shell:hover {
-            transform: translateY(-2px);
-            background: #229ed9;
+            background: rgba(42, 171, 238, 0.22);
+            transform: translateY(-1px);
         }
 
         .telegram-login-shell i {
-            font-size: 28px;
+            font-size: 22px;
+        }
+
+        .social-proof-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255,199,0,0.08);
+            border: 1px solid rgba(255,199,0,0.18);
+            border-radius: 999px;
+            padding: 10px 18px;
+            color: rgba(255,255,255,0.7);
+            font-size: 12px;
+            font-weight: 800;
+        }
+
+        .social-proof-badge i {
+            color: #ffc700;
         }
 
         .yandex-logo-mark {
@@ -234,31 +277,22 @@
 
     <div id="app-container">
         <div class="login-shell">
-            <div class="login-card text-center">
-                
+            <div class="login-card text-left">
+
                 <div id="step-input">
-                    <div class="mb-10">
-                        <div class="w-16 h-16 bg-[#ffc700]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <i class="fas fa-envelope text-[#ffc700] text-2xl"></i>
+                    <div class="mb-5">
+                        <div class="flex items-center justify-between mb-5">
+                            <span class="text-white font-black text-xl tracking-tight">Monkey <span class="text-[#ffc700]">Island</span></span>
+                            <a href="https://t.me/monkeyisland_support" target="_blank" rel="noopener" class="support-corner-btn" title="Поддержка">
+                                <i class="fas fa-headset"></i>
+                            </a>
                         </div>
-                        <h2 class="text-2xl font-black uppercase tracking-tighter">Вход в кабинет</h2>
-                        <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-2">
-                            {% if social_login_enabled %}
-                                Быстрее всего через аккаунт в один клик
-                            {% elif google_oauth_enabled %}
-                                Быстрее всего через Google
-                            {% elif yandex_oauth_enabled %}
-                                Быстрее всего через Яндекс
-                            {% elif telegram_auth_enabled %}
-                                Быстрее всего через Telegram
-                            {% else %}
-                                Введите почту, и мы пришлем ссылку
-                            {% endif %}
-                        </p>
+                        <h2 class="text-2xl font-black leading-tight mb-2">Войдите или создайте аккаунт</h2>
+                        {% if site_role == 'vpn' or site_role == 'cabinet' %}<p class="text-gray-400 text-sm leading-snug">Смотрите YouTube без рекламы и обходите Белый Список</p>{% endif %}
                     </div>
 
                     {% if social_login_enabled %}
-                        <div class="space-y-3">
+                        <div class="space-y-2">
                     {% endif %}
 
                     {% if google_oauth_enabled %}
@@ -306,7 +340,7 @@
                         </div>
                     {% endif %}
 
-                    <form id="magicLinkForm" class="space-y-6">
+                    <form id="magicLinkForm" class="space-y-3">
                         {% csrf_token %}
                         {% for key, value in tracking_params.items %}
                             <input type="hidden" name="{{ key }}" value="{{ value }}">
@@ -316,37 +350,53 @@
                                 {{ error }}
                             </div>
                         {% endif %}
-                        <div class="text-left">
-                            <label class="text-[10px] font-black uppercase text-gray-400 ml-4 mb-2 block tracking-widest">Ваш Email</label>
-                            <input type="email" id="email" name="email" placeholder="Введите Ваш email" required 
-                                   class="w-full input-field px-6 py-4 rounded-2xl font-bold outline-none">
+                        <div>
+                            <input type="email" id="email" name="email" placeholder="Электронная почта" required
+                                   class="w-full input-field px-6 py-4 rounded-full font-bold outline-none">
                         </div>
 
                         <div id="submit-error" class="hidden rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-left text-red-200 text-xs font-bold leading-relaxed"></div>
-                        <button type="submit" class="w-full tilda-yellow py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition">
-                            Получить ссылку для входа
+                        <button type="submit" class="w-full tilda-yellow py-4 rounded-full font-black text-sm tracking-wide transition">
+                            Продолжить
                         </button>
                     </form>
                 </div>
 
-                <div id="step-success" class="hidden-step animate-pulse">
-                    <div class="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-                        <i class="fas fa-paper-plane text-green-500 text-3xl"></i>
+                <div id="step-success" class="hidden-step">
+                    <div class="w-16 h-16 bg-green-500/20 rounded-2xl flex items-center justify-center mb-6">
+                        <i class="fas fa-paper-plane text-green-500 text-2xl"></i>
                     </div>
-                    <h2 class="text-xl font-black uppercase mb-4">Письмо в пути!</h2>
+                    <h2 class="text-2xl font-black mb-3">Письмо в пути!</h2>
                     <p class="text-gray-400 text-sm leading-relaxed">
-                        Мы отправили магическую ссылку на <br>
-                        <span id="target-email" class="text-white font-bold">вашу почту</span>. <br>
-                        Проверьте папку «Входящие» (или Спам).
+                        Мы отправили ссылку для входа на<br>
+                        <span id="target-email" class="text-white font-bold">вашу почту</span>.<br>
+                        Проверьте папку «Входящие» или Спам.
                     </p>
-                    <button onclick="location.reload()" class="mt-8 text-[10px] font-black uppercase text-[#ffc700] tracking-widest hover:underline">
-                        Я не получил письмо
+                    <button onclick="location.reload()" class="mt-6 text-xs font-black uppercase text-[#ffc700] tracking-widest hover:underline">
+                        Не получил письмо
                     </button>
                 </div>
 
-                <div class="mt-12 pt-8 border-t border-white/5">
-                    <a href="/" class="text-gray-400 text-xs font-black uppercase tracking-widest hover:text-white transition">
-                        <i class="fas fa-arrow-left mr-2"></i> Назад на остров
+                <div class="mt-5 flex flex-col items-center gap-3">
+                    {% if users_count %}
+                    <div class="social-proof-badge">
+                        <i class="fas fa-users"></i>
+                        {{ users_count }}+ пользователей уже с нами
+                    </div>
+                    {% else %}
+                    <div class="social-proof-badge">
+                        <i class="fas fa-users"></i>
+                        Тысячи пользователей уже с нами
+                    </div>
+                    {% endif %}
+                    <p class="text-gray-600 text-[11px] font-bold text-center leading-relaxed">
+                        Создавая аккаунт, вы принимаете
+                        <a href="/privacy/" class="text-gray-400 hover:text-white underline transition">Политику конфиденциальности</a>
+                        и
+                        <a href="/offer/" class="text-gray-400 hover:text-white underline transition">Условия использования</a>
+                    </p>
+                    <a href="/" class="text-gray-500 text-xs font-bold hover:text-white transition">
+                        <i class="fas fa-arrow-left mr-1"></i> Назад на остров
                     </a>
                 </div>
             </div>

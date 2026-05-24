@@ -1,0 +1,245 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Политика конфиденциальности — Monkey Island</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
+    <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #0a0a0a;
+            color: #ffffff;
+        }
+
+        .offer-card {
+            background: rgba(255, 255, 255, 0.035);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+        }
+
+        .offer-section h2 {
+            color: #ffc700;
+            font-size: 0.78rem;
+            font-weight: 900;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .offer-section p,
+        .offer-section li {
+            color: rgba(255, 255, 255, 0.82);
+            font-size: 0.95rem;
+            line-height: 1.8;
+        }
+
+        .offer-section ul {
+            list-style: disc;
+            padding-left: 1.25rem;
+        }
+
+        .offer-section a {
+            color: #ffc700;
+            font-weight: 700;
+        }
+    </style>
+    {% include "includes/yandex_metrika.html" %}
+</head>
+<body class="antialiased">
+    <header class="border-b border-white/5 bg-[#111111]">
+        <nav class="container mx-auto px-6 py-6 flex items-center justify-between gap-6">
+            <a href="/" class="text-xl md:text-2xl font-black uppercase tracking-tighter">
+                MONKEY ISLAND{% if site_role != 'vps' and site_role != 'vps_direct_sale' %}<span class="text-[#ffc700]"> VPN</span>{% endif %}
+            </a>
+            <a href="/" class="inline-flex items-center gap-2 rounded-full border border-[#ffc700] px-5 py-2 text-[#ffc700] text-xs font-black uppercase tracking-widest hover:bg-[#ffc700] hover:text-black transition">
+                <i class="fas fa-arrow-left"></i>
+                На главную
+            </a>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-6 py-14 md:py-20">
+        <div class="max-w-4xl mx-auto">
+            <div class="mb-10">
+                <p class="text-[#ffc700] text-xs font-black uppercase tracking-[0.24em] mb-4">Правовой документ</p>
+                <h1 class="text-3xl md:text-5xl font-black uppercase leading-tight mb-5">
+                    Политика конфиденциальности
+                </h1>
+                <p class="text-gray-400 text-sm md:text-base leading-relaxed">
+                    Дата вступления в силу: 03.05.2026. Настоящая Политика конфиденциальности описывает, какие данные собираются и как они используются при использовании сервиса Monkey Island (далее — «Сервис»).
+                </p>
+            </div>
+
+            <article class="offer-card p-6 md:p-10 space-y-10">
+
+                <section class="offer-section">
+                    <h2>1. Сбор информации</h2>
+                    <div class="space-y-4">
+                        <p>Мы можем собирать следующие категории данных:</p>
+                        <div class="space-y-4">
+                            <div>
+                                <p class="font-black text-white mb-1">Технические данные:</p>
+                                <ul class="space-y-1">
+                                    <li>IP-адрес (временно, для обеспечения соединения)</li>
+                                    <li>тип устройства, модель устройства</li>
+                                    <li>операционная система и её версия</li>
+                                    <li>языковые настройки</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-black text-white mb-1">Данные об использовании:</p>
+                                <ul class="space-y-1">
+                                    <li>информация о взаимодействии с приложением</li>
+                                    <li>дата и длительность сессий</li>
+                                    <li>диагностические данные и отчёты об ошибках</li>
+                                </ul>
+                            </div>
+                            <div>
+                                <p class="font-black text-white mb-1">Контактные данные:</p>
+                                <ul class="space-y-1">
+                                    <li>email (если пользователь предоставляет его добровольно)</li>
+                                    <li>Telegram ID (при авторизации через Telegram)</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <p>Мы не сохраняем историю посещённых сайтов и содержимое интернет-трафика пользователей при использовании{% if site_role != 'vps' and site_role != 'vps_direct_sale' %} VPN-соединения{% else %} соединения{% endif %}.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>2. Цели обработки данных</h2>
+                    <div class="space-y-3">
+                        <p>Мы используем данные для:</p>
+                        <ul class="space-y-1">
+                            <li>обеспечения работы {% if site_role != 'vps' and site_role != 'vps_direct_sale' %}VPN-соединения и {% endif %}предоставления доступа к Сервису</li>
+                            <li>улучшения качества и стабильности Сервиса</li>
+                            <li>анализа использования приложения</li>
+                            <li>поддержки пользователей</li>
+                            <li>предотвращения мошенничества и злоупотреблений</li>
+                            <li>выставления счетов и обработки платежей</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>3. Правовые основания обработки данных</h2>
+                    <div class="space-y-3">
+                        <p>Мы обрабатываем данные на следующих основаниях:</p>
+                        <ul class="space-y-1">
+                            <li>согласие пользователя (например, для аналитики)</li>
+                            <li>исполнение договора (предоставление {% if site_role != 'vps' and site_role != 'vps_direct_sale' %}VPN-{% endif %}сервиса)</li>
+                            <li>законный интерес (обеспечение безопасности и улучшение Сервиса)</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>4. Использование сторонних сервисов</h2>
+                    <div class="space-y-3">
+                        <p>Для обеспечения работы Сервиса мы можем использовать сторонние сервисы, включая:</p>
+                        <ul class="space-y-1">
+                            <li>платёжные системы (ЮКасса, Wata и другие)</li>
+                            <li>аналитические инструменты (Яндекс.Метрика)</li>
+                            <li>сервисы авторизации (Google OAuth, Яндекс OAuth, Telegram)</li>
+                        </ul>
+                        <p>Сторонние сервисы обрабатывают данные в соответствии со своими политиками конфиденциальности. Мы рекомендуем ознакомиться с ними на соответствующих сайтах.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>5. Передача данных</h2>
+                    <div class="space-y-3">
+                        <p>Мы не продаём персональные данные пользователей.</p>
+                        <p>Данные могут передаваться третьим лицам только в следующих случаях:</p>
+                        <ul class="space-y-1">
+                            <li>поставщикам услуг, обеспечивающим работу Сервиса (хостинг, платёжные системы)</li>
+                            <li>при необходимости соблюдения требований законодательства</li>
+                            <li>в случае защиты прав и безопасности пользователей и Сервиса</li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>6. Хранение данных</h2>
+                    <div class="space-y-3">
+                        <p>Мы храним данные только в течение времени, необходимого для:</p>
+                        <ul class="space-y-1">
+                            <li>выполнения целей обработки, указанных в настоящей Политике</li>
+                            <li>соблюдения юридических обязательств</li>
+                        </ul>
+                        <p>После этого данные удаляются или анонимизируются.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>7. Защита данных</h2>
+                    <div class="space-y-3">
+                        <p>Мы применяем технические и организационные меры для защиты данных пользователей от:</p>
+                        <ul class="space-y-1">
+                            <li>несанкционированного доступа</li>
+                            <li>утраты, изменения или уничтожения</li>
+                        </ul>
+                        <p>Все соединения между устройством пользователя и нашими серверами защищены современными протоколами шифрования.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>8. Права пользователей</h2>
+                    <div class="space-y-3">
+                        <p>Пользователи имеют право:</p>
+                        <ul class="space-y-1">
+                            <li>получить доступ к своим данным</li>
+                            <li>исправить неточные данные</li>
+                            <li>запросить удаление данных</li>
+                            <li>ограничить обработку данных</li>
+                            <li>возразить против обработки</li>
+                        </ul>
+                        <p>Для реализации прав обратитесь в поддержку Сервиса.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>9. Cookies и технологии отслеживания</h2>
+                    <div class="space-y-3">
+                        <p>Наш сайт может использовать cookies и аналогичные технологии для улучшения работы и аналитики. Пользователь может управлять ими через настройки браузера.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>10. Контакты</h2>
+                    <div class="space-y-3">
+                        <p>Если у вас есть вопросы по настоящей Политике конфиденциальности, свяжитесь с нами:</p>
+                        <ul class="space-y-1">
+                            <li>Telegram: <a href="https://t.me/monkeyislandsupportbot" target="_blank" rel="noopener">@monkeyislandsupportbot</a></li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>11. Изменения политики</h2>
+                    <div class="space-y-3">
+                        <p>Мы можем обновлять настоящую Политику конфиденциальности. Актуальная версия всегда доступна на сайте Сервиса. Продолжение использования Сервиса после публикации изменений означает согласие с обновлённой Политикой.</p>
+                    </div>
+                </section>
+
+            </article>
+
+            <div class="mt-10 flex flex-wrap gap-4">
+                <a href="/offer/" class="inline-flex items-center gap-2 text-[#ffc700] text-xs font-black uppercase tracking-widest hover:underline">
+                    <i class="fas fa-file-contract"></i> Условия использования
+                </a>
+                <a href="/" class="inline-flex items-center gap-2 text-gray-500 text-xs font-black uppercase tracking-widest hover:text-white transition">
+                    <i class="fas fa-arrow-left"></i> На главную
+                </a>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

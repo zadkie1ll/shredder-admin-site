@@ -760,6 +760,7 @@ def render_login(request, context=None, status=200):
         if telegram_auth_enabled
         else ""
     )
+    payload["site_role"] = get_site_role(request)
     if context:
         payload.update(context)
     response = render(request, "login.html", payload, status=status)
@@ -1679,6 +1680,10 @@ def offer(request):
             ),
         },
     )
+
+
+def privacy(request):
+    return render(request, "privacy.html", {"site_role": get_site_role(request)})
 
 
 @login_required(login_url="/login/")
