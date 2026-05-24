@@ -904,8 +904,8 @@
                 <button type="button" onclick="showTab('home')" class="nav-btn active" data-tab="home"><i class="fas fa-th-large"></i> Главная</button>
                 <button type="button" onclick="showTab('subscription')" class="nav-btn" data-tab="subscription"><i class="fas fa-key"></i> Подписка</button>
                 <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i> Настройка</button>
-                <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-circle"></i> Рефералы</button>
-                <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-anchor"></i> Поддержка</button>
+                <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-friends"></i> Рефералы</button>
+                <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-headset"></i> Поддержка</button>
             </nav>
         </aside>
 
@@ -913,8 +913,8 @@
             <button type="button" onclick="showTab('home')" class="nav-btn active" data-tab="home"><i class="fas fa-th-large"></i><span>Главная</span></button>
             <button type="button" onclick="showTab('subscription')" class="nav-btn" data-tab="subscription"><i class="fas fa-key"></i><span>Ключи</span></button>
             <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i><span>Настройка</span></button>
-            <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-circle"></i><span>Рефералы</span></button>
-            <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-anchor"></i><span>Помощь</span></button>
+            <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-friends"></i><span>Рефералы</span></button>
+            <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-headset"></i><span>Помощь</span></button>
         </nav>
 
         <main class="main-content">
@@ -1063,7 +1063,7 @@
                                         <div class="text-gray-500 text-sm font-bold">
                                             Автопродление:
                                             {% if has_recurrent %}
-                                                <span class="text-[#00ff88]">не подключено</span>
+                                                <span class="text-[#00ff88]">Включено</span>
                                             {% else %}
                                                 <span class="text-white">не подключено</span>
                                             {% endif %}
@@ -1102,14 +1102,14 @@
                                 <p class="text-gray-500 text-sm font-bold leading-relaxed">Приложения и подключение</p>
                             </button>
                             <button type="button" onclick="showTab('support')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
-                                <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
-                                    <i class="fas fa-life-ring text-lg"></i>
+                                <div class="w-12 h-12 rounded-2xl bg-[#2ec4b6]/10 border border-[#2ec4b6]/20 flex items-center justify-center text-[#2ec4b6] mb-4">
+                                    <i class="fas fa-headset text-lg"></i>
                                 </div>
                                 <h3 class="text-lg font-black mb-2">Поддержка</h3>
                                 <p class="text-gray-500 text-sm font-bold leading-relaxed">Помощь в Telegram</p>
                             </button>
                             <button type="button" onclick="showTab('profile')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
-                                <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
+                                <div class="w-12 h-12 rounded-2xl bg-[#9b5cff]/10 border border-[#9b5cff]/20 flex items-center justify-center text-[#9b5cff] mb-4">
                                     <i class="fas fa-user-friends text-lg"></i>
                                 </div>
                                 <h3 class="text-lg font-black mb-2">Рефералы</h3>
@@ -1688,10 +1688,7 @@
             document.getElementById('app-container').scrollTo({ top: 0, behavior: 'smooth' });
         }
 
-        function copyKey(id) {
-            const text = document.getElementById(id).innerText;
-            navigator.clipboard.writeText(text).then(() => alert('Ключ в кармане, капитан!'));
-        }
+
 
         // Функция для точного расчета высоты без учета адресной строки
         function setFullHeight() {

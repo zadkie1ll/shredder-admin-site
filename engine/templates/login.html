@@ -239,7 +239,7 @@
                 <div id="step-input">
                     <div class="mb-10">
                         <div class="w-16 h-16 bg-[#ffc700]/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <i class="fas fa-magic text-[#ffc700] text-2xl"></i>
+                            <i class="fas fa-envelope text-[#ffc700] text-2xl"></i>
                         </div>
                         <h2 class="text-2xl font-black uppercase tracking-tighter">Вход в кабинет</h2>
                         <p class="text-gray-500 text-[10px] uppercase tracking-widest mt-2">
@@ -322,6 +322,7 @@
                                    class="w-full input-field px-6 py-4 rounded-2xl font-bold outline-none">
                         </div>
 
+                        <div id="submit-error" class="hidden rounded-2xl border border-red-400/20 bg-red-400/10 px-4 py-3 text-left text-red-200 text-xs font-bold leading-relaxed"></div>
                         <button type="submit" class="w-full tilda-yellow py-5 rounded-2xl font-black uppercase text-xs tracking-[0.2em] transition">
                             Получить ссылку для входа
                         </button>
@@ -344,7 +345,7 @@
                 </div>
 
                 <div class="mt-12 pt-8 border-t border-white/5">
-                    <a href="/" class="text-gray-500 text-[10px] font-black uppercase tracking-widest hover:text-white transition">
+                    <a href="/" class="text-gray-400 text-xs font-black uppercase tracking-widest hover:text-white transition">
                         <i class="fas fa-arrow-left mr-2"></i> Назад на остров
                     </a>
                 </div>
@@ -460,21 +461,22 @@
                     body: new URLSearchParams(formData)
                 });
 
+                const errorEl = document.getElementById('submit-error');
                 if (response.ok) {
-                    // Успех: переключаем экран
                     document.getElementById('target-email').innerText = email;
                     document.getElementById('step-input').classList.add('hidden-step');
                     document.getElementById('step-success').classList.remove('hidden-step');
-                    
-                    // Если есть TG, можно добавить надпись: "Проверьте почту или Telegram"
                 } else {
-                    alert("Что-то пошло не так. Попробуйте позже.");
+                    errorEl.textContent = 'Что-то пошло не так. Попробуйте позже.';
+                    errorEl.classList.remove('hidden');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalBtnText;
                 }
             } catch (error) {
                 console.error("Error:", error);
-                alert("Ошибка сети.");
+                const errorEl = document.getElementById('submit-error');
+                errorEl.textContent = 'Ошибка сети. Проверьте подключение и попробуйте снова.';
+                errorEl.classList.remove('hidden');
                 submitBtn.disabled = false;
                 submitBtn.innerHTML = originalBtnText;
             }

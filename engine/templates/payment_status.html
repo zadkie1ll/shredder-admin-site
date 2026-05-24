@@ -4,9 +4,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffc700">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <link rel="manifest" href="/manifest.json">
     <title>Статус платежа — Monkey Island</title>
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap');
+
         :root {
             --bg: #0a0a0a;
             --panel: #1a1a1a;
@@ -34,7 +40,7 @@
                 url("{% static 'img/header-monkey-island.png' %}") center / cover no-repeat,
                 var(--bg);
             color: var(--ink);
-            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            font-family: 'Montserrat', ui-sans-serif, system-ui, -apple-system, sans-serif;
         }
 
         a { color: inherit; text-decoration: none; }
