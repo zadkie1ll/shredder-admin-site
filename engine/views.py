@@ -803,7 +803,7 @@ def hash_purchase_login_token(token):
     return hashlib.sha256(payload).hexdigest()
 
 
-def create_purchase_login_link(db_session, request, user):
+def create_purchase_login_token(db_session, user):
     raw_token = secrets.token_urlsafe(48)
     db_session.add(
         PurchaseLoginToken(
@@ -811,7 +811,20 @@ def create_purchase_login_link(db_session, request, user):
             token_hash=hash_purchase_login_token(raw_token),
         )
     )
-    return f"{get_current_base_url(request)}/login/purchase/{raw_token}/"
+    return raw_token
+
+
+def build_purchase_login_link(request, token):
+    return f"{get_current_base_url(request)}{reverse('purchase_auth', args=[token])}"
+
+
+def build_payment_status_url(request, token):
+    return f"{get_current_base_url(request)}{reverse('payment_status', args=[token])}"
+
+
+def create_purchase_login_link(db_session, request, user):
+    raw_token = create_purchase_login_token(db_session, user)
+    return build_purchase_login_link(request, raw_token)
 
 
 def verify_telegram_widget_auth(auth_data, bot_token):
@@ -1395,6 +1408,130 @@ def auth_by_purchase_link(request, token):
         return redirect("dashboard")
     finally:
         session.close()
+
+
+def get_purchase_login_token(db_session, token):
+    token_hash = hash_purchase_login_token(token)
+    login_token = (
+        db_session.query(PurchaseLoginToken)
+        .filter(
+            PurchaseLoginToken.token_hash == token_hash,
+            PurchaseLoginToken.revoked_at.is_(None),
+        )
+        .first()
+    )
+    if not login_token or not hmac.compare_digest(login_token.token_hash, token_hash):
+        return None
+    return login_token
+
+
+def is_wata_invoice_expired(invoice):
+    if not invoice or not invoice.expiration_datetime:
+        return False
+
+    expires_at = invoice.expiration_datetime
+    if expires_at.tzinfo is None:
+        return datetime.utcnow() > expires_at
+    return datetime.now(timezone.utc) > expires_at
+
+
+def get_purchase_payment_status(db_session, login_token):
+    started_at = login_token.created_at - timedelta(minutes=5)
+
+    yk_filters = [YkPayment.user_id == login_token.user_id]
+    if login_token.payment_gateway == "yookassa" and login_token.payment_reference:
+        yk_filters.append(YkPayment.payment_id == login_token.payment_reference)
+    else:
+        yk_filters.append(YkPayment.created_at >= started_at)
+
+    yk_payment = (
+        db_session.query(YkPayment)
+        .filter(*yk_filters)
+        .order_by(YkPayment.created_at.desc())
+        .first()
+    )
+    if yk_payment:
+        if yk_payment.status == "succeeded":
+            return "succeeded", "Платеж прошел успешно"
+        if yk_payment.status == "canceled":
+            return "failed", "Платеж не прошел"
+
+    wata_filters = [WataInvoice.user_id == login_token.user_id]
+    if login_token.payment_gateway == "wata" and login_token.payment_reference:
+        wata_filters.append(WataInvoice.order_id == login_token.payment_reference)
+    else:
+        wata_filters.append(WataInvoice.creation_time >= started_at)
+
+    wata_invoice = (
+        db_session.query(WataInvoice)
+        .filter(*wata_filters)
+        .order_by(WataInvoice.creation_time.desc())
+        .first()
+    )
+    if wata_invoice:
+        wata_transaction = (
+            db_session.query(WataTransaction)
+            .filter(WataTransaction.order_id == wata_invoice.order_id)
+            .order_by(WataTransaction.payment_time.desc())
+            .first()
+        )
+        if wata_transaction:
+            if wata_transaction.transaction_status == "Paid":
+                return "succeeded", "Платеж прошел успешно"
+            return "failed", "Платеж не прошел"
+        if is_wata_invoice_expired(wata_invoice):
+            return "failed", "Время оплаты истекло"
+
+    return "pending", "Ждем подтверждения платежа"
+
+
+def payment_status_payload(request, token):
+    if request.GET.get("result") == "failed":
+        return {
+            "status": "failed",
+            "message": "Платеж не прошел",
+            "login_url": "",
+        }
+
+    db_session = session_factory()
+    try:
+        login_token = get_purchase_login_token(db_session, token)
+        if not login_token:
+            return {
+                "status": "failed",
+                "message": "Ссылка проверки платежа истекла или неверна",
+                "login_url": "",
+            }
+
+        status, message = get_purchase_payment_status(db_session, login_token)
+        return {
+            "status": status,
+            "message": message,
+            "login_url": build_purchase_login_link(request, token)
+            if status == "succeeded"
+            else "",
+        }
+    finally:
+        db_session.close()
+
+
+def payment_status(request, token):
+    payload = payment_status_payload(request, token)
+    return render(
+        request,
+        "payment_status.html",
+        {
+            "initial_status": payload["status"],
+            "initial_message": payload["message"],
+            "login_url": payload["login_url"],
+            "status_api_url": reverse("payment_status_json", args=[token]),
+            "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
+        },
+    )
+
+
+def payment_status_json(request, token):
+    return JsonResponse(payment_status_payload(request, token))
 
 
 def auth_by_telegram_widget(request):
@@ -2956,6 +3093,84 @@ def support_admin_api_payment_info(request):
         db_session.close()
 
 
+def support_admin_api_payments(request):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    try:
+        limit = min(50, max(5, int(request.GET.get("limit") or "10")))
+    except ValueError:
+        limit = 10
+
+    db_session = session_factory()
+    try:
+        yk_payments = (
+            db_session.query(YkPayment, User)
+            .join(User, User.id == YkPayment.user_id)
+            .order_by(YkPayment.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+        wata_payments = (
+            db_session.query(WataTransaction, WataInvoice, User)
+            .join(WataInvoice, WataInvoice.order_id == WataTransaction.order_id)
+            .join(User, User.id == WataInvoice.user_id)
+            .order_by(WataTransaction.payment_time.desc())
+            .limit(limit)
+            .all()
+        )
+
+        payments = []
+        for payment, user in yk_payments:
+            payments.append(
+                {
+                    "id": payment.payment_id,
+                    "date": admin_date_label(payment.created_at, with_time=False),
+                    "date_sort": admin_dt(payment.created_at) or datetime.min,
+                    "user": user.username or user.email or str(user.id),
+                    "tariff": get_tariff_display_name(payment.subscription_period),
+                    "amount": admin_money(payment.amount),
+                    "currency": payment.currency,
+                    "status": {
+                        "succeeded": "Успешен",
+                        "pending": "В обработке",
+                        "canceled": "Ошибка",
+                        "waiting_for_capture": "Ожидает",
+                    }.get(payment.status, payment.status),
+                    "success": payment.status == "succeeded",
+                }
+            )
+
+        for payment, invoice, user in wata_payments:
+            payments.append(
+                {
+                    "id": payment.transaction_id,
+                    "date": admin_date_label(payment.payment_time, with_time=False),
+                    "date_sort": admin_dt(payment.payment_time) or datetime.min,
+                    "user": user.username or user.email or str(user.id),
+                    "tariff": invoice.tariff_id
+                    and get_tariff_display_name(invoice.tariff_id)
+                    or payment.order_description,
+                    "amount": admin_money(payment.amount),
+                    "currency": payment.currency,
+                    "status": "Успешен"
+                    if payment.transaction_status == "Paid"
+                    else "Ошибка",
+                    "success": payment.transaction_status == "Paid",
+                }
+            )
+
+        payments.sort(key=lambda item: item["date_sort"], reverse=True)
+        payments = payments[:limit]
+        for payment in payments:
+            payment.pop("date_sort", None)
+
+        return JsonResponse({"status": "ok", "payments": payments, "total": len(payments)})
+    finally:
+        db_session.close()
+
+
 def admin_payment_info_payload(db_session, payment, user, system, invoice=None):
     recurrent = db_session.query(YkRecurrentPayment).filter(YkRecurrentPayment.user_id == user.id).first()
     yk_ltv = db_session.query(func.sum(YkPayment.amount)).filter(YkPayment.user_id == user.id, YkPayment.status == "succeeded").scalar() or 0
@@ -3533,6 +3748,30 @@ def pay(request):
                     tariff.db_tariff_id,
                 )
 
+            use_permanent_purchase_link = (
+                request.POST.get("login_link_kind") == "purchase_permanent"
+            )
+            base_url = get_current_base_url(request)
+            payment_success_redirect_url = f"{base_url}/dashboard/"
+            payment_fail_redirect_url = f"{base_url}/"
+            login_link = None
+
+            if use_permanent_purchase_link:
+                raw_purchase_token = create_purchase_login_token(db_session, user)
+                login_link = build_purchase_login_link(request, raw_purchase_token)
+                payment_status_url = build_payment_status_url(request, raw_purchase_token)
+                payment_success_redirect_url = payment_status_url
+                payment_fail_redirect_url = append_query_params(
+                    payment_status_url,
+                    {"result": "failed"},
+                )
+                logging.info(
+                    "created permanent purchase login link: email=%s user_id=%s tariff_id=%s",
+                    email,
+                    user.id,
+                    tariff.db_tariff_id,
+                )
+
             if settings.PAYMENT_GATEWAY.lower() == "wata":
                 logging.info(
                     "creating wata invoice: email=%s user_id=%s tariff_id=%s",
@@ -3540,17 +3779,26 @@ def pay(request):
                     user.id,
                     tariff.db_tariff_id,
                 )
-                json = create_wata_payment_sync(
+                created_payment = create_wata_payment_sync(
                     wata_host=settings.WATA_HOST,
                     wata_token=settings.WATA_TOKEN,
                     tariff=tariff,
+                    success_redirect_url=payment_success_redirect_url,
+                    fail_redirect_url=payment_fail_redirect_url,
                 )
 
-                confirmation_url = json["url"]
+                confirmation_url = created_payment.confirmation_url
+                if use_permanent_purchase_link:
+                    login_token = get_purchase_login_token(
+                        db_session,
+                        raw_purchase_token,
+                    )
+                    login_token.payment_gateway = "wata"
+                    login_token.payment_reference = created_payment.reference
 
                 save_wata_invoice(
                     session=db_session,
-                    invoice_json=json,
+                    invoice_json=created_payment.payload,
                     tariff_id=tariff.db_tariff_id,
                     email=email,
                 )
@@ -3566,35 +3814,39 @@ def pay(request):
                     user.id,
                     tariff.db_tariff_id,
                 )
-                confirmation_url = create_yk_payment_sync(
+                created_payment = create_yk_payment_sync(
                     shop_id=settings.YOOKASSA_SHOP_ID,
                     secret=settings.YOOKASSA_SECRET_KEY,
                     tariff=tariff,
                     username=user.username,
                     telegram_id=user.telegram_id or 0,
+                    return_url=payment_success_redirect_url,
                 )
+                confirmation_url = created_payment.confirmation_url
+                if use_permanent_purchase_link:
+                    login_token = get_purchase_login_token(
+                        db_session,
+                        raw_purchase_token,
+                    )
+                    login_token.payment_gateway = "yookassa"
+                    login_token.payment_reference = created_payment.reference
 
-            use_permanent_purchase_link = (
-                request.POST.get("login_link_kind") == "purchase_permanent"
-            )
             if use_permanent_purchase_link:
-                login_link = create_purchase_login_link(db_session, request, user)
-                logging.info(
-                    "created permanent purchase login link: email=%s user_id=%s tariff_id=%s",
-                    email,
-                    user.id,
-                    tariff.db_tariff_id,
+                product_name = (
+                    "Monkey Island VPS"
+                    if get_site_role(request) in ("vps", "vps_direct_sale")
+                    else "VPN Monkey Island"
                 )
-                email_subject = "Ссылка доступа Monkey Island VPS"
+                email_subject = f"Ссылка доступа {product_name}"
                 email_title = "Доступ готов"
-                email_intro = "Мы подготовили для вас доступ Monkey Island VPS."
+                email_intro = f"Мы подготовили для вас доступ {product_name}."
                 login_link_note = (
                     "После оплаты зайдите по кнопке ниже: ссылка постоянная и "
                     "откроет оплаченный доступ, инструкции для устройств и поддержку."
                 )
                 email_button_text = "Открыть доступ"
                 email_footer = (
-                    "Если вы не оформляли Monkey Island VPS, просто "
+                    f"Если вы не оформляли {product_name}, просто "
                     "проигнорируйте это письмо."
                 )
             else:

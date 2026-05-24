@@ -142,6 +142,10 @@ SUPPORT_ATTACHMENT_MAX_BYTES = config(
     default=50 * 1024 * 1024,
     cast=int,
 )
+SUPPORT_TELEGRAM_URL = config(
+    "SUPPORT_TELEGRAM_URL",
+    default="https://t.me/monkeyislandsupportbot",
+)
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/

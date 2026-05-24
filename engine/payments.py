@@ -1,5 +1,6 @@
 import httpx
 import orjson
+from dataclasses import dataclass
 from uuid import uuid4
 from datetime import datetime
 from datetime import timedelta
@@ -9,9 +10,21 @@ from common.models.tariff import Tariff
 from common.models.tariff import TrialPromotionTariff
 
 
+@dataclass(frozen=True)
+class CreatedPayment:
+    confirmation_url: str
+    reference: str
+    payload: dict | None = None
+
+
 def create_yk_payment_sync(
-    shop_id: str, secret: str, tariff: Tariff, username: str, telegram_id: int | None
-) -> str:
+    shop_id: str,
+    secret: str,
+    tariff: Tariff,
+    username: str,
+    telegram_id: int | None,
+    return_url: str,
+) -> CreatedPayment:
     Configuration.account_id = shop_id
     Configuration.secret_key = secret
 
@@ -24,8 +37,7 @@ def create_yk_payment_sync(
             "amount": {"value": tariff.price, "currency": "RUB"},
             "confirmation": {
                 "type": "redirect",
-                # После оплаты на сайте логичнее возвращать в ЛК
-                "return_url": "https://твой-домен.com/dashboard/",
+                "return_url": return_url,
             },
             "metadata": {
                 "username": username,
@@ -41,10 +53,19 @@ def create_yk_payment_sync(
         idempotency_key,
     )
 
-    return payment.confirmation.confirmation_url
+    return CreatedPayment(
+        confirmation_url=payment.confirmation.confirmation_url,
+        reference=payment.id,
+    )
 
 
-def create_wata_payment_sync(wata_host: str, wata_token: str, tariff: Tariff):
+def create_wata_payment_sync(
+    wata_host: str,
+    wata_token: str,
+    tariff: Tariff,
+    success_redirect_url: str | None = None,
+    fail_redirect_url: str | None = None,
+) -> CreatedPayment:
     url = f"{wata_host}/links"
     headers = {
         "Content-Type": "application/json",
@@ -59,6 +80,10 @@ def create_wata_payment_sync(wata_host: str, wata_token: str, tariff: Tariff):
         "expirationDateTime": (datetime.utcnow() + timedelta(minutes=15)).isoformat()
         + "Z",
     }
+    if success_redirect_url:
+        payload["successRedirectUrl"] = success_redirect_url
+    if fail_redirect_url:
+        payload["failRedirectUrl"] = fail_redirect_url
 
     # Используем обычный Client вместо AsyncClient
     with httpx.Client() as client:
@@ -67,4 +92,9 @@ def create_wata_payment_sync(wata_host: str, wata_token: str, tariff: Tariff):
     response.raise_for_status()
 
     # Декодируем через orjson
-    return orjson.loads(response.content)
+    payment_json = orjson.loads(response.content)
+    return CreatedPayment(
+        confirmation_url=payment_json["url"],
+        reference=payment_json["orderId"],
+        payload=payment_json,
+    )

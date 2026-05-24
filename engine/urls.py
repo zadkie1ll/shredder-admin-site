@@ -70,6 +70,11 @@ urlpatterns = [
         name="support_admin_api_payment_info",
     ),
     path(
+        "support-admin/api/payments/",
+        views.support_admin_api_payments,
+        name="support_admin_api_payments",
+    ),
+    path(
         "support-admin/api/subscription-manage/",
         views.support_admin_api_subscription_manage,
         name="support_admin_api_subscription_manage",
@@ -120,6 +125,16 @@ urlpatterns = [
         name="support_admin_attachment",
     ),
     path("pay/", views.pay, name="pay"),
+    path(
+        "payment/status/<str:token>/",
+        views.payment_status,
+        name="payment_status",
+    ),
+    path(
+        "payment/status/<str:token>/json/",
+        views.payment_status_json,
+        name="payment_status_json",
+    ),
     path("login/", views.login, name="login"),
     path("login/send-link/", views.send_magic_link, name="send_magic_link"),
     path("login/google/", views.login_with_google, name="google_login"),

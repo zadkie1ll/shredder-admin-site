@@ -1,0 +1,361 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Статус платежа — Monkey Island</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
+    <style>
+        :root {
+            --bg: #0a0a0a;
+            --panel: #1a1a1a;
+            --panel-inner: #222222;
+            --ink: #ffffff;
+            --muted: #9ca3af;
+            --line: #2a2a2a;
+            --line-strong: #333333;
+            --gold: #ffc700;
+            --reef: #2ec4b6;
+            --red: #ff6b6b;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            display: grid;
+            place-items: center;
+            padding: 32px 20px;
+            background:
+                linear-gradient(180deg, rgba(0, 0, 0, 0.64), rgba(0, 0, 0, 0.88)),
+                radial-gradient(circle at 50% 0%, rgba(255, 199, 0, 0.08), transparent 38%),
+                url("{% static 'img/header-monkey-island.png' %}") center / cover no-repeat,
+                var(--bg);
+            color: var(--ink);
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        .status-shell {
+            width: min(520px, 100%);
+            padding: 40px 36px;
+            border: 1px solid var(--line);
+            border-radius: 20px;
+            background: var(--panel);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 34px;
+        }
+
+        .brand img {
+            width: 40px;
+            height: 40px;
+            border-radius: 12px;
+            object-fit: cover;
+            border: 1px solid rgba(255, 199, 0, 0.35);
+        }
+
+        .brand-title {
+            color: var(--gold);
+            font-size: 20px;
+            line-height: 1.12;
+            font-weight: 900;
+            letter-spacing: 0;
+            text-transform: uppercase;
+        }
+
+        .state-icon {
+            width: 58px;
+            height: 58px;
+            display: grid;
+            place-items: center;
+            margin-bottom: 28px;
+            border: 1px solid rgba(255, 199, 0, 0.42);
+            border-radius: 16px;
+            background: var(--gold);
+            color: #000000;
+            box-shadow: 0 0 20px rgba(255, 199, 0, 0.3);
+        }
+
+        .spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid rgba(0, 0, 0, 0.24);
+            border-top-color: #000000;
+            border-radius: 50%;
+            animation: spin 0.9s linear infinite;
+        }
+
+        .result-mark {
+            display: none;
+            font-size: 32px;
+            line-height: 1;
+            font-weight: 900;
+        }
+
+        .status-shell[data-status="succeeded"] .state-icon {
+            border-color: rgba(46, 196, 182, 0.42);
+            background: var(--reef);
+            box-shadow: 0 0 20px rgba(46, 196, 182, 0.24);
+        }
+
+        .status-shell[data-status="failed"] .state-icon {
+            border-color: rgba(255, 107, 107, 0.42);
+            background: var(--red);
+            box-shadow: 0 0 20px rgba(255, 107, 107, 0.22);
+        }
+
+        .status-shell[data-status="succeeded"] .spinner,
+        .status-shell[data-status="failed"] .spinner {
+            display: none;
+        }
+
+        .status-shell[data-status="succeeded"] .result-mark.success,
+        .status-shell[data-status="failed"] .result-mark.failure {
+            display: block;
+        }
+
+        h1 {
+            margin: 0 0 18px;
+            color: var(--ink);
+            font-size: clamp(36px, 7vw, 48px);
+            line-height: 1;
+            font-weight: 900;
+            letter-spacing: 0;
+        }
+
+        .status-text {
+            margin: 0 0 28px;
+            color: var(--muted);
+            font-size: 16px;
+            line-height: 1.55;
+            font-weight: 600;
+        }
+
+        .wait-notice {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            margin: 0 0 28px;
+            padding: 16px;
+            border: 1px solid rgba(255, 199, 0, 0.32);
+            border-radius: 12px;
+            background: rgba(255, 199, 0, 0.08);
+            color: var(--ink);
+            font-size: 14px;
+            line-height: 1.45;
+            font-weight: 900;
+        }
+
+        .wait-notice-mark {
+            flex: 0 0 auto;
+            display: grid;
+            place-items: center;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--gold);
+            color: #15120a;
+            font-size: 16px;
+            line-height: 1;
+            font-weight: 900;
+        }
+
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: stretch;
+        }
+
+        .btn {
+            min-height: 58px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px 18px;
+            border: 1px solid var(--line-strong);
+            border-radius: 12px;
+            background: var(--panel-inner);
+            color: var(--ink);
+            font-size: 14px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0;
+            transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255, 199, 0, 0.5);
+            background: rgba(245, 240, 223, 0.1);
+        }
+
+        .btn-primary {
+            border-color: transparent;
+            color: #000000;
+            background: var(--gold);
+            box-shadow: 0 18px 38px rgba(255, 199, 0, 0.18), inset 0 -2px 0 rgba(0, 0, 0, 0.14);
+        }
+
+        .btn-primary:hover {
+            border-color: transparent;
+            background: #e6b400;
+        }
+
+        .btn-secondary {
+            gap: 10px;
+        }
+
+        .btn-secondary:hover {
+            border-color: rgba(255, 199, 0, 0.36);
+            background: rgba(255, 199, 0, 0.08);
+        }
+
+        .support-btn-icon {
+            flex: 0 0 auto;
+            width: 22px;
+            height: 22px;
+            stroke: currentColor;
+        }
+
+        .status-shell[data-status="pending"] .login-action,
+        .status-shell[data-status="failed"] .login-action {
+            display: none;
+        }
+
+        .status-shell[data-status="succeeded"] .waiting-copy,
+        .status-shell[data-status="succeeded"] .wait-notice,
+        .status-shell[data-status="failed"] .wait-notice,
+        .status-shell[data-status="failed"] .waiting-copy {
+            display: none;
+        }
+
+        .status-shell[data-status="pending"] .failed-copy,
+        .status-shell[data-status="succeeded"] .failed-copy {
+            display: none;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 520px) {
+            body {
+                padding: 14px;
+            }
+
+            .status-shell {
+                padding: 30px 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="status-shell" id="status-shell" data-status="{{ initial_status }}">
+        <div class="brand">
+            <img src="{% static 'icons/icon-192x192.png' %}" alt="">
+            <div class="brand-title">Monkey Island</div>
+        </div>
+
+        <div class="state-icon" aria-hidden="true">
+            <div class="spinner"></div>
+            <div class="result-mark success">✓</div>
+            <div class="result-mark failure">!</div>
+        </div>
+
+        <h1 id="status-title">Проверяем платеж</h1>
+        <p class="status-text waiting-copy" id="waiting-copy">
+            Ждем обработки платежа. После успеха вы будете перенаправлены на страницу личного кабинета, пожалуйста ожидайте.
+        </p>
+        <div class="wait-notice">
+            <span class="wait-notice-mark">!</span>
+            <span>Пожалуйста, не закрывайте эту страницу до завершения проверки платежа.</span>
+        </div>
+        <p class="status-text failed-copy" id="failed-copy">
+            Платеж не прошел. Если деньги списались или вы не понимаете, что произошло, напишите в поддержку.
+        </p>
+
+        <div class="actions">
+            <a class="btn btn-primary login-action" id="login-action" href="{{ login_url }}">Перейти в личный кабинет</a>
+            <a class="btn btn-secondary" href="{{ support_telegram_url }}" target="_blank" rel="noopener">
+                <svg class="support-btn-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path d="M4 13a8 8 0 0 1 16 0" stroke-width="2" stroke-linecap="round"/>
+                    <path d="M4 13v3a2 2 0 0 0 2 2h1v-7H6a2 2 0 0 0-2 2Z" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M20 13v3a2 2 0 0 1-2 2h-1v-7h1a2 2 0 0 1 2 2Z" stroke-width="2" stroke-linejoin="round"/>
+                    <path d="M15 20h-3" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <span>Написать в поддержку</span>
+            </a>
+        </div>
+    </main>
+
+    <script>
+        const shell = document.getElementById('status-shell');
+        const title = document.getElementById('status-title');
+        const loginAction = document.getElementById('login-action');
+        const statusApiUrl = '{{ status_api_url|escapejs }}';
+
+        function applyStatus(payload) {
+            const status = payload.status || 'pending';
+            shell.dataset.status = status;
+
+            if (status === 'succeeded') {
+                title.textContent = 'Платеж прошел';
+                if (payload.login_url) {
+                    loginAction.href = payload.login_url;
+                    window.setTimeout(() => {
+                        window.location.href = payload.login_url;
+                    }, 900);
+                }
+                return true;
+            }
+
+            if (status === 'failed') {
+                title.textContent = payload.message || 'Платеж не прошел';
+                return true;
+            }
+
+            title.textContent = 'Проверяем платеж';
+            return false;
+        }
+
+        async function pollStatus() {
+            try {
+                const response = await fetch(`${statusApiUrl}${window.location.search}`, {
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                });
+                const payload = await response.json();
+                const done = applyStatus(payload);
+                if (!done) {
+                    window.setTimeout(pollStatus, 2500);
+                }
+            } catch (error) {
+                window.setTimeout(pollStatus, 3500);
+            }
+        }
+
+        applyStatus({
+            status: '{{ initial_status|escapejs }}',
+            message: '{{ initial_message|escapejs }}',
+            login_url: '{{ login_url|escapejs }}',
+        });
+        pollStatus();
+    </script>
+</body>
+</html>

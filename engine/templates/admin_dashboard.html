@@ -18,11 +18,11 @@
         * { box-sizing: border-box; }
         body { margin: 0; overflow-x: hidden; font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg-color); color: var(--text-main); }
         .page-bg { position: fixed; inset: 0; background: radial-gradient(circle at 76% 4%, rgba(255,199,0,.10), transparent 28%), radial-gradient(circle at 12% 22%, rgba(92,200,255,.10), transparent 26%), radial-gradient(circle at 92% 78%, rgba(167,139,250,.10), transparent 30%), linear-gradient(180deg, rgba(12,16,19,.96), #0b0f12); pointer-events: none; }
-        .sidebar { position: fixed; inset: 0 auto 0 0; width: 280px; display: flex; flex-direction: column; padding: 36px 20px 24px; border-right: 1px solid var(--card-border); background: rgba(13,13,15,.9); backdrop-filter: blur(15px); z-index: 20; }
-        .main { position: relative; z-index: 10; margin-left: 280px; padding: 40px; max-width: 1720px; }
+        .sidebar { position: fixed; inset: 0 auto 0 0; width: 238px; display: flex; flex-direction: column; padding: 22px 14px 18px; border-right: 1px solid var(--card-border); background: rgba(13,13,15,.9); backdrop-filter: blur(15px); z-index: 20; }
+        .main { position: relative; z-index: 10; margin-left: 238px; padding: 24px 28px; max-width: 1840px; }
         .card { position: relative; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 10px; box-shadow: 0 18px 50px rgba(0,0,0,.18); }
         .sidebar-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 2px; }
-        .tab-btn { width: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 16px; margin-bottom: 8px; border-radius: 14px; border: 1px solid transparent; background: transparent; color: rgba(232,237,242,.54); font-size: 13px; line-height: 1.25; font-weight: 800; text-transform: none; text-align: left; outline: none; transition: .18s; }
+        .tab-btn { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 9px 12px; margin-bottom: 5px; border-radius: 11px; border: 1px solid transparent; background: transparent; color: rgba(232,237,242,.54); font-size: 12px; line-height: 1.25; font-weight: 800; text-transform: none; text-align: left; outline: none; transition: .18s; }
         .tab-btn:focus { outline: none; box-shadow: none; }
         .tab-btn i { width: 18px; flex: 0 0 18px; text-align: center; }
         .tab-btn span { min-width: 0; overflow-wrap: anywhere; }
@@ -34,30 +34,30 @@
         .tab-btn:nth-of-type(6) i { color: var(--coral); }
         .tab-btn[data-tab="config-templates"] i { color: var(--mint); }
         .tab-btn.active { color: var(--brand-gold); background: rgba(255,199,0,.08); border: 1px solid rgba(255,199,0,.15); }
-        .brand { flex: 0 0 auto; padding-bottom: 22px; margin-bottom: 18px; border-bottom: 1px solid rgba(148,163,184,.10); }
-        .brand-eyebrow { color: var(--brand-gold); font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
-        .brand-title { margin-top: 8px; color: var(--text-main); font-size: 22px; line-height: 1.08; font-weight: 800; }
-        .logout { flex: 0 0 auto; width: 100%; min-height: 48px; display: flex; align-items: center; gap: 14px; margin-top: 18px; padding: 0 16px; border-radius: 14px; border: 1px solid rgba(251,113,133,.18); background: rgba(251,113,133,.06); color: rgba(232,237,242,.58); font-size: 13px; font-weight: 800; text-decoration: none; transition: .18s; }
+        .brand { flex: 0 0 auto; padding-bottom: 16px; margin-bottom: 14px; border-bottom: 1px solid rgba(148,163,184,.10); }
+        .brand-eyebrow { color: var(--brand-gold); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+        .brand-title { margin-top: 6px; color: var(--text-main); font-size: 20px; line-height: 1.08; font-weight: 800; }
+        .logout { flex: 0 0 auto; width: 100%; min-height: 40px; display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 0 12px; border-radius: 11px; border: 1px solid rgba(251,113,133,.18); background: rgba(251,113,133,.06); color: rgba(232,237,242,.58); font-size: 12px; font-weight: 800; text-decoration: none; transition: .18s; }
         .logout:hover { color: var(--red); border-color: rgba(251,113,133,.34); background: rgba(251,113,133,.10); }
         .logout i { width: 18px; flex: 0 0 18px; text-align: center; color: var(--coral); }
         .tab-panel { display: none; }
         .tab-panel.active { display: block; animation: fadeIn .18s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-        .admin-title { margin: 0 0 10px; color: var(--text-main); font-size: clamp(30px, 2.4vw, 40px); line-height: 1.08; font-weight: 900; letter-spacing: 0; }
-        .admin-subtitle { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.45; font-weight: 700; }
-        .panel-header { margin-bottom: 24px; }
+        .admin-title { margin: 0 0 6px; color: var(--text-main); font-size: clamp(26px, 1.85vw, 34px); line-height: 1.08; font-weight: 900; letter-spacing: 0; }
+        .admin-subtitle { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.35; font-weight: 700; }
+        .panel-header { margin-bottom: 16px; }
         .panel-header.config-panel-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; }
-        .form-card { padding: 20px; margin-bottom: 22px; }
+        .form-card { padding: 14px; margin-bottom: 16px; }
         .form-grid-two { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: center; }
-        .form-grid-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 12px; align-items: center; }
+        .form-grid-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 10px; align-items: center; }
         .subscription-actions { display: grid; grid-template-columns: 160px auto auto; gap: 12px; align-items: center; margin-top: 12px; }
-        .input { width: 100%; min-width: 0; max-width: 100%; min-height: 50px; border: 1px solid var(--card-border); background: var(--input-bg); color: var(--text-main); border-radius: 12px; padding: 0 16px; font-size: 14px; font-weight: 700; outline: none; }
+        .input { width: 100%; min-width: 0; max-width: 100%; min-height: 42px; border: 1px solid var(--card-border); background: var(--input-bg); color: var(--text-main); border-radius: 10px; padding: 0 14px; font-size: 13px; font-weight: 700; outline: none; }
         .input:focus { border-color: rgba(255,199,0,.45); }
         .input:-webkit-autofill,
         .input:-webkit-autofill:hover,
         .input:-webkit-autofill:focus { -webkit-text-fill-color: #fff; box-shadow: 0 0 0 1000px #202024 inset; transition: background-color 9999s ease-in-out 0s; caret-color: #fff; }
         .date-field { position: relative; min-width: 0; }
-        .date-trigger { width: 100%; min-height: 50px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border: 1px solid var(--card-border); background: var(--input-bg); color: var(--text-main); border-radius: 12px; padding: 0 16px; font-size: 14px; font-weight: 800; cursor: pointer; }
+        .date-trigger { width: 100%; min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid var(--card-border); background: var(--input-bg); color: var(--text-main); border-radius: 10px; padding: 0 14px; font-size: 13px; font-weight: 800; cursor: pointer; }
         .date-trigger i { color: var(--brand-gold); }
         .date-field.open .date-trigger { border-color: rgba(255,199,0,.45); background: rgba(255,199,0,.08); }
         .date-popover { position: absolute; top: calc(100% + 10px); left: 0; z-index: 80; width: min(330px, calc(100vw - 40px)); display: none; border: 1px solid var(--panel-border); border-radius: 16px; background: var(--card-bg); box-shadow: 0 24px 70px rgba(0,0,0,.5); padding: 14px; }
@@ -77,22 +77,22 @@
         .date-day.selected:hover { background: var(--brand-gold); }
         .date-picker-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
         .date-quick { border: 0; background: transparent; color: var(--brand-gold); font-size: 12px; font-weight: 800; text-transform: none; cursor: pointer; }
-        .date-presets { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 2px; }
-        .date-presets-label { color: var(--muted); font-size: 12px; font-weight: 800; margin-right: 2px; }
-        .date-preset { min-height: 30px; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; background: rgba(255,255,255,.05); color: var(--text-main); padding: 0 11px; font-size: 12px; font-weight: 800; cursor: pointer; transition: .16s; }
+        .date-presets { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 7px; align-items: center; margin-top: 0; }
+        .date-presets-label { color: var(--muted); font-size: 11px; font-weight: 800; margin-right: 2px; }
+        .date-preset { min-height: 28px; border: 1px solid rgba(255,255,255,.1); border-radius: 999px; background: rgba(255,255,255,.05); color: var(--text-main); padding: 0 10px; font-size: 11px; font-weight: 800; cursor: pointer; transition: .16s; }
         .date-preset:hover,
         .date-preset.active { color: #050505; background: var(--brand-gold); border-color: rgba(255,199,0,.7); }
-        .btn { min-height: 50px; display: inline-flex; align-items: center; justify-content: center; gap: 9px; border: 0; border-radius: 12px; padding: 0 22px; background: var(--brand-gold); color: #050505; font-size: 14px; font-weight: 800; text-transform: none; white-space: nowrap; cursor: pointer; }
+        .btn { min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 10px; padding: 0 18px; background: var(--brand-gold); color: #050505; font-size: 13px; font-weight: 800; text-transform: none; white-space: nowrap; cursor: pointer; }
         .btn:disabled { opacity: .42; cursor: not-allowed; }
         .btn-secondary { background: var(--inner-card-bg); color: white; border: 1px solid rgba(255,255,255,.1); }
-        .result-stack { display: grid; gap: 18px; }
-        .metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+        .result-stack { display: grid; gap: 14px; }
+        .metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .metrics-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .metrics-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-        .metric { min-height: 124px; padding: 22px; }
-        .metric-label { color: var(--muted); font-size: 12px; font-weight: 800; text-transform: none; letter-spacing: 0; margin-bottom: 18px; }
+        .metric { min-height: 86px; padding: 16px 18px; }
+        .metric-label { color: var(--muted); font-size: 11px; font-weight: 800; text-transform: none; letter-spacing: 0; margin-bottom: 10px; }
         .metric-label i { color: var(--brand-gold); margin-right: 8px; }
-        .metric-value { min-width: 0; overflow-wrap: anywhere; color: var(--text-main); font-size: clamp(26px, 2vw, 34px); line-height: 1.05; font-weight: 800; }
+        .metric-value { min-width: 0; overflow-wrap: anywhere; color: var(--text-main); font-size: clamp(22px, 1.55vw, 30px); line-height: 1.05; font-weight: 800; }
         .metrics-grid > .metric:nth-child(4n+1) { border-color: rgba(92,200,255,.32); background: linear-gradient(135deg, rgba(92,200,255,.10), var(--card-bg) 44%); }
         .metrics-grid > .metric:nth-child(4n+1) .metric-label i { color: var(--blue); }
         .metrics-grid > .metric:nth-child(4n+2) { border-color: rgba(45,212,191,.28); background: linear-gradient(135deg, rgba(45,212,191,.09), var(--card-bg) 44%); }
@@ -101,16 +101,35 @@
         .metrics-grid > .metric:nth-child(4n+3) .metric-label i { color: var(--violet); }
         .metrics-grid > .metric:nth-child(4n+4) { border-color: rgba(56,217,150,.30); background: linear-gradient(135deg, rgba(56,217,150,.10), var(--card-bg) 44%); }
         .metrics-grid > .metric:nth-child(4n+4) .metric-label i { color: var(--green); }
-        .table-row { display: grid; gap: 12px; align-items: center; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.07); font-size: 13px; font-weight: 800; }
+        .table-row { display: grid; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.07); font-size: 12px; font-weight: 800; }
         .table-row:last-child { border-bottom: 0; }
+        .admin-table-row { display: grid; gap: 10px; align-items: center; padding: 10px 12px; border-bottom: 1px solid rgba(255,255,255,.07); font-size: 12px; font-weight: 800; }
+        .admin-table-row:last-child { border-bottom: 0; }
         .data-table { overflow-x: auto; }
         .table-head { color: var(--muted); font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
-        .stats-row { grid-template-columns: minmax(150px, 1.3fr) repeat(6, minmax(96px, .75fr)); min-width: 860px; }
-        .payments-row { grid-template-columns: minmax(150px, .9fr) minmax(140px, .9fr) minmax(130px, .9fr) minmax(100px, .7fr) minmax(220px, 1.4fr); min-width: 850px; }
-        .referrals-row { grid-template-columns: minmax(260px, 1.4fr) minmax(100px, .6fr) minmax(110px, .7fr) minmax(170px, .8fr); min-width: 760px; }
-        .user-grid { display: grid; grid-template-columns: minmax(220px, 1.1fr) minmax(260px, 1.2fr) minmax(110px, .7fr) minmax(110px, .7fr) minmax(100px, .6fr); gap: 18px; }
+        .payments-board { overflow: hidden; margin-bottom: 22px; }
+        .payments-board-title { margin: 0; padding: 16px 18px; border-bottom: 1px solid rgba(255,255,255,.08); color: var(--text-main); font-size: 24px; line-height: 1.15; font-weight: 800; background: rgba(24, 34, 48, .55); }
+        .payments-board-scroll { overflow-x: auto; }
+        .payments-list-row { grid-template-columns: minmax(150px, 1fr) minmax(120px, 0.75fr) minmax(170px, 1fr) minmax(150px, 0.9fr) minmax(110px, 0.65fr) minmax(110px, 0.65fr); min-width: 860px; }
+        .user-payments-row { grid-template-columns: minmax(220px, 1.4fr) minmax(150px, 0.8fr) minmax(120px, 0.65fr) minmax(160px, 0.9fr) minmax(120px, 0.65fr) minmax(120px, 0.65fr); min-width: 920px; }
+        .payments-list-row.table-head { background: rgba(255,255,255,.055); }
+        .user-payments-row.table-head { background: rgba(255,255,255,.055); }
+        .payments-board-scroll .payments-list-row:not(.table-head):nth-child(odd) { background: rgba(255,255,255,.025); }
+        .payments-board-scroll .user-payments-row:not(.table-head):nth-child(odd) { background: rgba(255,255,255,.025); }
+        .payments-board-scroll .payments-list-row:not(.table-head):hover { background: rgba(92,200,255,.055); }
+        .payments-board-scroll .user-payments-row:not(.table-head):hover { background: rgba(92,200,255,.055); }
+        .payments-board-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 18px; color: var(--muted); font-size: 13px; font-weight: 700; }
+        .payments-pages { display: inline-flex; align-items: center; gap: 6px; }
+        .payments-page { min-width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--muted); }
+        .payments-page.active { color: var(--text-main); background: rgba(255,255,255,.10); }
+        .payment-status-pill { color: var(--red); font-weight: 800; }
+        .payment-status-pill.ok { color: var(--green); }
+        .stats-row { grid-template-columns: minmax(150px, 1.3fr) repeat(6, minmax(96px, 0.75fr)); min-width: 860px; }
+        .payments-row { grid-template-columns: minmax(150px, 0.9fr) minmax(140px, 0.9fr) minmax(130px, 0.9fr) minmax(100px, 0.7fr) minmax(220px, 1.4fr); min-width: 850px; }
+        .referrals-row { grid-template-columns: minmax(260px, 1.4fr) minmax(100px, 0.6fr) minmax(110px, 0.7fr) minmax(170px, 0.8fr); min-width: 760px; }
+        .user-grid { display: grid; grid-template-columns: minmax(220px, 1.1fr) minmax(260px, 1.2fr) minmax(110px, 0.7fr) minmax(110px, 0.7fr) minmax(100px, 0.6fr); gap: 18px; }
         .cell-label { color: var(--muted); font-size: 11px; font-weight: 800; text-transform: none; letter-spacing: 0; margin-bottom: 6px; }
-        .cell-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 14px; font-weight: 800; }
+        .cell-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 800; }
         .cell-value.wrap { white-space: normal; overflow-wrap: anywhere; }
         .muted { color: var(--muted); }
         .gold { color: var(--brand-gold); }
@@ -121,25 +140,25 @@
         .info-title { margin: 0 0 14px; color: var(--text-main); font-size: 22px; line-height: 1.2; font-weight: 800; }
         .info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
         .info-item { min-width: 0; }
-        .sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(360px, 1fr)); gap: 16px; }
-        .source-card { --source-accent: var(--brand-gold); padding: 20px; min-width: 0; overflow: hidden; border-color: color-mix(in srgb, var(--source-accent) 35%, var(--panel-border)); background: linear-gradient(160deg, color-mix(in srgb, var(--source-accent) 10%, transparent), var(--card-bg) 38%); }
+        .sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+        .source-card { --source-accent: var(--brand-gold); padding: 14px; min-width: 0; overflow: hidden; border-color: color-mix(in srgb, var(--source-accent) 35%, var(--panel-border)); background: linear-gradient(160deg, color-mix(in srgb, var(--source-accent) 10%, transparent), var(--card-bg) 38%); }
         .source-card:nth-child(4n+1) { --source-accent: var(--blue); }
         .source-card:nth-child(4n+2) { --source-accent: var(--violet); }
         .source-card:nth-child(4n+3) { --source-accent: var(--mint); }
         .source-card:nth-child(4n+4) { --source-accent: var(--coral); }
-        .source-header { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; margin-bottom: 16px; }
-        .source-title { min-width: 0; overflow: visible; overflow-wrap: anywhere; color: var(--source-accent); font-size: 24px; line-height: 1.1; font-weight: 800; }
+        .source-header { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 12px; }
+        .source-title { min-width: 0; overflow: visible; overflow-wrap: anywhere; color: var(--source-accent); font-size: 20px; line-height: 1.1; font-weight: 800; }
         .source-actions { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
         .source-pill { flex: 0 0 auto; border-radius: 999px; padding: 7px 11px; background: color-mix(in srgb, var(--source-accent) 13%, transparent); border: 1px solid color-mix(in srgb, var(--source-accent) 28%, transparent); color: var(--source-accent); font-size: 11px; font-weight: 800; text-transform: none; }
-        .source-details-btn { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 999px; padding: 0 14px; background: var(--brand-gold); color: #050505; font-size: 11px; font-weight: 800; text-transform: none; cursor: pointer; box-shadow: 0 0 0 1px rgba(255,199,0,.35); }
-        .source-metrics { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
-        .source-metric { min-width: 0; border-radius: 12px; padding: 16px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.1); }
-        .source-metric-label { margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 800; text-transform: none; letter-spacing: 0; }
-        .source-metric-value { color: var(--text-main); font-size: 28px; line-height: 1; font-weight: 800; }
-        .source-tariffs { margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255,255,255,.08); }
-        .source-tariff-title { margin-bottom: 10px; color: var(--muted); font-size: 12px; font-weight: 800; text-transform: none; letter-spacing: 0; }
-        .source-tariff-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-        .source-tariff { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; border-radius: 12px; padding: 10px 12px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.1); font-size: 12px; font-weight: 800; }
+        .source-details-btn { min-height: 30px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 999px; padding: 0 12px; background: var(--brand-gold); color: #050505; font-size: 10px; font-weight: 800; text-transform: none; cursor: pointer; box-shadow: 0 0 0 1px rgba(255,199,0,.35); }
+        .source-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+        .source-metric { min-width: 0; border-radius: 10px; padding: 10px 12px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.1); }
+        .source-metric-label { margin-bottom: 5px; color: var(--muted); font-size: 10px; font-weight: 800; text-transform: none; letter-spacing: 0; }
+        .source-metric-value { color: var(--text-main); font-size: 20px; line-height: 1; font-weight: 800; }
+        .source-tariffs { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.08); }
+        .source-tariff-title { margin-bottom: 8px; color: var(--muted); font-size: 11px; font-weight: 800; text-transform: none; letter-spacing: 0; }
+        .source-tariff-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+        .source-tariff { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-radius: 9px; padding: 8px 10px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.1); font-size: 11px; font-weight: 800; }
         .source-tariff-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #d3d6de; }
         .source-tariff-count { flex: 0 0 auto; color: #fff; }
         .modal-overlay { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.72); backdrop-filter: blur(8px); }
@@ -201,8 +220,8 @@
         .referral-map-card.has-children { border-color: rgba(167,139,250,.28); background: rgba(167,139,250,.08); }
         .graph-child-list { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
         .graph-child-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 999px; padding: 6px 8px; background: rgba(0,0,0,.22); border: 1px solid rgba(255,255,255,.09); color: #dfe2e8; font-size: 10px; font-weight: 800; }
-        .chart-card { min-height: 360px; padding: 20px; }
-        .empty-chart { min-height: 260px; display: flex; align-items: center; justify-content: center; color: #777d8c; font-weight: 800; }
+        .chart-card { min-height: 260px; padding: 14px; }
+        .empty-chart { min-height: 210px; display: flex; align-items: center; justify-content: center; color: #777d8c; font-weight: 800; }
         .chat-grid { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); gap: 18px; }
         .ticket-list { max-height: calc(100vh - 230px); overflow-y: auto; }
         .ticket-link { display: block; padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.07); transition: .16s; }
@@ -270,7 +289,7 @@
         .config-template-preview { height: 230px; overflow: auto; border-radius: 8px; padding: 12px; border: 1px solid rgba(255,255,255,.07); background: rgba(0,0,0,.24); color: #b9d6e8; font: 700 12px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; white-space: pre; scrollbar-color: rgba(148,163,184,.42) rgba(255,255,255,.05); }
         .config-template-card-actions { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.08); }
         .config-template-card-actions .mini-btn { background: rgba(255,255,255,.075); border-color: rgba(255,255,255,.14); }
-        canvas { width: 100%; height: 310px; display: block; }
+        canvas { width: 100%; height: 230px; display: block; }
         @media (max-width: 1024px) {
             .sidebar { position: sticky; top: 0; width: 100%; height: auto; flex-direction: row; gap: 7px; overflow-x: auto; padding: 12px; }
             .sidebar .brand, .sidebar .logout { display: none; }
@@ -384,6 +403,7 @@
         data-user-payments-url="{% url 'support_admin_api_user_payments' %}"
         data-referrals-url="{% url 'support_admin_api_referrals' %}"
         data-payment-info-url="{% url 'support_admin_api_payment_info' %}"
+        data-payments-url="{% url 'support_admin_api_payments' %}"
         data-subscription-manage-url="{% url 'support_admin_api_subscription_manage' %}"
         data-reply-templates-url="{% url 'support_admin_api_reply_templates' %}"
         data-config-templates-url="{% url 'support_admin_api_config_templates' %}"
@@ -454,9 +474,24 @@
 
         <section id="panel-payment-info" class="tab-panel">
             <header class="panel-header">
-                <h1 class="admin-title">Платеж по ID</h1>
-                <p class="admin-subtitle">Детали платежа YooKassa или Wata по ID</p>
+                <h1 class="admin-title">Платежи</h1>
+                <p class="admin-subtitle">История платежей и поиск деталей по ID</p>
             </header>
+            <section class="card payments-board">
+                <h2 class="payments-board-title">История платежей</h2>
+                <div id="payments-list" class="payments-board-scroll"></div>
+                <footer class="payments-board-footer">
+                    <span id="payments-list-count">Платежи: 0</span>
+                    <span class="payments-pages" aria-label="Страницы платежей">
+                        <span class="payments-page muted"><i class="fas fa-angle-left"></i></span>
+                        <span class="payments-page active">1</span>
+                        <span class="payments-page">2</span>
+                        <span class="payments-page">3</span>
+                        <span class="payments-page muted"><i class="fas fa-angle-right"></i></span>
+                        <span class="payments-page muted"><i class="fas fa-angles-right"></i></span>
+                    </span>
+                </footer>
+            </section>
             <form id="payment-info-form" class="card form-card form-grid-two">
                 <input class="input" name="payment_id" placeholder="payment_id или transaction_id">
                 <button class="btn" type="submit"><i class="fas fa-search"></i>Найти</button>
@@ -857,6 +892,7 @@
             const panel = document.getElementById(`panel-${tabId}`);
             if (panel) panel.classList.add('active');
             if (tabId === 'reply-templates') loadReplyTemplates();
+            if (tabId === 'payment-info') loadPaymentsList();
             if (tabId === 'config-templates') {
                 loadConfigTemplates();
             }
@@ -1584,27 +1620,33 @@
                         ${metric('Использование', escapeHtml(result.traffic), 'fa-signal')}
                         ${metric('Регистрация', escapeHtml(result.first_seen), 'fa-calendar')}
                     </div>
-                    <section class="payment-cards">
-                        ${(result.history || []).map((item) => `
-                            <article class="card payment-card">
-                                <div class="payment-card-head">
-                                    <div class="payment-status ${item.success ? 'green' : 'red'}">${item.success ? 'Успешен' : 'Неуспешен'}</div>
-                                    <div class="payment-system">${escapeHtml(item.system)}</div>
+                    <section class="card payments-board">
+                        <h2 class="payments-board-title">История платежей</h2>
+                        <div class="payments-board-scroll">
+                            ${(result.history || []).length ? `
+                                <div class="admin-table-row table-head user-payments-row">
+                                    <div>ID Платежа</div>
+                                    <div>Дата</div>
+                                    <div>Система</div>
+                                    <div>Тариф</div>
+                                    <div>Сумма</div>
+                                    <div>Статус</div>
                                 </div>
-                                <div class="payment-main">${item.amount} ${escapeHtml(item.currency)}</div>
-                                <div class="payment-detail-grid">
-                                    <div class="payment-detail">
-                                        <div class="payment-detail-label">Дата</div>
-                                        <div class="payment-detail-value">${escapeHtml(item.date)}</div>
+                                ${(result.history || []).map((item) => `
+                                    <div class="admin-table-row user-payments-row">
+                                        <div class="cell-value wrap" title="${escapeHtml(item.id)}">${escapeHtml(item.id)}</div>
+                                        <div>${escapeHtml(item.date)}</div>
+                                        <div>${escapeHtml(item.system)}</div>
+                                        <div class="cell-value wrap" title="${escapeHtml(item.tariff)}">${escapeHtml(item.tariff)}${item.trial ? ' · Trial' : ''}</div>
+                                        <div>${escapeHtml(item.amount)} ${escapeHtml(item.currency)}</div>
+                                        <div><span class="payment-status-pill ${item.success ? 'ok' : ''}">${item.success ? 'Успешен' : 'Ошибка'}</span></div>
                                     </div>
-                                    <div class="payment-detail">
-                                        <div class="payment-detail-label">Тариф</div>
-                                        <div class="payment-detail-value" title="${escapeHtml(item.tariff)}">${escapeHtml(item.tariff)}${item.trial ? ' · Trial' : ''}</div>
-                                    </div>
-                                </div>
-                                <div class="payment-id">${escapeHtml(item.id)}</div>
-                            </article>
-                        `).join('') || '<div class="card info-card muted">Платежей не найдено.</div>'}
+                                `).join('')}
+                            ` : '<div class="info-card muted">Платежей не найдено.</div>'}
+                        </div>
+                        <footer class="payments-board-footer">
+                            <span>Платежи: ${(result.history || []).length ? `1 - ${(result.history || []).length}` : '0'}</span>
+                        </footer>
                     </section>
                 </div>
             `;
@@ -1639,6 +1681,50 @@
                     </div>
                 </div>
             `;
+        }
+
+        async function loadPaymentsList() {
+            const target = document.getElementById('payments-list');
+            const count = document.getElementById('payments-list-count');
+            if (!target || !main.dataset.paymentsUrl) return;
+            target.innerHTML = inlineLoading('Загружаем платежи...');
+            let response;
+            try {
+                response = await fetch(`${main.dataset.paymentsUrl}?limit=10`, {
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    cache: 'no-store',
+                });
+            } catch (error) {
+                target.innerHTML = '<div class="info-card red">Не удалось загрузить платежи</div>';
+                return;
+            }
+            if (!response.ok) {
+                target.innerHTML = '<div class="info-card red">Не удалось загрузить платежи</div>';
+                return;
+            }
+            const payload = await response.json();
+            const payments = payload.payments || [];
+            target.innerHTML = `
+                <div class="admin-table-row table-head payments-list-row">
+                    <div>ID Платежа</div>
+                    <div>Дата</div>
+                    <div>Пользователь</div>
+                    <div>Тариф</div>
+                    <div>Сумма</div>
+                    <div>Статус</div>
+                </div>
+                ${payments.map((payment) => `
+                    <div class="admin-table-row payments-list-row">
+                        <div class="cell-value wrap" title="${escapeHtml(payment.id)}">${escapeHtml(payment.id)}</div>
+                        <div>${escapeHtml(payment.date)}</div>
+                        <div class="cell-value wrap" title="${escapeHtml(payment.user)}">${escapeHtml(payment.user)}</div>
+                        <div class="cell-value wrap" title="${escapeHtml(payment.tariff)}">${escapeHtml(payment.tariff)}</div>
+                        <div>${escapeHtml(payment.amount)} ${escapeHtml(payment.currency)}</div>
+                        <div><span class="payment-status-pill ${payment.success ? 'ok' : ''}">${escapeHtml(payment.status)}</span></div>
+                    </div>
+                `).join('') || '<div class="info-card muted">Платежей пока нет.</div>'}
+            `;
+            if (count) count.textContent = payments.length ? `Платежи: 1 - ${payments.length}` : 'Платежи: 0';
         }
 
         async function loadReferrals(event) {

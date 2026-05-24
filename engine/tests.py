@@ -1,11 +1,15 @@
 import hashlib
 import hmac
 import time
+from types import SimpleNamespace
+from unittest import mock
 
 from django.test import RequestFactory
 from django.test import SimpleTestCase
 from django.test import override_settings
 
+from engine.payments import create_wata_payment_sync
+from engine.payments import create_yk_payment_sync
 from engine.views import auth_by_telegram_widget
 from engine.views import get_telegram_auth_bot
 from engine.views import render_login
@@ -127,3 +131,77 @@ class TelegramAuthBotTests(SimpleTestCase):
         self.assertIn(
             "return_to=https%3A%2F%2Fmonkey-island-vpn.com%2Flogin%2F", content
         )
+
+
+class PaymentRedirectTests(SimpleTestCase):
+    def test_yookassa_payment_uses_return_url(self):
+        tariff = SimpleNamespace(
+            price=100,
+            db_tariff_id="one_month",
+            description="1 месяц",
+        )
+        confirmation = SimpleNamespace(confirmation_url="https://yk.example/pay")
+        payment = SimpleNamespace(id="yk-payment-id", confirmation=confirmation)
+
+        with mock.patch("engine.payments.Payment.create", return_value=payment) as create:
+            created_payment = create_yk_payment_sync(
+                shop_id="shop-id",
+                secret="secret",
+                tariff=tariff,
+                username="user-1",
+                telegram_id=0,
+                return_url="https://example.com/login/purchase/token/",
+            )
+
+        payload = create.call_args.args[0]
+        self.assertEqual(created_payment.confirmation_url, "https://yk.example/pay")
+        self.assertEqual(created_payment.reference, "yk-payment-id")
+        self.assertEqual(
+            payload["confirmation"]["return_url"],
+            "https://example.com/login/purchase/token/",
+        )
+
+    def test_wata_payment_uses_success_and_fail_redirect_urls(self):
+        tariff = SimpleNamespace(
+            price=100,
+            db_tariff_id="one_month",
+            description="1 месяц",
+        )
+        captured = {}
+
+        class FakeResponse:
+            content = b'{"url":"https://wata.example/pay","orderId":"order-1"}'
+
+            def raise_for_status(self):
+                return None
+
+        class FakeClient:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, traceback):
+                return None
+
+            def post(self, url, headers, json):
+                captured["url"] = url
+                captured["headers"] = headers
+                captured["json"] = json
+                return FakeResponse()
+
+        with mock.patch("engine.payments.httpx.Client", return_value=FakeClient()):
+            created_payment = create_wata_payment_sync(
+                wata_host="https://wata.example",
+                wata_token="token",
+                tariff=tariff,
+                success_redirect_url="https://example.com/login/purchase/token/",
+                fail_redirect_url="https://example.com/",
+            )
+
+        self.assertEqual(created_payment.confirmation_url, "https://wata.example/pay")
+        self.assertEqual(created_payment.reference, "order-1")
+        self.assertEqual(captured["url"], "https://wata.example/links")
+        self.assertEqual(
+            captured["json"]["successRedirectUrl"],
+            "https://example.com/login/purchase/token/",
+        )
+        self.assertEqual(captured["json"]["failRedirectUrl"], "https://example.com/")

@@ -340,6 +340,7 @@
                     <form action="/pay/" method="POST" class="space-y-4" target="_blank">
                         {% csrf_token %}
                         <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
+                        <input type="hidden" name="login_link_kind" value="purchase_permanent">
                         {% for key, value in tracking_params.items %}
                             <input type="hidden" name="{{ key }}" value="{{ value }}">
                         {% endfor %}
@@ -349,7 +350,7 @@
                             Оплатить
                         </button>
                         <p class="text-center text-gray-500 text-[10px] leading-relaxed">
-                            Нажимая «Оплатить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-bold hover:text-white transition">условия оферты</a>.
+                            Нажимая «Оплатить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-bold hover:text-white transition">условия оферты</a>. После оплаты откроется личный кабинет.
                         </p>
                     </form>
                 </div>
