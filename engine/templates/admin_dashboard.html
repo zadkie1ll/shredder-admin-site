@@ -14,26 +14,28 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        :root { --brand-gold: #ffc700; --bg-color: #0b0f12; --card-bg: rgba(22, 22, 24, .95); --inner-card-bg: rgba(255, 255, 255, .05); --input-bg: rgba(0, 0, 0, .4); --card-border: rgba(148, 163, 184, .16); --muted: #8d99a6; --green: #38d996; --red: #ff5c67; --blue: #5cc8ff; --violet: #a78bfa; --coral: #fb7185; --mint: #2dd4bf; --text-main: #e8edf2; --panel-border: #24303a; }
+        :root { --brand-gold: #ffc700; --bg-color: #0d1117; --card-bg: rgba(16, 21, 30, .98); --inner-card-bg: rgba(255, 255, 255, .045); --input-bg: rgba(0, 0, 0, .3); --card-border: rgba(148, 163, 184, .11); --muted: #8d99a6; --green: #38d996; --red: #ff5c67; --blue: #5cc8ff; --violet: #a78bfa; --coral: #fb7185; --mint: #2dd4bf; --text-main: #e8edf2; --panel-border: #1c2636; }
         * { box-sizing: border-box; }
         body { margin: 0; overflow-x: hidden; font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg-color); color: var(--text-main); }
-        .page-bg { position: fixed; inset: 0; background: radial-gradient(circle at 76% 4%, rgba(255,199,0,.10), transparent 28%), radial-gradient(circle at 12% 22%, rgba(92,200,255,.10), transparent 26%), radial-gradient(circle at 92% 78%, rgba(167,139,250,.10), transparent 30%), linear-gradient(180deg, rgba(12,16,19,.96), #0b0f12); pointer-events: none; }
-        .sidebar { position: fixed; inset: 0 auto 0 0; width: 238px; display: flex; flex-direction: column; padding: 22px 14px 18px; border-right: 1px solid var(--card-border); background: rgba(13,13,15,.9); backdrop-filter: blur(15px); z-index: 20; }
+        .page-bg { position: fixed; inset: 0; background: radial-gradient(ellipse at 85% 0%, rgba(255,199,0,.06), transparent 40%), radial-gradient(ellipse at 15% 90%, rgba(255,199,0,.035), transparent 38%), #0d1117; pointer-events: none; }
+        .sidebar { position: fixed; inset: 0 auto 0 0; width: 238px; display: flex; flex-direction: column; padding: 22px 14px 18px; border-right: 1px solid rgba(255,199,0,.08); background: rgba(10,10,12,.96); backdrop-filter: blur(20px); z-index: 20; }
         .main { position: relative; z-index: 10; margin-left: 238px; padding: 24px 28px; max-width: 1840px; }
-        .card { position: relative; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 10px; box-shadow: 0 18px 50px rgba(0,0,0,.18); }
+        .card { position: relative; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 14px; box-shadow: 0 2px 16px rgba(0,0,0,.22), 0 0 0 0.5px rgba(255,255,255,.04); }
         .sidebar-nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding-right: 2px; }
-        .tab-btn { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 9px 12px; margin-bottom: 5px; border-radius: 11px; border: 1px solid transparent; background: transparent; color: rgba(232,237,242,.54); font-size: 12px; line-height: 1.25; font-weight: 800; text-transform: none; text-align: left; outline: none; transition: .18s; }
+        .tab-btn { width: 100%; display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 9px 12px; margin-bottom: 4px; border-radius: 11px; border: 1px solid transparent; background: transparent; color: rgba(232,237,242,.72); font-size: 12px; line-height: 1.25; font-weight: 800; text-transform: none; text-align: left; outline: none; transition: .18s; }
+        .tab-btn:hover:not(.active) { color: #fff; background: rgba(255,255,255,.06); border-color: rgba(255,255,255,.07); }
         .tab-btn:focus { outline: none; box-shadow: none; }
         .tab-btn i { width: 18px; flex: 0 0 18px; text-align: center; }
         .tab-btn span { min-width: 0; overflow-wrap: anywhere; }
-        .tab-btn:nth-of-type(1) i { color: var(--blue); }
-        .tab-btn:nth-of-type(2) i { color: var(--green); }
-        .tab-btn:nth-of-type(3) i { color: var(--violet); }
-        .tab-btn:nth-of-type(4) i { color: var(--mint); }
-        .tab-btn:nth-of-type(5) i { color: var(--brand-gold); }
-        .tab-btn:nth-of-type(6) i { color: var(--coral); }
-        .tab-btn[data-tab="config-templates"] i { color: var(--mint); }
-        .tab-btn.active { color: var(--brand-gold); background: rgba(255,199,0,.08); border: 1px solid rgba(255,199,0,.15); }
+        .tab-btn[data-tab="stats"] i { color: var(--blue); }
+        .tab-btn[data-tab="user-payments"] i { color: var(--mint); }
+        .tab-btn[data-tab="referrals"] i { color: var(--violet); }
+        .tab-btn[data-tab="payment-info"] i { color: var(--green); }
+        .tab-btn[data-tab="subscription-manage"] i { color: var(--brand-gold); }
+        .tab-btn[data-tab="config-templates"] i { color: var(--coral); }
+        .tab-btn[data-tab="reply-templates"] i { color: var(--blue); }
+        .tab-btn[data-tab="support"] i { color: var(--coral); }
+        .tab-btn.active { color: #fff; background: rgba(255,199,0,.12); border: 1px solid rgba(255,199,0,.28); box-shadow: 0 2px 12px rgba(255,199,0,.08); }
         .brand { flex: 0 0 auto; padding-bottom: 16px; margin-bottom: 14px; border-bottom: 1px solid rgba(148,163,184,.10); }
         .brand-eyebrow { color: var(--brand-gold); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
         .brand-title { margin-top: 6px; color: var(--text-main); font-size: 20px; line-height: 1.08; font-weight: 800; }
@@ -108,7 +110,8 @@
         .data-table { overflow-x: auto; }
         .table-head { color: var(--muted); font-size: 10px; font-weight: 900; text-transform: uppercase; letter-spacing: .06em; }
         .payments-board { overflow: hidden; margin-bottom: 22px; }
-        .payments-board-title { margin: 0; padding: 16px 18px; border-bottom: 1px solid rgba(255,255,255,.08); color: var(--text-main); font-size: 24px; line-height: 1.15; font-weight: 800; background: rgba(24, 34, 48, .55); }
+        .payments-board-title { margin: 0; padding: 14px 18px; border-bottom: 1px solid rgba(255,255,255,.06); color: var(--text-main); font-size: 16px; line-height: 1.2; font-weight: 800; letter-spacing: .02em; }
+        .payment-id-cell { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; color: var(--muted); cursor: default; }
         .payments-board-scroll { overflow-x: auto; }
         .payments-list-row { grid-template-columns: minmax(150px, 1fr) minmax(120px, 0.75fr) minmax(170px, 1fr) minmax(150px, 0.9fr) minmax(110px, 0.65fr) minmax(110px, 0.65fr); min-width: 860px; }
         .user-payments-row { grid-template-columns: minmax(220px, 1.4fr) minmax(150px, 0.8fr) minmax(120px, 0.65fr) minmax(160px, 0.9fr) minmax(120px, 0.65fr) minmax(120px, 0.65fr); min-width: 920px; }
@@ -122,8 +125,8 @@
         .payments-pages { display: inline-flex; align-items: center; gap: 6px; }
         .payments-page { min-width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; color: var(--muted); }
         .payments-page.active { color: var(--text-main); background: rgba(255,255,255,.10); }
-        .payment-status-pill { color: var(--red); font-weight: 800; }
-        .payment-status-pill.ok { color: var(--green); }
+        .payment-status-pill { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; background: rgba(255,92,103,.12); color: var(--red); border: 1px solid rgba(255,92,103,.22); }
+        .payment-status-pill.ok { background: rgba(56,217,150,.10); color: var(--green); border-color: rgba(56,217,150,.22); }
         .stats-row { grid-template-columns: minmax(150px, 1.3fr) repeat(6, minmax(96px, 0.75fr)); min-width: 860px; }
         .payments-row { grid-template-columns: minmax(150px, 0.9fr) minmax(140px, 0.9fr) minmax(130px, 0.9fr) minmax(100px, 0.7fr) minmax(220px, 1.4fr); min-width: 850px; }
         .referrals-row { grid-template-columns: minmax(260px, 1.4fr) minmax(100px, 0.6fr) minmax(110px, 0.7fr) minmax(170px, 0.8fr); min-width: 760px; }
@@ -141,11 +144,7 @@
         .info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
         .info-item { min-width: 0; }
         .sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
-        .source-card { --source-accent: var(--brand-gold); padding: 14px; min-width: 0; overflow: hidden; border-color: color-mix(in srgb, var(--source-accent) 35%, var(--panel-border)); background: linear-gradient(160deg, color-mix(in srgb, var(--source-accent) 10%, transparent), var(--card-bg) 38%); }
-        .source-card:nth-child(4n+1) { --source-accent: var(--blue); }
-        .source-card:nth-child(4n+2) { --source-accent: var(--violet); }
-        .source-card:nth-child(4n+3) { --source-accent: var(--mint); }
-        .source-card:nth-child(4n+4) { --source-accent: var(--coral); }
+        .source-card { --source-accent: var(--brand-gold); padding: 14px; min-width: 0; overflow: hidden; border-color: rgba(255,199,0,.18); background: linear-gradient(160deg, rgba(255,199,0,.055), var(--card-bg) 40%); }
         .source-header { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 12px; }
         .source-title { min-width: 0; overflow: visible; overflow-wrap: anywhere; color: var(--source-accent); font-size: 20px; line-height: 1.1; font-weight: 800; }
         .source-actions { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
@@ -384,15 +383,15 @@
             {% if support_admin_is_full_admin %}
                 <button class="tab-btn active" data-tab="stats"><i class="fas fa-chart-line"></i><span>Аналитика</span></button>
             {% endif %}
-            <button class="tab-btn {% if not support_admin_is_full_admin %}active{% endif %}" data-tab="user-payments"><i class="fas fa-receipt"></i><span>Пользователь и платежи</span></button>
-            <button class="tab-btn" data-tab="referrals"><i class="fas fa-network-wired"></i><span>Реферальная сеть</span></button>
-            <button class="tab-btn" data-tab="payment-info"><i class="fas fa-credit-card"></i><span>Платеж по ID</span></button>
+            <button class="tab-btn {% if not support_admin_is_full_admin %}active{% endif %}" data-tab="user-payments"><i class="fas fa-receipt"></i><span>Клиент</span></button>
+            <button class="tab-btn" data-tab="referrals"><i class="fas fa-network-wired"></i><span>Рефералы</span></button>
+            <button class="tab-btn" data-tab="payment-info"><i class="fas fa-credit-card"></i><span>Найти платёж</span></button>
             {% if support_admin_is_full_admin %}
-                <button class="tab-btn" data-tab="subscription-manage"><i class="fas fa-hourglass-half"></i><span>Срок подписки</span></button>
-                <button class="tab-btn" data-tab="config-templates"><i class="fas fa-file-code"></i><span>Шаблоны конфигов</span></button>
+                <button class="tab-btn" data-tab="subscription-manage"><i class="fas fa-hourglass-half"></i><span>Подписка</span></button>
+                <button class="tab-btn" data-tab="config-templates"><i class="fas fa-file-code"></i><span>Конфиги</span></button>
             {% endif %}
-            <button class="tab-btn" data-tab="reply-templates"><i class="fas fa-comments"></i><span>Шаблоны ответов</span></button>
-            <button class="tab-btn" data-tab="support"><i class="fas fa-headset"></i><span>Поддержка</span></button>
+            <button class="tab-btn" data-tab="reply-templates"><i class="fas fa-comments"></i><span>Шаблоны</span></button>
+            <button class="tab-btn" data-tab="support"><i class="fas fa-headset"></i><span>Тикеты</span></button>
         </nav>
         <a href="{% url 'support_admin_logout' %}" class="logout"><i class="fas fa-right-from-bracket"></i><span>Выйти</span></a>
     </aside>
@@ -1634,10 +1633,10 @@
                                 </div>
                                 ${(result.history || []).map((item) => `
                                     <div class="admin-table-row user-payments-row">
-                                        <div class="cell-value wrap" title="${escapeHtml(item.id)}">${escapeHtml(item.id)}</div>
+                                        <div class="payment-id-cell" title="${escapeHtml(item.id)}">${escapeHtml(item.id)}</div>
                                         <div>${escapeHtml(item.date)}</div>
                                         <div>${escapeHtml(item.system)}</div>
-                                        <div class="cell-value wrap" title="${escapeHtml(item.tariff)}">${escapeHtml(item.tariff)}${item.trial ? ' · Trial' : ''}</div>
+                                        <div class="cell-value" title="${escapeHtml(item.tariff)}">${escapeHtml(item.tariff)}${item.trial ? ' · Trial' : ''}</div>
                                         <div>${escapeHtml(item.amount)} ${escapeHtml(item.currency)}</div>
                                         <div><span class="payment-status-pill ${item.success ? 'ok' : ''}">${item.success ? 'Успешен' : 'Ошибка'}</span></div>
                                     </div>
@@ -1715,10 +1714,10 @@
                 </div>
                 ${payments.map((payment) => `
                     <div class="admin-table-row payments-list-row">
-                        <div class="cell-value wrap" title="${escapeHtml(payment.id)}">${escapeHtml(payment.id)}</div>
+                        <div class="payment-id-cell" title="${escapeHtml(payment.id)}">${escapeHtml(payment.id)}</div>
                         <div>${escapeHtml(payment.date)}</div>
-                        <div class="cell-value wrap" title="${escapeHtml(payment.user)}">${escapeHtml(payment.user)}</div>
-                        <div class="cell-value wrap" title="${escapeHtml(payment.tariff)}">${escapeHtml(payment.tariff)}</div>
+                        <div class="cell-value" title="${escapeHtml(payment.user)}">${escapeHtml(payment.user)}</div>
+                        <div class="cell-value" title="${escapeHtml(payment.tariff)}">${escapeHtml(payment.tariff)}</div>
                         <div>${escapeHtml(payment.amount)} ${escapeHtml(payment.currency)}</div>
                         <div><span class="payment-status-pill ${payment.success ? 'ok' : ''}">${escapeHtml(payment.status)}</span></div>
                     </div>
