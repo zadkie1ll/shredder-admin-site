@@ -32,8 +32,8 @@ def save_wata_invoice(
             ),
             order_id=invoice_json["orderId"],
             description=invoice_json["description"],
-            success_redirect_url=invoice_json["successRedirectUrl"],
-            fail_redirect_url=invoice_json["failRedirectUrl"],
+            success_redirect_url=invoice_json.get("successRedirectUrl"),
+            fail_redirect_url=invoice_json.get("failRedirectUrl"),
             expiration_datetime=datetime.fromisoformat(
                 invoice_json["expirationDateTime"].replace("Z", "+00:00")
             ),

@@ -1869,6 +1869,7 @@ def dashboard(request):
             "support_open_count": support_open_count,
             "support_status_open": SupportTicketStatus.OPEN,
             "support_sender_user": SupportTicketMessageSender.USER,
+            "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
             "referral_link": f"https://t.me/{tg_bot}?start=a{user.username}",
             "site_referral_link": f"{get_current_base_url(request)}/?a={user.username}",
         },
@@ -3648,6 +3649,9 @@ def pay(request):
         capture_tracking_params(request)
         email_raw = request.POST.get("email")
         tariff_id = request.POST.get("tariff_id")
+        raw_purchase_token = None
+        use_permanent_purchase_link = False
+        payment_status_url = None
         tracking_params = get_tracking_params(request)
         tracking_cookies = {
             key: request.COOKIES.get(f"tracking_{key}") for key in TRACKING_PARAM_KEYS
@@ -3915,8 +3919,12 @@ def pay(request):
 
         except Exception as e:
             db_session.rollback()
-            logging.error(f"Pay error: {e}")
+            logging.exception("Pay error")
             messages.error(request, "Ошибка платежной системы")
+            if use_permanent_purchase_link and payment_status_url:
+                return redirect(
+                    append_query_params(payment_status_url, {"result": "failed"})
+                )
             return redirect("dashboard")
         finally:
             db_session.close()

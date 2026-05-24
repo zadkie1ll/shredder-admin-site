@@ -73,7 +73,7 @@ def create_wata_payment_sync(
     }
 
     payload = {
-        "amount": f"{tariff.price}.00",
+        "amount": float(tariff.price),
         "currency": "RUB",
         "description": tariff.description,
         "orderId": str(uuid4()),

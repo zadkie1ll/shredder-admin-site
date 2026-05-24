@@ -1727,176 +1727,40 @@
             </div>
 
             <div id="tab-support" class="tab-content">
-                <header class="mb-10 mobile-compact-header">
-                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Поддержка</h1>
-                    {% if support_ticket %}
-                        <p class="text-gray-500 text-sm md:text-base font-bold">
-                            Тикет #{{ support_ticket.id }}
-                            {% if support_ticket.status == support_status_open %}
-                                <span class="text-[#00ff88]">— открыт</span>
-                            {% else %}
-                                <span class="text-gray-400">— закрыт</span>
-                            {% endif %}
-                        </p>
-                    {% else %}
-                        <p class="text-gray-500 text-sm md:text-base font-bold">Напиши нам прямо здесь, без перехода в Telegram</p>
-                    {% endif %}
+                <header class="mb-8 mobile-compact-header">
+                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-3">Поддержка</h1>
+                    <p class="text-gray-500 text-sm md:text-base font-bold max-w-2xl">
+                        Напишите нам в Telegram, мы поможем с оплатой, подключением и настройкой устройств.
+                    </p>
                 </header>
-                <div class="overview-grid space-y-7">
-                    <section class="setup-shell support-chat-card">
-                        <div class="flex items-center justify-between gap-4 mb-5">
-                            <div>
-                                <h2 class="text-2xl font-black mb-1">
-                                    {% if support_ticket %}
-                                        {{ support_ticket.subject }}
-                                    {% else %}
-                                        Новое обращение
-                                    {% endif %}
-                                </h2>
-                                <p class="text-gray-500 text-sm font-bold">
-                                    {% if support_ticket and support_ticket.status == support_status_open %}
-                                        Мы ответим в этом чате. Страница сама сохранит историю.
-                                    {% elif support_ticket %}
-                                        Этот тикет закрыт. Можно создать новое обращение ниже.
-                                    {% else %}
-                                        Опиши проблему: подключение, оплата, приложение или устройство.
-                                    {% endif %}
-                                </p>
-                            </div>
-                            {% if support_ticket and support_ticket.status == support_status_open %}
-                                <form method="post" action="{% url 'close_support_ticket' support_ticket.id %}">
-                                    {% csrf_token %}
-                                    <button type="submit" class="border border-red-400/25 bg-red-400/10 text-red-200 px-4 py-3 rounded-xl text-[10px] font-black uppercase hover:bg-red-400/15 transition-colors whitespace-nowrap">
-                                        Закрыть
-                                    </button>
-                                </form>
-                            {% endif %}
-                        </div>
-
-                        {% if support_ticket %}
-                            <div class="support-chat-scroll space-y-4 pr-1 mb-5" id="support-chat-scroll">
-                                {% for message in support_messages %}
-                                    <div class="support-message {% if message.sender_type == support_sender_user %}support-message-user{% else %}support-message-support{% endif %}">
-                                        <div class="flex items-center justify-between gap-3 mb-2">
-                                            <span class="text-[10px] font-black uppercase tracking-widest {% if message.sender_type == support_sender_user %}text-[#ffc700]{% else %}text-[#00ff88]{% endif %}">
-                                                {% if message.sender_type == support_sender_user %}Вы{% else %}Поддержка{% endif %}
-                                            </span>
-                                            <span class="text-[10px] text-gray-500 font-bold">{{ message.created_at|date:"d.m H:i" }}</span>
-                                        </div>
-                                        <p class="text-sm text-white/90 font-bold leading-relaxed whitespace-pre-wrap">{{ message.message }}</p>
-                                        {% if message.attachments %}
-                                            <div class="support-attachment-grid">
-                                                {% for attachment in message.attachments %}
-                                                    <a href="{% url 'support_attachment' attachment.id %}" target="_blank" class="support-attachment" title="{{ attachment.file_name }}">
-                                                        {% if attachment.is_image %}
-                                                            <img src="{% url 'support_attachment' attachment.id %}" alt="{{ attachment.file_name }}">
-                                                        {% elif attachment.is_video %}
-                                                            <video src="{% url 'support_attachment' attachment.id %}" controls preload="metadata"></video>
-                                                        {% else %}
-                                                            <div class="p-3 text-xs font-bold text-gray-300">
-                                                                <i class="fas fa-paperclip mr-2 text-[#ffc700]"></i>{{ attachment.file_name }}
-                                                            </div>
-                                                        {% endif %}
-                                                    </a>
-                                                {% endfor %}
-                                            </div>
-                                        {% endif %}
-                                    </div>
-                                {% empty %}
-                                    <div class="h-full min-h-[260px] flex flex-col items-center justify-center text-center text-gray-600">
-                                        <i class="far fa-comment-dots text-4xl mb-4"></i>
-                                        <p class="text-sm font-bold">Напишите сообщение, чтобы начать</p>
-                                    </div>
-                                {% endfor %}
-                            </div>
-                        {% else %}
-                            <div class="flex-1 min-h-[260px] flex flex-col items-center justify-center text-center text-gray-600 mb-5">
-                                <i class="far fa-comment-dots text-5xl mb-4"></i>
-                                <p class="text-sm font-bold">Первое сообщение создаст тикет поддержки</p>
-                            </div>
-                        {% endif %}
-
-                        {% if support_ticket and support_ticket.status == support_status_open %}
-                            <form method="post" action="{% url 'create_support_ticket_message' support_ticket.id %}" enctype="multipart/form-data" class="flex items-end gap-3" id="support-message-form" data-messages-url="{% url 'support_ticket_messages_json' support_ticket.id %}">
-                                {% csrf_token %}
-                                <textarea name="message" rows="1" required placeholder="Ваш ответ..." class="support-input flex-1 px-5 py-4 font-bold"></textarea>
-                                <label class="support-file-btn" title="Прикрепить скриншот или видео">
-                                    <input type="file" name="attachments" accept="image/*,video/*" multiple class="hidden">
-                                    <i class="fas fa-paperclip"></i>
-                                </label>
-                                <button type="submit" class="setup-cta-btn !w-auto !min-w-[58px] !h-[58px] !p-0 !mb-0 !mr-0" aria-label="Отправить">
-                                    <i class="far fa-paper-plane"></i>
-                                </button>
-                            </form>
-                        {% elif not support_ticket %}
-                            <form method="post" action="{% url 'create_support_ticket' %}" enctype="multipart/form-data" class="space-y-3" id="support-create-form">
-                                {% csrf_token %}
-                                <input type="text" name="subject" placeholder="Тема обращения" class="support-input w-full px-5 py-4 font-bold">
-                                <div class="flex items-end gap-3">
-                                    <textarea name="message" rows="2" required placeholder="Опишите проблему..." class="support-input flex-1 px-5 py-4 font-bold"></textarea>
-                                    <label class="support-file-btn" title="Прикрепить скриншот или видео">
-                                        <input type="file" name="attachments" accept="image/*,video/*" multiple class="hidden">
-                                        <i class="fas fa-paperclip"></i>
-                                    </label>
-                                    <button type="submit" class="setup-cta-btn !w-auto !min-w-[58px] !h-[58px] !p-0 !mb-0 !mr-0" aria-label="Отправить">
-                                        <i class="far fa-paper-plane"></i>
-                                    </button>
-                                </div>
-                            </form>
-                        {% endif %}
-                    </section>
-
-                    {% if support_ticket and support_ticket.status != support_status_open %}
-                        <section class="setup-shell">
-                            <div class="flex items-start gap-5 mb-6">
-                                <div class="w-14 h-14 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
-                                    <i class="far fa-comment-dots text-xl"></i>
-                                </div>
-                                <div>
-                                    <h2 class="text-2xl font-black mb-2">Новое обращение</h2>
-                                    <p class="text-gray-500 text-sm font-bold leading-relaxed">Если вопрос остался или появилась новая проблема, создай отдельный тикет.</p>
-                                </div>
-                            </div>
-                            <form method="post" action="{% url 'create_support_ticket' %}" enctype="multipart/form-data" class="space-y-3" id="support-create-form">
-                                {% csrf_token %}
-                                <input type="text" name="subject" placeholder="Тема обращения" class="support-input w-full px-5 py-4 font-bold">
-                                <div class="flex items-end gap-3">
-                                    <textarea name="message" rows="2" required placeholder="Опишите проблему..." class="support-input flex-1 px-5 py-4 font-bold"></textarea>
-                                    <label class="support-file-btn" title="Прикрепить скриншот или видео">
-                                        <input type="file" name="attachments" accept="image/*,video/*" multiple class="hidden">
-                                        <i class="fas fa-paperclip"></i>
-                                    </label>
-                                    <button type="submit" class="setup-cta-btn !w-auto !min-w-[58px] !h-[58px] !p-0 !mb-0 !mr-0" aria-label="Отправить">
-                                        <i class="far fa-paper-plane"></i>
-                                    </button>
-                                </div>
-                            </form>
-                        </section>
+                <section class="setup-shell max-w-2xl">
+                    <div class="w-16 h-16 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-5">
+                        <i class="fab fa-telegram-plane text-2xl"></i>
+                    </div>
+                    <h2 class="text-2xl md:text-3xl font-black mb-3">Поддержка в Telegram</h2>
+                    <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-xl mb-7">
+                        Откройте бота поддержки и напишите нам. Обычно отвечаем быстрее всего именно там.
+                    </p>
+                    <a href="{{ support_telegram_url }}" target="_blank" rel="noopener" class="setup-cta-btn !w-auto !mb-0 !mr-0 px-10">
+                        <i class="fab fa-telegram-plane mr-2"></i>
+                        Написать в поддержку
+                    </a>
+                </section>
+                <div class="hidden" data-support-ticket-ui-hidden>
+                    {% if support_ticket and support_ticket.status == support_status_open %}
+                        <form method="post" action="{% url 'create_support_ticket_message' support_ticket.id %}" enctype="multipart/form-data" id="support-message-form" data-messages-url="{% url 'support_ticket_messages_json' support_ticket.id %}">
+                            {% csrf_token %}
+                            <textarea name="message" rows="1" required placeholder="Ваш ответ..." class="support-input"></textarea>
+                            <input type="file" name="attachments" accept="image/*,video/*" multiple>
+                        </form>
+                    {% else %}
+                        <form method="post" action="{% url 'create_support_ticket' %}" enctype="multipart/form-data" id="support-create-form">
+                            {% csrf_token %}
+                            <input type="text" name="subject" placeholder="Тема обращения" class="support-input">
+                            <textarea name="message" rows="2" required placeholder="Опишите проблему..." class="support-input"></textarea>
+                            <input type="file" name="attachments" accept="image/*,video/*" multiple>
+                        </form>
                     {% endif %}
-
-                    <section class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                        <button type="button" onclick="showTab('setup')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
-                            <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
-                                <i class="fas fa-bolt text-lg"></i>
-                            </div>
-                            <h3 class="text-lg font-black mb-2">Подключение</h3>
-                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Поможем добавить подписку в приложение</p>
-                        </button>
-                        <button type="button" onclick="showTariffs()" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
-                            <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
-                                <i class="fas fa-credit-card text-lg"></i>
-                            </div>
-                            <h3 class="text-lg font-black mb-2">Оплата</h3>
-                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Разберемся с продлением и платежами</p>
-                        </button>
-                        <button type="button" onclick="showTab('setup')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
-                            <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
-                                <i class="fas fa-mobile-alt text-lg"></i>
-                            </div>
-                            <h3 class="text-lg font-black mb-2">Устройства</h3>
-                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Подскажем клиент для телефона, ПК или ТВ</p>
-                        </button>
-                    </section>
                 </div>
             </div>
 
