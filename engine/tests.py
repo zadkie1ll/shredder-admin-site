@@ -13,6 +13,7 @@ from engine.payments import create_yk_payment_sync
 from engine.views import auth_by_telegram_widget
 from engine.views import get_telegram_auth_bot
 from engine.views import render_login
+from engine.views import should_send_payment_login_email
 from engine.views import verify_telegram_widget_auth
 
 
@@ -134,6 +135,22 @@ class TelegramAuthBotTests(SimpleTestCase):
 
 
 class PaymentRedirectTests(SimpleTestCase):
+    def test_authenticated_payment_does_not_send_login_email(self):
+        request = SimpleNamespace(
+            user=SimpleNamespace(is_authenticated=True, id=42),
+        )
+        payment_user = SimpleNamespace(id=42)
+
+        self.assertFalse(should_send_payment_login_email(request, payment_user))
+
+    def test_anonymous_payment_sends_login_email(self):
+        request = SimpleNamespace(
+            user=SimpleNamespace(is_authenticated=False, id=None),
+        )
+        payment_user = SimpleNamespace(id=42)
+
+        self.assertTrue(should_send_payment_login_email(request, payment_user))
+
     def test_yookassa_payment_uses_return_url(self):
         tariff = SimpleNamespace(
             price=100,

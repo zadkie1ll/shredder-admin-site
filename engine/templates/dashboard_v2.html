@@ -191,14 +191,11 @@
             }
 
             .nav-mobile .nav-btn span {
-                display: none;
+                display: block;
                 max-width: 100%;
                 overflow: hidden;
                 text-overflow: ellipsis;
-            }
-
-            .nav-mobile .nav-btn.active span {
-                display: block;
+                font-size: 9px;
             }
         }
 
@@ -1414,16 +1411,18 @@
                                                 <span class="text-white">не подключено</span>
                                             {% endif %}
                                         </div>
-                                        <div class="flex flex-wrap items-center gap-3">
-                                            <button type="button" onclick="showTab('profile')" class="text-[#ffc700] text-xs font-bold hover:text-white transition-colors">
+                                        <div class="flex flex-col gap-2">
+                                            <button type="button" onclick="showTab('profile')" class="text-[#ffc700] text-xs font-bold hover:text-white transition-colors self-start">
                                                 +40 дней за друга
                                             </button>
-                                            <button type="button" onclick="showTab('profile')" class="bg-white/10 hover:bg-white/15 border border-white/10 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all">
-                                                Подробнее
-                                            </button>
-                                            <button type="button" onclick="showTab('setup')" class="bg-[#ffc700]/10 hover:bg-[#ffc700]/20 border border-[#ffc700]/30 text-[#ffc700] px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">
-                                                <i class="fas fa-bolt mr-1"></i>Подключиться
-                                            </button>
+                                            <div class="flex items-center gap-3">
+                                                <button type="button" onclick="showTab('profile')" class="bg-white/10 hover:bg-white/15 border border-white/10 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all">
+                                                    Подробнее
+                                                </button>
+                                                <button type="button" onclick="showTab('setup')" class="bg-[#ffc700]/10 hover:bg-[#ffc700]/20 border border-[#ffc700]/30 text-[#ffc700] px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">
+                                                    <i class="fas fa-bolt mr-1"></i>Подключиться
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

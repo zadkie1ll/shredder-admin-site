@@ -3649,6 +3649,13 @@ def logout(request):
     return redirect("index")
 
 
+def should_send_payment_login_email(request, user):
+    return not (
+        request.user.is_authenticated
+        and str(request.user.id) == str(user.id)
+    )
+
+
 def pay(request):
     if request.method == "POST":
         capture_tracking_params(request)
@@ -3657,6 +3664,7 @@ def pay(request):
         raw_purchase_token = None
         use_permanent_purchase_link = False
         payment_status_url = None
+        is_authenticated_payment = False
         tracking_params = get_tracking_params(request)
         tracking_cookies = {
             key: request.COOKIES.get(f"tracking_{key}") for key in TRACKING_PARAM_KEYS
@@ -3891,28 +3899,37 @@ def pay(request):
                 tariff.db_tariff_id,
             )
 
-            try:
-                send_magic_link_email(
-                    email,
-                    login_link,
-                    subject=email_subject,
-                    template_context={
-                        "title": email_title,
-                        "intro": email_intro,
-                        "note": login_link_note,
-                        "button_text": email_button_text,
-                        "footer": email_footer,
-                    },
-                )
+            if not should_send_payment_login_email(request, user):
                 logging.info(
-                    "payment login email sent: email=%s user_id=%s tariff_id=%s permanent_link=%s",
+                    "payment login email skipped for authenticated user: "
+                    "email=%s user_id=%s tariff_id=%s",
                     email,
                     user.id,
                     tariff.db_tariff_id,
-                    use_permanent_purchase_link,
                 )
-            except Exception as e:
-                logging.exception(f"failed to send payment magic link to {email}: {e}")
+            else:
+                try:
+                    send_magic_link_email(
+                        email,
+                        login_link,
+                        subject=email_subject,
+                        template_context={
+                            "title": email_title,
+                            "intro": email_intro,
+                            "note": login_link_note,
+                            "button_text": email_button_text,
+                            "footer": email_footer,
+                        },
+                    )
+                    logging.info(
+                        "payment login email sent: email=%s user_id=%s tariff_id=%s permanent_link=%s",
+                        email,
+                        user.id,
+                        tariff.db_tariff_id,
+                        use_permanent_purchase_link,
+                    )
+                except Exception as e:
+                    logging.exception(f"failed to send payment magic link to {email}: {e}")
 
             logging.info(
                 "payment redirecting to confirmation_url: email=%s user_id=%s tariff_id=%s",
