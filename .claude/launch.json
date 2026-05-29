@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "monkey-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["/tmp/serve_monkey.py"],
+      "port": 7788
+    }
+  ]
+}

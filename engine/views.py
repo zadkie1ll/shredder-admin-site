@@ -2770,11 +2770,34 @@ def support_admin_api_user_payments(request):
 def build_admin_interval_stats(db_session, start_date, end_date):
     start_datetime = datetime.combine(start_date, time.min)
     end_datetime = datetime.combine(end_date, time.max)
-    events = (
-        db_session.query(EventLog.user_id, EventLog.event_payload)
+
+    first_subscription_events = (
+        db_session.query(
+            EventLog.user_id.label("user_id"),
+            EventLog.event_payload.label("event_payload"),
+            EventLog.timestamp.label("timestamp"),
+            func.row_number()
+            .over(
+                partition_by=EventLog.user_id,
+                order_by=(EventLog.timestamp, EventLog.id),
+            )
+            .label("row_number"),
+        )
         .filter(EventLog.event_type == "subscription_created")
-        .filter(EventLog.timestamp >= start_datetime)
-        .filter(EventLog.timestamp <= end_datetime)
+        .subquery()
+    )
+
+    # Берем только первое создание подписки на пользователя.
+    # При merge/site/magic-link сценариях повторные subscription_created не должны
+    # превращать старого пользователя в новую регистрацию выбранного периода.
+    events = (
+        db_session.query(
+            first_subscription_events.c.user_id,
+            first_subscription_events.c.event_payload,
+        )
+        .filter(first_subscription_events.c.row_number == 1)
+        .filter(first_subscription_events.c.timestamp >= start_datetime)
+        .filter(first_subscription_events.c.timestamp <= end_datetime)
         .all()
     )
     user_ids_by_traffic = {}
@@ -2819,18 +2842,43 @@ def build_admin_interval_stats(db_session, start_date, end_date):
         if not user_ids:
             continue
 
+        # В legacy-данных у пользователя могут быть платежи старше первого
+        # subscription_created в event_logs. Они не относятся к этой когорте.
+        traffic_source_subscription_events = (
+            db_session.query(
+                first_subscription_events.c.user_id,
+                first_subscription_events.c.timestamp,
+            )
+            .filter(first_subscription_events.c.row_number == 1)
+            .filter(first_subscription_events.c.user_id.in_(user_ids))
+            .subquery()
+        )
+        # YooKassa: captured_at точнее created_at, но у старых записей может быть пустым.
+        yk_payment_time = func.coalesce(YkPayment.captured_at, YkPayment.created_at)
+
         yk_rows = (
             db_session.query(YkPayment.subscription_period, func.count(YkPayment.id))
+            .join(
+                traffic_source_subscription_events,
+                traffic_source_subscription_events.c.user_id == YkPayment.user_id,
+            )
             .filter(YkPayment.status == "succeeded")
-            .filter(YkPayment.user_id.in_(user_ids))
+            .filter(yk_payment_time >= traffic_source_subscription_events.c.timestamp)
             .group_by(YkPayment.subscription_period)
             .all()
         )
         wata_rows = (
             db_session.query(WataInvoice.tariff_id, func.count(WataTransaction.id))
             .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .join(
+                traffic_source_subscription_events,
+                traffic_source_subscription_events.c.user_id == WataInvoice.user_id,
+            )
             .filter(WataTransaction.transaction_status == "Paid")
-            .filter(WataInvoice.user_id.in_(user_ids))
+            .filter(
+                WataTransaction.payment_time
+                >= traffic_source_subscription_events.c.timestamp
+            )
             .group_by(WataInvoice.tariff_id)
             .all()
         )
@@ -2844,8 +2892,12 @@ def build_admin_interval_stats(db_session, start_date, end_date):
         yk_payers = {
             row[0]
             for row in db_session.query(YkPayment.user_id)
+            .join(
+                traffic_source_subscription_events,
+                traffic_source_subscription_events.c.user_id == YkPayment.user_id,
+            )
             .filter(YkPayment.status == "succeeded")
-            .filter(YkPayment.user_id.in_(user_ids))
+            .filter(yk_payment_time >= traffic_source_subscription_events.c.timestamp)
             .distinct()
             .all()
         }
@@ -2853,8 +2905,15 @@ def build_admin_interval_stats(db_session, start_date, end_date):
             row[0]
             for row in db_session.query(WataInvoice.user_id)
             .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .join(
+                traffic_source_subscription_events,
+                traffic_source_subscription_events.c.user_id == WataInvoice.user_id,
+            )
             .filter(WataTransaction.transaction_status == "Paid")
-            .filter(WataInvoice.user_id.in_(user_ids))
+            .filter(
+                WataTransaction.payment_time
+                >= traffic_source_subscription_events.c.timestamp
+            )
             .distinct()
             .all()
         }
@@ -2991,22 +3050,43 @@ def support_admin_api_stats_source_users(request):
     end_datetime = datetime.combine(end_date, time.max)
     db_session = session_factory()
     try:
-        query = (
+        first_subscription_events = (
             db_session.query(
-                EventLog.user_id,
-                func.max(EventLog.timestamp).label("last_seen"),
+                EventLog.user_id.label("user_id"),
+                EventLog.event_payload.label("event_payload"),
+                EventLog.timestamp.label("timestamp"),
+                func.row_number()
+                .over(
+                    partition_by=EventLog.user_id,
+                    order_by=(EventLog.timestamp, EventLog.id),
+                )
+                .label("row_number"),
             )
             .filter(EventLog.event_type == "subscription_created")
-            .filter(EventLog.timestamp >= start_datetime)
-            .filter(EventLog.timestamp <= end_datetime)
+            .subquery()
+        )
+
+        query = (
+            db_session.query(
+                first_subscription_events.c.user_id,
+                first_subscription_events.c.timestamp.label("last_seen"),
+            )
+            .filter(first_subscription_events.c.row_number == 1)
+            .filter(first_subscription_events.c.timestamp >= start_datetime)
+            .filter(first_subscription_events.c.timestamp <= end_datetime)
         )
         if traffic_source is None:
-            query = query.filter(EventLog.event_payload["traffic_source"].astext.is_(None))
+            query = query.filter(
+                first_subscription_events.c.event_payload[
+                    "traffic_source"
+                ].astext.is_(None)
+            )
         else:
             query = query.filter(
-                EventLog.event_payload["traffic_source"].astext == str(traffic_source)
+                first_subscription_events.c.event_payload["traffic_source"].astext
+                == str(traffic_source)
             )
-        query = query.group_by(EventLog.user_id).order_by(func.max(EventLog.timestamp).desc())
+        query = query.order_by(first_subscription_events.c.timestamp.desc())
         total = query.count()
         rows = query.offset((page - 1) * per_page).limit(per_page).all()
         user_ids = [row.user_id for row in rows]
@@ -3014,11 +3094,28 @@ def support_admin_api_stats_source_users(request):
             user.id: user
             for user in db_session.query(User).filter(User.id.in_(user_ids or {-1})).all()
         }
+
+        page_subscription_events = (
+            db_session.query(
+                first_subscription_events.c.user_id,
+                first_subscription_events.c.timestamp,
+            )
+            .filter(first_subscription_events.c.row_number == 1)
+            .filter(first_subscription_events.c.user_id.in_(user_ids or {-1}))
+            .subquery()
+        )
+        # В списке пользователей источник должен совпадать со сводкой:
+        # платежи старше первого subscription_created не считаются оплатой когорты.
+        yk_payment_time = func.coalesce(YkPayment.captured_at, YkPayment.created_at)
         yk_paying_user_ids = {
             row[0]
             for row in db_session.query(YkPayment.user_id)
+            .join(
+                page_subscription_events,
+                page_subscription_events.c.user_id == YkPayment.user_id,
+            )
             .filter(YkPayment.status == "succeeded")
-            .filter(YkPayment.user_id.in_(user_ids or {-1}))
+            .filter(yk_payment_time >= page_subscription_events.c.timestamp)
             .distinct()
             .all()
         }
@@ -3026,8 +3123,12 @@ def support_admin_api_stats_source_users(request):
             row[0]
             for row in db_session.query(WataInvoice.user_id)
             .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .join(
+                page_subscription_events,
+                page_subscription_events.c.user_id == WataInvoice.user_id,
+            )
             .filter(WataTransaction.transaction_status == "Paid")
-            .filter(WataInvoice.user_id.in_(user_ids or {-1}))
+            .filter(WataTransaction.payment_time >= page_subscription_events.c.timestamp)
             .distinct()
             .all()
         }
