@@ -157,6 +157,11 @@ urlpatterns = [
         name="payment_status",
     ),
     path(
+        "payment/retry/<str:token>/",
+        views.payment_retry,
+        name="payment_retry",
+    ),
+    path(
         "payment/status/<str:token>/json/",
         views.payment_status_json,
         name="payment_status_json",

@@ -401,15 +401,15 @@
         }
 
         .payment-cta {
-            background: linear-gradient(135deg, #ff4fb8, #9b5cff) !important;
+            background: linear-gradient(135deg, #ff6b00, #ff9500) !important;
             color: #ffffff !important;
-            border: 1px solid rgba(255, 79, 184, .62) !important;
-            box-shadow: 0 16px 34px rgba(255, 79, 184, .24), inset 0 -2px 0 rgba(0,0,0,.18) !important;
+            border: 1px solid rgba(255, 107, 0, .5) !important;
+            box-shadow: 0 18px 38px rgba(255, 107, 0, .28), inset 0 -2px 0 rgba(0,0,0,.18) !important;
         }
 
         .payment-cta:hover {
-            filter: brightness(1.04);
-            box-shadow: 0 20px 42px rgba(255, 79, 184, .36), inset 0 -2px 0 rgba(0,0,0,.18) !important;
+            background: linear-gradient(135deg, #ff7d1a, #ffa520) !important;
+            box-shadow: 0 22px 48px rgba(255, 107, 0, .42), inset 0 -2px 0 rgba(0,0,0,.18) !important;
         }
 
         .overview-grid {
@@ -1841,7 +1841,7 @@
                             </div>
                         </div>
 
-                        <form method="POST" action="/pay/" target="_blank" class="mt-6">
+                        <form method="POST" action="/pay/" class="mt-6">
                             {% csrf_token %}
                             <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
                             <input type="hidden" name="email" value="{{ user.email }}">

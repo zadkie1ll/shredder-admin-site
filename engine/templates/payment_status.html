@@ -423,6 +423,9 @@
         /* ── Скрывать login-action не в succeeded ── */
         .status-shell[data-status="pending"]   .login-action { display: none; }
         .status-shell[data-status="failed"]    .login-action { display: none; }
+        .payment-action { display: none; }
+        .status-shell[data-status="pending"] .payment-action { display: inline-flex; }
+        .payment-action[href=""] { display: none !important; }
 
         /* ── Мобильная адаптация ── */
         @media (max-width: 520px) {
@@ -501,6 +504,9 @@
             <a class="btn btn-primary login-action" id="login-action" href="{{ login_url }}">
                 Перейти в личный кабинет
             </a>
+            <a class="btn btn-primary payment-action" id="payment-action" href="{{ payment_url }}">
+                Вернуться к оплате
+            </a>
             <a class="btn btn-secondary" href="{{ support_telegram_url }}" target="_blank" rel="noopener">
                 <svg class="support-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="M4 13a8 8 0 0 1 16 0" stroke-width="2" stroke-linecap="round"/>
@@ -518,8 +524,9 @@
         const title       = document.getElementById('status-title');
         const orbEmoji    = document.getElementById('orb-emoji');
         const loginAction = document.getElementById('login-action');
+        const paymentAction = document.getElementById('payment-action');
         const failedCopy  = document.getElementById('failed-copy');
-        const statusApiUrl = '{{ status_api_url|escapejs }}';
+        const statusApiUrl = '{{ status_api_url|default:""|escapejs }}';
 
         function applyStatus(payload) {
             const status = payload.status || 'pending';
@@ -548,6 +555,9 @@
 
             title.textContent = 'Проверяем платеж';
             orbEmoji.textContent = '⏳';
+            if (payload.payment_url) {
+                paymentAction.href = payload.payment_url;
+            }
             return false;
         }
 
@@ -570,8 +580,11 @@
             status:    '{{ initial_status|escapejs }}',
             message:   '{{ initial_message|escapejs }}',
             login_url: '{{ login_url|escapejs }}',
+            payment_url: '{{ payment_url|escapejs }}',
         });
-        pollStatus();
+        if (statusApiUrl) {
+            pollStatus();
+        }
     </script>
 </body>
 </html>

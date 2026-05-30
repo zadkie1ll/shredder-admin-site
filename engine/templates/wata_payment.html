@@ -1,0 +1,260 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffc700">
+    <title>Оплата — Monkey Island</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap');
+
+        :root {
+            --bg: #0a0a0a;
+            --panel: #171717;
+            --panel-inner: #222222;
+            --ink: #ffffff;
+            --muted: #9ca3af;
+            --line: #2a2a2a;
+            --gold: #ffc700;
+            --reef: #2ec4b6;
+            --red: #ff6b6b;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            min-height: 100dvh;
+            padding: 10px;
+            background:
+                linear-gradient(180deg, rgba(0,0,0,0.58), rgba(0,0,0,0.9)),
+                url("{% static 'img/header-monkey-island.png' %}") center / cover no-repeat,
+                var(--bg);
+            color: var(--ink);
+            font-family: 'Montserrat', ui-sans-serif, system-ui, -apple-system, sans-serif;
+        }
+
+        a { color: inherit; text-decoration: none; }
+
+        .payment-shell {
+            width: min(560px, calc(100vw - 20px));
+            min-height: calc(100dvh - 20px);
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            padding: 14px;
+            border: 1px solid var(--line);
+            border-radius: 16px;
+            background: rgba(23, 23, 23, 0.96);
+            box-shadow: 0 24px 55px rgba(0,0,0,0.55);
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .brand img {
+            width: 34px;
+            height: 34px;
+            border-radius: 10px;
+            object-fit: cover;
+            border: 1px solid rgba(255,199,0,0.35);
+        }
+
+        .brand-title {
+            color: var(--gold);
+            font-size: 18px;
+            line-height: 1.12;
+            font-weight: 900;
+            text-transform: uppercase;
+        }
+
+        .payment-topline {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-wrap: wrap;
+            gap: 14px;
+            margin-bottom: 10px;
+        }
+
+        .payment-title {
+            margin: 0;
+            font-size: 18px;
+            line-height: 1.15;
+            font-weight: 900;
+        }
+
+        .payment-price {
+            color: var(--gold);
+            font-size: 18px;
+            line-height: 1;
+            font-weight: 900;
+            white-space: nowrap;
+        }
+
+        .payment-subtitle {
+            margin: 0 0 10px;
+            color: var(--muted);
+            font-size: 12px;
+            line-height: 1.35;
+            font-weight: 700;
+        }
+
+        .payment-frame-wrap {
+            flex: 1 1 auto;
+            min-height: 720px;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: var(--panel-inner);
+        }
+
+        .payment-frame {
+            width: 100%;
+            height: 100%;
+            min-height: 720px;
+            display: block;
+            border: 0;
+            background: #ffffff;
+        }
+
+        .actions {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .btn {
+            min-height: 48px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 13px 16px;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            background: var(--panel-inner);
+            color: var(--ink);
+            font-size: 12px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            transition: transform 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+            cursor: pointer;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255,199,0,0.45);
+            background: rgba(255,199,0,0.06);
+        }
+
+        .btn-primary {
+            border-color: transparent;
+            color: #000;
+            background: var(--gold);
+            box-shadow: 0 16px 36px rgba(255,199,0,0.18), inset 0 -2px 0 rgba(0,0,0,0.14);
+        }
+
+        .btn-primary:hover {
+            border-color: transparent;
+            background: #e6b400;
+        }
+
+        .support-note {
+            margin: 8px 0 0;
+            color: var(--muted);
+            font-size: 11px;
+            line-height: 1.55;
+            font-weight: 600;
+            text-align: center;
+        }
+
+        .support-note a {
+            color: var(--gold);
+            font-weight: 900;
+        }
+
+        @media (max-width: 520px) {
+            body { padding: 8px; }
+            .payment-shell {
+                width: calc(100vw - 16px);
+                min-height: calc(100dvh - 16px);
+                padding: 12px;
+                border-radius: 14px;
+            }
+            .brand img { width: 30px; height: 30px; }
+            .brand-title { font-size: 16px; }
+            .payment-title { font-size: 15px; }
+            .payment-price { font-size: 15px; }
+            .payment-subtitle { font-size: 11px; }
+            .payment-frame-wrap,
+            .payment-frame { min-height: 680px; }
+        }
+
+        @media (min-height: 900px) {
+            .payment-frame-wrap,
+            .payment-frame { min-height: 760px; }
+        }
+    </style>
+</head>
+<body>
+    <main class="payment-shell">
+        <div class="brand">
+            <img src="{% static 'icons/icon-192x192.png' %}" alt="Monkey Island">
+            <div class="brand-title">Monkey Island</div>
+        </div>
+
+        <div class="payment-topline">
+            <h1 class="payment-title">{{ tariff_description }}</h1>
+            <div class="payment-price">{{ tariff_price }} ₽</div>
+        </div>
+        <p class="payment-subtitle">Оплата проходит прямо здесь. После подтверждения откроем проверку статуса.</p>
+
+        <div class="payment-frame-wrap">
+            <iframe
+                class="payment-frame"
+                id="payment-frame"
+                src="{{ wata_payment_url }}"
+                title="Форма оплаты Wata"
+                allow="payment *"
+            ></iframe>
+        </div>
+
+        <div class="actions">
+            {% if payment_status_url %}
+                <a class="btn btn-secondary" href="{{ payment_status_url }}">Я оплатил, проверить статус</a>
+            {% endif %}
+        </div>
+        <p class="support-note">
+            Если форма не загрузилась или оплата зависла, <a href="{{ support_telegram_url }}" target="_blank" rel="noopener">напишите в поддержку</a>.
+        </p>
+    </main>
+
+    <script>
+        const frame = document.getElementById('payment-frame');
+
+        function followStatusRedirect() {
+            try {
+                const href = frame.contentWindow.location.href;
+                if (href && href.startsWith(window.location.origin + '/payment/status/')) {
+                    window.location.href = href;
+                }
+            } catch (err) {
+                return;
+            }
+        }
+
+        frame.addEventListener('load', followStatusRedirect);
+        window.setInterval(followStatusRedirect, 1000);
+    </script>
+</body>
+</html>

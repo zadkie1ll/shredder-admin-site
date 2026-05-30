@@ -827,7 +827,7 @@
                                 {% endif %}
                             </div>
                         </div>
-                        <form action="/pay/" method="POST" class="pay-form" target="_blank">
+                        <form action="/pay/" method="POST" class="pay-form">
                             {% csrf_token %}
                             <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
                             <input type="hidden" name="login_link_kind" value="purchase_permanent">

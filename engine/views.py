@@ -850,6 +850,10 @@ def build_payment_status_url(request, token):
     return f"{get_current_base_url(request)}{reverse('payment_status', args=[token])}"
 
 
+def build_payment_retry_url(request, token):
+    return f"{get_current_base_url(request)}{reverse('payment_retry', args=[token])}"
+
+
 def create_purchase_login_link(db_session, request, user):
     raw_token = create_purchase_login_token(db_session, user)
     return build_purchase_login_link(request, raw_token)
@@ -1463,6 +1467,22 @@ def is_wata_invoice_expired(invoice):
     return datetime.now(timezone.utc) > expires_at
 
 
+def get_purchase_wata_invoice(db_session, login_token):
+    started_at = login_token.created_at - timedelta(minutes=5)
+    wata_filters = [WataInvoice.user_id == login_token.user_id]
+    if login_token.payment_gateway == "wata" and login_token.payment_reference:
+        wata_filters.append(WataInvoice.order_id == login_token.payment_reference)
+    else:
+        wata_filters.append(WataInvoice.creation_time >= started_at)
+
+    return (
+        db_session.query(WataInvoice)
+        .filter(*wata_filters)
+        .order_by(WataInvoice.creation_time.desc())
+        .first()
+    )
+
+
 def get_purchase_payment_status(db_session, login_token):
     started_at = login_token.created_at - timedelta(minutes=5)
 
@@ -1484,18 +1504,7 @@ def get_purchase_payment_status(db_session, login_token):
         if yk_payment.status == "canceled":
             return "failed", "Платеж не прошел"
 
-    wata_filters = [WataInvoice.user_id == login_token.user_id]
-    if login_token.payment_gateway == "wata" and login_token.payment_reference:
-        wata_filters.append(WataInvoice.order_id == login_token.payment_reference)
-    else:
-        wata_filters.append(WataInvoice.creation_time >= started_at)
-
-    wata_invoice = (
-        db_session.query(WataInvoice)
-        .filter(*wata_filters)
-        .order_by(WataInvoice.creation_time.desc())
-        .first()
-    )
+    wata_invoice = get_purchase_wata_invoice(db_session, login_token)
     if wata_invoice:
         wata_transaction = (
             db_session.query(WataTransaction)
@@ -1510,6 +1519,18 @@ def get_purchase_payment_status(db_session, login_token):
         if is_wata_invoice_expired(wata_invoice):
             return "failed", "Время оплаты истекло"
 
+    if login_token.payment_gateway == "wata" and login_token.payment_reference:
+        wata_transaction = (
+            db_session.query(WataTransaction)
+            .filter(WataTransaction.order_id == login_token.payment_reference)
+            .order_by(WataTransaction.payment_time.desc())
+            .first()
+        )
+        if wata_transaction:
+            if wata_transaction.transaction_status == "Paid":
+                return "succeeded", "Платеж прошел успешно"
+            return "failed", "Платеж не прошел"
+
     return "pending", "Ждем подтверждения платежа"
 
 
@@ -1519,6 +1540,7 @@ def payment_status_payload(request, token):
             "status": "failed",
             "message": "Платеж не прошел",
             "login_url": "",
+            "payment_url": "",
         }
 
     db_session = session_factory()
@@ -1529,16 +1551,53 @@ def payment_status_payload(request, token):
                 "status": "failed",
                 "message": "Ссылка проверки платежа истекла или неверна",
                 "login_url": "",
+                "payment_url": "",
             }
 
         status, message = get_purchase_payment_status(db_session, login_token)
+        wata_invoice = get_purchase_wata_invoice(db_session, login_token)
         return {
             "status": status,
             "message": message,
             "login_url": build_purchase_login_link(request, token)
             if status == "succeeded"
             else "",
+            "payment_url": build_payment_retry_url(request, token)
+            if status == "pending" and wata_invoice and wata_invoice.url
+            else "",
         }
+    finally:
+        db_session.close()
+
+
+def payment_retry(request, token):
+    db_session = session_factory()
+    try:
+        login_token = get_purchase_login_token(db_session, token)
+        if not login_token:
+            return redirect("payment_status", token=token)
+
+        wata_invoice = get_purchase_wata_invoice(db_session, login_token)
+        if not wata_invoice or not wata_invoice.url or is_wata_invoice_expired(wata_invoice):
+            return redirect("payment_status", token=token)
+
+        tariff = next(
+            (t for t in ACTUAL_TARIFFS if t.db_tariff_id == wata_invoice.tariff_id),
+            None,
+        )
+        return render(
+            request,
+            "wata_payment.html",
+            {
+                "tariff_description": tariff.description
+                if tariff
+                else wata_invoice.description,
+                "tariff_price": tariff.price if tariff else wata_invoice.amount,
+                "wata_payment_url": wata_invoice.url,
+                "payment_status_url": build_payment_status_url(request, token),
+                "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
+            },
+        )
     finally:
         db_session.close()
 
@@ -1552,6 +1611,7 @@ def payment_status(request, token):
             "initial_status": payload["status"],
             "initial_message": payload["message"],
             "login_url": payload["login_url"],
+            "payment_url": payload["payment_url"],
             "status_api_url": reverse("payment_status_json", args=[token]),
             "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
         },
@@ -4393,6 +4453,7 @@ def pay(request):
             use_permanent_purchase_link = (
                 request.POST.get("login_link_kind") == "purchase_permanent"
             )
+            use_wata_payment_widget = settings.PAYMENT_GATEWAY.lower() == "wata"
             base_url = get_current_base_url(request)
             payment_success_redirect_url = f"{base_url}/dashboard/"
             payment_fail_redirect_url = f"{base_url}/"
@@ -4414,6 +4475,21 @@ def pay(request):
                     tariff.db_tariff_id,
                 )
 
+            if use_wata_payment_widget and not raw_purchase_token:
+                raw_purchase_token = create_purchase_login_token(db_session, user)
+                payment_status_url = build_payment_status_url(request, raw_purchase_token)
+                payment_success_redirect_url = payment_status_url
+                payment_fail_redirect_url = append_query_params(
+                    payment_status_url,
+                    {"result": "failed"},
+                )
+                logging.info(
+                    "created wata payment status token: email=%s user_id=%s tariff_id=%s",
+                    email,
+                    user.id,
+                    tariff.db_tariff_id,
+                )
+
             if settings.PAYMENT_GATEWAY.lower() == "wata":
                 logging.info(
                     "creating wata invoice: email=%s user_id=%s tariff_id=%s",
@@ -4430,7 +4506,7 @@ def pay(request):
                 )
 
                 confirmation_url = created_payment.confirmation_url
-                if use_permanent_purchase_link:
+                if raw_purchase_token:
                     login_token = get_purchase_login_token(
                         db_session,
                         raw_purchase_token,
@@ -4562,15 +4638,47 @@ def pay(request):
                 user.id,
                 tariff.db_tariff_id,
             )
+            if settings.PAYMENT_GATEWAY.lower() == "wata":
+                logging.info(
+                    "payment rendering wata widget: email=%s user_id=%s tariff_id=%s",
+                    email,
+                    user.id,
+                    tariff.db_tariff_id,
+                )
+                return render(
+                    request,
+                    "wata_payment.html",
+                    {
+                        "tariff": tariff,
+                        "tariff_description": tariff.description,
+                        "tariff_price": tariff.price,
+                        "wata_payment_url": confirmation_url,
+                        "payment_status_url": payment_status_url,
+                        "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
+                    },
+                )
             return redirect(confirmation_url)
 
         except Exception as e:
             db_session.rollback()
             logging.exception("Pay error")
             messages.error(request, "Ошибка платежной системы")
-            if use_permanent_purchase_link and payment_status_url:
-                return redirect(
-                    append_query_params(payment_status_url, {"result": "failed"})
+            if settings.PAYMENT_GATEWAY.lower() == "wata":
+                return render(
+                    request,
+                    "payment_status.html",
+                    {
+                        "initial_status": "failed",
+                        "initial_message": (
+                            "Не удалось открыть форму оплаты. Попробуйте еще раз "
+                            "или напишите в поддержку."
+                        ),
+                        "login_url": "",
+                        "payment_url": "",
+                        "status_api_url": "",
+                        "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
+                    },
+                    status=502,
                 )
             return redirect("dashboard")
         finally:
