@@ -66,14 +66,20 @@ from common.models.db import SupportReplyTemplate
 from common.models.db import SystemSetting
 from common.models.db import ReferralProgramBlock
 from common.models.settings import BOOL_RUNTIME_SETTINGS
+from common.models.settings import BOT_JOIN_REFERRER_BONUS_DAYS_SETTING
+from common.models.settings import BOT_PURCHASE_REFERRER_BONUS_DAYS_SETTING
 from common.models.settings import BOT_REFERRAL_REGISTRATION_AUTOBLOCK_ENABLED_SETTING
 from common.models.settings import BOT_REFERRAL_REGISTRATION_BURST_LIMIT_SETTING
 from common.models.settings import BOT_REFERRAL_REGISTRATION_BURST_WINDOW_MINUTES_SETTING
+from common.models.settings import BOT_TRAFFIC_REFERRER_BONUS_DAYS_SETTING
+from common.models.settings import BOT_TRAFFIC_USAGE_ALERT_GB_SETTING
+from common.models.settings import BOT_TRAFFIC_USAGE_SUSPICIOUS_GB_SETTING
 from common.models.settings import CSV_INT_RUNTIME_SETTINGS
 from common.models.settings import CSV_STR_RUNTIME_SETTINGS
 from common.models.settings import ENUM_RUNTIME_SETTINGS
 from common.models.settings import INT_RUNTIME_SETTINGS
 from common.models.settings import NON_NEGATIVE_INT_RUNTIME_SETTINGS
+from common.models.settings import POSITIVE_FLOAT_RUNTIME_SETTINGS
 from common.models.settings import POSITIVE_INT_RUNTIME_SETTINGS
 from common.models.settings import RUNTIME_SETTING_DESCRIPTIONS
 from common.models.settings import RUNTIME_SETTING_KEYS
@@ -1751,6 +1757,15 @@ def dashboard(request):
             )
             .scalar()
         )
+        join_referrer_bonus_days = runtime_int_from_db(
+            session, BOT_JOIN_REFERRER_BONUS_DAYS_SETTING, 3
+        )
+        traffic_referrer_bonus_days = runtime_int_from_db(
+            session, BOT_TRAFFIC_REFERRER_BONUS_DAYS_SETTING, 7
+        )
+        purchase_referrer_bonus_days = runtime_int_from_db(
+            session, BOT_PURCHASE_REFERRER_BONUS_DAYS_SETTING, 30
+        )
 
         support_open_ticket = (
             session.query(SupportTicket)
@@ -1785,7 +1800,10 @@ def dashboard(request):
     finally:
         session.close()
 
-    bonus_days = ref_connected_count * 10 + ref_purchased_count * 30
+    bonus_days = (
+        ref_connected_count * traffic_referrer_bonus_days
+        + ref_purchased_count * purchase_referrer_bonus_days
+    )
     subscription = rwms_client.get_user_by_username(user.username)
     seconds_left = (
         user.time_until_expiration.total_seconds() if user.time_until_expiration else -1
@@ -1872,6 +1890,9 @@ def dashboard(request):
             "ref_connected_count": ref_connected_count,
             "ref_purchased_count": ref_purchased_count,
             "bonus_days": bonus_days,
+            "join_referrer_bonus_days": join_referrer_bonus_days,
+            "traffic_referrer_bonus_days": traffic_referrer_bonus_days,
+            "purchase_referrer_bonus_days": purchase_referrer_bonus_days,
             "tariffs": ACTUAL_TARIFFS,
             "has_recurrent": has_recurrent,
             "seconds_left": seconds_left,
@@ -2585,6 +2606,21 @@ def admin_money(value):
     return int(value or 0)
 
 
+def runtime_int_from_db(db_session, key, default_value, min_value=0):
+    value = db_session.get(SystemSetting, key)
+    if value is None:
+        return default_value
+    try:
+        parsed_value = int(value.value)
+    except (TypeError, ValueError):
+        logging.error("invalid integer system setting %s=%r", key, value.value)
+        return default_value
+    if parsed_value < min_value:
+        logging.error("invalid integer system setting %s=%r", key, value.value)
+        return default_value
+    return parsed_value
+
+
 def admin_dt(value):
     if not value:
         return None
@@ -2671,6 +2707,8 @@ def admin_runtime_setting_type(key):
         return "bool"
     if key in INT_RUNTIME_SETTINGS:
         return "int"
+    if key in POSITIVE_FLOAT_RUNTIME_SETTINGS:
+        return "float"
     if key in CSV_INT_RUNTIME_SETTINGS:
         return "csv_int"
     if key in CSV_STR_RUNTIME_SETTINGS:
@@ -2705,6 +2743,16 @@ def admin_validate_runtime_setting(key, value):
             return None, "Значение должно быть больше нуля"
         return str(int_value), None
 
+    if key in POSITIVE_FLOAT_RUNTIME_SETTINGS:
+        try:
+            float_value = float(value.replace(",", "."))
+        except ValueError:
+            return None, "Значение должно быть числом"
+        if float_value <= 0:
+            return None, "Значение должно быть больше нуля"
+        normalized = ("%f" % float_value).rstrip("0").rstrip(".")
+        return normalized, None
+
     if key in CSV_INT_RUNTIME_SETTINGS:
         values = [item.strip() for item in value.split(",") if item.strip()]
         for item in values:
@@ -2725,6 +2773,41 @@ def admin_validate_runtime_setting(key, value):
     if len(value) > 512:
         return None, "Значение не должно быть длиннее 512 символов"
     return value, None
+
+
+def admin_validate_traffic_usage_threshold_pair(db_session, key, normalized_value):
+    if key not in {
+        BOT_TRAFFIC_USAGE_SUSPICIOUS_GB_SETTING,
+        BOT_TRAFFIC_USAGE_ALERT_GB_SETTING,
+    }:
+        return None
+
+    values = {key: normalized_value}
+    other_key = (
+        BOT_TRAFFIC_USAGE_ALERT_GB_SETTING
+        if key == BOT_TRAFFIC_USAGE_SUSPICIOUS_GB_SETTING
+        else BOT_TRAFFIC_USAGE_SUSPICIOUS_GB_SETTING
+    )
+    other_setting = db_session.get(SystemSetting, other_key)
+    if other_setting is not None:
+        values[other_key] = other_setting.value
+
+    if not {
+        BOT_TRAFFIC_USAGE_SUSPICIOUS_GB_SETTING,
+        BOT_TRAFFIC_USAGE_ALERT_GB_SETTING,
+    }.issubset(values):
+        return None
+
+    try:
+        suspicious_gb = float(values[BOT_TRAFFIC_USAGE_SUSPICIOUS_GB_SETTING])
+        alert_gb = float(values[BOT_TRAFFIC_USAGE_ALERT_GB_SETTING])
+    except (TypeError, ValueError):
+        return "Текущая пара порогов в БД некорректна, исправьте оба значения"
+
+    if alert_gb < suspicious_gb:
+        return "Критический порог должен быть больше или равен подозрительному"
+
+    return None
 
 
 def admin_runtime_setting_payload(key, setting=None):
@@ -3726,6 +3809,13 @@ def support_admin_api_runtime_settings(request):
             )
             if error:
                 return JsonResponse({"status": "error", "message": error}, status=400)
+            pair_error = admin_validate_traffic_usage_threshold_pair(
+                db_session, key, normalized_value
+            )
+            if pair_error:
+                return JsonResponse(
+                    {"status": "error", "message": pair_error}, status=400
+                )
             setting = admin_upsert_system_setting(db_session, key, normalized_value)
             db_session.commit()
             db_session.refresh(setting)
