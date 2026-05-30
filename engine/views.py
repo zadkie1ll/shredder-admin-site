@@ -286,6 +286,12 @@ def get_registration_context(request, db_session):
         referrer = (
             db_session.query(User).filter(User.username == referrer_username).first()
         )
+        if referrer and db_session.get(ReferralProgramBlock, referrer.id):
+            logging.warning(
+                "ignore blocked site referral link from referrer %s",
+                referrer.username,
+            )
+            referrer = None
 
     return {
         "referrer": referrer,
@@ -3601,7 +3607,12 @@ def admin_successful_payment_count(db_session, user_id):
 
 
 def admin_referral_payload(db_session, user):
-    referrals = db_session.query(User).filter(User.referred_by_id == user.id).order_by(User.id.desc()).all()
+    referrals = (
+        db_session.query(User)
+        .filter(User.referred_by_id == user.id)
+        .order_by(User.id.desc())
+        .all()
+    )
     bonuses = db_session.query(ReferralBonus).filter(ReferralBonus.referrer_id == user.id).all()
     bonuses_by_referral = {}
     for bonus in bonuses:
