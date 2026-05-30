@@ -63,6 +63,21 @@ from common.models.db import SupportTicketMessageSender
 from common.models.db import SupportTicketStatus
 from common.models.db import SupportTicketAttachment
 from common.models.db import SupportReplyTemplate
+from common.models.db import SystemSetting
+from common.models.db import ReferralProgramBlock
+from common.models.settings import BOOL_RUNTIME_SETTINGS
+from common.models.settings import BOT_REFERRAL_REGISTRATION_AUTOBLOCK_ENABLED_SETTING
+from common.models.settings import BOT_REFERRAL_REGISTRATION_BURST_LIMIT_SETTING
+from common.models.settings import BOT_REFERRAL_REGISTRATION_BURST_WINDOW_MINUTES_SETTING
+from common.models.settings import CSV_INT_RUNTIME_SETTINGS
+from common.models.settings import CSV_STR_RUNTIME_SETTINGS
+from common.models.settings import ENUM_RUNTIME_SETTINGS
+from common.models.settings import INT_RUNTIME_SETTINGS
+from common.models.settings import NON_NEGATIVE_INT_RUNTIME_SETTINGS
+from common.models.settings import POSITIVE_INT_RUNTIME_SETTINGS
+from common.models.settings import RUNTIME_SETTING_DESCRIPTIONS
+from common.models.settings import RUNTIME_SETTING_KEYS
+from common.models.settings import SENSITIVE_RUNTIME_SETTINGS
 from common.models import analytics_event
 from common.models.tariff import Tariff
 from common.models.tariff import OneMonthTariff
@@ -2643,6 +2658,112 @@ def admin_user_payload(user):
     }
 
 
+def admin_mask_setting_value(key, value):
+    if value is None:
+        return ""
+    if key in SENSITIVE_RUNTIME_SETTINGS and str(value):
+        return "***"
+    return str(value)
+
+
+def admin_runtime_setting_type(key):
+    if key in BOOL_RUNTIME_SETTINGS:
+        return "bool"
+    if key in INT_RUNTIME_SETTINGS:
+        return "int"
+    if key in CSV_INT_RUNTIME_SETTINGS:
+        return "csv_int"
+    if key in CSV_STR_RUNTIME_SETTINGS:
+        return "csv"
+    if key in ENUM_RUNTIME_SETTINGS:
+        return "enum"
+    return "string"
+
+
+def admin_validate_runtime_setting(key, value):
+    key = (key or "").strip()
+    value = (value or "").strip()
+    if key not in RUNTIME_SETTING_KEYS:
+        return None, "Неизвестная настройка"
+
+    if key in BOOL_RUNTIME_SETTINGS:
+        normalized = value.lower()
+        if normalized in {"1", "true", "yes", "on", "да", "вкл"}:
+            return "1", None
+        if normalized in {"0", "false", "no", "off", "нет", "выкл"}:
+            return "0", None
+        return None, "Значение должно быть true/false или 1/0"
+
+    if key in INT_RUNTIME_SETTINGS:
+        try:
+            int_value = int(value)
+        except ValueError:
+            return None, "Значение должно быть числом"
+        if key in NON_NEGATIVE_INT_RUNTIME_SETTINGS and int_value < 0:
+            return None, "Значение не может быть отрицательным"
+        if key in POSITIVE_INT_RUNTIME_SETTINGS and int_value <= 0:
+            return None, "Значение должно быть больше нуля"
+        return str(int_value), None
+
+    if key in CSV_INT_RUNTIME_SETTINGS:
+        values = [item.strip() for item in value.split(",") if item.strip()]
+        for item in values:
+            if not item.lstrip("-").isdigit():
+                return None, "Список должен содержать только числа через запятую"
+        return ",".join(values), None
+
+    if key in CSV_STR_RUNTIME_SETTINGS:
+        return ",".join(item.strip() for item in value.split(",") if item.strip()), None
+
+    if key in ENUM_RUNTIME_SETTINGS:
+        normalized = value.lower()
+        allowed_values = ENUM_RUNTIME_SETTINGS[key]
+        if normalized not in allowed_values:
+            return None, f"Допустимые значения: {', '.join(sorted(allowed_values))}"
+        return normalized, None
+
+    if len(value) > 512:
+        return None, "Значение не должно быть длиннее 512 символов"
+    return value, None
+
+
+def admin_runtime_setting_payload(key, setting=None):
+    raw_value = setting.value if setting else ""
+    return {
+        "key": key,
+        "value": raw_value,
+        "display_value": admin_mask_setting_value(key, raw_value),
+        "is_set": setting is not None,
+        "type": admin_runtime_setting_type(key),
+        "sensitive": key in SENSITIVE_RUNTIME_SETTINGS,
+        "description": RUNTIME_SETTING_DESCRIPTIONS.get(key, ""),
+        "allowed_values": sorted(ENUM_RUNTIME_SETTINGS.get(key, [])),
+        "updated_at": admin_date_label(setting.updated_at) if setting else "",
+    }
+
+
+def admin_upsert_system_setting(db_session, key, value):
+    setting = db_session.get(SystemSetting, key)
+    if setting:
+        setting.value = value
+    else:
+        setting = SystemSetting(key=key, value=value)
+        db_session.add(setting)
+    db_session.flush()
+    return setting
+
+
+def admin_referral_block_payload(db_session, user):
+    block = db_session.get(ReferralProgramBlock, user.id) if user else None
+    return {
+        "user": admin_user_payload(user),
+        "blocked": bool(block),
+        "reason": block.reason if block else "",
+        "created_at": admin_date_label(block.created_at) if block else "",
+        "updated_at": admin_date_label(block.updated_at) if block else "",
+    }
+
+
 def admin_traffic_status_payload(traffic):
     if not traffic:
         return "Нет данных"
@@ -3435,6 +3556,7 @@ def admin_referral_payload(db_session, user):
 
     return {
         "user": admin_user_payload(user),
+        "referral_block": admin_referral_block_payload(db_session, user),
         "summary": {
             "referrals": len(referrals),
             "paid_referrals": sum(1 for row in referral_rows if row["paid"]),
@@ -3470,6 +3592,26 @@ def support_admin_api_subscription_manage(request):
 
         if action == "preview":
             return JsonResponse({"status": "ok", "result": {"user": admin_user_payload(user)}})
+
+        if action == "stop_autopay":
+            old_value = bool(user.autopay_allow)
+            user.autopay_allow = False
+            removed_recurrents = (
+                db_session.query(YkRecurrentPayment)
+                .filter(YkRecurrentPayment.user_id == user.id)
+                .delete(synchronize_session=False)
+            )
+            db_session.commit()
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "result": {
+                        "user": admin_user_payload(user),
+                        "old_autopay_allow": old_value,
+                        "removed_recurrents": removed_recurrents,
+                    },
+                }
+            )
 
         if action == "set_trial_hour":
             target_expire = datetime.now(timezone.utc) + timedelta(hours=1)
@@ -3517,6 +3659,287 @@ def support_admin_api_subscription_manage(request):
                     "new_expire_at": admin_date_label(user.expire_at),
                     "rwms_updated": rwms_updated,
                 },
+            }
+        )
+    finally:
+        db_session.close()
+
+
+def support_admin_api_runtime_settings(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "GET":
+            settings_by_key = {
+                setting.key: setting
+                for setting in db_session.query(SystemSetting).all()
+            }
+            items = [
+                admin_runtime_setting_payload(key, settings_by_key.get(key))
+                for key in RUNTIME_SETTING_KEYS
+            ]
+            known_keys = set(RUNTIME_SETTING_KEYS)
+            extra_items = [
+                {
+                    "key": setting.key,
+                    "value": setting.value,
+                    "display_value": admin_mask_setting_value(setting.key, setting.value),
+                    "is_set": True,
+                    "type": "custom",
+                    "sensitive": False,
+                    "description": "Пользовательская настройка",
+                    "allowed_values": [],
+                    "updated_at": admin_date_label(setting.updated_at),
+                }
+                for setting in settings_by_key.values()
+                if setting.key not in known_keys
+            ]
+            return JsonResponse({"status": "ok", "settings": items + extra_items})
+
+        if request.method != "POST":
+            return JsonResponse({"status": "error"}, status=405)
+
+        action = request.POST.get("action")
+        key = (request.POST.get("key") or "").strip()
+        if action == "delete":
+            if key not in RUNTIME_SETTING_KEYS:
+                return JsonResponse({"status": "error", "message": "Неизвестная настройка"}, status=400)
+            db_session.execute(sa_delete(SystemSetting).where(SystemSetting.key == key))
+            db_session.commit()
+            return JsonResponse({"status": "ok"})
+
+        if action == "save":
+            raw_value = request.POST.get("value") or ""
+            if key in SENSITIVE_RUNTIME_SETTINGS and not raw_value.strip():
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": "Введите новое значение секрета или удалите настройку из БД",
+                    },
+                    status=400,
+                )
+            normalized_value, error = admin_validate_runtime_setting(
+                key, raw_value
+            )
+            if error:
+                return JsonResponse({"status": "error", "message": error}, status=400)
+            setting = admin_upsert_system_setting(db_session, key, normalized_value)
+            db_session.commit()
+            db_session.refresh(setting)
+            return JsonResponse(
+                {"status": "ok", "setting": admin_runtime_setting_payload(key, setting)}
+            )
+
+        return JsonResponse({"status": "error", "message": "Неизвестное действие"}, status=400)
+    finally:
+        db_session.close()
+
+
+def support_admin_api_referral_antifraud(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    keys = (
+        BOT_REFERRAL_REGISTRATION_AUTOBLOCK_ENABLED_SETTING,
+        BOT_REFERRAL_REGISTRATION_BURST_LIMIT_SETTING,
+        BOT_REFERRAL_REGISTRATION_BURST_WINDOW_MINUTES_SETTING,
+    )
+    db_session = session_factory()
+    try:
+        if request.method == "POST":
+            action = request.POST.get("action")
+            if action in {"enable", "disable"}:
+                admin_upsert_system_setting(
+                    db_session,
+                    BOT_REFERRAL_REGISTRATION_AUTOBLOCK_ENABLED_SETTING,
+                    "1" if action == "enable" else "0",
+                )
+            elif action == "set":
+                for key, form_key in (
+                    (BOT_REFERRAL_REGISTRATION_BURST_LIMIT_SETTING, "limit"),
+                    (BOT_REFERRAL_REGISTRATION_BURST_WINDOW_MINUTES_SETTING, "window_minutes"),
+                ):
+                    normalized_value, error = admin_validate_runtime_setting(
+                        key, request.POST.get(form_key) or ""
+                    )
+                    if error:
+                        return JsonResponse({"status": "error", "message": error}, status=400)
+                    admin_upsert_system_setting(db_session, key, normalized_value)
+            else:
+                return JsonResponse({"status": "error", "message": "Неизвестное действие"}, status=400)
+            db_session.commit()
+        elif request.method != "GET":
+            return JsonResponse({"status": "error"}, status=405)
+
+        settings_by_key = {
+            setting.key: setting
+            for setting in db_session.query(SystemSetting).filter(SystemSetting.key.in_(keys)).all()
+        }
+        return JsonResponse(
+            {
+                "status": "ok",
+                "settings": [
+                    admin_runtime_setting_payload(key, settings_by_key.get(key))
+                    for key in keys
+                ],
+            }
+        )
+    finally:
+        db_session.close()
+
+
+def support_admin_api_referral_block(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+    if request.method != "POST":
+        return JsonResponse({"status": "error"}, status=405)
+
+    db_session = session_factory()
+    try:
+        user = admin_find_user(db_session, request.POST.get("q"))
+        if not user:
+            return JsonResponse({"status": "not_found"}, status=404)
+
+        action = request.POST.get("action")
+        if action == "block":
+            reason = (request.POST.get("reason") or "manual admin block").strip()
+            block = db_session.get(ReferralProgramBlock, user.id)
+            if block:
+                block.reason = reason
+            else:
+                db_session.add(ReferralProgramBlock(user_id=user.id, reason=reason))
+            db_session.commit()
+        elif action == "unblock":
+            db_session.execute(
+                sa_delete(ReferralProgramBlock).where(ReferralProgramBlock.user_id == user.id)
+            )
+            db_session.commit()
+        elif action != "status":
+            return JsonResponse({"status": "error", "message": "Неизвестное действие"}, status=400)
+
+        return JsonResponse({"status": "ok", "result": admin_referral_block_payload(db_session, user)})
+    finally:
+        db_session.close()
+
+
+def support_admin_api_recurrents(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+    if request.method != "GET":
+        return JsonResponse({"status": "error"}, status=405)
+
+    db_session = session_factory()
+    try:
+        limit = min(max(int(request.GET.get("limit") or 50), 1), 200)
+    except ValueError:
+        limit = 50
+    try:
+        rows = (
+            db_session.query(YkRecurrentPayment, User)
+            .join(User, User.id == YkRecurrentPayment.user_id)
+            .order_by(YkRecurrentPayment.captured_at.desc())
+            .limit(limit)
+            .all()
+        )
+        return JsonResponse(
+            {
+                "status": "ok",
+                "recurrents": [
+                    {
+                        "id": recurrent.id,
+                        "payment_id": recurrent.recurrent_payment_id,
+                        "user": admin_user_payload(user),
+                        "amount": recurrent.amount,
+                        "currency": recurrent.currency,
+                        "tariff": get_tariff_display_name(recurrent.subscription_period),
+                        "captured_at": admin_date_label(recurrent.captured_at),
+                        "scheduled_payment": bool(recurrent.scheduled_payment),
+                        "trial": bool(recurrent.is_trial_promotion),
+                    }
+                    for recurrent, user in rows
+                ],
+            }
+        )
+    finally:
+        db_session.close()
+
+
+def support_admin_api_top_payments(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+    if request.method != "GET":
+        return JsonResponse({"status": "error"}, status=405)
+
+    db_session = session_factory()
+    try:
+        limit = min(max(int(request.GET.get("limit") or 20), 1), 100)
+    except ValueError:
+        limit = 20
+    try:
+        totals = {}
+        user_ids = set()
+        yk_rows = (
+            db_session.query(
+                YkPayment.user_id,
+                func.coalesce(func.sum(YkPayment.amount), 0).label("total_amount"),
+                func.count(YkPayment.id).label("payments_count"),
+            )
+            .filter(YkPayment.status == "succeeded")
+            .group_by(YkPayment.user_id)
+            .all()
+        )
+        wata_rows = (
+            db_session.query(
+                WataInvoice.user_id,
+                func.coalesce(func.sum(WataTransaction.amount), 0).label("total_amount"),
+                func.count(WataTransaction.id).label("payments_count"),
+            )
+            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .filter(WataTransaction.transaction_status == "Paid")
+            .group_by(WataInvoice.user_id)
+            .all()
+        )
+        for user_id, amount, payments_count in yk_rows + wata_rows:
+            if not user_id:
+                continue
+            user_ids.add(user_id)
+            current = totals.setdefault(user_id, {"amount": 0, "payments_count": 0})
+            current["amount"] += int(amount or 0)
+            current["payments_count"] += int(payments_count or 0)
+
+        users_by_id = {}
+        if user_ids:
+            users_by_id = {
+                user.id: user
+                for user in db_session.query(User).filter(User.id.in_(user_ids)).all()
+            }
+        rows = sorted(
+            (
+                (users_by_id.get(user_id), data["amount"], data["payments_count"])
+                for user_id, data in totals.items()
+                if users_by_id.get(user_id)
+            ),
+            key=lambda row: row[1],
+            reverse=True,
+        )[:limit]
+        return JsonResponse(
+            {
+                "status": "ok",
+                "top": [
+                    {
+                        "user": admin_user_payload(user),
+                        "amount": int(total_amount or 0),
+                        "payments_count": int(payments_count or 0),
+                    }
+                    for user, total_amount, payments_count in rows
+                ],
             }
         )
     finally:

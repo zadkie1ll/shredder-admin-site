@@ -81,6 +81,31 @@ urlpatterns = [
         name="support_admin_api_subscription_manage",
     ),
     path(
+        "support-admin/api/runtime-settings/",
+        views.support_admin_api_runtime_settings,
+        name="support_admin_api_runtime_settings",
+    ),
+    path(
+        "support-admin/api/referral-antifraud/",
+        views.support_admin_api_referral_antifraud,
+        name="support_admin_api_referral_antifraud",
+    ),
+    path(
+        "support-admin/api/referral-block/",
+        views.support_admin_api_referral_block,
+        name="support_admin_api_referral_block",
+    ),
+    path(
+        "support-admin/api/recurrents/",
+        views.support_admin_api_recurrents,
+        name="support_admin_api_recurrents",
+    ),
+    path(
+        "support-admin/api/top-payments/",
+        views.support_admin_api_top_payments,
+        name="support_admin_api_top_payments",
+    ),
+    path(
         "support-admin/api/reply-templates/",
         views.support_admin_api_reply_templates,
         name="support_admin_api_reply_templates",
