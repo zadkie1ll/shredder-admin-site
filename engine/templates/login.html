@@ -320,13 +320,13 @@
                         </a>
                     {% endif %}
 
-                    {% if telegram_auth_enabled %}
-                        <a href="{{ telegram_direct_auth_url }}"
+                    {% if telegram_bot_login_enabled %}
+                        <a href="{{ telegram_bot_login_url }}"
                            class="telegram-login-shell"
                            aria-label="Войти через Telegram"
                            title="Войти через Telegram">
                             <i class="fab fa-telegram-plane"></i>
-                            Войти через Telegram
+                            Войти через Telegram-бота
                         </a>
                     {% endif %}
 

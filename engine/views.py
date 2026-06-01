@@ -867,16 +867,41 @@ def render_login(request, context=None, status=200):
     yandex_oauth_enabled = bool(
         settings.YANDEX_OAUTH_CLIENT_ID and settings.YANDEX_OAUTH_CLIENT_SECRET
     )
-    telegram_auth_enabled = bool(telegram_bot_username and telegram_bot_id)
+    telegram_bot_login_enabled = bool(telegram_bot_username)
+    telegram_widget_auth_enabled = False
 
     payload["google_oauth_enabled"] = google_oauth_enabled
     payload["yandex_oauth_enabled"] = yandex_oauth_enabled
-    payload["telegram_auth_enabled"] = telegram_auth_enabled
+    payload["telegram_auth_enabled"] = telegram_widget_auth_enabled
+    payload["telegram_bot_login_enabled"] = telegram_bot_login_enabled
     payload["social_login_enabled"] = any(
-        [google_oauth_enabled, yandex_oauth_enabled, telegram_auth_enabled]
+        [google_oauth_enabled, yandex_oauth_enabled, telegram_bot_login_enabled]
     )
     payload["telegram_bot_username"] = telegram_bot_username
     payload["telegram_bot_id"] = telegram_bot_id
+    telegram_start_parts = ["web"]
+    tracking_params = payload["tracking_params"]
+    if tracking_params.get("ymid"):
+        telegram_start_parts.append(f"ymid{tracking_params['ymid']}")
+    if tracking_params.get("ts"):
+        telegram_start_parts.append(f"ts{tracking_params['ts']}")
+    if tracking_params.get("a"):
+        telegram_start_parts.append(f"a{tracking_params['a']}")
+    telegram_start_payload = "-".join(telegram_start_parts)
+    if len(telegram_start_payload) > 64:
+        telegram_start_parts = ["web"]
+        if tracking_params.get("ts"):
+            telegram_start_parts.append(f"ts{tracking_params['ts']}")
+        if tracking_params.get("a"):
+            telegram_start_parts.append(f"a{tracking_params['a']}")
+        telegram_start_payload = "-".join(telegram_start_parts)
+    if len(telegram_start_payload) > 64:
+        telegram_start_payload = "web"
+    payload["telegram_bot_login_url"] = (
+        f"https://t.me/{telegram_bot_username}?start={telegram_start_payload}"
+        if telegram_bot_login_enabled
+        else ""
+    )
     payload["telegram_auth_url"] = append_query_params(
         f"{get_current_base_url(request)}{reverse('telegram_widget_auth')}",
         payload["tracking_params"],
@@ -895,7 +920,7 @@ def render_login(request, context=None, status=200):
                 "request_access": "write",
             }
         )
-        if telegram_auth_enabled
+        if telegram_widget_auth_enabled
         else ""
     )
     payload["site_role"] = get_site_role(request)
