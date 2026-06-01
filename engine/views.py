@@ -676,6 +676,103 @@ def sync_existing_user_tracking(db_session, user, traffic_source, ymid):
         )
 
 
+def get_proto_optional(message, field_name, default=None):
+    try:
+        if message.HasField(field_name):
+            return getattr(message, field_name)
+    except ValueError:
+        value = getattr(message, field_name, default)
+        return value if value not in ("", 0) else default
+
+    return default
+
+
+def rwms_expire_at(rw_user):
+    expire_at = get_proto_optional(rw_user, "expire_at")
+    if expire_at is None:
+        return None
+
+    return expire_at.ToDatetime().replace(tzinfo=None)
+
+
+def find_rwms_user_by_identity(email=None, telegram_id=None):
+    normalized_email = (email or "").lower().strip()
+    users_reply = rwms_client.get_all_users()
+    if users_reply is None:
+        return None
+
+    for rw_user in users_reply.users:
+        rw_email = (get_proto_optional(rw_user, "email", "") or "").lower().strip()
+        rw_telegram_id = get_proto_optional(rw_user, "telegram_id")
+
+        if normalized_email and rw_email == normalized_email:
+            return rw_user
+
+        if telegram_id is not None and rw_telegram_id == telegram_id:
+            return rw_user
+
+    return None
+
+
+def sync_local_user_from_rwms(
+    db_session,
+    rw_user,
+    email,
+    telegram_id,
+    context,
+    creation_channel,
+):
+    rw_email = get_proto_optional(rw_user, "email")
+    rw_telegram_id = get_proto_optional(rw_user, "telegram_id")
+    local_email = email or rw_email
+    local_telegram_id = telegram_id or rw_telegram_id
+
+    user = db_session.query(User).filter(User.username == rw_user.username).first()
+    if user:
+        if local_email and not user.email:
+            user.email = local_email
+        if local_telegram_id is not None and user.telegram_id is None:
+            user.telegram_id = local_telegram_id
+        user.expire_at = rwms_expire_at(rw_user)
+        if context["ymid"] is not None:
+            user.ymid = context["ymid"]
+        db_session.flush()
+        add_user_to_traffic_progress(db_session, user)
+        logging.info(
+            "local user %s synced from existing RWMS subscription",
+            user.username,
+        )
+        return user
+
+    referrer = context["referrer"]
+    user = User(
+        email=local_email,
+        telegram_id=local_telegram_id,
+        username=rw_user.username,
+        expire_at=rwms_expire_at(rw_user),
+        ymid=context["ymid"],
+        referred_by_id=referrer.id if referrer else None,
+        referral_type=ReferralType.STANDARD if referrer else None,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    add_user_to_traffic_progress(db_session, user)
+    add_event_log(
+        db_session,
+        user,
+        analytics_event.SubscriptionCreated(
+            traffic_source=context["traffic_source"],
+            creation_channel=creation_channel,
+        ),
+    )
+    logging.info(
+        "local user %s restored from existing RWMS subscription",
+        user.username,
+    )
+    return user
+
+
 def create_site_user(
     db_session,
     email,
@@ -703,13 +800,26 @@ def create_site_user(
 
     user_label = email or f"telegram_id={telegram_id}"
     if rw_user is None:
-        raise RuntimeError(
-            f"creating subscription for site user {user_label} was failed"
+        logging.warning(
+            "creating RWMS subscription for site user %s failed, "
+            "trying to recover existing RWMS subscription",
+            user_label,
+        )
+        rw_user = find_rwms_user_by_identity(email=email, telegram_id=telegram_id)
+        if rw_user is None:
+            raise RuntimeError(
+                f"creating subscription for site user {user_label} was failed"
+            )
+        return sync_local_user_from_rwms(
+            db_session,
+            rw_user,
+            email,
+            telegram_id,
+            context,
+            creation_channel,
         )
 
-    expire_at = None
-    if rw_user.HasField("expire_at"):
-        expire_at = rw_user.expire_at.ToDatetime().replace(tzinfo=None)
+    expire_at = rwms_expire_at(rw_user)
 
     user = User(
         email=email,

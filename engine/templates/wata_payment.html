@@ -26,8 +26,8 @@
 
         body {
             margin: 0;
-            min-height: 100vh;
-            min-height: 100dvh;
+            height: 100vh;
+            height: 100dvh;
             padding: 10px;
             background:
                 linear-gradient(180deg, rgba(0,0,0,0.58), rgba(0,0,0,0.9)),
@@ -41,7 +41,7 @@
 
         .payment-shell {
             width: min(560px, calc(100vw - 20px));
-            min-height: calc(100dvh - 20px);
+            height: calc(100dvh - 20px);
             margin: 0 auto;
             display: flex;
             flex-direction: column;
@@ -100,16 +100,24 @@
         }
 
         .payment-subtitle {
-            margin: 0 0 10px;
+            margin: 0 0 6px;
             color: var(--muted);
             font-size: 12px;
             line-height: 1.35;
             font-weight: 700;
         }
 
+        .payment-note {
+            margin: 0 0 10px;
+            color: var(--gold);
+            font-size: 12px;
+            line-height: 1.3;
+            font-weight: 800;
+        }
+
         .payment-frame-wrap {
-            flex: 1 1 auto;
-            min-height: 760px;
+            flex: 1 1 0;
+            min-height: 0;
             overflow: hidden;
             border: 1px solid var(--line);
             border-radius: 12px;
@@ -119,7 +127,7 @@
         .payment-frame {
             width: 100%;
             height: 100%;
-            min-height: 760px;
+            min-height: 0;
             display: block;
             border: 0;
             background: #ffffff;
@@ -129,7 +137,7 @@
             body { padding: 8px; }
             .payment-shell {
                 width: calc(100vw - 16px);
-                min-height: calc(100dvh - 16px);
+                height: calc(100dvh - 16px);
                 padding: 12px;
                 border-radius: 14px;
             }
@@ -137,14 +145,8 @@
             .brand-title { font-size: 16px; }
             .payment-title { font-size: 15px; }
             .payment-price { font-size: 15px; }
-            .payment-subtitle { font-size: 11px; }
-            .payment-frame-wrap,
-            .payment-frame { min-height: 700px; }
-        }
-
-        @media (min-height: 900px) {
-            .payment-frame-wrap,
-            .payment-frame { min-height: 820px; }
+            .payment-subtitle,
+            .payment-note { font-size: 11px; }
         }
     </style>
 </head>
@@ -160,6 +162,7 @@
             <div class="payment-price">{{ tariff_price }} ₽</div>
         </div>
         <p class="payment-subtitle">Оплата проходит прямо здесь. После подтверждения откроем проверку статуса.</p>
+        <p class="payment-note">После оплаты не закрывайте вкладку — вы попадете в личный кабинет.</p>
 
         <div class="payment-frame-wrap">
             <iframe
