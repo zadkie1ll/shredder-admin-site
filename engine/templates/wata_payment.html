@@ -175,11 +175,25 @@
 
     <script>
         const frame = document.getElementById('payment-frame');
+        const statusApiUrl = '{{ status_api_url|escapejs }}';
+        const paymentStatusUrl = '{{ payment_status_url|escapejs }}';
+        let statusRedirectStarted = false;
+        let frameLoadedOnce = false;
+        let frameInteracted = false;
+
+        function goToPaymentStatus() {
+            if (statusRedirectStarted || !paymentStatusUrl) {
+                return;
+            }
+            statusRedirectStarted = true;
+            window.location.href = paymentStatusUrl;
+        }
 
         function followStatusRedirect() {
             try {
                 const href = frame.contentWindow.location.href;
                 if (href && href.startsWith(window.location.origin + '/payment/status/')) {
+                    statusRedirectStarted = true;
                     window.location.href = href;
                 }
             } catch (err) {
@@ -187,8 +201,48 @@
             }
         }
 
-        frame.addEventListener('load', followStatusRedirect);
+        function handleFrameLoad() {
+            followStatusRedirect();
+
+            if (!frameLoadedOnce) {
+                frameLoadedOnce = true;
+                return;
+            }
+
+            if (frameInteracted) {
+                window.setTimeout(goToPaymentStatus, 300);
+            }
+        }
+
+        async function pollStatus() {
+            if (statusRedirectStarted || !statusApiUrl) {
+                return;
+            }
+
+            try {
+                const response = await fetch(statusApiUrl, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                const payload = await response.json();
+                if (payload.status === 'succeeded' || payload.status === 'failed') {
+                    goToPaymentStatus();
+                    return;
+                }
+            } catch (err) {
+                // Следующая попытка ниже: платежная форма продолжает работать в iframe.
+            }
+
+            window.setTimeout(pollStatus, 1800);
+        }
+
+        window.addEventListener('blur', () => {
+            if (document.activeElement === frame) {
+                frameInteracted = true;
+            }
+        });
+        frame.addEventListener('load', handleFrameLoad);
         window.setInterval(followStatusRedirect, 1000);
+        window.setTimeout(pollStatus, 1200);
     </script>
 </body>
 </html>

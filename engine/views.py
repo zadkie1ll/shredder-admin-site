@@ -84,6 +84,7 @@ from common.models.settings import POSITIVE_INT_RUNTIME_SETTINGS
 from common.models.settings import RUNTIME_SETTING_DESCRIPTIONS
 from common.models.settings import RUNTIME_SETTING_KEYS
 from common.models.settings import SENSITIVE_RUNTIME_SETTINGS
+from common.models.settings import TARIFF_PRICE_SETTINGS
 from common.models import analytics_event
 from common.models.tariff import Tariff
 from common.models.tariff import OneMonthTariff
@@ -1592,9 +1593,10 @@ def payment_retry(request, token):
                 "tariff_description": tariff.description
                 if tariff
                 else wata_invoice.description,
-                "tariff_price": tariff.price if tariff else wata_invoice.amount,
+                "tariff_price": wata_invoice.amount,
                 "wata_payment_url": wata_invoice.url,
                 "payment_status_url": build_payment_status_url(request, token),
+                "status_api_url": reverse("payment_status_json", args=[token]),
                 "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
             },
         )
@@ -1717,7 +1719,7 @@ def index(request):
             request,
             "index_vps.html",
             {
-                "tariffs": ACTUAL_TARIFFS,
+                "tariffs": get_runtime_actual_tariffs(),
                 "tracking_params": get_tracking_params(request),
                 "trial_period_days_label": format_days_ru(trial_period_days),
             },
@@ -1733,7 +1735,7 @@ def index(request):
         request,
         "index_vpn.html",
         {
-            "tariffs": ACTUAL_TARIFFS,
+            "tariffs": get_runtime_actual_tariffs(),
             "tracking_params": get_tracking_params(request),
             "trial_period_days_label": format_days_ru(trial_period_days),
         },
@@ -1748,10 +1750,15 @@ def vps_direct_sale(request):
 
 
 def render_vps_direct_sale(request):
+    tariffs = get_runtime_actual_tariffs()
     return render(
         request,
         "index_vps_direct_sale.html",
-        {"tariffs": ACTUAL_TARIFFS, "tracking_params": get_tracking_params(request)},
+        {
+            "tariffs": tariffs,
+            "min_tariff_price": min(tariff.price for tariff in tariffs),
+            "tracking_params": get_tracking_params(request),
+        },
     )
 
 
@@ -1760,7 +1767,7 @@ def offer(request):
         request,
         "offer.html",
         {
-            "tariffs": ACTUAL_TARIFFS,
+            "tariffs": get_runtime_actual_tariffs(),
             "trial_period_days_label": format_days_ru(settings.SITE_TRIAL_PERIOD_DAYS),
             "referral_trial_period_days_label": format_days_ru(
                 settings.SITE_REFERRAL_TRIAL_PERIOD_DAYS
@@ -1959,7 +1966,7 @@ def dashboard(request):
             "join_referrer_bonus_days": join_referrer_bonus_days,
             "traffic_referrer_bonus_days": traffic_referrer_bonus_days,
             "purchase_referrer_bonus_days": purchase_referrer_bonus_days,
-            "tariffs": ACTUAL_TARIFFS,
+            "tariffs": get_runtime_actual_tariffs(),
             "has_recurrent": has_recurrent,
             "seconds_left": seconds_left,
             "days_left": days_left,
@@ -2685,6 +2692,25 @@ def runtime_int_from_db(db_session, key, default_value, min_value=0):
         logging.error("invalid integer system setting %s=%r", key, value.value)
         return default_value
     return parsed_value
+
+
+def get_runtime_actual_tariffs(db_session=None):
+    should_close_session = db_session is None
+    if should_close_session:
+        db_session = session_factory()
+    try:
+        tariffs = []
+        for tariff in ACTUAL_TARIFFS:
+            key = TARIFF_PRICE_SETTINGS.get(tariff.db_tariff_id)
+            if key is None:
+                tariffs.append(tariff)
+                continue
+            price = runtime_int_from_db(db_session, key, tariff.price, min_value=1)
+            tariffs.append(tariff.model_copy(update={"price": price}))
+        return tariffs
+    finally:
+        if should_close_session:
+            db_session.close()
 
 
 def admin_dt(value):
@@ -4391,24 +4417,31 @@ def pay(request):
             )
             return HttpResponse("Не указан email или тариф", status=400)
 
-        tariff = next((t for t in ACTUAL_TARIFFS if t.db_tariff_id == tariff_id), None)
-        if not tariff:
-            logging.warning(
-                "payment request rejected: tariff not found tariff_id=%s email=%s",
-                tariff_id,
-                email,
-            )
-            return HttpResponse("Выбранный тариф не найден", status=400)
-
-        logging.info(
-            "payment request accepted: email=%s tariff_id=%s price=%s",
-            email,
-            tariff.db_tariff_id,
-            tariff.price,
-        )
-
         db_session = session_factory()
         try:
+            tariff = next(
+                (
+                    t
+                    for t in get_runtime_actual_tariffs(db_session)
+                    if t.db_tariff_id == tariff_id
+                ),
+                None,
+            )
+            if not tariff:
+                logging.warning(
+                    "payment request rejected: tariff not found tariff_id=%s email=%s",
+                    tariff_id,
+                    email,
+                )
+                return HttpResponse("Выбранный тариф не найден", status=400)
+
+            logging.info(
+                "payment request accepted: email=%s tariff_id=%s price=%s",
+                email,
+                tariff.db_tariff_id,
+                tariff.price,
+            )
+
             # Ищем или создаем пользователя
             user = db_session.query(User).filter(User.email == email).first()
             if not user:
@@ -4654,6 +4687,10 @@ def pay(request):
                         "tariff_price": tariff.price,
                         "wata_payment_url": confirmation_url,
                         "payment_status_url": payment_status_url,
+                        "status_api_url": reverse(
+                            "payment_status_json",
+                            args=[raw_purchase_token],
+                        ),
                         "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
                     },
                 )
@@ -4663,16 +4700,22 @@ def pay(request):
             db_session.rollback()
             logging.exception("Pay error")
             messages.error(request, "Ошибка платежной системы")
+            error_message = (
+                "Не удалось открыть форму оплаты. Попробуйте еще раз "
+                "или напишите в поддержку."
+            )
+            if "creating subscription for site user" in str(e):
+                error_message = (
+                    "Не удалось подготовить личный кабинет для оплаты. "
+                    "Попробуйте еще раз или напишите в поддержку."
+                )
             if settings.PAYMENT_GATEWAY.lower() == "wata":
                 return render(
                     request,
                     "payment_status.html",
                     {
                         "initial_status": "failed",
-                        "initial_message": (
-                            "Не удалось открыть форму оплаты. Попробуйте еще раз "
-                            "или напишите в поддержку."
-                        ),
+                        "initial_message": error_message,
                         "login_url": "",
                         "payment_url": "",
                         "status_api_url": "",

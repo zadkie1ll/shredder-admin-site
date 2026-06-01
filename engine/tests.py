@@ -8,9 +8,12 @@ from django.test import RequestFactory
 from django.test import SimpleTestCase
 from django.test import override_settings
 
+from common.models.settings import BOT_TARIFF_PRICE_MONTH_SETTING
+from common.models.settings import BOT_TARIFF_PRICE_YEAR_SETTING
 from engine.payments import create_wata_payment_sync
 from engine.payments import create_yk_payment_sync
 from engine.views import auth_by_telegram_widget
+from engine.views import get_runtime_actual_tariffs
 from engine.views import get_telegram_auth_bot
 from engine.views import render_login
 from engine.views import should_send_payment_login_email
@@ -135,6 +138,24 @@ class TelegramAuthBotTests(SimpleTestCase):
 
 
 class PaymentRedirectTests(SimpleTestCase):
+    def test_runtime_actual_tariffs_use_database_prices(self):
+        class FakeSession:
+            def get(self, model, key):
+                values = {
+                    BOT_TARIFF_PRICE_MONTH_SETTING: "199",
+                    BOT_TARIFF_PRICE_YEAR_SETTING: "bad-value",
+                }
+                value = values.get(key)
+                return SimpleNamespace(value=value) if value is not None else None
+
+        tariffs = {
+            tariff.db_tariff_id: tariff for tariff in get_runtime_actual_tariffs(FakeSession())
+        }
+
+        self.assertEqual(tariffs["month"].price, 199)
+        self.assertEqual(tariffs["threemonths"].price, 599)
+        self.assertEqual(tariffs["year"].price, 1799)
+
     def test_authenticated_payment_does_not_send_login_email(self):
         request = SimpleNamespace(
             user=SimpleNamespace(is_authenticated=True, id=42),
