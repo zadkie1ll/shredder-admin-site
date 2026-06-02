@@ -125,6 +125,8 @@ SITE_REFERRAL_TRIAL_PERIOD_DAYS = config(
     default=15,
     cast=int,
 )
+
+# Включает виджет настройки подключения в личном кабинете, заменяя старый способ
 USE_NEW_SETUP_FLOW = config("USE_NEW_SETUP_FLOW", default=True, cast=bool)
 EMAIL_PROVIDER = config("EMAIL_PROVIDER", default="smtp")
 RESEND_API_KEY = config("RESEND_API_KEY", default="")
