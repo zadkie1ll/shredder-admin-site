@@ -20,6 +20,11 @@
 
         :root {
             --vh: 1vh;
+            --island-bg: #090a0f;
+            --island-panel: rgba(17, 18, 23, 0.78);
+            --island-border: rgba(255, 255, 255, 0.08);
+            --island-muted: rgba(255, 255, 255, 0.58);
+            --island-yellow: #ffc700;
         }
 
         html, body {
@@ -35,7 +40,9 @@
         
         body { 
             font-family: 'Montserrat', sans-serif; 
-            background-color: #080808;
+            background:
+                radial-gradient(circle at 50% 18%, rgba(255, 199, 0, 0.08), transparent 26rem),
+                linear-gradient(180deg, #0b0c12 0%, var(--island-bg) 100%);
             color: #ffffff;
             margin: 0;
         }
@@ -62,13 +69,40 @@
         .page-background-image {
             position: absolute;
             inset: 0;
-            background-image:
-                linear-gradient(rgba(13, 13, 13, 0.35), rgba(13, 13, 13, 0.65)),
-                url("{% static 'img/bg9.png' %}");
+            background:
+                radial-gradient(circle at 72% 46%, rgba(255, 199, 0, 0.12), transparent 26rem),
+                radial-gradient(circle at 24% 26%, rgba(255, 255, 255, 0.045), transparent 22rem),
+                linear-gradient(180deg, #0b0c12 0%, #090a0f 100%);
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;
             transform: translateZ(0);
+        }
+
+        .page-background::before,
+        .page-background::after {
+            content: "";
+            position: absolute;
+            width: min(42vw, 520px);
+            aspect-ratio: 1;
+            background-repeat: no-repeat;
+            background-position: center;
+            background-size: contain;
+            opacity: 0.22;
+            filter: drop-shadow(0 44px 80px rgba(0,0,0,0.45));
+        }
+
+        .page-background::before {
+            left: max(24px, calc(50% - 760px));
+            bottom: 6vh;
+            background-image: url("{% static 'img/onboarding/family-vpn.png' %}");
+        }
+
+        .page-background::after {
+            right: max(24px, calc(50% - 760px));
+            top: 10vh;
+            background-image: url("{% static 'img/onboarding/smart-switch.png' %}");
+            opacity: 0.16;
         }
 
         .login-shell {
@@ -86,14 +120,16 @@
         }
 
         .login-card {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 36px;
+            background:
+                radial-gradient(circle at 50% 0%, rgba(255, 199, 0, 0.055), transparent 18rem),
+                var(--island-panel);
+            backdrop-filter: blur(24px);
+            border: 1px solid var(--island-border);
+            border-radius: 24px;
             width: 100%;
-            max-width: 420px;
-            padding: 32px 36px 28px;
-            box-shadow: 0 40px 100px rgba(0,0,0,0.8);
+            max-width: 430px;
+            padding: 34px 36px 28px;
+            box-shadow: 0 42px 110px rgba(0,0,0,0.64);
             position: relative;
         }
 
@@ -120,8 +156,8 @@
         }
 
         .input-field {
-            background-color: rgba(255,255,255,0.06);
-            border: 1px solid rgba(255,255,255,0.1);
+            background-color: rgba(0,0,0,0.26);
+            border: 1px solid rgba(255,255,255,0.11);
             color: white;
             font-size: 16px;
             -webkit-appearance: none;
@@ -129,24 +165,24 @@
             transition: all 0.3s ease;
         }
 
-        .input-field::placeholder { color: rgba(255,255,255,0.35); }
+        .input-field::placeholder { color: rgba(255,255,255,0.36); }
 
         .input-field:focus {
             border-color: rgba(255,199,0,0.5);
-            background-color: rgba(255,255,255,0.08);
+            background-color: rgba(255,255,255,0.055);
             outline: none;
         }
 
         .tilda-yellow {
-            background-color: #ffc700;
-            color: #000;
-            box-shadow: 0 12px 28px rgba(255, 199, 0, 0.25);
+            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%);
+            color: #08090d;
+            box-shadow: 0 18px 48px rgba(255, 199, 0, 0.24), inset 0 -4px 0 rgba(0,0,0,0.16);
         }
 
         .tilda-yellow:hover {
-            background-color: #e6b400;
+            filter: brightness(1.04);
             transform: translateY(-1px);
-            box-shadow: 0 16px 36px rgba(255, 199, 0, 0.32);
+            box-shadow: 0 22px 54px rgba(255, 199, 0, 0.3), inset 0 -4px 0 rgba(0,0,0,0.16);
         }
 
         .social-login-icon-row {
@@ -194,7 +230,7 @@
             overflow: hidden;
             transition: all 0.2s ease;
             color: #fff;
-            font-weight: 900;
+            font-weight: 700;
             font-size: 16px;
             text-transform: none;
             letter-spacing: 0;
@@ -222,11 +258,12 @@
         }
 
         .telegram-login-hint {
-            margin: 8px 4px 0;
-            color: rgba(255,255,255,0.5);
-            font-size: 11px;
+            margin: 10px auto 0;
+            max-width: 310px;
+            color: var(--island-muted);
+            font-size: 12px;
             line-height: 1.35;
-            font-weight: 700;
+            font-weight: 500;
             text-align: center;
         }
 
@@ -234,13 +271,49 @@
             display: inline-flex;
             align-items: center;
             gap: 8px;
-            background: rgba(255,199,0,0.08);
-            border: 1px solid rgba(255,199,0,0.18);
+            background: rgba(255,199,0,0.07);
+            border: 1px solid rgba(255,199,0,0.2);
             border-radius: 999px;
             padding: 10px 18px;
             color: rgba(255,255,255,0.7);
             font-size: 12px;
-            font-weight: 800;
+            font-weight: 700;
+        }
+
+        .login-brand {
+            font-size: 18px;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .login-title {
+            margin: 0 0 10px;
+            font-size: 36px;
+            line-height: 1.1;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .login-subtitle {
+            margin: 0;
+            color: var(--island-muted);
+            font-size: 18px;
+            line-height: 1.35;
+            font-weight: 500;
+            letter-spacing: 0;
+        }
+
+        .login-card .font-black {
+            font-weight: 700 !important;
+        }
+
+        .login-card .font-bold {
+            font-weight: 500 !important;
+        }
+
+        .login-card .tilda-yellow,
+        .login-card button[type="submit"] {
+            font-weight: 800 !important;
         }
 
         .social-proof-badge i {
@@ -411,6 +484,11 @@
         }
 
         @media (hover: none) and (pointer: coarse) {
+            .page-background::before,
+            .page-background::after {
+                display: none;
+            }
+
             .page-background {
                 inset: -12svh 0 -12svh 0;
                 will-change: transform;
@@ -426,12 +504,23 @@
         @media (max-width: 640px) {
             .login-shell {
                 align-items: stretch;
+                padding-left: 16px;
+                padding-right: 16px;
             }
 
             .login-card {
                 margin: auto 0;
-                padding: 36px 24px;
-                border-radius: 28px;
+                padding: 34px 24px 26px;
+                border-radius: 22px;
+            }
+
+            .login-title {
+                font-size: 32px;
+                line-height: 1.08;
+            }
+
+            .login-subtitle {
+                font-size: 16px;
             }
 
             .cabinet-onboarding-frame {
@@ -535,13 +624,13 @@
                 <div id="step-input">
                     <div class="mb-5">
                         <div class="flex items-center justify-between mb-5">
-                            <span class="text-white font-black text-xl tracking-tight">Monkey <span class="text-[#ffc700]">Island</span></span>
+                            <span class="login-brand text-white">Monkey <span class="text-[#ffc700]">Island</span></span>
                             <a href="https://t.me/monkeyisland_support" target="_blank" rel="noopener" class="support-corner-btn" title="Поддержка">
                                 <i class="fas fa-headset"></i>
                             </a>
                         </div>
-                        <h2 class="text-2xl font-black leading-tight mb-2">Войдите или создайте аккаунт</h2>
-                        {% if site_role == 'vpn' or site_role == 'cabinet' %}<p class="text-gray-400 text-sm leading-snug">Смотрите YouTube без рекламы и обходите Белый Список</p>{% endif %}
+                        <h2 class="login-title">Войдите или создайте аккаунт</h2>
+                        {% if site_role == 'vpn' or site_role == 'cabinet' %}<p class="login-subtitle">Смотрите YouTube без рекламы и обходите Белый Список</p>{% endif %}
                     </div>
 
                     {% if telegram_bot_login_enabled %}

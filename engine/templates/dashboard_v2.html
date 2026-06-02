@@ -38,17 +38,17 @@
         }
         
         :root {
-            --bg-color: #0b0f12;
-            --card-bg: rgba(17, 23, 28, 0.96);
-            --inner-card-bg: rgba(21, 29, 35, 0.82);
-            --card-border: rgba(148, 163, 184, 0.16);
+            --bg-color: #090a0f;
+            --card-bg: rgba(17, 18, 23, 0.88);
+            --inner-card-bg: rgba(255, 255, 255, 0.055);
+            --card-border: rgba(255, 255, 255, 0.08);
             --brand-gold: #ffc700;
             --nav-height: calc(70px + env(safe-area-inset-bottom));
-            --v2-text: #e8edf2;
-            --v2-muted: #8d99a6;
-            --v2-panel: #11171c;
-            --v2-panel-soft: #151d23;
-            --v2-border: #24303a;
+            --v2-text: #ffffff;
+            --v2-muted: rgba(255, 255, 255, 0.58);
+            --v2-panel: #111217;
+            --v2-panel-soft: #15161c;
+            --v2-border: rgba(255, 255, 255, 0.08);
             --v2-success: #38d996;
             --v2-danger: #ff5c67;
         }
@@ -401,15 +401,15 @@
         }
 
         .payment-cta {
-            background: linear-gradient(135deg, #ff6b00, #ff9500) !important;
-            color: #ffffff !important;
-            border: 1px solid rgba(255, 107, 0, .5) !important;
-            box-shadow: 0 18px 38px rgba(255, 107, 0, .28), inset 0 -2px 0 rgba(0,0,0,.18) !important;
+            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%) !important;
+            color: #08090d !important;
+            border: 0 !important;
+            box-shadow: 0 18px 38px rgba(255, 199, 0, .24), inset 0 -3px 0 rgba(0,0,0,.16) !important;
         }
 
         .payment-cta:hover {
-            background: linear-gradient(135deg, #ff7d1a, #ffa520) !important;
-            box-shadow: 0 22px 48px rgba(255, 107, 0, .42), inset 0 -2px 0 rgba(0,0,0,.18) !important;
+            background: linear-gradient(180deg, #ffdb3d 0%, #ffc700 58%, #f0ae00 100%) !important;
+            box-shadow: 0 22px 48px rgba(255, 199, 0, .32), inset 0 -3px 0 rgba(0,0,0,.16) !important;
         }
 
         .overview-grid {
@@ -885,24 +885,34 @@
             }
         }
 
-        /* Dashboard v2 preview */
+        /* Monkey Island dark onboarding skin */
         body.dashboard-v2 {
             background:
-                radial-gradient(circle at top left, rgba(255, 199, 0, 0.08), transparent 34rem),
-                linear-gradient(180deg, #0a0a0b 0%, #0a0a0b 100%);
+                radial-gradient(circle at 78% 12%, rgba(255, 199, 0, 0.11), transparent 30rem),
+                radial-gradient(circle at 18% 24%, rgba(255, 255, 255, 0.035), transparent 22rem),
+                linear-gradient(180deg, #0b0c12 0%, #090a0f 100%);
+            color: #fff;
         }
 
         .dashboard-v2 .page-background-image {
-            opacity: 0.25;
-            filter: none;
+            opacity: 0.08;
+            filter: saturate(0.35) contrast(1.1) brightness(0.55);
+        }
+
+        .dashboard-v2 #app-container {
+            background:
+                radial-gradient(circle at 50% 16%, rgba(255, 199, 0, 0.055), transparent 26rem),
+                linear-gradient(180deg, rgba(9, 10, 15, 0.2), rgba(9, 10, 15, 0.92));
         }
 
         .dashboard-v2 .sidebar-desktop {
             width: 248px;
             padding: 28px 16px;
-            background: rgba(13, 13, 15, 0.9);
-            border-right: 1px solid rgba(255, 255, 255, 0.1);
-            backdrop-filter: blur(15px);
+            background:
+                radial-gradient(circle at 60% 0%, rgba(255, 199, 0, 0.09), transparent 18rem),
+                rgba(9, 10, 15, 0.82);
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(22px);
         }
 
         .dashboard-v2 .main-content {
@@ -923,41 +933,43 @@
             display: inline-flex;
             align-items: center;
             gap: 10px;
-            font-size: 16px !important;
+            font-size: 18px !important;
             font-weight: 700 !important;
             letter-spacing: 0 !important;
-            text-transform: none !important;
+            text-transform: uppercase !important;
         }
 
         .dashboard-v2 .sidebar-desktop a::before {
             content: "";
             width: 30px;
             height: 30px;
-            border-radius: 8px;
+            border-radius: 10px;
             background: url("{% static 'icons/icon-192x192.png' %}") center / cover no-repeat;
-            border: 1px solid rgba(255, 199, 0, 0.16);
+            border: 1px solid rgba(255, 199, 0, 0.26);
+            box-shadow: 0 0 24px rgba(255, 199, 0, 0.12);
         }
 
         .dashboard-v2 .nav-btn {
-            min-height: 42px;
+            min-height: 46px;
             color: var(--v2-muted);
             font-size: 14px;
-            font-weight: 600;
+            font-weight: 700;
             letter-spacing: 0;
-            text-transform: none;
+            text-transform: uppercase;
         }
 
         .dashboard-v2 .sidebar-desktop .nav-btn {
             gap: 12px;
-            margin-bottom: 4px;
-            padding: 10px 12px;
-            border-radius: 8px;
+            margin-bottom: 7px;
+            padding: 11px 13px;
+            border-radius: 999px;
         }
 
         .dashboard-v2 .sidebar-desktop .nav-btn.active {
-            color: var(--v2-text);
-            background: rgba(255, 199, 0, 0.08);
-            border: 1px solid rgba(255, 199, 0, 0.15);
+            color: #090a0f;
+            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%);
+            border: 0;
+            box-shadow: 0 18px 38px rgba(255, 199, 0, 0.18), inset 0 -3px 0 rgba(0,0,0,0.16);
         }
 
         .dashboard-v2 .nav-btn i {
@@ -968,8 +980,9 @@
 
         .dashboard-v2 .nav-mobile {
             height: calc(64px + env(safe-area-inset-bottom));
-            background: rgba(15, 15, 18, 0.98);
-            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(9, 10, 15, 0.94);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(22px);
             padding-top: 9px;
         }
 
@@ -992,7 +1005,7 @@
         }
 
         .dashboard-v2 .uppercase {
-            text-transform: none !important;
+            text-transform: none;
         }
 
         .dashboard-v2 h1,
@@ -1034,11 +1047,11 @@
         .dashboard-v2 .text-gray-500,
         .dashboard-v2 .text-gray-400,
         .dashboard-v2 .text-gray-300 {
-            color: var(--v2-muted) !important;
+            color: rgba(255, 255, 255, 0.58) !important;
         }
 
         .dashboard-v2 .text-white {
-            color: var(--v2-text) !important;
+            color: #fff !important;
         }
 
         .dashboard-v2 .setup-shell,
@@ -1050,10 +1063,13 @@
         .dashboard-v2 .referral-rule-card,
         .dashboard-v2 .referral-stat-card,
         .dashboard-v2 .referral-link-card {
-            border: 1px solid var(--v2-border) !important;
-            border-radius: 10px !important;
-            background: rgba(22, 22, 24, 0.95) !important;
-            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.18) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 16px !important;
+            background:
+                radial-gradient(circle at 50% 0%, rgba(255, 199, 0, 0.045), transparent 20rem),
+                rgba(17, 18, 23, 0.86) !important;
+            box-shadow: 0 26px 70px rgba(0, 0, 0, 0.34) !important;
+            backdrop-filter: blur(18px);
         }
 
         .dashboard-v2 .setup-shell {
@@ -1076,7 +1092,7 @@
 
         .dashboard-v2 .status-overview-card::before,
         .dashboard-v2 .overview-hero-card::before {
-            opacity: 0.45;
+            opacity: 0.18;
         }
 
         .dashboard-v2 .status-progress-track {
@@ -1101,30 +1117,30 @@
         .dashboard-v2 .w-12.h-12,
         .dashboard-v2 .w-14.h-14,
         .dashboard-v2 .w-16.h-16 {
-            width: 40px !important;
-            height: 40px !important;
-            border-radius: 8px !important;
+            width: 44px !important;
+            height: 44px !important;
+            border-radius: 12px !important;
         }
 
         .dashboard-v2 .rounded-2xl,
         .dashboard-v2 .rounded-3xl,
         .dashboard-v2 .rounded-xl {
-            border-radius: 8px !important;
+            border-radius: 14px !important;
         }
 
         .dashboard-v2 .setup-link-btn,
         .dashboard-v2 .setup-cta-btn,
         .dashboard-v2 button[type="submit"].bg-\[\#ffc700\] {
-            min-height: 42px !important;
-            padding: 10px 16px !important;
-            border-radius: 8px !important;
-            background: var(--brand-gold) !important;
-            color: #171300 !important;
+            min-height: 48px !important;
+            padding: 12px 18px !important;
+            border-radius: 999px !important;
+            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%) !important;
+            color: #08090d !important;
             font-size: 13px !important;
             font-weight: 700 !important;
             letter-spacing: 0 !important;
-            text-transform: none !important;
-            box-shadow: none !important;
+            text-transform: uppercase !important;
+            box-shadow: 0 18px 38px rgba(255, 199, 0, 0.22), inset 0 -3px 0 rgba(0,0,0,0.16) !important;
         }
 
         .dashboard-v2 .setup-link-btn:hover,
@@ -1135,9 +1151,10 @@
         .dashboard-v2 .setup-link-btn.setup-secondary-btn,
         .dashboard-v2 .setup-cta-btn.setup-secondary-btn,
         .dashboard-v2 .bg-white\/10 {
-            background: rgba(255, 255, 255, 0.06) !important;
+            background: rgba(255, 255, 255, 0.055) !important;
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            color: var(--v2-text) !important;
+            color: #fff !important;
+            box-shadow: none !important;
         }
 
         .dashboard-v2 .platform-btn,
@@ -1155,24 +1172,24 @@
         .dashboard-v2 textarea,
         .dashboard-v2 .referral-link-input,
         .dashboard-v2 .support-input {
-            border-radius: 8px !important;
+            border-radius: 14px !important;
             border-color: rgba(255, 255, 255, 0.1) !important;
-            background: rgba(0, 0, 0, 0.55) !important;
-            color: var(--v2-text) !important;
-            font-weight: 500 !important;
+            background: rgba(0, 0, 0, 0.42) !important;
+            color: #fff !important;
+            font-weight: 700 !important;
         }
 
         .dashboard-v2 .key-box {
-            border-radius: 10px;
-            background: rgba(0, 0, 0, 0.4) !important;
+            border-radius: 16px;
+            background: rgba(0, 0, 0, 0.38) !important;
         }
 
         .dashboard-v2 .step-number-circle {
-            width: 38px;
-            height: 38px;
-            border-radius: 8px;
+            width: 42px;
+            height: 42px;
+            border-radius: 999px;
             font-weight: 700;
-            box-shadow: none;
+            box-shadow: 0 0 22px rgba(255, 199, 0, 0.22);
         }
 
         .dashboard-v2 .stepper-line {
@@ -1185,8 +1202,8 @@
         }
 
         .dashboard-v2 .support-message {
-            border-radius: 10px;
-            font-weight: 500;
+            border-radius: 16px;
+            font-weight: 700;
         }
 
         .dashboard-v2 .support-message p {
@@ -1196,6 +1213,13 @@
         .dashboard-v2 .copy-toast {
             border-radius: 8px;
             font-weight: 700;
+        }
+
+        .dashboard-v2 #app-container .setup-cta-btn,
+        .dashboard-v2 #app-container .setup-link-btn,
+        .dashboard-v2 #app-container .payment-cta,
+        .dashboard-v2 #app-container button[type="submit"].bg-\[\#ffc700\] {
+            font-weight: 800 !important;
         }
 
         @media (max-width: 1024px) {

@@ -14,26 +14,43 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
         
-        body { 
-            font-family: 'Montserrat', sans-serif; 
-            background-color: #111111; 
+        :root {
+            --island-bg: #090a0f;
+            --island-panel: rgba(17, 18, 23, 0.86);
+            --island-panel-strong: rgba(20, 21, 27, 0.94);
+            --island-border: rgba(255, 255, 255, 0.08);
+            --island-muted: rgba(255, 255, 255, 0.58);
+            --island-yellow: #ffc700;
+        }
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background:
+                radial-gradient(circle at 50% 20%, rgba(255, 199, 0, 0.08), transparent 26rem),
+                linear-gradient(180deg, #0b0c12 0%, var(--island-bg) 100%);
             color: #ffffff;
             overflow-x: hidden;
         }
 
         .hero-bg {
-            background-image: linear-gradient(180deg, rgba(17,17,17,0.3) 0%, #111111 100%), 
-                            url("{% static 'img/header-no-logo.png' %}");
-            background-image: 
-                linear-gradient(270deg, rgba(17,17,17,0.85) 0%, rgba(17,17,17,0.4) 60%, rgba(17,17,17,0) 100%),
-                linear-gradient(180deg, rgba(17,17,17,0.0) 60%, #111111 100%),
-                url("{% static 'img/header-no-logo.png' %}");
-            background-size: cover;
-            background-position: center;
-            background-repeat: no-repeat;
-            min-height: 100vh;
+            background:
+                radial-gradient(circle at 72% 50%, rgba(255, 199, 0, 0.13), transparent 28rem),
+                radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.04), transparent 20rem),
+                linear-gradient(180deg, #0b0c12 0%, #090a0f 100%);
+            min-height: 100svh;
             display: flex;
             flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .hero-bg::after {
+            content: "";
+            position: absolute;
+            inset: auto 0 0;
+            height: 34%;
+            background: linear-gradient(180deg, transparent 0%, var(--island-bg) 100%);
+            pointer-events: none;
         }
 
         /* Добавим тень для всей навигации, чтобы буквы не сливались с небом */
@@ -42,10 +59,10 @@
         }
 
         .benefit-card {
-            background: rgba(255, 255, 255, 0.03);
-            backdrop-filter: blur(5px);
-            border: 1px solid rgba(255, 255, 255, 0.05);
-            border-radius: 20px;
+            background: var(--island-panel);
+            backdrop-filter: blur(18px);
+            border: 1px solid var(--island-border);
+            border-radius: 12px;
             padding: 20px;
             transition: all 0.3s ease;
         }
@@ -55,13 +72,17 @@
             border-color: #ffc700;
         }
 
-        .tilda-yellow { background-color: #ffc700; color: #000000; }
+        .tilda-yellow {
+            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%);
+            color: #08090d;
+            box-shadow: 0 18px 48px rgba(255, 199, 0, 0.24), inset 0 -4px 0 rgba(0,0,0,0.16);
+        }
         .tilda-yellow:hover { background-color: #e6b400; }
         
         .tariff-card {
-            background-color: #1a1a1a;
-            border: 1px solid #2a2a2a;
-            border-radius: 20px;
+            background: var(--island-panel-strong);
+            border: 1px solid var(--island-border);
+            border-radius: 18px;
             transition: all 0.3s ease;
             position: relative;
         }
@@ -73,17 +94,16 @@
         }
 
         .input-field {
-            background-color: #222222;
-            border: 1px solid #333333;
+            background-color: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.12);
             color: white;
             border-radius: 12px;
         }
 
         .hero-title {
-            font-weight: 900;
-            letter-spacing: -2px;
-            /* Тень для читаемости на фоне облаков */
-            text-shadow: 0 4px 20px rgba(0,0,0,0.6);
+            font-weight: 700;
+            letter-spacing: 0;
+            text-shadow: none;
         }
 
         .drop-shadow-custom {
@@ -106,15 +126,65 @@
         }
 
         .pay-cta {
-            background: linear-gradient(135deg, #ff6b00, #ff9500);
-            color: #fff;
-            border: 1px solid rgba(255, 107, 0, .5);
-            box-shadow: 0 18px 38px rgba(255, 107, 0, .28), inset 0 -2px 0 rgba(0,0,0,.18);
+            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%);
+            color: #08090d;
+            border: 0;
+            box-shadow: 0 18px 38px rgba(255, 199, 0, .24), inset 0 -3px 0 rgba(0,0,0,.16);
         }
 
         .pay-cta:hover {
-            background: linear-gradient(135deg, #ff7d1a, #ffa520);
-            box-shadow: 0 22px 48px rgba(255, 107, 0, .42), inset 0 -2px 0 rgba(0,0,0,.18);
+            background: linear-gradient(180deg, #ffdb3d 0%, #ffc700 58%, #f0ae00 100%);
+            box-shadow: 0 22px 48px rgba(255, 199, 0, .32), inset 0 -3px 0 rgba(0,0,0,.16);
+        }
+
+        .hero-art {
+            width: min(92vw, 560px);
+            filter: drop-shadow(0 46px 80px rgba(0,0,0,0.55));
+        }
+
+        .island-section {
+            background:
+                radial-gradient(circle at 50% 10%, rgba(255, 199, 0, 0.05), transparent 26rem),
+                var(--island-bg) !important;
+        }
+
+        body > section,
+        footer {
+            background:
+                radial-gradient(circle at 50% 0%, rgba(255, 199, 0, 0.045), transparent 28rem),
+                var(--island-bg) !important;
+            border-color: var(--island-border) !important;
+        }
+
+        .font-black {
+            font-weight: 700 !important;
+        }
+
+        .tilda-yellow,
+        .pay-cta,
+        .discount-badge {
+            font-weight: 800 !important;
+        }
+
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: clamp(3.1rem, 14vw, 5.4rem) !important;
+                line-height: 0.98 !important;
+                text-align: left;
+            }
+
+            .hero-copy {
+                align-items: flex-start !important;
+                text-align: left !important;
+            }
+
+            .hero-art {
+                width: min(96vw, 430px);
+            }
+
+            .tariff-card {
+                border-radius: 16px;
+            }
         }
 
         /* Убираем стандартный маркер списка у details */
@@ -146,8 +216,8 @@
 <body class="antialiased">
 
     <div class="hero-bg">
-        <nav class="container mx-auto px-6 py-8 flex justify-between items-center relative z-10">
-            <div class="text-xl md:text-2xl font-black uppercase tracking-tighter">
+        <nav class="container mx-auto px-6 py-7 flex justify-between items-center relative z-10">
+            <div class="text-xl md:text-2xl font-black uppercase tracking-normal">
                 MONKEY ISLAND<span class="text-[#ffc700]"> VPN</span>
             </div>
             <div class="flex items-center space-x-4 md:space-x-10 font-bold text-xs md:text-sm uppercase">
@@ -158,19 +228,18 @@
             </div>
         </nav>
 
-        <section class="container mx-auto px-6 pb-14 md:pb-20 flex-grow flex items-center justify-center md:justify-end">
-            <div class="flex flex-col items-center text-center md:items-end md:text-right max-w-3xl">
-                <h1 class="hero-title text-4xl sm:text-6xl md:text-8xl mb-6 uppercase leading-[0.9]">
-                    БЫСТРЫЙ VPN <br>
-                    <span class="text-[#ffc700] whitespace-nowrap">ДЛЯ ВСЕХ УСТРОЙСТВ</span>
+        <section class="container mx-auto px-6 py-8 md:py-16 flex-grow grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(360px,560px)] items-center gap-8 lg:gap-12 relative z-10">
+            <div class="hero-copy flex flex-col items-center text-center lg:items-start lg:text-left max-w-3xl">
+                <h1 class="hero-title text-5xl sm:text-6xl md:text-8xl mb-7 leading-[0.98]">
+                    VPN для всей семьи и ваших устройств
                 </h1>
                 
-                <p class="text-gray-100 text-base md:text-2xl mb-10 font-medium drop-shadow-custom max-w-2xl">
+                <p class="text-white/60 text-xl md:text-3xl mb-10 font-medium max-w-2xl leading-snug">
                     Удобный и безопасный VPN для телефона, компьютера, планшета и роутера.
                     До 15 устройств на одной подписке.
                 </p>
                 
-                <div class="flex flex-col sm:flex-row items-center justify-center md:justify-end gap-4 mb-16 md:mb-24">
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-4 mb-10 w-full sm:w-auto">
                     <a href="#prices" class="tilda-yellow w-full sm:w-auto px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95">
                         ПОДКЛЮЧИТЬ VPN
                     </a>
@@ -185,7 +254,7 @@
                     {% endif %}
                 </div>
 
-                <div class="w-full grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6 pt-10 border-t border-white/10">
+                <div class="w-full grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 pt-8 border-t border-white/10">
                     <div class="benefit-card flex flex-col items-center">
                         <div class="text-[#ffc700] mb-3 text-2xl">
                             <i class="fas fa-globe-americas"></i>
@@ -216,6 +285,9 @@
                         </p>
                     </div>
                 </div>
+            </div>
+            <div class="flex justify-center lg:justify-end">
+                <img class="hero-art" src="{% static 'img/onboarding/family-vpn.png' %}" alt="">
             </div>
         </section>
     </div>
