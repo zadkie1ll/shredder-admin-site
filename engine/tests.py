@@ -176,7 +176,8 @@ class PaymentRedirectTests(SimpleTestCase):
                 return SimpleNamespace(value=value) if value is not None else None
 
         tariffs = {
-            tariff.db_tariff_id: tariff for tariff in get_runtime_actual_tariffs(FakeSession())
+            tariff.db_tariff_id: tariff
+            for tariff in get_runtime_actual_tariffs(FakeSession())
         }
 
         self.assertEqual(tariffs["month"].price, 199)
@@ -208,7 +209,9 @@ class PaymentRedirectTests(SimpleTestCase):
         confirmation = SimpleNamespace(confirmation_url="https://yk.example/pay")
         payment = SimpleNamespace(id="yk-payment-id", confirmation=confirmation)
 
-        with mock.patch("engine.payments.Payment.create", return_value=payment) as create:
+        with mock.patch(
+            "engine.payments.Payment.create", return_value=payment
+        ) as create:
             created_payment = create_yk_payment_sync(
                 shop_id="shop-id",
                 secret="secret",
