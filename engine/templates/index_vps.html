@@ -4,6 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#090a0f">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Monkey Island VPS — Мощный VPS для интернета и игр</title>
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
@@ -23,6 +25,11 @@
             --island-yellow: #ffc700;
         }
 
+        html {
+            min-height: 100%;
+            background: var(--island-bg);
+        }
+
         body {
             font-family: 'Montserrat', sans-serif;
             background:
@@ -30,6 +37,7 @@
                 linear-gradient(180deg, #0b0c12 0%, var(--island-bg) 100%);
             color: #ffffff;
             overflow-x: hidden;
+            min-height: 100%;
         }
 
         .hero-bg {
@@ -148,6 +156,10 @@
             filter: drop-shadow(0 46px 80px rgba(0,0,0,0.55));
         }
 
+        .hero-art-mobile {
+            display: none;
+        }
+
         body > section,
         footer {
             background:
@@ -167,9 +179,13 @@
         }
 
         @media (max-width: 768px) {
+            nav {
+                padding-top: max(18px, env(safe-area-inset-top)) !important;
+            }
+
             .hero-title {
-                font-size: clamp(3.1rem, 14vw, 5.4rem) !important;
-                line-height: 0.98 !important;
+                font-size: clamp(2.9rem, 13vw, 4.8rem) !important;
+                line-height: 1 !important;
                 text-align: left;
             }
 
@@ -179,7 +195,14 @@
             }
 
             .hero-art {
+                display: none;
+            }
+
+            .hero-art-mobile {
+                display: block;
                 width: min(96vw, 430px);
+                margin: -8px auto 6px;
+                filter: drop-shadow(0 38px 70px rgba(0,0,0,0.52));
             }
 
             .tariff-card {
@@ -237,6 +260,8 @@
                 <p class="text-white/60 text-xl md:text-3xl mb-10 font-medium max-w-2xl leading-snug">
                     Высокоскоростные серверы для снижения пинга в играх, стабильного стриминга. Канал до 10 Гбит/с без лимитов по трафику.
                 </p>
+
+                <img class="hero-art-mobile" src="{% static 'img/onboarding/always-on.png' %}" alt="">
 
                 <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-4 mb-10 w-full sm:w-auto">
                     <a href="#prices" class="tilda-yellow w-full sm:w-auto px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95">
