@@ -3209,7 +3209,11 @@
         }
 
         // 4. Инициализация при загрузке (чтобы была открыта первая вкладка)
-        document.addEventListener('DOMContentLoaded', () => {});
+        document.addEventListener('DOMContentLoaded', () => {
+            try {
+                localStorage.setItem('monkeyIslandHasDashboard', '1');
+            } catch (err) {}
+        });
     </script>
 </body>
 </html>

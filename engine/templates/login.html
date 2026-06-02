@@ -149,49 +149,53 @@
             box-shadow: 0 16px 36px rgba(255, 199, 0, 0.32);
         }
 
-        .social-login-btn {
-            width: 100%;
-            min-height: 52px;
-            border-radius: 999px;
+        .social-login-icon-row {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            margin-top: 16px;
+        }
+
+        .social-login-icon-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
             background: rgba(255, 255, 255, 0.08);
             border: 1px solid rgba(255,255,255,0.12);
             color: #fff;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 14px;
             font-weight: 900;
-            font-size: 13px;
-            text-transform: none;
-            letter-spacing: 0;
             transition: all 0.2s ease;
         }
 
-        .social-login-btn:hover {
+        .social-login-icon-btn:hover {
             background: rgba(255,255,255,0.13);
             transform: translateY(-1px);
         }
 
-        .social-login-btn svg {
-            width: 24px;
-            height: 24px;
-            flex-shrink: 0;
+        .social-login-icon-btn svg {
+            width: 22px;
+            height: 22px;
         }
 
         .telegram-login-shell {
             width: 100%;
-            min-height: 52px;
+            min-height: 58px;
             border-radius: 999px;
-            background: rgba(42, 171, 238, 0.15);
-            border: 1px solid rgba(42, 171, 238, 0.3);
+            background: linear-gradient(180deg, rgba(42, 43, 50, 0.96), rgba(29, 30, 36, 0.98));
+            border: 1px solid rgba(255,255,255,0.08);
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
             transition: all 0.2s ease;
-            color: #2aabee;
+            color: #fff;
             font-weight: 900;
-            font-size: 13px;
+            font-size: 16px;
             text-transform: none;
             letter-spacing: 0;
             gap: 12px;
@@ -199,12 +203,31 @@
         }
 
         .telegram-login-shell:hover {
-            background: rgba(42, 171, 238, 0.22);
+            background: linear-gradient(180deg, rgba(52, 53, 61, 0.98), rgba(35, 36, 43, 1));
             transform: translateY(-1px);
+            box-shadow: 0 20px 44px rgba(0, 0, 0, 0.42);
         }
 
         .telegram-login-shell i {
-            font-size: 22px;
+            width: 34px;
+            height: 34px;
+            border-radius: 50%;
+            background: #2aabee;
+            color: #fff;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 17px;
+            box-shadow: inset 0 -1px 0 rgba(0,0,0,0.18);
+        }
+
+        .telegram-login-hint {
+            margin: 8px 4px 0;
+            color: rgba(255,255,255,0.5);
+            font-size: 11px;
+            line-height: 1.35;
+            font-weight: 700;
+            text-align: center;
         }
 
         .social-proof-badge {
@@ -243,6 +266,153 @@
         /* Анимация для состояния отправки */
         .hidden-step { display: none; }
 
+        .cabinet-onboarding {
+            position: fixed;
+            inset: 0;
+            z-index: 50;
+            display: flex;
+            justify-content: center;
+            background: #090a0f;
+            color: #fff;
+            overflow: hidden;
+        }
+
+        .cabinet-onboarding.is-hidden {
+            display: none;
+        }
+
+        .cabinet-onboarding-frame {
+            width: min(100vw, 430px);
+            min-height: calc(var(--vh, 1vh) * 100);
+            padding: max(22px, env(safe-area-inset-top)) 32px max(22px, env(safe-area-inset-bottom));
+            display: flex;
+            flex-direction: column;
+            background:
+                radial-gradient(circle at 50% 55%, rgba(255, 199, 0, 0.12), transparent 34%),
+                linear-gradient(180deg, #0b0c12 0%, #090a0f 100%);
+            position: relative;
+        }
+
+        .cabinet-onboarding-progress {
+            display: grid;
+            grid-template-columns: repeat(5, minmax(0, 1fr));
+            gap: 10px;
+            padding-top: 22px;
+            margin-bottom: 70px;
+        }
+
+        .cabinet-onboarding-progress span {
+            height: 4px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.12);
+        }
+
+        .cabinet-onboarding-progress span.is-active {
+            background: #ffc700;
+            box-shadow: 0 0 16px rgba(255, 199, 0, 0.4);
+        }
+
+        .cabinet-onboarding-slides {
+            flex: 1 1 auto;
+            min-height: 0;
+            position: relative;
+        }
+
+        .cabinet-onboarding-slide {
+            display: none;
+            height: 100%;
+            flex-direction: column;
+        }
+
+        .cabinet-onboarding-slide.is-active {
+            display: flex;
+        }
+
+        .cabinet-onboarding-title {
+            margin: 0 0 22px;
+            font-size: 36px;
+            line-height: 1.12;
+            font-weight: 700;
+            letter-spacing: 0;
+        }
+
+        .cabinet-onboarding-text {
+            margin: 0;
+            color: rgba(255,255,255,0.58);
+            font-size: 22px;
+            line-height: 1.35;
+            font-weight: 500;
+            letter-spacing: 0;
+        }
+
+        .cabinet-onboarding-art {
+            flex: 1 1 auto;
+            min-height: 260px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 28px 0 20px;
+            position: relative;
+        }
+
+        .cabinet-onboarding-art img {
+            width: min(100%, 330px);
+            max-height: 42vh;
+            object-fit: contain;
+            mix-blend-mode: screen;
+            filter: drop-shadow(0 36px 60px rgba(0,0,0,0.45)) saturate(1.08) contrast(1.03);
+            -webkit-mask-image: radial-gradient(ellipse at center, #000 48%, rgba(0,0,0,0.78) 60%, rgba(0,0,0,0.22) 72%, transparent 84%);
+            mask-image: radial-gradient(ellipse at center, #000 48%, rgba(0,0,0,0.78) 60%, rgba(0,0,0,0.22) 72%, transparent 84%);
+        }
+
+        .cabinet-onboarding-legal {
+            margin: 0 0 18px;
+            color: rgba(255,255,255,0.52);
+            font-size: 13px;
+            line-height: 1.35;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        .cabinet-onboarding:not(.is-final) .cabinet-onboarding-legal {
+            visibility: hidden;
+        }
+
+        .cabinet-onboarding-legal a {
+            color: rgba(255,255,255,0.78);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .cabinet-onboarding-next {
+            width: 100%;
+            min-height: 58px;
+            border: 0;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 56%, #f0ae00 100%);
+            color: #08090d;
+            font: inherit;
+            font-size: 18px;
+            font-weight: 800;
+            cursor: pointer;
+            box-shadow: 0 18px 48px rgba(255, 199, 0, 0.24), inset 0 -4px 0 rgba(0,0,0,0.16);
+            transition: transform .18s ease, filter .18s ease;
+        }
+
+        .cabinet-onboarding-next:hover {
+            transform: translateY(-1px);
+            filter: brightness(1.04);
+        }
+
+        .cabinet-onboarding-next:focus {
+            outline: none;
+        }
+
+        .cabinet-onboarding-next:focus-visible {
+            outline: 3px solid rgba(255, 199, 0, 0.54);
+            outline-offset: 4px;
+        }
+
         @media (hover: none) and (pointer: coarse) {
             .page-background {
                 inset: -12svh 0 -12svh 0;
@@ -266,6 +436,29 @@
                 padding: 36px 24px;
                 border-radius: 28px;
             }
+
+            .cabinet-onboarding-frame {
+                width: 100vw;
+                padding-left: 28px;
+                padding-right: 28px;
+            }
+
+            .cabinet-onboarding-progress {
+                margin-bottom: 60px;
+            }
+
+            .cabinet-onboarding-title {
+                font-size: 34px;
+            }
+
+            .cabinet-onboarding-text {
+                font-size: 21px;
+            }
+
+            .cabinet-onboarding-art img {
+                width: min(100%, 340px);
+                max-height: 40vh;
+            }
         }
     </style>
     {% include "includes/yandex_metrika.html" %}
@@ -274,6 +467,69 @@
     <div class="page-background">
         <div class="page-background-image"></div>
     </div>
+
+    {% if login_onboarding_enabled %}
+    <div class="cabinet-onboarding" id="loginOnboarding" aria-label="Знакомство с Monkey Island VPN">
+        <div class="cabinet-onboarding-frame">
+            <div class="cabinet-onboarding-progress" aria-hidden="true">
+                <span class="is-active"></span>
+                <span></span>
+                <span></span>
+                <span></span>
+                <span></span>
+            </div>
+
+            <div class="cabinet-onboarding-slides">
+                <section class="cabinet-onboarding-slide is-active">
+                    <h2 class="cabinet-onboarding-title">VPN для всей семьи и ваших устройств</h2>
+                    <p class="cabinet-onboarding-text">Подключайте телефон, ноутбук, планшет и роутер — все в одном личном кабинете</p>
+                    <div class="cabinet-onboarding-art">
+                        <img src="{% static 'img/onboarding/family-vpn.png' %}" alt="">
+                    </div>
+                </section>
+
+                <section class="cabinet-onboarding-slide">
+                    <h2 class="cabinet-onboarding-title">Автоматическое переключение</h2>
+                    <p class="cabinet-onboarding-text">Открывайте банки, госуслуги и привычные приложения без лишней возни с настройками</p>
+                    <div class="cabinet-onboarding-art">
+                        <img src="{% static 'img/onboarding/smart-switch.png' %}" alt="">
+                    </div>
+                </section>
+
+                <section class="cabinet-onboarding-slide">
+                    <h2 class="cabinet-onboarding-title">Белый список — не проблема</h2>
+                    <p class="cabinet-onboarding-text">Monkey Island помогает оставаться на связи, когда доступны только отдельные сайты</p>
+                    <div class="cabinet-onboarding-art">
+                        <img src="{% static 'img/onboarding/open-internet.png' %}" alt="">
+                    </div>
+                </section>
+
+                <section class="cabinet-onboarding-slide">
+                    <h2 class="cabinet-onboarding-title">YouTube без рекламы</h2>
+                    <p class="cabinet-onboarding-text">Смотрите любимые видео спокойнее, быстрее и без лишних пауз</p>
+                    <div class="cabinet-onboarding-art">
+                        <img src="{% static 'img/onboarding/no-ads.png' %}" alt="">
+                    </div>
+                </section>
+
+                <section class="cabinet-onboarding-slide">
+                    <h2 class="cabinet-onboarding-title">Работает, когда другие VPN нет</h2>
+                    <p class="cabinet-onboarding-text">Включите один раз и возвращайтесь к своим задачам без постоянной смены VPN</p>
+                    <div class="cabinet-onboarding-art">
+                        <img src="{% static 'img/onboarding/always-on.png' %}" alt="">
+                    </div>
+                </section>
+            </div>
+
+            <p class="cabinet-onboarding-legal">
+                Нажимая кнопку, вы соглашаетесь с
+                <a href="/privacy/">Политикой конфиденциальности</a>
+                и <a href="/offer/">Офертой</a>
+            </p>
+            <button class="cabinet-onboarding-next" id="loginOnboardingNext" type="button">Начать</button>
+        </div>
+    </div>
+    {% endif %}
 
     <div id="app-container">
         <div class="login-shell">
@@ -291,48 +547,18 @@
                         {% if site_role == 'vpn' or site_role == 'cabinet' %}<p class="text-gray-400 text-sm leading-snug">Смотрите YouTube без рекламы и обходите Белый Список</p>{% endif %}
                     </div>
 
-                    {% if social_login_enabled %}
-                        <div class="space-y-2">
-                    {% endif %}
-
-                    {% if google_oauth_enabled %}
-                        <a href="{% url 'google_login' %}{% if tracking_params %}?{% for key, value in tracking_params.items %}{% if not forloop.first %}&{% endif %}{{ key }}={{ value|urlencode }}{% endfor %}{% endif %}"
-                           class="social-login-btn"
-                           aria-label="Войти через Google"
-                           title="Войти через Google">
-                            <svg viewBox="0 0 48 48" aria-hidden="true">
-                                <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.654 32.657 29.223 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
-                                <path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
-                                <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
-                                <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
-                            </svg>
-                            Войти через Google
-                        </a>
-                    {% endif %}
-
-                    {% if yandex_oauth_enabled %}
-                        <a href="{% url 'yandex_login' %}{% if tracking_params %}?{% for key, value in tracking_params.items %}{% if not forloop.first %}&{% endif %}{{ key }}={{ value|urlencode }}{% endfor %}{% endif %}"
-                           class="social-login-btn"
-                           aria-label="Войти через Яндекс"
-                           title="Войти через Яндекс">
-                            <span class="yandex-logo-mark" aria-hidden="true">Я</span>
-                            Войти через Яндекс
-                        </a>
-                    {% endif %}
-
                     {% if telegram_bot_login_enabled %}
                         <a href="{{ telegram_bot_login_url }}"
                            class="telegram-login-shell"
                            aria-label="Войти через Telegram"
                            title="Войти через Telegram">
                             <i class="fab fa-telegram-plane"></i>
-                            Войти через Telegram-бота
+                            Войти через Telegram
                         </a>
+                        <p class="telegram-login-hint">Бот создаст подписку и сразу пришлет ссылку в личный кабинет.</p>
                     {% endif %}
 
-                    {% if social_login_enabled %}
-                        </div>
-
+                    {% if telegram_bot_login_enabled %}
                         <div class="flex items-center gap-4 my-6">
                             <div class="h-px flex-1 bg-white/10"></div>
                             <span class="text-gray-500 text-[10px] font-black uppercase tracking-widest whitespace-nowrap">или по email</span>
@@ -360,6 +586,32 @@
                             Продолжить
                         </button>
                     </form>
+
+                    {% if google_oauth_enabled or yandex_oauth_enabled %}
+                        <div class="social-login-icon-row" aria-label="Другие способы входа">
+                            {% if google_oauth_enabled %}
+                                <a href="{% url 'google_login' %}{% if tracking_params %}?{% for key, value in tracking_params.items %}{% if not forloop.first %}&{% endif %}{{ key }}={{ value|urlencode }}{% endfor %}{% endif %}"
+                                   class="social-login-icon-btn"
+                                   aria-label="Войти через Google"
+                                   title="Войти через Google">
+                                    <svg viewBox="0 0 48 48" aria-hidden="true">
+                                        <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.654 32.657 29.223 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+                                        <path fill="#FF3D00" d="m6.306 14.691 6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                                        <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+                                        <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+                                    </svg>
+                                </a>
+                            {% endif %}
+                            {% if yandex_oauth_enabled %}
+                                <a href="{% url 'yandex_login' %}{% if tracking_params %}?{% for key, value in tracking_params.items %}{% if not forloop.first %}&{% endif %}{{ key }}={{ value|urlencode }}{% endfor %}{% endif %}"
+                                   class="social-login-icon-btn"
+                                   aria-label="Войти через Яндекс"
+                                   title="Войти через Яндекс">
+                                    <span class="yandex-logo-mark" aria-hidden="true">Я</span>
+                                </a>
+                            {% endif %}
+                        </div>
+                    {% endif %}
                 </div>
 
                 <div id="step-success" class="hidden-step">
@@ -484,6 +736,69 @@
         }
         window.addEventListener('orientationchange', setFullHeight);
         setFullHeight();
+
+        (function setupLoginOnboarding() {
+            const onboarding = document.getElementById('loginOnboarding');
+            if (!onboarding) return;
+
+            const storageKey = 'monkeyIslandLoginOnboardingSeen';
+            const forceShow = new URLSearchParams(window.location.search).get('onboarding') === '1';
+            const alwaysShowOnLocalhost = ['localhost', '127.0.0.1', '::1'].includes(window.location.hostname);
+            try {
+                if (
+                    !alwaysShowOnLocalhost
+                    && !forceShow
+                    && localStorage.getItem(storageKey) === '1'
+                ) {
+                    onboarding.classList.add('is-hidden');
+                    onboarding.setAttribute('aria-hidden', 'true');
+                    return;
+                }
+            } catch (err) {}
+
+            const slides = Array.from(onboarding.querySelectorAll('.cabinet-onboarding-slide'));
+            const progress = Array.from(onboarding.querySelectorAll('.cabinet-onboarding-progress span'));
+            const nextButton = document.getElementById('loginOnboardingNext');
+            let activeIndex = 0;
+
+            function renderSlide() {
+                slides.forEach((slide, index) => {
+                    slide.classList.toggle('is-active', index === activeIndex);
+                });
+                progress.forEach((item, index) => {
+                    item.classList.toggle('is-active', index <= activeIndex);
+                });
+                if (activeIndex === 0) {
+                    nextButton.textContent = 'Начать';
+                } else if (activeIndex === slides.length - 1) {
+                    nextButton.textContent = 'К кабинету';
+                } else {
+                    nextButton.textContent = 'Далее';
+                }
+                onboarding.classList.toggle('is-final', activeIndex === slides.length - 1);
+            }
+
+            function closeOnboarding() {
+                try {
+                    if (!alwaysShowOnLocalhost) {
+                        localStorage.setItem(storageKey, '1');
+                    }
+                } catch (err) {}
+                onboarding.classList.add('is-hidden');
+                onboarding.setAttribute('aria-hidden', 'true');
+            }
+
+            nextButton.addEventListener('click', () => {
+                if (activeIndex >= slides.length - 1) {
+                    closeOnboarding();
+                    return;
+                }
+                activeIndex += 1;
+                renderSlide();
+            });
+
+            renderSlide();
+        })();
 
         document.getElementById('magicLinkForm').addEventListener('submit', async function(e) {
             e.preventDefault();

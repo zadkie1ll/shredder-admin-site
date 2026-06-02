@@ -184,7 +184,7 @@
                         МОЙ КАБИНЕТ
                     </a>
                     {% else %}
-                    <a href="/login/" class="w-full sm:w-auto px-10 md:px-12 py-4 md:py-6 rounded-full border border-[#ffc700] bg-black/30 text-[#ffc700] font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 hover:bg-[#ffc700] hover:text-black active:scale-95">
+                    <a href="/login/" data-known-user-cta class="w-full sm:w-auto px-10 md:px-12 py-4 md:py-6 rounded-full border border-[#ffc700] bg-black/30 text-[#ffc700] font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 hover:bg-[#ffc700] hover:text-black active:scale-95">
                         ПОПРОБОВАТЬ БЕСПЛАТНО
                     </a>
                     {% endif %}
@@ -598,5 +598,21 @@
         </div>
     </footer>
 
+    <script>
+        (function updateKnownUserCta() {
+            try {
+                if (localStorage.getItem('monkeyIslandHasDashboard') !== '1') {
+                    return;
+                }
+            } catch (err) {
+                return;
+            }
+
+            document.querySelectorAll('[data-known-user-cta]').forEach((button) => {
+                button.textContent = 'ЛИЧНЫЙ КАБИНЕТ';
+                button.setAttribute('aria-label', 'Личный кабинет');
+            });
+        })();
+    </script>
 </body>
 </html>
