@@ -16,7 +16,9 @@ from engine.views import auth_by_telegram_widget
 from engine.views import get_runtime_actual_tariffs
 from engine.views import get_telegram_auth_bot
 from engine.views import render_login
+from engine.views import should_create_trial_for_channel
 from engine.views import should_send_payment_login_email
+from engine.views import site_trial_registration_enabled
 from engine.views import verify_telegram_widget_auth
 
 
@@ -121,7 +123,7 @@ class TelegramAuthBotTests(SimpleTestCase):
             },
         },
     )
-    def test_telegram_return_to_points_to_login_page(self):
+    def test_telegram_login_points_to_auth_bot(self):
         request = self.factory.get(
             "/login/",
             HTTP_HOST="monkey-island-vpn.com",
@@ -132,12 +134,37 @@ class TelegramAuthBotTests(SimpleTestCase):
         response = render_login(request)
         content = response.content.decode()
 
-        self.assertIn(
-            "return_to=https%3A%2F%2Fmonkey-island-vpn.com%2Flogin%2F", content
-        )
+        self.assertIn("https://t.me/vpn_auth_bot?start=web", content)
 
 
 class PaymentRedirectTests(SimpleTestCase):
+    def test_site_trial_registration_flag_falls_back_to_env_setting(self):
+        class FakeSession:
+            def get(self, model, key):
+                return None
+
+        with override_settings(SITE_TRIAL_REGISTRATION_ENABLED=True):
+            self.assertTrue(site_trial_registration_enabled(FakeSession()))
+
+    @override_settings(SITE_TRIAL_REGISTRATION_ENABLED=True)
+    def test_site_trial_registration_database_setting_overrides_env(self):
+        class FakeSession:
+            def get(self, model, key):
+                return SimpleNamespace(value="false")
+
+        self.assertFalse(site_trial_registration_enabled(FakeSession()))
+
+    @override_settings(SITE_TRIAL_REGISTRATION_ENABLED=False)
+    def test_telegram_widget_still_creates_trial_when_site_trial_disabled(self):
+        class FakeSession:
+            def get(self, model, key):
+                return None
+
+        self.assertTrue(
+            should_create_trial_for_channel(FakeSession(), "site_telegram_widget")
+        )
+        self.assertFalse(should_create_trial_for_channel(FakeSession(), "site"))
+
     def test_runtime_actual_tariffs_use_database_prices(self):
         class FakeSession:
             def get(self, model, key):

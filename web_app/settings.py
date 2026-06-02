@@ -125,6 +125,11 @@ SITE_REFERRAL_TRIAL_PERIOD_DAYS = config(
     default=15,
     cast=int,
 )
+SITE_TRIAL_REGISTRATION_ENABLED = config(
+    "SITE_TRIAL_REGISTRATION_ENABLED",
+    default=False,
+    cast=bool,
+)
 
 # Включает виджет настройки подключения в личном кабинете, заменяя старый способ
 USE_NEW_SETUP_FLOW = config("USE_NEW_SETUP_FLOW", default=True, cast=bool)

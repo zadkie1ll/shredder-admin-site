@@ -918,7 +918,14 @@
                     document.getElementById('step-input').classList.add('hidden-step');
                     document.getElementById('step-success').classList.remove('hidden-step');
                 } else {
-                    errorEl.textContent = 'Что-то пошло не так. Попробуйте позже.';
+                    let message = 'Что-то пошло не так. Попробуйте позже.';
+                    try {
+                        const payload = await response.json();
+                        if (payload && payload.message) {
+                            message = payload.message;
+                        }
+                    } catch (_) {}
+                    errorEl.textContent = message;
                     errorEl.classList.remove('hidden');
                     submitBtn.disabled = false;
                     submitBtn.innerHTML = originalBtnText;

@@ -84,6 +84,7 @@ from common.models.settings import POSITIVE_INT_RUNTIME_SETTINGS
 from common.models.settings import RUNTIME_SETTING_DESCRIPTIONS
 from common.models.settings import RUNTIME_SETTING_KEYS
 from common.models.settings import SENSITIVE_RUNTIME_SETTINGS
+from common.models.settings import SITE_TRIAL_REGISTRATION_ENABLED_SETTING
 from common.models.settings import TARIFF_PRICE_SETTINGS
 from common.models import analytics_event
 from common.models.tariff import Tariff
@@ -676,6 +677,42 @@ def sync_existing_user_tracking(db_session, user, traffic_source, ymid):
         )
 
 
+def runtime_bool_from_db(db_session, key, default_value):
+    value = db_session.get(SystemSetting, key)
+    if value is None:
+        return default_value
+
+    normalized = str(value.value or "").strip().lower()
+    if normalized in {"1", "true", "yes", "on", "да", "вкл"}:
+        return True
+    if normalized in {"0", "false", "no", "off", "нет", "выкл"}:
+        return False
+
+    logging.error("invalid boolean system setting %s=%r", key, value.value)
+    return default_value
+
+
+def site_trial_registration_enabled(db_session):
+    return runtime_bool_from_db(
+        db_session,
+        SITE_TRIAL_REGISTRATION_ENABLED_SETTING,
+        settings.SITE_TRIAL_REGISTRATION_ENABLED,
+    )
+
+
+def should_create_trial_for_channel(db_session, creation_channel):
+    if creation_channel == "site_telegram_widget":
+        return True
+    return site_trial_registration_enabled(db_session)
+
+
+def unknown_site_account_error():
+    return (
+        "Аккаунт не найден. Оплатите доступ на сайте или войдите через Telegram, "
+        "если вы уже создавали подписку в боте."
+    )
+
+
 def get_proto_optional(message, field_name, default=None):
     try:
         if message.HasField(field_name):
@@ -783,11 +820,19 @@ def create_site_user(
     context = get_registration_context(request, db_session)
     referrer = context["referrer"]
     username = str(uuid.uuid4().hex)
-    trial_period_days = (
-        settings.SITE_REFERRAL_TRIAL_PERIOD_DAYS
-        if referrer
-        else settings.SITE_TRIAL_PERIOD_DAYS
-    )
+    trial_period_days = 0
+    if should_create_trial_for_channel(db_session, creation_channel):
+        trial_period_days = (
+            settings.SITE_REFERRAL_TRIAL_PERIOD_DAYS
+            if referrer
+            else settings.SITE_TRIAL_PERIOD_DAYS
+        )
+    else:
+        logging.info(
+            "site trial subscription disabled for channel=%s, "
+            "creating RWMS subscription without free access",
+            creation_channel,
+        )
 
     rw_user = create_user(
         rwms_client=rwms_client,
@@ -1136,6 +1181,18 @@ def send_magic_link(request):
                 user = db_session.query(User).filter(User.email == email).first()
 
                 if not user:
+                    if not site_trial_registration_enabled(db_session):
+                        logging.info(
+                            "site magic link trial registration blocked for unknown email=%s",
+                            email,
+                        )
+                        return JsonResponse(
+                            {
+                                "status": "error",
+                                "message": unknown_site_account_error(),
+                            },
+                            status=404,
+                        )
                     user = create_site_user(
                         db_session,
                         email,
@@ -1290,6 +1347,16 @@ def auth_by_google_callback(request):
             user = db_session.query(User).filter(User.email == email).first()
 
             if not user:
+                if not site_trial_registration_enabled(db_session):
+                    logging.info(
+                        "site google oauth trial registration blocked for unknown email=%s",
+                        email,
+                    )
+                    return render_login(
+                        request,
+                        {"error": unknown_site_account_error()},
+                        status=404,
+                    )
                 user = create_site_user(
                     db_session,
                     email,
@@ -1431,6 +1498,16 @@ def auth_by_yandex_callback(request):
             user = db_session.query(User).filter(User.email == email).first()
 
             if not user:
+                if not site_trial_registration_enabled(db_session):
+                    logging.info(
+                        "site yandex oauth trial registration blocked for unknown email=%s",
+                        email,
+                    )
+                    return render_login(
+                        request,
+                        {"error": unknown_site_account_error()},
+                        status=404,
+                    )
                 user = create_site_user(
                     db_session,
                     email,
