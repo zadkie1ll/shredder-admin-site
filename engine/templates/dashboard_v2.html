@@ -1527,16 +1527,19 @@
             </div>
 
             <div class="plans-panel">
-                <h1 class="plans-title">Выберите тариф<br>для использования VPN</h1>
+                <h1 class="plans-title">Остался последний шаг<br>до подключения</h1>
+                <p class="text-gray-500 text-sm font-bold leading-relaxed mb-7">
+                    Вы уже в личном кабинете. Выберите тариф, оплатите доступ, и ключи подключения появятся здесь автоматически.
+                </p>
 
                 <div class="plans-benefits" aria-label="Преимущества подписки">
                     <div class="plans-benefit"><i class="fas fa-ban"></i><span>YouTube без рекламы</span></div>
                     <div class="plans-benefit"><i class="fas fa-infinity"></i><span>Безлимитный трафик</span></div>
                     <div class="plans-benefit"><i class="fas fa-layer-group"></i><span>Обход Белого списка</span></div>
-                    <div class="plans-benefit"><i class="fas fa-globe"></i><span>Более 20-ти локаций</span></div>
+                    <div class="plans-benefit"><i class="fas fa-headset"></i><span>Поддержка поможет подключить</span></div>
                 </div>
 
-                <form method="POST" action="/pay/" class="plans-form">
+                <form method="POST" action="/pay/" class="plans-form" data-payment-form data-context="dashboard_paywall">
                     {% csrf_token %}
                     {% for tariff in tariffs %}
                     <label class="plan-row" for="plans-tariff-{{ tariff.db_tariff_id }}">
@@ -1587,12 +1590,12 @@
                     {% endif %}
 
                     <p class="plans-legal">
+                        Оплата картой через WATA. После подтверждения мы откроем ключи в этом кабинете.
                         Оформляя покупку, вы соглашаетесь с <a href="/offer/" target="_blank">офертой</a>.
-                        Отмена возможна в любой момент.
                     </p>
 
                     <button type="submit" class="plans-submit payment-cta w-full px-6 font-black transition-all hover:scale-[1.01] active:scale-95">
-                        Продолжить
+                        Оплатить и получить доступ
                     </button>
                 </form>
             </div>
@@ -3825,6 +3828,28 @@
 
         // Инициализация при загрузке
         document.addEventListener('DOMContentLoaded', () => {
+            const sendGoal = (goal, params = {}) => {
+                try {
+                    if (typeof window.ym === 'function') {
+                        window.ym(109167744, 'reachGoal', goal, params);
+                    }
+                } catch (err) {}
+            };
+
+            if (document.querySelector('.plans-only-view')) {
+                sendGoal('dashboard_no_subscription_seen');
+            }
+            document.querySelectorAll('[data-payment-form]').forEach((form) => {
+                form.addEventListener('submit', () => {
+                    const checkedTariff = form.querySelector('input[name="tariff_id"]:checked');
+                    const tariffInput = checkedTariff || form.querySelector('input[name="tariff_id"]');
+                    sendGoal('pay_click', {
+                        page: 'dashboard_paywall',
+                        tariff_id: tariffInput ? tariffInput.value : '',
+                    });
+                });
+            });
+
             selectedNewSetupPlatform = detectNewSetupPlatform();
             renderNewSetupWizard();
             setPlatform('android');

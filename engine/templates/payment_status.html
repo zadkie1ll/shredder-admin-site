@@ -527,12 +527,24 @@
         const paymentAction = document.getElementById('payment-action');
         const failedCopy  = document.getElementById('failed-copy');
         const statusApiUrl = '{{ status_api_url|default:""|escapejs }}';
+        let statusGoalSent = false;
+
+        function sendStatusGoal(goal) {
+            if (statusGoalSent) return;
+            statusGoalSent = true;
+            try {
+                if (typeof window.ym === 'function') {
+                    window.ym(109167744, 'reachGoal', goal);
+                }
+            } catch (err) {}
+        }
 
         function applyStatus(payload) {
             const status = payload.status || 'pending';
             shell.dataset.status = status;
 
             if (status === 'succeeded') {
+                sendStatusGoal('payment_success');
                 title.textContent = 'Платеж прошел';
                 orbEmoji.textContent = '✓';
                 if (payload.login_url) {
@@ -545,6 +557,7 @@
             }
 
             if (status === 'failed') {
+                sendStatusGoal('payment_failed');
                 title.textContent = 'Не получилось';
                 orbEmoji.textContent = '!';
                 if (payload.message) {

@@ -184,6 +184,15 @@
         let frameLoadedOnce = false;
         let frameInteracted = false;
 
+        try {
+            if (typeof window.ym === 'function') {
+                window.ym(109167744, 'reachGoal', 'payment_widget_loaded', {
+                    gateway: 'wata',
+                    tariff_price: '{{ tariff_price|escapejs }}',
+                });
+            }
+        } catch (err) {}
+
         function goToPaymentStatus() {
             if (statusRedirectStarted || !paymentStatusUrl) {
                 return;

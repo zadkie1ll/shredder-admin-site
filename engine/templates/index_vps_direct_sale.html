@@ -424,6 +424,33 @@
             grid-template-columns: repeat(3, minmax(0, 1fr));
         }
 
+        .checkout-trust {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .checkout-trust .card {
+            padding: 16px;
+        }
+
+        .checkout-trust strong {
+            display: block;
+            margin-bottom: 5px;
+            color: var(--ink);
+            font-size: 14px;
+            line-height: 1.2;
+            font-weight: 800;
+        }
+
+        .checkout-trust span {
+            color: var(--muted);
+            font-size: 13px;
+            line-height: 1.25;
+            font-weight: 600;
+        }
+
         .steps,
         .faq-grid {
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -670,6 +697,7 @@
             .hero,
             .grid-3,
             .tariffs,
+            .checkout-trust,
             .steps,
             .faq-grid {
                 grid-template-columns: 1fr;
@@ -849,6 +877,13 @@
             <section id="prices" class="section">
                 <div class="section-head">
                     <h2>Тарифы</h2>
+                    <p class="section-note">Выберите срок, укажите email и оплатите картой. После подтверждения мы откроем личный кабинет с ключом и инструкциями.</p>
+                </div>
+                <div class="checkout-trust">
+                    <article class="card"><strong>Оплата картой</strong><span>через WATA</span></article>
+                    <article class="card"><strong>Доступ сразу</strong><span>после оплаты</span></article>
+                    <article class="card"><strong>Ссылка на email</strong><span>запасной вход в ЛК</span></article>
+                    <article class="card"><strong>Поддержка</strong><span>поможем подключить</span></article>
                 </div>
                 <div class="tariffs">
                     {% for tariff in tariffs %}
@@ -878,7 +913,7 @@
                                 {% endif %}
                             </div>
                         </div>
-                        <form action="/pay/" method="POST" class="pay-form">
+                        <form action="/pay/" method="POST" class="pay-form" data-payment-form data-tariff-id="{{ tariff.db_tariff_id }}" data-tariff-price="{{ tariff.price }}">
                             {% csrf_token %}
                             <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
                             <input type="hidden" name="login_link_kind" value="purchase_permanent">
@@ -983,5 +1018,45 @@
             </footer>
         </div>
     </main>
+    <script>
+        (function setupConversionTracking() {
+            const counterId = 109167744;
+            const page = 'vps_direct_sale';
+            const sendGoal = (goal, params = {}) => {
+                try {
+                    if (typeof window.ym === 'function') {
+                        window.ym(counterId, 'reachGoal', goal, { page, ...params });
+                    }
+                } catch (err) {}
+            };
+
+            sendGoal('landing_view');
+
+            document.querySelectorAll('a[href="#prices"]').forEach((node) => {
+                node.addEventListener('click', () => sendGoal('tariff_cta_click'));
+            });
+
+            const prices = document.getElementById('prices');
+            if (prices && 'IntersectionObserver' in window) {
+                let sent = false;
+                const observer = new IntersectionObserver((entries) => {
+                    if (sent || !entries.some((entry) => entry.isIntersecting)) return;
+                    sent = true;
+                    sendGoal('tariff_seen');
+                    observer.disconnect();
+                }, { threshold: 0.25 });
+                observer.observe(prices);
+            }
+
+            document.querySelectorAll('[data-payment-form]').forEach((form) => {
+                form.addEventListener('submit', () => {
+                    sendGoal('pay_click', {
+                        tariff_id: form.dataset.tariffId || '',
+                        tariff_price: form.dataset.tariffPrice || '',
+                    });
+                });
+            });
+        })();
+    </script>
 </body>
 </html>

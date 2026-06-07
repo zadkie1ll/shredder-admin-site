@@ -264,16 +264,16 @@
                 <img class="hero-art-mobile" src="{% static 'img/onboarding/always-on.png' %}" alt="">
 
                 <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-4 mb-10 w-full sm:w-auto">
-                    <a href="#prices" class="tilda-yellow w-full sm:w-auto px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95">
-                        ВЫБРАТЬ ТАРИФ
+                    <a href="#prices" data-conversion-goal="tariff_cta_click" class="tilda-yellow w-full sm:w-auto px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95">
+                        ВЫБРАТЬ ТАРИФ ОТ {{ tariffs.0.price }} ₽
                     </a>
                     {% if user.is_authenticated %}
-                    <a href="/dashboard/" class="w-full sm:w-auto px-10 md:px-12 py-4 md:py-6 rounded-full border border-[#ffc700] bg-black/30 text-[#ffc700] font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 hover:bg-[#ffc700] hover:text-black active:scale-95">
+                    <a href="/dashboard/" class="w-full sm:w-auto px-8 md:px-10 py-4 md:py-5 rounded-full border border-white/10 bg-white/5 text-white/70 font-black uppercase text-sm md:text-base transition hover:border-[#ffc700]/40 hover:text-[#ffc700] active:scale-95">
                         МОЙ КАБИНЕТ
                     </a>
                     {% else %}
-                    <a href="/login/" data-known-user-cta class="w-full sm:w-auto px-10 md:px-12 py-4 md:py-6 rounded-full border border-[#ffc700] bg-black/30 text-[#ffc700] font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 hover:bg-[#ffc700] hover:text-black active:scale-95">
-                        ПОПРОБОВАТЬ БЕСПЛАТНО
+                    <a href="/login/" data-known-user-cta class="w-full sm:w-auto px-8 md:px-10 py-4 md:py-5 rounded-full border border-white/10 bg-white/5 text-white/70 font-black uppercase text-sm md:text-base transition hover:border-[#ffc700]/40 hover:text-[#ffc700] active:scale-95">
+                        ВОЙТИ В КАБИНЕТ
                     </a>
                     {% endif %}
                 </div>
@@ -406,7 +406,16 @@
         <div class="container mx-auto px-6">
             <div class="text-center mb-16">
                 <h2 class="text-4xl md:text-6xl font-black uppercase mb-4 tracking-tighter">ТАРИФЫ</h2>
+                <p class="text-white/60 text-base md:text-xl font-bold max-w-2xl mx-auto mb-8">
+                    Выберите период, укажите email и оплатите картой. После подтверждения мы автоматически откроем личный кабинет с ключами.
+                </p>
                 <div class="w-20 h-1.5 bg-[#ffc700] mx-auto"></div>
+            </div>
+            <div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-3 mb-12">
+                <div class="benefit-card text-center"><i class="fas fa-credit-card text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Оплата картой</p><span class="text-white/50 text-xs">через WATA</span></div>
+                <div class="benefit-card text-center"><i class="fas fa-bolt text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Доступ сразу</p><span class="text-white/50 text-xs">после оплаты</span></div>
+                <div class="benefit-card text-center"><i class="fas fa-envelope text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Ссылка на email</p><span class="text-white/50 text-xs">и вход в ЛК</span></div>
+                <div class="benefit-card text-center"><i class="fab fa-telegram-plane text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Поддержка</p><span class="text-white/50 text-xs">поможем подключить</span></div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-6xl mx-auto">
                 {% for tariff in tariffs %}
@@ -432,7 +441,7 @@
                         </ul>
                     </div>
 
-                    <form action="/pay/" method="POST" class="space-y-4">
+                    <form action="/pay/" method="POST" class="space-y-4" data-payment-form data-tariff-id="{{ tariff.db_tariff_id }}" data-tariff-price="{{ tariff.price }}">
                         {% csrf_token %}
                         <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
                         <input type="hidden" name="login_link_kind" value="purchase_permanent">
@@ -442,7 +451,7 @@
                         <input type="email" name="email" placeholder="ТВОЙ EMAIL" required
                             class="w-full input-field px-4 py-4 font-bold text-xs uppercase tracking-widest focus:border-[#ffc700] outline-none transition">
                         <button type="submit" class="w-full pay-cta py-4 rounded-xl font-black uppercase text-sm tracking-widest transition shadow-lg">
-                            Оплатить
+                            ОПЛАТИТЬ И ПОЛУЧИТЬ ДОСТУП
                         </button>
                         <p class="text-center text-gray-500 text-[10px] leading-relaxed">
                             Нажимая «Оплатить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-bold hover:text-white transition">условия оферты</a>. После оплаты откроется личный кабинет.
@@ -690,6 +699,45 @@
     </footer>
 
     <script>
+        (function setupConversionTracking() {
+            const counterId = 109167744;
+            const page = 'vps';
+            const sendGoal = (goal, params = {}) => {
+                try {
+                    if (typeof window.ym === 'function') {
+                        window.ym(counterId, 'reachGoal', goal, { page, ...params });
+                    }
+                } catch (err) {}
+            };
+
+            sendGoal('landing_view');
+
+            document.querySelectorAll('[data-conversion-goal], a[href="#prices"]').forEach((node) => {
+                node.addEventListener('click', () => sendGoal(node.dataset.conversionGoal || 'tariff_cta_click'));
+            });
+
+            const prices = document.getElementById('prices');
+            if (prices && 'IntersectionObserver' in window) {
+                let sent = false;
+                const observer = new IntersectionObserver((entries) => {
+                    if (sent || !entries.some((entry) => entry.isIntersecting)) return;
+                    sent = true;
+                    sendGoal('tariff_seen');
+                    observer.disconnect();
+                }, { threshold: 0.25 });
+                observer.observe(prices);
+            }
+
+            document.querySelectorAll('[data-payment-form]').forEach((form) => {
+                form.addEventListener('submit', () => {
+                    sendGoal('pay_click', {
+                        tariff_id: form.dataset.tariffId || '',
+                        tariff_price: form.dataset.tariffPrice || '',
+                    });
+                });
+            });
+        })();
+
         (function updateKnownUserCta() {
             try {
                 if (localStorage.getItem('monkeyIslandHasDashboard') !== '1') {

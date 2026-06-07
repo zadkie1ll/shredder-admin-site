@@ -342,6 +342,19 @@ def add_event_log_once(db_session, user, event):
     return True
 
 
+def create_invoice_event_for_tariff(tariff_id):
+    event_by_tariff = {
+        "oneday": analytics_event.CreateInvoiceOneDay,
+        "threedays": analytics_event.CreateInvoiceThreeDays,
+        "month": analytics_event.CreateInvoiceOneMonth,
+        "threemonths": analytics_event.CreateInvoiceThreeMonths,
+        "sixmonths": analytics_event.CreateInvoiceSixMonths,
+        "year": analytics_event.CreateInvoiceOneYear,
+    }
+    event_class = event_by_tariff.get(tariff_id)
+    return event_class() if event_class else None
+
+
 def dashboard_support_redirect():
     return redirect("/dashboard/?tab=support")
 
@@ -5059,6 +5072,10 @@ def pay(request):
                     )
                     login_token.payment_gateway = "yookassa"
                     login_token.payment_reference = created_payment.reference
+
+            invoice_event = create_invoice_event_for_tariff(tariff.db_tariff_id)
+            if invoice_event:
+                add_event_log(db_session, user, invoice_event)
 
             if use_permanent_purchase_link:
                 product_name = (
