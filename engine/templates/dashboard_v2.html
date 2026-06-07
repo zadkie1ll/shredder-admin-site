@@ -144,6 +144,26 @@
             border: 1px solid rgba(255, 199, 0, 0.15);
         }
 
+        .sidebar-footer {
+            margin-top: auto;
+            padding-top: 16px;
+        }
+
+        .sidebar-logout-btn {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 16px 20px;
+            border-radius: 18px;
+            color: rgba(255, 255, 255, 0.48);
+        }
+
+        .sidebar-logout-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.06);
+        }
+
         /* Контент */
         .main-content { margin-left: 280px; padding: 40px; position: relative; z-index: 10; }
 
@@ -410,6 +430,231 @@
         .payment-cta:hover {
             background: linear-gradient(180deg, #ffdb3d 0%, #ffc700 58%, #f0ae00 100%) !important;
             box-shadow: 0 22px 48px rgba(255, 199, 0, .32), inset 0 -3px 0 rgba(0,0,0,.16) !important;
+        }
+
+        .plans-only-view {
+            position: relative;
+            z-index: 20;
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 34px 18px 28px;
+        }
+
+        .plans-topbar {
+            width: min(100%, 430px);
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 18px;
+            margin-bottom: 44px;
+        }
+
+        .plans-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+            font-weight: 800;
+            font-size: 17px;
+        }
+
+        .plans-brand::before {
+            content: "";
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            background: url("{% static 'icons/icon-192x192.png' %}") center / cover no-repeat;
+            border: 1px solid rgba(255, 199, 0, 0.26);
+        }
+
+        .plans-panel {
+            width: min(100%, 430px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .plans-title {
+            font-size: 28px;
+            line-height: 1.14;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 28px;
+        }
+
+        .plans-benefits {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 28px;
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .plans-benefit {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+        }
+
+        .plans-benefit i {
+            width: 18px;
+            color: rgba(255, 255, 255, 0.62);
+            font-size: 15px;
+        }
+
+        .plans-form {
+            display: flex;
+            flex-direction: column;
+            gap: 11px;
+        }
+
+        .plan-row {
+            min-height: 68px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto auto;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.055);
+            background: rgba(255, 255, 255, 0.075);
+            cursor: pointer;
+            transition: border-color .18s ease, background .18s ease, transform .18s ease;
+        }
+
+        .plan-row:hover {
+            background: rgba(255, 255, 255, 0.095);
+            border-color: rgba(255, 199, 0, 0.22);
+        }
+
+        .plan-row:has(input:checked) {
+            border-color: rgba(255, 199, 0, 0.58);
+            background:
+                radial-gradient(circle at 90% 50%, rgba(255, 199, 0, 0.16), transparent 11rem),
+                rgba(255, 255, 255, 0.09);
+        }
+
+        .plan-title-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .plan-note {
+            margin-top: 4px;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+
+        .plan-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 22px;
+            padding: 0 8px;
+            border-radius: 999px;
+            background: rgba(255, 199, 0, 0.14);
+            color: #ffc700;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .plan-price {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .plan-price strong {
+            display: block;
+            color: #fff;
+            font-size: 15px;
+            line-height: 1.2;
+            font-weight: 700;
+        }
+
+        .plan-price span {
+            display: block;
+            margin-top: 4px;
+            color: rgba(255, 255, 255, 0.52);
+            font-size: 11px;
+            line-height: 1.2;
+            font-weight: 600;
+        }
+
+        .plan-radio {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            accent-color: #ffc700;
+        }
+
+        .plans-email {
+            margin-top: 6px;
+        }
+
+        .plans-legal {
+            margin: 18px auto 0;
+            max-width: 360px;
+            color: rgba(255, 255, 255, 0.42);
+            font-size: 11px;
+            line-height: 1.35;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .plans-legal a {
+            color: rgba(255, 255, 255, 0.68);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .plans-submit {
+            margin-top: 84px;
+            min-height: 58px;
+            border-radius: 999px;
+            font-size: 15px;
+        }
+
+        @media (max-width: 640px) {
+            .plans-only-view {
+                padding: max(20px, env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom));
+            }
+
+            .plans-topbar {
+                margin-bottom: 34px;
+            }
+
+            .plans-title {
+                font-size: 25px;
+                margin-bottom: 24px;
+            }
+
+            .plan-row {
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 10px;
+                padding: 14px;
+            }
+
+            .plan-price {
+                grid-column: 1 / 2;
+                text-align: left;
+            }
+
+            .plan-radio {
+                grid-column: 2 / 3;
+                grid-row: 1 / 3;
+            }
+
+            .plans-submit {
+                margin-top: 54px;
+            }
         }
 
         .overview-grid {
@@ -978,6 +1223,19 @@
             font-size: 15px;
         }
 
+        .dashboard-v2 .sidebar-logout-btn {
+            min-height: 46px;
+            margin-bottom: 0;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.035);
+        }
+
+        .dashboard-v2 .sidebar-logout-btn:hover {
+            border-color: rgba(255, 199, 0, 0.22);
+            background: rgba(255, 199, 0, 0.06);
+            color: #ffc700;
+        }
+
         .dashboard-v2 .nav-mobile {
             height: calc(64px + env(safe-area-inset-bottom));
             background: rgba(9, 10, 15, 0.94);
@@ -1262,7 +1520,86 @@
     </div>
 
     <div id="app-container">
-        <div id="interface-wrapper">
+        {% if not has_subscription_access %}
+        <section class="plans-only-view">
+            <div class="plans-topbar">
+                <a href="/" class="plans-brand">MONKEY <span class="text-[#ffc700]">ISLAND</span></a>
+            </div>
+
+            <div class="plans-panel">
+                <h1 class="plans-title">Выберите тариф<br>для использования VPN</h1>
+
+                <div class="plans-benefits" aria-label="Преимущества подписки">
+                    <div class="plans-benefit"><i class="fas fa-ban"></i><span>YouTube без рекламы</span></div>
+                    <div class="plans-benefit"><i class="fas fa-infinity"></i><span>Безлимитный трафик</span></div>
+                    <div class="plans-benefit"><i class="fas fa-layer-group"></i><span>Обход Белого списка</span></div>
+                    <div class="plans-benefit"><i class="fas fa-globe"></i><span>Более 20-ти локаций</span></div>
+                </div>
+
+                <form method="POST" action="/pay/" class="plans-form">
+                    {% csrf_token %}
+                    {% for tariff in tariffs %}
+                    <label class="plan-row" for="plans-tariff-{{ tariff.db_tariff_id }}">
+                        <span class="min-w-0">
+                            <span class="plan-title-line">
+                                {% if tariff.db_tariff_id == "month" %}
+                                    1 месяц
+                                {% elif tariff.db_tariff_id == "threemonths" %}
+                                    3 месяца <span class="plan-badge">-20%</span>
+                                {% elif tariff.db_tariff_id == "year" %}
+                                    12 месяцев <span class="plan-badge">-40%</span>
+                                {% else %}
+                                    {{ tariff.description }}
+                                {% endif %}
+                            </span>
+                            <span class="plan-note">
+                                {% if tariff.db_tariff_id == "month" %}
+                                    Здесь и сейчас
+                                {% elif tariff.db_tariff_id == "threemonths" %}
+                                    Разумная экономия
+                                {% elif tariff.db_tariff_id == "year" %}
+                                    Максимальная выгода
+                                {% else %}
+                                    Быстрый доступ
+                                {% endif %}
+                            </span>
+                        </span>
+                        <span class="plan-price">
+                            <strong>
+                                {% if tariff.db_tariff_id == "threemonths" %}
+                                    {% widthratio tariff.price 3 1 %} ₽ / месяц
+                                {% elif tariff.db_tariff_id == "year" %}
+                                    {% widthratio tariff.price 12 1 %} ₽ / месяц
+                                {% else %}
+                                    {{ tariff.price }} ₽ / месяц
+                                {% endif %}
+                            </strong>
+                            <span>{{ tariff.price }} ₽ сейчас</span>
+                        </span>
+                        <input id="plans-tariff-{{ tariff.db_tariff_id }}" class="plan-radio" type="radio" name="tariff_id" value="{{ tariff.db_tariff_id }}" {% if forloop.first %}checked{% endif %}>
+                    </label>
+                    {% endfor %}
+
+                    {% if user.email %}
+                        <input type="hidden" name="email" value="{{ user.email }}">
+                    {% else %}
+                        <input type="email" name="email" required autocomplete="email" placeholder="Email для чека и входа" class="plans-email referral-link-input w-full py-4 px-5 text-sm text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
+                    {% endif %}
+
+                    <p class="plans-legal">
+                        Оформляя покупку, вы соглашаетесь с <a href="/offer/" target="_blank">офертой</a>.
+                        Отмена возможна в любой момент.
+                    </p>
+
+                    <button type="submit" class="plans-submit payment-cta w-full px-6 font-black transition-all hover:scale-[1.01] active:scale-95">
+                        Продолжить
+                    </button>
+                </form>
+            </div>
+        </section>
+        {% endif %}
+
+        <div id="interface-wrapper" class="{% if not has_subscription_access %}hidden{% endif %}">
         <aside class="sidebar-desktop">
             <div class="mb-12 px-4">
                 <a href="/" class="text-xl font-black tracking-tighter uppercase">MONKEY <span class="text-[#ffc700]">ISLAND</span></a>
@@ -1274,6 +1611,11 @@
                 <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-friends"></i> Рефералы</button>
                 <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-headset"></i> Поддержка</button>
             </nav>
+            <div class="sidebar-footer">
+                <button type="button" onclick="window.location.href='{% url 'logout' %}'" class="nav-btn sidebar-logout-btn">
+                    <i class="fas fa-sign-out-alt"></i> Выйти
+                </button>
+            </div>
         </aside>
 
         <nav class="nav-mobile">
@@ -1289,7 +1631,10 @@
             <div id="tab-home" class="tab-content active">
                 <div id="main-dashboard-view">
                     <header class="mb-10">
-                        {% if show_not_connected_banner %}
+                        {% if not has_subscription_access %}
+                            <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Нет активной подписки</h1>
+                            <p class="text-gray-500 text-sm md:text-base font-bold">Выберите тариф, оплатите доступ и мы сразу откроем ключи подключения.</p>
+                        {% elif show_not_connected_banner %}
                             <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Подключи VPN</h1>
                             <p class="text-gray-500 text-sm md:text-base font-bold">Подписка готова, осталось добавить ее в приложение</p>
                         {% else %}
@@ -1332,7 +1677,7 @@
                             </section>
                         {% endif %}
 
-                        {% if show_telegram_bind_banner %}
+                        {% if show_telegram_bind_banner and has_subscription_access %}
                             <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-[#ffc700]/40 bg-[#ffc700]/5">
                                 <div class="flex items-start gap-4">
                                     <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 flex items-center justify-center text-[#ffc700] flex-shrink-0">
@@ -1349,7 +1694,7 @@
                             </section>
                         {% endif %}
 
-                        {% if show_email_bind_banner %}
+                        {% if show_email_bind_banner and has_subscription_access %}
                             <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-[#ffc700]/40 bg-[#ffc700]/5">
                                 <div class="flex items-start gap-4">
                                     <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 flex items-center justify-center text-[#ffc700] flex-shrink-0">
@@ -1386,10 +1731,10 @@
                         <section class="setup-shell status-overview-card">
                             <div class="relative z-10 flex flex-col gap-8">
                                 <div class="flex items-start justify-between gap-4">
-                                    {% if seconds_left <= 0 %}
+                                    {% if not has_subscription_access %}
                                         <div class="flex items-center gap-2 text-red-400 text-sm font-black">
                                             <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>
-                                            Подписка истекла
+                                            Нет активной подписки
                                         </div>
                                     {% else %}
                                         <div class="flex items-center gap-2 text-[#00ff88] text-sm font-black">
@@ -1397,21 +1742,20 @@
                                             Активна
                                         </div>
                                     {% endif %}
-                                    <span class="text-gray-500 text-sm font-bold">{{ user.expire_at|date:"d.m.Y" }}</span>
+                                    <span class="text-gray-500 text-sm font-bold">{% if user.expire_at %}{{ user.expire_at|date:"d.m.Y" }}{% else %}—{% endif %}</span>
                                 </div>
 
                                 <div>
-                                    {% if seconds_left <= 0 %}
+                                    {% if not has_subscription_access %}
                                         <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-3">
-                                            <div class="flex items-end gap-4">
-                                                <span id="days-left-count" data-seconds-left="{{ seconds_left|floatformat:0 }}" data-time-left-value="{{ time_left_value }}" data-time-left-label="{{ time_left_label }}" class="text-6xl font-black leading-none text-red-400">0</span>
-                                                <span id="time-left-label" class="text-gray-500 text-xl font-bold mb-2">{{ time_left_label }}</span>
+                                            <div>
+                                                <h2 class="text-3xl font-black mb-3">Доступ еще не оплачен</h2>
+                                                <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-xl">Оформите подписку, и в кабинете появятся ключи, инструкции для устройств и поддержка.</p>
                                             </div>
                                             <button type="button" onclick="showTariffs()" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !mb-0 !mr-0">
-                                                Продлить
+                                                Купить подписку
                                             </button>
                                         </div>
-                                        <p class="text-gray-500 text-sm font-bold">Продли доступ, чтобы снова подключиться к VPN.</p>
                                     {% else %}
                                         <div class="flex flex-wrap items-end gap-x-4 gap-y-2 mb-3">
                                             <span id="days-left-count" data-seconds-left="{{ seconds_left|floatformat:0 }}" data-time-left-value="{{ time_left_value }}" data-time-left-label="{{ time_left_label }}" class="text-6xl font-black leading-none text-white">—</span>
@@ -1426,29 +1770,31 @@
                                         <div id="subscription-progress-bar" class="status-progress-bar"></div>
                                     </div>
 
-                                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                                        <div class="text-gray-500 text-sm font-bold">
-                                            Автопродление:
-                                            {% if has_recurrent %}
-                                                <span class="text-[#00ff88]">Включено</span>
-                                            {% else %}
-                                                <span class="text-white">не подключено</span>
-                                            {% endif %}
-                                        </div>
-                                        <div class="flex flex-col gap-2">
-                                            <button type="button" onclick="showTab('profile')" class="text-[#ffc700] text-xs font-bold hover:text-white transition-colors self-start">
-                                                +40 дней за друга
-                                            </button>
-                                            <div class="flex items-center gap-3">
-                                                <button type="button" onclick="showTab('profile')" class="bg-white/10 hover:bg-white/15 border border-white/10 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all">
-                                                    Подробнее
+                                    {% if has_subscription_access %}
+                                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                            <div class="text-gray-500 text-sm font-bold">
+                                                Автопродление:
+                                                {% if has_recurrent %}
+                                                    <span class="text-[#00ff88]">Включено</span>
+                                                {% else %}
+                                                    <span class="text-white">не подключено</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="flex flex-col gap-2">
+                                                <button type="button" onclick="showTab('profile')" class="text-[#ffc700] text-xs font-bold hover:text-white transition-colors self-start">
+                                                    +40 дней за друга
                                                 </button>
-                                                <button type="button" onclick="showTab('setup')" class="bg-[#ffc700]/10 hover:bg-[#ffc700]/20 border border-[#ffc700]/30 text-[#ffc700] px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">
-                                                    <i class="fas fa-bolt mr-1"></i>Подключиться
-                                                </button>
+                                                <div class="flex items-center gap-3">
+                                                    <button type="button" onclick="showTab('profile')" class="bg-white/10 hover:bg-white/15 border border-white/10 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all">
+                                                        Подробнее
+                                                    </button>
+                                                    <button type="button" onclick="showTab('setup')" class="bg-[#ffc700]/10 hover:bg-[#ffc700]/20 border border-[#ffc700]/30 text-[#ffc700] px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">
+                                                        <i class="fas fa-bolt mr-1"></i>Подключиться
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </section>
@@ -1466,6 +1812,7 @@
                         {% endif %}
 
                         <section class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                            {% if has_subscription_access %}
                             <button type="button" onclick="showTab('setup')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
                                 <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
                                     <i class="fas fa-bolt text-lg"></i>
@@ -1473,6 +1820,15 @@
                                 <h3 class="text-lg font-black mb-2">Настройка</h3>
                                 <p class="text-gray-500 text-sm font-bold leading-relaxed">Приложения и подключение</p>
                             </button>
+                            {% else %}
+                            <button type="button" onclick="showTariffs()" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
+                                <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
+                                    <i class="fas fa-credit-card text-lg"></i>
+                                </div>
+                                <h3 class="text-lg font-black mb-2">Купить подписку</h3>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Тарифы и оплата</p>
+                            </button>
+                            {% endif %}
                             <button type="button" onclick="showTab('support')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
                                 <div class="w-12 h-12 rounded-2xl bg-[#2ec4b6]/10 border border-[#2ec4b6]/20 flex items-center justify-center text-[#2ec4b6] mb-4">
                                     <i class="fas fa-headset text-lg"></i>
@@ -1503,15 +1859,15 @@
                         <div class="grid grid-cols-1 md:grid-cols-3 gap-6 subscription-status-grid">
                             <div>
                                 <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2">Статус</p>
-                                {% if seconds_left <= 0 %}
-                                    <p class="text-red-400 text-xl font-black">Истекла</p>
+                                {% if not has_subscription_access %}
+                                    <p class="text-red-400 text-xl font-black">Нет активной подписки</p>
                                 {% else %}
                                     <p class="text-[#00ff88] text-xl font-black">Активна</p>
                                 {% endif %}
                             </div>
                             <div>
                                 <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2">Окончание</p>
-                                <p class="text-white text-xl font-black">{{ user.expire_at|date:"d.m.Y" }}</p>
+                                <p class="text-white text-xl font-black">{% if has_subscription_access %}{{ user.expire_at|date:"d.m.Y" }}{% else %}—{% endif %}</p>
                             </div>
                             <div>
                                 <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2">Автопродление</p>
@@ -1524,6 +1880,19 @@
                         </div>
                     </section>
 
+                    {% if not has_subscription_access %}
+                    <section class="setup-shell p-6 md:p-8 subscription-next-card">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                            <div>
+                                <h2 class="text-2xl font-black mb-3">Ключи появятся после оплаты</h2>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">Сейчас у аккаунта нет активной подписки. Выберите тариф, и после подтверждения платежа мы автоматически откроем доступ в этом кабинете.</p>
+                            </div>
+                            <button type="button" onclick="showTariffs()" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
+                                Купить подписку
+                            </button>
+                        </div>
+                    </section>
+                    {% else %}
                     <section class="setup-shell p-6 md:p-8 subscription-keys-card">
                         <div class="mb-6">
                             <h2 class="text-2xl font-black mb-2">Ключи подключения</h2>
@@ -1584,6 +1953,7 @@
                             </button>
                         </div>
                     </section>
+                    {% endif %}
                 </div>
             </div>
 
@@ -1593,6 +1963,19 @@
                     <p class="text-gray-500 text-sm md:text-base font-bold">Выбери устройство и подключись по готовой инструкции</p>
                 </header>
                 <div class="overview-grid space-y-7">
+                    {% if not has_subscription_access %}
+                    <section class="setup-shell p-6 md:p-8 subscription-next-card">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                            <div>
+                                <h2 class="text-2xl font-black mb-3">Сначала оформите подписку</h2>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">После оплаты здесь появится мастер подключения и готовые ключи для приложений.</p>
+                            </div>
+                            <button type="button" onclick="showTariffs()" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
+                                Купить подписку
+                            </button>
+                        </div>
+                    </section>
+                    {% else %}
                     <section class="setup-shell overview-hero-card {% if use_new_setup_flow %}hidden{% endif %}">
                         <div class="relative z-10 flex flex-col md:flex-row md:items-center gap-6">
                             <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
@@ -1638,6 +2021,7 @@
                         </section>
                         <div id="full-instructions-container" class="space-y-5"></div>
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -1799,8 +2183,8 @@
             <section class="setup-shell overview-hero-card">
                 <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                     <div>
-                        <h2 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Продлить подписку</h2>
-                        <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed max-w-2xl">Выбери срок доступа. Дни добавятся к текущей подписке после оплаты.</p>
+                        <h2 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">{% if has_subscription_access %}Продлить подписку{% else %}Купить подписку{% endif %}</h2>
+                        <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed max-w-2xl">{% if has_subscription_access %}Выбери срок доступа. Дни добавятся к текущей подписке после оплаты.{% else %}Выберите срок доступа. После оплаты мы активируем подписку и откроем ключи подключения в этом кабинете.{% endif %}</p>
                     </div>
                     <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                         <i class="fas fa-crown text-2xl"></i>
@@ -1868,7 +2252,11 @@
                         <form method="POST" action="/pay/" class="mt-6">
                             {% csrf_token %}
                             <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
-                            <input type="hidden" name="email" value="{{ user.email }}">
+                            {% if user.email %}
+                                <input type="hidden" name="email" value="{{ user.email }}">
+                            {% else %}
+                                <input type="email" name="email" required autocomplete="email" placeholder="Email для чека и входа" class="referral-link-input w-full py-4 px-5 text-sm text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner mb-4">
+                            {% endif %}
                             <button type="submit" class="payment-cta w-full py-4 px-6 rounded-xl font-black text-sm transition-all hover:scale-[1.02] active:scale-95">
                                 Оплатить <i class="fas fa-arrow-right ml-2"></i>
                             </button>
@@ -1884,7 +2272,7 @@
     </div>
     </div>
 
-    <div id="ref-pill" class="fixed right-0 top-[75%] z-50 animate-bounce-horizontal" onclick="toggleRefSheet()">
+    <div id="ref-pill" class="fixed right-0 top-[75%] z-50 animate-bounce-horizontal {% if not has_subscription_access %}hidden{% endif %}" onclick="toggleRefSheet()">
         <div class="bg-[#ffc700] text-black pl-3 pr-2 py-2 rounded-l-xl shadow-[0_0_15px_rgba(255,199,0,0.3)] flex items-center gap-2 cursor-pointer border-y border-l border-white/20 transition-all hover:pr-4">
             <i class="fas fa-gift text-sm"></i>
             <span class="text-[9px] font-black uppercase tracking-tighter">+40 дней</span>

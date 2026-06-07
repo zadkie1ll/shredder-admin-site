@@ -96,6 +96,7 @@ from common.models.tariff import ThreeMonthsTariff
 from common.rwms_client_sync import RwmsClientSync
 
 from .rwms_helpers import create_user
+from .rwms_helpers import create_user_until
 from .encrypt_happ_url import encrypt_happ_url1
 from .sql_helpers import save_wata_invoice
 
@@ -700,8 +701,6 @@ def site_trial_registration_enabled(db_session):
 
 
 def should_create_trial_for_channel(db_session, creation_channel):
-    if creation_channel == "site_telegram_widget":
-        return True
     return site_trial_registration_enabled(db_session)
 
 
@@ -809,6 +808,37 @@ def sync_local_user_from_rwms(
     return user
 
 
+def create_local_site_user_without_rwms(
+    db_session,
+    email,
+    telegram_id,
+    username,
+    context,
+    creation_channel,
+):
+    referrer = context["referrer"]
+    user = User(
+        email=email,
+        telegram_id=telegram_id,
+        username=username,
+        expire_at=None,
+        ymid=context["ymid"],
+        referred_by_id=referrer.id if referrer else None,
+        referral_type=ReferralType.STANDARD if referrer else None,
+    )
+    db_session.add(user)
+    db_session.flush()
+
+    add_user_to_traffic_progress(db_session, user)
+
+    logging.info(
+        "local site account %s created without RWMS subscription, channel=%s",
+        user.username,
+        creation_channel,
+    )
+    return user
+
+
 def create_site_user(
     db_session,
     email,
@@ -819,20 +849,52 @@ def create_site_user(
     context = get_registration_context(request, db_session)
     referrer = context["referrer"]
     username = str(uuid.uuid4().hex)
-    trial_period_days = 0
-    if should_create_trial_for_channel(db_session, creation_channel):
-        trial_period_days = (
-            settings.SITE_REFERRAL_TRIAL_PERIOD_DAYS
-            if referrer
-            else settings.SITE_TRIAL_PERIOD_DAYS
-        )
-    else:
+    user_label = email or f"telegram_id={telegram_id}"
+    create_trial_subscription = should_create_trial_for_channel(
+        db_session,
+        creation_channel,
+    )
+
+    if not create_trial_subscription:
         logging.info(
             "site trial subscription disabled for channel=%s, "
-            "creating RWMS subscription without free access",
+            "creating local account without RWMS subscription",
+            creation_channel,
+        )
+        try:
+            rw_user = find_rwms_user_by_identity(email=email, telegram_id=telegram_id)
+        except Exception:
+            logging.exception(
+                "failed to recover existing RWMS subscription for site user %s; "
+                "continuing with local account",
+                user_label,
+            )
+            rw_user = None
+
+        if rw_user is not None:
+            return sync_local_user_from_rwms(
+                db_session,
+                rw_user,
+                email,
+                telegram_id,
+                context,
+                creation_channel,
+            )
+
+        return create_local_site_user_without_rwms(
+            db_session,
+            email,
+            telegram_id,
+            username,
+            context,
             creation_channel,
         )
 
+    trial_period_days = (
+        settings.SITE_REFERRAL_TRIAL_PERIOD_DAYS
+        if referrer
+        else settings.SITE_TRIAL_PERIOD_DAYS
+    )
     rw_user = create_user(
         rwms_client=rwms_client,
         username=username,
@@ -842,17 +904,33 @@ def create_site_user(
         telegram_id=telegram_id,
     )
 
-    user_label = email or f"telegram_id={telegram_id}"
     if rw_user is None:
         logging.warning(
             "creating RWMS subscription for site user %s failed, "
             "trying to recover existing RWMS subscription",
             user_label,
         )
-        rw_user = find_rwms_user_by_identity(email=email, telegram_id=telegram_id)
+        try:
+            rw_user = find_rwms_user_by_identity(email=email, telegram_id=telegram_id)
+        except Exception:
+            logging.exception(
+                "failed to recover existing RWMS subscription for site user %s",
+                user_label,
+            )
+            rw_user = None
+
         if rw_user is None:
-            raise RuntimeError(
-                f"creating subscription for site user {user_label} was failed"
+            logging.warning(
+                "creating local account for site user %s after RWMS trial creation failed",
+                user_label,
+            )
+            return create_local_site_user_without_rwms(
+                db_session,
+                email,
+                telegram_id,
+                username,
+                context,
+                creation_channel,
             )
         return sync_local_user_from_rwms(
             db_session,
@@ -1180,18 +1258,6 @@ def send_magic_link(request):
                 user = db_session.query(User).filter(User.email == email).first()
 
                 if not user:
-                    if not site_trial_registration_enabled(db_session):
-                        logging.info(
-                            "site magic link trial registration blocked for unknown email=%s",
-                            email,
-                        )
-                        return JsonResponse(
-                            {
-                                "status": "error",
-                                "message": unknown_site_account_error(),
-                            },
-                            status=404,
-                        )
                     user = create_site_user(
                         db_session,
                         email,
@@ -1346,16 +1412,6 @@ def auth_by_google_callback(request):
             user = db_session.query(User).filter(User.email == email).first()
 
             if not user:
-                if not site_trial_registration_enabled(db_session):
-                    logging.info(
-                        "site google oauth trial registration blocked for unknown email=%s",
-                        email,
-                    )
-                    return render_login(
-                        request,
-                        {"error": unknown_site_account_error()},
-                        status=404,
-                    )
                 user = create_site_user(
                     db_session,
                     email,
@@ -1497,16 +1553,6 @@ def auth_by_yandex_callback(request):
             user = db_session.query(User).filter(User.email == email).first()
 
             if not user:
-                if not site_trial_registration_enabled(db_session):
-                    logging.info(
-                        "site yandex oauth trial registration blocked for unknown email=%s",
-                        email,
-                    )
-                    return render_login(
-                        request,
-                        {"error": unknown_site_account_error()},
-                        status=404,
-                    )
                 user = create_site_user(
                     db_session,
                     email,
@@ -2101,6 +2147,10 @@ def dashboard(request):
     seconds_left = (
         user.time_until_expiration.total_seconds() if user.time_until_expiration else -1
     )
+    if subscription is None:
+        seconds_left = -1
+
+    has_subscription_access = subscription is not None and seconds_left > 0
     days_left = int((seconds_left + 86399) // 86400) if seconds_left > 0 else 0
     expiring_banner_threshold_seconds = 3 * 24 * 60 * 60
     show_expiring_banner = 0 < seconds_left <= expiring_banner_threshold_seconds
@@ -2108,7 +2158,7 @@ def dashboard(request):
     show_email_bind_banner = not user.email
     show_not_connected_banner = False
 
-    if seconds_left > 0 and traffic_progress and not traffic_progress.passed_0:
+    if has_subscription_access and traffic_progress and not traffic_progress.passed_0:
         show_not_connected_banner = True
 
     if settings.DEBUG:
@@ -2133,10 +2183,16 @@ def dashboard(request):
         if request.GET.get("debug_expired") == "1":
             seconds_left = -1
 
+        if request.GET.get("debug_no_rwms") == "1":
+            subscription = None
+            seconds_left = -1
+
         show_expiring_banner = 0 < seconds_left <= expiring_banner_threshold_seconds
         days_left = int((seconds_left + 86399) // 86400) if seconds_left > 0 else 0
 
-    if seconds_left <= 0:
+    has_subscription_access = subscription is not None and seconds_left > 0
+
+    if not has_subscription_access:
         show_expiring_banner = False
         show_not_connected_banner = False
     elif show_not_connected_banner:
@@ -2157,14 +2213,12 @@ def dashboard(request):
         time_left_label = "дней осталось"
 
     plain_subscription_url = (
-        subscription.subscription_url
-        if subscription
-        else "Не удалось получить ключ доступа. Пожалуйста, свяжитесь с поддержкой."
+        subscription.subscription_url if has_subscription_access else ""
     )
     happ_subscription_url = (
         encrypt_happ_url1(subscription.subscription_url + "/custom-json")
-        if subscription
-        else "Не удалось получить ключ доступа. Пожалуйста, свяжитесь с поддержкой."
+        if has_subscription_access
+        else ""
     )
 
     dashboard_template = (
@@ -2188,6 +2242,7 @@ def dashboard(request):
             "purchase_referrer_bonus_days": purchase_referrer_bonus_days,
             "tariffs": get_runtime_actual_tariffs(),
             "has_recurrent": has_recurrent,
+            "has_subscription_access": has_subscription_access,
             "seconds_left": seconds_left,
             "days_left": days_left,
             "time_left_value": time_left_value,
@@ -4160,6 +4215,19 @@ def support_admin_api_subscription_manage(request):
                 )
             )
             rwms_updated = response is not None
+        else:
+            logging.warning(
+                "RWMS subscription for admin-updated user %s is missing, recreating",
+                user.username,
+            )
+            response = create_user_until(
+                rwms_client=rwms_client,
+                username=user.username,
+                expire_at=target_expire,
+                email=user.email,
+                telegram_id=user.telegram_id,
+            )
+            rwms_updated = response is not None
 
         return JsonResponse(
             {
@@ -4795,25 +4863,79 @@ def pay(request):
                 tariff.price,
             )
 
-            # Ищем или создаем пользователя
-            user = db_session.query(User).filter(User.email == email).first()
-            if not user:
-                user = create_site_user(db_session, email, request)
+            authenticated_user = None
+            if request.user.is_authenticated:
+                authenticated_user = (
+                    db_session.query(User).filter(User.id == request.user.id).first()
+                )
+                if not authenticated_user:
+                    logging.warning(
+                        "payment request rejected: authenticated user not found user_id=%s",
+                        request.user.id,
+                    )
+                    return HttpResponse("Аккаунт не найден", status=401)
+
+            # Ищем или создаем пользователя. Для авторизованного аккаунта используем
+            # именно текущую запись, чтобы платеж не создал дубль по email.
+            if authenticated_user:
+                user = authenticated_user
+                is_authenticated_payment = True
+                if user.email and user.email != email:
+                    logging.warning(
+                        "payment request rejected: email mismatch for authenticated user "
+                        "user_id=%s user_email=%s submitted_email=%s",
+                        user.id,
+                        user.email,
+                        email,
+                    )
+                    return HttpResponse(
+                        "Email не совпадает с текущим аккаунтом",
+                        status=400,
+                    )
+
+                if not user.email:
+                    email_owner = (
+                        db_session.query(User)
+                        .filter(User.email == email, User.id != user.id)
+                        .first()
+                    )
+                    if email_owner:
+                        logging.warning(
+                            "payment request rejected: email already belongs to another user "
+                            "email=%s current_user_id=%s owner_user_id=%s",
+                            email,
+                            user.id,
+                            email_owner.id,
+                        )
+                        return HttpResponse(
+                            "Этот email уже привязан к другому аккаунту",
+                            status=400,
+                        )
+                    user.email = email
+                    db_session.flush()
+                    logging.info(
+                        "payment email attached to authenticated user: "
+                        "email=%s user_id=%s username=%s tariff_id=%s",
+                        email,
+                        user.id,
+                        user.username,
+                        tariff.db_tariff_id,
+                    )
+
                 logging.info(
-                    "payment user created: email=%s user_id=%s username=%s tariff_id=%s",
+                    "payment existing authenticated user tracking preserved: "
+                    "email=%s user_id=%s username=%s tariff_id=%s",
                     email,
                     user.id,
                     user.username,
                     tariff.db_tariff_id,
                 )
             else:
-                is_authenticated_payment = request.user.is_authenticated and str(
-                    request.user.id
-                ) == str(user.id)
-                if is_authenticated_payment:
+                user = db_session.query(User).filter(User.email == email).first()
+                if not user:
+                    user = create_site_user(db_session, email, request)
                     logging.info(
-                        "payment existing authenticated user tracking preserved: "
-                        "email=%s user_id=%s username=%s tariff_id=%s",
+                        "payment user created: email=%s user_id=%s username=%s tariff_id=%s",
                         email,
                         user.id,
                         user.username,
@@ -4827,13 +4949,13 @@ def pay(request):
                         registration_context["traffic_source"],
                         registration_context["ymid"],
                     )
-                logging.info(
-                    "payment existing user found: email=%s user_id=%s username=%s tariff_id=%s",
-                    email,
-                    user.id,
-                    user.username,
-                    tariff.db_tariff_id,
-                )
+                    logging.info(
+                        "payment existing user found: email=%s user_id=%s username=%s tariff_id=%s",
+                        email,
+                        user.id,
+                        user.username,
+                        tariff.db_tariff_id,
+                    )
 
             use_permanent_purchase_link = (
                 request.POST.get("login_link_kind") == "purchase_permanent"

@@ -10,9 +10,11 @@ from django.test import override_settings
 
 from common.models.settings import BOT_TARIFF_PRICE_MONTH_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_YEAR_SETTING
+from common.models.db import User
 from engine.payments import create_wata_payment_sync
 from engine.payments import create_yk_payment_sync
 from engine.views import auth_by_telegram_widget
+from engine.views import create_site_user
 from engine.views import get_runtime_actual_tariffs
 from engine.views import get_telegram_auth_bot
 from engine.views import render_login
@@ -155,15 +157,113 @@ class PaymentRedirectTests(SimpleTestCase):
         self.assertFalse(site_trial_registration_enabled(FakeSession()))
 
     @override_settings(SITE_TRIAL_REGISTRATION_ENABLED=False)
-    def test_telegram_widget_still_creates_trial_when_site_trial_disabled(self):
+    def test_site_trial_registration_flag_controls_all_site_channels(self):
         class FakeSession:
             def get(self, model, key):
                 return None
 
-        self.assertTrue(
+        self.assertFalse(
             should_create_trial_for_channel(FakeSession(), "site_telegram_widget")
         )
         self.assertFalse(should_create_trial_for_channel(FakeSession(), "site"))
+
+    @override_settings(SITE_TRIAL_REGISTRATION_ENABLED=False)
+    def test_create_site_user_without_trial_creates_local_user_without_rwms(self):
+        class FakeSession:
+            def __init__(self):
+                self.added = []
+
+            def get(self, model, key):
+                return None
+
+            def add(self, obj):
+                self.added.append(obj)
+                if isinstance(obj, User):
+                    obj.id = 1
+
+            def flush(self):
+                return None
+
+        session = FakeSession()
+        request = SimpleNamespace()
+
+        with mock.patch(
+            "engine.views.get_registration_context",
+            return_value={"referrer": None, "traffic_source": 42, "ymid": 1001},
+        ), mock.patch(
+            "engine.views.find_rwms_user_by_identity",
+            return_value=None,
+        ) as find_rwms, mock.patch(
+            "engine.views.create_user",
+        ) as create_rwms_user, mock.patch(
+            "engine.views.add_user_to_traffic_progress",
+        ), mock.patch(
+            "engine.views.add_event_log",
+        ) as add_event_log:
+            user = create_site_user(
+                session,
+                "new@example.com",
+                request,
+                creation_channel="site_magic_link",
+            )
+
+        self.assertEqual(user.email, "new@example.com")
+        self.assertIsNone(user.telegram_id)
+        self.assertIsNone(user.expire_at)
+        self.assertEqual(user.ymid, 1001)
+        self.assertIn(user, session.added)
+        find_rwms.assert_called_once_with(email="new@example.com", telegram_id=None)
+        create_rwms_user.assert_not_called()
+        add_event_log.assert_not_called()
+
+    @override_settings(SITE_TRIAL_REGISTRATION_ENABLED=True, SITE_TRIAL_PERIOD_DAYS=7)
+    def test_create_site_user_with_trial_flag_keeps_rwms_trial_path(self):
+        class FakeRwUser(SimpleNamespace):
+            def HasField(self, field_name):
+                return False
+
+        class FakeSession:
+            def __init__(self):
+                self.added = []
+
+            def get(self, model, key):
+                return None
+
+            def add(self, obj):
+                self.added.append(obj)
+                if isinstance(obj, User):
+                    obj.id = 2
+
+            def flush(self):
+                return None
+
+        session = FakeSession()
+        request = SimpleNamespace()
+        rw_user = FakeRwUser(username="rw-user")
+
+        with mock.patch(
+            "engine.views.get_registration_context",
+            return_value={"referrer": None, "traffic_source": 42, "ymid": None},
+        ), mock.patch(
+            "engine.views.create_user",
+            return_value=rw_user,
+        ) as create_rwms_user, mock.patch(
+            "engine.views.add_user_to_traffic_progress",
+        ), mock.patch(
+            "engine.views.add_event_log",
+        ) as add_event_log:
+            user = create_site_user(
+                session,
+                "trial@example.com",
+                request,
+                creation_channel="site_magic_link",
+            )
+
+        self.assertEqual(user.email, "trial@example.com")
+        self.assertIsNone(user.expire_at)
+        create_rwms_user.assert_called_once()
+        self.assertEqual(create_rwms_user.call_args.kwargs["trial_period_days"], 7)
+        add_event_log.assert_called_once()
 
     def test_runtime_actual_tariffs_use_database_prices(self):
         class FakeSession:
