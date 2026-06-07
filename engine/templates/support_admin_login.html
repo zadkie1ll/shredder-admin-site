@@ -9,23 +9,80 @@
     <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
+        :root {
+            --brand-gold: #ffc700;
+            --bg-color: #090a0f;
+            --card-bg: rgba(17, 18, 23, .88);
+            --card-border: rgba(255, 255, 255, .08);
+            --muted: rgba(255, 255, 255, .56);
+        }
+
+        html,
+        body {
+            min-height: 100%;
+        }
+
         body {
             font-family: 'Montserrat', sans-serif;
-            background: #080808;
+            background: var(--bg-color);
             color: #fff;
+            margin: 0;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image: url("{% static 'img/bg6.png' %}");
+            background-size: cover;
+            background-position: center;
+            opacity: .18;
+            pointer-events: none;
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(circle at 52% 12%, rgba(255,199,0,.12), transparent 28rem),
+                linear-gradient(180deg, rgba(9,10,15,.82), #090a0f 86%);
+            pointer-events: none;
+        }
+
+        .admin-login-shell {
+            position: relative;
+            z-index: 1;
+        }
+
+        .admin-login-card {
+            border-color: var(--card-border);
+            background: var(--card-bg);
+            backdrop-filter: blur(16px);
+            box-shadow: 0 28px 90px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.025);
+        }
+
+        .admin-login-input {
+            background: rgba(0,0,0,.48);
+            border-color: rgba(255,255,255,.1);
+        }
+
+        .admin-login-button {
+            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #efb200 100%);
+            box-shadow: 0 16px 34px rgba(255,199,0,.2), inset 0 -2px 0 rgba(0,0,0,.16);
         }
     </style>
     {% include "includes/yandex_metrika.html" %}
 </head>
 <body>
-    <main class="min-h-screen flex items-center justify-center p-5">
-        <section class="w-full max-w-md rounded-[28px] border border-white/10 bg-[#161618] p-8 shadow-2xl">
+    <main class="admin-login-shell min-h-screen flex items-center justify-center p-5">
+        <section class="admin-login-card w-full max-w-md rounded-[28px] border p-8">
             <div class="mb-8 text-center">
                 <div class="w-14 h-14 rounded-2xl bg-[#ffc700]/10 text-[#ffc700] flex items-center justify-center mx-auto mb-4">
                     <i class="fas fa-headset text-2xl"></i>
                 </div>
                 <h1 class="text-2xl font-black uppercase">Поддержка</h1>
-                <p class="text-gray-500 text-sm font-bold mt-2">Вход для оператора</p>
+                <p class="text-sm font-bold mt-2" style="color: var(--muted);">Вход для оператора</p>
             </div>
 
             {% if error %}
@@ -36,8 +93,8 @@
 
             <form method="post" class="space-y-4">
                 {% csrf_token %}
-                <input type="password" name="password" placeholder="Пароль" required class="w-full rounded-2xl border border-white/10 bg-black/40 px-5 py-4 text-white font-bold outline-none focus:border-[#ffc700]/40">
-                <button type="submit" class="w-full rounded-2xl bg-[#ffc700] px-5 py-4 text-black text-sm font-black uppercase">
+                <input type="password" name="password" placeholder="Пароль" required class="admin-login-input w-full rounded-2xl border px-5 py-4 text-white font-bold outline-none focus:border-[#ffc700]/40">
+                <button type="submit" class="admin-login-button w-full rounded-2xl px-5 py-4 text-black text-sm font-black uppercase">
                     Войти
                 </button>
             </form>
