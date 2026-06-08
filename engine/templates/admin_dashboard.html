@@ -58,9 +58,11 @@
         .admin-subtitle { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.4; font-weight: 600; }
         .panel-header { margin-bottom: 20px; }
         .panel-header.config-panel-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; }
-        .form-card { padding: 16px; margin-bottom: 16px; }
+        .form-card { position: relative; z-index: 3; overflow: visible; padding: 16px; margin-bottom: 16px; }
+        .form-card.date-popover-open,
+        .form-card:has(.date-field.open) { z-index: 120; }
         .form-grid-two { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
-        .form-grid-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+        .form-grid-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(170px, .45fr) auto; gap: 10px; align-items: center; }
         .subscription-actions { display: grid; grid-template-columns: 160px repeat(3, auto); gap: 10px; align-items: center; margin-top: 10px; }
         .input { width: 100%; min-width: 0; max-width: 100%; min-height: 40px; border: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.22); color: var(--text-main); border-radius: 9px; padding: 0 13px; font-size: 13px; font-weight: 600; outline: none; transition: border-color .15s, background .15s; }
         .input:focus { border-color: rgba(255,199,0,.38); background: rgba(0,0,0,.28); }
@@ -68,10 +70,11 @@
         .input:-webkit-autofill:hover,
         .input:-webkit-autofill:focus { -webkit-text-fill-color: #fff; box-shadow: 0 0 0 1000px #191e2a inset; transition: background-color 9999s ease-in-out 0s; caret-color: #fff; }
         .date-field { position: relative; min-width: 0; }
+        .date-field.open { z-index: 130; }
         .date-trigger { width: 100%; min-height: 40px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.22); color: var(--text-main); border-radius: 9px; padding: 0 13px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .14s; }
         .date-trigger i { color: var(--brand-gold); }
         .date-field.open .date-trigger { border-color: rgba(255,199,0,.38); background: rgba(255,199,0,.06); }
-        .date-popover { position: absolute; top: calc(100% + 10px); left: 0; z-index: 80; width: min(330px, calc(100vw - 40px)); display: none; border: 1px solid var(--panel-border); border-radius: 14px; background: var(--card-bg); box-shadow: 0 20px 60px rgba(0,0,0,.55); padding: 14px; }
+        .date-popover { position: absolute; top: calc(100% + 10px); left: 0; z-index: 140; width: min(330px, calc(100vw - 40px)); display: none; border: 1px solid var(--panel-border); border-radius: 14px; background: rgba(17, 18, 23, .98); box-shadow: 0 20px 60px rgba(0,0,0,.55); backdrop-filter: blur(14px); padding: 14px; }
         .date-field.open .date-popover { display: block; }
         .date-picker-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
         .date-picker-title { color: #fff; font-size: 14px; font-weight: 800; }
@@ -130,6 +133,7 @@
         .command-sub { margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 600; }
         .result-stack { display: grid; gap: 14px; }
         .metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+        .metrics-grid.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
         .metrics-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
         .metrics-grid.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         .metric { min-height: 90px; padding: 18px 20px; }
@@ -262,6 +266,18 @@
         .graph-child-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.07); }
         .graph-child-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 999px; padding: 4px 8px; background: rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.08); color: #d0d4dc; font-size: 10px; font-weight: 700; }
         .chart-card { min-height: 260px; padding: 16px; }
+        .sales-chart-card { display: grid; gap: 12px; }
+        .sales-chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .sales-chart-title { margin: 0; color: #fff; font-size: 15px; line-height: 1.2; font-weight: 900; }
+        .sales-chart-subtitle { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.35; font-weight: 700; }
+        .sales-chart-note { color: var(--brand-gold); font-size: 11px; line-height: 1.35; font-weight: 800; text-align: right; }
+        .sales-chart-canvas-wrap { position: relative; min-height: 300px; }
+        .sales-chart-canvas-wrap canvas { height: 300px; }
+        .sales-chart-tooltip { position: absolute; z-index: 5; display: none; min-width: 190px; max-width: 280px; padding: 10px 12px; border-radius: 11px; border: 1px solid rgba(255,199,0,.2); background: rgba(9,10,15,.96); box-shadow: 0 18px 50px rgba(0,0,0,.42); color: #fff; font-size: 11px; line-height: 1.45; font-weight: 700; pointer-events: none; }
+        .sales-chart-tooltip strong { display: block; color: var(--brand-gold); font-size: 12px; margin-bottom: 4px; }
+        .sales-chart-legend { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; color: var(--muted); font-size: 11px; font-weight: 800; }
+        .sales-chart-legend-item { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 999px; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.075); }
+        .sales-chart-swatch { width: 8px; height: 8px; border-radius: 999px; background: var(--swatch, var(--brand-gold)); }
         .empty-chart { min-height: 210px; display: flex; align-items: center; justify-content: center; color: rgba(138,149,163,.6); font-weight: 700; font-size: 13px; }
         .chat-grid { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); gap: 18px; }
         .ticket-list { max-height: calc(100vh - 230px); overflow-y: auto; }
@@ -338,6 +354,7 @@
             .chat-grid { grid-template-columns: 1fr; }
             .user-grid { grid-template-columns: 1fr; }
             .metrics-grid,
+            .metrics-grid.five,
             .metrics-grid.three,
             .metrics-grid.two,
             .sources-grid,
@@ -484,6 +501,12 @@
                     </button>
                     <div class="date-popover" data-date-popover></div>
                 </div>
+                <select class="input" name="granularity" aria-label="Детализация графика">
+                    <option value="auto">Авто</option>
+                    <option value="day">По дням</option>
+                    <option value="week" selected>По неделям</option>
+                    <option value="month">По месяцам</option>
+                </select>
                 <button class="btn" type="submit"><i class="fas fa-rotate"></i>Обновить</button>
                 <div class="date-presets" aria-label="Быстрый выбор периода">
                     <span class="date-presets-label">Период</span>
@@ -844,6 +867,7 @@
         let configSaveInFlight = false;
         const money = (value) => `${Number(value || 0).toLocaleString('ru-RU')} ₽`;
         const pct = (value) => `${Number(value || 0).toFixed(1)}%`;
+        const tariffChartColors = ['#ffc700', '#38d996', '#ff5c67', '#8f8f99', '#f59e0b', '#d8dde8', '#7dd3fc'];
 
         function escapeHtml(value) {
             return String(value || '')
@@ -929,6 +953,10 @@
             document.querySelectorAll('[data-date-picker].open').forEach((field) => {
                 if (field !== exceptField) field.classList.remove('open');
             });
+            document.querySelectorAll('.form-card.date-popover-open').forEach((form) => {
+                const hasOpenPicker = form.querySelector('[data-date-picker].open');
+                form.classList.toggle('date-popover-open', Boolean(hasOpenPicker));
+            });
         }
 
         function renderDatePicker(field, viewDate) {
@@ -969,13 +997,18 @@
             popover.querySelector('[data-date-today]').addEventListener('click', () => {
                 setDateFieldValue(field, isoFromLocalDate(new Date()));
                 field.classList.remove('open');
+                field.closest('.form-card')?.classList.remove('date-popover-open');
             });
-            popover.querySelector('[data-date-close]').addEventListener('click', () => field.classList.remove('open'));
+            popover.querySelector('[data-date-close]').addEventListener('click', () => {
+                field.classList.remove('open');
+                field.closest('.form-card')?.classList.remove('date-popover-open');
+            });
             popover.querySelectorAll('[data-date-day]').forEach((button) => {
                 button.addEventListener('click', () => {
                     setDateFieldValue(field, button.dataset.dateDay);
                     clearStatsPresetActive();
                     field.classList.remove('open');
+                    field.closest('.form-card')?.classList.remove('date-popover-open');
                 });
             });
         }
@@ -990,6 +1023,7 @@
                     const shouldOpen = !field.classList.contains('open');
                     closeDatePickers(field);
                     field.classList.toggle('open', shouldOpen);
+                    field.closest('.form-card')?.classList.toggle('date-popover-open', shouldOpen);
                     if (shouldOpen) renderDatePicker(field, new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
                 });
                 field.querySelector('[data-date-popover]').addEventListener('click', (event) => event.stopPropagation());
@@ -1497,8 +1531,9 @@
             `;
         }
 
-        function drawBarChart(canvas, rows) {
+        function drawSalesSeriesChart(canvas, series) {
             if (!canvas) return;
+            const buckets = series?.buckets || [];
             const ctx = canvas.getContext('2d');
             const dpr = window.devicePixelRatio || 1;
             const width = canvas.clientWidth * dpr;
@@ -1506,40 +1541,157 @@
             canvas.width = width;
             canvas.height = height;
             ctx.clearRect(0, 0, width, height);
-            if (!rows.length) return;
-            const max = Math.max(1, ...rows.map((row) => row.subscriptions));
-            const leftPadding = 44 * dpr;
-            const topPadding = 28 * dpr;
+            if (!buckets.length) return;
+            const maxRevenue = Math.max(1, ...buckets.map((row) => Number(row.revenue || 0)));
+            const maxPayments = Math.max(1, ...buckets.map((row) => Number(row.payments || 0)));
+            const leftPadding = 70 * dpr;
+            const topPadding = 24 * dpr;
             const rightPadding = 24 * dpr;
-            const bottomPadding = (rows.length <= 3 ? 58 : 78) * dpr;
-            const gap = 14 * dpr;
+            const bottomPadding = 64 * dpr;
             const plotWidth = width - leftPadding - rightPadding;
             const plotHeight = height - topPadding - bottomPadding;
-            const barWidth = Math.max(18 * dpr, (plotWidth - gap * (rows.length - 1)) / Math.max(1, rows.length));
-            const barPalette = ['#5cc8ff', '#a78bfa', '#2dd4bf', '#ffc700', '#fb7185', '#38d996'];
+
+            const xForIndex = (index) => {
+                if (buckets.length === 1) return leftPadding + plotWidth / 2;
+                return leftPadding + (plotWidth * index) / (buckets.length - 1);
+            };
+            const revenueY = (value) => topPadding + plotHeight - (plotHeight * Number(value || 0)) / maxRevenue;
+            const paymentBarHeight = (value) => Math.max(2 * dpr, (plotHeight * .34 * Number(value || 0)) / maxPayments);
+            const barSlot = buckets.length > 1 ? plotWidth / (buckets.length - 1) : plotWidth;
+            const barWidth = Math.min(40 * dpr, Math.max(8 * dpr, barSlot * .34));
+
+            ctx.lineWidth = 1 * dpr;
+            ctx.strokeStyle = 'rgba(255,255,255,.07)';
+            ctx.fillStyle = 'rgba(255,255,255,.46)';
             ctx.font = `700 ${11 * dpr}px Montserrat, system-ui, sans-serif`;
-            rows.forEach((row, index) => {
-                const x = leftPadding + index * (barWidth + gap);
-                const barHeight = plotHeight * (row.subscriptions / max);
-                const y = topPadding + plotHeight - barHeight;
-                ctx.fillStyle = barPalette[index % barPalette.length];
-                ctx.fillRect(x, y, barWidth, barHeight);
-                ctx.fillStyle = 'rgba(255,255,255,.72)';
-                ctx.textAlign = 'center';
-                ctx.fillText(String(row.subscriptions), x + barWidth / 2, Math.max(14 * dpr, y - 8 * dpr));
-                ctx.fillStyle = 'rgba(255,255,255,.45)';
-                ctx.textBaseline = 'top';
-                if (rows.length <= 3) {
-                    ctx.fillText(row.label.slice(0, 18), x + barWidth / 2, topPadding + plotHeight + 18 * dpr);
+            ctx.textAlign = 'right';
+            ctx.textBaseline = 'middle';
+            [0, .25, .5, .75, 1].forEach((step) => {
+                const y = topPadding + plotHeight - plotHeight * step;
+                ctx.beginPath();
+                ctx.moveTo(leftPadding, y);
+                ctx.lineTo(leftPadding + plotWidth, y);
+                ctx.stroke();
+                ctx.fillText(money(Math.round(maxRevenue * step)).replace(' ₽', ''), leftPadding - 10 * dpr, y);
+            });
+
+            const points = buckets.map((row, index) => ({
+                x: xForIndex(index),
+                y: revenueY(row.revenue),
+                row,
+            }));
+
+            buckets.forEach((row, index) => {
+                const x = xForIndex(index);
+                let y = topPadding + plotHeight;
+                const tariffs = row.tariffs || [];
+                if (tariffs.length) {
+                    tariffs.forEach((tariff, tariffIndex) => {
+                        const segmentHeight = paymentBarHeight(tariff.count);
+                        y -= segmentHeight;
+                        ctx.fillStyle = tariffChartColors[tariffIndex % tariffChartColors.length];
+                        ctx.fillRect(x - barWidth / 2, y, barWidth, segmentHeight);
+                    });
                 } else {
+                    ctx.fillStyle = 'rgba(255,255,255,.12)';
+                    ctx.fillRect(x - barWidth / 2, y - 2 * dpr, barWidth, 2 * dpr);
+                }
+                ctx.fillStyle = 'rgba(255,255,255,.62)';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'bottom';
+                if (row.payments) {
+                    ctx.fillText(String(row.payments), x, Math.max(topPadding + 10 * dpr, y - 6 * dpr));
+                }
+                ctx.fillStyle = 'rgba(255,255,255,.42)';
+                ctx.textBaseline = 'top';
+                if (buckets.length <= 8 || index % Math.ceil(buckets.length / 8) === 0 || index === buckets.length - 1) {
                     ctx.save();
-                    ctx.translate(x + barWidth / 2, topPadding + plotHeight + 20 * dpr);
-                    ctx.rotate(-0.45);
-                    ctx.textAlign = 'right';
-                    ctx.fillText(row.label.slice(0, 16), 0, 0);
+                    ctx.translate(x, topPadding + plotHeight + 16 * dpr);
+                    if (buckets.length > 7) {
+                        ctx.rotate(-0.45);
+                        ctx.textAlign = 'right';
+                    } else {
+                        ctx.textAlign = 'center';
+                    }
+                    ctx.fillText(String(row.label || '').slice(0, 18), 0, 0);
                     ctx.restore();
                 }
-                ctx.textBaseline = 'alphabetic';
+            });
+
+            const gradient = ctx.createLinearGradient(0, topPadding, 0, topPadding + plotHeight);
+            gradient.addColorStop(0, 'rgba(56,217,150,.24)');
+            gradient.addColorStop(1, 'rgba(56,217,150,0)');
+            ctx.beginPath();
+            points.forEach((point, index) => {
+                if (index === 0) ctx.moveTo(point.x, point.y);
+                else ctx.lineTo(point.x, point.y);
+            });
+            ctx.lineTo(points[points.length - 1].x, topPadding + plotHeight);
+            ctx.lineTo(points[0].x, topPadding + plotHeight);
+            ctx.closePath();
+            ctx.fillStyle = gradient;
+            ctx.fill();
+
+            ctx.beginPath();
+            points.forEach((point, index) => {
+                if (index === 0) ctx.moveTo(point.x, point.y);
+                else ctx.lineTo(point.x, point.y);
+            });
+            ctx.strokeStyle = '#38d996';
+            ctx.lineWidth = 3 * dpr;
+            ctx.stroke();
+
+            points.forEach((point) => {
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 4 * dpr, 0, Math.PI * 2);
+                ctx.fillStyle = '#090a0f';
+                ctx.fill();
+                ctx.strokeStyle = '#38d996';
+                ctx.lineWidth = 2 * dpr;
+                ctx.stroke();
+            });
+
+            canvas.__salesChartPoints = points.map((point) => ({
+                x: point.x / dpr,
+                y: point.y / dpr,
+                row: point.row,
+            }));
+        }
+
+        function bindSalesChartTooltip(canvas) {
+            const tooltip = document.getElementById('sales-chart-tooltip');
+            if (!canvas || !tooltip) return;
+            const hide = () => {
+                tooltip.style.display = 'none';
+            };
+            canvas.addEventListener('mouseleave', hide);
+            canvas.addEventListener('mousemove', (event) => {
+                const points = canvas.__salesChartPoints || [];
+                if (!points.length) return hide();
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const nearest = points.reduce((best, point) => {
+                    const distance = Math.abs(point.x - x);
+                    return !best || distance < best.distance ? {point, distance} : best;
+                }, null);
+                if (!nearest || nearest.distance > 34) return hide();
+                const row = nearest.point.row;
+                const tariffLines = (row.tariffs || []).map((tariff) => (
+                    `<div>${escapeHtml(tariff.name)}: <span class="gold">${tariff.count}</span> · ${money(tariff.revenue)}</div>`
+                )).join('') || '<div class="muted">Продаж по тарифам нет</div>';
+                tooltip.innerHTML = `
+                    <strong>${escapeHtml(row.label)}</strong>
+                    <div>Выручка: <span class="green">${money(row.revenue)}</span></div>
+                    <div>Платежей: <span class="gold">${row.payments}</span></div>
+                    <div>Покупателей: ${row.unique_paying_users}</div>
+                    <div class="mt-1">${tariffLines}</div>
+                `;
+                const tooltipWidth = 240;
+                const left = Math.min(rect.width - tooltipWidth - 10, Math.max(10, nearest.point.x + 12));
+                const top = Math.max(10, nearest.point.y - 26);
+                tooltip.style.left = `${left}px`;
+                tooltip.style.top = `${top}px`;
+                tooltip.style.display = 'block';
             });
         }
 
@@ -1554,6 +1706,17 @@
             const payload = await response.json();
             const result = payload.result;
             const hasSources = (result.sources || []).length > 0;
+            const series = result.sales_series || {buckets: [], tariff_names: []};
+            const hasSalesSeries = (series.buckets || []).some((bucket) => bucket.revenue || bucket.payments);
+            const granularityLabels = {day: 'по дням', week: 'по неделям', month: 'по месяцам'};
+            const legendItems = [
+                '<span class="sales-chart-legend-item"><span class="sales-chart-swatch" style="--swatch:#38d996"></span>Выручка</span>',
+                ...(series.tariff_names || []).map((name, index) => `
+                    <span class="sales-chart-legend-item">
+                        <span class="sales-chart-swatch" style="--swatch:${tariffChartColors[index % tariffChartColors.length]}"></span>${escapeHtml(name)}
+                    </span>
+                `),
+            ].join('');
             const sourceCards = result.sources.map((source, index) => {
                 const sourceValue = source.traffic_source === null || source.traffic_source === undefined ? '__direct__' : String(source.traffic_source);
                 return `
@@ -1608,13 +1771,25 @@
                 `;
             }).join('');
             target.innerHTML = `
-                <div class="metrics-grid">
+                <div class="metrics-grid five">
                     ${metric('Подписок', result.totals.subscriptions, 'fa-users')}
                     ${metric('Подключений', result.totals.connections, 'fa-plug')}
                     ${metric('Покупателей', result.totals.unique_paying_users, 'fa-ticket')}
                     ${metric('Платежей', result.totals.payments, 'fa-coins')}
+                    ${metric('Выручка', money(result.totals.revenue), 'fa-wallet')}
                 </div>
-                <section class="card chart-card">${hasSources ? '<canvas id="stats-chart"></canvas>' : '<div class="empty-chart">Данных за период нет.</div>'}</section>
+                <section class="card chart-card sales-chart-card">
+                    <div class="sales-chart-head">
+                        <div>
+                            <h3 class="sales-chart-title">Продажи новых клиентов</h3>
+                            <div class="sales-chart-subtitle">Выручка и платежи по тарифам, ${escapeHtml(granularityLabels[series.granularity] || 'по неделям')}</div>
+                        </div>
+                        ${series.note ? `<div class="sales-chart-note">${escapeHtml(series.note)}</div>` : ''}
+                    </div>
+                    ${hasSalesSeries
+                        ? `<div class="sales-chart-canvas-wrap"><canvas id="stats-chart"></canvas><div id="sales-chart-tooltip" class="sales-chart-tooltip"></div></div><div class="sales-chart-legend">${legendItems}</div>`
+                        : '<div class="empty-chart">Продаж новых клиентов за период нет.</div>'}
+                </section>
                 <section class="sources-grid">
                     ${sourceCards || '<div class="card info-card muted">Данных за период нет.</div>'}
                 </section>
@@ -1633,7 +1808,11 @@
                     </div>
                 </section>
             `;
-            if (hasSources) drawBarChart(document.getElementById('stats-chart'), result.sources);
+            if (hasSalesSeries) {
+                const chart = document.getElementById('stats-chart');
+                drawSalesSeriesChart(chart, series);
+                bindSalesChartTooltip(chart);
+            }
         }
 
         function openSourceUsersModal(button) {

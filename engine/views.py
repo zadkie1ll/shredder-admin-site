@@ -3044,6 +3044,175 @@ def get_tariff_order(tariff_name):
     return order.get(tariff_name, 99)
 
 
+ADMIN_STATS_GRANULARITIES = {"auto", "day", "week", "month"}
+ADMIN_STATS_MAX_DAILY_DAYS = 62
+
+
+def admin_stats_normalize_granularity(requested, start_date, end_date):
+    requested = (requested or "week").lower()
+    if requested not in ADMIN_STATS_GRANULARITIES:
+        requested = "week"
+
+    days = (end_date - start_date).days + 1
+    if requested == "auto":
+        if days <= 31:
+            return "day", requested, ""
+        if days <= 180:
+            return "week", requested, ""
+        return "month", requested, ""
+
+    if requested == "day" and days > ADMIN_STATS_MAX_DAILY_DAYS:
+        return (
+            "week",
+            requested,
+            "Диапазон длиннее двух месяцев, поэтому дневная детализация заменена недельной.",
+        )
+
+    return requested, requested, ""
+
+
+def admin_stats_bucket_start(value, granularity):
+    if granularity == "day":
+        return value
+    if granularity == "week":
+        return value - timedelta(days=value.weekday())
+    return date(value.year, value.month, 1)
+
+
+def admin_stats_next_bucket_start(value, granularity):
+    if granularity == "day":
+        return value + timedelta(days=1)
+    if granularity == "week":
+        return value + timedelta(days=7)
+    if value.month == 12:
+        return date(value.year + 1, 1, 1)
+    return date(value.year, value.month + 1, 1)
+
+
+def admin_stats_bucket_label(bucket_start, bucket_end, granularity):
+    if granularity == "day":
+        return bucket_start.strftime("%d.%m")
+    if granularity == "week":
+        return f"{bucket_start.strftime('%d.%m')}–{bucket_end.strftime('%d.%m')}"
+    return bucket_start.strftime("%m.%Y")
+
+
+def build_admin_sales_series(
+    db_session,
+    first_subscription_events,
+    start_date,
+    end_date,
+    granularity,
+    requested_granularity,
+    granularity_note,
+):
+    start_datetime = datetime.combine(start_date, time.min)
+    end_datetime = datetime.combine(end_date, time.max)
+    bucket_start = admin_stats_bucket_start(start_date, granularity)
+    buckets = {}
+
+    current = bucket_start
+    while current <= end_date:
+        next_start = admin_stats_next_bucket_start(current, granularity)
+        bucket_end = min(next_start - timedelta(days=1), end_date)
+        display_start = max(current, start_date)
+        key = current.isoformat()
+        buckets[key] = {
+            "key": key,
+            "label": admin_stats_bucket_label(display_start, bucket_end, granularity),
+            "start": display_start.isoformat(),
+            "end": bucket_end.isoformat(),
+            "revenue": 0,
+            "payments": 0,
+            "unique_paying_users": 0,
+            "payer_ids": set(),
+            "tariffs": {},
+        }
+        current = next_start
+
+    cohort_events = (
+        db_session.query(
+            first_subscription_events.c.user_id,
+            first_subscription_events.c.timestamp,
+        )
+        .filter(first_subscription_events.c.row_number == 1)
+        .filter(first_subscription_events.c.timestamp >= start_datetime)
+        .filter(first_subscription_events.c.timestamp <= end_datetime)
+        .subquery()
+    )
+    yk_payment_time = func.coalesce(YkPayment.captured_at, YkPayment.created_at)
+    yk_rows = (
+        db_session.query(
+            YkPayment.user_id,
+            yk_payment_time.label("payment_time"),
+            YkPayment.subscription_period,
+            YkPayment.amount,
+        )
+        .join(cohort_events, cohort_events.c.user_id == YkPayment.user_id)
+        .filter(YkPayment.status == "succeeded")
+        .filter(yk_payment_time >= cohort_events.c.timestamp)
+        .filter(yk_payment_time >= start_datetime)
+        .filter(yk_payment_time <= end_datetime)
+        .all()
+    )
+    wata_rows = (
+        db_session.query(
+            WataInvoice.user_id,
+            WataTransaction.payment_time,
+            WataInvoice.tariff_id,
+            WataTransaction.amount,
+        )
+        .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+        .join(cohort_events, cohort_events.c.user_id == WataInvoice.user_id)
+        .filter(WataTransaction.transaction_status == "Paid")
+        .filter(WataTransaction.payment_time >= cohort_events.c.timestamp)
+        .filter(WataTransaction.payment_time >= start_datetime)
+        .filter(WataTransaction.payment_time <= end_datetime)
+        .all()
+    )
+
+    tariff_names = set()
+    for user_id, payment_time, tariff_id, amount in [*yk_rows, *wata_rows]:
+        payment_time = admin_dt(payment_time)
+        if not payment_time:
+            continue
+        payment_date = payment_time.date()
+        key = admin_stats_bucket_start(payment_date, granularity).isoformat()
+        bucket = buckets.get(key)
+        if bucket is None:
+            continue
+        tariff_name = get_tariff_display_name(tariff_id)
+        amount = admin_money(amount)
+        tariff_names.add(tariff_name)
+        bucket["revenue"] += amount
+        bucket["payments"] += 1
+        bucket["payer_ids"].add(user_id)
+        tariff = bucket["tariffs"].setdefault(
+            tariff_name, {"name": tariff_name, "count": 0, "revenue": 0}
+        )
+        tariff["count"] += 1
+        tariff["revenue"] += amount
+
+    output_buckets = []
+    for bucket in buckets.values():
+        bucket["unique_paying_users"] = len(bucket.pop("payer_ids"))
+        bucket["tariffs"] = [
+            value
+            for _, value in sorted(
+                bucket["tariffs"].items(), key=lambda item: get_tariff_order(item[0])
+            )
+        ]
+        output_buckets.append(bucket)
+
+    return {
+        "granularity": granularity,
+        "requested_granularity": requested_granularity,
+        "note": granularity_note,
+        "tariff_names": sorted(tariff_names, key=get_tariff_order),
+        "buckets": output_buckets,
+    }
+
+
 def admin_find_user(db_session, value):
     value = (value or "").strip()
     if not value:
@@ -3359,9 +3528,14 @@ def support_admin_api_user_payments(request):
         db_session.close()
 
 
-def build_admin_interval_stats(db_session, start_date, end_date):
+def build_admin_interval_stats(
+    db_session, start_date, end_date, requested_granularity="week"
+):
     start_datetime = datetime.combine(start_date, time.min)
     end_datetime = datetime.combine(end_date, time.max)
+    granularity, requested_granularity, granularity_note = (
+        admin_stats_normalize_granularity(requested_granularity, start_date, end_date)
+    )
 
     first_subscription_events = (
         db_session.query(
@@ -3427,8 +3601,10 @@ def build_admin_interval_stats(db_session, start_date, end_date):
         "subscriptions": 0,
         "connections": 0,
         "payments": 0,
+        "revenue": 0,
         "unique_paying_users": 0,
     }
+    yk_payment_time = func.coalesce(YkPayment.captured_at, YkPayment.created_at)
 
     for traffic_source, user_ids in user_ids_by_traffic.items():
         if not user_ids:
@@ -3445,22 +3621,28 @@ def build_admin_interval_stats(db_session, start_date, end_date):
             .filter(first_subscription_events.c.user_id.in_(user_ids))
             .subquery()
         )
-        # YooKassa: captured_at точнее created_at, но у старых записей может быть пустым.
-        yk_payment_time = func.coalesce(YkPayment.captured_at, YkPayment.created_at)
-
         yk_rows = (
-            db_session.query(YkPayment.subscription_period, func.count(YkPayment.id))
+            db_session.query(
+                YkPayment.subscription_period,
+                func.count(YkPayment.id),
+                func.coalesce(func.sum(YkPayment.amount), 0),
+            )
             .join(
                 traffic_source_subscription_events,
                 traffic_source_subscription_events.c.user_id == YkPayment.user_id,
             )
             .filter(YkPayment.status == "succeeded")
             .filter(yk_payment_time >= traffic_source_subscription_events.c.timestamp)
+            .filter(yk_payment_time <= end_datetime)
             .group_by(YkPayment.subscription_period)
             .all()
         )
         wata_rows = (
-            db_session.query(WataInvoice.tariff_id, func.count(WataTransaction.id))
+            db_session.query(
+                WataInvoice.tariff_id,
+                func.count(WataTransaction.id),
+                func.coalesce(func.sum(WataTransaction.amount), 0),
+            )
             .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
             .join(
                 traffic_source_subscription_events,
@@ -3471,15 +3653,18 @@ def build_admin_interval_stats(db_session, start_date, end_date):
                 WataTransaction.payment_time
                 >= traffic_source_subscription_events.c.timestamp
             )
+            .filter(WataTransaction.payment_time <= end_datetime)
             .group_by(WataInvoice.tariff_id)
             .all()
         )
 
         tariff_stats = {}
-        for tariff_id, count in [*yk_rows, *wata_rows]:
+        traffic_source_revenue = 0
+        for tariff_id, count, amount in [*yk_rows, *wata_rows]:
             tariff_name = get_tariff_display_name(tariff_id)
             tariff_stats[tariff_name] = tariff_stats.get(tariff_name, 0) + count
             total_tariffs[tariff_name] = total_tariffs.get(tariff_name, 0) + count
+            traffic_source_revenue += admin_money(amount)
 
         yk_payers = {
             row[0]
@@ -3490,6 +3675,7 @@ def build_admin_interval_stats(db_session, start_date, end_date):
             )
             .filter(YkPayment.status == "succeeded")
             .filter(yk_payment_time >= traffic_source_subscription_events.c.timestamp)
+            .filter(yk_payment_time <= end_datetime)
             .distinct()
             .all()
         }
@@ -3506,6 +3692,7 @@ def build_admin_interval_stats(db_session, start_date, end_date):
                 WataTransaction.payment_time
                 >= traffic_source_subscription_events.c.timestamp
             )
+            .filter(WataTransaction.payment_time <= end_datetime)
             .distinct()
             .all()
         }
@@ -3527,6 +3714,7 @@ def build_admin_interval_stats(db_session, start_date, end_date):
             "connections": connections,
             "unique_paying_users": unique_payers,
             "payments": payments,
+            "revenue": traffic_source_revenue,
             "connection_conversion": (
                 (connections / subscriptions * 100) if subscriptions else 0
             ),
@@ -3544,8 +3732,18 @@ def build_admin_interval_stats(db_session, start_date, end_date):
         totals["subscriptions"] += subscriptions
         totals["connections"] += connections
         totals["payments"] += payments
+        totals["revenue"] += traffic_source_revenue
         totals["unique_paying_users"] += unique_payers
 
+    sales_series = build_admin_sales_series(
+        db_session,
+        first_subscription_events,
+        start_date,
+        end_date,
+        granularity,
+        requested_granularity,
+        granularity_note,
+    )
     sources.sort(key=lambda item: item["subscriptions"], reverse=True)
     totals["referrals"] = referral_count
     totals["referral_traffic"] = referral_bonus_counts.get(ReferralBonusType.TRAFFIC, 0)
@@ -3567,6 +3765,7 @@ def build_admin_interval_stats(db_session, start_date, end_date):
         "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
         "totals": totals,
         "sources": sources,
+        "sales_series": sales_series,
         "tariffs": [
             {"name": name, "count": count}
             for name, count in sorted(
@@ -3608,7 +3807,12 @@ def support_admin_api_stats(request):
         return JsonResponse(
             {
                 "status": "ok",
-                "result": build_admin_interval_stats(db_session, start_date, end_date),
+                "result": build_admin_interval_stats(
+                    db_session,
+                    start_date,
+                    end_date,
+                    request.GET.get("granularity", "week"),
+                ),
             }
         )
     finally:
