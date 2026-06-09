@@ -3105,9 +3105,11 @@ def build_admin_sales_series(
     granularity,
     requested_granularity,
     granularity_note,
+    sales_mode="cohort",
 ):
     start_datetime = datetime.combine(start_date, time.min)
     end_datetime = datetime.combine(end_date, time.max)
+    sales_mode = "absolute" if sales_mode == "absolute" else "cohort"
     bucket_start = admin_stats_bucket_start(start_date, granularity)
     buckets = {}
 
@@ -3130,63 +3132,121 @@ def build_admin_sales_series(
         }
         current = next_start
 
-    cohort_events = (
-        db_session.query(
-            first_subscription_events.c.user_id,
-            first_subscription_events.c.timestamp,
-        )
-        .filter(first_subscription_events.c.row_number == 1)
-        .filter(first_subscription_events.c.timestamp >= start_datetime)
-        .filter(first_subscription_events.c.timestamp <= end_datetime)
-        .subquery()
-    )
     yk_payment_time = func.coalesce(YkPayment.captured_at, YkPayment.created_at)
-    yk_rows = (
-        db_session.query(
-            YkPayment.user_id,
-            yk_payment_time.label("payment_time"),
-            YkPayment.subscription_period,
-            YkPayment.amount,
+
+    if sales_mode == "absolute":
+        yk_rows = (
+            db_session.query(
+                YkPayment.id,
+                YkPayment.user_id,
+                yk_payment_time.label("payment_time"),
+                YkPayment.subscription_period,
+                YkPayment.amount,
+            )
+            .filter(YkPayment.status == "succeeded")
+            .filter(yk_payment_time >= start_datetime)
+            .filter(yk_payment_time <= end_datetime)
+            .all()
         )
-        .join(cohort_events, cohort_events.c.user_id == YkPayment.user_id)
-        .filter(YkPayment.status == "succeeded")
-        .filter(yk_payment_time >= cohort_events.c.timestamp)
-        .filter(yk_payment_time >= start_datetime)
-        .filter(yk_payment_time <= end_datetime)
-        .all()
-    )
-    wata_rows = (
-        db_session.query(
-            WataInvoice.user_id,
-            WataTransaction.payment_time,
-            WataInvoice.tariff_id,
-            WataTransaction.amount,
+        wata_rows = (
+            db_session.query(
+                WataTransaction.id,
+                WataInvoice.user_id,
+                WataTransaction.payment_time,
+                WataInvoice.tariff_id,
+                WataTransaction.amount,
+            )
+            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .filter(WataTransaction.transaction_status == "Paid")
+            .filter(WataTransaction.payment_time >= start_datetime)
+            .filter(WataTransaction.payment_time <= end_datetime)
+            .all()
         )
-        .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
-        .join(cohort_events, cohort_events.c.user_id == WataInvoice.user_id)
-        .filter(WataTransaction.transaction_status == "Paid")
-        .filter(WataTransaction.payment_time >= cohort_events.c.timestamp)
-        .filter(WataTransaction.payment_time >= start_datetime)
-        .filter(WataTransaction.payment_time <= end_datetime)
-        .all()
-    )
+    else:
+        cohort_events = (
+            db_session.query(
+                first_subscription_events.c.user_id,
+                first_subscription_events.c.timestamp,
+            )
+            .filter(first_subscription_events.c.row_number == 1)
+            .filter(first_subscription_events.c.timestamp >= start_datetime)
+            .filter(first_subscription_events.c.timestamp <= end_datetime)
+            .subquery()
+        )
+        yk_rows = (
+            db_session.query(
+                YkPayment.id,
+                YkPayment.user_id,
+                yk_payment_time.label("payment_time"),
+                YkPayment.subscription_period,
+                YkPayment.amount,
+            )
+            .join(cohort_events, cohort_events.c.user_id == YkPayment.user_id)
+            .filter(YkPayment.status == "succeeded")
+            .filter(yk_payment_time >= cohort_events.c.timestamp)
+            .filter(yk_payment_time <= end_datetime)
+            .all()
+        )
+        wata_rows = (
+            db_session.query(
+                WataTransaction.id,
+                WataInvoice.user_id,
+                WataTransaction.payment_time,
+                WataInvoice.tariff_id,
+                WataTransaction.amount,
+            )
+            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .join(cohort_events, cohort_events.c.user_id == WataInvoice.user_id)
+            .filter(WataTransaction.transaction_status == "Paid")
+            .filter(WataTransaction.payment_time >= cohort_events.c.timestamp)
+            .filter(WataTransaction.payment_time <= end_datetime)
+            .all()
+        )
+
+    payments = []
+    for payment_id, user_id, payment_time, tariff_id, amount in yk_rows:
+        payment_time = admin_dt(payment_time)
+        if payment_time:
+            payments.append(
+                {
+                    "source": "yk",
+                    "id": payment_id,
+                    "user_id": user_id,
+                    "payment_time": payment_time,
+                    "tariff_id": tariff_id,
+                    "amount": amount,
+                }
+            )
+    for payment_id, user_id, payment_time, tariff_id, amount in wata_rows:
+        payment_time = admin_dt(payment_time)
+        if payment_time:
+            payments.append(
+                {
+                    "source": "wata",
+                    "id": payment_id,
+                    "user_id": user_id,
+                    "payment_time": payment_time,
+                    "tariff_id": tariff_id,
+                    "amount": amount,
+                }
+            )
 
     tariff_names = set()
-    for user_id, payment_time, tariff_id, amount in [*yk_rows, *wata_rows]:
-        payment_time = admin_dt(payment_time)
-        if not payment_time:
+    for payment in payments:
+        payment_time = payment["payment_time"]
+        if payment_time < start_datetime or payment_time > end_datetime:
             continue
         payment_date = payment_time.date()
         key = admin_stats_bucket_start(payment_date, granularity).isoformat()
         bucket = buckets.get(key)
         if bucket is None:
             continue
-        tariff_name = get_tariff_display_name(tariff_id)
-        amount = admin_money(amount)
+        tariff_name = get_tariff_display_name(payment["tariff_id"])
+        amount = admin_money(payment["amount"])
         tariff_names.add(tariff_name)
         bucket["revenue"] += amount
         bucket["payments"] += 1
-        bucket["payer_ids"].add(user_id)
+        bucket["payer_ids"].add(payment["user_id"])
         tariff = bucket["tariffs"].setdefault(
             tariff_name, {"name": tariff_name, "count": 0, "revenue": 0}
         )
@@ -3205,6 +3265,7 @@ def build_admin_sales_series(
         output_buckets.append(bucket)
 
     return {
+        "mode": sales_mode,
         "granularity": granularity,
         "requested_granularity": requested_granularity,
         "note": granularity_note,
@@ -3529,7 +3590,7 @@ def support_admin_api_user_payments(request):
 
 
 def build_admin_interval_stats(
-    db_session, start_date, end_date, requested_granularity="week"
+    db_session, start_date, end_date, requested_granularity="week", sales_mode="cohort"
 ):
     start_datetime = datetime.combine(start_date, time.min)
     end_datetime = datetime.combine(end_date, time.max)
@@ -3743,6 +3804,7 @@ def build_admin_interval_stats(
         granularity,
         requested_granularity,
         granularity_note,
+        sales_mode,
     )
     sources.sort(key=lambda item: item["subscriptions"], reverse=True)
     totals["referrals"] = referral_count
@@ -3812,6 +3874,7 @@ def support_admin_api_stats(request):
                     start_date,
                     end_date,
                     request.GET.get("granularity", "week"),
+                    request.GET.get("sales_mode", "cohort"),
                 ),
             }
         )

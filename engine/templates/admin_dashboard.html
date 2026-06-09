@@ -62,7 +62,7 @@
         .form-card.date-popover-open,
         .form-card:has(.date-field.open) { z-index: 120; }
         .form-grid-two { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
-        .form-grid-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(170px, .45fr) auto; gap: 10px; align-items: center; }
+        .form-grid-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(170px, .42fr) minmax(210px, .55fr) auto; gap: 10px; align-items: center; }
         .subscription-actions { display: grid; grid-template-columns: 160px repeat(3, auto); gap: 10px; align-items: center; margin-top: 10px; }
         .input { width: 100%; min-width: 0; max-width: 100%; min-height: 40px; border: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.22); color: var(--text-main); border-radius: 9px; padding: 0 13px; font-size: 13px; font-weight: 600; outline: none; transition: border-color .15s, background .15s; }
         .input:focus { border-color: rgba(255,199,0,.38); background: rgba(0,0,0,.28); }
@@ -506,6 +506,10 @@
                     <option value="day">По дням</option>
                     <option value="week" selected>По неделям</option>
                     <option value="month">По месяцам</option>
+                </select>
+                <select class="input" name="sales_mode" aria-label="Режим продаж">
+                    <option value="cohort" selected>Новые клиенты</option>
+                    <option value="absolute">Все платежи</option>
                 </select>
                 <button class="btn" type="submit"><i class="fas fa-rotate"></i>Обновить</button>
                 <div class="date-presets" aria-label="Быстрый выбор периода">
@@ -1709,6 +1713,19 @@
             const series = result.sales_series || {buckets: [], tariff_names: []};
             const hasSalesSeries = (series.buckets || []).some((bucket) => bucket.revenue || bucket.payments);
             const granularityLabels = {day: 'по дням', week: 'по неделям', month: 'по месяцам'};
+            const seriesModeLabels = {
+                cohort: {
+                    title: 'Продажи новых клиентов',
+                    subtitle: 'Выручка и платежи по тарифам в когортах новых клиентов',
+                    empty: 'Продаж новых клиентов за период нет.',
+                },
+                absolute: {
+                    title: 'Все платежи',
+                    subtitle: 'Абсолютная выручка и все успешные платежи по тарифам',
+                    empty: 'Платежей за период нет.',
+                },
+            };
+            const seriesMode = seriesModeLabels[series.mode] || seriesModeLabels.cohort;
             const legendItems = [
                 '<span class="sales-chart-legend-item"><span class="sales-chart-swatch" style="--swatch:#38d996"></span>Выручка</span>',
                 ...(series.tariff_names || []).map((name, index) => `
@@ -1781,14 +1798,14 @@
                 <section class="card chart-card sales-chart-card">
                     <div class="sales-chart-head">
                         <div>
-                            <h3 class="sales-chart-title">Продажи новых клиентов</h3>
-                            <div class="sales-chart-subtitle">Выручка и платежи по тарифам, ${escapeHtml(granularityLabels[series.granularity] || 'по неделям')}</div>
+                            <h3 class="sales-chart-title">${seriesMode.title}</h3>
+                            <div class="sales-chart-subtitle">${seriesMode.subtitle}, ${escapeHtml(granularityLabels[series.granularity] || 'по неделям')}</div>
                         </div>
                         ${series.note ? `<div class="sales-chart-note">${escapeHtml(series.note)}</div>` : ''}
                     </div>
                     ${hasSalesSeries
                         ? `<div class="sales-chart-canvas-wrap"><canvas id="stats-chart"></canvas><div id="sales-chart-tooltip" class="sales-chart-tooltip"></div></div><div class="sales-chart-legend">${legendItems}</div>`
-                        : '<div class="empty-chart">Продаж новых клиентов за период нет.</div>'}
+                        : `<div class="empty-chart">${seriesMode.empty}</div>`}
                 </section>
                 <section class="sources-grid">
                     ${sourceCards || '<div class="card info-card muted">Данных за период нет.</div>'}
