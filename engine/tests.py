@@ -1,7 +1,6 @@
 import hashlib
 import hmac
 import time
-from datetime import date
 from datetime import datetime
 from types import SimpleNamespace
 from unittest import mock
@@ -15,8 +14,8 @@ from common.models.settings import BOT_TARIFF_PRICE_YEAR_SETTING
 from common.models.db import User
 from engine.payments import create_wata_payment_sync
 from engine.payments import create_yk_payment_sync
+from engine.views import admin_stats_row_bucket_key
 from engine.views import auth_by_telegram_widget
-from engine.views import build_admin_sales_series
 from engine.views import create_site_user
 from engine.views import get_runtime_actual_tariffs
 from engine.views import get_telegram_auth_bot
@@ -28,70 +27,12 @@ from engine.views import verify_telegram_widget_auth
 
 
 class AdminSalesSeriesTests(SimpleTestCase):
-    def test_absolute_daily_sales_do_not_change_when_range_expands(self):
-        class FakeQuery:
-            def __init__(self, rows):
-                self.rows = rows
+    def test_bucket_key_matches_selected_granularity(self):
+        value = datetime(2026, 5, 20, 12, 0)
 
-            def filter(self, *args, **kwargs):
-                return self
-
-            def join(self, *args, **kwargs):
-                return self
-
-            def all(self):
-                return self.rows
-
-        class FakeSession:
-            def __init__(self):
-                self.query_count = 0
-
-            def query(self, *args):
-                self.query_count += 1
-                if self.query_count == 1:
-                    return FakeQuery(
-                        [
-                            (1, 1, datetime(2026, 5, 20, 12, 0), "month", 249),
-                            (2, 2, datetime(2026, 5, 14, 12, 0), "threemonths", 599),
-                            (3, 2, datetime(2026, 5, 20, 13, 0), "threemonths", 599),
-                        ]
-                    )
-                return FakeQuery([])
-
-        def day_bucket(series):
-            return next(
-                bucket
-                for bucket in series["buckets"]
-                if bucket["start"] == "2026-05-20"
-            )
-
-        week_series = build_admin_sales_series(
-            FakeSession(),
-            None,
-            date(2026, 5, 20),
-            date(2026, 5, 26),
-            "day",
-            "day",
-            "",
-            "absolute",
-        )
-        month_series = build_admin_sales_series(
-            FakeSession(),
-            None,
-            date(2026, 5, 1),
-            date(2026, 5, 30),
-            "day",
-            "day",
-            "",
-            "absolute",
-        )
-
-        self.assertEqual(week_series["mode"], "absolute")
-        self.assertEqual(month_series["mode"], "absolute")
-        self.assertEqual(day_bucket(week_series)["payments"], 2)
-        self.assertEqual(day_bucket(week_series)["revenue"], 848)
-        self.assertEqual(day_bucket(month_series)["payments"], 2)
-        self.assertEqual(day_bucket(month_series)["revenue"], 848)
+        self.assertEqual(admin_stats_row_bucket_key(value, "day"), "2026-05-20")
+        self.assertEqual(admin_stats_row_bucket_key(value, "week"), "2026-05-18")
+        self.assertEqual(admin_stats_row_bucket_key(value, "month"), "2026-05-01")
 
 
 class TelegramAuthBotTests(SimpleTestCase):

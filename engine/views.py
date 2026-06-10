@@ -42,6 +42,7 @@ from sqlalchemy import Integer
 from sqlalchemy import update
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import or_
+from sqlalchemy import union_all
 from sqlalchemy.exc import IntegrityError
 from common.models.db import User
 from common.models.db import EventLog
@@ -3097,6 +3098,25 @@ def admin_stats_bucket_label(bucket_start, bucket_end, granularity):
     return bucket_start.strftime("%m.%Y")
 
 
+def admin_stats_bucket_sql(value, granularity):
+    if granularity == "day":
+        return func.date_trunc("day", value)
+    if granularity == "week":
+        return func.date_trunc("week", value)
+    return func.date_trunc("month", value)
+
+
+def admin_stats_row_bucket_key(value, granularity):
+    value = admin_dt(value)
+    if not value:
+        return None
+    return admin_stats_bucket_start(value.date(), granularity).isoformat()
+
+
+def admin_stats_source_key(value):
+    return None if value is None else str(value)
+
+
 def build_admin_sales_series(
     db_session,
     first_subscription_events,
@@ -3133,34 +3153,59 @@ def build_admin_sales_series(
         current = next_start
 
     yk_payment_time = func.coalesce(YkPayment.captured_at, YkPayment.created_at)
+    yk_bucket = admin_stats_bucket_sql(yk_payment_time, granularity)
+    wata_bucket = admin_stats_bucket_sql(WataTransaction.payment_time, granularity)
 
     if sales_mode == "absolute":
         yk_rows = (
             db_session.query(
-                YkPayment.id,
-                YkPayment.user_id,
-                yk_payment_time.label("payment_time"),
+                yk_bucket.label("bucket_start"),
                 YkPayment.subscription_period,
-                YkPayment.amount,
+                func.count(YkPayment.id),
+                func.coalesce(func.sum(YkPayment.amount), 0),
             )
+            .select_from(YkPayment)
             .filter(YkPayment.status == "succeeded")
             .filter(yk_payment_time >= start_datetime)
             .filter(yk_payment_time <= end_datetime)
+            .group_by(yk_bucket, YkPayment.subscription_period)
             .all()
         )
         wata_rows = (
             db_session.query(
-                WataTransaction.id,
-                WataInvoice.user_id,
-                WataTransaction.payment_time,
+                wata_bucket.label("bucket_start"),
                 WataInvoice.tariff_id,
-                WataTransaction.amount,
+                func.count(WataTransaction.id),
+                func.coalesce(func.sum(WataTransaction.amount), 0),
             )
+            .select_from(WataInvoice)
             .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
             .filter(WataTransaction.transaction_status == "Paid")
             .filter(WataTransaction.payment_time >= start_datetime)
             .filter(WataTransaction.payment_time <= end_datetime)
+            .group_by(wata_bucket, WataInvoice.tariff_id)
             .all()
+        )
+        yk_payer_query = (
+            db_session.query(
+                yk_bucket.label("bucket_start"),
+                YkPayment.user_id.label("user_id"),
+            )
+            .select_from(YkPayment)
+            .filter(YkPayment.status == "succeeded")
+            .filter(yk_payment_time >= start_datetime)
+            .filter(yk_payment_time <= end_datetime)
+        )
+        wata_payer_query = (
+            db_session.query(
+                wata_bucket.label("bucket_start"),
+                WataInvoice.user_id.label("user_id"),
+            )
+            .select_from(WataInvoice)
+            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .filter(WataTransaction.transaction_status == "Paid")
+            .filter(WataTransaction.payment_time >= start_datetime)
+            .filter(WataTransaction.payment_time <= end_datetime)
         )
     else:
         cohort_events = (
@@ -3175,87 +3220,105 @@ def build_admin_sales_series(
         )
         yk_rows = (
             db_session.query(
-                YkPayment.id,
-                YkPayment.user_id,
-                yk_payment_time.label("payment_time"),
+                yk_bucket.label("bucket_start"),
                 YkPayment.subscription_period,
-                YkPayment.amount,
+                func.count(YkPayment.id),
+                func.coalesce(func.sum(YkPayment.amount), 0),
             )
+            .select_from(YkPayment)
             .join(cohort_events, cohort_events.c.user_id == YkPayment.user_id)
             .filter(YkPayment.status == "succeeded")
             .filter(yk_payment_time >= cohort_events.c.timestamp)
+            .filter(yk_payment_time >= start_datetime)
             .filter(yk_payment_time <= end_datetime)
+            .group_by(yk_bucket, YkPayment.subscription_period)
             .all()
         )
         wata_rows = (
             db_session.query(
-                WataTransaction.id,
-                WataInvoice.user_id,
-                WataTransaction.payment_time,
+                wata_bucket.label("bucket_start"),
                 WataInvoice.tariff_id,
-                WataTransaction.amount,
+                func.count(WataTransaction.id),
+                func.coalesce(func.sum(WataTransaction.amount), 0),
             )
+            .select_from(WataInvoice)
             .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
             .join(cohort_events, cohort_events.c.user_id == WataInvoice.user_id)
             .filter(WataTransaction.transaction_status == "Paid")
             .filter(WataTransaction.payment_time >= cohort_events.c.timestamp)
+            .filter(WataTransaction.payment_time >= start_datetime)
             .filter(WataTransaction.payment_time <= end_datetime)
+            .group_by(wata_bucket, WataInvoice.tariff_id)
             .all()
         )
+        yk_payer_query = (
+            db_session.query(
+                yk_bucket.label("bucket_start"),
+                YkPayment.user_id.label("user_id"),
+            )
+            .select_from(YkPayment)
+            .join(cohort_events, cohort_events.c.user_id == YkPayment.user_id)
+            .filter(YkPayment.status == "succeeded")
+            .filter(yk_payment_time >= cohort_events.c.timestamp)
+            .filter(yk_payment_time >= start_datetime)
+            .filter(yk_payment_time <= end_datetime)
+        )
+        wata_payer_query = (
+            db_session.query(
+                wata_bucket.label("bucket_start"),
+                WataInvoice.user_id.label("user_id"),
+            )
+            .select_from(WataInvoice)
+            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .join(cohort_events, cohort_events.c.user_id == WataInvoice.user_id)
+            .filter(WataTransaction.transaction_status == "Paid")
+            .filter(WataTransaction.payment_time >= cohort_events.c.timestamp)
+            .filter(WataTransaction.payment_time >= start_datetime)
+            .filter(WataTransaction.payment_time <= end_datetime)
+        )
 
-    payments = []
-    for payment_id, user_id, payment_time, tariff_id, amount in yk_rows:
-        payment_time = admin_dt(payment_time)
-        if payment_time:
-            payments.append(
-                {
-                    "source": "yk",
-                    "id": payment_id,
-                    "user_id": user_id,
-                    "payment_time": payment_time,
-                    "tariff_id": tariff_id,
-                    "amount": amount,
-                }
-            )
-    for payment_id, user_id, payment_time, tariff_id, amount in wata_rows:
-        payment_time = admin_dt(payment_time)
-        if payment_time:
-            payments.append(
-                {
-                    "source": "wata",
-                    "id": payment_id,
-                    "user_id": user_id,
-                    "payment_time": payment_time,
-                    "tariff_id": tariff_id,
-                    "amount": amount,
-                }
-            )
+    payer_events = union_all(
+        yk_payer_query.statement,
+        wata_payer_query.statement,
+    ).subquery()
+    payer_rows = (
+        db_session.query(
+            payer_events.c.bucket_start,
+            func.count(func.distinct(payer_events.c.user_id)),
+        )
+        .group_by(payer_events.c.bucket_start)
+        .all()
+    )
+    for bucket_start_value, unique_payers in payer_rows:
+        key = admin_stats_row_bucket_key(bucket_start_value, granularity)
+        bucket = buckets.get(key)
+        if bucket is not None:
+            bucket["unique_paying_users"] = int(unique_payers or 0)
 
     tariff_names = set()
-    for payment in payments:
-        payment_time = payment["payment_time"]
-        if payment_time < start_datetime or payment_time > end_datetime:
-            continue
-        payment_date = payment_time.date()
-        key = admin_stats_bucket_start(payment_date, granularity).isoformat()
+    for bucket_start_value, tariff_id, count, amount in [
+        *yk_rows,
+        *wata_rows,
+    ]:
+        key = admin_stats_row_bucket_key(bucket_start_value, granularity)
         bucket = buckets.get(key)
         if bucket is None:
             continue
-        tariff_name = get_tariff_display_name(payment["tariff_id"])
-        amount = admin_money(payment["amount"])
+        tariff_name = get_tariff_display_name(tariff_id)
+        amount = admin_money(amount)
+        count = int(count or 0)
         tariff_names.add(tariff_name)
         bucket["revenue"] += amount
-        bucket["payments"] += 1
-        bucket["payer_ids"].add(payment["user_id"])
+        bucket["payments"] += count
         tariff = bucket["tariffs"].setdefault(
             tariff_name, {"name": tariff_name, "count": 0, "revenue": 0}
         )
-        tariff["count"] += 1
+        tariff["count"] += count
         tariff["revenue"] += amount
 
     output_buckets = []
     for bucket in buckets.values():
-        bucket["unique_paying_users"] = len(bucket.pop("payer_ids"))
+        bucket.pop("payer_ids", None)
         bucket["tariffs"] = [
             value
             for _, value in sorted(
@@ -3611,52 +3674,69 @@ def build_admin_interval_stats(
             .label("row_number"),
         )
         .filter(EventLog.event_type == "subscription_created")
+        .filter(EventLog.timestamp <= end_datetime)
         .subquery()
     )
 
     # Берем только первое создание подписки на пользователя.
     # При merge/site/magic-link сценариях повторные subscription_created не должны
     # превращать старого пользователя в новую регистрацию выбранного периода.
-    events = (
+    cohort_events = (
         db_session.query(
-            first_subscription_events.c.user_id,
-            first_subscription_events.c.event_payload,
+            first_subscription_events.c.user_id.label("user_id"),
+            first_subscription_events.c.timestamp.label("timestamp"),
+            first_subscription_events.c.event_payload["traffic_source"].astext.label(
+                "traffic_source"
+            ),
         )
         .filter(first_subscription_events.c.row_number == 1)
         .filter(first_subscription_events.c.timestamp >= start_datetime)
         .filter(first_subscription_events.c.timestamp <= end_datetime)
+        .subquery()
+    )
+
+    source_stats = {}
+    subscription_rows = (
+        db_session.query(
+            cohort_events.c.traffic_source,
+            func.count(cohort_events.c.user_id),
+        )
+        .group_by(cohort_events.c.traffic_source)
         .all()
     )
-    user_ids_by_traffic = {}
-    all_user_ids = set()
-    for user_id, payload in events:
-        payload = payload or {}
-        traffic_source = payload.get("traffic_source")
-        user_ids_by_traffic.setdefault(traffic_source, set()).add(user_id)
-        all_user_ids.add(user_id)
+    for traffic_source, subscriptions in subscription_rows:
+        source_stats[admin_stats_source_key(traffic_source)] = {
+            "traffic_source": admin_stats_source_key(traffic_source),
+            "subscriptions": int(subscriptions or 0),
+            "connections": 0,
+            "unique_paying_users": 0,
+            "payments": 0,
+            "revenue": 0,
+            "tariffs": {},
+        }
 
-    referral_user_ids = [
-        row[0]
-        for row in db_session.query(User.id)
+    referral_count = (
+        db_session.query(func.count(User.id))
+        .join(cohort_events, cohort_events.c.user_id == User.id)
         .filter(User.referred_by_id.isnot(None))
-        .filter(User.id.in_(all_user_ids or {-1}))
-        .all()
-    ]
-    referral_count = len(referral_user_ids)
+        .scalar()
+        or 0
+    )
     bonus_rows = (
         db_session.query(
             ReferralBonus.bonus_type,
             func.count(ReferralBonus.id),
         )
+        .join(cohort_events, cohort_events.c.user_id == ReferralBonus.referral_id)
+        .join(User, User.id == cohort_events.c.user_id)
         .filter(ReferralBonus.created_at >= start_datetime)
         .filter(ReferralBonus.created_at <= end_datetime)
-        .filter(ReferralBonus.referral_id.in_(referral_user_ids or {-1}))
+        .filter(User.referred_by_id.isnot(None))
         .group_by(ReferralBonus.bonus_type)
         .all()
     )
     referral_bonus_counts = {bonus_type: count for bonus_type, count in bonus_rows}
 
-    sources = []
     total_tariffs = {}
     totals = {
         "subscriptions": 0,
@@ -3667,133 +3747,144 @@ def build_admin_interval_stats(
     }
     yk_payment_time = func.coalesce(YkPayment.captured_at, YkPayment.created_at)
 
-    for traffic_source, user_ids in user_ids_by_traffic.items():
-        if not user_ids:
+    connection_rows = (
+        db_session.query(
+            cohort_events.c.traffic_source,
+            func.count(func.distinct(EventLog.user_id)),
+        )
+        .select_from(EventLog)
+        .join(cohort_events, cohort_events.c.user_id == EventLog.user_id)
+        .filter(EventLog.event_type == "traffic_threshold_reached")
+        .filter(EventLog.event_payload["threshold"].astext.cast(Integer) == 0)
+        .group_by(cohort_events.c.traffic_source)
+        .all()
+    )
+    for traffic_source, connections in connection_rows:
+        source = source_stats.get(admin_stats_source_key(traffic_source))
+        if source is not None:
+            source["connections"] = int(connections or 0)
+
+    yk_rows = (
+        db_session.query(
+            cohort_events.c.traffic_source,
+            YkPayment.subscription_period,
+            func.count(YkPayment.id),
+            func.coalesce(func.sum(YkPayment.amount), 0),
+        )
+        .select_from(YkPayment)
+        .join(cohort_events, cohort_events.c.user_id == YkPayment.user_id)
+        .filter(YkPayment.status == "succeeded")
+        .filter(yk_payment_time >= cohort_events.c.timestamp)
+        .filter(yk_payment_time <= end_datetime)
+        .group_by(cohort_events.c.traffic_source, YkPayment.subscription_period)
+        .all()
+    )
+    wata_rows = (
+        db_session.query(
+            cohort_events.c.traffic_source,
+            WataInvoice.tariff_id,
+            func.count(WataTransaction.id),
+            func.coalesce(func.sum(WataTransaction.amount), 0),
+        )
+        .select_from(WataInvoice)
+        .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+        .join(cohort_events, cohort_events.c.user_id == WataInvoice.user_id)
+        .filter(WataTransaction.transaction_status == "Paid")
+        .filter(WataTransaction.payment_time >= cohort_events.c.timestamp)
+        .filter(WataTransaction.payment_time <= end_datetime)
+        .group_by(cohort_events.c.traffic_source, WataInvoice.tariff_id)
+        .all()
+    )
+    for traffic_source, tariff_id, count, amount in [*yk_rows, *wata_rows]:
+        source = source_stats.get(admin_stats_source_key(traffic_source))
+        if source is None:
             continue
+        tariff_name = get_tariff_display_name(tariff_id)
+        amount = admin_money(amount)
+        count = int(count or 0)
+        source["payments"] += count
+        source["revenue"] += amount
+        source["tariffs"][tariff_name] = source["tariffs"].get(tariff_name, 0) + count
+        total_tariffs[tariff_name] = total_tariffs.get(tariff_name, 0) + count
 
-        # В legacy-данных у пользователя могут быть платежи старше первого
-        # subscription_created в event_logs. Они не относятся к этой когорте.
-        traffic_source_subscription_events = (
-            db_session.query(
-                first_subscription_events.c.user_id,
-                first_subscription_events.c.timestamp,
-            )
-            .filter(first_subscription_events.c.row_number == 1)
-            .filter(first_subscription_events.c.user_id.in_(user_ids))
-            .subquery()
+    yk_payer_query = (
+        db_session.query(
+            cohort_events.c.traffic_source.label("traffic_source"),
+            YkPayment.user_id.label("user_id"),
         )
-        yk_rows = (
-            db_session.query(
-                YkPayment.subscription_period,
-                func.count(YkPayment.id),
-                func.coalesce(func.sum(YkPayment.amount), 0),
-            )
-            .join(
-                traffic_source_subscription_events,
-                traffic_source_subscription_events.c.user_id == YkPayment.user_id,
-            )
-            .filter(YkPayment.status == "succeeded")
-            .filter(yk_payment_time >= traffic_source_subscription_events.c.timestamp)
-            .filter(yk_payment_time <= end_datetime)
-            .group_by(YkPayment.subscription_period)
-            .all()
+        .select_from(YkPayment)
+        .join(cohort_events, cohort_events.c.user_id == YkPayment.user_id)
+        .filter(YkPayment.status == "succeeded")
+        .filter(yk_payment_time >= cohort_events.c.timestamp)
+        .filter(yk_payment_time <= end_datetime)
+    )
+    wata_payer_query = (
+        db_session.query(
+            cohort_events.c.traffic_source.label("traffic_source"),
+            WataInvoice.user_id.label("user_id"),
         )
-        wata_rows = (
-            db_session.query(
-                WataInvoice.tariff_id,
-                func.count(WataTransaction.id),
-                func.coalesce(func.sum(WataTransaction.amount), 0),
-            )
-            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
-            .join(
-                traffic_source_subscription_events,
-                traffic_source_subscription_events.c.user_id == WataInvoice.user_id,
-            )
-            .filter(WataTransaction.transaction_status == "Paid")
-            .filter(
-                WataTransaction.payment_time
-                >= traffic_source_subscription_events.c.timestamp
-            )
-            .filter(WataTransaction.payment_time <= end_datetime)
-            .group_by(WataInvoice.tariff_id)
-            .all()
+        .select_from(WataInvoice)
+        .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+        .join(cohort_events, cohort_events.c.user_id == WataInvoice.user_id)
+        .filter(WataTransaction.transaction_status == "Paid")
+        .filter(WataTransaction.payment_time >= cohort_events.c.timestamp)
+        .filter(WataTransaction.payment_time <= end_datetime)
+    )
+    payer_events = union_all(
+        yk_payer_query.statement,
+        wata_payer_query.statement,
+    ).subquery()
+    payer_rows = (
+        db_session.query(
+            payer_events.c.traffic_source,
+            func.count(func.distinct(payer_events.c.user_id)),
         )
+        .group_by(payer_events.c.traffic_source)
+        .all()
+    )
+    for traffic_source, unique_payers in payer_rows:
+        source = source_stats.get(admin_stats_source_key(traffic_source))
+        if source is not None:
+            source["unique_paying_users"] = int(unique_payers or 0)
 
-        tariff_stats = {}
-        traffic_source_revenue = 0
-        for tariff_id, count, amount in [*yk_rows, *wata_rows]:
-            tariff_name = get_tariff_display_name(tariff_id)
-            tariff_stats[tariff_name] = tariff_stats.get(tariff_name, 0) + count
-            total_tariffs[tariff_name] = total_tariffs.get(tariff_name, 0) + count
-            traffic_source_revenue += admin_money(amount)
-
-        yk_payers = {
-            row[0]
-            for row in db_session.query(YkPayment.user_id)
-            .join(
-                traffic_source_subscription_events,
-                traffic_source_subscription_events.c.user_id == YkPayment.user_id,
-            )
-            .filter(YkPayment.status == "succeeded")
-            .filter(yk_payment_time >= traffic_source_subscription_events.c.timestamp)
-            .filter(yk_payment_time <= end_datetime)
-            .distinct()
-            .all()
-        }
-        wata_payers = {
-            row[0]
-            for row in db_session.query(WataInvoice.user_id)
-            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
-            .join(
-                traffic_source_subscription_events,
-                traffic_source_subscription_events.c.user_id == WataInvoice.user_id,
-            )
-            .filter(WataTransaction.transaction_status == "Paid")
-            .filter(
-                WataTransaction.payment_time
-                >= traffic_source_subscription_events.c.timestamp
-            )
-            .filter(WataTransaction.payment_time <= end_datetime)
-            .distinct()
-            .all()
-        }
-        unique_payers = len(yk_payers | wata_payers)
-        connections = (
-            db_session.query(func.count(func.distinct(EventLog.user_id)))
-            .filter(EventLog.event_type == "traffic_threshold_reached")
-            .filter(EventLog.user_id.in_(user_ids))
-            .filter(EventLog.event_payload["threshold"].astext.cast(Integer) == 0)
-            .scalar()
-            or 0
+    sources = []
+    for source in source_stats.values():
+        subscriptions = source["subscriptions"]
+        unique_payers = source["unique_paying_users"]
+        sources.append(
+            {
+                "traffic_source": source["traffic_source"],
+                "label": (
+                    "Direct"
+                    if source["traffic_source"] is None
+                    else f"TS_{source['traffic_source']}"
+                ),
+                "subscriptions": subscriptions,
+                "connections": source["connections"],
+                "unique_paying_users": unique_payers,
+                "payments": source["payments"],
+                "revenue": source["revenue"],
+                "connection_conversion": (
+                    (source["connections"] / subscriptions * 100)
+                    if subscriptions
+                    else 0
+                ),
+                "payment_conversion": (
+                    (unique_payers / subscriptions * 100) if subscriptions else 0
+                ),
+                "tariffs": [
+                    {"name": name, "count": count}
+                    for name, count in sorted(
+                        source["tariffs"].items(),
+                        key=lambda item: get_tariff_order(item[0]),
+                    )
+                ],
+            }
         )
-        subscriptions = len(user_ids)
-        payments = sum(tariff_stats.values())
-        source = {
-            "traffic_source": traffic_source,
-            "label": "Direct" if traffic_source is None else f"TS_{traffic_source}",
-            "subscriptions": subscriptions,
-            "connections": connections,
-            "unique_paying_users": unique_payers,
-            "payments": payments,
-            "revenue": traffic_source_revenue,
-            "connection_conversion": (
-                (connections / subscriptions * 100) if subscriptions else 0
-            ),
-            "payment_conversion": (
-                (unique_payers / subscriptions * 100) if subscriptions else 0
-            ),
-            "tariffs": [
-                {"name": name, "count": count}
-                for name, count in sorted(
-                    tariff_stats.items(), key=lambda item: get_tariff_order(item[0])
-                )
-            ],
-        }
-        sources.append(source)
         totals["subscriptions"] += subscriptions
-        totals["connections"] += connections
-        totals["payments"] += payments
-        totals["revenue"] += traffic_source_revenue
+        totals["connections"] += source["connections"]
+        totals["payments"] += source["payments"]
+        totals["revenue"] += source["revenue"]
         totals["unique_paying_users"] += unique_payers
 
     sales_series = build_admin_sales_series(
