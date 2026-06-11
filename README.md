@@ -125,6 +125,36 @@ Backend дополнительно пишет существующие собы�
 
 ---
 
+## Админка: runtime-настройки
+
+Раздел настроек в `admin_dashboard.html` управляет таблицей `system_settings`
+через `support_admin_api_runtime_settings` (`engine/views.py`). Список и валидация
+полностью data-driven из `common/models/settings.py` (`RUNTIME_SETTING_KEYS` +
+типовые множества `INT_/POSITIVE_INT_/NON_NEGATIVE_INT_RUNTIME_SETTINGS` и т.д.):
+любой ключ, добавленный в common, автоматически появляется в админке. Пустое
+значение = fallback на env/default; «Сбросить» удаляет строку из БД.
+
+Группировка в UI задаётся константой `SETTING_GROUPS` (шаблон). Ключи, не попавшие
+ни в одну группу, всё равно показываются отдельным блоком в конце.
+
+### Win-back настройки
+
+Группа **Win-back** конфигурирует кампанию возврата истёкших пользователей
+(сервисы user-notify/bot/payment/email):
+
+- `winback_price_month`, `winback_price_threemonths`, `winback_price_year` — сниженные
+  цены тарифов в win-back витрине (на витрине «все тарифы» месяц показывается по
+  регулярной цене, скидка — только на 3 и 12 мес.).
+- `winback_send_hour_start`, `winback_send_hour_end` — окно отправки (часы МСК).
+- `winback_offer_ttl_hours` — срок жизни персонального оффера (`winback_offers`).
+- `winback_grace_hours` — грейс после истечения оффера, в течение которого скидку
+  ещё разово отдают.
+
+Чтобы группа отобразилась, в `common` сайта должны присутствовать win-back ключи
+из `common/models/settings.py` — пропагируйте common, как и для остальных сервисов.
+
+---
+
 ## Деплой
 
 Смотри `docker/website/PRODUCTION.md` и `docker/edge/PRODUCTION.md`.

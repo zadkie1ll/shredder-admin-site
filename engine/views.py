@@ -3393,6 +3393,12 @@ def admin_runtime_setting_type(key):
     return "string"
 
 
+# Часы окна отправки win-back — час суток (0-23). Ключи заданы строками намеренно:
+# common сайта может ещё не содержать win-back констант, а сюда мы попадаем только
+# после проверки key in RUNTIME_SETTING_KEYS (т.е. уже после пропагации common).
+WINBACK_SEND_HOUR_SETTINGS = {"winback_send_hour_start", "winback_send_hour_end"}
+
+
 def admin_validate_runtime_setting(key, value):
     key = (key or "").strip()
     value = (value or "").strip()
@@ -3416,6 +3422,8 @@ def admin_validate_runtime_setting(key, value):
             return None, "Значение не может быть отрицательным"
         if key in POSITIVE_INT_RUNTIME_SETTINGS and int_value <= 0:
             return None, "Значение должно быть больше нуля"
+        if key in WINBACK_SEND_HOUR_SETTINGS and not (0 <= int_value <= 23):
+            return None, "Час должен быть в диапазоне 0-23"
         return str(int_value), None
 
     if key in POSITIVE_FLOAT_RUNTIME_SETTINGS:
