@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-SSH_HOST="${SSH_HOST:-mi.website}"
+SSH_HOST="${SSH_HOST:-mi.fornex.website}"
 REMOTE_DIR="${REMOTE_DIR:-/root/website/postgres}"
 DOCKER_NETWORK="${DOCKER_NETWORK:-monkey-island-network}"
 

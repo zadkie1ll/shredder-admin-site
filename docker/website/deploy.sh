@@ -4,7 +4,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-SSH_HOST="${SSH_HOST:-mi.website}"
+SSH_HOST="${SSH_HOST:-mi.fornex.website}"
 REMOTE_DIR="${REMOTE_DIR:-/root/website/website}"
 DOCKER_NETWORK="${DOCKER_NETWORK:-monkey-island-network}"
 
@@ -29,7 +29,7 @@ Options:
   -h, --help    Show this help
 
 Environment overrides:
-  SSH_HOST          SSH config host or user@host (default: mi.website)
+  SSH_HOST          SSH config host or user@host (default: mi.fornex.website)
   REMOTE_DIR        Remote website directory (default: /root/website/website)
   DOCKER_NETWORK    Shared docker network for website/postgres (default: monkey-island-network)
   LOCAL_IMAGE_TAG   Tag embedded in the built tar (default: monkey-island-website:v0.1)
