@@ -130,6 +130,39 @@ Backend дополнительно пишет существующие собы�
 
 ---
 
+## Mobile API (`mobile_api`) — авторизация мобильного приложения
+
+Django-приложение `mobile_api` обслуживает мобильное приложение Monkey Island
+(на базе hiddify/sing-box). Авторизация — по одноразовому device-code, как у
+существующего web-login через бота: бот по `/start app_<code>` сохраняет
+`hash(code) → user`, приложение меняет код на access-токен.
+
+**Эндпоинты** (`web_app/urls.py`):
+
+| Метод/путь | Назначение |
+|---|---|
+| `POST /api/mobile/v1/auth/exchange` `{code}` | Обменять одноразовый код на `{access_token, subscription_url, user}` (код one-time, TTL 10 мин) |
+| `GET /api/mobile/v1/me` (Bearer) | Статус подписки: `status`, `expire_at`, `days_left`, `subscription_url` |
+| `GET /api/mobile/v1/tariffs` | Список тарифов |
+| `POST /api/mobile/v1/auth/logout` (Bearer) | Отозвать access-токен |
+| `GET /app/auth-redirect?code=…` | Мост https → `monkeyisland://auth?code=…` (кнопка «Войти» в боте) |
+
+Авторизация API — заголовок `Authorization: Bearer <access_token>`. В БД хранятся
+только хэши (`sha256` с `SECRET_KEY`, как у telegram-login). Эндпоинты `csrf_exempt`
+(токен-авторизация, не сессии).
+
+**Новые таблицы БД** (в общем сабмодуле `common/models/db.py`, аддитивно — существующие
+не меняются): `mobile_auth_codes` (code_hash, user_id, expires_at, used_at, source),
+`mobile_access_tokens` (token_hash, user_id, revoked_at, last_seen_at). Так как `common` —
+общий сабмодуль, изменение видно и боту.
+
+> ⚠️ **Требуется миграция.** Сгенерировать штатным скриптом (не вручную):
+> `./common/alembic-revision.sh "add mobile auth tables"`, затем применить.
+
+Тесты: `python manage.py test mobile_api` (логика кодов/токенов на in-memory SQLite).
+
+---
+
 ## Админка: runtime-настройки
 
 Раздел настроек в `admin_dashboard.html` управляет таблицей `system_settings`

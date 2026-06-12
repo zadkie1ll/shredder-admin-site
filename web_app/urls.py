@@ -18,7 +18,13 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 
+from mobile_api import views as mobile_views
+
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("api/mobile/v1/", include("mobile_api.urls")),
+    # App bridge page (https -> monkeyisland:// deep link). Telegram inline buttons
+    # can't use custom schemes, so the bot's "Войти" button points here.
+    path("app/auth-redirect", mobile_views.auth_redirect, name="app_auth_redirect"),
     path("", include("engine.urls")),
 ]
