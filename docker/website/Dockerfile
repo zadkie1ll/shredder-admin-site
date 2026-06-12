@@ -37,6 +37,7 @@ COPY --from=builder /opt/venv /opt/venv
 COPY manage.py database.py ./
 COPY common ./common
 COPY engine ./engine
+COPY mobile_api ./mobile_api
 COPY proto ./proto
 COPY web_app ./web_app
 COPY docker/website/entrypoint.sh /entrypoint.sh
