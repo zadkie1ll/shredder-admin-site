@@ -11,11 +11,18 @@
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    </noscript>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
-        
+
         :root {
             --island-bg: #090a0f;
             --island-panel: rgba(17, 18, 23, 0.86);
@@ -131,6 +138,46 @@
             text-transform: uppercase;
             box-shadow: 0 10px 20px rgba(255, 199, 0, 0.3);
             z-index: 10;
+        }
+
+        .tariff-popular {
+            border-color: #ffc700;
+            box-shadow: 0 0 0 1px #ffc700, 0 24px 60px rgba(255, 199, 0, 0.14);
+        }
+
+        .popular-pill {
+            display: inline-block;
+            background: #ffc700;
+            color: #08090d;
+            font-size: 11px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            padding: 4px 12px;
+            border-radius: 999px;
+            margin-bottom: 12px;
+        }
+
+        .mobile-buybar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 40;
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+            background: rgba(9, 10, 15, 0.94);
+            backdrop-filter: blur(14px);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            transform: translateY(130%);
+            transition: transform 0.25s ease;
+        }
+
+        .mobile-buybar.is-visible {
+            transform: translateY(0);
+        }
+
+        @media (min-width: 768px) {
+            .mobile-buybar { display: none !important; }
         }
 
         .pay-cta {
@@ -254,17 +301,16 @@
         <section class="container mx-auto px-6 py-8 md:py-16 flex-grow grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(360px,560px)] items-center gap-8 lg:gap-12 relative z-10">
             <div class="hero-copy flex flex-col items-center text-center lg:items-start lg:text-left max-w-3xl">
                 <h1 class="hero-title text-5xl sm:text-6xl md:text-8xl mb-7 leading-[0.98]">
-                    VPN для всей семьи и ваших устройств
+                    VPN, который работает, когда остальные&nbsp;— нет
                 </h1>
-                
+
                 <p class="text-white/60 text-xl md:text-3xl mb-10 font-medium max-w-2xl leading-snug">
-                    Удобный и безопасный VPN для телефона, компьютера, планшета и роутера.
-                    До 15 устройств на одной подписке.
+                    YouTube без рекламы, открытые сайты даже при «белых списках», безлимитный трафик и до 15 устройств — на одной подписке.
                 </p>
 
-                <img class="hero-art-mobile" src="{% static 'img/onboarding/family-vpn.png' %}" alt="">
-                
-                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-4 mb-10 w-full sm:w-auto">
+                <img class="hero-art-mobile" src="{% static 'img/onboarding/family-vpn.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
+
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-4 mb-4 w-full sm:w-auto">
                     <a href="#prices" data-conversion-goal="tariff_cta_click" class="tilda-yellow w-full sm:w-auto px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95">
                         ПОДКЛЮЧИТЬ VPN ОТ {{ tariffs.0.price }} ₽
                     </a>
@@ -272,47 +318,59 @@
                     <a href="/dashboard/" class="w-full sm:w-auto px-8 md:px-10 py-4 md:py-5 rounded-full border border-white/10 bg-white/5 text-white/70 font-black uppercase text-sm md:text-base transition hover:border-[#ffc700]/40 hover:text-[#ffc700] active:scale-95">
                         МОЙ КАБИНЕТ
                     </a>
-                    {% else %}
-                    <a href="/login/" data-known-user-cta class="w-full sm:w-auto px-8 md:px-10 py-4 md:py-5 rounded-full border border-white/10 bg-white/5 text-white/70 font-black uppercase text-sm md:text-base transition hover:border-[#ffc700]/40 hover:text-[#ffc700] active:scale-95">
-                        ВОЙТИ В КАБИНЕТ
-                    </a>
                     {% endif %}
                 </div>
+                {% if not user.is_authenticated %}
+                <p class="text-white/45 text-sm md:text-base mb-10 text-center lg:text-left">
+                    Уже покупали?
+                    <a href="/login/" data-known-user-cta class="text-white/75 underline underline-offset-4 hover:text-[#ffc700] transition font-semibold">Войти в кабинет</a>
+                </p>
+                {% endif %}
 
-                <div class="w-full grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 pt-8 border-t border-white/10">
+                <div class="w-full grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5 pt-8 border-t border-white/10">
                     <div class="benefit-card flex flex-col items-center">
                         <div class="text-[#ffc700] mb-3 text-2xl">
-                            <i class="fas fa-globe-americas"></i>
+                            <i class="fas fa-unlock"></i>
                         </div>
-                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">Быстрые локации</h4>
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2 text-center">Обходит белые списки</h4>
                         <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Выбирайте подходящий регион для стабильного и быстрого подключения.
+                            Открывает нужные сайты и сервисы, даже когда доступны лишь отдельные ресурсы.
                         </p>
                     </div>
 
                     <div class="benefit-card flex flex-col items-center">
                         <div class="text-[#ffc700] mb-3 text-2xl">
-                            <i class="fas fa-bolt"></i>
+                            <i class="fab fa-youtube"></i>
                         </div>
-                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">Простое подключение</h4>
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2 text-center">YouTube без рекламы</h4>
                         <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Установите приложение, добавьте ключ и включайте VPN когда нужно.
+                            Смотрите видео быстро и без рекламных пауз на любом устройстве.
                         </p>
                     </div>
 
                     <div class="benefit-card flex flex-col items-center">
                         <div class="text-[#ffc700] mb-3 text-2xl">
-                            <i class="fas fa-shield-alt"></i>
+                            <i class="fas fa-infinity"></i>
                         </div>
-                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2">До 15 устройств</h4>
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2 text-center">Безлимитный трафик</h4>
                         <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Одна подписка подходит для семьи, работы и личных устройств.
+                            Без ограничений по объему и без снижения скорости.
+                        </p>
+                    </div>
+
+                    <div class="benefit-card flex flex-col items-center">
+                        <div class="text-[#ffc700] mb-3 text-2xl">
+                            <i class="fas fa-users"></i>
+                        </div>
+                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2 text-center">До 15 устройств</h4>
+                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
+                            Одна подписка на семью: телефоны, компьютеры, планшеты и роутер.
                         </p>
                     </div>
                 </div>
             </div>
             <div class="flex justify-center lg:justify-end">
-                <img class="hero-art" src="{% static 'img/onboarding/family-vpn.png' %}" alt="">
+                <img class="hero-art" src="{% static 'img/onboarding/family-vpn.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
             </div>
         </section>
     </div>
@@ -328,33 +386,16 @@
     </section>
 
     {% if not user.is_authenticated %}
-    <section class="py-20 bg-[#111111] border-b border-white/5">
+    <section class="py-10 bg-[#0d0d0d] border-b border-white/5">
         <div class="container mx-auto px-6">
-            <div class="relative overflow-hidden rounded-[32px] border border-[#ffc700]/25 bg-[#ffc700]/5 p-8 md:p-12 shadow-[0_0_50px_rgba(255,199,0,0.08)]">
-                <div class="relative z-10 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-10">
-                    <div class="max-w-3xl">
-                        <div class="inline-flex items-center gap-2 rounded-full border border-[#ffc700]/30 bg-black/30 px-4 py-2 text-[#ffc700] text-[10px] font-black uppercase tracking-widest mb-6">
-                            <i class="fas fa-user-shield"></i>
-                            Личный кабинет
-                        </div>
-                        <h2 class="text-3xl md:text-5xl font-black uppercase mb-5 text-white leading-tight">
-                            Уже есть доступ? <span class="text-[#ffc700]">Войдите</span>
-                        </h2>
-                        <p class="text-white text-sm md:text-lg leading-relaxed opacity-90 max-w-2xl">
-                            Вход по email работает для пользователей, которые уже оплатили доступ на сайте или создали подписку через Telegram-бота.
-                        </p>
-                    </div>
-
-                    <div class="flex flex-col items-stretch sm:items-start lg:items-end gap-4">
-                        <a href="/login/" class="tilda-yellow inline-flex items-center justify-center gap-3 px-8 md:px-10 py-5 rounded-full font-black uppercase text-sm md:text-base shadow-2xl transition transform hover:scale-105 active:scale-95 whitespace-nowrap">
-                            <i class="fas fa-right-to-bracket"></i>
-                            Войти в личный кабинет
-                        </a>
-                        <p class="text-gray-400 text-xs md:text-sm text-center sm:text-left lg:text-right max-w-sm">
-                            Если аккаунта еще нет, выберите тариф на странице или начните через Telegram.
-                        </p>
-                    </div>
-                </div>
+            <div class="rounded-2xl border border-white/10 bg-white/[0.03] px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <p class="text-white/70 text-sm md:text-base font-medium">
+                    <i class="fas fa-user-shield text-[#ffc700] mr-2"></i>
+                    Уже оплачивали доступ или есть подписка из Telegram-бота?
+                </p>
+                <a href="/login/" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-white/15 text-white/80 font-bold text-sm hover:border-[#ffc700]/50 hover:text-[#ffc700] transition whitespace-nowrap">
+                    <i class="fas fa-right-to-bracket"></i> Войти в кабинет
+                </a>
             </div>
         </div>
     </section>
@@ -413,15 +454,15 @@
                 <div class="w-20 h-1.5 bg-[#ffc700] mx-auto"></div>
             </div>
             <div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-3 mb-12">
-                <div class="benefit-card text-center"><i class="fas fa-credit-card text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Оплата картой</p><span class="text-white/50 text-xs">через WATA</span></div>
+                <div class="benefit-card text-center"><i class="fas fa-credit-card text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Оплата картой</p><span class="text-white/50 text-xs">Visa · MC · Mir · СБП</span></div>
                 <div class="benefit-card text-center"><i class="fas fa-bolt text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Доступ сразу</p><span class="text-white/50 text-xs">после оплаты</span></div>
                 <div class="benefit-card text-center"><i class="fas fa-envelope text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Ссылка на email</p><span class="text-white/50 text-xs">и вход в ЛК</span></div>
                 <div class="benefit-card text-center"><i class="fab fa-telegram-plane text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Поддержка</p><span class="text-white/50 text-xs">поможем подключить</span></div>
             </div>
             <div class="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-6xl mx-auto">
                 {% for tariff in tariffs %}
-                <div class="tariff-card p-10 flex flex-col justify-between">
-                    
+                <div class="tariff-card p-10 flex flex-col justify-between{% if "3 месяца" in tariff.description %} tariff-popular{% endif %}">
+
                     {% if "3 месяца" in tariff.description %}
                         <div class="discount-badge">Скидка 20%</div>
                     {% elif "1 год" in tariff.description %}
@@ -429,19 +470,27 @@
                     {% endif %}
 
                     <div>
-                        <h3 class="text-[#ffc700] font-black text-xl uppercase mb-2">{{ tariff.description }}</h3>
+                        {% if "3 месяца" in tariff.description %}
+                            <div class="popular-pill">Выбирают чаще всего</div>
+                        {% endif %}
+                        <h3 class="text-[#ffc700] font-black text-xl uppercase mb-2">
+                            {% if tariff.db_tariff_id == "month" %}1 месяц{% elif tariff.db_tariff_id == "threemonths" %}3 месяца{% elif tariff.db_tariff_id == "year" %}12 месяцев{% else %}{{ tariff.description }}{% endif %}
+                        </h3>
                         <div class="mb-8">
                             <div class="text-5xl font-black">{{ tariff.price }} ₽</div>
+                            <div class="text-white/45 text-sm font-bold mt-1">
+                                {% if tariff.db_tariff_id == "threemonths" %}≈ {% widthratio tariff.price 3 1 %} ₽ в месяц{% elif tariff.db_tariff_id == "year" %}≈ {% widthratio tariff.price 12 1 %} ₽ в месяц{% else %}за месяц доступа{% endif %}
+                            </div>
                         </div>
-                        
+
                         <ul class="text-gray-400 space-y-4 mb-10 text-sm font-medium">
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Работает в мобильных сетях</li>
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> До 15 устройств по подписке</li>
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Открывает сайты при «белых списках»</li>
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> YouTube без рекламы</li>
                             <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Безлимитный трафик</li>
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Инструкции для популярных платформ</li>
+                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> До 15 устройств на подписке</li>
                         </ul>
                     </div>
-                    
+
                     <form action="/pay/" method="POST" class="space-y-4" data-payment-form data-tariff-id="{{ tariff.db_tariff_id }}" data-tariff-price="{{ tariff.price }}">
                         {% csrf_token %}
                         <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
@@ -449,13 +498,22 @@
                         {% for key, value in tracking_params.items %}
                             <input type="hidden" name="{{ key }}" value="{{ value }}">
                         {% endfor %}
-                        <input type="email" name="email" placeholder="ТВОЙ EMAIL" required 
-                            class="w-full input-field px-4 py-4 font-bold text-xs uppercase tracking-widest focus:border-[#ffc700] outline-none transition">
+                        <input type="email" name="email" placeholder="Ваш email" required autocomplete="email" inputmode="email"
+                            class="w-full input-field px-4 py-4 font-bold text-base focus:border-[#ffc700] outline-none transition">
                         <button type="submit" class="w-full pay-cta py-4 rounded-xl font-black uppercase text-sm tracking-widest transition shadow-lg">
-                            ОПЛАТИТЬ И ПОЛУЧИТЬ ДОСТУП
+                            Оплатить и подключиться
                         </button>
+                        <p class="flex items-center justify-center gap-2 text-[11px] font-bold text-[#00ff88]">
+                            <i class="fas fa-rotate-left"></i> Не подойдёт — вернём деньги в течение 3 дней
+                        </p>
+                        <div class="flex items-center justify-center gap-3 text-white/55">
+                            <i class="fas fa-lock text-[#ffc700] text-xs"></i>
+                            <i class="fab fa-cc-visa text-lg"></i>
+                            <i class="fab fa-cc-mastercard text-lg"></i>
+                            <span class="text-[10px] font-black uppercase tracking-wider">Mir · СБП</span>
+                        </div>
                         <p class="text-center text-gray-500 text-[10px] leading-relaxed">
-                            Нажимая «Оплатить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-bold hover:text-white transition">условия оферты</a>. После оплаты откроется личный кабинет.
+                            Безопасная оплата картой, данные карты не храним. Нажимая «Оплатить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-bold hover:text-white transition">условия оферты</a>. После оплаты сразу откроется личный кабинет.
                         </p>
                     </form>
                 </div>
@@ -622,7 +680,7 @@
                             <div class="bg-white/5 p-4 rounded-xl space-y-2">
                                 <p>1. <span class="text-[#ffc700] font-bold">Оплата на сайте:</span> Доступ открывается после успешной оплаты выбранного тарифа.</p>
                                 <p>2. <span class="text-[#ffc700] font-bold">Без автоплатежей:</span> После окончания оплаченного периода продление не списывается автоматически.</p>
-                                <p>3. <span class="text-[#ffc700] font-bold">Возврат средств:</span> Возврат за оплаченный период не оформляется. Условия описаны в <a href="/offer/" class="text-[#ffc700] font-bold hover:text-white transition">оферте</a>.</p>
+                                <p>3. <span class="text-[#ffc700] font-bold">Возврат средств:</span> Если сервис не подошел, вернем деньги в течение 3 дней после оплаты. Подробные условия — в <a href="/offer/" class="text-[#ffc700] font-bold hover:text-white transition">оферте</a>.</p>
                             </div>
                         </div>
                     </div>
@@ -681,7 +739,41 @@
         </div>
     </footer>
 
+    {% if not user.is_authenticated %}
+    <div class="mobile-buybar" id="mobileBuybar" aria-hidden="true">
+        <a href="#prices" data-conversion-goal="tariff_cta_click" class="tilda-yellow w-full flex items-center justify-center gap-2 py-4 rounded-full font-black uppercase text-base shadow-2xl active:scale-95">
+            Купить VPN от {{ tariffs.0.price }} ₽
+        </a>
+    </div>
+    {% endif %}
+
     <script>
+        (function setupStickyBuyBar() {
+            const bar = document.getElementById('mobileBuybar');
+            if (!bar || !('IntersectionObserver' in window)) return;
+            const heroCta = document.querySelector('.hero-bg a[href="#prices"]');
+            const prices = document.getElementById('prices');
+            let heroOut = false;
+            let pricesIn = false;
+            const update = () => {
+                const show = heroOut && !pricesIn;
+                bar.classList.toggle('is-visible', show);
+                bar.setAttribute('aria-hidden', show ? 'false' : 'true');
+            };
+            if (heroCta) {
+                new IntersectionObserver((entries) => {
+                    heroOut = !entries[0].isIntersecting;
+                    update();
+                }, { threshold: 0 }).observe(heroCta);
+            }
+            if (prices) {
+                new IntersectionObserver((entries) => {
+                    pricesIn = entries[0].isIntersecting;
+                    update();
+                }, { threshold: 0.1 }).observe(prices);
+            }
+        })();
+
         (function setupConversionTracking() {
             const counterId = 109167744;
             const page = 'vpn';

@@ -384,3 +384,42 @@ class PaymentRedirectTests(SimpleTestCase):
             "https://example.com/login/purchase/token/",
         )
         self.assertEqual(captured["json"]["failRedirectUrl"], "https://example.com/")
+
+
+class LoginOnboardingTests(SimpleTestCase):
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    @override_settings(
+        ALLOWED_HOSTS=["cab.example.com"],
+        CABINET_DOMAINS=["cab.example.com"],
+        VPN_DOMAINS=[],
+        VPS_DOMAINS=[],
+        VPS_DIRECT_SALE_DOMAINS=[],
+        DEFAULT_CABINET_DOMAIN="https://cab.example.com",
+        TELEGRAM_AUTH_BOTS={},
+    )
+    def test_cabinet_domain_hides_login_onboarding(self):
+        request = self.factory.get("/login/", HTTP_HOST="cab.example.com", secure=True)
+        request.session = {}
+
+        content = render_login(request).content.decode()
+
+        self.assertNotIn('id="loginOnboarding"', content)
+
+    @override_settings(
+        ALLOWED_HOSTS=["vpn.example.com"],
+        CABINET_DOMAINS=[],
+        VPN_DOMAINS=["vpn.example.com"],
+        VPS_DOMAINS=[],
+        VPS_DIRECT_SALE_DOMAINS=[],
+        DEFAULT_CABINET_DOMAIN="https://vpn.example.com",
+        TELEGRAM_AUTH_BOTS={},
+    )
+    def test_vpn_domain_shows_login_onboarding(self):
+        request = self.factory.get("/login/", HTTP_HOST="vpn.example.com", secure=True)
+        request.session = {}
+
+        content = render_login(request).content.decode()
+
+        self.assertIn('id="loginOnboarding"', content)

@@ -13,10 +13,17 @@
     <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <title>Вход — Monkey Island VPN</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    </noscript>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
 
         :root {
             --vh: 1vh;
@@ -95,13 +102,13 @@
         .page-background::before {
             left: max(24px, calc(50% - 760px));
             bottom: 6vh;
-            background-image: url("{% static 'img/onboarding/family-vpn.png' %}");
+            background-image: url("{% static 'img/onboarding/family-vpn.webp' %}");
         }
 
         .page-background::after {
             right: max(24px, calc(50% - 760px));
             top: 10vh;
-            background-image: url("{% static 'img/onboarding/smart-switch.png' %}");
+            background-image: url("{% static 'img/onboarding/smart-switch.webp' %}");
             opacity: 0.16;
         }
 
@@ -570,7 +577,7 @@
                     <h2 class="cabinet-onboarding-title">VPN для всей семьи и ваших устройств</h2>
                     <p class="cabinet-onboarding-text">Подключайте телефон, ноутбук, планшет и роутер — все в одном личном кабинете</p>
                     <div class="cabinet-onboarding-art">
-                        <img src="{% static 'img/onboarding/family-vpn.png' %}" alt="">
+                        <img src="{% static 'img/onboarding/family-vpn.webp' %}" alt="" width="720" height="720" decoding="async">
                     </div>
                 </section>
 
@@ -578,7 +585,7 @@
                     <h2 class="cabinet-onboarding-title">Автоматическое переключение</h2>
                     <p class="cabinet-onboarding-text">Открывайте банки, госуслуги и привычные приложения без лишней возни с настройками</p>
                     <div class="cabinet-onboarding-art">
-                        <img src="{% static 'img/onboarding/smart-switch.png' %}" alt="">
+                        <img src="{% static 'img/onboarding/smart-switch.webp' %}" alt="" width="720" height="720" decoding="async" loading="lazy">
                     </div>
                 </section>
 
@@ -586,7 +593,7 @@
                     <h2 class="cabinet-onboarding-title">Белый список — не проблема</h2>
                     <p class="cabinet-onboarding-text">Monkey Island помогает оставаться на связи, когда доступны только отдельные сайты</p>
                     <div class="cabinet-onboarding-art">
-                        <img src="{% static 'img/onboarding/open-internet.png' %}" alt="">
+                        <img src="{% static 'img/onboarding/open-internet.webp' %}" alt="" width="720" height="720" decoding="async" loading="lazy">
                     </div>
                 </section>
 
@@ -594,7 +601,7 @@
                     <h2 class="cabinet-onboarding-title">YouTube без рекламы</h2>
                     <p class="cabinet-onboarding-text">Смотрите любимые видео спокойнее, быстрее и без лишних пауз</p>
                     <div class="cabinet-onboarding-art">
-                        <img src="{% static 'img/onboarding/no-ads.png' %}" alt="">
+                        <img src="{% static 'img/onboarding/no-ads.webp' %}" alt="" width="720" height="720" decoding="async" loading="lazy">
                     </div>
                 </section>
 
@@ -602,7 +609,7 @@
                     <h2 class="cabinet-onboarding-title">Работает, когда другие VPN нет</h2>
                     <p class="cabinet-onboarding-text">Включите один раз и возвращайтесь к своим задачам без постоянной смены VPN</p>
                     <div class="cabinet-onboarding-art">
-                        <img src="{% static 'img/onboarding/always-on.png' %}" alt="">
+                        <img src="{% static 'img/onboarding/always-on.webp' %}" alt="" width="720" height="720" decoding="async" loading="lazy">
                     </div>
                 </section>
             </div>

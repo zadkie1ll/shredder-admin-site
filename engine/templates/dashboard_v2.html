@@ -2183,7 +2183,7 @@
                 <span class="text-sm font-bold text-gray-500 group-hover:text-white">Назад в кабинет</span>
             </button>
 
-            <section class="setup-shell overview-hero-card">
+            <section class="setup-shell overview-hero-card hidden lg:block">
                 <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                     <div>
                         <h2 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">{% if has_subscription_access %}Продлить подписку{% else %}Купить подписку{% endif %}</h2>
@@ -2195,7 +2195,83 @@
                 </div>
             </section>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-7 w-full">
+            {# Мобильная версия экрана продления: радио-список тарифов, как на странице оплаты #}
+            <div class="lg:hidden plans-panel mx-auto !w-full">
+                <h1 class="plans-title">{% if has_subscription_access %}Продлить подписку{% else %}Остался последний шаг<br>до подключения{% endif %}</h1>
+                <p class="text-gray-500 text-sm font-bold leading-relaxed mb-7">
+                    {% if has_subscription_access %}Выберите срок — дни добавятся к текущей подписке сразу после оплаты.{% else %}Вы уже в личном кабинете. Выберите тариф, оплатите доступ, и ключи подключения появятся здесь автоматически.{% endif %}
+                </p>
+
+                <div class="plans-benefits" aria-label="Преимущества подписки">
+                    <div class="plans-benefit"><i class="fas fa-ban"></i><span>YouTube без рекламы</span></div>
+                    <div class="plans-benefit"><i class="fas fa-infinity"></i><span>Безлимитный трафик</span></div>
+                    <div class="plans-benefit"><i class="fas fa-layer-group"></i><span>Обход Белого списка</span></div>
+                    <div class="plans-benefit"><i class="fas fa-users"></i><span>До 15 устройств на подписке</span></div>
+                </div>
+
+                <form method="POST" action="/pay/" class="plans-form" data-payment-form data-context="dashboard_renew">
+                    {% csrf_token %}
+                    {% for tariff in tariffs %}
+                    <label class="plan-row" for="renew-tariff-{{ tariff.db_tariff_id }}">
+                        <span class="min-w-0">
+                            <span class="plan-title-line">
+                                {% if tariff.db_tariff_id == "month" %}
+                                    1 месяц
+                                {% elif tariff.db_tariff_id == "threemonths" %}
+                                    3 месяца <span class="plan-badge">-20%</span>
+                                {% elif tariff.db_tariff_id == "year" %}
+                                    12 месяцев <span class="plan-badge">-40%</span>
+                                {% else %}
+                                    {{ tariff.description }}
+                                {% endif %}
+                            </span>
+                            <span class="plan-note">
+                                {% if tariff.db_tariff_id == "month" %}
+                                    Здесь и сейчас
+                                {% elif tariff.db_tariff_id == "threemonths" %}
+                                    Разумная экономия
+                                {% elif tariff.db_tariff_id == "year" %}
+                                    Максимальная выгода
+                                {% else %}
+                                    Быстрый доступ
+                                {% endif %}
+                            </span>
+                        </span>
+                        <span class="plan-price">
+                            <strong>
+                                {% if tariff.db_tariff_id == "threemonths" %}
+                                    {% widthratio tariff.price 3 1 %} ₽ / месяц
+                                {% elif tariff.db_tariff_id == "year" %}
+                                    {% widthratio tariff.price 12 1 %} ₽ / месяц
+                                {% else %}
+                                    {{ tariff.price }} ₽ / месяц
+                                {% endif %}
+                            </strong>
+                            <span>{{ tariff.price }} ₽ сейчас</span>
+                        </span>
+                        <input id="renew-tariff-{{ tariff.db_tariff_id }}" class="plan-radio" type="radio" name="tariff_id" value="{{ tariff.db_tariff_id }}" {% if forloop.first %}checked{% endif %}>
+                    </label>
+                    {% endfor %}
+
+                    {% if user.email %}
+                        <input type="hidden" name="email" value="{{ user.email }}">
+                    {% else %}
+                        <input type="email" name="email" required autocomplete="email" placeholder="Email для чека и входа" class="plans-email referral-link-input w-full py-4 px-5 text-sm text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
+                    {% endif %}
+
+                    <p class="plans-legal">
+                        Оплата картой через WATA (Visa, Mastercard, Mir, СБП). После подтверждения мы откроем
+                        ключи в этом кабинете. Не подойдёт — вернём деньги в течение 3 дней.
+                        Оформляя покупку, вы соглашаетесь с <a href="/offer/" target="_blank">офертой</a>.
+                    </p>
+
+                    <button type="submit" class="plans-submit payment-cta w-full px-6 font-black transition-all hover:scale-[1.01] active:scale-95">
+                        Оплатить и получить доступ
+                    </button>
+                </form>
+            </div>
+
+            <div class="hidden lg:grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-7 w-full">
                 {% for tariff in tariffs %}
                 <div class="tariff-card setup-step-card p-6 transition-all duration-300 border-2 border-white/5 relative group !mb-0
                     {% if forloop.counter == 2 %} 
@@ -2235,24 +2311,19 @@
                                 <span class="text-5xl font-black tracking-tighter">{{ tariff.price }}</span>
                                 <span class="text-2xl font-black text-[#ffc700]">₽</span>
                             </div>
-                        </div>
-                        
-                        <div class="grid grid-cols-3 gap-2 border-t border-white/5 pt-5">
-                            <div class="text-center">
-                                <i class="fas fa-bolt text-[#ffc700] text-sm mb-2"></i>
-                                <p class="text-gray-500 text-[10px] font-bold">Быстро</p>
-                            </div>
-                            <div class="text-center">
-                                <i class="fas fa-infinity text-[#ffc700] text-sm mb-2"></i>
-                                <p class="text-gray-500 text-[10px] font-bold">Безлимит</p>
-                            </div>
-                            <div class="text-center">
-                                <i class="fas fa-shield-alt text-[#ffc700] text-sm mb-2"></i>
-                                <p class="text-gray-500 text-[10px] font-bold">Защита</p>
+                            <div class="text-gray-500 text-xs font-bold mt-1">
+                                {% if tariff.db_tariff_id == "threemonths" %}≈ {% widthratio tariff.price 3 1 %} ₽ в месяц{% elif tariff.db_tariff_id == "year" %}≈ {% widthratio tariff.price 12 1 %} ₽ в месяц{% else %}за месяц доступа{% endif %}
                             </div>
                         </div>
 
-                        <form method="POST" action="/pay/" class="mt-6">
+                        <ul class="border-t border-white/5 pt-5 space-y-3 text-left">
+                            <li class="flex items-center gap-2.5 text-gray-300 text-sm font-medium"><i class="fas fa-check text-[#ffc700] text-xs"></i> Обход белых списков</li>
+                            <li class="flex items-center gap-2.5 text-gray-300 text-sm font-medium"><i class="fas fa-check text-[#ffc700] text-xs"></i> YouTube без рекламы</li>
+                            <li class="flex items-center gap-2.5 text-gray-300 text-sm font-medium"><i class="fas fa-check text-[#ffc700] text-xs"></i> Безлимитный трафик</li>
+                            <li class="flex items-center gap-2.5 text-gray-300 text-sm font-medium"><i class="fas fa-check text-[#ffc700] text-xs"></i> До 15 устройств на подписке</li>
+                        </ul>
+
+                        <form method="POST" action="/pay/" class="mt-6" data-payment-form data-context="dashboard_renew">
                             {% csrf_token %}
                             <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
                             {% if user.email %}
@@ -2263,8 +2334,17 @@
                             <button type="submit" class="payment-cta w-full py-4 px-6 rounded-xl font-black text-sm transition-all hover:scale-[1.02] active:scale-95">
                                 Оплатить <i class="fas fa-arrow-right ml-2"></i>
                             </button>
-                            <p class="mt-3 text-center text-gray-500 text-[10px] leading-relaxed">
-                                Нажимая «Оплатить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-bold hover:text-white transition">условия оферты</a>.
+                            <p class="mt-3 flex items-center justify-center gap-2 text-[11px] font-bold text-[#00ff88]">
+                                <i class="fas fa-rotate-left"></i> Не подойдёт — вернём деньги в течение 3 дней
+                            </p>
+                            <div class="mt-2 flex items-center justify-center gap-3 text-white/45">
+                                <i class="fas fa-lock text-[#ffc700] text-[10px]"></i>
+                                <i class="fab fa-cc-visa"></i>
+                                <i class="fab fa-cc-mastercard"></i>
+                                <span class="text-[9px] font-black uppercase tracking-wider">Mir · СБП</span>
+                            </div>
+                            <p class="mt-2 text-center text-gray-500 text-[10px] leading-relaxed">
+                                Оплата картой через WATA. После оплаты ключи откроются прямо здесь. Нажимая «Оплатить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-bold hover:text-white transition">условия оферты</a>.
                             </p>
                         </form>
                     </div>

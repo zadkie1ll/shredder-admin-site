@@ -1060,7 +1060,9 @@ def render_login(request, context=None, status=200):
         else ""
     )
     payload["site_role"] = get_site_role(request)
-    payload["login_onboarding_enabled"] = True
+    # Онбординг из 5 слайдов показываем на всех доменах, кроме cabinet:
+    # на cabinet-доменах главная страница — это форма входа без онбординга.
+    payload["login_onboarding_enabled"] = payload["site_role"] != "cabinet"
     if context:
         payload.update(context)
     response = render(request, "login.html", payload, status=status)
