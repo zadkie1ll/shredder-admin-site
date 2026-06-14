@@ -166,6 +166,11 @@ urlpatterns = [
         views.payment_status_json,
         name="payment_status_json",
     ),
+    path(
+        "payment/status/<str:token>/active-json/",
+        views.payment_status_active_json,
+        name="payment_status_active_json",
+    ),
     path("login/", views.login, name="login"),
     path("login/send-link/", views.send_magic_link, name="send_magic_link"),
     path("login/google/", views.login_with_google, name="google_login"),

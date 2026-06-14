@@ -7,6 +7,7 @@ import json
 import resend
 import secrets
 import httpx
+from time import monotonic
 from pathlib import Path
 from datetime import datetime
 from datetime import date
@@ -104,6 +105,7 @@ from .sql_helpers import save_wata_invoice
 from database import session_factory
 from engine.payments import create_yk_payment_sync
 from engine.payments import create_wata_payment_sync
+from engine.payments import fetch_wata_transaction_status
 import proto.rwmanager_pb2 as proto
 
 ACTUAL_TARIFFS: list[Tariff] = [
@@ -518,12 +520,21 @@ def support_reply_template_payload(template):
     }
 
 
+def form_bool_enabled(value, default=True):
+    if value is None:
+        return default
+
+    return str(value).strip().lower() in {"1", "true", "on", "yes"}
+
+
 def custom_config_template_payload(template):
     return {
         "id": template.id,
         "name": template.name,
         "template_json": template.template_json,
         "entry_name": template.entry_name or "",
+        "enable_dialer_proxy": bool(getattr(template, "enable_dialer_proxy", True)),
+        "dialer_proxy_name": getattr(template, "dialer_proxy_name", None) or "",
         "announce_text": template.announce_text or "",
         "support_url": template.support_url or "",
         "profile_update_interval": template.profile_update_interval or "",
@@ -1809,7 +1820,64 @@ def get_purchase_payment_status(db_session, login_token):
     return "pending", "Ждем подтверждения платежа"
 
 
-def payment_status_payload(request, token):
+# Активная проверка статуса оплаты у Wata лимитирована (у Wata GET — 1 запрос
+# в 30 секунд на объект), поэтому троттлим вызовы по order_id.
+WATA_ACTIVE_CHECK_MIN_INTERVAL_SECONDS = 30
+_wata_active_check_last_ts = {}
+
+
+def active_wata_status_for_token(login_token):
+    """Активно (через API Wata) определяет финальный статус оплаты для токена.
+
+    Используется, чтобы не ждать вебхук и редирект самой Wata (её экран успеха
+    держит пользователя ~10 секунд). Возвращает ("succeeded"|"failed", message)
+    или None, если статус ещё не финальный/проверка недоступна/сработал троттлинг.
+    Безопасно: успехом считаем ТОЛЬКО явный "Paid" от Wata.
+    """
+    if (
+        getattr(login_token, "payment_gateway", None) != "wata"
+        or not getattr(login_token, "payment_reference", None)
+    ):
+        return None
+
+    order_id = login_token.payment_reference
+    now = monotonic()
+
+    # Подчищаем устаревшие записи (старше окна троттлинга они бесполезны),
+    # чтобы кэш не рос бесконечно.
+    if len(_wata_active_check_last_ts) > 5000:
+        cutoff = now - WATA_ACTIVE_CHECK_MIN_INTERVAL_SECONDS
+        for stale_key in [
+            key
+            for key, ts in _wata_active_check_last_ts.items()
+            if ts < cutoff
+        ]:
+            _wata_active_check_last_ts.pop(stale_key, None)
+
+    last = _wata_active_check_last_ts.get(order_id, 0.0)
+    if now - last < WATA_ACTIVE_CHECK_MIN_INTERVAL_SECONDS:
+        return None
+    _wata_active_check_last_ts[order_id] = now
+
+    try:
+        status = fetch_wata_transaction_status(
+            settings.WATA_HOST,
+            settings.WATA_TOKEN,
+            order_id,
+        )
+    except Exception:
+        logging.exception("active wata status check failed for order %s", order_id)
+        return None
+
+    if status == "Paid":
+        logging.info("active wata check: order %s is Paid", order_id)
+        return "succeeded", "Платеж прошел успешно"
+    if status == "Declined":
+        return "failed", "Платеж не прошел"
+    return None
+
+
+def payment_status_payload(request, token, allow_active_check=False):
     if request.GET.get("result") == "failed":
         return {
             "status": "failed",
@@ -1830,6 +1898,13 @@ def payment_status_payload(request, token):
             }
 
         status, message = get_purchase_payment_status(db_session, login_token)
+        # Если в БД ещё нет подтверждения (вебхук не дошёл), но это разрешено
+        # вызывающим — спрашиваем статус напрямую у Wata, чтобы не ждать её
+        # 10-секундный экран успеха.
+        if status == "pending" and allow_active_check:
+            active = active_wata_status_for_token(login_token)
+            if active:
+                status, message = active
         wata_invoice = get_purchase_wata_invoice(db_session, login_token)
         return {
             "status": status,
@@ -1879,6 +1954,9 @@ def payment_retry(request, token):
                 "wata_payment_url": wata_invoice.url,
                 "payment_status_url": build_payment_status_url(request, token),
                 "status_api_url": reverse("payment_status_json", args=[token]),
+                "status_active_url": reverse(
+                    "payment_status_active_json", args=[token]
+                ),
                 "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
             },
         )
@@ -1887,6 +1965,12 @@ def payment_retry(request, token):
 
 
 def payment_status(request, token):
+    # Здесь НЕ используем активную проверку Wata: вход в кабинет должен
+    # оставаться завязан на вебхук, который не только подтверждает оплату, но и
+    # активирует подписку. Иначе можно увести пользователя в кабинет раньше,
+    # чем подписка активирована («оплатил, но нет доступа»). Активная проверка
+    # применяется только на странице оплаты (wata_payment), чтобы быстрее
+    # увести пользователя с 10-секундного экрана успеха Wata на эту страницу.
     payload = payment_status_payload(request, token)
     return render(
         request,
@@ -1904,6 +1988,14 @@ def payment_status(request, token):
 
 def payment_status_json(request, token):
     return JsonResponse(payment_status_payload(request, token))
+
+
+def payment_status_active_json(request, token):
+    # Эндпоинт с активной проверкой статуса у Wata. Вызывается фронтом РЕДКО
+    # (после оплаты), чтобы не упереться в лимит Wata (1 GET / 30с на объект).
+    return JsonResponse(
+        payment_status_payload(request, token, allow_active_check=True)
+    )
 
 
 def auth_by_telegram_widget(request):
@@ -2112,6 +2204,7 @@ def dashboard(request):
             )
             .scalar()
         )
+
         join_referrer_bonus_days = runtime_int_from_db(
             session, BOT_JOIN_REFERRER_BONUS_DAYS_SETTING, 3
         )
@@ -2156,9 +2249,11 @@ def dashboard(request):
         session.close()
 
     bonus_days = (
-        ref_connected_count * traffic_referrer_bonus_days
-        + ref_purchased_count * purchase_referrer_bonus_days
+        session.query(func.coalesce(func.sum(ReferralBonus.days_added), 0))
+        .filter(ReferralBonus.referrer_id == user.id)
+        .scalar()
     )
+
     subscription = rwms_client.get_user_by_username(user.username)
     seconds_left = (
         user.time_until_expiration.total_seconds() if user.time_until_expiration else -1
@@ -2791,6 +2886,10 @@ def support_admin_api_config_templates(request):
         name = request.POST.get("name", "").strip()
         template_json = request.POST.get("template_json", "").strip()
         entry_name = request.POST.get("entry_name", "").strip() or None
+        enable_dialer_proxy = form_bool_enabled(
+            request.POST.get("enable_dialer_proxy"), default=True
+        )
+        dialer_proxy_name = request.POST.get("dialer_proxy_name", "").strip() or None
         announce_text = request.POST.get("announce_text", "").strip() or None
         support_url = request.POST.get("support_url", "").strip() or None
         profile_update_interval = (
@@ -2862,6 +2961,8 @@ def support_admin_api_config_templates(request):
         template.name = name[:160]
         template.template_json = template_json
         template.entry_name = entry_name[:256] if entry_name else None
+        template.enable_dialer_proxy = enable_dialer_proxy
+        template.dialer_proxy_name = dialer_proxy_name[:256] if dialer_proxy_name else None
         template.announce_text = announce_text
         template.support_url = support_url[:512] if support_url else None
         template.profile_update_interval = (
@@ -5556,6 +5657,10 @@ def pay(request):
                         "payment_status_url": payment_status_url,
                         "status_api_url": reverse(
                             "payment_status_json",
+                            args=[raw_purchase_token],
+                        ),
+                        "status_active_url": reverse(
+                            "payment_status_active_json",
                             args=[raw_purchase_token],
                         ),
                         "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,

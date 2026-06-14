@@ -1,5 +1,6 @@
 import hashlib
 import hmac
+import json
 import time
 from datetime import datetime
 from types import SimpleNamespace
@@ -14,9 +15,13 @@ from common.models.settings import BOT_TARIFF_PRICE_YEAR_SETTING
 from common.models.db import User
 from engine.payments import create_wata_payment_sync
 from engine.payments import create_yk_payment_sync
+from engine.payments import fetch_wata_transaction_status
+from engine.views import active_wata_status_for_token
 from engine.views import admin_stats_row_bucket_key
 from engine.views import auth_by_telegram_widget
 from engine.views import create_site_user
+from engine.views import custom_config_template_payload
+from engine.views import form_bool_enabled
 from engine.views import get_runtime_actual_tariffs
 from engine.views import get_telegram_auth_bot
 from engine.views import render_login
@@ -24,6 +29,34 @@ from engine.views import should_create_trial_for_channel
 from engine.views import should_send_payment_login_email
 from engine.views import site_trial_registration_enabled
 from engine.views import verify_telegram_widget_auth
+
+
+class CustomConfigTemplatePayloadTests(SimpleTestCase):
+    def test_form_bool_enabled_handles_checkbox_values(self):
+        self.assertTrue(form_bool_enabled("1"))
+        self.assertTrue(form_bool_enabled("on"))
+        self.assertFalse(form_bool_enabled("0"))
+        self.assertTrue(form_bool_enabled(None, default=True))
+
+    def test_payload_contains_dialer_proxy_options(self):
+        template = SimpleNamespace(
+            id=1,
+            name="default",
+            template_json="{}",
+            entry_name="proxy",
+            enable_dialer_proxy=False,
+            dialer_proxy_name="CUSTOM-ROUTING",
+            announce_text=None,
+            support_url=None,
+            profile_update_interval=None,
+            additional_headers=None,
+            is_active=True,
+        )
+
+        payload = custom_config_template_payload(template)
+
+        self.assertFalse(payload["enable_dialer_proxy"])
+        self.assertEqual(payload["dialer_proxy_name"], "CUSTOM-ROUTING")
 
 
 class AdminSalesSeriesTests(SimpleTestCase):
@@ -423,3 +456,87 @@ class LoginOnboardingTests(SimpleTestCase):
         content = render_login(request).content.decode()
 
         self.assertIn('id="loginOnboarding"', content)
+
+
+def _fake_wata_http_client(status_code=200, body_obj=None):
+    payload = json.dumps(body_obj or {}).encode()
+
+    class FakeResponse:
+        def __init__(self):
+            self.status_code = status_code
+            self.content = payload
+
+    class FakeClient:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+        def get(self, url, headers=None, params=None):
+            return FakeResponse()
+
+    return FakeClient()
+
+
+class WataActiveStatusTests(SimpleTestCase):
+    def test_fetch_returns_paid_when_any_item_paid(self):
+        client = _fake_wata_http_client(body_obj={"items": [{"status": "Paid"}]})
+        with mock.patch("engine.payments.httpx.Client", return_value=client):
+            result = fetch_wata_transaction_status("https://h", "tok", "order-1")
+        self.assertEqual(result, "Paid")
+
+    def test_fetch_returns_declined_when_all_declined(self):
+        client = _fake_wata_http_client(
+            body_obj={"items": [{"status": "Declined"}, {"status": "Declined"}]}
+        )
+        with mock.patch("engine.payments.httpx.Client", return_value=client):
+            result = fetch_wata_transaction_status("https://h", "tok", "order-2")
+        self.assertEqual(result, "Declined")
+
+    def test_fetch_returns_none_while_pending(self):
+        client = _fake_wata_http_client(body_obj={"items": [{"status": "Pending"}]})
+        with mock.patch("engine.payments.httpx.Client", return_value=client):
+            result = fetch_wata_transaction_status("https://h", "tok", "order-3")
+        self.assertIsNone(result)
+
+    def test_fetch_returns_none_on_empty_or_error(self):
+        empty = _fake_wata_http_client(body_obj={"items": []})
+        with mock.patch("engine.payments.httpx.Client", return_value=empty):
+            self.assertIsNone(
+                fetch_wata_transaction_status("https://h", "tok", "order-4")
+            )
+
+        err = _fake_wata_http_client(status_code=429, body_obj={})
+        with mock.patch("engine.payments.httpx.Client", return_value=err):
+            self.assertIsNone(
+                fetch_wata_transaction_status("https://h", "tok", "order-5")
+            )
+
+    def test_fetch_returns_none_when_missing_args(self):
+        self.assertIsNone(fetch_wata_transaction_status("", "tok", "order"))
+        self.assertIsNone(fetch_wata_transaction_status("https://h", "", "order"))
+        self.assertIsNone(fetch_wata_transaction_status("https://h", "tok", ""))
+
+    @override_settings(WATA_HOST="https://h", WATA_TOKEN="tok")
+    def test_active_status_is_throttled_per_order(self):
+        token = SimpleNamespace(
+            payment_gateway="wata", payment_reference="order-throttle-1"
+        )
+        with mock.patch(
+            "engine.views.fetch_wata_transaction_status", return_value="Paid"
+        ) as fetch:
+            first = active_wata_status_for_token(token)
+            second = active_wata_status_for_token(token)
+
+        self.assertEqual(first, ("succeeded", "Платеж прошел успешно"))
+        self.assertIsNone(second)  # второй вызов в пределах 30с — троттлинг
+        self.assertEqual(fetch.call_count, 1)
+
+    def test_active_status_ignores_non_wata_token(self):
+        token = SimpleNamespace(payment_gateway="yookassa", payment_reference="x")
+        with mock.patch(
+            "engine.views.fetch_wata_transaction_status"
+        ) as fetch:
+            self.assertIsNone(active_wata_status_for_token(token))
+        fetch.assert_not_called()

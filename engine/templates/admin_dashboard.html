@@ -789,6 +789,19 @@
                             <input class="input" id="config-entry-name" name="entry_name" maxlength="256" placeholder="Например proxy">
                         </div>
                         <div class="config-field">
+                            <label class="config-field-label" for="config-dialer-proxy-name">dialerProxy</label>
+                            <div class="config-field-hint">Имя outbound для sockopt.dialerProxy. Если пусто, используется ROUTING-IN.</div>
+                            <input class="input" id="config-dialer-proxy-name" name="dialer_proxy_name" maxlength="256" placeholder="ROUTING-IN">
+                        </div>
+                        <div class="config-field">
+                            <input type="hidden" name="enable_dialer_proxy" value="0">
+                            <label class="reply-template-active">
+                                <input type="checkbox" id="config-enable-dialer-proxy" name="enable_dialer_proxy" value="1" checked>
+                                Включить sockopt.dialerProxy
+                            </label>
+                            <div class="config-field-hint">Управляет dialerProxy у основного outbound, который вставляется первым в outbounds.</div>
+                        </div>
+                        <div class="config-field">
                             <label class="config-field-label" for="config-support-url">Ссылка поддержки</label>
                             <div class="config-field-hint">URL, который клиент сможет открыть для обращения в поддержку.</div>
                             <input class="input" id="config-support-url" name="support_url" maxlength="512" placeholder="https://...">
@@ -1366,6 +1379,8 @@
             form.querySelector('[name="template_id"]').value = '';
             form.querySelector('[name="name"]').value = '';
             form.querySelector('[name="additional_headers"]').value = '{}';
+            form.querySelector('[name="enable_dialer_proxy"]').checked = true;
+            form.querySelector('[name="dialer_proxy_name"]').value = '';
             form.querySelector('[name="is_active"]').checked = true;
             form.querySelector('button[type="submit"]').innerHTML = '<i class="fas fa-save"></i>Сохранить';
             setConfigJsonValue('{\n  "log": {\n    "loglevel": "warning"\n  }\n}');
@@ -1381,6 +1396,7 @@
                         <div class="config-template-meta">
                             <span class="config-template-badge ${template.is_active ? 'active' : ''}">${template.is_active ? 'Активный шаблон' : 'Неактивен'}</span>
                             ${template.entry_name ? `<span class="config-template-badge">Профиль: ${escapeHtml(template.entry_name)}</span>` : ''}
+                            <span class="config-template-badge">dialerProxy: ${template.enable_dialer_proxy ? escapeHtml(template.dialer_proxy_name || 'ROUTING-IN') : 'выключен'}</span>
                             ${template.profile_update_interval ? `<span class="config-template-badge">Интервал автообновления: ${escapeHtml(template.profile_update_interval)}</span>` : ''}
                         </div>
                     </div>
@@ -1428,6 +1444,8 @@
             form.querySelector('[name="template_id"]').value = template.id;
             form.querySelector('[name="name"]').value = template.name || '';
             form.querySelector('[name="entry_name"]').value = template.entry_name || '';
+            form.querySelector('[name="enable_dialer_proxy"]').checked = template.enable_dialer_proxy !== false;
+            form.querySelector('[name="dialer_proxy_name"]').value = template.dialer_proxy_name || '';
             form.querySelector('[name="announce_text"]').value = template.announce_text || '';
             form.querySelector('[name="support_url"]').value = template.support_url || '';
             form.querySelector('[name="profile_update_interval"]').value = template.profile_update_interval || '';
@@ -1458,6 +1476,7 @@
             const formData = new FormData(form);
             formData.set('action', 'save');
             formData.set('template_json', templateJson);
+            formData.set('enable_dialer_proxy', form.querySelector('[name="enable_dialer_proxy"]').checked ? '1' : '0');
             formData.set('is_active', form.querySelector('[name="is_active"]').checked ? '1' : '0');
             setConfigMessage('');
             setConfigSaving(true);

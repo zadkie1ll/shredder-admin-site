@@ -179,10 +179,12 @@
     <script>
         const frame = document.getElementById('payment-frame');
         const statusApiUrl = '{{ status_api_url|escapejs }}';
+        const statusActiveUrl = '{{ status_active_url|escapejs }}';
         const paymentStatusUrl = '{{ payment_status_url|escapejs }}';
         let statusRedirectStarted = false;
         let frameLoadedOnce = false;
         let frameInteracted = false;
+        let activeBackstopStarted = false;
 
         try {
             if (typeof window.ym === 'function') {
@@ -213,6 +215,37 @@
             }
         }
 
+        // Активная проверка статуса напрямую у Wata (через наш бэкенд, который
+        // троттлит обращения к Wata до 1 раза в 30с на заказ). Нужна, чтобы не
+        // ждать 10-секундный экран успеха Wata: как только оплата подтверждена —
+        // сразу уводим пользователя на нашу страницу статуса.
+        async function activeCheck() {
+            if (statusRedirectStarted || !statusActiveUrl) {
+                return;
+            }
+            try {
+                const response = await fetch(statusActiveUrl, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+                const payload = await response.json();
+                if (payload.status === 'succeeded' || payload.status === 'failed') {
+                    goToPaymentStatus();
+                }
+            } catch (err) {
+                // Молча: остаются вебхук-опрос и собственный редирект Wata.
+            }
+        }
+
+        function startActiveBackstop() {
+            if (activeBackstopStarted) {
+                return;
+            }
+            activeBackstopStarted = true;
+            // Бэкстоп на случай, если экран успеха Wata не вызывает событие load
+            // фрейма. Бэкенд всё равно троттлит реальные обращения к Wata.
+            window.setInterval(activeCheck, 8000);
+        }
+
         function handleFrameLoad() {
             followStatusRedirect();
 
@@ -220,6 +253,10 @@
                 frameLoadedOnce = true;
                 return;
             }
+
+            // Любая перезагрузка фрейма после ввода данных — повод проверить
+            // статус у Wata: возможно, это уже экран успеха.
+            activeCheck();
 
             if (frameInteracted) {
                 window.setTimeout(goToPaymentStatus, 300);
@@ -244,17 +281,18 @@
                 // Следующая попытка ниже: платежная форма продолжает работать в iframe.
             }
 
-            window.setTimeout(pollStatus, 1800);
+            window.setTimeout(pollStatus, 1500);
         }
 
         window.addEventListener('blur', () => {
             if (document.activeElement === frame) {
                 frameInteracted = true;
+                startActiveBackstop();
             }
         });
         frame.addEventListener('load', handleFrameLoad);
         window.setInterval(followStatusRedirect, 1000);
-        window.setTimeout(pollStatus, 1200);
+        window.setTimeout(pollStatus, 1000);
     </script>
 </body>
 </html>

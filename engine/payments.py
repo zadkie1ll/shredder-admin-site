@@ -98,3 +98,60 @@ def create_wata_payment_sync(
         reference=payment_json["orderId"],
         payload=payment_json,
     )
+
+
+def fetch_wata_transaction_status(
+    wata_host: str,
+    wata_token: str,
+    order_id: str,
+    timeout: float = 4.0,
+) -> str | None:
+    """Активно спрашивает у Wata статус транзакции по orderId (read-only).
+
+    Возвращает:
+      - "Paid"      — есть успешная транзакция по заказу;
+      - "Declined"  — все транзакции по заказу отклонены (и нет ожидающих);
+      - None        — заказ ещё не оплачен/в процессе, не найден, либо любая
+                      ошибка/таймаут/лимит. В этом случае вызывающий код обязан
+                      вести себя как раньше (опираться на вебхук). Неопределённость
+                      НИКОГДА не трактуется как успех.
+
+    Внимание: у Wata GET лимитирован 1 запросом в 30 секунд на объект, поэтому
+    вызывать эту функцию нужно редко и с троттлингом на стороне вызывающего.
+    """
+    if not (wata_host and wata_token and order_id):
+        return None
+
+    url = f"{wata_host}/transactions"
+    headers = {"Authorization": f"Bearer {wata_token}"}
+    params = {"orderId": order_id, "maxResultCount": 50}
+
+    try:
+        with httpx.Client(timeout=timeout) as client:
+            response = client.get(url, headers=headers, params=params)
+        if response.status_code != 200:
+            return None
+        payload = orjson.loads(response.content)
+    except Exception:
+        return None
+
+    items = payload.get("items") if isinstance(payload, dict) else None
+    if not items:
+        return None
+
+    statuses = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        status = item.get("status") or item.get("transactionStatus")
+        if status:
+            statuses.append(status)
+
+    if "Paid" in statuses:
+        return "Paid"
+    # Ещё есть незавершённые попытки — рано говорить об отказе.
+    if any(s in ("Created", "Pending") for s in statuses):
+        return None
+    if statuses and all(s == "Declined" for s in statuses):
+        return "Declined"
+    return None
