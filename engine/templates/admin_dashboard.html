@@ -1379,7 +1379,7 @@
             form.querySelector('[name="template_id"]').value = '';
             form.querySelector('[name="name"]').value = '';
             form.querySelector('[name="additional_headers"]').value = '{}';
-            form.querySelector('[name="enable_dialer_proxy"]').checked = true;
+            form.querySelector('#config-enable-dialer-proxy').checked = true;
             form.querySelector('[name="dialer_proxy_name"]').value = '';
             form.querySelector('[name="is_active"]').checked = true;
             form.querySelector('button[type="submit"]').innerHTML = '<i class="fas fa-save"></i>Сохранить';
@@ -1444,7 +1444,7 @@
             form.querySelector('[name="template_id"]').value = template.id;
             form.querySelector('[name="name"]').value = template.name || '';
             form.querySelector('[name="entry_name"]').value = template.entry_name || '';
-            form.querySelector('[name="enable_dialer_proxy"]').checked = template.enable_dialer_proxy !== false;
+            form.querySelector('#config-enable-dialer-proxy').checked = template.enable_dialer_proxy !== false;
             form.querySelector('[name="dialer_proxy_name"]').value = template.dialer_proxy_name || '';
             form.querySelector('[name="announce_text"]').value = template.announce_text || '';
             form.querySelector('[name="support_url"]').value = template.support_url || '';
@@ -1476,7 +1476,7 @@
             const formData = new FormData(form);
             formData.set('action', 'save');
             formData.set('template_json', templateJson);
-            formData.set('enable_dialer_proxy', form.querySelector('[name="enable_dialer_proxy"]').checked ? '1' : '0');
+            formData.set('enable_dialer_proxy', form.querySelector('#config-enable-dialer-proxy').checked ? '1' : '0');
             formData.set('is_active', form.querySelector('[name="is_active"]').checked ? '1' : '0');
             setConfigMessage('');
             setConfigSaving(true);
