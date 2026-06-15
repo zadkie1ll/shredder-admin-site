@@ -15,11 +15,22 @@ import secrets
 from datetime import datetime, timedelta
 
 from django.conf import settings
+from sqlalchemy import text
 
-from common.models.db import MobileAccessToken, MobileAuthCode, User
+from common.models.db import (
+    EmailLoginCode,
+    MobileAccessToken,
+    MobileAuthCode,
+    User,
+)
 
 # One-time login code lifetime.
 AUTH_CODE_TTL = timedelta(minutes=10)
+
+# Email login-code lifetime and brute-force ceiling. The contract fixes these:
+# a 6-digit numeric code is short, so we cap verify attempts and the TTL tightly.
+EMAIL_CODE_TTL = timedelta(minutes=10)
+EMAIL_CODE_MAX_ATTEMPTS = 5
 
 
 def hash_auth_code(code):
@@ -29,6 +40,13 @@ def hash_auth_code(code):
 
 def hash_access_token(token):
     payload = f"mobile-access-token:{token}:{settings.SECRET_KEY}".encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def hash_email_code(code):
+    # Distinct namespace from the telegram auth code so the two hash spaces never
+    # collide even if the same string is used as both. Only the hash is stored.
+    payload = f"mobile-email-code:{code}:{settings.SECRET_KEY}".encode()
     return hashlib.sha256(payload).hexdigest()
 
 
@@ -46,6 +64,21 @@ def register_auth_code(db_session, *, user_id, code, source="bot_start", now=Non
     )
 
 
+def _issue_access_token(db_session, user, now=None):
+    """Issue a fresh revocable access token for ``user``. Only the hash is stored.
+    Shared by the telegram device-code exchange and the email-code verify path so
+    token issuance lives in exactly one place. Returns the raw token."""
+    raw_token = secrets.token_urlsafe(48)
+    db_session.add(
+        MobileAccessToken(
+            user_id=user.id,
+            token_hash=hash_access_token(raw_token),
+            last_seen_at=now,
+        )
+    )
+    return raw_token
+
+
 def exchange_code(db_session, code, now=None):
     """One-time exchange: the code must exist, be unused and unexpired. Marks it
     used and issues a fresh access token. Returns ``(user, raw_access_token)`` or
@@ -60,12 +93,86 @@ def exchange_code(db_session, code, now=None):
         return None, None
 
     row.used_at = now
-    raw_token = secrets.token_urlsafe(48)
-    db_session.add(
-        MobileAccessToken(user_id=row.user_id, token_hash=hash_access_token(raw_token))
-    )
     user = db_session.query(User).filter(User.id == row.user_id).one_or_none()
+    if user is None:
+        return None, None
+    raw_token = _issue_access_token(db_session, user, now=now)
     return user, raw_token
+
+
+def register_email_code(db_session, email, code, source="mobile_email", now=None):
+    """Persist ``hash(code)`` for ``email`` with a short TTL. The caller has already
+    lowercased ``email`` and validated its shape. Only the hash is stored, never the
+    raw code. Returns the created row."""
+    now = now or datetime.utcnow()
+    # Requesting a new code invalidates any prior unused codes for this email, so at
+    # most one code is ever active (conventional "a new code voids the old one"). This
+    # also prevents an older still-unexpired code from shadowing the newest at verify
+    # time, and caps the brute-force surface to a single active code.
+    (
+        db_session.query(EmailLoginCode)
+        .filter(
+            EmailLoginCode.email == email,
+            EmailLoginCode.used_at.is_(None),
+        )
+        .update({EmailLoginCode.used_at: now}, synchronize_session=False)
+    )
+    row = EmailLoginCode(
+        email=email,
+        code_hash=hash_email_code(code),
+        source=source,
+        created_at=now,
+        expires_at=now + EMAIL_CODE_TTL,
+    )
+    db_session.add(row)
+    return row
+
+
+def verify_email_code(db_session, email, code, now=None):
+    """Verify ``code`` against the newest unused, unexpired code for ``email``.
+
+    Returns ``(True, row)`` on a match (row marked used), else ``(False, row|None)``.
+    On a code mismatch the attempt counter is incremented so a code is locked after
+    ``EMAIL_CODE_MAX_ATTEMPTS`` wrong tries. The caller has already lowercased
+    ``email``."""
+    now = now or datetime.utcnow()
+    row = (
+        db_session.query(EmailLoginCode)
+        .filter(
+            EmailLoginCode.email == email,
+            EmailLoginCode.used_at.is_(None),
+            EmailLoginCode.expires_at > now,
+        )
+        .order_by(EmailLoginCode.created_at.desc(), EmailLoginCode.id.desc())
+        .first()
+    )
+    if row is None:
+        return False, None
+    if row.attempts >= EMAIL_CODE_MAX_ATTEMPTS:
+        return False, row
+    if row.code_hash != hash_email_code(code):
+        row.attempts = row.attempts + 1
+        return False, row
+
+    row.used_at = now
+    return True, row
+
+
+def lock_email(db_session, email):
+    """Serialize concurrent email-verify transactions for the same address with a
+    Postgres transaction-level advisory lock (auto-released on commit/rollback).
+
+    Without this, two simultaneous verifies for a brand-new email could each
+    provision an RWMS trial subscription — the DB-row loser rolls back, but its
+    gRPC ``AddUser`` already created a second (orphaned) subscription. Holding the
+    lock for the whole find-or-provision section guarantees only one provisioner
+    runs per email. No-op on non-Postgres backends (e.g. the test SQLite)."""
+    if db_session.get_bind().dialect.name != "postgresql":
+        return
+    db_session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:email))"),
+        {"email": email},
+    )
 
 
 def bearer_token(request):

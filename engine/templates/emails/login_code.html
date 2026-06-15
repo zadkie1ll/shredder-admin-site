@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body { margin: 0; padding: 0; background-color: #0c0c0c; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .container { max-width: 600px; margin: 0 auto; padding: 40px 20px; background-color: #0c0c0c; text-align: center; }
+        .card { background-color: #161616; border: 1px solid #ffffff10; border-radius: 24px; padding: 40px; }
+        .brand { color: #ffffff; font-size: 13px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.02em; margin: 0 0 22px; }
+        .brand span { color: #ffc700; }
+        .logo { width: 88px; height: 88px; background-color: #ffc70010; border: 1px solid #ffc70025; border-radius: 22px; margin: 0 auto 24px; line-height: 88px; color: #ffc700; font-size: 18px; font-weight: 900; overflow: hidden; }
+        h1 { color: #ffffff; font-size: 24px; font-weight: 900; text-transform: uppercase; letter-spacing: -0.05em; margin-bottom: 8px; }
+        p { color: #9ca3af; font-size: 14px; line-height: 1.6; margin-bottom: 24px; }
+        .code { display: inline-block; background-color: #ffc70010; border: 1px solid #ffc70025; border-radius: 14px; color: #ffc700; font-size: 38px; font-weight: 900; letter-spacing: 0.35em; padding: 18px 28px 18px 38px; }
+        .footer { margin-top: 32px; color: #4b5563; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; }
+        @media only screen and (max-width: 480px) {
+            .container { padding: 16px 10px; }
+            .card { border-radius: 18px; padding: 28px 18px; }
+            .brand { font-size: 12px; margin-bottom: 18px; }
+            .logo { width: 72px; height: 72px; line-height: 72px; border-radius: 18px; }
+            h1 { font-size: 22px; line-height: 1.1; margin-top: 0; }
+            p { font-size: 14px; line-height: 1.55; }
+            .code { font-size: 32px; letter-spacing: 0.28em; padding: 16px 18px 16px 26px; }
+            .footer { padding: 0 8px; font-size: 10px; line-height: 1.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <div class="brand">MONKEY <span>ISLAND</span></div>
+            <div class="logo">MI</div>
+            <h1>Код для входа</h1>
+            <p>Введите этот код в приложении, чтобы войти или зарегистрироваться.</p>
+            <div class="code">{{ code }}</div>
+            <p style="margin-top: 24px;">Код действует {{ ttl_minutes }} мин.</p>
+        </div>
+        <div class="footer">
+            Если вы не запрашивали вход, просто проигнорируйте это письмо.
+        </div>
+    </div>
+</body>
+</html>

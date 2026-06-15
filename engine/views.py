@@ -1234,6 +1234,42 @@ def send_magic_link_email(email, link, *, subject=None, template_context=None):
         )
 
 
+def send_login_code_email(email, code, *, ttl_minutes=10):
+    """Send a one-time login code to ``email``, synchronously, via the same
+    transport the site uses for magic-link emails (Resend, with the Django
+    ``send_mail`` fallback). Used by the mobile email-login flow; raises on a
+    send failure so the caller can surface it (and not persist the code)."""
+    context = {"code": code, "ttl_minutes": ttl_minutes}
+    html_message = render_to_string("emails/login_code.html", context)
+    plain_message = (
+        f"Ваш код для входа в Monkey Island: {code}\n"
+        f"Код действует {ttl_minutes} мин. "
+        "Если вы не запрашивали вход, просто проигнорируйте это письмо."
+    )
+    subject = "Код для входа в Monkey Island"
+
+    if settings.EMAIL_PROVIDER.lower() == "resend":
+        resend.api_key = settings.RESEND_API_KEY
+        resend.Emails.send(
+            {
+                "from": settings.RESEND_FROM_EMAIL,
+                "to": [email],
+                "subject": subject,
+                "html": html_message,
+                "text": plain_message,
+            }
+        )
+    else:
+        send_mail(
+            subject=subject,
+            message=plain_message,
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[email],
+            html_message=html_message,
+            fail_silently=False,
+        )
+
+
 def build_email_confirmation_token(user_id, email):
     return signing.dumps(
         {

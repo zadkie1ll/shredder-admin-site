@@ -213,15 +213,22 @@ Backend дополнительно пишет существующие собы�
 ## Mobile API (`mobile_api`) — авторизация мобильного приложения
 
 Django-приложение `mobile_api` обслуживает мобильное приложение Monkey Island
-(на базе hiddify/sing-box). Авторизация — по одноразовому device-code, как у
-существующего web-login через бота: бот по `/start app_<code>` сохраняет
-`hash(code) → user`, приложение меняет код на access-токен.
+(на базе hiddify/sing-box). Поддерживаются два способа входа:
+
+1. **Telegram device-code** — бот по `/start app_<code>` сохраняет `hash(code) → user`,
+   приложение меняет код на access-токен (`/auth/exchange`).
+2. **Вход по email-коду** — приложение присылает email, бэкенд генерирует 6-значный
+   код и отправляет письмо **синхронно тем же способом, что и magic-link** (Resend,
+   с fallback на Django `send_mail`); пользователь вводит код и получает access-токен
+   (`/auth/email/request` + `/auth/email/verify`).
 
 **Эндпоинты** (`web_app/urls.py`):
 
 | Метод/путь | Назначение |
 |---|---|
 | `POST /api/mobile/v1/auth/exchange` `{code}` | Обменять одноразовый код на `{access_token, subscription_url, user}` (код one-time, TTL 10 мин) |
+| `POST /api/mobile/v1/auth/email/request` `{email}` | Сгенерировать 6-значный код и отправить письмо. Ответ `{ok, ttl_seconds}`. Всегда 200 для валидного email (не раскрывает, существует ли пользователь). `400 invalid_email`, `429 rate_limited` |
+| `POST /api/mobile/v1/auth/email/verify` `{email, code}` | Проверить код → `{access_token, subscription_url, user}` (тот же формат, что `/auth/exchange`). `401 invalid_or_expired_code`, `429 rate_limited` |
 | `GET /api/mobile/v1/me` (Bearer) | Статус подписки: `status`, `expire_at`, `days_left`, `subscription_url` |
 | `GET /api/mobile/v1/tariffs` | Список тарифов |
 | `POST /api/mobile/v1/auth/logout` (Bearer) | Отозвать access-токен |
@@ -229,17 +236,50 @@ Django-приложение `mobile_api` обслуживает мобильно
 
 Авторизация API — заголовок `Authorization: Bearer <access_token>`. В БД хранятся
 только хэши (`sha256` с `SECRET_KEY`, как у telegram-login). Эндпоинты `csrf_exempt`
-(токен-авторизация, не сессии).
+(токен-авторизация, не сессии). Выдача токена едина для обоих способов входа
+(`auth._issue_access_token`).
+
+**Email-код: параметры и безопасность.** Код — 6 цифр (`secrets.randbelow(1_000_000)`,
+с ведущими нулями), TTL 10 мин, не более 5 попыток ввода на код. Rate-limit на отправку:
+не чаще 1 кода в 60 сек и не более 5 кодов в час на email (определяется по свежим
+строкам `email_login_codes`, без отдельного стейта). Хранится только `hash(code)`.
+
+**Email-код: провижининг при первом входе (критично для денег).** Если по `email`
+пользователь не найден — создаётся **полноценный триал, как в боте**: реальная подписка
+в Remnawave через существующий sync-хелпер `engine.rwms_helpers.create_user(...)`
+(`expire_at = now + SITE_TRIAL_PERIOD_DAYS`, по умолчанию 7 дней) + строка `users`.
+Триал создаётся **безусловно** (НЕ зависит от `SITE_TRIAL_REGISTRATION_ENABLED`).
+Перед `AddUser` username проверяется через `get_user_by_username` (должен быть `None`) —
+никогда не пишем поверх чужой подписки, ничего не удаляем/не пересоздаём. Для
+**существующего** пользователя RWMS не трогается вообще (ни create, ни extend).
+Логика вынесена в `mobile_api/provisioning.py`. Username генерируется тем же
+способом, что и в `create_site_user` (`uuid4().hex`; fallback `mi_` + `token_hex`).
 
 **Новые таблицы БД** (в общем сабмодуле `common/models/db.py`, аддитивно — существующие
 не меняются): `mobile_auth_codes` (code_hash, user_id, expires_at, used_at, source),
-`mobile_access_tokens` (token_hash, user_id, revoked_at, last_seen_at). Так как `common` —
-общий сабмодуль, изменение видно и боту.
+`mobile_access_tokens` (token_hash, user_id, revoked_at, last_seen_at),
+`email_login_codes` (email[индекс, не unique], code_hash, source, created_at, expires_at,
+used_at, attempts). Так как `common` — общий сабмодуль, изменение видно и боту/email-сервису.
+
+**Отправка письма.** Код отправляется **синхронно** хелпером `engine.views.send_login_code_email`
+(шаблон `emails/login_code.html`) — тем же транспортом, что и magic-link: Resend
+(при `EMAIL_PROVIDER=resend`) с fallback на Django `send_mail`. Никакой очереди, Redis или
+email-сервиса в этом пути нет. Если отправка упала — код не сохраняется (откат транзакции),
+а `/auth/email/request` отвечает `502 email_send_failed`.
+
+**Env-переменные.** Отдельных новых переменных не требуется — отправка переиспользует
+существующие настройки писем сайта (`EMAIL_PROVIDER`, `RESEND_API_KEY`, `RESEND_FROM_EMAIL`,
+`DEFAULT_FROM_EMAIL`) — те же, что у magic-link.
 
 > ⚠️ **Требуется миграция.** Сгенерировать штатным скриптом (не вручную):
-> `./common/alembic-revision.sh "add mobile auth tables"`, затем применить.
+> `./common/alembic-revision.sh "add email login codes"`, затем применить.
 
-Тесты: `python manage.py test mobile_api` (логика кодов/токенов на in-memory SQLite).
+**Затронутые сервисы:** `common` (общий сабмодуль: добавлена модель `EmailLoginCode`),
+мобильное приложение (новый UI входа по email). Письмо с кодом сайт отправляет сам
+(Resend/`send_mail`), поэтому `monkey-island-email` для этого пути **не нужен**.
+
+Тесты: `python manage.py test mobile_api` (логика кодов/токенов + эндпоинты email-входа
+с моками RWMS и отправки письма, на in-memory SQLite).
 
 ---
 
