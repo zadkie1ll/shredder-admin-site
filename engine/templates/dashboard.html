@@ -19,7 +19,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
 
         html, body {
             width: 100%;
@@ -49,16 +49,20 @@
             --card-border: rgba(255, 255, 255, 0.08);
             --brand-gold: #ffc700;
             --nav-height: calc(70px + env(safe-area-inset-bottom));
+            --v2-text: #ffffff;
+            --v2-muted: rgba(255, 255, 255, 0.58);
+            --v2-panel: #111217;
+            --v2-panel-soft: #15161c;
+            --v2-border: rgba(255, 255, 255, 0.08);
+            --v2-success: #38d996;
+            --v2-danger: #ff5c67;
         }
 
-        body { 
-            font-family: 'Montserrat', sans-serif; 
-            background:
-                radial-gradient(circle at 78% 12%, rgba(255, 199, 0, 0.11), transparent 30rem),
-                radial-gradient(circle at 18% 24%, rgba(255, 255, 255, 0.035), transparent 22rem),
-                linear-gradient(180deg, #0b0c12 0%, var(--bg-color) 100%);
-            color: #f5f5f5; 
-            margin: 0; 
+        body {
+            font-family: 'Montserrat', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--v2-text);
+            margin: 0;
         }
 
         .page-background {
@@ -74,8 +78,7 @@
             background-image: var(--dashboard-bg-image);
             background-size: cover;
             background-position: center;
-            opacity: 0.08;
-            filter: saturate(0.35) contrast(1.1) brightness(0.55);
+            opacity: 0.25;
             transform: translateZ(0);
         }
 
@@ -97,16 +100,14 @@
         }
 
         /* Навигация */
-        .sidebar-desktop { 
-            width: 280px; 
-            position: fixed; 
-            left: 0; top: 0; bottom: 0; 
-            background:
-                radial-gradient(circle at 60% 0%, rgba(255, 199, 0, 0.09), transparent 18rem),
-                rgba(9, 10, 15, 0.82);
-            backdrop-filter: blur(22px);
-            border-right: 1px solid var(--card-border); 
-            z-index: 100; 
+        .sidebar-desktop {
+            width: 280px;
+            position: fixed;
+            left: 0; top: 0; bottom: 0;
+            background: rgba(13, 13, 15, 0.9);
+            backdrop-filter: blur(15px);
+            border-right: 1px solid var(--card-border);
+            z-index: 100;
             padding: 40px 20px;
             display: flex;
             flex-direction: column;
@@ -116,8 +117,8 @@
             position: fixed;
             bottom: 0; left: 0; right: 0;
             height: var(--nav-height);
-            background: rgba(9, 10, 15, 0.94);
-            backdrop-filter: blur(22px);
+            background: rgba(15, 15, 18, 0.98);
+            backdrop-filter: blur(20px);
             border-top: 1px solid var(--card-border);
             display: none;
             justify-content: space-around;
@@ -161,14 +162,11 @@
             padding: 16px 20px;
             border-radius: 18px;
             color: rgba(255, 255, 255, 0.48);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            background: rgba(255, 255, 255, 0.035);
         }
 
         .sidebar-logout-btn:hover {
-            color: #ffc700;
-            background: rgba(255, 199, 0, 0.06);
-            border-color: rgba(255, 199, 0, 0.22);
+            color: #fff;
+            background: rgba(255, 255, 255, 0.06);
         }
 
         /* Контент */
@@ -218,14 +216,11 @@
             }
 
             .nav-mobile .nav-btn span {
-                display: none;
+                display: block;
                 max-width: 100%;
                 overflow: hidden;
                 text-overflow: ellipsis;
-            }
-
-            .nav-mobile .nav-btn.active span {
-                display: block;
+                font-size: 9px;
             }
         }
 
@@ -286,12 +281,533 @@
             gap: 12px;
         }
 
-        .setup-link-btn.setup-secondary-btn,
-        .setup-cta-btn.setup-secondary-btn {
-            background: rgba(255, 255, 255, 0.05) !important;
-            color: #fff !important;
-            border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            box-shadow: none !important;
+        /* Мастер настройки: компактные действия и понятный выбор устройства */
+        .setup-wizard-actions {
+            max-width: 460px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .setup-text-link {
+            display: inline-block;
+            color: rgba(255, 255, 255, 0.55);
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            cursor: pointer;
+            background: none;
+            border: 0;
+        }
+
+        .setup-text-link:hover {
+            color: #fff;
+        }
+
+        .setup-detected {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            max-width: 360px;
+            margin: 0 auto 22px;
+            padding: 13px 18px;
+            border-radius: 16px;
+            background: rgba(0, 255, 136, 0.08);
+            border: 1px solid rgba(0, 255, 136, 0.25);
+            text-align: left;
+        }
+
+        .setup-detected > i:first-child {
+            font-size: 24px;
+            color: #fff;
+            width: 28px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .setup-detected-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .setup-detected-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .setup-detected-name {
+            font-size: 18px;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .setup-detected-ok {
+            color: #00ff88;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .setup-device-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        .setup-device-chip {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: #fff;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: border-color 0.18s ease, background 0.18s ease;
+            text-align: left;
+        }
+
+        .setup-device-chip:hover {
+            border-color: rgba(255, 199, 0, 0.4);
+            background: rgba(255, 199, 0, 0.06);
+        }
+
+        .setup-device-chip.is-current {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.08);
+        }
+
+        .setup-device-chip > i:first-child {
+            font-size: 18px;
+            width: 22px;
+            text-align: center;
+        }
+
+        .setup-device-chip-check {
+            color: #00ff88;
+            margin-left: auto;
+        }
+
+        @media (min-width: 768px) {
+            .setup-device-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
+        /* Компактный экран настройки (плоский флоу) — помещается в ~1 экран */
+        .setup-compact-card {
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .setup-connect-title {
+            color: #fff;
+            font-size: 16px;
+            font-weight: 800;
+            line-height: 1.2;
+            text-transform: uppercase;
+            letter-spacing: 0;
+            margin: 0 0 2px;
+        }
+
+        .setup-connect-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin: 0;
+            padding: 0;
+            list-style: none;
+        }
+
+        .setup-connect-item {
+            display: grid;
+            grid-template-columns: 22px 1fr;
+            gap: 8px;
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.625;
+        }
+
+        .setup-connect-num {
+            color: rgba(255, 255, 255, 0.46);
+        }
+
+        .setup-connect-link {
+            color: #ffc700;
+            font-weight: 700;
+        }
+
+        .setup-connect-link:hover {
+            color: #ffe066;
+        }
+
+        .setup-compact-step {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .setup-compact-num {
+            width: 26px;
+            height: 26px;
+            border-radius: 8px;
+            background: #ffc700;
+            color: #08090d;
+            font-weight: 900;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .setup-compact-title {
+            font-size: 15px;
+            font-weight: 800;
+            margin-bottom: 2px;
+        }
+
+        .setup-compact-text {
+            color: rgba(255, 255, 255, 0.55);
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        .setup-compact-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 13px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .setup-compact-link:hover {
+            border-color: rgba(255, 199, 0, 0.4);
+        }
+
+        /* Главный CTA «Подключиться в 1 клик» — заметный, но не баннерный на ПК. */
+        .setup-compact-cta {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            width: auto;
+            min-width: min(100%, 420px);
+            max-width: 100%;
+            align-self: flex-start;
+            padding: 15px 22px;
+            border-radius: 14px;
+            background: #ffc700;
+            color: #08090d;
+            font-size: 15px;
+            font-weight: 700;
+            box-shadow: 0 10px 28px rgba(255, 199, 0, 0.28);
+        }
+
+        .setup-compact-cta i {
+            font-size: 14px;
+        }
+
+        /* Предупреждение к шагу (step.note) — приглушённый, но читаемый колаут */
+        .setup-compact-note {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 199, 0, 0.22);
+            background: rgba(255, 199, 0, 0.06);
+        }
+
+        .setup-compact-note-title {
+            display: block;
+            font-size: 9px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #ffc700;
+            margin-bottom: 3px;
+        }
+
+        .setup-compact-note-text {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.35;
+            color: rgba(255, 255, 255, 0.62);
+        }
+
+        .setup-compact-key {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding-top: 14px;
+        }
+
+        .setup-compact-keylabel {
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.625;
+            margin-bottom: 8px;
+        }
+
+        .setup-compact-keyrow {
+            display: flex;
+            gap: 8px;
+        }
+
+        .setup-compact-keyinput {
+            flex: 1;
+            min-width: 0;
+            min-height: 44px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 10px 12px;
+            color: #fff;
+            font-size: 12px;
+            font-family: ui-monospace, monospace;
+        }
+
+        .setup-compact-copybtn {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            padding: 15px 22px;
+            border-radius: 14px;
+            background: #ffc700;
+            border: 0;
+            color: #08090d;
+            font-size: 15px;
+            font-weight: 700;
+            box-shadow: 0 10px 28px rgba(255, 199, 0, 0.28);
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        @media (max-width: 480px) {
+            .setup-compact-keyrow {
+                flex-direction: column;
+            }
+            .setup-compact-copybtn {
+                justify-content: center;
+            }
+        }
+
+        .setup-compact-links-inline {
+            margin-top: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 16px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .setup-compact-inline-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #ffc700;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .setup-compact-inline-link:hover {
+            color: #fff;
+        }
+
+        /* Ссылка прямо внутри текста шага (слово-ссылка, как в боте) */
+        .setup-compact-textlink {
+            color: #ffc700;
+            font-weight: 800;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .setup-compact-textlink:hover {
+            color: #fff;
+        }
+
+        /* Финальный шаг «Подключение и использование»: вынесен в самый низ
+           и оформлен приглушённо, чтобы не перетягивать внимание. */
+        /* Приглушаем визуально (мельче, разделитель), но без стэкинга opacity —
+           текст инструкции должен оставаться читаемым (WCAG AA). */
+        .setup-compact-usage {
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            padding-top: 14px;
+        }
+
+        .setup-compact-usage-title {
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.625;
+            margin-bottom: 4px;
+        }
+
+        .setup-compact-usage-text {
+            color: #6b7280;
+            font-size: 14px;
+            font-weight: 700;
+            line-height: 1.625;
+        }
+
+        /* Ёмкий выбор устройства/приложения сверху: дропдаун платформы + ряд чипов приложений */
+        .setup-picker-card {
+            padding: 16px;
+        }
+
+        .setup-picker-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .setup-picker-bar-title {
+            font-size: 13px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #fff;
+        }
+
+        .setup-platform-select-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .setup-platform-select-icon {
+            position: absolute;
+            left: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        .setup-platform-select {
+            appearance: none;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+            min-height: 44px;
+            padding: 10px 36px 10px 38px;
+            cursor: pointer;
+        }
+
+        .setup-platform-select:focus-visible {
+            outline: 2px solid var(--brand-gold);
+            outline-offset: 1px;
+        }
+
+        .setup-platform-select option {
+            background: #15161c;
+            color: #fff;
+        }
+
+        .setup-platform-select-chev {
+            position: absolute;
+            right: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 11px;
+            pointer-events: none;
+        }
+
+        .setup-app-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .setup-app-chip {
+            position: relative;
+            flex: 1 1 130px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 52px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.72);
+            font-size: 14px;
+            font-weight: 800;
+            text-align: left;
+            cursor: pointer;
+            transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+        }
+
+        .setup-app-chip:hover {
+            border-color: rgba(255, 199, 0, 0.4);
+            color: #fff;
+        }
+
+        .setup-app-chip.is-active {
+            border-color: var(--brand-gold);
+            background: rgba(255, 199, 0, 0.08);
+            color: #fff;
+            box-shadow: inset 0 0 0 1px rgba(255, 199, 0, 0.45);
+        }
+
+        .setup-app-chip-dot {
+            display: none;
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: var(--brand-gold);
+            flex-shrink: 0;
+        }
+
+        .setup-app-chip.is-recommended .setup-app-chip-dot {
+            display: block;
+        }
+
+        .setup-app-chip-name {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 480px) {
+            .setup-compact-card {
+                padding: 16px;
+                gap: 12px;
+            }
+
+            .setup-compact-cta {
+                width: 100%;
+                min-width: 0;
+                align-self: stretch;
+            }
         }
 
         @media (max-width: 640px) {
@@ -321,17 +837,16 @@
         .setup-shell {
             background: var(--card-bg) !important;
             border: 1px solid var(--card-border) !important;
-            border-radius: 16px;
+            border-radius: 28px;
             padding: 24px;
-            box-shadow: 0 26px 70px rgba(0,0,0,0.34);
-            backdrop-filter: blur(18px);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4);
             position: relative; /* Важно для линии! */
         }
 
         .setup-step-card {
             background: var(--inner-card-bg) !important;
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            border-radius: 16px;
+            border-radius: 20px;
             padding: 32px;
             margin-bottom: 24px;
             box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
@@ -358,10 +873,10 @@
         }
 
         .platform-btn.active, .app-btn.active {
-            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%) !important;
-            color: #08090d !important;
+            background: var(--brand-gold) !important;
+            color: #000 !important;
             border-color: var(--brand-gold) !important;
-            box-shadow: 0 18px 38px rgba(255, 199, 0, 0.22), inset 0 -3px 0 rgba(0,0,0,0.16);
+            box-shadow: 0 4px 15px rgba(255, 199, 0, 0.3);
         }
 
         /* ЛИНИЯ СТЕППЕРА (ИСПРАВЛЕНО) */
@@ -394,12 +909,12 @@
             top: 0;
             z-index: 10;
             width: 50px; height: 50px;
-            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%);
-            color: #08090d;
-            border-radius: 999px;
+            background: var(--brand-gold);
+            color: #000;
+            border-radius: 14px;
             display: flex; align-items: center; justify-content: center;
-            font-weight: 700;
-            box-shadow: 0 0 22px rgba(255, 199, 0, 0.22);
+            font-weight: 900;
+            box-shadow: 0 0 15px rgba(255, 199, 0, 0.3);
         }
 
         /* Кнопки */
@@ -407,17 +922,17 @@
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
-            gap: 10px !important;
-            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%) !important;
+            gap: 9px !important;
+            background: #ffc700 !important;
             color: #08090d !important;
-            padding: 14px 28px !important;
-            border-radius: 999px !important;
-            font-size: 12px !important;
+            padding: 15px 22px !important;
+            border-radius: 14px !important;
+            font-size: 15px !important;
             font-weight: 700 !important;
-            text-transform: uppercase !important;
+            text-transform: none !important;
             transition: 0.2s !important;
             border: none !important;
-            box-shadow: 0 18px 38px rgba(255, 199, 0, 0.22), inset 0 -3px 0 rgba(0,0,0,0.16) !important;
+            box-shadow: 0 10px 28px rgba(255, 199, 0, 0.28) !important;
             margin-right: 12px;
             margin-bottom: 12px;
         }
@@ -433,15 +948,245 @@
         }
 
         .payment-cta {
-            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%) !important;
+            background: #ffc700 !important;
             color: #08090d !important;
             border: 0 !important;
-            box-shadow: 0 18px 38px rgba(255, 199, 0, .24), inset 0 -3px 0 rgba(0,0,0,.16) !important;
+            padding: 15px 22px !important;
+            border-radius: 14px !important;
+            font-size: 15px !important;
+            font-weight: 700 !important;
+            text-transform: none !important;
+            box-shadow: 0 10px 28px rgba(255, 199, 0, 0.28) !important;
         }
 
         .payment-cta:hover {
-            background: linear-gradient(180deg, #ffdb3d 0%, #ffc700 58%, #f0ae00 100%) !important;
-            box-shadow: 0 22px 48px rgba(255, 199, 0, .32), inset 0 -3px 0 rgba(0,0,0,.16) !important;
+            background: #ffd43a !important;
+            box-shadow: 0 12px 32px rgba(255, 199, 0, 0.32) !important;
+        }
+
+        .plans-only-view {
+            position: relative;
+            z-index: 20;
+            min-height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 34px 18px 28px;
+        }
+
+        .plans-topbar {
+            width: min(100%, 430px);
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 18px;
+            margin-bottom: 44px;
+        }
+
+        .plans-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+            font-weight: 800;
+            font-size: 17px;
+        }
+
+        .plans-brand::before {
+            content: "";
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            background: url("{% static 'icons/icon-192x192.png' %}") center / cover no-repeat;
+            border: 1px solid rgba(255, 199, 0, 0.26);
+        }
+
+        .plans-panel {
+            width: min(100%, 430px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .plans-title {
+            font-size: 28px;
+            line-height: 1.14;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 28px;
+        }
+
+        .plans-benefits {
+            display: grid;
+            gap: 12px;
+            margin-bottom: 28px;
+            color: rgba(255, 255, 255, 0.78);
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .plans-benefit {
+            display: flex;
+            align-items: center;
+            gap: 11px;
+        }
+
+        .plans-benefit i {
+            width: 18px;
+            color: rgba(255, 255, 255, 0.62);
+            font-size: 15px;
+        }
+
+        .plans-form {
+            display: flex;
+            flex-direction: column;
+            gap: 11px;
+        }
+
+        .plan-row {
+            min-height: 68px;
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto auto;
+            align-items: center;
+            gap: 14px;
+            padding: 14px 16px;
+            border-radius: 16px;
+            border: 1px solid rgba(255, 255, 255, 0.055);
+            background: rgba(255, 255, 255, 0.075);
+            cursor: pointer;
+            transition: border-color .18s ease, background .18s ease, transform .18s ease;
+        }
+
+        .plan-row:hover {
+            background: rgba(255, 255, 255, 0.095);
+            border-color: rgba(255, 199, 0, 0.22);
+        }
+
+        .plan-row:has(input:checked) {
+            border-color: rgba(255, 199, 0, 0.58);
+            background:
+                radial-gradient(circle at 90% 50%, rgba(255, 199, 0, 0.16), transparent 11rem),
+                rgba(255, 255, 255, 0.09);
+        }
+
+        .plan-title-line {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
+            line-height: 1.2;
+        }
+
+        .plan-note {
+            margin-top: 4px;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+
+        .plan-badge {
+            display: inline-flex;
+            align-items: center;
+            min-height: 22px;
+            padding: 0 8px;
+            border-radius: 999px;
+            background: rgba(255, 199, 0, 0.14);
+            color: #ffc700;
+            font-size: 11px;
+            font-weight: 800;
+        }
+
+        .plan-price {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .plan-price strong {
+            display: block;
+            color: #fff;
+            font-size: 15px;
+            line-height: 1.2;
+            font-weight: 700;
+        }
+
+        .plan-price span {
+            display: block;
+            margin-top: 4px;
+            color: rgba(255, 255, 255, 0.52);
+            font-size: 11px;
+            line-height: 1.2;
+            font-weight: 600;
+        }
+
+        .plan-radio {
+            width: 18px;
+            height: 18px;
+            margin: 0;
+            accent-color: #ffc700;
+        }
+
+        .plans-email {
+            margin-top: 6px;
+        }
+
+        .plans-legal {
+            margin: 18px auto 0;
+            max-width: 360px;
+            color: rgba(255, 255, 255, 0.42);
+            font-size: 11px;
+            line-height: 1.35;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .plans-legal a {
+            color: rgba(255, 255, 255, 0.68);
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .plans-submit {
+            margin-top: 84px;
+            min-height: 58px;
+            border-radius: 999px;
+            font-size: 15px;
+        }
+
+        @media (max-width: 640px) {
+            .plans-only-view {
+                padding: max(20px, env(safe-area-inset-top)) 18px calc(24px + env(safe-area-inset-bottom));
+            }
+
+            .plans-topbar {
+                margin-bottom: 34px;
+            }
+
+            .plans-title {
+                font-size: 25px;
+                margin-bottom: 24px;
+            }
+
+            .plan-row {
+                grid-template-columns: minmax(0, 1fr) auto;
+                gap: 10px;
+                padding: 14px;
+            }
+
+            .plan-price {
+                grid-column: 1 / 2;
+                text-align: left;
+            }
+
+            .plan-radio {
+                grid-column: 2 / 3;
+                grid-row: 1 / 3;
+            }
+
+            .plans-submit {
+                margin-top: 54px;
+            }
         }
 
         .overview-grid {
@@ -568,22 +1313,7 @@
             padding: 12px 24px;
             border-radius: 12px;
             z-index: 10001;
-            font-weight: 700;
-        }
-
-        #app-container .font-black {
-            font-weight: 700 !important;
-        }
-
-        #app-container .font-bold {
-            font-weight: 500 !important;
-        }
-
-        #app-container .setup-cta-btn,
-        #app-container .setup-link-btn,
-        #app-container .payment-cta,
-        #app-container button[type="submit"].bg-\[\#ffc700\] {
-            font-weight: 800 !important;
+            font-weight: 900;
         }
 
         @media (max-width: 640px) {
@@ -945,10 +1675,425 @@
                 grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
             }
         }
+
+        /* Monkey Island dark onboarding skin */
+        body.dashboard-v2 {
+            background:
+                radial-gradient(circle at 78% 12%, rgba(255, 199, 0, 0.11), transparent 30rem),
+                radial-gradient(circle at 18% 24%, rgba(255, 255, 255, 0.035), transparent 22rem),
+                linear-gradient(180deg, #0b0c12 0%, #090a0f 100%);
+            color: #fff;
+        }
+
+        .dashboard-v2 .page-background-image {
+            opacity: 0.08;
+            filter: saturate(0.35) contrast(1.1) brightness(0.55);
+        }
+
+        .dashboard-v2 #app-container {
+            background:
+                radial-gradient(circle at 50% 16%, rgba(255, 199, 0, 0.055), transparent 26rem),
+                linear-gradient(180deg, rgba(9, 10, 15, 0.2), rgba(9, 10, 15, 0.92));
+        }
+
+        .dashboard-v2 .sidebar-desktop {
+            width: 248px;
+            padding: 28px 16px;
+            background:
+                radial-gradient(circle at 60% 0%, rgba(255, 199, 0, 0.09), transparent 18rem),
+                rgba(9, 10, 15, 0.82);
+            border-right: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(22px);
+        }
+
+        .dashboard-v2 .main-content {
+            margin-left: 248px;
+            padding: 32px;
+        }
+
+        .dashboard-v2 .overview-grid,
+        .dashboard-v2 .setup-wizard-stage {
+            max-width: 1080px;
+        }
+
+        .dashboard-v2 .sidebar-desktop .mb-12 {
+            margin-bottom: 28px !important;
+        }
+
+        .dashboard-v2 .sidebar-desktop a {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0 !important;
+            text-transform: uppercase !important;
+        }
+
+        .dashboard-v2 .sidebar-desktop a::before {
+            content: "";
+            width: 30px;
+            height: 30px;
+            border-radius: 10px;
+            background: url("{% static 'icons/icon-192x192.png' %}") center / cover no-repeat;
+            border: 1px solid rgba(255, 199, 0, 0.26);
+            box-shadow: 0 0 24px rgba(255, 199, 0, 0.12);
+        }
+
+        .dashboard-v2 .nav-btn {
+            min-height: 46px;
+            color: var(--v2-muted);
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0;
+            text-transform: uppercase;
+        }
+
+        .dashboard-v2 .sidebar-desktop .nav-btn {
+            gap: 12px;
+            margin-bottom: 7px;
+            padding: 11px 13px;
+            border-radius: 999px;
+        }
+
+        .dashboard-v2 .sidebar-desktop .nav-btn.active {
+            color: #090a0f;
+            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%);
+            border: 0;
+            box-shadow: 0 18px 38px rgba(255, 199, 0, 0.18), inset 0 -3px 0 rgba(0,0,0,0.16);
+        }
+
+        .dashboard-v2 .nav-btn i {
+            width: 18px;
+            color: inherit;
+            font-size: 15px;
+        }
+
+        .dashboard-v2 .sidebar-logout-btn {
+            min-height: 46px;
+            margin-bottom: 0;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(255, 255, 255, 0.035);
+        }
+
+        .dashboard-v2 .sidebar-logout-btn:hover {
+            border-color: rgba(255, 199, 0, 0.22);
+            background: rgba(255, 199, 0, 0.06);
+            color: #ffc700;
+        }
+
+        .dashboard-v2 .nav-mobile {
+            height: calc(64px + env(safe-area-inset-bottom));
+            background: rgba(9, 10, 15, 0.94);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(22px);
+            padding-top: 9px;
+        }
+
+        .dashboard-v2 header {
+            margin-bottom: 24px !important;
+        }
+
+        .dashboard-v2 h1,
+        .dashboard-v2 h2,
+        .dashboard-v2 h3,
+        .dashboard-v2 h4,
+        .dashboard-v2 h5,
+        .dashboard-v2 .font-black {
+            font-weight: 700 !important;
+            letter-spacing: 0 !important;
+        }
+
+        .dashboard-v2 .font-bold {
+            font-weight: 500 !important;
+        }
+
+        .dashboard-v2 .uppercase {
+            text-transform: none;
+        }
+
+        .dashboard-v2 h1,
+        .dashboard-v2 .text-4xl {
+            font-size: 30px !important;
+            line-height: 1.16 !important;
+        }
+
+        .dashboard-v2 .text-3xl {
+            font-size: 26px !important;
+            line-height: 1.2 !important;
+        }
+
+        .dashboard-v2 .text-2xl {
+            font-size: 21px !important;
+            line-height: 1.24 !important;
+        }
+
+        .dashboard-v2 .text-xl {
+            font-size: 18px !important;
+            line-height: 1.25 !important;
+        }
+
+        .dashboard-v2 .text-lg {
+            font-size: 16px !important;
+            line-height: 1.32 !important;
+        }
+
+        .dashboard-v2 .text-6xl {
+            font-size: 44px !important;
+            line-height: 1 !important;
+        }
+
+        .dashboard-v2 .text-5xl {
+            font-size: 36px !important;
+            line-height: 1.05 !important;
+        }
+
+        .dashboard-v2 .text-gray-500,
+        .dashboard-v2 .text-gray-400,
+        .dashboard-v2 .text-gray-300 {
+            color: rgba(255, 255, 255, 0.58) !important;
+        }
+
+        .dashboard-v2 .text-white {
+            color: #fff !important;
+        }
+
+        .dashboard-v2 .setup-shell,
+        .dashboard-v2 .setup-step-card,
+        .dashboard-v2 .support-chat-card,
+        .dashboard-v2 .tariff-card,
+        .dashboard-v2 .overview-hero-card,
+        .dashboard-v2 .metric-card,
+        .dashboard-v2 .referral-rule-card,
+        .dashboard-v2 .referral-stat-card,
+        .dashboard-v2 .referral-link-card {
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 16px !important;
+            background:
+                radial-gradient(circle at 50% 0%, rgba(255, 199, 0, 0.045), transparent 20rem),
+                rgba(17, 18, 23, 0.86) !important;
+            box-shadow: 0 26px 70px rgba(0, 0, 0, 0.34) !important;
+            backdrop-filter: blur(18px);
+        }
+
+        .dashboard-v2 .setup-shell {
+            padding: 22px !important;
+        }
+
+        .dashboard-v2 .overview-grid.space-y-7 > :not([hidden]) ~ :not([hidden]),
+        .dashboard-v2 .space-y-7 > :not([hidden]) ~ :not([hidden]) {
+            margin-top: 16px !important;
+        }
+
+        .dashboard-v2 .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+            margin-top: 14px !important;
+        }
+
+        .dashboard-v2 .status-overview-card {
+            min-height: 210px;
+            padding: 24px !important;
+        }
+
+        .dashboard-v2 .status-overview-card::before,
+        .dashboard-v2 .overview-hero-card::before {
+            opacity: 0.18;
+        }
+
+        .dashboard-v2 .status-progress-track {
+            height: 6px;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .dashboard-v2 .status-progress-bar {
+            background: linear-gradient(90deg, var(--brand-gold), #f9d85e);
+            box-shadow: 0 0 20px rgba(255, 199, 0, 0.35);
+        }
+
+        .dashboard-v2 .quick-action-card {
+            min-height: 0;
+        }
+
+        .dashboard-v2 .quick-action-card:hover {
+            transform: translateY(-1px);
+            background: rgba(255, 199, 0, 0.06) !important;
+        }
+
+        .dashboard-v2 .w-12.h-12,
+        .dashboard-v2 .w-14.h-14,
+        .dashboard-v2 .w-16.h-16 {
+            width: 44px !important;
+            height: 44px !important;
+            border-radius: 12px !important;
+        }
+
+        .dashboard-v2 .rounded-2xl,
+        .dashboard-v2 .rounded-3xl,
+        .dashboard-v2 .rounded-xl {
+            border-radius: 14px !important;
+        }
+
+        .dashboard-v2 .setup-link-btn,
+        .dashboard-v2 .setup-cta-btn,
+        .dashboard-v2 button[type="submit"].bg-\[\#ffc700\] {
+            min-height: auto !important;
+            padding: 15px 22px !important;
+            border-radius: 14px !important;
+            background: #ffc700 !important;
+            color: #08090d !important;
+            font-size: 15px !important;
+            font-weight: 700 !important;
+            letter-spacing: 0 !important;
+            text-transform: none !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            box-shadow: 0 10px 28px rgba(255, 199, 0, 0.28) !important;
+        }
+
+        .dashboard-v2 .dashboard-action-btn {
+            min-height: auto !important;
+            padding: 15px 22px !important;
+            font-size: 15px !important;
+            line-height: 1.15 !important;
+        }
+
+        .dashboard-v2 .quick-access-btn {
+            background: #ffc700 !important;
+            color: #08090d !important;
+            padding: 15px 22px !important;
+            border-radius: 14px !important;
+            font-size: 15px !important;
+            font-weight: 700 !important;
+            line-height: 1.15 !important;
+            text-transform: none !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+            box-shadow: 0 10px 28px rgba(255, 199, 0, 0.28) !important;
+        }
+
+        .dashboard-v2 .setup-link-btn:hover,
+        .dashboard-v2 .setup-cta-btn:hover {
+            transform: translateY(-1px);
+        }
+
+        .dashboard-v2 .bg-white\/10 {
+            background: rgba(255, 255, 255, 0.055) !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: #fff !important;
+            box-shadow: none !important;
+        }
+
+        .dashboard-v2 .platform-btn,
+        .dashboard-v2 .app-btn {
+            min-height: 44px;
+            padding: 8px 13px !important;
+            border-radius: 8px !important;
+            font-size: 13px !important;
+            font-weight: 600 !important;
+            letter-spacing: 0 !important;
+            text-transform: none !important;
+        }
+
+        .dashboard-v2 input,
+        .dashboard-v2 textarea,
+        .dashboard-v2 .referral-link-input,
+        .dashboard-v2 .support-input {
+            border-radius: 14px !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            background: rgba(0, 0, 0, 0.42) !important;
+            color: #fff !important;
+            font-weight: 700 !important;
+        }
+
+        .dashboard-v2 .referral-link-field button,
+        .dashboard-v2 .bottom-sheet-copy-btn {
+            background: #ffc700 !important;
+            color: #08090d !important;
+            border-radius: 14px !important;
+            font-size: 15px !important;
+            font-weight: 700 !important;
+            text-transform: none !important;
+            box-shadow: 0 10px 28px rgba(255, 199, 0, 0.28) !important;
+            user-select: none !important;
+            -webkit-user-select: none !important;
+        }
+
+        .dashboard-v2 .key-box {
+            border-radius: 16px;
+            background: rgba(0, 0, 0, 0.38) !important;
+        }
+
+        .dashboard-v2 .step-number-circle {
+            width: 42px;
+            height: 42px;
+            border-radius: 999px;
+            font-weight: 700;
+            box-shadow: 0 0 22px rgba(255, 199, 0, 0.22);
+        }
+
+        .dashboard-v2 .stepper-line {
+            left: 38px;
+            opacity: 0.6;
+        }
+
+        .dashboard-v2 .step-item {
+            padding-left: 56px;
+        }
+
+        .dashboard-v2 .support-message {
+            border-radius: 16px;
+            font-weight: 700;
+        }
+
+        .dashboard-v2 .support-message p {
+            font-weight: 500 !important;
+        }
+
+        .dashboard-v2 .copy-toast {
+            border-radius: 8px;
+            font-weight: 700;
+        }
+
+        .dashboard-v2 #app-container .setup-cta-btn,
+        .dashboard-v2 #app-container .setup-link-btn,
+        .dashboard-v2 #app-container .payment-cta,
+        .dashboard-v2 #app-container button[type="submit"].bg-\[\#ffc700\] {
+            font-size: 15px !important;
+            font-weight: 700 !important;
+        }
+
+        @media (max-width: 1024px) {
+            .dashboard-v2 .main-content {
+                margin-left: 0 !important;
+                padding: 24px 18px 104px !important;
+            }
+        }
+
+        @media (max-width: 640px) {
+            .dashboard-v2 .main-content {
+                padding: 18px 14px 96px !important;
+            }
+
+            .dashboard-v2 h1,
+            .dashboard-v2 .text-4xl,
+            .dashboard-v2 .mobile-compact-header h1,
+            .dashboard-v2 .referral-mobile-header h1 {
+                font-size: 26px !important;
+                line-height: 1.12 !important;
+            }
+
+            .dashboard-v2 .setup-shell {
+                padding: 16px !important;
+            }
+
+            .dashboard-v2 .subscription-status-grid {
+                grid-template-columns: 1fr !important;
+                gap: 14px !important;
+            }
+        }
     </style>
     {% include "includes/yandex_metrika.html" %}
 </head>
-<body style="--dashboard-bg-image: url('{% static 'img/bg6.png' %}');">
+<body class="dashboard-v2" style="--dashboard-bg-image: url('{% static 'img/bg6.png' %}');">
 
     <div class="page-background">
         <div class="page-background-image">
@@ -956,7 +2101,89 @@
     </div>
 
     <div id="app-container">
-        <div id="interface-wrapper">
+        {% if not has_subscription_access %}
+        <section class="plans-only-view">
+            <div class="plans-topbar">
+                <a href="/" class="plans-brand">MONKEY <span class="text-[#ffc700]">ISLAND</span></a>
+            </div>
+
+            <div class="plans-panel">
+                <h1 class="plans-title">Остался последний шаг<br>до подключения</h1>
+                <p class="text-gray-500 text-sm font-bold leading-relaxed mb-7">
+                    Вы уже в личном кабинете. Выберите тариф, оплатите доступ, и ключи подключения появятся здесь автоматически.
+                </p>
+
+                <div class="plans-benefits" aria-label="Преимущества подписки">
+                    <div class="plans-benefit"><i class="fas fa-ban"></i><span>YouTube без рекламы</span></div>
+                    <div class="plans-benefit"><i class="fas fa-infinity"></i><span>Безлимитный трафик</span></div>
+                    <div class="plans-benefit"><i class="fas fa-layer-group"></i><span>Обход Белого списка</span></div>
+                    <div class="plans-benefit"><i class="fas fa-headset"></i><span>Поддержка поможет подключить</span></div>
+                </div>
+
+                <form method="POST" action="/pay/" class="plans-form" data-payment-form data-context="dashboard_paywall">
+                    {% csrf_token %}
+                    {% for tariff in tariffs %}
+                    <label class="plan-row" for="plans-tariff-{{ tariff.db_tariff_id }}">
+                        <span class="min-w-0">
+                            <span class="plan-title-line">
+                                {% if tariff.db_tariff_id == "month" %}
+                                    1 месяц
+                                {% elif tariff.db_tariff_id == "threemonths" %}
+                                    3 месяца <span class="plan-badge">-20%</span>
+                                {% elif tariff.db_tariff_id == "year" %}
+                                    12 месяцев <span class="plan-badge">-40%</span>
+                                {% else %}
+                                    {{ tariff.description }}
+                                {% endif %}
+                            </span>
+                            <span class="plan-note">
+                                {% if tariff.db_tariff_id == "month" %}
+                                    Здесь и сейчас
+                                {% elif tariff.db_tariff_id == "threemonths" %}
+                                    Разумная экономия
+                                {% elif tariff.db_tariff_id == "year" %}
+                                    Максимальная выгода
+                                {% else %}
+                                    Быстрый доступ
+                                {% endif %}
+                            </span>
+                        </span>
+                        <span class="plan-price">
+                            <strong>
+                                {% if tariff.db_tariff_id == "threemonths" %}
+                                    {% widthratio tariff.price 3 1 %} ₽ / месяц
+                                {% elif tariff.db_tariff_id == "year" %}
+                                    {% widthratio tariff.price 12 1 %} ₽ / месяц
+                                {% else %}
+                                    {{ tariff.price }} ₽ / месяц
+                                {% endif %}
+                            </strong>
+                            <span>{{ tariff.price }} ₽ сейчас</span>
+                        </span>
+                        <input id="plans-tariff-{{ tariff.db_tariff_id }}" class="plan-radio" type="radio" name="tariff_id" value="{{ tariff.db_tariff_id }}" {% if forloop.first %}checked{% endif %}>
+                    </label>
+                    {% endfor %}
+
+                    {% if user.email %}
+                        <input type="hidden" name="email" value="{{ user.email }}">
+                    {% else %}
+                        <input type="email" name="email" required autocomplete="email" placeholder="Email для чека и входа" class="plans-email referral-link-input w-full py-4 px-5 text-sm text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
+                    {% endif %}
+
+                    <p class="plans-legal">
+                        Оплата картой через WATA. После подтверждения мы откроем ключи в этом кабинете.
+                        Оформляя покупку, вы соглашаетесь с <a href="/offer/" target="_blank">офертой</a>.
+                    </p>
+
+                    <button type="submit" class="plans-submit payment-cta w-full transition-all hover:scale-[1.01] active:scale-95">
+                        Оплатить
+                    </button>
+                </form>
+            </div>
+        </section>
+        {% endif %}
+
+        <div id="interface-wrapper" class="{% if not has_subscription_access %}hidden{% endif %}">
         <aside class="sidebar-desktop">
             <div class="mb-12 px-4">
                 <a href="/" class="text-xl font-black tracking-tighter uppercase">MONKEY <span class="text-[#ffc700]">ISLAND</span></a>
@@ -986,14 +2213,21 @@
             <div id="tab-home" class="tab-content active">
                 <div id="main-dashboard-view">
                     <header class="mb-10">
-                        {% if show_not_connected_banner %}
-                            <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Подключи VPN</h1>
+                        {% if not has_subscription_access %}
+                            <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Нет активной подписки</h1>
+                            <p class="text-gray-500 text-sm md:text-base font-bold">Выберите тариф, оплатите доступ и мы сразу откроем ключи подключения.</p>
+                        {% elif show_not_connected_banner %}
+                            <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Подключитесь к серверу</h1>
                             <p class="text-gray-500 text-sm md:text-base font-bold">Подписка готова, осталось добавить ее в приложение</p>
                         {% else %}
                             <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Привет!</h1>
-                            <p class="text-gray-500 text-sm md:text-base font-bold">Управление твоей подпиской</p>
+                            <p class="text-gray-500 text-sm md:text-base font-bold">Управление вашей подпиской</p>
                         {% endif %}
                     </header>
+
+                    <button type="button" onclick="quickAccessInstall()" class="quick-access-btn inline-flex items-center gap-2 mb-8 hover:brightness-105 active:scale-95 transition">
+                        <i class="fas fa-bolt"></i> Быстрый доступ
+                    </button>
 
                     <div class="overview-grid space-y-7">
                         {% if show_not_connected_banner %}
@@ -1004,60 +2238,60 @@
                                             <i class="fas fa-bolt text-lg"></i>
                                         </div>
                                         <div>
-                                            <h3 class="text-xl md:text-2xl font-black mb-3">Начни с подключения</h3>
-                                            <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">Выбери свое устройство, установи приложение и нажми кнопку добавления подписки. После этого VPN можно включить в приложении.</p>
+                                            <h3 class="text-xl md:text-2xl font-black mb-3">Начните с подключения</h3>
+                                            <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">Выберите устройство, установите приложение и нажмите кнопку добавления подписки. После этого VPN можно включить в приложении.</p>
                                             <div class="mt-5 flex flex-col sm:flex-row gap-x-6 gap-y-2 text-sm font-black text-white">
                                                 <div class="flex items-center gap-2">
                                                     <span class="text-[#00ff88]">1.</span>
-                                                    <span>Выбери устройство</span>
+                                                    <span>Выберите устройство</span>
                                                 </div>
                                                 <div class="flex items-center gap-2">
                                                     <span class="text-[#00ff88]">2.</span>
-                                                    <span>Установи приложение</span>
+                                                    <span>Установите приложение</span>
                                                 </div>
                                                 <div class="flex items-center gap-2">
                                                     <span class="text-[#00ff88]">3.</span>
-                                                    <span>Добавь подписку</span>
+                                                    <span>Добавьте подписку</span>
                                                 </div>
                                             </div>
                                         </div>
                                     </div>
-                                    <button type="button" onclick="showTab('setup')" class="setup-cta-btn !w-full lg:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
+                                    <button type="button" onclick="showTab('setup')" class="setup-cta-btn dashboard-action-btn !w-full lg:!w-auto !whitespace-nowrap !mb-0 !mr-0">
                                         Подключить VPN
                                     </button>
                                 </div>
                             </section>
                         {% endif %}
 
-                        {% if show_telegram_bind_banner %}
+                        {% if show_telegram_bind_banner and has_subscription_access %}
                             <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-[#ffc700]/40 bg-[#ffc700]/5">
                                 <div class="flex items-start gap-4">
                                     <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                                         <i class="fab fa-telegram text-xl"></i>
                                     </div>
                                     <div>
-                                        <h3 class="text-lg font-black mb-2">Привяжи Telegram и получи +7 дней</h3>
+                                        <h3 class="text-lg font-black mb-2">Привяжите Telegram и получите +7 дней</h3>
                                         <p class="text-gray-500 text-sm font-bold leading-relaxed">Добавим 7 дней к подписке, напомним о продлении и поможем с подключением, если что-то пойдет не так.</p>
                                     </div>
                                 </div>
-                                <a href="{{ tg_bind_link }}" class="setup-link-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
+                                <a href="{{ tg_bind_link }}" class="setup-link-btn dashboard-action-btn !w-full md:!w-auto !whitespace-nowrap !mb-0 !mr-0">
                                     Забрать +7 дней
                                 </a>
                             </section>
                         {% endif %}
 
-                        {% if show_email_bind_banner %}
+                        {% if show_email_bind_banner and has_subscription_access %}
                             <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-[#ffc700]/40 bg-[#ffc700]/5">
                                 <div class="flex items-start gap-4">
                                     <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                                         <i class="fas fa-envelope text-lg"></i>
                                     </div>
                                     <div>
-                                        <h3 class="text-lg font-black mb-2">Привяжи email, чтобы не потерять доступ</h3>
+                                        <h3 class="text-lg font-black mb-2">Привяжите email, чтобы не потерять доступ</h3>
                                         <p class="text-gray-500 text-sm font-bold leading-relaxed">Почта поможет не потерять доступ к подписке, получать письма об оплате и быстро входить в кабинет без Telegram.</p>
                                     </div>
                                 </div>
-                                <button type="button" onclick="openEmailBindSheet()" class="setup-link-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
+                                <button type="button" onclick="openEmailBindSheet()" class="setup-link-btn dashboard-action-btn !w-full md:!w-auto !whitespace-nowrap !mb-0 !mr-0">
                                     Привязать email
                                 </button>
                             </section>
@@ -1071,76 +2305,59 @@
                                     </div>
                                     <div>
                                         <h3 class="text-lg font-black mb-2">Подписка скоро закончится</h3>
-                                        <p class="text-gray-500 text-sm font-bold leading-relaxed">Осталось {{ time_left_value }} {{ time_left_label }}. Продли доступ заранее, чтобы VPN не отключился в неподходящий момент.</p>
+                                        <p class="text-gray-500 text-sm font-bold leading-relaxed">Осталось {{ time_left_value }} {{ time_left_label }}. Продлите доступ заранее, чтобы VPN не отключился в неподходящий момент.</p>
                                     </div>
                                 </div>
-                                <button type="button" onclick="showTariffs()" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !mb-0 !mr-0">
+                                <button type="button" onclick="showTariffs()" class="setup-cta-btn dashboard-action-btn !w-full md:!w-auto !mb-0 !mr-0">
                                     Продлить
                                 </button>
                             </section>
                         {% endif %}
 
                         <section class="setup-shell status-overview-card">
-                            <div class="relative z-10 flex flex-col gap-8">
-                                <div class="flex items-start justify-between gap-4">
-                                    {% if not has_subscription_access %}
-                                        <div class="flex items-center gap-2 text-red-400 text-sm font-black">
-                                            <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>
-                                            Нет активной подписки
+                            <div class="relative z-10 flex flex-col gap-7">
+                                {% if not has_subscription_access %}
+                                    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-5">
+                                        <div>
+                                            <p class="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-3">Подписка</p>
+                                            <h2 class="text-3xl font-black mb-3">Доступ не оплачен</h2>
+                                            <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-xl">Оформите подписку, и в кабинете появятся ключи, инструкции для устройств и поддержка.</p>
                                         </div>
-                                    {% else %}
-                                        <div class="flex items-center gap-2 text-[#00ff88] text-sm font-black">
-                                            <span class="w-2.5 h-2.5 rounded-full bg-[#00ff88]"></span>
-                                            Активна
-                                        </div>
-                                    {% endif %}
-                                    <span class="text-gray-500 text-sm font-bold">{% if user.expire_at %}{{ user.expire_at|date:"d.m.Y" }}{% else %}—{% endif %}</span>
-                                </div>
-
-                                <div>
-                                    {% if not has_subscription_access %}
-                                        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-3">
-                                            <div>
-                                                <h2 class="text-3xl font-black mb-3">Доступ еще не оплачен</h2>
-                                                <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-xl">Оформите подписку, и в кабинете появятся ключи, инструкции для устройств и поддержка.</p>
-                                            </div>
-                                            <button type="button" onclick="showTariffs()" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !mb-0 !mr-0">
-                                                Купить подписку
-                                            </button>
-                                        </div>
-                                    {% else %}
-                                        <div class="flex flex-wrap items-end gap-x-4 gap-y-2 mb-3">
+                                        <button type="button" onclick="showTariffs()" class="setup-cta-btn dashboard-action-btn !w-full md:!w-auto !mb-0 !mr-0">
+                                            Купить подписку
+                                        </button>
+                                    </div>
+                                {% else %}
+                                    <div>
+                                        <p class="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-4">Подписка</p>
+                                        <div class="flex items-baseline gap-2.5 mb-3">
                                             <span id="days-left-count" data-seconds-left="{{ seconds_left|floatformat:0 }}" data-time-left-value="{{ time_left_value }}" data-time-left-label="{{ time_left_label }}" class="text-6xl font-black leading-none text-white">—</span>
-                                            <span class="text-gray-500 text-xl font-bold mb-2">до {{ user.expire_at|date:"j E" }}</span>
+                                            <span class="text-3xl font-black leading-none text-white">{{ time_left_unit }}</span>
                                         </div>
-                                        <p id="time-left-caption" class="text-gray-500 text-sm font-bold">{{ time_left_label }}</p>
-                                    {% endif %}
-                                </div>
+                                        <div class="flex items-center gap-2 text-[#00ff88] text-base font-black">
+                                            <span class="w-2.5 h-2.5 rounded-full bg-[#00ff88] flex-shrink-0"></span>
+                                            Активна до {{ user.expire_at|date:"d.m.Y" }}
+                                        </div>
+                                    </div>
 
-                                <div class="space-y-5">
                                     <div class="status-progress-track">
                                         <div id="subscription-progress-bar" class="status-progress-bar"></div>
                                     </div>
 
-                                    <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                                         <div class="text-gray-500 text-sm font-bold">
                                             Автопродление:
                                             {% if has_recurrent %}
-                                                <span class="text-[#00ff88]">Включено</span>
+                                                <span class="text-[#00ff88]">включено</span>
                                             {% else %}
                                                 <span class="text-white">не подключено</span>
                                             {% endif %}
                                         </div>
-                                        <div class="flex flex-wrap items-center gap-3">
-                                            <button type="button" onclick="showTab('profile')" class="text-[#ffc700] text-xs font-bold hover:text-white transition-colors">
-                                                +40 дней за друга
-                                            </button>
-                                            <button type="button" onclick="showTab('profile')" class="bg-white/10 hover:bg-white/15 border border-white/10 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all">
-                                                Подробнее
-                                            </button>
-                                        </div>
+                                        <button type="button" onclick="showTab('setup')" class="setup-cta-btn dashboard-action-btn !w-full sm:!w-auto !mb-0 !mr-0">
+                                            <i class="fas fa-book-open"></i> Открыть инструкцию
+                                        </button>
                                     </div>
-                                </div>
+                                {% endif %}
                             </div>
                         </section>
 
@@ -1148,35 +2365,57 @@
                             <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
                                 <div>
                                     <h3 class="text-lg font-black mb-2">Продлить подписку</h3>
-                                    <p class="text-gray-500 text-sm font-bold">Выбери новый тариф или добавь дней к текущей подписке.</p>
+                                    <p class="text-gray-500 text-sm font-bold">Выберите новый тариф или добавьте дней к текущей подписке.</p>
                                 </div>
-                                <button type="button" onclick="showTariffs()" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !mb-0 !mr-0">
+                                <button type="button" onclick="showTariffs()" class="setup-cta-btn dashboard-action-btn !w-full md:!w-auto !mb-0 !mr-0">
                                     Продлить
                                 </button>
                             </section>
                         {% endif %}
 
-                        <section class="grid grid-cols-1 md:grid-cols-3 gap-5">
-                            <button type="button" onclick="showTab('setup')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
-                                <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
-                                    <i class="fas fa-bolt text-lg"></i>
+                        <section class="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                            {% if has_subscription_access %}
+                            <button type="button" onclick="showTab('setup')" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
+                                <div class="w-11 h-11 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                    <i class="fas fa-bolt"></i>
                                 </div>
-                                <h3 class="text-lg font-black mb-2">Установка</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Приложения и подключение</p>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="text-base font-black leading-tight">Установка</h3>
+                                    <p class="text-gray-500 text-xs font-bold leading-snug">Установка на ваши устройства</p>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-600 text-sm flex-shrink-0"></i>
                             </button>
-                            <button type="button" onclick="showTab('support')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
-                                <div class="w-12 h-12 rounded-2xl bg-[#2ec4b6]/10 border border-[#2ec4b6]/20 flex items-center justify-center text-[#2ec4b6] mb-4">
-                                    <i class="fas fa-headset text-lg"></i>
+                            {% else %}
+                            <button type="button" onclick="showTariffs()" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
+                                <div class="w-11 h-11 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                    <i class="fas fa-credit-card"></i>
                                 </div>
-                                <h3 class="text-lg font-black mb-2">Поддержка</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Помощь в Telegram</p>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="text-base font-black leading-tight">Купить подписку</h3>
+                                    <p class="text-gray-500 text-xs font-bold leading-snug">Тарифы и оплата</p>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-600 text-sm flex-shrink-0"></i>
                             </button>
-                            <button type="button" onclick="showTab('profile')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
-                                <div class="w-12 h-12 rounded-2xl bg-[#9b5cff]/10 border border-[#9b5cff]/20 flex items-center justify-center text-[#9b5cff] mb-4">
-                                    <i class="fas fa-user-friends text-lg"></i>
+                            {% endif %}
+                            <button type="button" onclick="showTab('support')" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
+                                <div class="w-11 h-11 rounded-xl bg-[#2ec4b6]/10 border border-[#2ec4b6]/20 flex items-center justify-center text-[#2ec4b6] flex-shrink-0">
+                                    <i class="fas fa-headset"></i>
                                 </div>
-                                <h3 class="text-lg font-black mb-2">Рефералы</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Пригласи друга</p>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="text-base font-black leading-tight">Поддержка</h3>
+                                    <p class="text-gray-500 text-xs font-bold leading-snug">Помощь в Telegram</p>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-600 text-sm flex-shrink-0"></i>
+                            </button>
+                            <button type="button" onclick="showTab('profile')" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
+                                <div class="w-11 h-11 rounded-xl bg-[#9b5cff]/10 border border-[#9b5cff]/20 flex items-center justify-center text-[#9b5cff] flex-shrink-0">
+                                    <i class="fas fa-user-friends"></i>
+                                </div>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="text-base font-black leading-tight">Рефералы</h3>
+                                    <p class="text-gray-500 text-xs font-bold leading-snug">+40 дней за друга</p>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-600 text-sm flex-shrink-0"></i>
                             </button>
                         </section>
 
@@ -1187,26 +2426,27 @@
             <div id="tab-setup" class="tab-content">
                 <header class="mb-10 {% if use_new_setup_flow %}hidden{% endif %}">
                     <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Установка</h1>
-                    <p class="text-gray-500 text-sm md:text-base font-bold">Выбери устройство и подключись по готовой инструкции</p>
+                    <p class="text-gray-500 text-sm md:text-base font-bold">Установите приложение и подключитесь в один клик</p>
                 </header>
                 <div class="overview-grid space-y-7">
-                    <section class="setup-shell overview-hero-card {% if use_new_setup_flow %}hidden{% endif %}">
-                        <div class="relative z-10 flex flex-col md:flex-row md:items-center gap-6">
-                            <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
-                                <i class="fas fa-bolt text-2xl"></i>
+                    {% if not has_subscription_access %}
+                    <section class="setup-shell p-6 md:p-8 subscription-next-card">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
+                            <div>
+                                <h2 class="text-2xl font-black mb-3">Сначала оформите подписку</h2>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">После оплаты здесь появится мастер подключения и готовые ключи для приложений.</p>
                             </div>
-                            <div class="flex-1">
-                                <h2 class="text-2xl font-black mb-2">Подключение за пару минут</h2>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">Сначала выбери платформу, затем приложение. Ниже появятся ссылки для установки и кнопка быстрого добавления подписки.</p>
-                            </div>
+                            <button type="button" onclick="showTariffs()" class="setup-cta-btn dashboard-action-btn !w-full md:!w-auto !whitespace-nowrap !mb-0 !mr-0">
+                                Купить подписку
+                            </button>
                         </div>
                     </section>
-
+                    {% else %}
                     <div id="new-setup-flow" class="{% if not use_new_setup_flow %}hidden{% endif %}">
                         <section class="setup-wizard-shell">
                             <div class="setup-wizard-stage">
                                 <div id="new-setup-device-picker" class="setup-shell p-6 md:p-8 mb-7 hidden">
-                                    <h3 class="text-lg font-black mb-3">Выбери устройство</h3>
+                                    <h3 class="text-lg font-black mb-3">Выберите устройство</h3>
                                     <div id="new-setup-platforms" class="setup-chip-group flex flex-wrap gap-3"></div>
                                 </div>
 
@@ -1217,24 +2457,31 @@
                         </section>
                     </div>
 
-                    <div id="setup-logic-placeholder" class="space-y-7 {% if use_new_setup_flow %}hidden{% endif %}">
-                        <section class="setup-shell p-6 md:p-8">
-                            <h3 class="text-lg font-black mb-3">1. Выберите платформу</h3>
-                            <div class="setup-chip-group flex flex-wrap gap-3 mb-8">
-                                <button onclick="setPlatform('android')" id="btn-android" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase active">Android</button>
-                                <button onclick="setPlatform('ios')" id="btn-ios" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">iOS</button>
-                                <button onclick="setPlatform('windows')" id="btn-windows" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">Windows</button>
-                                <button onclick="setPlatform('macos')" id="btn-macos" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">macOS</button>
-                                <button onclick="setPlatform('androidtv')" id="btn-androidtv" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">Android TV</button>
-                                <button onclick="setPlatform('appletv')" id="btn-appletv" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">Apple TV</button>
+                    <div id="setup-logic-placeholder" class="space-y-3 {% if use_new_setup_flow %}hidden{% endif %}">
+                        <!-- Ёмкий выбор устройства/приложения сверху: дропдаун платформы + ряд чипов приложений -->
+                        <section class="setup-shell setup-picker-card">
+                            <div class="setup-picker-bar">
+                                <h3 class="setup-picker-bar-title">Установка</h3>
+                                <div class="setup-platform-select-wrap">
+                                    <i id="platform-select-icon" class="fab fa-android setup-platform-select-icon" aria-hidden="true"></i>
+                                    <select id="platform-select" class="setup-platform-select" aria-label="Выберите устройство" onchange="setPlatform(this.value)">
+                                        <option value="android">Android</option>
+                                        <option value="ios">iOS</option>
+                                        <option value="windows">Windows</option>
+                                        <option value="macos">macOS</option>
+                                        <option value="linux">Linux</option>
+                                        <option value="androidtv">Android TV</option>
+                                        <option value="appletv">Apple TV</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down setup-platform-select-chev" aria-hidden="true"></i>
+                                </div>
                             </div>
-                            <div id="app-selector-container">
-                                <h3 class="text-lg font-black mb-3">2. Выберите приложение</h3>
-                                <div id="app-selector" class="flex flex-wrap gap-2 mb-2"></div>
-                            </div>
+                            <div id="app-selector" class="setup-app-row" role="group" aria-label="Выбор приложения"></div>
                         </section>
-                        <div id="full-instructions-container" class="space-y-5"></div>
+
+                        <div id="full-instructions-container"></div>
                     </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -1250,7 +2497,7 @@
                             </div>
                             <div>
                                 <h3 class="text-lg font-black mb-2">+{{ join_referrer_bonus_days|default:"3" }} дня за регистрацию</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Добавим, когда друг создаст аккаунт по твоей ссылке.</p>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Добавим, когда друг создаст аккаунт по вашей ссылке.</p>
                             </div>
                         </div>
                         <div class="setup-step-card metric-card flex items-start gap-4 !mb-0 referral-rule-card">
@@ -1296,7 +2543,7 @@
                         <div class="flex flex-col gap-5">
                             <div>
                                 <h3 class="text-lg font-black mb-2">Пригласительная ссылка</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Отправь другу ссылку на сайт или в Telegram. Бонусы начислятся автоматически.</p>
+                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Отправьте другу ссылку на сайт или в Telegram. Бонусы начислятся автоматически.</p>
                             </div>
                             <div>
                                 <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Ссылка на сайт</p>
@@ -1309,7 +2556,7 @@
                                         class="referral-link-input w-full py-5 pl-14 pr-40 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
 
                                     <button onclick="copyReferralLink('site-ref-link-input')"
-                                            class="absolute right-2 top-2 bottom-2 setup-cta-btn !w-auto !py-0 !px-8 !text-[10px] !mb-0 !mr-0">
+                                            class="absolute right-2 top-2 bottom-2 setup-cta-btn dashboard-action-btn !w-auto !py-0 !px-8 !mb-0 !mr-0">
                                         Копировать
                                     </button>
                                 </div>
@@ -1325,7 +2572,7 @@
                                         class="referral-link-input w-full py-5 pl-14 pr-40 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
 
                                     <button onclick="copyReferralLink('ref-link-input')"
-                                            class="absolute right-2 top-2 bottom-2 setup-cta-btn !w-auto !py-0 !px-8 !text-[10px] !mb-0 !mr-0">
+                                            class="absolute right-2 top-2 bottom-2 setup-cta-btn dashboard-action-btn !w-auto !py-0 !px-8 !mb-0 !mr-0">
                                         Копировать
                                     </button>
                                 </div>
@@ -1383,11 +2630,11 @@
                 <span class="text-sm font-bold text-gray-500 group-hover:text-white">Назад в кабинет</span>
             </button>
 
-            <section class="setup-shell overview-hero-card">
+            <section class="setup-shell overview-hero-card hidden lg:block">
                 <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-6">
                     <div>
-                        <h2 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Продлить подписку</h2>
-                        <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed max-w-2xl">Выбери срок доступа. Дни добавятся к текущей подписке после оплаты.</p>
+                        <h2 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">{% if has_subscription_access %}Продлить подписку{% else %}Купить подписку{% endif %}</h2>
+                        <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed max-w-2xl">{% if has_subscription_access %}Выберите срок доступа. Дни добавятся к текущей подписке после оплаты.{% else %}Выберите срок доступа. После оплаты мы активируем подписку и откроем ключи подключения в этом кабинете.{% endif %}</p>
                     </div>
                     <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                         <i class="fas fa-crown text-2xl"></i>
@@ -1395,7 +2642,83 @@
                 </div>
             </section>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-7 w-full">
+            {# Мобильная версия экрана продления: радио-список тарифов, как на странице оплаты #}
+            <div class="lg:hidden plans-panel mx-auto !w-full">
+                <h1 class="plans-title">{% if has_subscription_access %}Продлить подписку{% else %}Остался последний шаг<br>до подключения{% endif %}</h1>
+                <p class="text-gray-500 text-sm font-bold leading-relaxed mb-7">
+                    {% if has_subscription_access %}Выберите срок — дни добавятся к текущей подписке сразу после оплаты.{% else %}Вы уже в личном кабинете. Выберите тариф, оплатите доступ, и ключи подключения появятся здесь автоматически.{% endif %}
+                </p>
+
+                <div class="plans-benefits" aria-label="Преимущества подписки">
+                    <div class="plans-benefit"><i class="fas fa-ban"></i><span>YouTube без рекламы</span></div>
+                    <div class="plans-benefit"><i class="fas fa-infinity"></i><span>Безлимитный трафик</span></div>
+                    <div class="plans-benefit"><i class="fas fa-layer-group"></i><span>Обход Белого списка</span></div>
+                    <div class="plans-benefit"><i class="fas fa-users"></i><span>До 15 устройств на подписке</span></div>
+                </div>
+
+                <form method="POST" action="/pay/" class="plans-form" data-payment-form data-context="dashboard_renew">
+                    {% csrf_token %}
+                    {% for tariff in tariffs %}
+                    <label class="plan-row" for="renew-tariff-{{ tariff.db_tariff_id }}">
+                        <span class="min-w-0">
+                            <span class="plan-title-line">
+                                {% if tariff.db_tariff_id == "month" %}
+                                    1 месяц
+                                {% elif tariff.db_tariff_id == "threemonths" %}
+                                    3 месяца <span class="plan-badge">-20%</span>
+                                {% elif tariff.db_tariff_id == "year" %}
+                                    12 месяцев <span class="plan-badge">-40%</span>
+                                {% else %}
+                                    {{ tariff.description }}
+                                {% endif %}
+                            </span>
+                            <span class="plan-note">
+                                {% if tariff.db_tariff_id == "month" %}
+                                    Здесь и сейчас
+                                {% elif tariff.db_tariff_id == "threemonths" %}
+                                    Разумная экономия
+                                {% elif tariff.db_tariff_id == "year" %}
+                                    Максимальная выгода
+                                {% else %}
+                                    Быстрый доступ
+                                {% endif %}
+                            </span>
+                        </span>
+                        <span class="plan-price">
+                            <strong>
+                                {% if tariff.db_tariff_id == "threemonths" %}
+                                    {% widthratio tariff.price 3 1 %} ₽ / месяц
+                                {% elif tariff.db_tariff_id == "year" %}
+                                    {% widthratio tariff.price 12 1 %} ₽ / месяц
+                                {% else %}
+                                    {{ tariff.price }} ₽ / месяц
+                                {% endif %}
+                            </strong>
+                            <span>{{ tariff.price }} ₽ сейчас</span>
+                        </span>
+                        <input id="renew-tariff-{{ tariff.db_tariff_id }}" class="plan-radio" type="radio" name="tariff_id" value="{{ tariff.db_tariff_id }}" {% if forloop.first %}checked{% endif %}>
+                    </label>
+                    {% endfor %}
+
+                    {% if user.email %}
+                        <input type="hidden" name="email" value="{{ user.email }}">
+                    {% else %}
+                        <input type="email" name="email" required autocomplete="email" placeholder="Email для чека и входа" class="plans-email referral-link-input w-full py-4 px-5 text-sm text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
+                    {% endif %}
+
+                    <p class="plans-legal">
+                        Оплата картой через WATA (Visa, Mastercard, Mir, СБП). После подтверждения мы откроем
+                        ключи в этом кабинете. Не подойдёт — вернём деньги в течение 3 дней.
+                        Оформляя покупку, вы соглашаетесь с <a href="/offer/" target="_blank">офертой</a>.
+                    </p>
+
+                    <button type="submit" class="plans-submit payment-cta w-full transition-all hover:scale-[1.01] active:scale-95">
+                        Оплатить и получить доступ
+                    </button>
+                </form>
+            </div>
+
+            <div class="hidden lg:grid grid-cols-1 lg:grid-cols-3 gap-5 lg:gap-7 w-full">
                 {% for tariff in tariffs %}
                 <div class="tariff-card setup-step-card p-6 transition-all duration-300 border-2 border-white/5 relative group !mb-0
                     {% if forloop.counter == 2 %} 
@@ -1435,24 +2758,19 @@
                                 <span class="text-5xl font-black tracking-tighter">{{ tariff.price }}</span>
                                 <span class="text-2xl font-black text-[#ffc700]">₽</span>
                             </div>
-                        </div>
-                        
-                        <div class="grid grid-cols-3 gap-2 border-t border-white/5 pt-5">
-                            <div class="text-center">
-                                <i class="fas fa-bolt text-[#ffc700] text-sm mb-2"></i>
-                                <p class="text-gray-500 text-[10px] font-bold">Быстро</p>
-                            </div>
-                            <div class="text-center">
-                                <i class="fas fa-infinity text-[#ffc700] text-sm mb-2"></i>
-                                <p class="text-gray-500 text-[10px] font-bold">Безлимит</p>
-                            </div>
-                            <div class="text-center">
-                                <i class="fas fa-shield-alt text-[#ffc700] text-sm mb-2"></i>
-                                <p class="text-gray-500 text-[10px] font-bold">Защита</p>
+                            <div class="text-gray-500 text-xs font-bold mt-1">
+                                {% if tariff.db_tariff_id == "threemonths" %}≈ {% widthratio tariff.price 3 1 %} ₽ в месяц{% elif tariff.db_tariff_id == "year" %}≈ {% widthratio tariff.price 12 1 %} ₽ в месяц{% else %}за месяц доступа{% endif %}
                             </div>
                         </div>
 
-                        <form method="POST" action="/pay/" class="mt-6">
+                        <ul class="border-t border-white/5 pt-5 space-y-3 text-left">
+                            <li class="flex items-center gap-2.5 text-gray-300 text-sm font-medium"><i class="fas fa-check text-[#ffc700] text-xs"></i> Обход белых списков</li>
+                            <li class="flex items-center gap-2.5 text-gray-300 text-sm font-medium"><i class="fas fa-check text-[#ffc700] text-xs"></i> YouTube без рекламы</li>
+                            <li class="flex items-center gap-2.5 text-gray-300 text-sm font-medium"><i class="fas fa-check text-[#ffc700] text-xs"></i> Безлимитный трафик</li>
+                            <li class="flex items-center gap-2.5 text-gray-300 text-sm font-medium"><i class="fas fa-check text-[#ffc700] text-xs"></i> До 15 устройств на подписке</li>
+                        </ul>
+
+                        <form method="POST" action="/pay/" class="mt-6" data-payment-form data-context="dashboard_renew">
                             {% csrf_token %}
                             <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
                             {% if user.email %}
@@ -1460,11 +2778,20 @@
                             {% else %}
                                 <input type="email" name="email" required autocomplete="email" placeholder="Email для чека и входа" class="referral-link-input w-full py-4 px-5 text-sm text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner mb-4">
                             {% endif %}
-                            <button type="submit" class="payment-cta w-full py-4 px-6 rounded-xl font-black text-sm transition-all hover:scale-[1.02] active:scale-95">
+                            <button type="submit" class="payment-cta w-full transition-all hover:scale-[1.02] active:scale-95">
                                 Оплатить <i class="fas fa-arrow-right ml-2"></i>
                             </button>
-                            <p class="mt-3 text-center text-gray-500 text-[10px] leading-relaxed">
-                                Нажимая «Оплатить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-bold hover:text-white transition">условия оферты</a>.
+                            <p class="mt-3 flex items-center justify-center gap-2 text-[11px] font-bold text-[#00ff88]">
+                                <i class="fas fa-rotate-left"></i> Не подойдёт — вернём деньги в течение 3 дней
+                            </p>
+                            <div class="mt-2 flex items-center justify-center gap-3 text-white/45">
+                                <i class="fas fa-lock text-[#ffc700] text-[10px]"></i>
+                                <i class="fab fa-cc-visa"></i>
+                                <i class="fab fa-cc-mastercard"></i>
+                                <span class="text-[9px] font-black uppercase tracking-wider">Mir · СБП</span>
+                            </div>
+                            <p class="mt-2 text-center text-gray-500 text-[10px] leading-relaxed">
+                                Оплата картой через WATA. После оплаты ключи откроются прямо здесь. Нажимая «Оплатить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-bold hover:text-white transition">условия оферты</a>.
                             </p>
                         </form>
                     </div>
@@ -1475,10 +2802,25 @@
     </div>
     </div>
 
-    <div id="ref-pill" class="fixed right-0 top-[75%] z-50 animate-bounce-horizontal" onclick="toggleRefSheet()">
-        <div class="bg-[#ffc700] text-black pl-3 pr-2 py-2 rounded-l-xl shadow-[0_0_15px_rgba(255,199,0,0.3)] flex items-center gap-2 cursor-pointer border-y border-l border-white/20 transition-all hover:pr-4">
-            <i class="fas fa-gift text-sm"></i>
-            <span class="text-[9px] font-black uppercase tracking-tighter">+40 дней</span>
+    <div id="quick-access-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center p-5">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeQuickAccessModal()"></div>
+        <div class="relative z-10 w-full max-w-md setup-shell p-6 md:p-7">
+            <div class="flex items-start justify-between gap-4 mb-1">
+                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mt-1">Приложение</p>
+                <button type="button" onclick="closeQuickAccessModal()" class="w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-white/60 flex items-center justify-center hover:text-white transition flex-shrink-0">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <h2 id="quick-access-title" class="text-2xl font-black mb-3 text-[#ffc700]"></h2>
+            <div id="quick-access-body" class="text-gray-300 text-sm font-bold leading-relaxed mb-6"></div>
+            <button type="button" onclick="closeQuickAccessModal()" class="setup-cta-btn !w-full !py-4 !mb-0 !mr-0">Понятно</button>
+        </div>
+    </div>
+
+    <div id="ref-pill" class="fixed right-0 top-[78%] z-50 {% if not has_subscription_access %}hidden{% endif %}" onclick="toggleRefSheet()" title="+40 дней за друга">
+        <div class="bg-[#ffc700] text-black pl-2.5 pr-2 py-2 rounded-l-lg shadow-[0_0_12px_rgba(255,199,0,0.25)] flex items-center gap-1.5 cursor-pointer border-y border-l border-white/20 transition-all hover:pr-3">
+            <i class="fas fa-gift text-xs"></i>
+            <span class="text-[10px] font-black">+40</span>
         </div>
     </div>
 
@@ -1496,7 +2838,7 @@
                         </div>
                         <div>
                             <h4 class="text-xl font-black mb-2">Приглашения и бонусы</h4>
-                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Отправь ссылку другу и получай дни к подписке автоматически.</p>
+                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Отправьте ссылку другу и получайте дни к подписке автоматически.</p>
                         </div>
                     </div>
                     <div class="md:text-right">
@@ -1563,14 +2905,14 @@
                 <div class="relative">
                     <input type="text" readonly value="{{ site_referral_link }}" id="site-ref-link-input-sheet"
                         class="w-full bg-black/60 border border-white/10 rounded-2xl py-5 pl-5 pr-36 text-[11px] font-mono text-white focus:outline-none focus:border-[#ffc700]/40 transition-all shadow-inner">
-                    <button onclick="copyRefLink(event, 'site-ref-link-input-sheet')" class="bottom-sheet-copy-btn absolute right-2 top-2 bottom-2 bg-[#ffc700] hover:bg-[#ffd740] text-black px-6 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-[#ffc700]/20">
+                    <button onclick="copyRefLink(event, 'site-ref-link-input-sheet')" class="bottom-sheet-copy-btn absolute right-2 top-2 bottom-2 px-6 transition-all active:scale-95">
                         Сайт
                     </button>
                 </div>
                 <div class="relative">
                     <input type="text" readonly value="{{ referral_link }}" id="ref-link-input-sheet" 
                         class="w-full bg-black/60 border border-white/10 rounded-2xl py-5 pl-5 pr-36 text-[11px] font-mono text-white focus:outline-none focus:border-[#ffc700]/40 transition-all shadow-inner">
-                    <button onclick="copyRefLink(event, 'ref-link-input-sheet')" class="bottom-sheet-copy-btn absolute right-2 top-2 bottom-2 bg-[#ffc700] hover:bg-[#ffd740] text-black px-6 rounded-xl font-black text-[10px] transition-all active:scale-95 shadow-lg shadow-[#ffc700]/20">
+                    <button onclick="copyRefLink(event, 'ref-link-input-sheet')" class="bottom-sheet-copy-btn absolute right-2 top-2 bottom-2 px-6 transition-all active:scale-95">
                         Telegram
                     </button>
                 </div>
@@ -1659,8 +3001,6 @@
 
             document.getElementById('app-container').scrollTo({ top: 0, behavior: 'smooth' });
         }
-
-
 
         // Функция для точного расчета высоты без учета адресной строки
         function setFullHeight() {
@@ -1760,11 +3100,11 @@
                             url: 'clashmeta://install-config?name={{ user.username }}&url={{ plain_subscription_url }}',
                             oneClickText: 'Добавить подписку',
                             title: 'Добавление подписки',
-                            content: 'Нажми кнопку ниже — откроется окно создания профиля. Тебе потребуется указать период автообновления, например, 720 минут. Справа вверху нажми на кнопку Сохранить.'
+                            content: 'Нажмите кнопку ниже — откроется окно создания профиля. Вам потребуется указать период автообновления, например, 720 минут. Справа вверху нажмите на кнопку Сохранить.'
                         },
                         {
                             title: 'Подключение и использование',
-                            content: 'Перейди в пункт Профили и выбери созданный профиль, затем вернись на главную страницу. Теперь ты можешь подключиться, нажав на кнопку Остановлен.'
+                            content: 'Перейдите в пункт Профили и выберите созданный профиль, затем вернитесь на главную страницу. Теперь вы можете подключиться, нажав на кнопку Остановлен.'
                         }
                     ]
                 },
@@ -1805,24 +3145,14 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Откройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль.',
-                            links: [
-                                {
-                                    text: 'App Store (RU)',
-                                    url: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973'
-                                },
-                                {
-                                    text: 'App Store (Для других регионов)',
-                                    url: 'https://apps.apple.com/us/app/happ-proxy-utility/id6504287215'
-                                }
-                            ]
+                            content: 'Скачайте <a href="https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973" target="_blank" rel="noopener" class="setup-compact-textlink">Happ</a> для России или <a href="https://apps.apple.com/us/app/happ-proxy-utility/id6504287215" target="_blank" rel="noopener" class="setup-compact-textlink">Happ</a> для других регионов.'
                         },
                         {
                             type: 'button',
                             url: '{{ happ_subscription_url }}',
                             oneClickText: 'Добавить подписку',
                             title: 'Добавление подписки',
-                            content: 'Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически.'
+                            content: 'Нажмите на кнопку ниже, чтобы подключиться в 1 клик.'
                         },
                         {
                             title: 'Подключение и использование',
@@ -1861,7 +3191,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Откройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль.',
+                            content: 'Скачайте приложение в App Store и установите.',
                             links: [
                                 { text: 'App Store', url: 'https://apps.apple.com/ru/app/shadowrocket/id932747118' }
                             ],
@@ -1886,7 +3216,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 { text: 'Windows (Установщик)', url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-windows-amd64-setup.exe' },
                                 { text: 'Windows на ARM (Установщик)', url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-windows-arm64-setup.exe' }
@@ -1914,7 +3244,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 {
                                     text: 'Windows (Установщик)',
@@ -1986,7 +3316,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 {
                                     text: 'Windows (Установщик)',
@@ -2014,7 +3344,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 {
                                     text: 'App Store (RU)',
@@ -2044,7 +3374,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 { text: 'macOS (Apple Silicon)', url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-macos-arm64.dmg' },
                                 { text: 'macOS (Intel)', url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-macos-amd64.dmg' }
@@ -2072,7 +3402,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 {
                                     text: 'macOS (Apple Silicon)',
@@ -2150,7 +3480,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 {
                                     text: 'amd64 (.deb)',
@@ -2192,7 +3522,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 {
                                     text: 'amd64 (.deb)',
@@ -2416,7 +3746,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Откройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль.',
+                            content: 'Скачайте приложение в App Store и установите.',
                             links: [
                                 {
                                     text: 'Открыть в App Store',
@@ -2573,6 +3903,26 @@
             return newSetupApps[selectedNewSetupPlatform] || newSetupApps.android;
         }
 
+        function getNewSetupPlatformMeta() {
+            return newSetupPlatforms.find(p => p.id === selectedNewSetupPlatform) || newSetupPlatforms[0];
+        }
+
+        function renderNewSetupDeviceChips() {
+            return newSetupPlatforms.map(p => `
+                <button type="button" onclick="pickNewSetupDevice('${p.id}')" class="setup-device-chip ${p.id === selectedNewSetupPlatform ? 'is-current' : ''}">
+                    <i class="${p.icon}"></i>
+                    <span>${p.label}</span>
+                    ${p.id === selectedNewSetupPlatform ? '<i class="fas fa-check setup-device-chip-check"></i>' : ''}
+                </button>
+            `).join('');
+        }
+
+        function pickNewSetupDevice(id) {
+            selectedNewSetupPlatform = id;
+            newSetupStep = 'start';
+            renderNewSetupWizard();
+        }
+
         function renderNewSetupPlatforms() {
             const container = document.getElementById('new-setup-platforms');
             if (!container) return;
@@ -2600,7 +3950,7 @@
 
         function newSetupButton(label, onclick, extraClass = '', iconClass = '') {
             return `
-                <button type="button" onclick="${onclick}" class="setup-cta-btn !w-full !py-5 !px-6 !text-sm !mb-0 !mr-0 ${extraClass}">
+                <button type="button" onclick="${onclick}" class="setup-cta-btn dashboard-action-btn !w-full !mb-0 !mr-0 ${extraClass}">
                     ${iconClass ? `<i class="${iconClass}"></i>` : ''}
                     ${label}
                 </button>
@@ -2609,7 +3959,7 @@
 
         function newSetupLink(label, url, extraClass = '', iconClass = '') {
             return `
-                <a href="${url}" target="_blank" rel="noopener" class="setup-cta-btn !w-full !py-5 !px-6 !text-sm !mb-0 !mr-0 ${extraClass}">
+                <a href="${url}" target="_blank" rel="noopener" class="setup-cta-btn dashboard-action-btn !w-full !mb-0 !mr-0 ${extraClass}">
                     ${iconClass ? `<i class="${iconClass}"></i>` : ''}
                     ${label}
                 </a>
@@ -2629,8 +3979,7 @@
             if (!root) return;
 
             const app = getNewSetupApp();
-            renderNewSetupPlatforms();
-            setNewSetupDevicePickerVisible(newSetupStep === 'devices');
+            const meta = getNewSetupPlatformMeta();
 
             const copyValue = app.copyValue || (
                 app.keyInputId === 'new-setup-happ-key'
@@ -2638,14 +3987,34 @@
                     : '{{ plain_subscription_url }}'
             );
 
-            if (newSetupStep === 'start' || newSetupStep === 'devices') {
+            if (newSetupStep === 'devices') {
                 root.innerHTML = `
-                    <h2 class="text-3xl md:text-4xl font-black mb-3">Установка на ${app.platformLabel}</h2>
-                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Подключение проходит в 3 шага и занимает пару минут</p>
+                    <h2 class="text-2xl md:text-3xl font-black mb-2">Выберите устройство</h2>
+                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-7">На какой платформе подключаем VPN?</p>
+                    <div class="setup-device-grid">${renderNewSetupDeviceChips()}</div>
+                    <div class="mt-6">
+                        <button type="button" onclick="backNewSetupStart()" class="setup-text-link">← Назад</button>
+                    </div>
+                `;
+                return;
+            }
+
+            if (newSetupStep === 'start') {
+                root.innerHTML = `
+                    <div class="setup-detected">
+                        <i class="${meta.icon}"></i>
+                        <div class="setup-detected-text">
+                            <span class="setup-detected-label">Ваше устройство</span>
+                            <span class="setup-detected-name">${app.platformLabel}</span>
+                        </div>
+                        <i class="fas fa-check-circle setup-detected-ok"></i>
+                    </div>
+                    <h2 class="text-2xl md:text-3xl font-black mb-2">Подключим за пару минут</h2>
+                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-8">Платформу определили автоматически. Нажмите кнопку ниже — проведём по 3 коротким шагам.</p>
                     ${newSetupOrb('fas fa-link', 25)}
-                    <div class="space-y-4">
-                        ${newSetupButton(`Начать настройку на этом устройстве`, "startNewSetupInstall()", "", "fas fa-play")}
-                        ${newSetupButton(`Настроить другое устройство`, "showNewSetupDevices()", "setup-secondary-btn", "fas fa-mobile-alt")}
+                    <div class="setup-wizard-actions">
+                        ${newSetupButton(`Начать настройку`, "startNewSetupInstall()", "", "fas fa-play")}
+                        <button type="button" onclick="showNewSetupDevices()" class="setup-text-link" style="margin-top:2px;">У меня другое устройство</button>
                     </div>
                 `;
                 return;
@@ -2654,9 +4023,9 @@
             if (newSetupStep === 'install') {
                 root.innerHTML = `
                     <h2 class="text-3xl md:text-4xl font-black mb-3">Приложение</h2>
-                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Установи ${app.appName} и вернись к этому экрану</p>
+                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Установите ${app.appName} и вернитесь к этому экрану</p>
                     ${newSetupOrb('fas fa-download', 50)}
-                    <div class="space-y-4">
+                    <div class="setup-wizard-actions">
                         ${newSetupLink(app.installText, app.installUrl, "", "fas fa-download")}
                         ${app.fallbackUrl ? newSetupLink(app.fallbackText, app.fallbackUrl, "setup-secondary-btn", "fas fa-external-link-alt") : ''}
                         ${newSetupButton(`Далее: приложение установлено`, "startNewSetupSubscription()", "setup-secondary-btn", "fas fa-arrow-right")}
@@ -2669,10 +4038,10 @@
             if (newSetupStep === 'subscription') {
                 root.innerHTML = `
                     <h2 class="text-3xl md:text-4xl font-black mb-3">Подписка</h2>
-                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Добавь подписку в ${app.appName} кнопкой ниже</p>
+                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Добавьте подписку в ${app.appName} кнопкой ниже</p>
                     ${newSetupOrb('fas fa-plus-circle', 75)}
                     <input type="text" readonly value="${copyValue}" id="new-setup-copy-input" class="sr-only">
-                    <div class="space-y-4">
+                    <div class="setup-wizard-actions">
                         ${newSetupLink(app.addText, app.subscriptionUrl, "", "fas fa-plus-circle")}
                         ${newSetupButton(`Скопировать ссылку подписки`, "copyInputValue('new-setup-copy-input', 'Ссылка подписки скопирована')", "setup-secondary-btn", "fas fa-copy")}
                         ${newSetupButton(`Далее: подписка добавлена`, "finishNewSetup()", "setup-secondary-btn", "fas fa-arrow-right")}
@@ -2684,9 +4053,9 @@
 
             root.innerHTML = `
                 <h2 class="text-3xl md:text-4xl font-black mb-3">Готово!</h2>
-                <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Теперь включи VPN в приложении ${app.appName}</p>
+                <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Теперь включите VPN в приложении ${app.appName}</p>
                 ${newSetupOrb('fas fa-check', 100)}
-                <div class="space-y-4">
+                <div class="setup-wizard-actions">
                     ${newSetupButton(`Перейти в личный кабинет`, "showTab('home')", "", "fas fa-th-large")}
                     ${newSetupButton(`Настроить другое устройство`, "showNewSetupDevices()", "setup-secondary-btn", "fas fa-mobile-alt")}
                     <button type="button" onclick="backNewSetupSubscription()" class="mt-4 text-gray-500 text-sm font-black hover:text-[#ffc700] transition-colors">← Предыдущий шаг</button>
@@ -2730,169 +4099,143 @@
         }
 
         function setPlatform(platform) {
-            document.querySelectorAll('.platform-btn').forEach(btn => btn.classList.remove('active'));
-            const activeBtn = document.getElementById('btn-' + platform);
-            if (activeBtn) activeBtn.classList.add('active');
-            
+            // Неизвестная/неподдерживаемая платформа (напр. detect вернул то, чего нет
+            // в installData) — мягко откатываемся на Android, чтобы герой-карточка отрисовалась.
+            if (!installData[platform] || !installData[platform].length) { platform = 'android'; }
+
+            // Синхронизируем дропдаун платформы и его иконку с выбором
+            const select = document.getElementById('platform-select');
+            if (select && select.value !== platform) select.value = platform;
+            const meta = newSetupPlatforms.find(p => p.id === platform);
+            const platformIcon = document.getElementById('platform-select-icon');
+            if (platformIcon && meta) platformIcon.className = meta.icon + ' setup-platform-select-icon';
+
+            // Строим ряд чипов приложений для выбранной платформы
             const selector = document.getElementById('app-selector');
-            const selectorContainer = document.getElementById('app-selector-container'); // Находим контейнер с заголовком
-            
             selector.innerHTML = '';
 
-            if (installData[platform] && installData[platform].length > 0) {
-                selectorContainer.style.display = 'block'; // Показываем заголовок и кнопки
+            installData[platform].forEach((app, index) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                // Первое приложение — рекомендованное (помечаем точкой)
+                btn.className = index === 0 ? 'setup-app-chip is-recommended' : 'setup-app-chip';
+                btn.setAttribute('aria-pressed', 'false');
+                btn.innerHTML = '<span class="setup-app-chip-dot" aria-hidden="true"></span><span class="setup-app-chip-name"></span>';
+                btn.querySelector('.setup-app-chip-name').textContent = app.name;
+                btn.onclick = () => setApp(platform, index, btn);
+                selector.appendChild(btn);
+            });
 
-                installData[platform].forEach((app, index) => {
-                    const btn = document.createElement('button');
-                    btn.type = "button";
-                    btn.className = `app-btn px-5 py-3 rounded-xl text-[10px] font-black uppercase transition-all`;
-                    btn.innerText = app.name;
-                    btn.onclick = () => setApp(platform, index, btn);
-                    selector.appendChild(btn);
-                });
+            const firstBtn = selector.querySelector('.setup-app-chip');
+            setApp(platform, 0, firstBtn);
+        }
 
-                const firstBtn = selector.querySelector('.app-btn');
-                setApp(platform, 0, firstBtn);
-            } else {
-                selectorContainer.style.display = 'none'; // Прячем, если приложений нет
-            }
+        function escapeRegExp(value) {
+            return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        function formatInstallLinkLabel(appName, linkText) {
+            const rawText = String(linkText || '').trim();
+            if (!rawText) return appName;
+
+            const appNamePattern = new RegExp(`^${escapeRegExp(appName)}\\s*`, 'i');
+            const detail = rawText.replace(appNamePattern, '').trim();
+            const source = detail || rawText;
+
+            if (/apple silicon/i.test(source)) return `${appName} (Apple Silicon)`;
+            if (/intel/i.test(source)) return `${appName} (Intel)`;
+            if (/windows/i.test(source) && /arm/i.test(source)) return `${appName} для Windows ARM`;
+            if (/windows/i.test(source)) return `${appName} для Windows`;
+            if (/macos|mac os/i.test(source)) return `${appName} для macOS`;
+            if (/linux/i.test(source)) return `${appName} для Linux`;
+            if (/apk/i.test(source)) return `${appName} APK`;
+            const parenthesized = source.match(/\(([^)]+)\)/);
+            if (parenthesized) return `${appName} (${parenthesized[1]})`;
+            if (rawText.toLowerCase().includes(appName.toLowerCase())) return rawText;
+
+            return appName;
         }
 
         function setApp(platform, index, btnElement) {
-            // 1. Исправляем визуальное выделение кнопок
-            document.querySelectorAll('.app-btn').forEach(b => {
-                // Убираем активные стили (рамку и цвет)
-                b.classList.remove('active', 'border-[#ffc700]', 'text-[#ffc700]', 'bg-[#ffc700]/5');
-                b.classList.add('text-gray-400'); // Возвращаем обычный цвет
+            // Подсветка выбранного чипа приложения
+            document.querySelectorAll('.setup-app-chip').forEach(b => {
+                b.classList.remove('is-active');
+                b.setAttribute('aria-pressed', 'false');
             });
 
             if (btnElement) {
-                btnElement.classList.add('active', 'border-[#ffc700]', 'text-[#ffc700]', 'bg-[#ffc700]/5');
-                btnElement.classList.remove('text-gray-400');
+                btnElement.classList.add('is-active');
+                btnElement.setAttribute('aria-pressed', 'true');
             }
 
-            // 2. Отрисовка контента (твой код без изменений структуры)
+            // 2. Отрисовка контента.
             const app = installData[platform][index];
             const container = document.getElementById('full-instructions-container');
             container.innerHTML = '';
 
+            // Ключ для копирования = url шага-кнопки (ссылка-подписка для приложения)
             const buttonStep = app.steps.find(s => s.type === 'button');
             const subKey = buttonStep ? buttonStep.url : '';
             const installStep = app.steps.find(s => s.title === 'Установка приложения') || app.steps.find(s => s.links);
+
+            // Финальный шаг «Подключение и использование» выносим в самый низ
+            // и оформляем приглушённо, чтобы он меньше привлекал внимание.
             const usageStep = app.steps.find(s => s.title === 'Подключение и использование');
-            const mainSteps = app.steps.filter(s => s !== usageStep && s !== installStep && s !== buttonStep);
 
-            const stepperWrapper = document.createElement('div');
-            stepperWrapper.className = 'space-y-5';
+            let html = '<div class="setup-shell setup-compact-card">';
 
-            let installInstruction = `Скачайте <span class="text-[#ffc700] font-bold">${app.name}</span>.`;
+            let installInstruction = `Скачайте <span class="setup-connect-link">${app.name}</span>.`;
             if (installStep?.content && !installStep.links?.length) {
-                installInstruction = installStep.content.replaceAll('setup-compact-textlink', 'text-[#ffc700] font-bold hover:text-[#ffe066]');
+                installInstruction = installStep.content.replaceAll('setup-compact-textlink', 'setup-connect-link');
             } else if (installStep?.links?.length) {
                 const happRussiaLink = installStep.links.find(link => /apk|ru/i.test(`${link.text} ${link.url}`));
                 const happOtherLink = installStep.links.find(link => link !== happRussiaLink);
                 if (app.name === 'Happ' && happRussiaLink && happOtherLink) {
-                    installInstruction = `Скачайте <a href="${happRussiaLink.url}" target="_blank" rel="noopener" class="text-[#ffc700] font-bold hover:text-[#ffe066]">Happ</a> для России или <a href="${happOtherLink.url}" target="_blank" rel="noopener" class="text-[#ffc700] font-bold hover:text-[#ffe066]">Happ</a> для других регионов.`;
+                    installInstruction = `Скачайте <a href="${happRussiaLink.url}" target="_blank" rel="noopener" class="setup-connect-link">Happ</a> для России или <a href="${happOtherLink.url}" target="_blank" rel="noopener" class="setup-connect-link">Happ</a> для других регионов.`;
                 } else {
-                    const installLinks = installStep.links.map(link => `<a href="${link.url}" target="_blank" rel="noopener" class="text-[#ffc700] font-bold hover:text-[#ffe066]">${link.text}</a>`).join(' или ');
+                    const installLinks = installStep.links.map(link => `<a href="${link.url}" target="_blank" rel="noopener" class="setup-connect-link">${formatInstallLinkLabel(app.name, link.text)}</a>`).join(' или ');
                     installInstruction = `Скачайте ${installLinks}.`;
                 }
             }
 
-            const heroCard = document.createElement('div');
-            heroCard.className = "setup-step-card !mb-0";
-            let heroHtml = `
-                <h3 class="text-white text-base font-extrabold uppercase leading-tight mb-4">Для подключения</h3>
-                <ol class="space-y-2.5 mb-5">
-                    <li class="grid grid-cols-[22px_1fr] gap-2 text-gray-500 text-sm font-bold leading-relaxed">
-                        <span>1.</span>
+            html += `
+                <h3 class="setup-connect-title">Для подключения</h3>
+                <ol class="setup-connect-list">
+                    <li class="setup-connect-item">
+                        <span class="setup-connect-num">1.</span>
                         <span>${installInstruction}</span>
                     </li>
-                    <li class="grid grid-cols-[22px_1fr] gap-2 text-gray-500 text-sm font-bold leading-relaxed">
-                        <span>2.</span>
+                    <li class="setup-connect-item">
+                        <span class="setup-connect-num">2.</span>
                         <span>Нажмите на кнопку ниже, чтобы подключиться в 1 клик.</span>
                     </li>
                 </ol>`;
 
             if (buttonStep) {
-                heroHtml += `
-                    <a href="${buttonStep.url}" class="setup-cta-btn !w-full !py-4 !px-6 !text-sm !font-bold !mb-0 !mr-0">
-                        <i class="fas fa-bolt"></i> Подключиться в 1 клик!
-                    </a>`;
+                html += `<a href="${buttonStep.url}" class="setup-compact-cta"><i class="fas fa-bolt"></i> Подключиться в 1 клик!</a>`;
             }
 
-            heroCard.innerHTML = heroHtml;
-            stepperWrapper.appendChild(heroCard);
-
-            mainSteps.forEach((step, idx) => {
-                const stepRow = document.createElement('div');
-                stepRow.className = "setup-step-card !mb-0";
-                
-                let html = `
-                    <div class="flex flex-col md:flex-row gap-5">
-                        <div class="w-12 h-12 rounded-2xl bg-[#ffc700] text-black flex items-center justify-center font-black flex-shrink-0">
-                            ${idx + 3}
-                        </div>
-                        <div class="flex-1">
-                            <h4 class="text-lg font-black mb-2">${step.title}</h4>
-                            <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">${step.content}</p>
-                `;
-
-                if (step.links) {
-                    html += `<div class="flex flex-wrap gap-3 mt-5">`;
-                    step.links.forEach(link => {
-                        html += `
-                            <a href="${link.url}" target="_blank" class="setup-link-btn">
-                                <i class="fas fa-download"></i> ${link.text}
-                            </a>`;
-                    });
-                    html += `</div>`;
-                }
-
-                if (step.type === 'button') {
-                    html += `
-                        <a href="${step.url}" class="setup-cta-btn mt-6">
-                            <i class="fas fa-bolt"></i> ${step.oneClickText}
-                        </a>`;
-                }
-
-                if (step.note) {
-                    html += `
-                        <div class="mt-5 rounded-2xl border border-[#ffc700]/20 bg-[#ffc700]/5 p-4">
-                            <h5 class="text-[9px] font-black uppercase text-[#ffc700] mb-1 tracking-widest">${step.note.title}</h5>
-                            <p class="text-[12px] md:text-[13px] text-gray-400 leading-relaxed">${step.note.text}</p>
-                        </div>`;
-                }
-
-                html += `</div></div>`;
-                stepRow.innerHTML = html;
-                stepperWrapper.appendChild(stepRow);
-            });
-
             if (subKey) {
-                const keyRow = document.createElement('div');
-                keyRow.className = "setup-step-card !mb-0";
-                keyRow.innerHTML = `
-                    <p class="text-gray-500 text-sm font-bold leading-relaxed mb-4">Не сработало? Скопируйте ключ и вставьте в приложение вручную:</p>
-                    <div class="flex flex-col sm:flex-row gap-3">
-                        <input type="text" readonly value="${subKey}" id="setup-copy-key" class="flex-1 bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-xs text-gray-400 min-w-0">
-                        <button type="button" onclick="copyInputValue('setup-copy-key', 'Ключ скопирован')" class="setup-cta-btn !w-full sm:!w-auto !py-4 !px-6 !text-[10px] !whitespace-nowrap !mb-0 !mr-0">
-                            <i class="fas fa-copy"></i> Копировать
-                        </button>
+                html += `
+                    <div class="setup-compact-key">
+                        <p class="setup-compact-keylabel">Не сработало? Скопируйте ключ и вставьте в приложение вручную:</p>
+                        <div class="setup-compact-keyrow">
+                            <input type="text" readonly value="${subKey}" id="setup-copy-key" class="setup-compact-keyinput">
+                            <button type="button" onclick="copyInputValue('setup-copy-key', 'Ключ скопирован')" class="setup-compact-copybtn"><i class="fas fa-copy"></i> Копировать</button>
+                        </div>
                     </div>`;
-                stepperWrapper.appendChild(keyRow);
             }
 
             if (usageStep) {
-                const usageRow = document.createElement('div');
-                usageRow.className = "setup-step-card !mb-0";
-                usageRow.innerHTML = `
-                    <h4 class="text-gray-500 text-sm font-bold leading-relaxed mb-1">${usageStep.title}</h4>
-                    <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">${usageStep.content}</p>`;
-                stepperWrapper.appendChild(usageRow);
+                html += `
+                    <div class="setup-compact-usage">
+                        <h4 class="setup-compact-usage-title">${usageStep.title}</h4>
+                        <p class="setup-compact-usage-text">${usageStep.content}</p>
+                    </div>`;
             }
 
-            container.appendChild(stepperWrapper);
+            html += '</div>';
+            container.innerHTML = html;
         }
 
         function updateSubscriptionOverview() {
@@ -3106,9 +4449,35 @@
 
         // Инициализация при загрузке
         document.addEventListener('DOMContentLoaded', () => {
+            const sendGoal = (goal, params = {}) => {
+                try {
+                    if (typeof window.ym === 'function') {
+                        window.ym(109167744, 'reachGoal', goal, params);
+                    }
+                } catch (err) {}
+            };
+
+            if (document.querySelector('.plans-only-view')) {
+                sendGoal('dashboard_no_subscription_seen');
+            }
+            document.querySelectorAll('[data-payment-form]').forEach((form) => {
+                form.addEventListener('submit', () => {
+                    const checkedTariff = form.querySelector('input[name="tariff_id"]:checked');
+                    const tariffInput = checkedTariff || form.querySelector('input[name="tariff_id"]');
+                    sendGoal('pay_click', {
+                        page: 'dashboard_paywall',
+                        tariff_id: tariffInput ? tariffInput.value : '',
+                    });
+                });
+            });
+
             selectedNewSetupPlatform = detectNewSetupPlatform();
             renderNewSetupWizard();
-            setPlatform('android');
+
+            // Компактный флоу: определяем устройство пользователя и сразу показываем
+            // рекомендованное приложение (первое в installData), а не хардкод Android.
+            // setPlatform синхронизирует дропдаун платформы и строит чипы приложений.
+            setPlatform(detectNewSetupPlatform());
             updateSubscriptionOverview();
             setupSupportAjaxForm(document.getElementById('support-message-form'));
             setupSupportAjaxForm(document.getElementById('support-create-form'));
@@ -3212,19 +4581,120 @@
             document.addEventListener('DOMContentLoaded', openEmailBindSheet);
         {% endif %}
 
-        // Обновленная функция копирования (чтобы text ready)
+        function clearCopySelection(copyText) {
+            if (copyText && typeof copyText.setSelectionRange === 'function') {
+                copyText.setSelectionRange(0, 0);
+            }
+            if (copyText && typeof copyText.blur === 'function') {
+                copyText.blur();
+            }
+            const selection = window.getSelection && window.getSelection();
+            if (selection && selection.removeAllRanges) selection.removeAllRanges();
+        }
+
+        let deferredInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', (event) => {
+            event.preventDefault();
+            deferredInstallPrompt = event;
+        });
+
+        function isStandalonePWA() {
+            return window.matchMedia('(display-mode: standalone)').matches
+                || window.navigator.standalone === true;
+        }
+
+        function isIOSDevice() {
+            const ua = navigator.userAgent || '';
+            return /iphone|ipad|ipod/i.test(ua)
+                || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        }
+
+        function openQuickAccessModal(title, bodyHtml) {
+            const modal = document.getElementById('quick-access-modal');
+            if (!modal) return;
+            document.getElementById('quick-access-title').textContent = title;
+            document.getElementById('quick-access-body').innerHTML = bodyHtml;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeQuickAccessModal() {
+            const modal = document.getElementById('quick-access-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function quickAccessInstall() {
+            // Уже установлено / открыто как приложение
+            if (isStandalonePWA()) {
+                openQuickAccessModal('Приложение уже установлено', 'Кабинет уже открыт как приложение или добавлен на главный экран — отдельная установка не нужна.');
+                return;
+            }
+            // Android / Chrome / Edge — нативная установка PWA
+            if (deferredInstallPrompt) {
+                deferredInstallPrompt.prompt();
+                try {
+                    await deferredInstallPrompt.userChoice;
+                } catch (err) {}
+                deferredInstallPrompt = null;
+                return;
+            }
+            // iOS Safari — автоматической установки нет, показываем инструкцию
+            if (isIOSDevice()) {
+                openQuickAccessModal('Добавьте на iPhone/iPad', 'В Safari нажмите <b>«Поделиться»</b> затем выберите <b>«На экран «Домой»»</b> — кабинет будет открываться как отдельное приложение.');
+                return;
+            }
+            // Прочие браузеры — общая инструкция
+            openQuickAccessModal('Добавьте кабинет как приложение', 'Откройте меню браузера и выберите <b>«Установить приложение»</b> или <b>«Добавить на главный экран»</b> — кабинет будет открываться как отдельное приложение.');
+        }
+
+        // Запасной способ копирования для старых браузеров / небезопасного контекста.
+        // Выделение снимается сразу после копирования, чтобы ключ не подсвечивался.
+        function legacyCopyInput(copyText) {
+            copyText.select();
+            copyText.setSelectionRange(0, 99999);
+            let ok = false;
+            try {
+                ok = document.execCommand('copy');
+            } catch (err) {
+                ok = false;
+            }
+            clearCopySelection(copyText);
+            return ok;
+        }
+
+        function copyInputText(copyText, message) {
+            if (!copyText) return Promise.resolve(false);
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                return navigator.clipboard.writeText(copyText.value)
+                    .then(() => {
+                        clearCopySelection(copyText);
+                        if (message) showToast(message);
+                        return true;
+                    })
+                    .catch(() => {
+                        const ok = legacyCopyInput(copyText);
+                        if (ok && message) showToast(message);
+                        return ok;
+                    });
+            }
+
+            const ok = legacyCopyInput(copyText);
+            if (ok && message) showToast(message);
+            return Promise.resolve(ok);
+        }
+
         function copyRefLink(event, inputId) {
             const copyText = document.getElementById(inputId);
-            copyText.select();
-            copyText.setSelectionRange(0, 99999); // Для мобилок
-            
-            navigator.clipboard.writeText(copyText.value).then(() => {
-                // Используем переданный event для доступа к кнопке
-                const btn = event.target;
-                const originalText = btn.innerText;
+            const btn = event?.target?.closest('button');
+            const originalText = btn ? btn.innerText : '';
+
+            copyInputText(copyText).then((ok) => {
+                if (!ok || !btn) return;
                 btn.innerText = "ГОТОВО!";
                 btn.classList.replace('bg-[#ffc700]', 'bg-[#00ff88]');
-                
+
                 setTimeout(() => {
                     btn.innerText = originalText;
                     btn.classList.replace('bg-[#00ff88]', 'bg-[#ffc700]');
@@ -3233,22 +4703,11 @@
         }
 
         function copyReferralLink(inputId) {
-            const copyText = document.getElementById(inputId);
-            copyText.select();
-            copyText.setSelectionRange(0, 99999);
-            navigator.clipboard.writeText(copyText.value);
-            
-            // Можно вызвать твой стандартный тост уведомления
-            showToast('Ссылка скопирована!'); 
+            copyInputText(document.getElementById(inputId), 'Ссылка скопирована!');
         }
 
         function copyInputValue(inputId, message) {
-            const copyText = document.getElementById(inputId);
-            copyText.select();
-            copyText.setSelectionRange(0, 99999);
-            navigator.clipboard.writeText(copyText.value).then(() => {
-                showToast(message);
-            });
+            copyInputText(document.getElementById(inputId), message);
         }
 
         // 4. Инициализация при загрузке (чтобы была открыта первая вкладка)

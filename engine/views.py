@@ -2371,13 +2371,9 @@ def dashboard(request):
         else ""
     )
 
-    dashboard_template = (
-        "dashboard.html" if request.GET.get("ui") == "v1" else "dashboard_v2.html"
-    )
-
     return render(
         request,
-        dashboard_template,
+        "dashboard.html",
         {
             "user": user,
             "tg_bind_link": tg_bind_link,

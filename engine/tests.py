@@ -34,48 +34,80 @@ from engine.views import verify_telegram_widget_auth
 
 class DashboardSetupTemplateTests(SimpleTestCase):
     def test_compact_setup_uses_connection_hero(self):
-        template = Path("engine/templates/dashboard_v2.html").read_text()
-        legacy_template = Path("engine/templates/dashboard.html").read_text()
+        template = Path("engine/templates/dashboard.html").read_text()
 
         self.assertIn("Для подключения", template)
         self.assertIn("Подключиться в 1 клик!", template)
+        self.assertIn("min-width: min(100%, 420px);", template)
+        self.assertIn("align-self: flex-start;", template)
+        self.assertIn("align-self: stretch;", template)
         self.assertIn('data-tab="setup"><i class="fas fa-bolt"></i> Установка</button>', template)
         self.assertIn("<span>Установка</span>", template)
         self.assertIn("installInstruction", template)
-        self.assertIn("s !== installStep && s !== buttonStep", template)
+        self.assertIn("formatInstallLinkLabel", template)
+        self.assertNotIn("setup-connect-extra-list", template)
+        self.assertNotIn("setup-connect-step-title", template)
+        self.assertNotIn("setup-connect-step-text", template)
+        self.assertNotIn("const mainSteps =", template)
         self.assertNotIn("#9cff1a", template)
         self.assertIn("color: #6b7280;", template)
         self.assertIn("font-size: 14px;", template)
         self.assertIn("font-weight: 700;", template)
         self.assertIn("line-height: 1.625;", template)
+        self.assertIn("font-size: 15px !important;", template)
+        self.assertIn("text-transform: none !important;", template)
+        self.assertIn("box-shadow: 0 10px 28px rgba(255, 199, 0, 0.28)", template)
+        self.assertIn("background: #ffc700 !important;", template)
+        self.assertIn(".setup-compact-copybtn", template)
+        self.assertIn("dashboard-action-btn", template)
+        self.assertIn("quick-access-btn", template)
+        self.assertIn("copyInputText", template)
+        self.assertIn("clearCopySelection", template)
+        self.assertIn("setup-cta-btn dashboard-action-btn !w-full sm:!w-auto", template)
+        self.assertNotIn("setup-cta-btn !w-full !py-5 !mb-0 !mr-0", template)
+        self.assertNotIn("setup-link-btn.setup-secondary-btn", template)
+        self.assertNotIn("setup-cta-btn.setup-secondary-btn", template)
+        self.assertNotIn('${link.text}</a>`).join(\' или \');', template)
         self.assertNotIn('id="tab-subscription"', template)
-        self.assertNotIn('id="tab-subscription"', legacy_template)
         self.assertNotIn("showTab('subscription')", template)
-        self.assertNotIn("showTab('subscription')", legacy_template)
+
+    def test_dashboard_customer_copy_uses_respectful_tone(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        informal_fragments = [
+            "Управление твоей",
+            "Подключись ",
+            "Выбери ",
+            "Установи ",
+            "Добавь ",
+            "Нажми ",
+            "Тебе ",
+            "Теперь ты",
+            "Отправь ",
+            "получай ",
+            "Привяжи ",
+            "Продли ",
+            "Начни ",
+            "по твоей ссылке",
+        ]
+
+        for fragment in informal_fragments:
+            self.assertNotIn(fragment, template)
 
 
 class DashboardReferralTemplateTests(SimpleTestCase):
     def test_referral_page_shows_registration_bonus(self):
-        template = Path("engine/templates/dashboard_v2.html").read_text()
-        legacy_template = Path("engine/templates/dashboard.html").read_text()
+        template = Path("engine/templates/dashboard.html").read_text()
 
         registration_bonus = '+{{ join_referrer_bonus_days|default:"3" }} дня за регистрацию'
         self.assertIn("Приглашения и бонусы", template)
-        self.assertIn("Приглашения и бонусы", legacy_template)
         self.assertIn(registration_bonus, template)
-        self.assertIn(registration_bonus, legacy_template)
         self.assertIn("когда друг создаст аккаунт", template)
-        self.assertIn("когда друг создаст аккаунт", legacy_template)
         self.assertIn("md:grid-cols-3", template)
-        self.assertIn("md:grid-cols-3", legacy_template)
         self.assertIn("padding: 22px 24px !important;", template)
-        self.assertIn("padding: 22px 24px !important;", legacy_template)
         self.assertIn("padding: 18px 22px !important;", template)
-        self.assertIn("padding: 18px 22px !important;", legacy_template)
         self.assertIn(".referral-stat-card p:last-child", template)
-        self.assertIn(".referral-stat-card p:last-child", legacy_template)
         self.assertNotIn("Добыча за друзей", template)
-        self.assertNotIn("Добыча за друзей", legacy_template)
 
 
 class CustomConfigTemplatePayloadTests(SimpleTestCase):
