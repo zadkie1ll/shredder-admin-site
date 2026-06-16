@@ -33,6 +33,11 @@
             box-sizing: border-box;
         }
 
+        img {
+            max-width: 100%;
+            height: auto;
+        }
+
         html {
             min-height: 100%;
             background: var(--bg);
@@ -205,12 +210,11 @@
 
         h1 {
             margin-bottom: 22px;
-            font-size: clamp(42px, 6vw, 78px);
-            line-height: 0.98;
+            font-size: clamp(30px, 4.2vw, 50px);
+            line-height: 1.06;
             letter-spacing: 0;
             font-weight: 700;
             overflow-wrap: break-word;
-            hyphens: auto;
         }
 
         .lead {
@@ -644,6 +648,35 @@
             text-align: center;
         }
 
+        .mobile-buybar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 60;
+            display: none;
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+            background: rgba(9, 10, 15, 0.94);
+            backdrop-filter: blur(14px);
+            border-top: 1px solid var(--line);
+            transform: translateY(130%);
+            transition: transform .25s ease;
+        }
+
+        .mobile-buybar.is-visible {
+            transform: translateY(0);
+        }
+
+        .mobile-buybar .btn {
+            width: 100%;
+        }
+
+        @media (max-width: 700px) {
+            .mobile-buybar {
+                display: block;
+            }
+        }
+
         .email:focus {
             border-color: rgba(255, 199, 0, 0.62);
         }
@@ -793,8 +826,8 @@
 
             h1 {
                 margin-bottom: 24px;
-                font-size: clamp(34px, 10vw, 60px);
-                line-height: 1.05;
+                font-size: clamp(26px, 7.2vw, 40px);
+                line-height: 1.08;
             }
 
             .lead {
@@ -882,26 +915,26 @@
             <section id="top" class="hero">
                 <div class="hero-copy">
                     <div class="eyebrow">доступ готов через несколько минут</div>
-                    <h1>Личный сервер для быстрого интернета без ограничений</h1>
+                    <h1>Личный сервер для игр, интернета и работы</h1>
                     <p class="lead">
-                        Открывайте любые сайты и сервисы, смотрите видео без рекламных пауз, безлимитный трафик и до 15 устройств — на одной подписке, без ручной настройки.
+                        Подключайте телефон, компьютер и планшет по одному ключу. Скорость до 10 Гбит/с, безлимитный трафик и до 15 устройств — на одной подписке.
                     </p>
-                    <img class="hero-art-mobile" src="{% static 'img/onboarding/always-on.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
+                    <img class="hero-art-mobile" src="{% static 'img/onboarding/personal-server-hub.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
                     <div class="hero-actions">
                         <a class="btn btn-primary" href="#prices">Купить от {{ min_tariff_price }} ₽</a>
                         <a class="btn" href="#how">Посмотреть подключение</a>
                     </div>
                     <div class="trust-row">
-                        <span class="trust">безлимитный трафик</span>
+                        <span class="trust">стриминг и игры</span>
+                        <span class="trust">до 10 Гбит/с</span>
                         <span class="trust">до 15 устройств</span>
                         <span class="trust">без автосписаний</span>
-                        <span class="trust">iOS · Android · Windows · macOS · Linux</span>
                     </div>
                 </div>
 
                 <div class="hero-board" aria-label="Карта подключений Monkey Island">
                     <div class="map-lines"></div>
-                    <img class="hero-art" src="{% static 'img/onboarding/always-on.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
+                    <img class="hero-art" src="{% static 'img/onboarding/personal-server-hub.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
                     <div class="route route-one"></div>
                     <div class="route route-two"></div>
                     <div class="route route-three"></div>
@@ -924,19 +957,19 @@
                 </div>
                 <div class="grid-3">
                     <article class="card feature">
-                        <span class="feature-kicker">доступ</span>
-                        <h3>Открывайте любые сайты и сервисы</h3>
-                        <p>Нужные ресурсы остаются доступными, даже когда у провайдера открыты лишь отдельные сайты.</p>
+                        <span class="feature-kicker">локации</span>
+                        <h3>Личный сервер с выбором локации</h3>
+                        <p>Персональный сервер с возможностью менять локацию в любой момент — под вашу задачу.</p>
                     </article>
                     <article class="card feature">
                         <span class="feature-kicker">скорость</span>
-                        <h3>Видео без рекламы и безлимитный трафик</h3>
-                        <p>Смотрите видео и стримы без рекламных вставок, общайтесь и работайте без ограничений по объему и скорости.</p>
+                        <h3>Канал до 10 Гбит/с без лимита трафика</h3>
+                        <p>Скорости хватает для видео, звонков, игр и работы — без лимита по объёму.</p>
                     </article>
                     <article class="card feature">
-                        <span class="feature-kicker">личный ключ</span>
+                        <span class="feature-kicker">устройства</span>
                         <h3>До 15 устройств на одной подписке</h3>
-                        <p>Подключайте телефон, ноутбук, планшет и роутер по одному ключу — для всей семьи.</p>
+                        <p>Подключайте телефон, ноутбук и планшет по одному ключу — для всей семьи.</p>
                     </article>
                 </div>
             </section>
@@ -981,8 +1014,8 @@
                             </div>
                         </div>
                         <ul class="tariff-points">
-                            <li>Открывает любые сайты и сервисы</li>
-                            <li>Видео без рекламы</li>
+                            <li>Для игр, видео и работы</li>
+                            <li>Канал до 10 Гбит/с</li>
                             <li>Безлимитный трафик</li>
                             <li>До 15 устройств</li>
                         </ul>
@@ -1009,33 +1042,10 @@
                 <div class="section-head">
                     <h2>Как это работает</h2>
                 </div>
-                <div class="steps">
-                    <article class="card step">
-                        <h3>1. Оплатите доступ</h3>
-                        <p>Выберите тариф, укажите email и перейдите на защищенную страницу оплаты.</p>
-                        <div class="code-box">тариф -> email -> оплата</div>
-                    </article>
-                    <article class="card step">
-                        <h3>2. Откройте ссылку из почты</h3>
-                        <p>После оплаты дождитесь подтверждения на сайте: мы автоматически откроем личный кабинет. Email останется запасным способом входа.</p>
-                        <div class="code-box">оплата -> проверка -> ЛК</div>
-                    </article>
-                    <article class="card step">
-                        <h3>3. Подключите устройство</h3>
-                        <p>Проследуйте простой инструкции для вашего телефона, компьютера, планшета или роутера.</p>
-                        <div class="code-box">выберите устройство -> следуйте шагам</div>
-                    </article>
-                    <article class="card step">
-                        <h3>4. Наслаждайтесь</h3>
-                        <p>Пользуйтесь быстрым приватным подключением на всех своих устройствах без автосписаний.</p>
-                        <div class="locations">
-                            <span class="location">телефон</span>
-                            <span class="location">ноутбук</span>
-                            <span class="location">планшет</span>
-                            <span class="location">роутер</span>
-                        </div>
-                    </article>
-                </div>
+                <article class="card step">
+                    <h3>Всё просто</h3>
+                    <p>После оплаты вы сразу получаете доступ в личный кабинет с простой пошаговой инструкцией по настройке — ключ и понятные шаги уже готовы для вашего устройства.</p>
+                </article>
             </section>
 
             <section id="faq" class="section">
@@ -1057,7 +1067,7 @@
                     </article>
                     <article class="card faq-card">
                         <h3>Какие устройства поддерживаются?</h3>
-                        <p>iOS, Android, Windows, macOS, Linux и часть роутеров. Для каждой платформы будут готовые инструкции.</p>
+                        <p>iOS, Android, Windows, macOS и Linux. Для каждой платформы — готовые инструкции.</p>
                     </article>
                     <article class="card faq-card">
                         <h3>Когда придет доступ?</h3>
@@ -1089,14 +1099,39 @@
             </section>
 
             <footer class="footer">
-                <div>© Monkey Island VPS. Персональный виртуальный сервер для быстрого и приватного подключения.</div>
+                <div>© Monkey Island VPS. Персональный виртуальный сервер для быстрого и стабильного подключения.</div>
                 <div class="footer-links">
                     <a href="/offer/">Пользовательское соглашение</a>
                 </div>
             </footer>
         </div>
     </main>
+
+    <div class="mobile-buybar" id="mobileBuybar" aria-hidden="true">
+        <a class="btn btn-primary" href="#prices" data-conversion-goal="tariff_cta_click">Купить от {{ min_tariff_price }} ₽</a>
+    </div>
+
     <script>
+        (function setupStickyBuyBar() {
+            const bar = document.getElementById('mobileBuybar');
+            if (!bar || !('IntersectionObserver' in window)) return;
+            const heroCta = document.querySelector('.hero-actions .btn-primary') || document.querySelector('.hero');
+            const prices = document.getElementById('prices');
+            let heroOut = false;
+            let pricesIn = false;
+            const update = () => {
+                const show = heroOut && !pricesIn;
+                bar.classList.toggle('is-visible', show);
+                bar.setAttribute('aria-hidden', show ? 'false' : 'true');
+            };
+            if (heroCta) {
+                new IntersectionObserver((e) => { heroOut = !e[0].isIntersecting; update(); }, { threshold: 0 }).observe(heroCta);
+            }
+            if (prices) {
+                new IntersectionObserver((e) => { pricesIn = e[0].isIntersecting; update(); }, { threshold: 0.1 }).observe(prices);
+            }
+        })();
+
         (function setupConversionTracking() {
             const counterId = 109167744;
             const page = 'vps_direct_sale';
