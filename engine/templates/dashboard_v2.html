@@ -289,6 +289,131 @@
             box-shadow: none !important;
         }
 
+        /* Мастер настройки: компактные действия и понятный выбор устройства */
+        .setup-wizard-actions {
+            max-width: 460px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .setup-text-link {
+            display: inline-block;
+            color: rgba(255, 255, 255, 0.55);
+            font-size: 13px;
+            font-weight: 700;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+            cursor: pointer;
+            background: none;
+            border: 0;
+        }
+
+        .setup-text-link:hover {
+            color: #fff;
+        }
+
+        .setup-detected {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            max-width: 360px;
+            margin: 0 auto 22px;
+            padding: 13px 18px;
+            border-radius: 16px;
+            background: rgba(0, 255, 136, 0.08);
+            border: 1px solid rgba(0, 255, 136, 0.25);
+            text-align: left;
+        }
+
+        .setup-detected > i:first-child {
+            font-size: 24px;
+            color: #fff;
+            width: 28px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .setup-detected-text {
+            display: flex;
+            flex-direction: column;
+            line-height: 1.2;
+            flex: 1;
+            min-width: 0;
+        }
+
+        .setup-detected-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        .setup-detected-name {
+            font-size: 18px;
+            font-weight: 800;
+            color: #fff;
+        }
+
+        .setup-detected-ok {
+            color: #00ff88;
+            font-size: 20px;
+            flex-shrink: 0;
+        }
+
+        .setup-device-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            max-width: 480px;
+            margin: 0 auto;
+        }
+
+        .setup-device-chip {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 14px 16px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: #fff;
+            font-weight: 700;
+            font-size: 14px;
+            cursor: pointer;
+            transition: border-color 0.18s ease, background 0.18s ease;
+            text-align: left;
+        }
+
+        .setup-device-chip:hover {
+            border-color: rgba(255, 199, 0, 0.4);
+            background: rgba(255, 199, 0, 0.06);
+        }
+
+        .setup-device-chip.is-current {
+            border-color: #00ff88;
+            background: rgba(0, 255, 136, 0.08);
+        }
+
+        .setup-device-chip > i:first-child {
+            font-size: 18px;
+            width: 22px;
+            text-align: center;
+        }
+
+        .setup-device-chip-check {
+            color: #00ff88;
+            margin-left: auto;
+        }
+
+        @media (min-width: 768px) {
+            .setup-device-grid {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+        }
+
         @media (max-width: 640px) {
             .setup-wizard-shell {
                 min-height: auto;
@@ -1369,7 +1494,7 @@
         }
 
         .dashboard-v2 .quick-action-card {
-            min-height: 126px;
+            min-height: 0;
         }
 
         .dashboard-v2 .quick-action-card:hover {
@@ -1779,28 +1904,13 @@
                                     </div>
 
                                     {% if has_subscription_access %}
-                                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                                            <div class="text-gray-500 text-sm font-bold">
-                                                Автопродление:
-                                                {% if has_recurrent %}
-                                                    <span class="text-[#00ff88]">Включено</span>
-                                                {% else %}
-                                                    <span class="text-white">не подключено</span>
-                                                {% endif %}
-                                            </div>
-                                            <div class="flex flex-col gap-2">
-                                                <button type="button" onclick="showTab('profile')" class="text-[#ffc700] text-xs font-bold hover:text-white transition-colors self-start">
-                                                    +40 дней за друга
-                                                </button>
-                                                <div class="flex items-center gap-3">
-                                                    <button type="button" onclick="showTab('profile')" class="bg-white/10 hover:bg-white/15 border border-white/10 text-white px-6 py-3 rounded-xl text-[10px] font-black uppercase transition-all">
-                                                        Подробнее
-                                                    </button>
-                                                    <button type="button" onclick="showTab('setup')" class="bg-[#ffc700]/10 hover:bg-[#ffc700]/20 border border-[#ffc700]/30 text-[#ffc700] px-6 py-3 rounded-xl text-[10px] font-black uppercase tracking-wider transition-all">
-                                                        <i class="fas fa-bolt mr-1"></i>Подключиться
-                                                    </button>
-                                                </div>
-                                            </div>
+                                        <div class="text-gray-500 text-sm font-bold">
+                                            Автопродление:
+                                            {% if has_recurrent %}
+                                                <span class="text-[#00ff88]">включено</span>
+                                            {% else %}
+                                                <span class="text-white">не подключено</span>
+                                            {% endif %}
                                         </div>
                                     {% endif %}
                                 </div>
@@ -1819,37 +1929,49 @@
                             </section>
                         {% endif %}
 
-                        <section class="grid grid-cols-1 md:grid-cols-3 gap-5">
+                        <section class="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                             {% if has_subscription_access %}
-                            <button type="button" onclick="showTab('setup')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
-                                <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
-                                    <i class="fas fa-bolt text-lg"></i>
+                            <button type="button" onclick="showTab('setup')" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
+                                <div class="w-11 h-11 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                    <i class="fas fa-bolt"></i>
                                 </div>
-                                <h3 class="text-lg font-black mb-2">Настройка</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Приложения и подключение</p>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="text-base font-black leading-tight">Настройка</h3>
+                                    <p class="text-gray-500 text-xs font-bold leading-snug">Установка на ваши устройства</p>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-600 text-sm flex-shrink-0"></i>
                             </button>
                             {% else %}
-                            <button type="button" onclick="showTariffs()" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
-                                <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
-                                    <i class="fas fa-credit-card text-lg"></i>
+                            <button type="button" onclick="showTariffs()" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
+                                <div class="w-11 h-11 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                    <i class="fas fa-credit-card"></i>
                                 </div>
-                                <h3 class="text-lg font-black mb-2">Купить подписку</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Тарифы и оплата</p>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="text-base font-black leading-tight">Купить подписку</h3>
+                                    <p class="text-gray-500 text-xs font-bold leading-snug">Тарифы и оплата</p>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-600 text-sm flex-shrink-0"></i>
                             </button>
                             {% endif %}
-                            <button type="button" onclick="showTab('support')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
-                                <div class="w-12 h-12 rounded-2xl bg-[#2ec4b6]/10 border border-[#2ec4b6]/20 flex items-center justify-center text-[#2ec4b6] mb-4">
-                                    <i class="fas fa-headset text-lg"></i>
+                            <button type="button" onclick="showTab('support')" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
+                                <div class="w-11 h-11 rounded-xl bg-[#2ec4b6]/10 border border-[#2ec4b6]/20 flex items-center justify-center text-[#2ec4b6] flex-shrink-0">
+                                    <i class="fas fa-headset"></i>
                                 </div>
-                                <h3 class="text-lg font-black mb-2">Поддержка</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Помощь в Telegram</p>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="text-base font-black leading-tight">Поддержка</h3>
+                                    <p class="text-gray-500 text-xs font-bold leading-snug">Помощь в Telegram</p>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-600 text-sm flex-shrink-0"></i>
                             </button>
-                            <button type="button" onclick="showTab('profile')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
-                                <div class="w-12 h-12 rounded-2xl bg-[#9b5cff]/10 border border-[#9b5cff]/20 flex items-center justify-center text-[#9b5cff] mb-4">
-                                    <i class="fas fa-user-friends text-lg"></i>
+                            <button type="button" onclick="showTab('profile')" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
+                                <div class="w-11 h-11 rounded-xl bg-[#9b5cff]/10 border border-[#9b5cff]/20 flex items-center justify-center text-[#9b5cff] flex-shrink-0">
+                                    <i class="fas fa-user-friends"></i>
                                 </div>
-                                <h3 class="text-lg font-black mb-2">Рефералы</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Пригласи друга</p>
+                                <div class="min-w-0 flex-1">
+                                    <h3 class="text-base font-black leading-tight">Рефералы</h3>
+                                    <p class="text-gray-500 text-xs font-bold leading-snug">+40 дней за друга</p>
+                                </div>
+                                <i class="fas fa-chevron-right text-gray-600 text-sm flex-shrink-0"></i>
                             </button>
                         </section>
 
@@ -2360,10 +2482,10 @@
     </div>
     </div>
 
-    <div id="ref-pill" class="fixed right-0 top-[75%] z-50 animate-bounce-horizontal {% if not has_subscription_access %}hidden{% endif %}" onclick="toggleRefSheet()">
-        <div class="bg-[#ffc700] text-black pl-3 pr-2 py-2 rounded-l-xl shadow-[0_0_15px_rgba(255,199,0,0.3)] flex items-center gap-2 cursor-pointer border-y border-l border-white/20 transition-all hover:pr-4">
-            <i class="fas fa-gift text-sm"></i>
-            <span class="text-[9px] font-black uppercase tracking-tighter">+40 дней</span>
+    <div id="ref-pill" class="fixed right-0 top-[78%] z-50 {% if not has_subscription_access %}hidden{% endif %}" onclick="toggleRefSheet()" title="+40 дней за друга">
+        <div class="bg-[#ffc700] text-black pl-2.5 pr-2 py-2 rounded-l-lg shadow-[0_0_12px_rgba(255,199,0,0.25)] flex items-center gap-1.5 cursor-pointer border-y border-l border-white/20 transition-all hover:pr-3">
+            <i class="fas fa-gift text-xs"></i>
+            <span class="text-[10px] font-black">+40</span>
         </div>
     </div>
 
@@ -3447,6 +3569,26 @@
             return newSetupApps[selectedNewSetupPlatform] || newSetupApps.android;
         }
 
+        function getNewSetupPlatformMeta() {
+            return newSetupPlatforms.find(p => p.id === selectedNewSetupPlatform) || newSetupPlatforms[0];
+        }
+
+        function renderNewSetupDeviceChips() {
+            return newSetupPlatforms.map(p => `
+                <button type="button" onclick="pickNewSetupDevice('${p.id}')" class="setup-device-chip ${p.id === selectedNewSetupPlatform ? 'is-current' : ''}">
+                    <i class="${p.icon}"></i>
+                    <span>${p.label}</span>
+                    ${p.id === selectedNewSetupPlatform ? '<i class="fas fa-check setup-device-chip-check"></i>' : ''}
+                </button>
+            `).join('');
+        }
+
+        function pickNewSetupDevice(id) {
+            selectedNewSetupPlatform = id;
+            newSetupStep = 'start';
+            renderNewSetupWizard();
+        }
+
         function renderNewSetupPlatforms() {
             const container = document.getElementById('new-setup-platforms');
             if (!container) return;
@@ -3503,8 +3645,7 @@
             if (!root) return;
 
             const app = getNewSetupApp();
-            renderNewSetupPlatforms();
-            setNewSetupDevicePickerVisible(newSetupStep === 'devices');
+            const meta = getNewSetupPlatformMeta();
 
             const copyValue = app.copyValue || (
                 app.keyInputId === 'new-setup-happ-key'
@@ -3512,14 +3653,34 @@
                     : '{{ plain_subscription_url }}'
             );
 
-            if (newSetupStep === 'start' || newSetupStep === 'devices') {
+            if (newSetupStep === 'devices') {
                 root.innerHTML = `
-                    <h2 class="text-3xl md:text-4xl font-black mb-3">Настройка на ${app.platformLabel}</h2>
-                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Подключение проходит в 3 шага и занимает пару минут</p>
+                    <h2 class="text-2xl md:text-3xl font-black mb-2">Выберите устройство</h2>
+                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-7">На какой платформе подключаем VPN?</p>
+                    <div class="setup-device-grid">${renderNewSetupDeviceChips()}</div>
+                    <div class="mt-6">
+                        <button type="button" onclick="backNewSetupStart()" class="setup-text-link">← Назад</button>
+                    </div>
+                `;
+                return;
+            }
+
+            if (newSetupStep === 'start') {
+                root.innerHTML = `
+                    <div class="setup-detected">
+                        <i class="${meta.icon}"></i>
+                        <div class="setup-detected-text">
+                            <span class="setup-detected-label">Ваше устройство</span>
+                            <span class="setup-detected-name">${app.platformLabel}</span>
+                        </div>
+                        <i class="fas fa-check-circle setup-detected-ok"></i>
+                    </div>
+                    <h2 class="text-2xl md:text-3xl font-black mb-2">Подключим за пару минут</h2>
+                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-8">Платформу определили автоматически. Нажмите кнопку ниже — проведём по 3 коротким шагам.</p>
                     ${newSetupOrb('fas fa-link', 25)}
-                    <div class="space-y-4">
-                        ${newSetupButton(`Начать настройку на этом устройстве`, "startNewSetupInstall()", "", "fas fa-play")}
-                        ${newSetupButton(`Настроить другое устройство`, "showNewSetupDevices()", "setup-secondary-btn", "fas fa-mobile-alt")}
+                    <div class="setup-wizard-actions">
+                        ${newSetupButton(`Начать настройку`, "startNewSetupInstall()", "", "fas fa-play")}
+                        <button type="button" onclick="showNewSetupDevices()" class="setup-text-link" style="margin-top:2px;">У меня другое устройство</button>
                     </div>
                 `;
                 return;
@@ -3530,7 +3691,7 @@
                     <h2 class="text-3xl md:text-4xl font-black mb-3">Приложение</h2>
                     <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Установи ${app.appName} и вернись к этому экрану</p>
                     ${newSetupOrb('fas fa-download', 50)}
-                    <div class="space-y-4">
+                    <div class="setup-wizard-actions">
                         ${newSetupLink(app.installText, app.installUrl, "", "fas fa-download")}
                         ${app.fallbackUrl ? newSetupLink(app.fallbackText, app.fallbackUrl, "setup-secondary-btn", "fas fa-external-link-alt") : ''}
                         ${newSetupButton(`Далее: приложение установлено`, "startNewSetupSubscription()", "setup-secondary-btn", "fas fa-arrow-right")}
@@ -3546,7 +3707,7 @@
                     <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Добавь подписку в ${app.appName} кнопкой ниже</p>
                     ${newSetupOrb('fas fa-plus-circle', 75)}
                     <input type="text" readonly value="${copyValue}" id="new-setup-copy-input" class="sr-only">
-                    <div class="space-y-4">
+                    <div class="setup-wizard-actions">
                         ${newSetupLink(app.addText, app.subscriptionUrl, "", "fas fa-plus-circle")}
                         ${newSetupButton(`Скопировать ссылку подписки`, "copyInputValue('new-setup-copy-input', 'Ссылка подписки скопирована')", "setup-secondary-btn", "fas fa-copy")}
                         ${newSetupButton(`Далее: подписка добавлена`, "finishNewSetup()", "setup-secondary-btn", "fas fa-arrow-right")}
@@ -3560,7 +3721,7 @@
                 <h2 class="text-3xl md:text-4xl font-black mb-3">Готово!</h2>
                 <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Теперь включи VPN в приложении ${app.appName}</p>
                 ${newSetupOrb('fas fa-check', 100)}
-                <div class="space-y-4">
+                <div class="setup-wizard-actions">
                     ${newSetupButton(`Перейти в личный кабинет`, "showTab('home')", "", "fas fa-th-large")}
                     ${newSetupButton(`Настроить другое устройство`, "showNewSetupDevices()", "setup-secondary-btn", "fas fa-mobile-alt")}
                     <button type="button" onclick="backNewSetupSubscription()" class="mt-4 text-gray-500 text-sm font-black hover:text-[#ffc700] transition-colors">← Предыдущий шаг</button>
