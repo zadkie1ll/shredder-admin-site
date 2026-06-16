@@ -2352,12 +2352,15 @@ def dashboard(request):
     if seconds_left <= 0:
         time_left_value = 0
         time_left_label = "дней осталось"
+        time_left_unit = "дн."
     elif seconds_left < 24 * 60 * 60:
         time_left_value = max(1, int((seconds_left + 3599) // 3600))
         time_left_label = "часов осталось"
+        time_left_unit = "ч."
     else:
         time_left_value = days_left
         time_left_label = "дней осталось"
+        time_left_unit = "дн."
 
     plain_subscription_url = (
         subscription.subscription_url if has_subscription_access else ""
@@ -2394,6 +2397,7 @@ def dashboard(request):
             "days_left": days_left,
             "time_left_value": time_left_value,
             "time_left_label": time_left_label,
+            "time_left_unit": time_left_unit,
             "show_telegram_bind_banner": show_telegram_bind_banner,
             "show_email_bind_banner": show_email_bind_banner,
             "show_expiring_banner": show_expiring_banner,

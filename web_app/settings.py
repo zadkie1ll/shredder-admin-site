@@ -131,8 +131,10 @@ SITE_TRIAL_REGISTRATION_ENABLED = config(
     cast=bool,
 )
 
-# Включает виджет настройки подключения в личном кабинете, заменяя старый способ
-USE_NEW_SETUP_FLOW = config("USE_NEW_SETUP_FLOW", default=True, cast=bool)
+# Старый пошаговый «мастер»-виджет настройки (с орбитой) отключён по умолчанию:
+# показываем плоский флоу «платформа → приложение → подписка» (как у конкурентов).
+# Код мастера остаётся в шаблоне и включается обратно через USE_NEW_SETUP_FLOW=true.
+USE_NEW_SETUP_FLOW = config("USE_NEW_SETUP_FLOW", default=False, cast=bool)
 EMAIL_PROVIDER = config("EMAIL_PROVIDER", default="smtp")
 RESEND_API_KEY = config("RESEND_API_KEY", default="")
 RESEND_FROM_EMAIL = config("RESEND_FROM_EMAIL", default="")

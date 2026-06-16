@@ -414,6 +414,359 @@
             }
         }
 
+        /* Компактный экран настройки (плоский флоу) — помещается в ~1 экран */
+        .setup-compact-card {
+            padding: 18px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .setup-compact-step {
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+        }
+
+        .setup-compact-num {
+            width: 26px;
+            height: 26px;
+            border-radius: 8px;
+            background: #ffc700;
+            color: #08090d;
+            font-weight: 900;
+            font-size: 13px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .setup-compact-title {
+            font-size: 15px;
+            font-weight: 800;
+            margin-bottom: 2px;
+        }
+
+        .setup-compact-text {
+            color: rgba(255, 255, 255, 0.55);
+            font-size: 13px;
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        .setup-compact-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 13px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: #fff;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .setup-compact-link:hover {
+            border-color: rgba(255, 199, 0, 0.4);
+        }
+
+        /* Главный CTA «Подключиться в 1 клик» — герой экрана настройки.
+           Рендерится прямым потомком .setup-compact-card (вне колонки шага),
+           поэтому занимает всю ширину карточки и выравнивается с блоками ниже. */
+        .setup-compact-cta {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            width: 100%;
+            padding: 15px 22px;
+            border-radius: 14px;
+            background: #ffc700;
+            color: #08090d;
+            font-size: 15px;
+            font-weight: 700;
+            box-shadow: 0 10px 28px rgba(255, 199, 0, 0.28);
+        }
+
+        .setup-compact-cta i {
+            font-size: 14px;
+        }
+
+        /* Предупреждение к шагу (step.note) — приглушённый, но читаемый колаут */
+        .setup-compact-note {
+            margin-top: 10px;
+            padding: 10px 12px;
+            border-radius: 12px;
+            border: 1px solid rgba(255, 199, 0, 0.22);
+            background: rgba(255, 199, 0, 0.06);
+        }
+
+        .setup-compact-note-title {
+            display: block;
+            font-size: 9px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.12em;
+            color: #ffc700;
+            margin-bottom: 3px;
+        }
+
+        .setup-compact-note-text {
+            display: block;
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.35;
+            color: rgba(255, 255, 255, 0.62);
+        }
+
+        .setup-compact-key {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding-top: 14px;
+        }
+
+        .setup-compact-keylabel {
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 12px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .setup-compact-keyrow {
+            display: flex;
+            gap: 8px;
+        }
+
+        .setup-compact-keyinput {
+            flex: 1;
+            min-width: 0;
+            min-height: 44px;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            padding: 10px 12px;
+            color: #fff;
+            font-size: 12px;
+            font-family: ui-monospace, monospace;
+        }
+
+        .setup-compact-copybtn {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            min-height: 44px;
+            padding: 10px 14px;
+            border-radius: 10px;
+            background: rgba(255, 199, 0, 0.12);
+            border: 1px solid rgba(255, 199, 0, 0.3);
+            color: #ffc700;
+            font-size: 12px;
+            font-weight: 800;
+            white-space: nowrap;
+            cursor: pointer;
+        }
+
+        @media (max-width: 480px) {
+            .setup-compact-keyrow {
+                flex-direction: column;
+            }
+            .setup-compact-copybtn {
+                justify-content: center;
+            }
+        }
+
+        .setup-compact-links-inline {
+            margin-top: 8px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px 16px;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .setup-compact-inline-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: #ffc700;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .setup-compact-inline-link:hover {
+            color: #fff;
+        }
+
+        /* Ссылка прямо внутри текста шага (слово-ссылка, как в боте) */
+        .setup-compact-textlink {
+            color: #ffc700;
+            font-weight: 800;
+            text-decoration: underline;
+            text-underline-offset: 2px;
+        }
+
+        .setup-compact-textlink:hover {
+            color: #fff;
+        }
+
+        /* Финальный шаг «Подключение и использование»: вынесен в самый низ
+           и оформлен приглушённо, чтобы не перетягивать внимание. */
+        /* Приглушаем визуально (мельче, разделитель), но без стэкинга opacity —
+           текст инструкции должен оставаться читаемым (WCAG AA). */
+        .setup-compact-usage {
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            padding-top: 14px;
+        }
+
+        .setup-compact-usage-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.78);
+            margin-bottom: 4px;
+        }
+
+        .setup-compact-usage-text {
+            color: rgba(255, 255, 255, 0.62);
+            font-size: 12px;
+            font-weight: 600;
+            line-height: 1.35;
+        }
+
+        /* Ёмкий выбор устройства/приложения сверху: дропдаун платформы + ряд чипов приложений */
+        .setup-picker-card {
+            padding: 16px;
+        }
+
+        .setup-picker-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .setup-picker-bar-title {
+            font-size: 13px;
+            font-weight: 900;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #fff;
+        }
+
+        .setup-platform-select-wrap {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            flex-shrink: 0;
+        }
+
+        .setup-platform-select-icon {
+            position: absolute;
+            left: 14px;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 14px;
+            pointer-events: none;
+        }
+
+        .setup-platform-select {
+            appearance: none;
+            -webkit-appearance: none;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 12px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+            min-height: 44px;
+            padding: 10px 36px 10px 38px;
+            cursor: pointer;
+        }
+
+        .setup-platform-select:focus-visible {
+            outline: 2px solid var(--brand-gold);
+            outline-offset: 1px;
+        }
+
+        .setup-platform-select option {
+            background: #15161c;
+            color: #fff;
+        }
+
+        .setup-platform-select-chev {
+            position: absolute;
+            right: 14px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 11px;
+            pointer-events: none;
+        }
+
+        .setup-app-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .setup-app-chip {
+            position: relative;
+            flex: 1 1 130px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-height: 52px;
+            padding: 12px 14px;
+            border-radius: 14px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            background: rgba(255, 255, 255, 0.04);
+            color: rgba(255, 255, 255, 0.72);
+            font-size: 14px;
+            font-weight: 800;
+            text-align: left;
+            cursor: pointer;
+            transition: border-color 0.18s ease, background 0.18s ease, color 0.18s ease;
+        }
+
+        .setup-app-chip:hover {
+            border-color: rgba(255, 199, 0, 0.4);
+            color: #fff;
+        }
+
+        .setup-app-chip.is-active {
+            border-color: var(--brand-gold);
+            background: rgba(255, 199, 0, 0.08);
+            color: #fff;
+            box-shadow: inset 0 0 0 1px rgba(255, 199, 0, 0.45);
+        }
+
+        .setup-app-chip-dot {
+            display: none;
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: var(--brand-gold);
+            flex-shrink: 0;
+        }
+
+        .setup-app-chip.is-recommended .setup-app-chip-dot {
+            display: block;
+        }
+
+        .setup-app-chip-name {
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 480px) {
+            .setup-compact-card {
+                padding: 16px;
+                gap: 12px;
+            }
+        }
+
         @media (max-width: 640px) {
             .setup-wizard-shell {
                 min-height: auto;
@@ -1547,7 +1900,7 @@
 
         .dashboard-v2 .platform-btn,
         .dashboard-v2 .app-btn {
-            min-height: 38px;
+            min-height: 44px;
             padding: 8px 13px !important;
             border-radius: 8px !important;
             font-size: 13px !important;
@@ -1776,6 +2129,10 @@
                         {% endif %}
                     </header>
 
+                    <button type="button" onclick="quickAccessInstall()" class="inline-flex items-center gap-2 mb-8 px-7 py-3 rounded-full bg-[#ffc700] text-black text-xs font-black uppercase tracking-wider shadow-lg hover:brightness-105 active:scale-95 transition">
+                        <i class="fas fa-bolt"></i> Быстрый доступ
+                    </button>
+
                     <div class="overview-grid space-y-7">
                         {% if show_not_connected_banner %}
                             <section class="setup-shell p-6 md:p-8 border border-[#00ff88]/30 bg-[#00ff88]/5">
@@ -1862,60 +2219,52 @@
                         {% endif %}
 
                         <section class="setup-shell status-overview-card">
-                            <div class="relative z-10 flex flex-col gap-8">
-                                <div class="flex items-start justify-between gap-4">
-                                    {% if not has_subscription_access %}
-                                        <div class="flex items-center gap-2 text-red-400 text-sm font-black">
-                                            <span class="w-2.5 h-2.5 rounded-full bg-red-400"></span>
-                                            Нет активной подписки
+                            <div class="relative z-10 flex flex-col gap-7">
+                                {% if not has_subscription_access %}
+                                    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-5">
+                                        <div>
+                                            <p class="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-3">Подписка</p>
+                                            <h2 class="text-3xl font-black mb-3">Доступ не оплачен</h2>
+                                            <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-xl">Оформите подписку, и в кабинете появятся ключи, инструкции для устройств и поддержка.</p>
                                         </div>
-                                    {% else %}
-                                        <div class="flex items-center gap-2 text-[#00ff88] text-sm font-black">
-                                            <span class="w-2.5 h-2.5 rounded-full bg-[#00ff88]"></span>
-                                            Активна
-                                        </div>
-                                    {% endif %}
-                                    <span class="text-gray-500 text-sm font-bold">{% if user.expire_at %}{{ user.expire_at|date:"d.m.Y" }}{% else %}—{% endif %}</span>
-                                </div>
-
-                                <div>
-                                    {% if not has_subscription_access %}
-                                        <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-5 mb-3">
-                                            <div>
-                                                <h2 class="text-3xl font-black mb-3">Доступ еще не оплачен</h2>
-                                                <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-xl">Оформите подписку, и в кабинете появятся ключи, инструкции для устройств и поддержка.</p>
-                                            </div>
-                                            <button type="button" onclick="showTariffs()" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !mb-0 !mr-0">
-                                                Купить подписку
-                                            </button>
-                                        </div>
-                                    {% else %}
-                                        <div class="flex flex-wrap items-end gap-x-4 gap-y-2 mb-3">
+                                        <button type="button" onclick="showTariffs()" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !mb-0 !mr-0">
+                                            Купить подписку
+                                        </button>
+                                    </div>
+                                {% else %}
+                                    <div>
+                                        <p class="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-4">Подписка</p>
+                                        <div class="flex items-baseline gap-2.5 mb-3">
                                             <span id="days-left-count" data-seconds-left="{{ seconds_left|floatformat:0 }}" data-time-left-value="{{ time_left_value }}" data-time-left-label="{{ time_left_label }}" class="text-6xl font-black leading-none text-white">—</span>
-                                            <span class="text-gray-500 text-xl font-bold mb-2">до {{ user.expire_at|date:"j E" }}</span>
+                                            <span class="text-3xl font-black leading-none text-white">{{ time_left_unit }}</span>
                                         </div>
-                                        <p id="time-left-caption" class="text-gray-500 text-sm font-bold">{{ time_left_label }}</p>
-                                    {% endif %}
-                                </div>
+                                        <div class="flex items-center gap-2 text-[#00ff88] text-base font-black">
+                                            <span class="w-2.5 h-2.5 rounded-full bg-[#00ff88] flex-shrink-0"></span>
+                                            Активна до {{ user.expire_at|date:"d.m.Y" }}
+                                        </div>
+                                    </div>
 
-                                <div class="space-y-5">
                                     <div class="status-progress-track">
                                         <div id="subscription-progress-bar" class="status-progress-bar"></div>
                                     </div>
 
-                                    {% if has_subscription_access %}
-                                        <div class="text-gray-500 text-sm font-bold">
-                                            Автопродление:
-                                            {% if has_recurrent %}
-                                                <span class="text-[#00ff88]">включено</span>
-                                            {% else %}
-                                                <span class="text-white">не подключено</span>
-                                            {% endif %}
-                                        </div>
-                                    {% endif %}
-                                </div>
+                                    <div class="text-gray-500 text-sm font-bold">
+                                        Автопродление:
+                                        {% if has_recurrent %}
+                                            <span class="text-[#00ff88]">включено</span>
+                                        {% else %}
+                                            <span class="text-white">не подключено</span>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
                             </div>
                         </section>
+
+                        {% if has_subscription_access %}
+                        <button type="button" onclick="showTab('setup')" class="setup-cta-btn !w-full !py-5 !mb-0 !mr-0">
+                            <i class="fas fa-book-open"></i> Открыть инструкцию
+                        </button>
+                        {% endif %}
 
                         {% if not show_expiring_banner and not show_not_connected_banner and seconds_left > 0 %}
                             <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
@@ -2090,7 +2439,7 @@
             <div id="tab-setup" class="tab-content">
                 <header class="mb-10 {% if use_new_setup_flow %}hidden{% endif %}">
                     <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Настройка</h1>
-                    <p class="text-gray-500 text-sm md:text-base font-bold">Выбери устройство и подключись по готовой инструкции</p>
+                    <p class="text-gray-500 text-sm md:text-base font-bold">Установи приложение и подключись в один клик</p>
                 </header>
                 <div class="overview-grid space-y-7">
                     {% if not has_subscription_access %}
@@ -2106,18 +2455,6 @@
                         </div>
                     </section>
                     {% else %}
-                    <section class="setup-shell overview-hero-card {% if use_new_setup_flow %}hidden{% endif %}">
-                        <div class="relative z-10 flex flex-col md:flex-row md:items-center gap-6">
-                            <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
-                                <i class="fas fa-bolt text-2xl"></i>
-                            </div>
-                            <div class="flex-1">
-                                <h2 class="text-2xl font-black mb-2">Подключение за пару минут</h2>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">Сначала выбери платформу, затем приложение. Ниже появятся ссылки для установки и кнопка быстрого добавления подписки.</p>
-                            </div>
-                        </div>
-                    </section>
-
                     <div id="new-setup-flow" class="{% if not use_new_setup_flow %}hidden{% endif %}">
                         <section class="setup-wizard-shell">
                             <div class="setup-wizard-stage">
@@ -2133,23 +2470,29 @@
                         </section>
                     </div>
 
-                    <div id="setup-logic-placeholder" class="space-y-7 {% if use_new_setup_flow %}hidden{% endif %}">
-                        <section class="setup-shell p-6 md:p-8">
-                            <h3 class="text-lg font-black mb-3">1. Выберите платформу</h3>
-                            <div class="setup-chip-group flex flex-wrap gap-3 mb-8">
-                                <button onclick="setPlatform('android')" id="btn-android" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase active">Android</button>
-                                <button onclick="setPlatform('ios')" id="btn-ios" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">iOS</button>
-                                <button onclick="setPlatform('windows')" id="btn-windows" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">Windows</button>
-                                <button onclick="setPlatform('macos')" id="btn-macos" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">macOS</button>
-                                <button onclick="setPlatform('androidtv')" id="btn-androidtv" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">Android TV</button>
-                                <button onclick="setPlatform('appletv')" id="btn-appletv" class="platform-btn px-6 py-3 rounded-xl text-[10px] font-black uppercase">Apple TV</button>
+                    <div id="setup-logic-placeholder" class="space-y-3 {% if use_new_setup_flow %}hidden{% endif %}">
+                        <!-- Ёмкий выбор устройства/приложения сверху: дропдаун платформы + ряд чипов приложений -->
+                        <section class="setup-shell setup-picker-card">
+                            <div class="setup-picker-bar">
+                                <h3 class="setup-picker-bar-title">Установка</h3>
+                                <div class="setup-platform-select-wrap">
+                                    <i id="platform-select-icon" class="fab fa-android setup-platform-select-icon" aria-hidden="true"></i>
+                                    <select id="platform-select" class="setup-platform-select" aria-label="Выберите устройство" onchange="setPlatform(this.value)">
+                                        <option value="android">Android</option>
+                                        <option value="ios">iOS</option>
+                                        <option value="windows">Windows</option>
+                                        <option value="macos">macOS</option>
+                                        <option value="linux">Linux</option>
+                                        <option value="androidtv">Android TV</option>
+                                        <option value="appletv">Apple TV</option>
+                                    </select>
+                                    <i class="fas fa-chevron-down setup-platform-select-chev" aria-hidden="true"></i>
+                                </div>
                             </div>
-                            <div id="app-selector-container">
-                                <h3 class="text-lg font-black mb-3">2. Выберите приложение</h3>
-                                <div id="app-selector" class="flex flex-wrap gap-2 mb-2"></div>
-                            </div>
+                            <div id="app-selector" class="setup-app-row" role="group" aria-label="Выбор приложения"></div>
                         </section>
-                        <div id="full-instructions-container" class="space-y-5"></div>
+
+                        <div id="full-instructions-container"></div>
                     </div>
                     {% endif %}
                 </div>
@@ -2482,6 +2825,21 @@
     </div>
     </div>
 
+    <div id="quick-access-modal" class="fixed inset-0 z-[9999] hidden items-center justify-center p-5">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm" onclick="closeQuickAccessModal()"></div>
+        <div class="relative z-10 w-full max-w-md setup-shell p-6 md:p-7">
+            <div class="flex items-start justify-between gap-4 mb-1">
+                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mt-1">Приложение</p>
+                <button type="button" onclick="closeQuickAccessModal()" class="w-9 h-9 rounded-xl bg-white/5 border border-white/10 text-white/60 flex items-center justify-center hover:text-white transition flex-shrink-0">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <h2 id="quick-access-title" class="text-2xl font-black mb-3 text-[#ffc700]"></h2>
+            <div id="quick-access-body" class="text-gray-300 text-sm font-bold leading-relaxed mb-6"></div>
+            <button type="button" onclick="closeQuickAccessModal()" class="setup-cta-btn !w-full !py-4 !mb-0 !mr-0">Понятно</button>
+        </div>
+    </div>
+
     <div id="ref-pill" class="fixed right-0 top-[78%] z-50 {% if not has_subscription_access %}hidden{% endif %}" onclick="toggleRefSheet()" title="+40 дней за друга">
         <div class="bg-[#ffc700] text-black pl-2.5 pr-2 py-2 rounded-l-lg shadow-[0_0_12px_rgba(255,199,0,0.25)] flex items-center gap-1.5 cursor-pointer border-y border-l border-white/20 transition-all hover:pr-3">
             <i class="fas fa-gift text-xs"></i>
@@ -2801,24 +3159,14 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Откройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль.',
-                            links: [
-                                {
-                                    text: 'App Store (RU)',
-                                    url: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973'
-                                },
-                                {
-                                    text: 'App Store (Для других регионов)',
-                                    url: 'https://apps.apple.com/us/app/happ-proxy-utility/id6504287215'
-                                }
-                            ]
+                            content: 'Скачайте <a href="https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973" target="_blank" rel="noopener" class="setup-compact-textlink">Happ</a> для России или <a href="https://apps.apple.com/us/app/happ-proxy-utility/id6504287215" target="_blank" rel="noopener" class="setup-compact-textlink">Happ</a> для других регионов.'
                         },
                         {
                             type: 'button',
                             url: '{{ happ_subscription_url }}',
                             oneClickText: 'Добавить подписку',
                             title: 'Добавление подписки',
-                            content: 'Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически.'
+                            content: 'Нажмите на кнопку ниже, чтобы подключиться в 1 клик.'
                         },
                         {
                             title: 'Подключение и использование',
@@ -2857,7 +3205,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Откройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль.',
+                            content: 'Скачайте приложение в App Store и установите.',
                             links: [
                                 { text: 'App Store', url: 'https://apps.apple.com/ru/app/shadowrocket/id932747118' }
                             ],
@@ -2882,7 +3230,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 { text: 'Windows (Установщик)', url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-windows-amd64-setup.exe' },
                                 { text: 'Windows на ARM (Установщик)', url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-windows-arm64-setup.exe' }
@@ -2910,7 +3258,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 {
                                     text: 'Windows (Установщик)',
@@ -2982,7 +3330,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 {
                                     text: 'Windows (Установщик)',
@@ -3010,7 +3358,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 {
                                     text: 'App Store (RU)',
@@ -3040,7 +3388,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 { text: 'macOS (Apple Silicon)', url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-macos-arm64.dmg' },
                                 { text: 'macOS (Intel)', url: 'https://github.com/pluralplay/FlClashX/releases/latest/download/FlClashX-macos-amd64.dmg' }
@@ -3068,7 +3416,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 {
                                     text: 'macOS (Apple Silicon)',
@@ -3146,7 +3494,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 {
                                     text: 'amd64 (.deb)',
@@ -3188,7 +3536,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Выберите подходящую версию для вашего устройства, нажмите на кнопку ниже и установите приложение.',
+                            content: 'Скачайте нужную версию ниже и установите приложение.',
                             links: [
                                 {
                                     text: 'amd64 (.deb)',
@@ -3412,7 +3760,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Откройте страницу в App Store и установите приложение. Запустите его, в окне разрешения VPN-конфигурации нажмите Allow и введите свой пароль.',
+                            content: 'Скачайте приложение в App Store и установите.',
                             links: [
                                 {
                                     text: 'Открыть в App Store',
@@ -3765,102 +4113,112 @@
         }
 
         function setPlatform(platform) {
-            document.querySelectorAll('.platform-btn').forEach(btn => btn.classList.remove('active'));
-            const activeBtn = document.getElementById('btn-' + platform);
-            if (activeBtn) activeBtn.classList.add('active');
-            
+            // Неизвестная/неподдерживаемая платформа (напр. detect вернул то, чего нет
+            // в installData) — мягко откатываемся на Android, чтобы герой-карточка отрисовалась.
+            if (!installData[platform] || !installData[platform].length) { platform = 'android'; }
+
+            // Синхронизируем дропдаун платформы и его иконку с выбором
+            const select = document.getElementById('platform-select');
+            if (select && select.value !== platform) select.value = platform;
+            const meta = newSetupPlatforms.find(p => p.id === platform);
+            const platformIcon = document.getElementById('platform-select-icon');
+            if (platformIcon && meta) platformIcon.className = meta.icon + ' setup-platform-select-icon';
+
+            // Строим ряд чипов приложений для выбранной платформы
             const selector = document.getElementById('app-selector');
-            const selectorContainer = document.getElementById('app-selector-container'); // Находим контейнер с заголовком
-            
             selector.innerHTML = '';
 
-            if (installData[platform] && installData[platform].length > 0) {
-                selectorContainer.style.display = 'block'; // Показываем заголовок и кнопки
+            installData[platform].forEach((app, index) => {
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                // Первое приложение — рекомендованное (помечаем точкой)
+                btn.className = index === 0 ? 'setup-app-chip is-recommended' : 'setup-app-chip';
+                btn.setAttribute('aria-pressed', 'false');
+                btn.innerHTML = '<span class="setup-app-chip-dot" aria-hidden="true"></span><span class="setup-app-chip-name"></span>';
+                btn.querySelector('.setup-app-chip-name').textContent = app.name;
+                btn.onclick = () => setApp(platform, index, btn);
+                selector.appendChild(btn);
+            });
 
-                installData[platform].forEach((app, index) => {
-                    const btn = document.createElement('button');
-                    btn.type = "button";
-                    btn.className = `app-btn px-5 py-3 rounded-xl text-[10px] font-black uppercase transition-all`;
-                    btn.innerText = app.name;
-                    btn.onclick = () => setApp(platform, index, btn);
-                    selector.appendChild(btn);
-                });
-
-                const firstBtn = selector.querySelector('.app-btn');
-                setApp(platform, 0, firstBtn);
-            } else {
-                selectorContainer.style.display = 'none'; // Прячем, если приложений нет
-            }
+            const firstBtn = selector.querySelector('.setup-app-chip');
+            setApp(platform, 0, firstBtn);
         }
 
         function setApp(platform, index, btnElement) {
-            // 1. Исправляем визуальное выделение кнопок
-            document.querySelectorAll('.app-btn').forEach(b => {
-                // Убираем активные стили (рамку и цвет)
-                b.classList.remove('active', 'border-[#ffc700]', 'text-[#ffc700]', 'bg-[#ffc700]/5');
-                b.classList.add('text-gray-400'); // Возвращаем обычный цвет
+            // Подсветка выбранного чипа приложения
+            document.querySelectorAll('.setup-app-chip').forEach(b => {
+                b.classList.remove('is-active');
+                b.setAttribute('aria-pressed', 'false');
             });
 
             if (btnElement) {
-                btnElement.classList.add('active', 'border-[#ffc700]', 'text-[#ffc700]', 'bg-[#ffc700]/5');
-                btnElement.classList.remove('text-gray-400');
+                btnElement.classList.add('is-active');
+                btnElement.setAttribute('aria-pressed', 'true');
             }
 
             // 2. Отрисовка контента (твой код без изменений структуры)
             const app = installData[platform][index];
             const container = document.getElementById('full-instructions-container');
-            
             container.innerHTML = '';
-            
-            const stepperWrapper = document.createElement('div');
-            stepperWrapper.className = 'space-y-5';
 
-            app.steps.forEach((step, idx) => {
-                const stepRow = document.createElement('div');
-                stepRow.className = "setup-step-card !mb-0";
-                
-                let html = `
-                    <div class="flex flex-col md:flex-row gap-5">
-                        <div class="w-12 h-12 rounded-2xl bg-[#ffc700] text-black flex items-center justify-center font-black flex-shrink-0">
-                            ${idx + 1}
-                        </div>
-                        <div class="flex-1">
-                            <h4 class="text-lg font-black mb-2">${step.title}</h4>
-                            <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">${step.content}</p>
-                `;
+            // Ключ для копирования = url шага-кнопки (ссылка-подписка для приложения)
+            const buttonStep = app.steps.find(s => s.type === 'button');
+            const subKey = buttonStep ? buttonStep.url : '';
+
+            // Финальный шаг «Подключение и использование» выносим в самый низ
+            // и оформляем приглушённо, чтобы он меньше привлекал внимание.
+            const usageStep = app.steps.find(s => s.title === 'Подключение и использование');
+            const mainSteps = app.steps.filter(s => s !== usageStep);
+
+            let html = '<div class="setup-shell setup-compact-card">';
+
+            mainSteps.forEach((step, idx) => {
+                html += `
+                    <div class="setup-compact-step">
+                        <span class="setup-compact-num">${idx + 1}</span>
+                        <div class="min-w-0 flex-1">
+                            <h4 class="setup-compact-title">${step.title}</h4>
+                            <p class="setup-compact-text">${step.content}</p>`;
 
                 if (step.links) {
-                    html += `<div class="flex flex-wrap gap-3 mt-5">`;
-                    step.links.forEach(link => {
-                        html += `
-                            <a href="${link.url}" target="_blank" class="setup-link-btn">
-                                <i class="fas fa-download"></i> ${link.text}
-                            </a>`;
-                    });
-                    html += `</div>`;
-                }
-
-                if (step.type === 'button') {
-                    html += `
-                        <a href="${step.url}" class="setup-cta-btn mt-6">
-                            <i class="fas fa-bolt"></i> ${step.oneClickText}
-                        </a>`;
+                    const linksHtml = step.links.map(link => `<a href="${link.url}" target="_blank" class="setup-compact-inline-link"><i class="fas fa-download" style="font-size:11px;"></i>${link.text}</a>`).join('');
+                    html += `<div class="setup-compact-links-inline">${linksHtml}</div>`;
                 }
 
                 if (step.note) {
-                    html += `
-                        <div class="mt-5 rounded-2xl border border-[#ffc700]/20 bg-[#ffc700]/5 p-4">
-                            <h5 class="text-[9px] font-black uppercase text-[#ffc700] mb-1 tracking-widest">${step.note.title}</h5>
-                            <p class="text-[12px] md:text-[13px] text-gray-400 leading-relaxed">${step.note.text}</p>
-                        </div>`;
+                    html += `<div class="setup-compact-note"><span class="setup-compact-note-title">${step.note.title}</span><span class="setup-compact-note-text">${step.note.text}</span></div>`;
                 }
 
                 html += `</div></div>`;
-                stepRow.innerHTML = html;
-                stepperWrapper.appendChild(stepRow);
+
+                // Главный CTA выносим из колонки шага — прямым потомком карточки,
+                // чтобы он занимал всю ширину и читался как герой экрана.
+                if (step.type === 'button') {
+                    html += `<a href="${step.url}" class="setup-compact-cta"><i class="fas fa-bolt"></i> Подключиться в 1 клик!</a>`;
+                }
             });
 
-            container.appendChild(stepperWrapper);
+            if (subKey) {
+                html += `
+                    <div class="setup-compact-key">
+                        <p class="setup-compact-keylabel">Не сработало? Скопируйте ключ и вставьте в приложение вручную:</p>
+                        <div class="setup-compact-keyrow">
+                            <input type="text" readonly value="${subKey}" id="setup-copy-key" class="setup-compact-keyinput">
+                            <button type="button" onclick="copyInputValue('setup-copy-key', 'Ключ скопирован')" class="setup-compact-copybtn"><i class="fas fa-copy"></i> Копировать</button>
+                        </div>
+                    </div>`;
+            }
+
+            if (usageStep) {
+                html += `
+                    <div class="setup-compact-usage">
+                        <h4 class="setup-compact-usage-title">${usageStep.title}</h4>
+                        <p class="setup-compact-usage-text">${usageStep.content}</p>
+                    </div>`;
+            }
+
+            html += '</div>';
+            container.innerHTML = html;
         }
 
         function updateSubscriptionOverview() {
@@ -4098,7 +4456,11 @@
 
             selectedNewSetupPlatform = detectNewSetupPlatform();
             renderNewSetupWizard();
-            setPlatform('android');
+
+            // Компактный флоу: определяем устройство пользователя и сразу показываем
+            // рекомендованное приложение (первое в installData), а не хардкод Android.
+            // setPlatform синхронизирует дропдаун платформы и строит чипы приложений.
+            setPlatform(detectNewSetupPlatform());
             updateSubscriptionOverview();
             setupSupportAjaxForm(document.getElementById('support-message-form'));
             setupSupportAjaxForm(document.getElementById('support-create-form'));
@@ -4232,13 +4594,94 @@
             showToast('Ссылка скопирована!'); 
         }
 
-        function copyInputValue(inputId, message) {
-            const copyText = document.getElementById(inputId);
+        let deferredInstallPrompt = null;
+        window.addEventListener('beforeinstallprompt', (event) => {
+            event.preventDefault();
+            deferredInstallPrompt = event;
+        });
+
+        function isStandalonePWA() {
+            return window.matchMedia('(display-mode: standalone)').matches
+                || window.navigator.standalone === true;
+        }
+
+        function isIOSDevice() {
+            const ua = navigator.userAgent || '';
+            return /iphone|ipad|ipod/i.test(ua)
+                || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+        }
+
+        function openQuickAccessModal(title, bodyHtml) {
+            const modal = document.getElementById('quick-access-modal');
+            if (!modal) return;
+            document.getElementById('quick-access-title').textContent = title;
+            document.getElementById('quick-access-body').innerHTML = bodyHtml;
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeQuickAccessModal() {
+            const modal = document.getElementById('quick-access-modal');
+            if (!modal) return;
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        async function quickAccessInstall() {
+            // Уже установлено / открыто как приложение
+            if (isStandalonePWA()) {
+                openQuickAccessModal('Приложение уже установлено', 'Кабинет уже открыт как приложение или добавлен на главный экран — отдельная установка не нужна.');
+                return;
+            }
+            // Android / Chrome / Edge — нативная установка PWA
+            if (deferredInstallPrompt) {
+                deferredInstallPrompt.prompt();
+                try {
+                    await deferredInstallPrompt.userChoice;
+                } catch (err) {}
+                deferredInstallPrompt = null;
+                return;
+            }
+            // iOS Safari — автоматической установки нет, показываем инструкцию
+            if (isIOSDevice()) {
+                openQuickAccessModal('Добавьте на экран «Домой»', 'В Safari нажмите кнопку <b>«Поделиться»</b> (квадрат со стрелкой вверх внизу экрана), пролистайте и выберите <b>«На экран «Домой»»</b>. Иконка кабинета появится на рабочем столе и будет открываться как приложение.');
+                return;
+            }
+            // Прочие браузеры — общая инструкция
+            openQuickAccessModal('Добавьте кабинет как приложение', 'Откройте меню браузера и выберите <b>«Установить приложение»</b> или <b>«Добавить на главный экран»</b> — кабинет будет открываться как отдельное приложение.');
+        }
+
+        // Запасной способ копирования для старых браузеров / небезопасного контекста.
+        // Выделение снимается сразу после копирования, чтобы ключ не подсвечивался.
+        function legacyCopyInput(copyText) {
             copyText.select();
             copyText.setSelectionRange(0, 99999);
-            navigator.clipboard.writeText(copyText.value).then(() => {
+            let ok = false;
+            try {
+                ok = document.execCommand('copy');
+            } catch (err) {
+                ok = false;
+            }
+            copyText.setSelectionRange(0, 0);
+            copyText.blur();
+            const selection = window.getSelection && window.getSelection();
+            if (selection && selection.removeAllRanges) selection.removeAllRanges();
+            return ok;
+        }
+
+        function copyInputValue(inputId, message) {
+            const copyText = document.getElementById(inputId);
+            if (!copyText) return;
+
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+                navigator.clipboard.writeText(copyText.value)
+                    .then(() => showToast(message))
+                    .catch(() => {
+                        if (legacyCopyInput(copyText)) showToast(message);
+                    });
+            } else if (legacyCopyInput(copyText)) {
                 showToast(message);
-            });
+            }
         }
 
         // 4. Инициализация при загрузке (чтобы была открыта первая вкладка)
