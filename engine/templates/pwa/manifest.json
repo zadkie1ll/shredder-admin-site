@@ -3,8 +3,8 @@
   "short_name": "Monkey Island VPN",
   "start_url": "/dashboard/",
   "display": "standalone",
-  "background_color": "#1a1a1a",
-  "theme_color": "#ff9900",
+  "background_color": "#090a0f",
+  "theme_color": "#090a0f",
   "icons": [
     {
       "src": "/static/icons/icon-192x192.png",

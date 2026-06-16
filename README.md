@@ -99,6 +99,8 @@ async function pollStatus() {
 
 SPA-like дашборд с вкладками (home / subscription / setup / profile / support).
 Адаптивный: десктоп — боковое меню 248px, мобайл — нижний nav-bar.
+Шаблоны кабинета и PWA manifest явно задают темную `theme-color`/`color-scheme`,
+чтобы iOS Safari и standalone-режим не подсвечивали системные зоны светлым цветом.
 
 Личный кабинет поддерживает новый инвариант: запись в SQLAlchemy-таблице `users`
 может существовать без RWMS-подписки. В этом случае кабинет показывает состояние
