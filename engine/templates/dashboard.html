@@ -508,6 +508,20 @@
             min-height: 132px;
         }
 
+        .referral-rule-card {
+            min-height: auto;
+            padding: 22px 24px !important;
+        }
+
+        .referral-stat-card {
+            min-height: auto;
+            padding: 18px 22px !important;
+        }
+
+        .referral-stat-card p:last-child {
+            line-height: 1;
+        }
+
         .referral-link-input {
             background: rgba(0, 0, 0, 0.55);
             border: 1px solid rgba(255, 255, 255, 0.1);
@@ -949,8 +963,7 @@
             </div>
             <nav>
                 <button type="button" onclick="showTab('home')" class="nav-btn active" data-tab="home"><i class="fas fa-th-large"></i> Главная</button>
-                <button type="button" onclick="showTab('subscription')" class="nav-btn" data-tab="subscription"><i class="fas fa-key"></i> Подписка</button>
-                <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i> Настройка</button>
+                <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i> Установка</button>
                 <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-friends"></i> Рефералы</button>
                 <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-headset"></i> Поддержка</button>
             </nav>
@@ -963,8 +976,7 @@
 
         <nav class="nav-mobile">
             <button type="button" onclick="showTab('home')" class="nav-btn active" data-tab="home"><i class="fas fa-th-large"></i><span>Главная</span></button>
-            <button type="button" onclick="showTab('subscription')" class="nav-btn" data-tab="subscription"><i class="fas fa-key"></i><span>Ключи</span></button>
-            <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i><span>Настройка</span></button>
+            <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i><span>Установка</span></button>
             <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-friends"></i><span>Рефералы</span></button>
             <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-headset"></i><span>Помощь</span></button>
         </nav>
@@ -1149,7 +1161,7 @@
                                 <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-4">
                                     <i class="fas fa-bolt text-lg"></i>
                                 </div>
-                                <h3 class="text-lg font-black mb-2">Настройка</h3>
+                                <h3 class="text-lg font-black mb-2">Установка</h3>
                                 <p class="text-gray-500 text-sm font-bold leading-relaxed">Приложения и подключение</p>
                             </button>
                             <button type="button" onclick="showTab('support')" class="setup-step-card quick-action-card flex flex-col items-center justify-center text-center !mb-0">
@@ -1172,103 +1184,9 @@
                 </div>
             </div>
 
-            <div id="tab-subscription" class="tab-content">
-                <header class="mb-10 mobile-compact-header">
-                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Подписка</h1>
-                    <p class="text-gray-500 text-sm md:text-base font-bold">Ключи подключения и статус доступа</p>
-                </header>
-                <div class="overview-grid space-y-7">
-                    <section class="setup-shell p-6 md:p-8">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 subscription-status-grid">
-                            <div>
-                                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2">Статус</p>
-                                {% if not has_subscription_access %}
-                                    <p class="text-red-400 text-xl font-black">Нет активной подписки</p>
-                                {% else %}
-                                    <p class="text-[#00ff88] text-xl font-black">Активна</p>
-                                {% endif %}
-                            </div>
-                            <div>
-                                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2">Окончание</p>
-                                <p class="text-white text-xl font-black">{% if has_subscription_access %}{{ user.expire_at|date:"d.m.Y" }}{% else %}—{% endif %}</p>
-                            </div>
-                            <div>
-                                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2">Автопродление</p>
-                                {% if has_recurrent %}
-                                    <p class="text-[#00ff88] text-xl font-black">Включено</p>
-                                {% else %}
-                                    <p class="text-white text-xl font-black">Не подключено</p>
-                                {% endif %}
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="setup-shell p-6 md:p-8 subscription-keys-card">
-                        <div class="mb-6">
-                            <h2 class="text-2xl font-black mb-2">Ключи подключения</h2>
-                            <p class="text-gray-500 text-sm font-bold leading-relaxed subscription-keys-intro">Скопируй ключ для своего приложения. Для Happ используй отдельный Happ-ключ, для остальных клиентов — обычный.</p>
-                        </div>
-
-                        <div class="space-y-5 subscription-key-list">
-                            <div>
-                                <div class="flex items-center gap-3 mb-3 subscription-key-title-row">
-                                    <div class="w-10 h-10 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0 subscription-key-icon">
-                                        <i class="fas fa-bolt text-sm"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="text-lg font-black">Happ-ключ</h3>
-                                        <p class="text-gray-500 text-xs font-bold">Для приложения Happ (все локации в белом списке)</p>
-                                    </div>
-                                </div>
-                                <div class="flex flex-col sm:flex-row gap-3 subscription-key-row">
-                                    <input type="text" readonly value="{{ happ_subscription_url }}" id="happ-subscription-key-input" class="referral-link-input min-w-0 flex-1 py-4 px-5 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
-                                    <button type="button" onclick="copyInputValue('happ-subscription-key-input', 'Happ-ключ скопирован')" class="setup-cta-btn !w-full sm:!w-auto !py-4 !px-6 !text-[10px] !whitespace-nowrap !mb-0 !mr-0">
-                                        Копировать
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div>
-                                <div class="flex items-center gap-3 mb-3 subscription-key-title-row">
-                                    <div class="w-10 h-10 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0 subscription-key-icon">
-                                        <i class="fas fa-link text-sm"></i>
-                                    </div>
-                                    <div>
-                                        <h3 class="text-lg font-black">Обычный ключ</h3>
-                                        <p class="text-gray-500 text-xs font-bold">Для Clash, Hiddify, Shadowrocket и других клиентов</p>
-                                    </div>
-                                </div>
-                                <div class="flex flex-col sm:flex-row gap-3 subscription-key-row">
-                                    <input type="text" readonly value="{{ plain_subscription_url }}" id="plain-subscription-key-input" class="referral-link-input min-w-0 flex-1 py-4 px-5 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
-                                    <button type="button" onclick="copyInputValue('plain-subscription-key-input', 'Обычный ключ скопирован')" class="setup-cta-btn !w-full sm:!w-auto !py-4 !px-6 !text-[10px] !whitespace-nowrap !mb-0 !mr-0">
-                                        Копировать
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </section>
-
-                    <section class="setup-shell p-6 md:p-8 subscription-next-card">
-                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-                            <div>
-                                <h2 class="text-2xl font-black mb-3">Что делать дальше</h2>
-                                <div class="flex flex-col sm:flex-row gap-x-6 gap-y-2 text-sm font-black text-white">
-                                    <div class="flex items-center gap-2"><span class="text-[#ffc700]">1.</span><span>Открой настройку</span></div>
-                                    <div class="flex items-center gap-2"><span class="text-[#ffc700]">2.</span><span>Следуй виджету</span></div>
-                                    <div class="flex items-center gap-2"><span class="text-[#ffc700]">3.</span><span>Включи VPN</span></div>
-                                </div>
-                            </div>
-                            <button type="button" onclick="showTab('setup')" class="setup-cta-btn !w-full md:!w-auto !py-4 !px-8 !text-sm !whitespace-nowrap !mb-0 !mr-0">
-                                Открыть виджет настройки
-                            </button>
-                        </div>
-                    </section>
-                </div>
-            </div>
-
             <div id="tab-setup" class="tab-content">
                 <header class="mb-10 {% if use_new_setup_flow %}hidden{% endif %}">
-                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Настройка</h1>
+                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Установка</h1>
                     <p class="text-gray-500 text-sm md:text-base font-bold">Выбери устройство и подключись по готовой инструкции</p>
                 </header>
                 <div class="overview-grid space-y-7">
@@ -1321,30 +1239,20 @@
             </div>
 
             <div id="tab-profile" class="tab-content">
-                <header class="mb-10 referral-mobile-header">
-                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Рефералы</h1>
-                    <p class="text-gray-500 text-sm md:text-base font-bold">Приглашай друзей и получай дни к подписке</p>
+                <header class="mb-7 referral-mobile-header">
+                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Приглашения и бонусы</h1>
                 </header>
                 <div class="overview-grid space-y-7">
-                    <section class="setup-shell overview-hero-card referral-hero-card">
-                        <div class="relative z-10 flex flex-col md:flex-row md:items-center md:justify-between gap-7">
-                            <div class="flex items-start gap-5">
-                                <div class="w-16 h-16 rounded-3xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
-                                    <i class="fas fa-gift text-2xl"></i>
-                                </div>
-                                <div>
-                                    <h2 class="text-2xl font-black mb-2">Добыча за друзей</h2>
-                                    <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">Друг получает доступ по твоей ссылке, а ты получаешь бонусные дни, когда он начинает пользоваться VPN и оформляет подписку.</p>
-                                </div>
+                    <section class="grid grid-cols-1 md:grid-cols-3 gap-5 referral-rule-grid">
+                        <div class="setup-step-card metric-card flex items-start gap-4 !mb-0 referral-rule-card">
+                            <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                <i class="fas fa-user-check text-lg"></i>
                             </div>
-                            <div class="md:text-right">
-                                <p class="text-gray-500 text-sm font-bold mb-1">Бонусные дни</p>
-                                <p class="text-5xl font-black text-[#ffc700]">+{{ bonus_days|default:"0" }}</p>
+                            <div>
+                                <h3 class="text-lg font-black mb-2">+{{ join_referrer_bonus_days|default:"3" }} дня за регистрацию</h3>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Добавим, когда друг создаст аккаунт по твоей ссылке.</p>
                             </div>
                         </div>
-                    </section>
-
-                    <section class="grid grid-cols-1 md:grid-cols-2 gap-5 referral-rule-grid">
                         <div class="setup-step-card metric-card flex items-start gap-4 !mb-0 referral-rule-card">
                             <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                                 <i class="fas fa-user-plus text-lg"></i>
@@ -1587,7 +1495,7 @@
                             <i class="fas fa-gift text-xl"></i>
                         </div>
                         <div>
-                            <h4 class="text-xl font-black mb-2">Добыча за друзей</h4>
+                            <h4 class="text-xl font-black mb-2">Приглашения и бонусы</h4>
                             <p class="text-gray-500 text-sm font-bold leading-relaxed">Отправь ссылку другу и получай дни к подписке автоматически.</p>
                         </div>
                     </div>
@@ -1598,7 +1506,16 @@
                 </div>
             </div>
 
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-5">
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">
+                <div class="setup-step-card !p-4 !mb-0 flex items-start gap-3">
+                    <div class="w-10 h-10 bg-[#ffc700]/10 border border-[#ffc700]/20 rounded-xl flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                        <i class="fas fa-user-check text-sm"></i>
+                    </div>
+                    <div>
+                        <h5 class="text-sm font-black mb-1">+{{ join_referrer_bonus_days|default:"3" }} дня за регистрацию</h5>
+                        <p class="text-gray-500 text-xs font-bold leading-relaxed">когда друг создаст аккаунт</p>
+                    </div>
+                </div>
                 <div class="setup-step-card !p-4 !mb-0 flex items-start gap-3">
                     <div class="w-10 h-10 bg-[#ffc700]/10 border border-[#ffc700]/20 rounded-xl flex items-center justify-center text-[#ffc700] flex-shrink-0">
                         <i class="fas fa-user-plus text-sm"></i>
@@ -2723,7 +2640,7 @@
 
             if (newSetupStep === 'start' || newSetupStep === 'devices') {
                 root.innerHTML = `
-                    <h2 class="text-3xl md:text-4xl font-black mb-3">Настройка на ${app.platformLabel}</h2>
+                    <h2 class="text-3xl md:text-4xl font-black mb-3">Установка на ${app.platformLabel}</h2>
                     <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Подключение проходит в 3 шага и занимает пару минут</p>
                     ${newSetupOrb('fas fa-link', 25)}
                     <div class="space-y-4">
@@ -2857,20 +2774,64 @@
             // 2. Отрисовка контента (твой код без изменений структуры)
             const app = installData[platform][index];
             const container = document.getElementById('full-instructions-container');
-            
             container.innerHTML = '';
-            
+
+            const buttonStep = app.steps.find(s => s.type === 'button');
+            const subKey = buttonStep ? buttonStep.url : '';
+            const installStep = app.steps.find(s => s.title === 'Установка приложения') || app.steps.find(s => s.links);
+            const usageStep = app.steps.find(s => s.title === 'Подключение и использование');
+            const mainSteps = app.steps.filter(s => s !== usageStep && s !== installStep && s !== buttonStep);
+
             const stepperWrapper = document.createElement('div');
             stepperWrapper.className = 'space-y-5';
 
-            app.steps.forEach((step, idx) => {
+            let installInstruction = `Скачайте <span class="text-[#ffc700] font-bold">${app.name}</span>.`;
+            if (installStep?.content && !installStep.links?.length) {
+                installInstruction = installStep.content.replaceAll('setup-compact-textlink', 'text-[#ffc700] font-bold hover:text-[#ffe066]');
+            } else if (installStep?.links?.length) {
+                const happRussiaLink = installStep.links.find(link => /apk|ru/i.test(`${link.text} ${link.url}`));
+                const happOtherLink = installStep.links.find(link => link !== happRussiaLink);
+                if (app.name === 'Happ' && happRussiaLink && happOtherLink) {
+                    installInstruction = `Скачайте <a href="${happRussiaLink.url}" target="_blank" rel="noopener" class="text-[#ffc700] font-bold hover:text-[#ffe066]">Happ</a> для России или <a href="${happOtherLink.url}" target="_blank" rel="noopener" class="text-[#ffc700] font-bold hover:text-[#ffe066]">Happ</a> для других регионов.`;
+                } else {
+                    const installLinks = installStep.links.map(link => `<a href="${link.url}" target="_blank" rel="noopener" class="text-[#ffc700] font-bold hover:text-[#ffe066]">${link.text}</a>`).join(' или ');
+                    installInstruction = `Скачайте ${installLinks}.`;
+                }
+            }
+
+            const heroCard = document.createElement('div');
+            heroCard.className = "setup-step-card !mb-0";
+            let heroHtml = `
+                <h3 class="text-white text-base font-extrabold uppercase leading-tight mb-4">Для подключения</h3>
+                <ol class="space-y-2.5 mb-5">
+                    <li class="grid grid-cols-[22px_1fr] gap-2 text-gray-500 text-sm font-bold leading-relaxed">
+                        <span>1.</span>
+                        <span>${installInstruction}</span>
+                    </li>
+                    <li class="grid grid-cols-[22px_1fr] gap-2 text-gray-500 text-sm font-bold leading-relaxed">
+                        <span>2.</span>
+                        <span>Нажмите на кнопку ниже, чтобы подключиться в 1 клик.</span>
+                    </li>
+                </ol>`;
+
+            if (buttonStep) {
+                heroHtml += `
+                    <a href="${buttonStep.url}" class="setup-cta-btn !w-full !py-4 !px-6 !text-sm !font-bold !mb-0 !mr-0">
+                        <i class="fas fa-bolt"></i> Подключиться в 1 клик!
+                    </a>`;
+            }
+
+            heroCard.innerHTML = heroHtml;
+            stepperWrapper.appendChild(heroCard);
+
+            mainSteps.forEach((step, idx) => {
                 const stepRow = document.createElement('div');
                 stepRow.className = "setup-step-card !mb-0";
                 
                 let html = `
                     <div class="flex flex-col md:flex-row gap-5">
                         <div class="w-12 h-12 rounded-2xl bg-[#ffc700] text-black flex items-center justify-center font-black flex-shrink-0">
-                            ${idx + 1}
+                            ${idx + 3}
                         </div>
                         <div class="flex-1">
                             <h4 class="text-lg font-black mb-2">${step.title}</h4>
@@ -2907,6 +2868,29 @@
                 stepRow.innerHTML = html;
                 stepperWrapper.appendChild(stepRow);
             });
+
+            if (subKey) {
+                const keyRow = document.createElement('div');
+                keyRow.className = "setup-step-card !mb-0";
+                keyRow.innerHTML = `
+                    <p class="text-gray-500 text-sm font-bold leading-relaxed mb-4">Не сработало? Скопируйте ключ и вставьте в приложение вручную:</p>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <input type="text" readonly value="${subKey}" id="setup-copy-key" class="flex-1 bg-black/40 border border-white/10 rounded-2xl px-4 py-4 text-xs text-gray-400 min-w-0">
+                        <button type="button" onclick="copyInputValue('setup-copy-key', 'Ключ скопирован')" class="setup-cta-btn !w-full sm:!w-auto !py-4 !px-6 !text-[10px] !whitespace-nowrap !mb-0 !mr-0">
+                            <i class="fas fa-copy"></i> Копировать
+                        </button>
+                    </div>`;
+                stepperWrapper.appendChild(keyRow);
+            }
+
+            if (usageStep) {
+                const usageRow = document.createElement('div');
+                usageRow.className = "setup-step-card !mb-0";
+                usageRow.innerHTML = `
+                    <h4 class="text-gray-500 text-sm font-bold leading-relaxed mb-1">${usageStep.title}</h4>
+                    <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">${usageStep.content}</p>`;
+                stepperWrapper.appendChild(usageRow);
+            }
 
             container.appendChild(stepperWrapper);
         }

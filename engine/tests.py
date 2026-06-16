@@ -3,6 +3,7 @@ import hmac
 import json
 import time
 from datetime import datetime
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
@@ -29,6 +30,52 @@ from engine.views import should_create_trial_for_channel
 from engine.views import should_send_payment_login_email
 from engine.views import site_trial_registration_enabled
 from engine.views import verify_telegram_widget_auth
+
+
+class DashboardSetupTemplateTests(SimpleTestCase):
+    def test_compact_setup_uses_connection_hero(self):
+        template = Path("engine/templates/dashboard_v2.html").read_text()
+        legacy_template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn("Для подключения", template)
+        self.assertIn("Подключиться в 1 клик!", template)
+        self.assertIn('data-tab="setup"><i class="fas fa-bolt"></i> Установка</button>', template)
+        self.assertIn("<span>Установка</span>", template)
+        self.assertIn("installInstruction", template)
+        self.assertIn("s !== installStep && s !== buttonStep", template)
+        self.assertNotIn("#9cff1a", template)
+        self.assertIn("color: #6b7280;", template)
+        self.assertIn("font-size: 14px;", template)
+        self.assertIn("font-weight: 700;", template)
+        self.assertIn("line-height: 1.625;", template)
+        self.assertNotIn('id="tab-subscription"', template)
+        self.assertNotIn('id="tab-subscription"', legacy_template)
+        self.assertNotIn("showTab('subscription')", template)
+        self.assertNotIn("showTab('subscription')", legacy_template)
+
+
+class DashboardReferralTemplateTests(SimpleTestCase):
+    def test_referral_page_shows_registration_bonus(self):
+        template = Path("engine/templates/dashboard_v2.html").read_text()
+        legacy_template = Path("engine/templates/dashboard.html").read_text()
+
+        registration_bonus = '+{{ join_referrer_bonus_days|default:"3" }} дня за регистрацию'
+        self.assertIn("Приглашения и бонусы", template)
+        self.assertIn("Приглашения и бонусы", legacy_template)
+        self.assertIn(registration_bonus, template)
+        self.assertIn(registration_bonus, legacy_template)
+        self.assertIn("когда друг создаст аккаунт", template)
+        self.assertIn("когда друг создаст аккаунт", legacy_template)
+        self.assertIn("md:grid-cols-3", template)
+        self.assertIn("md:grid-cols-3", legacy_template)
+        self.assertIn("padding: 22px 24px !important;", template)
+        self.assertIn("padding: 22px 24px !important;", legacy_template)
+        self.assertIn("padding: 18px 22px !important;", template)
+        self.assertIn("padding: 18px 22px !important;", legacy_template)
+        self.assertIn(".referral-stat-card p:last-child", template)
+        self.assertIn(".referral-stat-card p:last-child", legacy_template)
+        self.assertNotIn("Добыча за друзей", template)
+        self.assertNotIn("Добыча за друзей", legacy_template)
 
 
 class CustomConfigTemplatePayloadTests(SimpleTestCase):
