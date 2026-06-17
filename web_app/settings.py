@@ -89,6 +89,45 @@ def telegram_auth_bots(value):
     return bots
 
 
+def telegram_web_login_start_codes(value):
+    value = value.strip()
+    if not value:
+        return {}
+
+    codes = {}
+    for item in value.split(","):
+        if not item.strip():
+            continue
+
+        parts = [part.strip() for part in item.split("|", 1)]
+        if len(parts) != 2:
+            raise ValueError(
+                "TELEGRAM_WEB_LOGIN_START_CODES entries must use "
+                "domain|webvN or webvN|domain format"
+            )
+
+        left, right = parts
+        left_is_code = left.lower().startswith("web")
+        right_is_code = right.lower().startswith("web")
+        if left_is_code == right_is_code:
+            raise ValueError(
+                "TELEGRAM_WEB_LOGIN_START_CODES entries must contain one domain "
+                "and one web start code"
+            )
+
+        if left_is_code:
+            code, domain = left, right
+        else:
+            domain, code = left, right
+
+        normalized_domain = normalize_domain_entry(domain)
+        normalized_code = code.lower()
+        if normalized_domain and normalized_code:
+            codes[normalized_domain] = normalized_code
+
+    return codes
+
+
 VPN_DOMAINS = config(
     "VPN_DOMAINS",
     default=config("PROMO_DOMAINS", default="localhost,127.0.0.1"),
@@ -119,6 +158,11 @@ TELEGRAM_AUTH_BOT_TOKEN = config(
     default=config("MI_VPN_BOT_TOKEN", default=""),
 )
 TELEGRAM_AUTH_BOTS = config("TELEGRAM_AUTH_BOTS", default="", cast=telegram_auth_bots)
+TELEGRAM_WEB_LOGIN_START_CODES = config(
+    "TELEGRAM_WEB_LOGIN_START_CODES",
+    default="",
+    cast=telegram_web_login_start_codes,
+)
 SITE_TRIAL_PERIOD_DAYS = config("SITE_TRIAL_PERIOD_DAYS", default=7, cast=int)
 SITE_REFERRAL_TRIAL_PERIOD_DAYS = config(
     "SITE_REFERRAL_TRIAL_PERIOD_DAYS",

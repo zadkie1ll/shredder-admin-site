@@ -25,11 +25,13 @@ from engine.views import custom_config_template_payload
 from engine.views import form_bool_enabled
 from engine.views import get_runtime_actual_tariffs
 from engine.views import get_telegram_auth_bot
+from engine.views import get_telegram_web_login_start_code
 from engine.views import render_login
 from engine.views import should_create_trial_for_channel
 from engine.views import should_send_payment_login_email
 from engine.views import site_trial_registration_enabled
 from engine.views import verify_telegram_widget_auth
+from web_app.settings import telegram_web_login_start_codes
 
 
 class DashboardSetupTemplateTests(SimpleTestCase):
@@ -172,6 +174,34 @@ class TelegramAuthBotTests(SimpleTestCase):
 
         self.assertEqual(bot["username"], "vpn_auth_bot")
         self.assertEqual(bot["token"], "222:second-token")
+
+    @override_settings(
+        TELEGRAM_WEB_LOGIN_START_CODES={
+            "monkeyislandvpn.com": "webv2",
+            "monkey-island-vpn.com": "webv3",
+        }
+    )
+    def test_selects_telegram_web_login_start_code_by_host(self):
+        self.assertEqual(
+            get_telegram_web_login_start_code("monkeyislandvpn.com"),
+            "webv2",
+        )
+        self.assertEqual(
+            get_telegram_web_login_start_code("monkey-island-vpn.com"),
+            "webv3",
+        )
+        self.assertEqual(get_telegram_web_login_start_code("mnk-island.org"), "web")
+
+    def test_parses_telegram_web_login_start_codes_in_both_orders(self):
+        self.assertEqual(
+            telegram_web_login_start_codes(
+                "mnk-island.org|webv1,webv2|https://monkeyislandvpn.com"
+            ),
+            {
+                "mnk-island.org": "webv1",
+                "monkeyislandvpn.com": "webv2",
+            },
+        )
 
     @override_settings(
         TELEGRAM_AUTH_BOTS={},

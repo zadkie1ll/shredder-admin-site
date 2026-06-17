@@ -185,6 +185,11 @@ def get_telegram_auth_bot(host):
     return None
 
 
+def get_telegram_web_login_start_code(host):
+    normalized_host = normalize_host(host)
+    return settings.TELEGRAM_WEB_LOGIN_START_CODES.get(normalized_host, "web")
+
+
 def get_telegram_bot_id(bot):
     return bot["token"].split(":", 1)[0]
 
@@ -1026,7 +1031,7 @@ def render_login(request, context=None, status=200):
     )
     payload["telegram_bot_username"] = telegram_bot_username
     payload["telegram_bot_id"] = telegram_bot_id
-    telegram_start_parts = ["web"]
+    telegram_start_parts = [get_telegram_web_login_start_code(request.get_host())]
     tracking_params = payload["tracking_params"]
     if tracking_params.get("ymid"):
         telegram_start_parts.append(f"ymid{tracking_params['ymid']}")
@@ -1036,14 +1041,14 @@ def render_login(request, context=None, status=200):
         telegram_start_parts.append(f"a{tracking_params['a']}")
     telegram_start_payload = "-".join(telegram_start_parts)
     if len(telegram_start_payload) > 64:
-        telegram_start_parts = ["web"]
+        telegram_start_parts = [get_telegram_web_login_start_code(request.get_host())]
         if tracking_params.get("ts"):
             telegram_start_parts.append(f"ts{tracking_params['ts']}")
         if tracking_params.get("a"):
             telegram_start_parts.append(f"a{tracking_params['a']}")
         telegram_start_payload = "-".join(telegram_start_parts)
     if len(telegram_start_payload) > 64:
-        telegram_start_payload = "web"
+        telegram_start_payload = get_telegram_web_login_start_code(request.get_host())
     payload["telegram_bot_login_url"] = (
         f"https://t.me/{telegram_bot_username}?start={telegram_start_payload}"
         if telegram_bot_login_enabled

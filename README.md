@@ -226,6 +226,17 @@ Action-кнопки кабинета (`setup-cta-btn`, `setup-link-btn`, `paymen
 > поведения в проде проверьте и env-переменную, и runtime-настройку
 > `site_trial_registration_enabled` в админке («Общие»): runtime-значение перекрывает env.
 
+Telegram-вход через бота сохраняет доменный контекст через короткие start-коды.
+Сайт не передаёт полный URL в Telegram: вместо этого env
+`TELEGRAM_WEB_LOGIN_START_CODES` задаёт allowlist вида
+`mnk-island.org|webv1,monkeyislandvpn.com|webv2,monkey-island-vpn.com|webv3`.
+Рекомендуемый порядок — `domain|webvN`; для защиты от ошибки конфигурации сайт также
+понимает обратный порядок `webvN|domain` и нормализует его в тот же allowlist.
+Если домена нет в списке, сайт отправляет старый `web` для обратной совместимости.
+В Telegram-боте тем же кодам должны соответствовать URL в
+`MI_VPN_BOT_WEB_LOGIN_URLS`; `web` и `webv1` всегда означают обычный bot
+`web_login_url`, который также используется для `/web`.
+
 Онбординг из 5 слайдов (`login_onboarding_enabled` в `render_login`) показывается на
 всех доменах, **кроме `cabinet`** — на cabinet-доменах главная сразу показывает форму
 входа без онбординга (соответствует требованию: онбординг только на не-cabinet доменах).
