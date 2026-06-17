@@ -2986,19 +2986,6 @@ def support_admin_api_config_templates(request):
         else:
             template = CustomConfigTemplate()
 
-        if is_active:
-            active_templates_query = db_session.query(CustomConfigTemplate).filter(
-                CustomConfigTemplate.is_active.is_(True)
-            )
-            if template_id:
-                active_templates_query = active_templates_query.filter(
-                    CustomConfigTemplate.id != int(template_id)
-                )
-            active_templates_query.update(
-                {CustomConfigTemplate.is_active: False},
-                synchronize_session=False,
-            )
-
         template.name = name[:160]
         template.template_json = template_json
         template.entry_name = entry_name[:256] if entry_name else None
@@ -3021,7 +3008,7 @@ def support_admin_api_config_templates(request):
             return JsonResponse(
                 {
                     "status": "error",
-                    "message": "Не удалось сохранить: проверьте уникальность имени конфига",
+                    "message": "Не удалось сохранить: проверьте уникальность имени конфига и снятие старого ограничения на один активный шаблон",
                 },
                 status=400,
             )

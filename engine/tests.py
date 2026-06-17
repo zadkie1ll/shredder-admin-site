@@ -13,6 +13,7 @@ from django.test import override_settings
 
 from common.models.settings import BOT_TARIFF_PRICE_MONTH_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_YEAR_SETTING
+from common.models.db import CustomConfigTemplate
 from common.models.db import User
 from engine.payments import create_wata_payment_sync
 from engine.payments import create_yk_payment_sync
@@ -30,6 +31,7 @@ from engine.views import render_login
 from engine.views import should_create_trial_for_channel
 from engine.views import should_send_payment_login_email
 from engine.views import site_trial_registration_enabled
+from engine.views import support_admin_api_config_templates
 from engine.views import verify_telegram_widget_auth
 from web_app.settings import telegram_web_login_start_codes
 
@@ -113,6 +115,12 @@ class DashboardReferralTemplateTests(SimpleTestCase):
 
 
 class CustomConfigTemplatePayloadTests(SimpleTestCase):
+    def test_custom_config_template_model_allows_multiple_active_rows(self):
+        self.assertNotIn(
+            "uix_custom_config_templates_single_active",
+            {index.name for index in CustomConfigTemplate.__table__.indexes},
+        )
+
     def test_form_bool_enabled_handles_checkbox_values(self):
         self.assertTrue(form_bool_enabled("1"))
         self.assertTrue(form_bool_enabled("on"))
@@ -138,6 +146,57 @@ class CustomConfigTemplatePayloadTests(SimpleTestCase):
 
         self.assertFalse(payload["enable_dialer_proxy"])
         self.assertEqual(payload["dialer_proxy_name"], "CUSTOM-ROUTING")
+
+    def test_config_template_save_does_not_deactivate_other_active_templates(self):
+        template = SimpleNamespace(
+            id=1,
+            name="old",
+            template_json="{}",
+            entry_name=None,
+            enable_dialer_proxy=True,
+            dialer_proxy_name=None,
+            announce_text=None,
+            support_url=None,
+            profile_update_interval=None,
+            additional_headers={},
+            is_active=True,
+            updated_at=None,
+        )
+
+        class FakeSession:
+            def get(self, model, template_id):
+                return template
+
+            def query(self, model):
+                raise AssertionError("saving an active template must not deactivate others")
+
+            def commit(self):
+                return None
+
+            def rollback(self):
+                return None
+
+            def close(self):
+                return None
+
+        request = RequestFactory().post(
+            "/support-admin/api/config-templates/",
+            data={
+                "template_id": "1",
+                "name": "active-a",
+                "template_json": "{}",
+                "is_active": "1",
+            },
+        )
+
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=FakeSession()),
+        ):
+            response = support_admin_api_config_templates(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(template.is_active)
 
 
 class AdminSalesSeriesTests(SimpleTestCase):

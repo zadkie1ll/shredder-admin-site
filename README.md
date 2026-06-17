@@ -408,8 +408,14 @@ email-сервиса в этом пути нет. Если отправка уп
 - `enable_dialer_proxy` — включает или выключает добавление `sockopt.dialerProxy`;
 - `dialer_proxy_name` — имя outbound для `dialerProxy`; пустое значение означает fallback `ROUTING-IN` в custom-config.
 
-> Требуется миграция БД после обновления common-модели из бота: новые поля должны
-> появиться в `custom_config_templates` через штатный alembic-скрипт common.
+Админка допускает несколько записей с `is_active=true`. В DB-режиме сервис
+`monkey-island-custom-config` берёт все активные шаблоны и выдаёт их пользователям
+по кругу в порядке `id`.
+
+> Требуется миграция БД после обновления common-модели: если в базе ещё есть partial
+> unique index `uix_custom_config_templates_single_active`, его нужно снять отдельной
+> штатной alembic-миграцией common. Иначе PostgreSQL по-прежнему не позволит сохранить
+> несколько записей с `is_active=true`.
 
 ### Win-back настройки
 
