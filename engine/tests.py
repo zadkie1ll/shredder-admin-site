@@ -114,6 +114,32 @@ class DashboardReferralTemplateTests(SimpleTestCase):
         self.assertNotIn("Добыча за друзей", template)
 
 
+class AdminDashboardTemplateTests(SimpleTestCase):
+    def test_large_loading_state_uses_payment_status_orb_spinner(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn(".admin-loading-state", template)
+        self.assertIn(".admin-loading-orb", template)
+        self.assertIn(".admin-loading-orb-pulse", template)
+        self.assertIn(".admin-loading-orb-ring-outer", template)
+        self.assertIn(".admin-loading-orb-ring-inner", template)
+        self.assertIn(".admin-loading-orb-center", template)
+        self.assertIn(".admin-loading-caption", template)
+        self.assertIn("admin-orb-spin-cw", template)
+        self.assertIn("admin-orb-spin-ccw", template)
+        self.assertIn('role="status"', template)
+        self.assertIn("const safeText = escapeHtml(text);", template)
+        self.assertIn('<p class="admin-loading-caption">${safeText}</p>', template)
+        self.assertNotIn("card info-card admin-loading", template)
+        self.assertNotIn("Запрос отправлен", template)
+        self.assertNotIn("Ожидаем ответ сервера", template)
+        self.assertNotIn("Обновляем данные", template)
+        self.assertNotIn(
+            '<div class="card info-card muted">${text}</div>',
+            template,
+        )
+
+
 class CustomConfigTemplatePayloadTests(SimpleTestCase):
     def test_custom_config_template_model_allows_multiple_active_rows(self):
         self.assertNotIn(
