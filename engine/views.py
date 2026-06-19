@@ -1980,27 +1980,7 @@ def payment_retry(request, token):
         ):
             return redirect("payment_status", token=token)
 
-        tariff = next(
-            (t for t in ACTUAL_TARIFFS if t.db_tariff_id == wata_invoice.tariff_id),
-            None,
-        )
-        return render(
-            request,
-            "wata_payment.html",
-            {
-                "tariff_description": (
-                    tariff.description if tariff else wata_invoice.description
-                ),
-                "tariff_price": wata_invoice.amount,
-                "wata_payment_url": wata_invoice.url,
-                "payment_status_url": build_payment_status_url(request, token),
-                "status_api_url": reverse("payment_status_json", args=[token]),
-                "status_active_url": reverse(
-                    "payment_status_active_json", args=[token]
-                ),
-                "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
-            },
-        )
+        return redirect(wata_invoice.url)
     finally:
         db_session.close()
 
@@ -5667,33 +5647,6 @@ def pay(request):
                 user.id,
                 tariff.db_tariff_id,
             )
-            if settings.PAYMENT_GATEWAY.lower() == "wata":
-                logging.info(
-                    "payment rendering wata widget: email=%s user_id=%s tariff_id=%s",
-                    email,
-                    user.id,
-                    tariff.db_tariff_id,
-                )
-                return render(
-                    request,
-                    "wata_payment.html",
-                    {
-                        "tariff": tariff,
-                        "tariff_description": tariff.description,
-                        "tariff_price": tariff.price,
-                        "wata_payment_url": confirmation_url,
-                        "payment_status_url": payment_status_url,
-                        "status_api_url": reverse(
-                            "payment_status_json",
-                            args=[raw_purchase_token],
-                        ),
-                        "status_active_url": reverse(
-                            "payment_status_active_json",
-                            args=[raw_purchase_token],
-                        ),
-                        "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
-                    },
-                )
             return redirect(confirmation_url)
 
         except Exception as e:

@@ -27,6 +27,7 @@ from engine.views import form_bool_enabled
 from engine.views import get_runtime_actual_tariffs
 from engine.views import get_telegram_auth_bot
 from engine.views import get_telegram_web_login_start_code
+from engine.views import payment_retry
 from engine.views import render_login
 from engine.views import should_create_trial_for_channel
 from engine.views import should_send_payment_login_email
@@ -121,9 +122,16 @@ class DashboardPwaLayoutTemplateTests(SimpleTestCase):
         self.assertIn("document.documentElement.classList.add('standalone-pwa')", template)
         self.assertIn("document.documentElement.classList.add('ios-device')", template)
         self.assertIn("html.standalone-pwa.ios-device #app-container", template)
+        self.assertIn("html.standalone-pwa.ios-device body.dashboard-v2 #tariff-selection-view", template)
         self.assertIn("padding-top: calc(18px + env(safe-area-inset-top)) !important;", template)
+        self.assertIn("padding-top: calc(20px + env(safe-area-inset-top)) !important;", template)
         self.assertIn("height: 72px;", template)
         self.assertIn("padding-bottom: 88px !important;", template)
+
+    def test_mobile_renewal_cta_is_short(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertNotIn("Оплатить и получить доступ", template)
 
 
 class AdminDashboardTemplateTests(SimpleTestCase):
@@ -150,6 +158,33 @@ class AdminDashboardTemplateTests(SimpleTestCase):
             '<div class="card info-card muted">${text}</div>',
             template,
         )
+
+
+class WataPaymentFlowTests(SimpleTestCase):
+    def test_wata_views_do_not_embed_hosted_payment_page_in_iframe(self):
+        views = Path("engine/views.py").read_text()
+
+        self.assertNotIn('"wata_payment.html"', views)
+        self.assertNotIn("payment rendering wata widget", views)
+
+    def test_wata_payment_retry_redirects_to_hosted_invoice_url(self):
+        request = RequestFactory().get("/pay/retry/token/")
+        invoice = SimpleNamespace(url="https://wata.example/pay", order_id="order-1")
+
+        class FakeSession:
+            def close(self):
+                return None
+
+        with (
+            mock.patch("engine.views.session_factory", return_value=FakeSession()),
+            mock.patch("engine.views.get_purchase_login_token", return_value=object()),
+            mock.patch("engine.views.get_purchase_wata_invoice", return_value=invoice),
+            mock.patch("engine.views.is_wata_invoice_expired", return_value=False),
+        ):
+            response = payment_retry(request, "token")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response["Location"], "https://wata.example/pay")
 
 
 class CustomConfigTemplatePayloadTests(SimpleTestCase):

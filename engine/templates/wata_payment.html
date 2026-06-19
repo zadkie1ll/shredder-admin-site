@@ -203,18 +203,6 @@
             window.location.href = paymentStatusUrl;
         }
 
-        function followStatusRedirect() {
-            try {
-                const href = frame.contentWindow.location.href;
-                if (href && href.startsWith(window.location.origin + '/payment/status/')) {
-                    statusRedirectStarted = true;
-                    window.location.href = href;
-                }
-            } catch (err) {
-                return;
-            }
-        }
-
         // Активная проверка статуса напрямую у Wata (через наш бэкенд, который
         // троттлит обращения к Wata до 1 раза в 30с на заказ). Нужна, чтобы не
         // ждать 10-секундный экран успеха Wata: как только оплата подтверждена —
@@ -247,19 +235,16 @@
         }
 
         function handleFrameLoad() {
-            followStatusRedirect();
-
             if (!frameLoadedOnce) {
                 frameLoadedOnce = true;
                 return;
             }
 
-            // Любая перезагрузка фрейма после ввода данных — повод проверить
-            // статус у Wata: возможно, это уже экран успеха.
-            activeCheck();
-
+            // Любая перезагрузка фрейма после взаимодействия — только повод
+            // проверить статус у Wata. Сам факт load/redirect внутри формы не
+            // означает оплату: в СБП iframe перезагружается уже после выбора банка.
             if (frameInteracted) {
-                window.setTimeout(goToPaymentStatus, 300);
+                activeCheck();
             }
         }
 
@@ -291,7 +276,6 @@
             }
         });
         frame.addEventListener('load', handleFrameLoad);
-        window.setInterval(followStatusRedirect, 1000);
         window.setTimeout(pollStatus, 1000);
     </script>
 </body>

@@ -2125,12 +2125,21 @@
                 padding-top: 8px;
                 padding-bottom: 0;
             }
+
+            html.standalone-pwa.ios-device body.dashboard-v2 #tariff-selection-view {
+                min-height: 100dvh;
+                padding-top: calc(24px + env(safe-area-inset-top)) !important;
+            }
         }
 
         @media (max-width: 640px) {
             html.standalone-pwa.ios-device body.dashboard-v2 .main-content {
                 padding-top: calc(18px + env(safe-area-inset-top)) !important;
                 padding-bottom: 88px !important;
+            }
+
+            html.standalone-pwa.ios-device body.dashboard-v2 #tariff-selection-view {
+                padding-top: calc(20px + env(safe-area-inset-top)) !important;
             }
         }
     </style>
@@ -2756,7 +2765,7 @@
                     </p>
 
                     <button type="submit" class="plans-submit payment-cta w-full transition-all hover:scale-[1.01] active:scale-95">
-                        Оплатить и получить доступ
+                        Оплатить
                     </button>
                 </form>
             </div>
