@@ -114,6 +114,18 @@ class DashboardReferralTemplateTests(SimpleTestCase):
         self.assertNotIn("Добыча за друзей", template)
 
 
+class DashboardPwaLayoutTemplateTests(SimpleTestCase):
+    def test_ios_standalone_pwa_uses_safe_area_layout_fix(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn("document.documentElement.classList.add('standalone-pwa')", template)
+        self.assertIn("document.documentElement.classList.add('ios-device')", template)
+        self.assertIn("html.standalone-pwa.ios-device #app-container", template)
+        self.assertIn("padding-top: calc(18px + env(safe-area-inset-top)) !important;", template)
+        self.assertIn("height: 72px;", template)
+        self.assertIn("padding-bottom: 88px !important;", template)
+
+
 class AdminDashboardTemplateTests(SimpleTestCase):
     def test_large_loading_state_uses_payment_status_orb_spinner(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()

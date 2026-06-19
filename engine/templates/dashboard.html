@@ -16,6 +16,17 @@
     <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <title>VPN Monkey Island</title>
+    <script>
+        (function () {
+            var standalone = window.matchMedia('(display-mode: standalone)').matches
+                || window.navigator.standalone === true;
+            var ua = navigator.userAgent || '';
+            var ios = /iphone|ipad|ipod/i.test(ua)
+                || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+            if (standalone) document.documentElement.classList.add('standalone-pwa');
+            if (ios) document.documentElement.classList.add('ios-device');
+        })();
+    </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
@@ -2088,6 +2099,38 @@
             .dashboard-v2 .subscription-status-grid {
                 grid-template-columns: 1fr !important;
                 gap: 14px !important;
+            }
+        }
+
+        html.standalone-pwa.ios-device,
+        html.standalone-pwa.ios-device body {
+            height: 100dvh;
+            min-height: -webkit-fill-available;
+            overflow: hidden;
+        }
+
+        html.standalone-pwa.ios-device #app-container {
+            height: 100dvh;
+            min-height: -webkit-fill-available;
+        }
+
+        @media (max-width: 1024px) {
+            html.standalone-pwa.ios-device body.dashboard-v2 .main-content {
+                padding-top: calc(24px + env(safe-area-inset-top)) !important;
+                padding-bottom: 88px !important;
+            }
+
+            html.standalone-pwa.ios-device body.dashboard-v2 .nav-mobile {
+                height: 72px;
+                padding-top: 8px;
+                padding-bottom: 0;
+            }
+        }
+
+        @media (max-width: 640px) {
+            html.standalone-pwa.ios-device body.dashboard-v2 .main-content {
+                padding-top: calc(18px + env(safe-area-inset-top)) !important;
+                padding-bottom: 88px !important;
             }
         }
     </style>
