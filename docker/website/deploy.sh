@@ -99,6 +99,7 @@ if [[ "${DRY_RUN}" -eq 0 ]]; then
         '${REMOTE_DIR}/letsencrypt' \
         '${REMOTE_DIR}/certbot-work' \
         '${REMOTE_DIR}/certbot-logs' \
+        '${REMOTE_DIR}/certbot-www' \
         '${REMOTE_DIR}/origin-allowlist'"
 fi
 
@@ -156,11 +157,9 @@ chmod +x update-origin-allowlist.sh issue-certs.sh renew-certs.sh install-renew-
 ./update-origin-allowlist.sh
 ./issue-certs.sh
 ./install-renew-cron.sh
-docker compose -f docker-compose.yml down || true
-docker image rm '${REMOTE_IMAGE_TAG}' || true
 docker load -i '${IMAGE_TAR_NAME}'
 docker image tag '${LOCAL_IMAGE_TAG}' '${REMOTE_IMAGE_TAG}'
-docker compose -f docker-compose.yml up -d --no-build
+docker compose -f docker-compose.yml up -d --no-build --force-recreate
 docker ps
 EOF
 )

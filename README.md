@@ -447,3 +447,4 @@ email-сервиса в этом пути нет. Если отправка уп
 Смотри `docker/website/PRODUCTION.md` и `docker/edge/PRODUCTION.md`.
 
 Конфиги: `docker/website/docker-compose.yml` + `nginx.conf.template`.
+Origin deploy и renew сертификата не должны выполнять `docker compose down`, чтобы ошибка certbot или загрузки образа не оставляла сайт выключенным и не удаляла compose-логи.

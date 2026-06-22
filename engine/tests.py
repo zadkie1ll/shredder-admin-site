@@ -781,3 +781,51 @@ class WataActiveStatusTests(SimpleTestCase):
         ) as fetch:
             self.assertIsNone(active_wata_status_for_token(token))
         fetch.assert_not_called()
+
+
+class WebsiteDockerRuntimeTests(SimpleTestCase):
+    def test_origin_renew_keeps_compose_stack_running(self):
+        renew_script = Path("docker/website/renew-certs.sh").read_text()
+
+        self.assertNotIn('docker compose -f "${COMPOSE_FILE}" down', renew_script)
+        self.assertNotIn("--standalone", renew_script)
+        self.assertNotIn("-p 80:80", renew_script)
+        self.assertIn("--webroot", renew_script)
+        self.assertIn("--webroot-path /var/www/certbot", renew_script)
+        self.assertIn(
+            '-v "${SCRIPT_DIR}/certbot-www:/var/www/certbot"',
+            renew_script,
+        )
+
+    def test_origin_nginx_serves_acme_challenge_webroot(self):
+        compose = Path("docker/website/docker-compose.yml").read_text()
+        nginx = Path("docker/website/nginx.conf.template").read_text()
+
+        self.assertIn("./certbot-www:/var/www/certbot:ro", compose)
+        self.assertIn(
+            "location ^~ /.well-known/acme-challenge/",
+            nginx,
+        )
+        self.assertIn("root /var/www/certbot;", nginx)
+        self.assertIn("try_files $uri =404;", nginx)
+
+    def test_origin_issue_certs_restores_running_stack_on_failure(self):
+        issue_script = Path("docker/website/issue-certs.sh").read_text()
+
+        self.assertNotIn('docker compose -f "${COMPOSE_FILE}" down', issue_script)
+        self.assertIn('docker compose -f "${COMPOSE_FILE}" stop nginx', issue_script)
+        self.assertIn("restore_stack()", issue_script)
+        self.assertIn("trap restore_stack EXIT", issue_script)
+        self.assertIn("--standalone", issue_script)
+
+    def test_origin_deploy_does_not_remove_running_stack_before_image_load(self):
+        deploy_script = Path("docker/website/deploy.sh").read_text()
+
+        self.assertNotIn("docker compose -f docker-compose.yml down", deploy_script)
+        self.assertNotIn("docker image rm '${REMOTE_IMAGE_TAG}'", deploy_script)
+        self.assertIn("docker load -i '${IMAGE_TAR_NAME}'", deploy_script)
+        self.assertIn(
+            "docker compose -f docker-compose.yml up -d --no-build --force-recreate",
+            deploy_script,
+        )
+        self.assertIn("'${REMOTE_DIR}/certbot-www'", deploy_script)

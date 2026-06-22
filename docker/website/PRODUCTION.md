@@ -17,6 +17,7 @@ Origin обслуживает только backend-трафик от edge и о�
     letsencrypt/
     certbot-work/
     certbot-logs/
+    certbot-www/
     origin-allowlist/
   postgres/
     .env
@@ -32,8 +33,8 @@ Origin обслуживает только backend-трафик от edge и о�
 - `docker/website/docker-compose.yml` - origin стек
 - `docker/website/nginx.conf.template` - backend-only nginx для origin
 - `docker/website/update-origin-allowlist.sh` - генерация allowlist для edge IP
-- `docker/website/issue-certs.sh` - выпуск origin-сертификата по HTTP-01
-- `docker/website/renew-certs.sh` - renew origin-сертификата
+- `docker/website/issue-certs.sh` - первичный выпуск origin-сертификата по standalone HTTP-01
+- `docker/website/renew-certs.sh` - renew origin-сертификата через nginx webroot без остановки сайта
 - `docker/website/deploy.sh` - деплой origin
 
 ## Как это работает
@@ -149,13 +150,17 @@ cd docker/website
 - выпускает сертификат на `ORIGIN_CERTBOT_DOMAINS` через standalone HTTP-01;
 - ставит cron на renew;
 - делает `docker load`;
-- поднимает `docker compose -f docker-compose.yml up -d --no-build`.
+- пересоздает stack через `docker compose -f docker-compose.yml up -d --no-build --force-recreate` без предварительного `down`.
 
 ## Origin сертификат
 
 Origin использует отдельный сертификат на технический домен, например `origin.teaworld.uk`.
 
 Пользовательские домены не должны входить в этот сертификат.
+
+Первичный выпуск сертификата использует standalone HTTP-01 и может кратко остановить только nginx, если origin уже был запущен. Если выпуск завершится ошибкой, скрипт вернет origin stack в прежнее состояние.
+
+Плановый renew использует webroot (`/var/www/certbot`) через уже работающий nginx и не должен выполнять `docker compose down`. Это важно: `docker compose down` удаляет контейнеры и обычные compose-логи, а при ошибке certbot может оставить сайт выключенным.
 
 Edge должен ходить на origin так:
 
@@ -183,7 +188,7 @@ ufw allow from EDGE_IP_2 to any port 443
 ufw deny 443
 ```
 
-Порт `80` нужен для HTTP-01 challenge certbot и должен быть доступен снаружи во время первичного выпуска и renew.
+Порт `80` нужен для HTTP-01 challenge certbot и должен быть доступен снаружи во время первичного выпуска и renew. В обычном режиме nginx отдает на 80 порту только `/.well-known/acme-challenge/`, остальные запросы закрывает.
 Порт `443` можно и нужно ограничивать только edge IP.
 
 ## Полезные команды
@@ -195,6 +200,13 @@ docker compose -f docker-compose.yml logs -f app
 docker compose -f docker-compose.yml logs -f nginx
 ./renew-certs.sh
 ./update-origin-allowlist.sh
+```
+
+Если origin внезапно оказался остановлен, сначала проверьте cron-лог renew:
+
+```bash
+tail -n 200 /var/log/monkey-island-origin-renew.log
+docker compose -f docker-compose.yml ps -a
 ```
 
 ## Что проверить

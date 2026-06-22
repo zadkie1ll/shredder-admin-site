@@ -43,7 +43,11 @@ if [[ -z "${LETSENCRYPT_EMAIL}" || -z "${ORIGIN_CERT_NAME}" || -z "${ORIGIN_CERT
     exit 1
 fi
 
-mkdir -p "${SCRIPT_DIR}/letsencrypt" "${SCRIPT_DIR}/certbot-work" "${SCRIPT_DIR}/certbot-logs"
+mkdir -p \
+    "${SCRIPT_DIR}/letsencrypt" \
+    "${SCRIPT_DIR}/certbot-work" \
+    "${SCRIPT_DIR}/certbot-logs" \
+    "${SCRIPT_DIR}/certbot-www"
 
 CERT_PATH="${SCRIPT_DIR}/letsencrypt/live/${ORIGIN_CERT_NAME}/fullchain.pem"
 if [[ -f "${CERT_PATH}" ]] && openssl x509 -checkend 0 -noout -in "${CERT_PATH}" >/dev/null 2>&1; then
@@ -71,11 +75,25 @@ if [[ ${#domain_args[@]} -eq 0 ]]; then
 fi
 
 was_running=0
+stopped_for_certbot=0
+
+restore_stack() {
+    local status=$?
+    if [[ "${stopped_for_certbot}" -eq 1 && "${was_running}" -eq 1 ]]; then
+        echo "Restoring origin stack after certificate issue attempt."
+        docker compose -f "${COMPOSE_FILE}" up -d || true
+    fi
+    exit "${status}"
+}
+
+trap restore_stack EXIT
+
 if docker compose -f "${COMPOSE_FILE}" ps --status running 2>/dev/null | grep -q nginx; then
     was_running=1
 fi
 
-docker compose -f "${COMPOSE_FILE}" down || true
+docker compose -f "${COMPOSE_FILE}" stop nginx || true
+stopped_for_certbot=1
 
 docker run --rm \
     -p 80:80 \
@@ -97,5 +115,8 @@ docker run --rm \
 if [[ "${was_running}" -eq 1 ]]; then
     docker compose -f "${COMPOSE_FILE}" up -d
 fi
+
+stopped_for_certbot=0
+trap - EXIT
 
 echo "Certificate ready: ${ORIGIN_CERT_NAME}"
