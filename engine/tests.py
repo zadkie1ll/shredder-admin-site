@@ -14,6 +14,7 @@ from django.test import override_settings
 from common.models.settings import BOT_TARIFF_PRICE_MONTH_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_YEAR_SETTING
 from common.models.db import CustomConfigTemplate
+from common.models.db import MagicToken
 from common.models.db import User
 from engine.payments import create_wata_payment_sync
 from engine.payments import create_yk_payment_sync
@@ -27,6 +28,8 @@ from engine.views import form_bool_enabled
 from engine.views import get_runtime_actual_tariffs
 from engine.views import get_telegram_auth_bot
 from engine.views import get_telegram_web_login_start_code
+from engine.views import pay
+from engine.views import payment_session_url_key
 from engine.views import payment_retry
 from engine.views import render_login
 from engine.views import should_create_trial_for_channel
@@ -166,6 +169,221 @@ class WataPaymentFlowTests(SimpleTestCase):
 
         self.assertNotIn('"wata_payment.html"', views)
         self.assertNotIn("payment rendering wata widget", views)
+
+    def test_payment_forms_open_provider_tab_and_status_in_current_tab(self):
+        for template_name in (
+            "engine/templates/index_vpn.html",
+            "engine/templates/index_vps.html",
+            "engine/templates/index_vps_direct_sale.html",
+            "engine/templates/dashboard.html",
+        ):
+            with self.subTest(template=template_name):
+                template = Path(template_name).read_text()
+                self.assertIn("window.open('', '_blank')", template)
+                self.assertIn("'X-Payment-Launch': 'new-tab'", template)
+                self.assertIn("payload.payment_url", template)
+                self.assertIn("payload.payment_status_url", template)
+
+    def test_payment_status_has_open_payment_button_for_pending_tab(self):
+        template = Path("engine/templates/payment_status.html").read_text()
+
+        self.assertIn("Открыть форму оплаты", template)
+        self.assertNotIn("Проверить статус вручную", template)
+        self.assertNotIn("manual-status-action", template)
+        self.assertIn('target="_blank" rel="noopener"', template)
+
+    @override_settings(PAYMENT_GATEWAY="wata", WATA_HOST="https://wata.example", WATA_TOKEN="token")
+    def test_ajax_payment_launch_returns_provider_and_status_urls(self):
+        tariff = SimpleNamespace(
+            price=100,
+            db_tariff_id="month",
+            description="1 месяц",
+        )
+        user = SimpleNamespace(
+            id=42,
+            email="user@example.com",
+            username="user-42",
+            telegram_id=None,
+        )
+        login_token = SimpleNamespace(payment_gateway=None, payment_reference=None)
+
+        class SessionDict(dict):
+            modified = False
+
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return user
+
+        class FakeSession:
+            def query(self, model):
+                return FakeQuery()
+
+            def add(self, obj):
+                if isinstance(obj, MagicToken):
+                    obj.token = "magic-token"
+
+            def flush(self):
+                return None
+
+            def commit(self):
+                return None
+
+            def rollback(self):
+                return None
+
+            def close(self):
+                return None
+
+        request = RequestFactory().post(
+            "/pay/",
+            {
+                "email": "user@example.com",
+                "tariff_id": "month",
+                "login_link_kind": "purchase_permanent",
+            },
+            HTTP_ACCEPT="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            HTTP_X_PAYMENT_LAUNCH="new-tab",
+            HTTP_HOST="example.com",
+        )
+        request.user = SimpleNamespace(is_authenticated=False, id=None)
+        request.session = SessionDict()
+
+        created_payment = SimpleNamespace(
+            confirmation_url="https://wata.example/pay",
+            reference="order-1",
+            payload={"id": "invoice-1"},
+        )
+
+        with (
+            mock.patch("engine.views.session_factory", return_value=FakeSession()),
+            mock.patch("engine.views.get_runtime_actual_tariffs", return_value=[tariff]),
+            mock.patch("engine.views.get_registration_context", return_value={"traffic_source": None, "ymid": None}),
+            mock.patch("engine.views.sync_existing_user_tracking"),
+            mock.patch("engine.views.create_purchase_login_token", return_value="raw-token"),
+            mock.patch("engine.views.get_purchase_login_token", return_value=login_token),
+            mock.patch("engine.views.create_wata_payment_sync", return_value=created_payment),
+            mock.patch("engine.views.save_wata_invoice"),
+            mock.patch("engine.views.add_event_log"),
+            mock.patch("engine.views.send_magic_link_email"),
+        ):
+            response = pay(request)
+
+        payload = json.loads(response.content)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["payment_url"], "https://wata.example/pay")
+        self.assertTrue(
+            payload["payment_status_url"].endswith(
+                "/payment/status/raw-token/"
+            )
+        )
+        self.assertEqual(login_token.payment_gateway, "wata")
+        self.assertEqual(login_token.payment_reference, "order-1")
+        self.assertEqual(
+            request.session[payment_session_url_key("raw-token")],
+            "https://wata.example/pay",
+        )
+        self.assertTrue(request.session.modified)
+
+    @override_settings(
+        PAYMENT_GATEWAY="yookassa",
+        YOOKASSA_SHOP_ID="shop",
+        YOOKASSA_SECRET_KEY="secret",
+    )
+    def test_ajax_yookassa_payment_launch_uses_status_token(self):
+        tariff = SimpleNamespace(
+            price=100,
+            db_tariff_id="month",
+            description="1 месяц",
+        )
+        user = SimpleNamespace(
+            id=42,
+            email="user@example.com",
+            username="user-42",
+            telegram_id=None,
+        )
+        login_token = SimpleNamespace(payment_gateway=None, payment_reference=None)
+
+        class SessionDict(dict):
+            modified = False
+
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return user
+
+        class FakeSession:
+            def query(self, model):
+                return FakeQuery()
+
+            def add(self, obj):
+                if isinstance(obj, MagicToken):
+                    obj.token = "magic-token"
+
+            def flush(self):
+                return None
+
+            def commit(self):
+                return None
+
+            def rollback(self):
+                return None
+
+            def close(self):
+                return None
+
+        request = RequestFactory().post(
+            "/pay/",
+            {
+                "email": "user@example.com",
+                "tariff_id": "month",
+            },
+            HTTP_ACCEPT="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            HTTP_X_PAYMENT_LAUNCH="new-tab",
+            HTTP_HOST="example.com",
+        )
+        request.user = SimpleNamespace(is_authenticated=False, id=None)
+        request.session = SessionDict()
+
+        created_payment = SimpleNamespace(
+            confirmation_url="https://yookassa.example/pay",
+            reference="yk-payment-1",
+        )
+
+        with (
+            mock.patch("engine.views.session_factory", return_value=FakeSession()),
+            mock.patch("engine.views.get_runtime_actual_tariffs", return_value=[tariff]),
+            mock.patch(
+                "engine.views.get_registration_context",
+                return_value={"traffic_source": None, "ymid": None},
+            ),
+            mock.patch("engine.views.sync_existing_user_tracking"),
+            mock.patch("engine.views.create_purchase_login_token", return_value="raw-token"),
+            mock.patch("engine.views.get_purchase_login_token", return_value=login_token),
+            mock.patch("engine.views.create_yk_payment_sync", return_value=created_payment),
+            mock.patch("engine.views.add_event_log"),
+            mock.patch("engine.views.send_magic_link_email"),
+        ):
+            response = pay(request)
+
+        payload = json.loads(response.content)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["payment_url"], "https://yookassa.example/pay")
+        self.assertTrue(
+            payload["payment_status_url"].endswith(
+                "/payment/status/raw-token/"
+            )
+        )
+        self.assertEqual(login_token.payment_gateway, "yookassa")
+        self.assertEqual(login_token.payment_reference, "yk-payment-1")
 
     def test_wata_payment_retry_redirects_to_hosted_invoice_url(self):
         request = RequestFactory().get("/pay/retry/token/")

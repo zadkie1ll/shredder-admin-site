@@ -1145,6 +1145,10 @@ def build_payment_retry_url(request, token):
     return f"{get_current_base_url(request)}{reverse('payment_retry', args=[token])}"
 
 
+def payment_session_url_key(token):
+    return f"payment_url:{token}"
+
+
 def create_purchase_login_link(db_session, request, user):
     raw_token = create_purchase_login_token(db_session, user)
     return build_purchase_login_link(request, raw_token)
@@ -1947,6 +1951,7 @@ def payment_status_payload(request, token, allow_active_check=False):
             if active:
                 status, message = active
         wata_invoice = get_purchase_wata_invoice(db_session, login_token)
+        session_payment_url = request.session.get(payment_session_url_key(token), "")
         return {
             "status": status,
             "message": message,
@@ -1958,7 +1963,7 @@ def payment_status_payload(request, token, allow_active_check=False):
             "payment_url": (
                 build_payment_retry_url(request, token)
                 if status == "pending" and wata_invoice and wata_invoice.url
-                else ""
+                else session_payment_url if status == "pending" else ""
             ),
         }
     finally:
@@ -5276,6 +5281,14 @@ def should_send_payment_login_email(request, user):
     return not (request.user.is_authenticated and str(request.user.id) == str(user.id))
 
 
+def wants_payment_launch_json(request):
+    return (
+        request.headers.get("X-Payment-Launch") == "new-tab"
+        or request.headers.get("X-Requested-With") == "XMLHttpRequest"
+        or "application/json" in request.headers.get("Accept", "")
+    )
+
+
 def pay(request):
     if request.method == "POST":
         capture_tracking_params(request)
@@ -5285,6 +5298,7 @@ def pay(request):
         use_permanent_purchase_link = False
         payment_status_url = None
         is_authenticated_payment = False
+        payment_launch_json = wants_payment_launch_json(request)
         tracking_params = get_tracking_params(request)
         tracking_cookies = {
             key: request.COOKIES.get(f"tracking_{key}") for key in TRACKING_PARAM_KEYS
@@ -5450,7 +5464,6 @@ def pay(request):
             use_permanent_purchase_link = (
                 request.POST.get("login_link_kind") == "purchase_permanent"
             )
-            use_wata_payment_widget = settings.PAYMENT_GATEWAY.lower() == "wata"
             base_url = get_current_base_url(request)
             payment_success_redirect_url = f"{base_url}/dashboard/"
             payment_fail_redirect_url = f"{base_url}/"
@@ -5458,15 +5471,6 @@ def pay(request):
 
             if use_permanent_purchase_link:
                 raw_purchase_token = create_purchase_login_token(db_session, user)
-                login_link = build_purchase_login_link(request, raw_purchase_token)
-                payment_status_url = build_payment_status_url(
-                    request, raw_purchase_token
-                )
-                payment_success_redirect_url = payment_status_url
-                payment_fail_redirect_url = append_query_params(
-                    payment_status_url,
-                    {"result": "failed"},
-                )
                 logging.info(
                     "created permanent purchase login link: email=%s user_id=%s tariff_id=%s",
                     email,
@@ -5474,22 +5478,22 @@ def pay(request):
                     tariff.db_tariff_id,
                 )
 
-            if use_wata_payment_widget and not raw_purchase_token:
+            if not raw_purchase_token:
                 raw_purchase_token = create_purchase_login_token(db_session, user)
-                payment_status_url = build_payment_status_url(
-                    request, raw_purchase_token
-                )
-                payment_success_redirect_url = payment_status_url
-                payment_fail_redirect_url = append_query_params(
-                    payment_status_url,
-                    {"result": "failed"},
-                )
                 logging.info(
-                    "created wata payment status token: email=%s user_id=%s tariff_id=%s",
+                    "created payment status token: email=%s user_id=%s tariff_id=%s",
                     email,
                     user.id,
                     tariff.db_tariff_id,
                 )
+
+            login_link = build_purchase_login_link(request, raw_purchase_token)
+            payment_status_url = build_payment_status_url(request, raw_purchase_token)
+            payment_success_redirect_url = payment_status_url
+            payment_fail_redirect_url = append_query_params(
+                payment_status_url,
+                {"result": "failed"},
+            )
 
             if settings.PAYMENT_GATEWAY.lower() == "wata":
                 logging.info(
@@ -5507,13 +5511,12 @@ def pay(request):
                 )
 
                 confirmation_url = created_payment.confirmation_url
-                if raw_purchase_token:
-                    login_token = get_purchase_login_token(
-                        db_session,
-                        raw_purchase_token,
-                    )
-                    login_token.payment_gateway = "wata"
-                    login_token.payment_reference = created_payment.reference
+                login_token = get_purchase_login_token(
+                    db_session,
+                    raw_purchase_token,
+                )
+                login_token.payment_gateway = "wata"
+                login_token.payment_reference = created_payment.reference
 
                 save_wata_invoice(
                     session=db_session,
@@ -5542,13 +5545,12 @@ def pay(request):
                     return_url=payment_success_redirect_url,
                 )
                 confirmation_url = created_payment.confirmation_url
-                if use_permanent_purchase_link:
-                    login_token = get_purchase_login_token(
-                        db_session,
-                        raw_purchase_token,
-                    )
-                    login_token.payment_gateway = "yookassa"
-                    login_token.payment_reference = created_payment.reference
+                login_token = get_purchase_login_token(
+                    db_session,
+                    raw_purchase_token,
+                )
+                login_token.payment_gateway = "yookassa"
+                login_token.payment_reference = created_payment.reference
 
             invoice_event = create_invoice_event_for_tariff(tariff.db_tariff_id)
             if invoice_event:
@@ -5600,6 +5602,10 @@ def pay(request):
                 )
 
             db_session.commit()
+            request.session[payment_session_url_key(raw_purchase_token)] = (
+                confirmation_url
+            )
+            request.session.modified = True
             logging.info(
                 "payment db transaction committed: email=%s user_id=%s tariff_id=%s",
                 email,
@@ -5642,11 +5648,20 @@ def pay(request):
                     )
 
             logging.info(
-                "payment redirecting to confirmation_url: email=%s user_id=%s tariff_id=%s",
+                "payment redirecting to confirmation_url: email=%s user_id=%s tariff_id=%s json=%s",
                 email,
                 user.id,
                 tariff.db_tariff_id,
+                payment_launch_json,
             )
+            if payment_launch_json:
+                return JsonResponse(
+                    {
+                        "status": "ok",
+                        "payment_url": confirmation_url,
+                        "payment_status_url": payment_status_url,
+                    }
+                )
             return redirect(confirmation_url)
 
         except Exception as e:
@@ -5661,6 +5676,14 @@ def pay(request):
                 error_message = (
                     "Не удалось подготовить личный кабинет для оплаты. "
                     "Попробуйте еще раз или напишите в поддержку."
+                )
+            if payment_launch_json:
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": error_message,
+                    },
+                    status=502,
                 )
             if settings.PAYMENT_GATEWAY.lower() == "wata":
                 return render(

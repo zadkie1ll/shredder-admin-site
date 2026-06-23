@@ -788,11 +788,48 @@
             }
 
             document.querySelectorAll('[data-payment-form]').forEach((form) => {
-                form.addEventListener('submit', () => {
+                form.addEventListener('submit', async (event) => {
                     sendGoal('pay_click', {
                         tariff_id: form.dataset.tariffId || '',
                         tariff_price: form.dataset.tariffPrice || '',
                     });
+                    if (!window.fetch || !window.FormData) {
+                        return;
+                    }
+
+                    event.preventDefault();
+                    const paymentWindow = window.open('', '_blank');
+                    if (paymentWindow) {
+                        paymentWindow.opener = null;
+                        paymentWindow.document.write('<!doctype html><title>Оплата</title><body style="margin:0;background:#111;color:#fff;font-family:system-ui;display:grid;place-items:center;min-height:100vh">Открываем форму оплаты...</body>');
+                    }
+
+                    const submitButton = form.querySelector('button[type="submit"]');
+                    if (submitButton) submitButton.disabled = true;
+
+                    try {
+                        const response = await fetch(form.action, {
+                            method: 'POST',
+                            body: new FormData(form),
+                            credentials: 'same-origin',
+                            headers: {
+                                'Accept': 'application/json',
+                                'X-Requested-With': 'XMLHttpRequest',
+                                'X-Payment-Launch': 'new-tab',
+                            },
+                        });
+                        const payload = await response.json();
+                        if (!response.ok || payload.status !== 'ok') {
+                            throw new Error(payload.message || 'payment launch failed');
+                        }
+                        if (paymentWindow && payload.payment_url) {
+                            paymentWindow.location.href = payload.payment_url;
+                        }
+                        window.location.href = payload.payment_status_url;
+                    } catch (err) {
+                        if (paymentWindow && !paymentWindow.closed) paymentWindow.close();
+                        form.submit();
+                    }
                 });
             });
         })();

@@ -426,7 +426,6 @@
         .payment-action { display: none; }
         .status-shell[data-status="pending"] .payment-action { display: inline-flex; }
         .payment-action[href=""] { display: none !important; }
-
         /* ── Мобильная адаптация ── */
         @media (max-width: 520px) {
             body { padding: 14px; }
@@ -466,7 +465,10 @@
 
         <!-- Тексты -->
         <p class="status-text pending-only">
-            Не закрывайте страницу — как только платеж пройдет, вы попадете в личный кабинет.
+            Проверяем статус платежа. Не закрывайте эту страницу — как только платеж пройдет, вы попадете в личный кабинет.
+        </p>
+        <p class="status-text pending-only">
+            Если вы еще не оплатили, откройте вкладку с формой оплаты и завершите платеж.
         </p>
         <p class="status-text success-only">
             Платеж прошел успешно. Переходим в личный кабинет…
@@ -504,8 +506,8 @@
             <a class="btn btn-primary login-action" id="login-action" href="{{ login_url }}">
                 Перейти в личный кабинет
             </a>
-            <a class="btn btn-primary payment-action" id="payment-action" href="{{ payment_url }}">
-                Вернуться к оплате
+            <a class="btn btn-primary payment-action" id="payment-action" href="{{ payment_url }}" target="_blank" rel="noopener">
+                Открыть форму оплаты
             </a>
             <a class="btn btn-secondary" href="{{ support_telegram_url }}" target="_blank" rel="noopener">
                 <svg class="support-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
