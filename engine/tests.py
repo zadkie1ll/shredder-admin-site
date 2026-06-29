@@ -11,6 +11,7 @@ from django.test import RequestFactory
 from django.test import SimpleTestCase
 from django.test import override_settings
 
+from common.models.settings import BOT_APPLE_RECOMMENDED_APP_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_MONTH_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_YEAR_SETTING
 from common.models.db import CustomConfigTemplate
@@ -20,6 +21,9 @@ from engine.payments import create_wata_payment_sync
 from engine.payments import create_yk_payment_sync
 from engine.payments import fetch_wata_transaction_status
 from engine.views import active_wata_status_for_token
+from engine.views import admin_runtime_setting_payload
+from engine.views import admin_runtime_setting_type
+from engine.views import admin_validate_runtime_setting
 from engine.views import admin_stats_row_bucket_key
 from engine.views import auth_by_telegram_widget
 from engine.views import create_site_user
@@ -161,6 +165,46 @@ class AdminDashboardTemplateTests(SimpleTestCase):
             '<div class="card info-card muted">${text}</div>',
             template,
         )
+
+    def test_apple_recommended_app_is_grouped_with_common_runtime_settings(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("'apple_recommended_app'", template)
+        self.assertIn(
+            "'technical_work_enabled', 'apple_recommended_app'",
+            template,
+        )
+
+
+class AdminRuntimeSettingsTests(SimpleTestCase):
+    def test_apple_recommended_app_setting_is_enum(self):
+        self.assertEqual(
+            admin_runtime_setting_type(BOT_APPLE_RECOMMENDED_APP_SETTING),
+            "enum",
+        )
+
+        normalized_value, error = admin_validate_runtime_setting(
+            BOT_APPLE_RECOMMENDED_APP_SETTING,
+            "INCY",
+        )
+
+        self.assertIsNone(error)
+        self.assertEqual(normalized_value, "incy")
+
+    def test_apple_recommended_app_payload_exposes_allowed_values(self):
+        payload = admin_runtime_setting_payload(BOT_APPLE_RECOMMENDED_APP_SETTING)
+
+        self.assertEqual(payload["allowed_values"], ["happ", "incy"])
+        self.assertIn("iOS/macOS", payload["description"])
+
+    def test_apple_recommended_app_rejects_unknown_value(self):
+        normalized_value, error = admin_validate_runtime_setting(
+            BOT_APPLE_RECOMMENDED_APP_SETTING,
+            "streisand",
+        )
+
+        self.assertIsNone(normalized_value)
+        self.assertIn("Допустимые значения", error)
 
 
 class WataPaymentFlowTests(SimpleTestCase):
