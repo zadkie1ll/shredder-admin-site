@@ -4161,6 +4161,266 @@ def build_admin_interval_stats(
     }
 
 
+def admin_clamp_cohort_window(period_start, period_end, cohort_start, cohort_end):
+    """Зажимает окно когорты в границы внешнего периода.
+
+    Возвращает кортеж (clamped_start, clamped_end, error_message). Окно когорты
+    обязано пересекаться с внешним периодом — иначе считать нечего, и возвращается
+    текст ошибки (русский, как остальные admin-ответы). Чистая функция без БД —
+    удобно покрывать юнит-тестами.
+    """
+    if cohort_start > cohort_end:
+        return None, None, "Начало когорты больше её конца"
+
+    clamped_start = max(cohort_start, period_start)
+    clamped_end = min(cohort_end, period_end)
+    if clamped_start > clamped_end:
+        return None, None, "Окно когорты вне выбранного диапазона"
+
+    return clamped_start, clamped_end, None
+
+
+def build_admin_cohort_retention_stats(
+    db_session,
+    period_start,
+    period_end,
+    cohort_start,
+    cohort_end,
+    requested_granularity="month",
+):
+    """Когортная аналитика с РАЗДЕЛЁННЫМИ окнами когорты и графика.
+
+    Отличие от build_admin_interval_stats: там окно когорты и окно графика — это один
+    и тот же интервал. Здесь они разделены:
+    - когорта фиксируется по ВНУТРЕННЕМУ окну [cohort_start, cohort_end];
+    - платежи этой когорты строятся на ВСЁМ внешнем периоде [period_start, period_end].
+
+    Это позволяет, например, взять весь 2025 год как период и январь как когорту, и
+    посмотреть, что осталось от январских клиентов на всём горизонте года.
+
+    Бизнес-логика выбора когорты идентична существующей (первое событие
+    subscription_created на пользователя), поэтому переиспользуется build_admin_cohort_table,
+    а сама серия графика — build_admin_sales_series в режиме "cohort". Никакой
+    существующий код при этом не меняется.
+    """
+    period_start_dt = datetime.combine(period_start, time.min)
+    period_end_dt = datetime.combine(period_end, time.max)
+    cohort_start_dt = datetime.combine(cohort_start, time.min)
+    cohort_end_dt = datetime.combine(cohort_end, time.max)
+
+    granularity, requested_granularity, granularity_note = (
+        admin_stats_normalize_granularity(
+            requested_granularity, period_start, period_end
+        )
+    )
+
+    yk_payment_time = func.coalesce(YkPayment.captured_at, YkPayment.created_at)
+
+    # Когорта материализуется по ОКНУ КОГОРТЫ (а не по всему периоду).
+    cohort_events = build_admin_cohort_table(db_session, cohort_start_dt, cohort_end_dt)
+    try:
+        source_stats = {}
+        cohort_size = 0
+        subscription_rows = (
+            db_session.query(
+                cohort_events.c.traffic_source,
+                func.count(cohort_events.c.user_id),
+            )
+            .group_by(cohort_events.c.traffic_source)
+            .all()
+        )
+        for traffic_source, subscriptions in subscription_rows:
+            key = admin_stats_source_key(traffic_source)
+            count = int(subscriptions or 0)
+            cohort_size += count
+            source_stats[key] = {
+                "traffic_source": key,
+                "label": "Direct" if traffic_source is None else f"TS_{traffic_source}",
+                "subscriptions": count,
+                "payments": 0,
+                "revenue": 0,
+                "unique_paying_users": 0,
+            }
+
+        # Платежи когорты за ВЕСЬ внешний период, агрегированные по источникам.
+        # payment_time >= timestamp когорты гарантирует, что платежи раньше первой
+        # подписки пользователя в когорту не попадают.
+        yk_rows = (
+            db_session.query(
+                cohort_events.c.traffic_source,
+                func.count(YkPayment.id),
+                func.coalesce(func.sum(YkPayment.amount), 0),
+            )
+            .select_from(YkPayment)
+            .join(cohort_events, cohort_events.c.user_id == YkPayment.user_id)
+            .filter(YkPayment.status == "succeeded")
+            .filter(yk_payment_time >= cohort_events.c.timestamp)
+            .filter(yk_payment_time >= period_start_dt)
+            .filter(yk_payment_time <= period_end_dt)
+            .group_by(cohort_events.c.traffic_source)
+            .all()
+        )
+        wata_rows = (
+            db_session.query(
+                cohort_events.c.traffic_source,
+                func.count(WataTransaction.id),
+                func.coalesce(func.sum(WataTransaction.amount), 0),
+            )
+            .select_from(WataInvoice)
+            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .join(cohort_events, cohort_events.c.user_id == WataInvoice.user_id)
+            .filter(WataTransaction.transaction_status == "Paid")
+            .filter(WataTransaction.payment_time >= cohort_events.c.timestamp)
+            .filter(WataTransaction.payment_time >= period_start_dt)
+            .filter(WataTransaction.payment_time <= period_end_dt)
+            .group_by(cohort_events.c.traffic_source)
+            .all()
+        )
+        total_payments = 0
+        total_revenue = 0
+        for traffic_source, count, amount in [*yk_rows, *wata_rows]:
+            count = int(count or 0)
+            amount = admin_money(amount)
+            total_payments += count
+            total_revenue += amount
+            source = source_stats.get(admin_stats_source_key(traffic_source))
+            if source is not None:
+                source["payments"] += count
+                source["revenue"] += amount
+
+        # Уникальные плательщики когорты (по источникам и всего). У каждого
+        # пользователя ровно одна строка в когорте → одно значение traffic_source,
+        # поэтому сумма distinct по источникам равна общему distinct по когорте.
+        yk_payer_query = (
+            db_session.query(
+                cohort_events.c.traffic_source.label("traffic_source"),
+                YkPayment.user_id.label("user_id"),
+            )
+            .select_from(YkPayment)
+            .join(cohort_events, cohort_events.c.user_id == YkPayment.user_id)
+            .filter(YkPayment.status == "succeeded")
+            .filter(yk_payment_time >= cohort_events.c.timestamp)
+            .filter(yk_payment_time >= period_start_dt)
+            .filter(yk_payment_time <= period_end_dt)
+        )
+        wata_payer_query = (
+            db_session.query(
+                cohort_events.c.traffic_source.label("traffic_source"),
+                WataInvoice.user_id.label("user_id"),
+            )
+            .select_from(WataInvoice)
+            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+            .join(cohort_events, cohort_events.c.user_id == WataInvoice.user_id)
+            .filter(WataTransaction.transaction_status == "Paid")
+            .filter(WataTransaction.payment_time >= cohort_events.c.timestamp)
+            .filter(WataTransaction.payment_time >= period_start_dt)
+            .filter(WataTransaction.payment_time <= period_end_dt)
+        )
+        payer_events = union_all(
+            yk_payer_query.statement,
+            wata_payer_query.statement,
+        ).subquery()
+        payer_rows = (
+            db_session.query(
+                payer_events.c.traffic_source,
+                func.count(func.distinct(payer_events.c.user_id)),
+            )
+            .group_by(payer_events.c.traffic_source)
+            .all()
+        )
+        unique_paying_users = 0
+        for traffic_source, payers in payer_rows:
+            payers = int(payers or 0)
+            unique_paying_users += payers
+            source = source_stats.get(admin_stats_source_key(traffic_source))
+            if source is not None:
+                source["unique_paying_users"] = payers
+
+        # Сколько рефералов ПРИВЕЛА когорта: пользователи, чей referred_by_id
+        # указывает на члена когорты (join по лёгкой temp-таблице, дёшево). Это
+        # обратное направление к build_admin_interval_stats, где считается, сколько
+        # членов когорты сами пришли по реферальной ссылке.
+        invited_referrals = (
+            db_session.query(func.count(User.id))
+            .join(cohort_events, cohort_events.c.user_id == User.referred_by_id)
+            .scalar()
+            or 0
+        )
+        # Из приведённых: сколько начали пользоваться (TRAFFIC) и сколько оплатили
+        # (PURCHASE) — по бонусам, где пригласивший (referrer_id) состоит в когорте.
+        invited_bonus_rows = (
+            db_session.query(
+                ReferralBonus.bonus_type,
+                func.count(ReferralBonus.id),
+            )
+            .join(cohort_events, cohort_events.c.user_id == ReferralBonus.referrer_id)
+            .group_by(ReferralBonus.bonus_type)
+            .all()
+        )
+        invited_bonus_counts = {
+            bonus_type: int(count or 0) for bonus_type, count in invited_bonus_rows
+        }
+
+        # График платежей когорты на ВСЁМ внешнем периоде — переиспользуем
+        # существующий построитель серии в когортном режиме, передав внешний период.
+        sales_series = build_admin_sales_series(
+            db_session,
+            cohort_events,
+            period_start,
+            period_end,
+            granularity,
+            requested_granularity,
+            granularity_note,
+            sales_mode="cohort",
+        )
+    finally:
+        # Не держим временную таблицу на пуловом соединении после ответа.
+        drop_admin_cohort_table(db_session)
+
+    sources = []
+    for source in sorted(
+        source_stats.values(), key=lambda item: item["subscriptions"], reverse=True
+    ):
+        subscriptions = source["subscriptions"]
+        payers = source["unique_paying_users"]
+        sources.append(
+            {
+                **source,
+                "payment_conversion": (
+                    payers / subscriptions * 100 if subscriptions else 0
+                ),
+                "arpu": source["revenue"] / subscriptions if subscriptions else 0,
+            }
+        )
+
+    totals = {
+        "cohort_size": cohort_size,
+        "payments": total_payments,
+        "revenue": total_revenue,
+        "unique_paying_users": unique_paying_users,
+        "payment_conversion": (
+            unique_paying_users / cohort_size * 100 if cohort_size else 0
+        ),
+        "arpu": total_revenue / cohort_size if cohort_size else 0,
+        "arppu": total_revenue / unique_paying_users if unique_paying_users else 0,
+        "invited_referrals": invited_referrals,
+        "invited_referrals_active": invited_bonus_counts.get(
+            ReferralBonusType.TRAFFIC, 0
+        ),
+        "invited_referrals_paid": invited_bonus_counts.get(
+            ReferralBonusType.PURCHASE, 0
+        ),
+    }
+
+    return {
+        "period": {"start": period_start.isoformat(), "end": period_end.isoformat()},
+        "cohort": {"start": cohort_start.isoformat(), "end": cohort_end.isoformat()},
+        "totals": totals,
+        "sources": sources,
+        "sales_series": sales_series,
+    }
+
+
 def support_admin_api_stats(request):
     auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
     if auth_response:
@@ -4366,6 +4626,72 @@ def support_admin_api_stats_source_users(request):
                         "total_pages": (total + per_page - 1) // per_page,
                     },
                 },
+            }
+        )
+    finally:
+        db_session.close()
+
+
+def support_admin_api_cohort_stats(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    try:
+        today = date.today()
+        # По умолчанию: внешний период — последние 12 месяцев, когорта — первый месяц.
+        period_start = (
+            admin_parse_date(request.GET.get("start"))
+            if request.GET.get("start")
+            else today - timedelta(days=364)
+        )
+        period_end = (
+            admin_parse_date(request.GET.get("end"))
+            if request.GET.get("end")
+            else today
+        )
+        cohort_start = (
+            admin_parse_date(request.GET.get("cohort_start"))
+            if request.GET.get("cohort_start")
+            else period_start
+        )
+        cohort_end = (
+            admin_parse_date(request.GET.get("cohort_end"))
+            if request.GET.get("cohort_end")
+            else min(period_end, period_start + timedelta(days=29))
+        )
+    except ValueError:
+        return JsonResponse(
+            {"status": "error", "message": "Неверный формат даты"}, status=400
+        )
+
+    if period_start > period_end:
+        return JsonResponse(
+            {"status": "error", "message": "Начало диапазона больше его конца"},
+            status=400,
+        )
+
+    cohort_start, cohort_end, cohort_error = admin_clamp_cohort_window(
+        period_start, period_end, cohort_start, cohort_end
+    )
+    if cohort_error:
+        return JsonResponse(
+            {"status": "error", "message": cohort_error}, status=400
+        )
+
+    db_session = session_factory()
+    try:
+        return JsonResponse(
+            {
+                "status": "ok",
+                "result": build_admin_cohort_retention_stats(
+                    db_session,
+                    period_start,
+                    period_end,
+                    cohort_start,
+                    cohort_end,
+                    request.GET.get("granularity", "month"),
+                ),
             }
         )
     finally:

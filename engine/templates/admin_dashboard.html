@@ -323,6 +323,42 @@
         .sales-chart-legend-item { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 999px; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.075); }
         .sales-chart-swatch { width: 8px; height: 8px; border-radius: 999px; background: var(--swatch, var(--brand-gold)); }
         .empty-chart { min-height: 210px; display: flex; align-items: center; justify-content: center; color: rgba(138,149,163,.6); font-weight: 700; font-size: 13px; }
+        .subtabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,.08); }
+        .subtab { display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13px; font-weight: 800; cursor: pointer; transition: color .14s, border-color .14s; }
+        .subtab i { font-size: 12px; }
+        .subtab:hover { color: #fff; }
+        .subtab.active { color: var(--brand-gold); border-bottom-color: var(--brand-gold); }
+        .subtab-panel { display: none; }
+        .subtab-panel.active { display: block; animation: fadeIn .15s ease-out; }
+        .cohort-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px 10px; align-items: end; }
+        .cohort-field { display: grid; gap: 6px; min-width: 0; }
+        .cohort-field-label { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .02em; }
+        .cohort-field-label.is-cohort { color: var(--brand-gold); }
+        .cohort-controls { grid-column: 1 / -1; display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+        .cohort-controls .input { width: auto; min-width: 170px; }
+        .cohort-presets { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+        .cohort-presets-label { color: var(--muted); font-size: 11px; font-weight: 700; margin-right: 2px; }
+        .cohort-preset { min-height: 26px; border: 1px solid rgba(255,255,255,.09); border-radius: 999px; background: rgba(255,255,255,.04); color: var(--text-main); padding: 0 10px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all .13s; }
+        .cohort-preset:hover, .cohort-preset.active { color: #050505; background: var(--brand-gold); border-color: transparent; }
+        .cohort-hint { padding: 20px; color: var(--muted); font-size: 13px; line-height: 1.6; font-weight: 600; }
+        .cohort-table { width: 100%; border-collapse: collapse; font-size: 12px; font-weight: 700; }
+        .cohort-table th { text-align: right; padding: 9px 12px; color: var(--muted); font-size: 11px; font-weight: 800; border-bottom: 1px solid rgba(255,255,255,.08); white-space: nowrap; }
+        .cohort-table th:first-child, .cohort-table td:first-child { text-align: left; }
+        .cohort-table td { text-align: right; padding: 9px 12px; color: #fff; border-bottom: 1px solid rgba(255,255,255,.05); white-space: nowrap; }
+        .cohort-table tbody tr:last-child td { border-bottom: 0; }
+        .cohort-table tbody tr:hover td { background: rgba(255,255,255,.03); }
+        .metrics-legend { margin-bottom: 16px; padding: 0; border: 1px solid rgba(255,255,255,.08); border-radius: 12px; background: rgba(255,255,255,.02); overflow: hidden; }
+        .metrics-legend > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 9px; padding: 13px 16px; color: #fff; font-size: 13px; font-weight: 800; user-select: none; }
+        .metrics-legend > summary::-webkit-details-marker { display: none; }
+        .metrics-legend > summary i.legend-icon { color: var(--brand-gold); font-size: 13px; }
+        .metrics-legend > summary .legend-chevron { margin-left: auto; color: var(--muted); font-size: 12px; transition: transform .16s; }
+        .metrics-legend[open] > summary .legend-chevron { transform: rotate(180deg); }
+        .metrics-legend > summary:hover { color: var(--brand-gold); }
+        .metrics-legend-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px 22px; margin: 0; padding: 6px 16px 18px; }
+        .metrics-legend-item { min-width: 0; padding-left: 11px; border-left: 2px solid rgba(255,199,0,.32); }
+        .metrics-legend-item dt { color: var(--brand-gold); font-size: 12px; font-weight: 800; }
+        .metrics-legend-item dd { margin: 4px 0 0; color: #c4cad4; font-size: 12px; line-height: 1.5; font-weight: 600; }
+        .metrics-legend-item dd .formula { color: var(--muted); font-weight: 700; }
         .chat-grid { display: grid; grid-template-columns: minmax(260px, 360px) minmax(0, 1fr); gap: 18px; }
         .ticket-list { max-height: calc(100vh - 230px); overflow-y: auto; }
         .ticket-link { display: block; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.05); transition: background .13s; }
@@ -404,6 +440,8 @@
             .sources-grid,
             .form-grid-two,
             .form-grid-stats,
+            .cohort-grid,
+            .metrics-legend-grid,
             .system-grid,
             .system-form.two,
             .subscription-actions,
@@ -508,6 +546,7 @@
     <main class="main"
         data-stats-url="{% url 'support_admin_api_stats' %}"
         data-stats-source-users-url="{% url 'support_admin_api_stats_source_users' %}"
+        data-cohort-stats-url="{% url 'support_admin_api_cohort_stats' %}"
         data-user-payments-url="{% url 'support_admin_api_user_payments' %}"
         data-referrals-url="{% url 'support_admin_api_referrals' %}"
         data-payment-info-url="{% url 'support_admin_api_payment_info' %}"
@@ -528,6 +567,11 @@
                 <h1 class="admin-title">Аналитика</h1>
                 <p class="admin-subtitle">Подписки, подключения, платежи и рекламные источники</p>
             </header>
+            <div class="subtabs" role="tablist" aria-label="Режим аналитики">
+                <button type="button" class="subtab active" data-subtab="overview" role="tab"><i class="fas fa-chart-line"></i>Сквозной анализ</button>
+                <button type="button" class="subtab" data-subtab="cohort" role="tab"><i class="fas fa-users"></i>Когортный анализ</button>
+            </div>
+            <div id="subpanel-overview" class="subtab-panel active">
             <form id="stats-form" class="card form-card form-grid-stats">
                 <div class="date-field" data-date-picker>
                     <input type="hidden" name="start">
@@ -568,6 +612,133 @@
                 </div>
             </form>
             <div id="stats-result" class="result-stack"></div>
+            </div>
+
+            <div id="subpanel-cohort" class="subtab-panel">
+            <p class="admin-subtitle" style="margin-bottom: 16px;">Выберите диапазон, затем когорту внутри него — график покажет платежи этой когорты за весь диапазон</p>
+            <form id="cohort-form" class="card form-card cohort-grid">
+                <div class="cohort-field">
+                    <span class="cohort-field-label">Диапазон — начало</span>
+                    <div class="date-field" data-date-picker>
+                        <input type="hidden" name="start">
+                        <button type="button" class="date-trigger" data-date-trigger>
+                            <span data-date-label>Дата начала</span>
+                            <i class="fas fa-calendar-days"></i>
+                        </button>
+                        <div class="date-popover" data-date-popover></div>
+                    </div>
+                </div>
+                <div class="cohort-field">
+                    <span class="cohort-field-label">Диапазон — конец</span>
+                    <div class="date-field" data-date-picker>
+                        <input type="hidden" name="end">
+                        <button type="button" class="date-trigger" data-date-trigger>
+                            <span data-date-label>Дата конца</span>
+                            <i class="fas fa-calendar-days"></i>
+                        </button>
+                        <div class="date-popover" data-date-popover></div>
+                    </div>
+                </div>
+                <div class="cohort-field">
+                    <span class="cohort-field-label is-cohort">Когорта — начало</span>
+                    <div class="date-field" data-date-picker>
+                        <input type="hidden" name="cohort_start">
+                        <button type="button" class="date-trigger" data-date-trigger>
+                            <span data-date-label>Дата начала</span>
+                            <i class="fas fa-calendar-days"></i>
+                        </button>
+                        <div class="date-popover" data-date-popover></div>
+                    </div>
+                </div>
+                <div class="cohort-field">
+                    <span class="cohort-field-label is-cohort">Когорта — конец</span>
+                    <div class="date-field" data-date-picker>
+                        <input type="hidden" name="cohort_end">
+                        <button type="button" class="date-trigger" data-date-trigger>
+                            <span data-date-label>Дата конца</span>
+                            <i class="fas fa-calendar-days"></i>
+                        </button>
+                        <div class="date-popover" data-date-popover></div>
+                    </div>
+                </div>
+                <div class="cohort-controls">
+                    <select class="input" name="granularity" aria-label="Детализация графика">
+                        <option value="auto">Авто</option>
+                        <option value="day">По дням</option>
+                        <option value="week">По неделям</option>
+                        <option value="month" selected>По месяцам</option>
+                    </select>
+                    <button class="btn" type="submit"><i class="fas fa-chart-line"></i>Построить</button>
+                </div>
+                <div class="cohort-presets" aria-label="Быстрый выбор диапазона">
+                    <span class="cohort-presets-label">Диапазон</span>
+                    <button class="cohort-preset" type="button" data-cohort-period="this-year">Этот год</button>
+                    <button class="cohort-preset" type="button" data-cohort-period="last-year">Прошлый год</button>
+                    <button class="cohort-preset" type="button" data-cohort-period="prev-year">Позапрошлый</button>
+                    <button class="cohort-preset" type="button" data-cohort-period="365">12 месяцев</button>
+                    <button class="cohort-preset" type="button" data-cohort-period="history">Всё время</button>
+                </div>
+                <div class="cohort-presets" aria-label="Быстрый выбор когорты">
+                    <span class="cohort-presets-label">Когорта</span>
+                    <button class="cohort-preset" type="button" data-cohort-window="first-week">1-я неделя</button>
+                    <button class="cohort-preset" type="button" data-cohort-window="first-month">1-й месяц</button>
+                    <button class="cohort-preset" type="button" data-cohort-window="first-30">Первые 30 дней</button>
+                    <button class="cohort-preset" type="button" data-cohort-window="first-quarter">1-й квартал</button>
+                </div>
+            </form>
+            <details class="metrics-legend">
+                <summary><i class="fas fa-circle-question legend-icon"></i>Как читать показатели<i class="fas fa-chevron-down legend-chevron"></i></summary>
+                <dl class="metrics-legend-grid">
+                    <div class="metrics-legend-item">
+                        <dt>Размер когорты</dt>
+                        <dd>Сколько новых клиентов пришло в выбранное окно когорты (по первому событию создания подписки).</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>Покупатели</dt>
+                        <dd>Сколько из когорты сделали хотя бы один успешный платёж за период.</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>Платежи</dt>
+                        <dd>Общее число успешных платежей когорты за период.</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>Выручка</dt>
+                        <dd>Суммарная выручка когорты за период.</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>Конверсия</dt>
+                        <dd>Доля купивших. <span class="formula">Покупатели ÷ Размер когорты</span>.</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>ARPU</dt>
+                        <dd>Средняя выручка на клиента, включая неплативших. <span class="formula">Выручка ÷ Размер когорты</span>.</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>ARPPU</dt>
+                        <dd>Средняя выручка на покупателя. <span class="formula">Выручка ÷ Покупатели</span>.</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>Привела рефералов</dt>
+                        <dd>Сколько новых пользователей пригласили члены когорты.</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>Рефералы активны</dt>
+                        <dd>Из приглашённых когортой — сколько начали пользоваться сервисом.</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>Рефералы оплатили</dt>
+                        <dd>Из приглашённых когортой — сколько совершили покупку.</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>График</dt>
+                        <dd>Линия — выручка по времени, столбцы — платежи по тарифам; всё по когорте за весь диапазон. Наведите курсор для деталей корзины.</dd>
+                    </div>
+                </dl>
+            </details>
+            <div id="cohort-result" class="result-stack">
+                <div class="card cohort-hint">Выберите диапазон и когорту внутри него, затем нажмите «Построить».</div>
+            </div>
+            </div>
         </section>
         {% endif %}
 
@@ -1640,9 +1811,14 @@
             `;
         }
 
-        function drawSalesSeriesChart(canvas, series) {
+        function drawSalesSeriesChart(canvas, series, options = {}) {
             if (!canvas) return;
             const buckets = series?.buckets || [];
+            // По умолчанию (без options) поведение идентично прежнему: числа платежей
+            // рисуются над каждым баром. Для плотных графиков (например когортного по
+            // неделям) их можно скрыть, чтобы подписи не наезжали друг на друга.
+            const maxBarCountLabels = options.maxBarCountLabels ?? Infinity;
+            const showBarCounts = buckets.length <= maxBarCountLabels;
             const ctx = canvas.getContext('2d');
             const dpr = window.devicePixelRatio || 1;
             const width = canvas.clientWidth * dpr;
@@ -1708,7 +1884,7 @@
                 ctx.fillStyle = 'rgba(255,255,255,.62)';
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'bottom';
-                if (row.payments) {
+                if (row.payments && showBarCounts) {
                     ctx.fillText(String(row.payments), x, Math.max(topPadding + 10 * dpr, y - 6 * dpr));
                 }
                 ctx.fillStyle = 'rgba(255,255,255,.42)';
@@ -1801,6 +1977,269 @@
                 tooltip.style.left = `${left}px`;
                 tooltip.style.top = `${top}px`;
                 tooltip.style.display = 'block';
+            });
+        }
+
+        let lastCohortResult = null;
+        // Старт бизнеса — апрель 2025. Пресет «Всё время» начинается отсюда, а не с
+        // условного 2020 года, по которому всё равно нет данных.
+        const COHORT_BUSINESS_START = new Date(2025, 3, 1);
+
+        function getCohortForm() {
+            return document.getElementById('cohort-form');
+        }
+
+        // Для месячной детализации label приходит как "MM.YYYY" — показываем месяц
+        // словом ("Декабрь 2025"), чтобы в подсказке не были одни цифры.
+        function cohortBucketLabel(label, granularity) {
+            if (granularity === 'month') {
+                const match = /^(\d{2})\.(\d{4})$/.exec(label || '');
+                if (match) return `${monthNames[Number(match[1]) - 1]} ${match[2]}`;
+            }
+            return label || '';
+        }
+
+        function setCohortField(name, isoDate) {
+            const form = getCohortForm();
+            if (!form) return;
+            const field = form.querySelector(`[name="${name}"]`)?.closest('[data-date-picker]');
+            if (field) setDateFieldValue(field, isoDate);
+        }
+
+        function getCohortFieldDate(name) {
+            const form = getCohortForm();
+            if (!form) return null;
+            const input = form.querySelector(`[name="${name}"]`);
+            return input ? localDateFromIso(input.value) : null;
+        }
+
+        function markCohortPresetActive(attribute, value) {
+            const form = getCohortForm();
+            if (!form) return;
+            form.querySelectorAll(`[data-${attribute}]`).forEach((button) => {
+                button.classList.toggle('active', button.dataset[attribute === 'cohort-period' ? 'cohortPeriod' : 'cohortWindow'] === value);
+            });
+        }
+
+        function applyCohortWindowPreset(preset, markActive = true) {
+            const periodStart = getCohortFieldDate('start');
+            const periodEnd = getCohortFieldDate('end');
+            if (!periodStart || !periodEnd) return;
+            const cohortStart = periodStart;
+            let cohortEnd;
+            if (preset === 'first-week') {
+                cohortEnd = addDays(periodStart, 6);
+            } else if (preset === 'first-30') {
+                cohortEnd = addDays(periodStart, 29);
+            } else if (preset === 'first-quarter') {
+                cohortEnd = addDays(periodStart, 89);
+            } else {
+                // first-month: до последнего дня месяца, в котором начинается диапазон.
+                cohortEnd = new Date(periodStart.getFullYear(), periodStart.getMonth() + 1, 0);
+            }
+            if (cohortEnd > periodEnd) cohortEnd = periodEnd;
+            setCohortField('cohort_start', isoFromLocalDate(cohortStart));
+            setCohortField('cohort_end', isoFromLocalDate(cohortEnd));
+            if (markActive) markCohortPresetActive('cohort-window', preset);
+        }
+
+        function applyCohortPeriodPreset(preset) {
+            const today = new Date();
+            const todayOnly = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+            const year = today.getFullYear();
+            let start = todayOnly;
+            let end = todayOnly;
+            if (preset === 'this-year') {
+                start = new Date(year, 0, 1);
+                end = new Date(year, 11, 31);
+                if (end > todayOnly) end = todayOnly;
+            } else if (preset === 'last-year') {
+                start = new Date(year - 1, 0, 1);
+                end = new Date(year - 1, 11, 31);
+            } else if (preset === 'prev-year') {
+                start = new Date(year - 2, 0, 1);
+                end = new Date(year - 2, 11, 31);
+            } else if (preset === '365') {
+                start = addDays(todayOnly, -364);
+                end = todayOnly;
+            } else if (preset === 'history') {
+                start = new Date(COHORT_BUSINESS_START.getFullYear(), COHORT_BUSINESS_START.getMonth(), COHORT_BUSINESS_START.getDate());
+                end = todayOnly;
+            }
+            setCohortField('start', isoFromLocalDate(start));
+            setCohortField('end', isoFromLocalDate(end));
+            // Когорта по умолчанию — первый месяц нового диапазона.
+            applyCohortWindowPreset('first-month');
+            markCohortPresetActive('cohort-period', preset);
+        }
+
+        function bindCohortChartTooltip(canvas, tooltip, granularity) {
+            if (!canvas || !tooltip) return;
+            const hide = () => {
+                tooltip.style.display = 'none';
+            };
+            canvas.addEventListener('mouseleave', hide);
+            canvas.addEventListener('mousemove', (event) => {
+                const points = canvas.__salesChartPoints || [];
+                if (!points.length) return hide();
+                const rect = canvas.getBoundingClientRect();
+                const x = event.clientX - rect.left;
+                const nearest = points.reduce((best, point) => {
+                    const distance = Math.abs(point.x - x);
+                    return !best || distance < best.distance ? {point, distance} : best;
+                }, null);
+                if (!nearest || nearest.distance > 34) return hide();
+                const row = nearest.point.row;
+                const tariffLines = (row.tariffs || []).map((tariff) => (
+                    `<div>${escapeHtml(tariff.name)}: <span class="gold">${tariff.count}</span> · ${money(tariff.revenue)}</div>`
+                )).join('') || '<div class="muted">Продаж по тарифам нет</div>';
+                tooltip.innerHTML = `
+                    <strong>${escapeHtml(cohortBucketLabel(row.label, granularity))}</strong>
+                    <div>Выручка: <span class="green">${money(row.revenue)}</span></div>
+                    <div>Платежей: <span class="gold">${row.payments}</span></div>
+                    <div>Покупателей: ${row.unique_paying_users}</div>
+                    <div class="mt-1">${tariffLines}</div>
+                `;
+                const tooltipWidth = 240;
+                const left = Math.min(rect.width - tooltipWidth - 10, Math.max(10, nearest.point.x + 12));
+                const top = Math.max(10, nearest.point.y - 26);
+                tooltip.style.left = `${left}px`;
+                tooltip.style.top = `${top}px`;
+                tooltip.style.display = 'block';
+            });
+        }
+
+        function renderCohortSources(result) {
+            const sources = (result && result.sources) || [];
+            if (!sources.length) {
+                return '<div class="card info-card muted">У когорты нет источников за период.</div>';
+            }
+            const rows = sources.map((source) => `
+                <tr>
+                    <td title="${escapeHtml(source.label)}">${escapeHtml(source.label)}</td>
+                    <td>${num(source.subscriptions)}</td>
+                    <td>${num(source.unique_paying_users)}</td>
+                    <td>${num(source.payments)}</td>
+                    <td>${money(source.revenue)}</td>
+                    <td class="gold">${pct(source.payment_conversion)}</td>
+                    <td>${money(source.arpu)}</td>
+                </tr>
+            `).join('');
+            return `
+                <section class="card chart-card" style="overflow-x:auto;">
+                    <h3 class="sales-chart-title" style="margin-bottom:14px;">Когорта по источникам</h3>
+                    <table class="cohort-table">
+                        <thead>
+                            <tr>
+                                <th>Источник</th>
+                                <th>Когорта</th>
+                                <th>Покупатели</th>
+                                <th>Платежи</th>
+                                <th>Выручка</th>
+                                <th>Конв.</th>
+                                <th>ARPU</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </section>
+            `;
+        }
+
+        async function loadCohortStats(event) {
+            if (event) event.preventDefault();
+            const target = document.getElementById('cohort-result');
+            const form = getCohortForm();
+            if (!target || !form) return;
+            setLoading(target);
+            const params = new URLSearchParams(new FormData(form));
+            let payload;
+            try {
+                const response = await fetch(`${main.dataset.cohortStatsUrl}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    return setError(target, (payload && payload.message) || 'Не удалось собрать когортную статистику');
+                }
+            } catch (error) {
+                return setError(target, 'Не удалось собрать когортную статистику');
+            }
+            const result = payload.result;
+            lastCohortResult = result;
+            const series = result.sales_series || {buckets: [], tariff_names: []};
+            const hasSeries = (series.buckets || []).some((bucket) => bucket.revenue || bucket.payments);
+            const granularityLabels = {day: 'по дням', week: 'по неделям', month: 'по месяцам'};
+            const period = result.period || {};
+            const cohort = result.cohort || {};
+            const subtitle = `Когорта ${displayDate(cohort.start)} – ${displayDate(cohort.end)} · платежи за ${displayDate(period.start)} – ${displayDate(period.end)}`;
+            const legendItems = [
+                '<span class="sales-chart-legend-item"><span class="sales-chart-swatch" style="--swatch:#38d996"></span>Выручка</span>',
+                ...(series.tariff_names || []).map((name, index) => `
+                    <span class="sales-chart-legend-item">
+                        <span class="sales-chart-swatch" style="--swatch:${tariffChartColors[index % tariffChartColors.length]}"></span>${escapeHtml(name)}
+                    </span>
+                `),
+            ].join('');
+            target.innerHTML = `
+                <div class="metrics-grid five">
+                    ${metric('Размер когорты', num(result.totals.cohort_size), 'fa-users')}
+                    ${metric('Покупателей', num(result.totals.unique_paying_users), 'fa-ticket')}
+                    ${metric('Платежей', num(result.totals.payments), 'fa-coins')}
+                    ${metric('Выручка', money(result.totals.revenue), 'fa-wallet')}
+                    ${metric('Конверсия', pct(result.totals.payment_conversion), 'fa-percent')}
+                </div>
+                <div class="metrics-grid five">
+                    ${metric('ARPU (на клиента)', money(result.totals.arpu), 'fa-user')}
+                    ${metric('ARPPU (на покупателя)', money(result.totals.arppu), 'fa-user-tag')}
+                    ${metric('Привела рефералов', num(result.totals.invited_referrals), 'fa-user-plus')}
+                    ${metric('Рефералы активны', num(result.totals.invited_referrals_active), 'fa-plug')}
+                    ${metric('Рефералы оплатили', num(result.totals.invited_referrals_paid), 'fa-coins')}
+                </div>
+                <section class="card chart-card sales-chart-card">
+                    <div class="sales-chart-head">
+                        <div>
+                            <h3 class="sales-chart-title">Платежи когорты за период</h3>
+                            <div class="sales-chart-subtitle">${escapeHtml(subtitle)}, ${escapeHtml(granularityLabels[series.granularity] || 'по месяцам')}</div>
+                        </div>
+                        ${series.note ? `<div class="sales-chart-note">${escapeHtml(series.note)}</div>` : ''}
+                    </div>
+                    ${hasSeries
+                        ? `<div class="sales-chart-canvas-wrap"><canvas id="cohort-chart"></canvas><div id="cohort-chart-tooltip" class="sales-chart-tooltip"></div></div><div class="sales-chart-legend">${legendItems}</div>`
+                        : '<div class="empty-chart">У когорты нет платежей за выбранный период.</div>'}
+                </section>
+                <section>${renderCohortSources(result)}</section>
+            `;
+            if (hasSeries) {
+                const chart = document.getElementById('cohort-chart');
+                // На плотных графиках (много корзин) числа над барами скрываем, чтобы
+                // подписи не наезжали и график читался.
+                drawSalesSeriesChart(chart, series, {maxBarCountLabels: 18});
+                bindCohortChartTooltip(chart, document.getElementById('cohort-chart-tooltip'), series.granularity);
+            }
+        }
+
+        function setupCohortControls() {
+            const form = getCohortForm();
+            if (!form) return;
+            form.querySelectorAll('[data-cohort-period]').forEach((button) => {
+                button.addEventListener('click', () => applyCohortPeriodPreset(button.dataset.cohortPeriod));
+            });
+            form.querySelectorAll('[data-cohort-window]').forEach((button) => {
+                button.addEventListener('click', () => applyCohortWindowPreset(button.dataset.cohortWindow));
+            });
+        }
+
+        function showStatsSubtab(name) {
+            document.querySelectorAll('#panel-stats .subtab').forEach((button) => {
+                button.classList.toggle('active', button.dataset.subtab === name);
+            });
+            document.querySelectorAll('#panel-stats .subtab-panel').forEach((panel) => {
+                panel.classList.toggle('active', panel.id === `subpanel-${name}`);
+            });
+        }
+
+        function setupStatsSubtabs() {
+            document.querySelectorAll('#panel-stats .subtab').forEach((button) => {
+                button.addEventListener('click', () => showStatsSubtab(button.dataset.subtab));
             });
         }
 
@@ -2704,6 +3143,17 @@
         setupStatsPresets();
         if (statsForm) {
             setStatsDateRange(addDays(today, -29), today, '30');
+        }
+
+        setupStatsSubtabs();
+        const cohortForm = document.getElementById('cohort-form');
+        if (cohortForm) {
+            cohortForm.addEventListener('submit', loadCohortStats);
+            setupCohortControls();
+            // Значения по умолчанию: последние 12 месяцев, когорта — первый месяц.
+            // График автоматически НЕ строим, чтобы не запускать тяжёлый запрос
+            // одновременно с основной аналитикой — админ нажимает «Построить».
+            applyCohortPeriodPreset('365');
         }
 
         const defaultTab = document.querySelector('.tab-btn.active')?.dataset.tab || document.querySelector('.tab-btn')?.dataset.tab;

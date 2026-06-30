@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import time
+from datetime import date
 from datetime import datetime
 from pathlib import Path
 from types import SimpleNamespace
@@ -21,10 +22,12 @@ from engine.payments import create_wata_payment_sync
 from engine.payments import create_yk_payment_sync
 from engine.payments import fetch_wata_transaction_status
 from engine.views import active_wata_status_for_token
+from engine.views import admin_clamp_cohort_window
 from engine.views import admin_runtime_setting_payload
 from engine.views import admin_runtime_setting_type
 from engine.views import admin_validate_runtime_setting
 from engine.views import admin_stats_row_bucket_key
+from engine.views import support_admin_api_cohort_stats
 from engine.views import auth_by_telegram_widget
 from engine.views import create_site_user
 from engine.views import custom_config_template_payload
@@ -542,6 +545,205 @@ class AdminSalesSeriesTests(SimpleTestCase):
         self.assertEqual(admin_stats_row_bucket_key(value, "day"), "2026-05-20")
         self.assertEqual(admin_stats_row_bucket_key(value, "week"), "2026-05-18")
         self.assertEqual(admin_stats_row_bucket_key(value, "month"), "2026-05-01")
+
+
+class AdminCohortWindowClampTests(SimpleTestCase):
+    def test_clamps_cohort_window_into_period(self):
+        start, end, error = admin_clamp_cohort_window(
+            date(2025, 1, 1),
+            date(2025, 12, 31),
+            date(2024, 12, 1),
+            date(2025, 2, 15),
+        )
+
+        self.assertIsNone(error)
+        self.assertEqual(start, date(2025, 1, 1))
+        self.assertEqual(end, date(2025, 2, 15))
+
+    def test_keeps_cohort_window_when_already_inside(self):
+        start, end, error = admin_clamp_cohort_window(
+            date(2025, 1, 1),
+            date(2025, 12, 31),
+            date(2025, 3, 1),
+            date(2025, 3, 31),
+        )
+
+        self.assertIsNone(error)
+        self.assertEqual(start, date(2025, 3, 1))
+        self.assertEqual(end, date(2025, 3, 31))
+
+    def test_rejects_inverted_cohort_window(self):
+        start, end, error = admin_clamp_cohort_window(
+            date(2025, 1, 1),
+            date(2025, 12, 31),
+            date(2025, 5, 1),
+            date(2025, 4, 1),
+        )
+
+        self.assertIsNone(start)
+        self.assertIsNone(end)
+        self.assertEqual(error, "Начало когорты больше её конца")
+
+    def test_rejects_cohort_window_outside_period(self):
+        start, end, error = admin_clamp_cohort_window(
+            date(2025, 1, 1),
+            date(2025, 3, 31),
+            date(2025, 6, 1),
+            date(2025, 6, 30),
+        )
+
+        self.assertIsNone(start)
+        self.assertIsNone(end)
+        self.assertEqual(error, "Окно когорты вне выбранного диапазона")
+
+
+class AdminCohortStatsEndpointTests(SimpleTestCase):
+    class FakeSession:
+        def close(self):
+            return None
+
+    def test_endpoint_does_not_run_builder_without_admin_role(self):
+        request = RequestFactory().get(
+            "/support-admin/api/cohort-stats/",
+            {"start": "2025-01-01", "end": "2025-12-31"},
+        )
+        request.session = {}
+
+        with mock.patch(
+            "engine.views.build_admin_cohort_retention_stats"
+        ) as builder:
+            response = support_admin_api_cohort_stats(request)
+
+        self.assertNotEqual(response.status_code, 200)
+        self.assertFalse(builder.called)
+
+    def test_invalid_period_returns_400(self):
+        request = RequestFactory().get(
+            "/support-admin/api/cohort-stats/",
+            {"start": "2025-12-31", "end": "2025-01-01"},
+        )
+
+        with (
+            mock.patch(
+                "engine.views.require_support_admin_role", return_value=None
+            ),
+            mock.patch(
+                "engine.views.build_admin_cohort_retention_stats"
+            ) as builder,
+        ):
+            response = support_admin_api_cohort_stats(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(builder.called)
+        self.assertEqual(json.loads(response.content)["status"], "error")
+
+    def test_passes_clamped_cohort_window_to_builder(self):
+        request = RequestFactory().get(
+            "/support-admin/api/cohort-stats/",
+            {
+                "start": "2025-01-01",
+                "end": "2025-12-31",
+                # Когорта частично выходит за начало диапазона — должна зажаться.
+                "cohort_start": "2024-12-01",
+                "cohort_end": "2025-01-31",
+                "granularity": "month",
+            },
+        )
+
+        with (
+            mock.patch(
+                "engine.views.require_support_admin_role", return_value=None
+            ),
+            mock.patch(
+                "engine.views.session_factory",
+                return_value=self.FakeSession(),
+            ),
+            mock.patch(
+                "engine.views.build_admin_cohort_retention_stats",
+                return_value={"sentinel": True},
+            ) as builder,
+        ):
+            response = support_admin_api_cohort_stats(request)
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["result"], {"sentinel": True})
+
+        args = builder.call_args.args
+        # args: (db_session, period_start, period_end, cohort_start, cohort_end, granularity)
+        self.assertEqual(args[1], date(2025, 1, 1))
+        self.assertEqual(args[2], date(2025, 12, 31))
+        self.assertEqual(args[3], date(2025, 1, 1))
+        self.assertEqual(args[4], date(2025, 1, 31))
+        self.assertEqual(args[5], "month")
+
+
+class AdminCohortDashboardTemplateTests(SimpleTestCase):
+    def test_cohort_analytics_section_is_present(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("data-cohort-stats-url", template)
+        self.assertIn('id="cohort-form"', template)
+        self.assertIn("Когортный анализ", template)
+        self.assertIn('name="cohort_start"', template)
+        self.assertIn('name="cohort_end"', template)
+        self.assertIn("data-cohort-period", template)
+        self.assertIn("data-cohort-window", template)
+        self.assertIn("function loadCohortStats", template)
+        self.assertIn("applyCohortPeriodPreset", template)
+        # Когортный график переиспользует существующий построитель серии (с опцией
+        # плотности подписей), не дублируя отрисовку.
+        self.assertIn("drawSalesSeriesChart(chart, series, {maxBarCountLabels", template)
+
+    def test_analytics_has_overview_and_cohort_subtabs(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('id="subpanel-overview"', template)
+        self.assertIn('id="subpanel-cohort"', template)
+        self.assertIn('data-subtab="overview"', template)
+        self.assertIn('data-subtab="cohort"', template)
+        self.assertIn("function showStatsSubtab", template)
+        self.assertIn("setupStatsSubtabs", template)
+
+    def test_cohort_shows_invited_referrals_metrics(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("invited_referrals", template)
+        self.assertIn("invited_referrals_active", template)
+        self.assertIn("invited_referrals_paid", template)
+        self.assertIn("Привела рефералов", template)
+
+    def test_cohort_all_time_preset_starts_at_business_start_not_2020(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        # «Всё время» в когорте отсчитывается от старта бизнеса (апрель 2025),
+        # а не от условного 2020 года, по которому нет данных.
+        self.assertIn("COHORT_BUSINESS_START = new Date(2025, 3, 1)", template)
+        self.assertNotIn("start = new Date(2020, 0, 1);\n                end = todayOnly;", template)
+
+    def test_cohort_tooltip_shows_month_name_for_monthly_granularity(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("function cohortBucketLabel", template)
+        self.assertIn("cohortBucketLabel(row.label, granularity)", template)
+
+    def test_cohort_panel_has_metrics_legend(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('class="metrics-legend"', template)
+        self.assertIn("Как читать показатели", template)
+        # Определения ключевых показателей присутствуют.
+        for term in ("ARPU", "ARPPU", "Размер когорты", "Привела рефералов"):
+            self.assertIn(term, template)
+
+    def test_existing_stats_form_is_untouched(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        # Старый блок аналитики и его контракт остаются на месте.
+        self.assertIn('id="stats-form"', template)
+        self.assertIn('name="sales_mode"', template)
+        self.assertIn("function loadStats", template)
 
 
 class TelegramAuthBotTests(SimpleTestCase):
