@@ -197,23 +197,47 @@
         .stat-row-value.gold { color: var(--brand-gold); }
         .stat-row-value.green { color: var(--green); }
         .stat-list-empty { padding: 6px 0 2px; color: var(--muted); font-size: 13px; font-weight: 600; }
-        .sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
+        .sources-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap: 12px; }
         .source-card { --source-accent: var(--brand-gold); padding: 16px; min-width: 0; overflow: hidden; border-color: rgba(255,199,0,.14); background: linear-gradient(155deg, rgba(255,199,0,.05) 0%, var(--card-bg) 44%); }
         .source-header { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 12px; }
         .source-title { min-width: 0; overflow: visible; overflow-wrap: anywhere; color: var(--source-accent); font-size: 19px; line-height: 1.1; font-weight: 800; }
         .source-actions { min-width: 0; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
-        .source-pill { flex: 0 0 auto; border-radius: 999px; padding: 6px 10px; background: color-mix(in srgb, var(--source-accent) 11%, transparent); border: 1px solid color-mix(in srgb, var(--source-accent) 22%, transparent); color: var(--source-accent); font-size: 11px; font-weight: 700; }
+        .source-pill { flex: 0 0 auto; display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 11px; background: color-mix(in srgb, var(--source-accent) 11%, transparent); border: 1px solid color-mix(in srgb, var(--source-accent) 22%, transparent); color: var(--source-accent); font-size: 12px; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .source-pill i { font-size: 11px; opacity: .85; }
         .source-details-btn { min-height: 28px; display: inline-flex; align-items: center; gap: 7px; border: 0; border-radius: 999px; padding: 0 12px; background: var(--brand-gold); color: #050505; font-size: 10px; font-weight: 800; cursor: pointer; }
         .source-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 7px; }
         .source-metric { min-width: 0; border-radius: 9px; padding: 10px 12px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.08); }
         .source-metric-label { margin-bottom: 4px; color: var(--muted); font-size: 10px; font-weight: 700; }
-        .source-metric-value { color: var(--text-main); font-size: 19px; line-height: 1; font-weight: 800; }
+        .source-metric-value { color: var(--text-main); font-size: 19px; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; }
         .source-tariffs { margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.07); }
         .source-tariff-title { margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
         .source-tariff-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; }
         .source-tariff { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; border-radius: 8px; padding: 7px 10px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.08); font-size: 11px; font-weight: 700; }
         .source-tariff-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #c8ccd4; }
-        .source-tariff-count { flex: 0 0 auto; color: #fff; font-weight: 800; }
+        .source-tariff-count { flex: 0 0 auto; color: #fff; font-weight: 800; font-variant-numeric: tabular-nums; }
+        .source-tariff-empty { padding: 4px 0 2px; color: var(--muted); font-size: 12px; font-weight: 600; }
+        .sources-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+        .sources-toolbar-title { margin: 0; color: var(--text-main); font-size: 18px; line-height: 1.1; font-weight: 800; letter-spacing: -.015em; }
+        .sources-view-toggle { display: inline-flex; gap: 3px; padding: 3px; border-radius: 10px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.08); }
+        .sources-view-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; border-radius: 7px; padding: 7px 12px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 800; cursor: pointer; transition: all .13s; }
+        .sources-view-btn i { font-size: 12px; }
+        .sources-view-btn:hover:not(.is-active) { color: var(--text-main); }
+        .sources-view-btn.is-active { background: var(--brand-gold); color: #050505; }
+        .sources-table-card { padding: 0; overflow: hidden; }
+        .sources-table-row { grid-template-columns: minmax(140px, 1.5fr) repeat(5, minmax(78px, 0.85fr)) repeat(2, minmax(86px, 0.8fr)) 44px; min-width: 980px; }
+        .sources-table-row.table-head { background: rgba(255,255,255,.04); }
+        .sources-table-card .sources-table-row:not(.table-head):hover { background: rgba(255,199,0,.05); }
+        .sources-th { display: inline-flex; align-items: center; justify-content: flex-end; gap: 5px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; text-align: right; cursor: pointer; }
+        .sources-th.is-name { justify-content: flex-start; text-align: left; }
+        .sources-th.is-active { color: var(--brand-gold); }
+        .sources-th i { font-size: 9px; opacity: .7; }
+        .sources-th-action { cursor: default; }
+        .sources-cell { min-width: 0; color: var(--text-main); font-size: 12px; font-weight: 700; }
+        .sources-cell.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .sources-cell.gold { color: var(--brand-gold); }
+        .sources-cell-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-weight: 800; }
+        .sources-row-action { display: inline-flex; align-items: center; justify-content: center; justify-self: end; width: 30px; height: 30px; border: 0; border-radius: 8px; background: var(--inner-card-bg); color: var(--brand-gold); cursor: pointer; transition: all .13s; }
+        .sources-row-action:hover { background: rgba(255,199,0,.14); }
         .modal-overlay { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.76); backdrop-filter: blur(10px); }
         .modal-overlay.open { display: flex; }
         .modal-card { position: relative; width: min(1120px, 100%); max-height: min(760px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 14px; box-shadow: 0 30px 90px rgba(0,0,0,.5); }
@@ -903,7 +927,13 @@
         let adminToastTimer = null;
         let configSaveInFlight = false;
         const money = (value) => `${Number(value || 0).toLocaleString('ru-RU')} ₽`;
+        const num = (value) => Number(value || 0).toLocaleString('ru-RU');
         const pct = (value) => `${Number(value || 0).toFixed(1)}%`;
+        let lastStatsResult = null;
+        // На десктопе по умолчанию сравнительная таблица источников, на мобилке —
+        // более читаемые карточки. Пользователь может переключать вид вручную.
+        let sourcesViewMode = window.matchMedia('(max-width: 1024px)').matches ? 'cards' : 'table';
+        let sourcesSort = {key: 'subscriptions', dir: 'desc'};
         const tariffChartColors = ['#ffc700', '#38d996', '#ff5c67', '#8f8f99', '#f59e0b', '#d8dde8', '#7dd3fc'];
 
         function escapeHtml(value) {
@@ -1098,6 +1128,26 @@
         document.addEventListener('click', (event) => {
             const sourceDetailsButton = event.target.closest('[data-source-details]');
             if (sourceDetailsButton) openSourceUsersModal(sourceDetailsButton);
+
+            const sourcesViewButton = event.target.closest('[data-sources-view]');
+            if (sourcesViewButton) {
+                const mode = sourcesViewButton.dataset.sourcesView === 'cards' ? 'cards' : 'table';
+                if (mode !== sourcesViewMode) {
+                    sourcesViewMode = mode;
+                    rerenderSourcesSection();
+                }
+            }
+
+            const sortButton = event.target.closest('[data-sort-key]');
+            if (sortButton) {
+                const key = sortButton.dataset.sortKey;
+                if (sourcesSort.key === key) {
+                    sourcesSort = {key, dir: sourcesSort.dir === 'asc' ? 'desc' : 'asc'};
+                } else {
+                    sourcesSort = {key, dir: key === 'label' ? 'asc' : 'desc'};
+                }
+                rerenderSourcesSection();
+            }
 
             const editButton = event.target.closest('[data-template-edit]');
             if (editButton) {
@@ -1754,6 +1804,150 @@
             });
         }
 
+        const SOURCE_COLUMNS = [
+            {key: 'label', label: 'Источник', name: true},
+            {key: 'subscriptions', label: 'Подписки', fmt: num},
+            {key: 'connections', label: 'Подключения', fmt: num},
+            {key: 'unique_paying_users', label: 'Покупатели', fmt: num},
+            {key: 'payments', label: 'Платежи', fmt: num},
+            {key: 'revenue', label: 'Выручка', fmt: money},
+            {key: 'connection_conversion', label: 'Конв. подкл.', fmt: pct, tone: 'gold'},
+            {key: 'payment_conversion', label: 'Конв. прод.', fmt: pct, tone: 'gold'},
+        ];
+
+        function sourceValueOf(source) {
+            return source.traffic_source === null || source.traffic_source === undefined
+                ? '__direct__'
+                : String(source.traffic_source);
+        }
+
+        function sortedSources(sources) {
+            const {key, dir} = sourcesSort;
+            const factor = dir === 'asc' ? 1 : -1;
+            return [...sources].sort((a, b) => {
+                if (key === 'label') {
+                    return factor * String(a.label).localeCompare(String(b.label), 'ru');
+                }
+                return factor * ((Number(a[key]) || 0) - (Number(b[key]) || 0));
+            });
+        }
+
+        function sourcesSortIcon(key) {
+            if (sourcesSort.key !== key) return '<i class="fas fa-sort"></i>';
+            return sourcesSort.dir === 'asc'
+                ? '<i class="fas fa-sort-up"></i>'
+                : '<i class="fas fa-sort-down"></i>';
+        }
+
+        function renderSourcesTable(sources) {
+            const head = `<div class="admin-table-row table-head sources-table-row">
+                ${SOURCE_COLUMNS.map((col) => `
+                    <button type="button" class="sources-th${col.name ? ' is-name' : ''}${sourcesSort.key === col.key ? ' is-active' : ''}" data-sort-key="${col.key}">
+                        ${escapeHtml(col.label)}${sourcesSortIcon(col.key)}
+                    </button>
+                `).join('')}
+                <span class="sources-th sources-th-action"></span>
+            </div>`;
+            const rows = sources.map((source) => {
+                const sourceValue = sourceValueOf(source);
+                const cells = SOURCE_COLUMNS.map((col) => {
+                    if (col.name) {
+                        return `<span class="sources-cell sources-cell-name" title="${escapeHtml(source.label)}">${escapeHtml(source.label)}</span>`;
+                    }
+                    return `<span class="sources-cell num${col.tone ? ' ' + col.tone : ''}">${col.fmt(source[col.key])}</span>`;
+                }).join('');
+                return `<div class="admin-table-row sources-table-row">
+                    ${cells}
+                    <button type="button" class="sources-row-action" data-source-details data-source="${escapeHtml(sourceValue)}" data-source-label="${escapeHtml(source.label)}" aria-label="Подробности: ${escapeHtml(source.label)}"><i class="fas fa-list"></i></button>
+                </div>`;
+            }).join('');
+            return `<div class="card sources-table-card"><div class="data-table">${head}${rows}</div></div>`;
+        }
+
+        function renderSourceCards(sources) {
+            const cards = sources.map((source, index) => {
+                const sourceValue = sourceValueOf(source);
+                return `
+                <article class="card source-card" data-source-card="${index}">
+                    <div class="source-header">
+                        <h3 class="source-title" title="${escapeHtml(source.label)}">${escapeHtml(source.label)}</h3>
+                        <div class="source-actions">
+                            <button type="button" class="source-details-btn" data-source-details data-source="${escapeHtml(sourceValue)}" data-source-label="${escapeHtml(source.label)}">
+                                <i class="fas fa-list"></i>Подробности
+                            </button>
+                            <span class="source-pill" title="Выручка источника"><i class="fas fa-wallet"></i>${money(source.revenue)}</span>
+                        </div>
+                    </div>
+                    <div class="source-metrics">
+                        <div class="source-metric">
+                            <div class="source-metric-label">Подписки</div>
+                            <div class="source-metric-value">${num(source.subscriptions)}</div>
+                        </div>
+                        <div class="source-metric">
+                            <div class="source-metric-label">Подключения</div>
+                            <div class="source-metric-value">${num(source.connections)}</div>
+                        </div>
+                        <div class="source-metric">
+                            <div class="source-metric-label">Покупатели</div>
+                            <div class="source-metric-value">${num(source.unique_paying_users)}</div>
+                        </div>
+                        <div class="source-metric">
+                            <div class="source-metric-label">Платежи</div>
+                            <div class="source-metric-value">${num(source.payments)}</div>
+                        </div>
+                        <div class="source-metric">
+                            <div class="source-metric-label">Конв. в подключение</div>
+                            <div class="source-metric-value gold">${pct(source.connection_conversion)}</div>
+                        </div>
+                        <div class="source-metric">
+                            <div class="source-metric-label">Конв. в продажу</div>
+                            <div class="source-metric-value gold">${pct(source.payment_conversion)}</div>
+                        </div>
+                    </div>
+                    <div class="source-tariffs">
+                        <div class="source-tariff-title">Платежи по тарифам</div>
+                        ${(source.tariffs || []).length
+                            ? `<div class="source-tariff-list">${source.tariffs.map((tariff) => `
+                                <div class="source-tariff">
+                                    <span class="source-tariff-name" title="${escapeHtml(tariff.name)}">${escapeHtml(tariff.name)}</span>
+                                    <span class="source-tariff-count">${num(tariff.count)}</span>
+                                </div>
+                            `).join('')}</div>`
+                            : '<div class="source-tariff-empty">Платежей по тарифам нет</div>'}
+                    </div>
+                </article>
+                `;
+            }).join('');
+            return `<section class="sources-grid">${cards}</section>`;
+        }
+
+        function renderSourcesSection(result) {
+            const sources = (result && result.sources) || [];
+            if (!sources.length) {
+                return '<div class="card info-card muted">Данных за период нет.</div>';
+            }
+            const sorted = sortedSources(sources);
+            const body = sourcesViewMode === 'cards'
+                ? renderSourceCards(sorted)
+                : renderSourcesTable(sorted);
+            return `
+                <div class="sources-toolbar">
+                    <h3 class="sources-toolbar-title">Источники трафика</h3>
+                    <div class="sources-view-toggle" role="group" aria-label="Вид источников">
+                        <button type="button" class="sources-view-btn${sourcesViewMode === 'table' ? ' is-active' : ''}" data-sources-view="table"><i class="fas fa-table-list"></i>Таблица</button>
+                        <button type="button" class="sources-view-btn${sourcesViewMode === 'cards' ? ' is-active' : ''}" data-sources-view="cards"><i class="fas fa-table-cells-large"></i>Карточки</button>
+                    </div>
+                </div>
+                ${body}
+            `;
+        }
+
+        function rerenderSourcesSection() {
+            if (!lastStatsResult) return;
+            const container = document.getElementById('sources-section');
+            if (container) container.innerHTML = renderSourcesSection(lastStatsResult);
+        }
+
         async function loadStats(event) {
             if (event) event.preventDefault();
             const target = document.getElementById('stats-result');
@@ -1789,65 +1983,13 @@
                     </span>
                 `),
             ].join('');
-            const sourceCards = result.sources.map((source, index) => {
-                const sourceValue = source.traffic_source === null || source.traffic_source === undefined ? '__direct__' : String(source.traffic_source);
-                return `
-                <article class="card source-card" data-source-card="${index}">
-                    <div class="source-header">
-                        <h3 class="source-title" title="${escapeHtml(source.label)}">${escapeHtml(source.label)}</h3>
-                        <div class="source-actions">
-                            <button type="button" class="source-details-btn" data-source-details data-source="${escapeHtml(sourceValue)}" data-source-label="${escapeHtml(source.label)}">
-                                <i class="fas fa-list"></i>Подробности
-                            </button>
-                            <span class="source-pill">Источник</span>
-                        </div>
-                    </div>
-                    <div class="source-metrics">
-                        <div class="source-metric">
-                            <div class="source-metric-label">Подписки</div>
-                            <div class="source-metric-value">${source.subscriptions}</div>
-                        </div>
-                        <div class="source-metric">
-                            <div class="source-metric-label">Подключения</div>
-                            <div class="source-metric-value">${source.connections}</div>
-                        </div>
-                        <div class="source-metric">
-                            <div class="source-metric-label">Покупатели</div>
-                            <div class="source-metric-value">${source.unique_paying_users}</div>
-                        </div>
-                        <div class="source-metric">
-                            <div class="source-metric-label">Платежи</div>
-                            <div class="source-metric-value">${source.payments}</div>
-                        </div>
-                        <div class="source-metric">
-                            <div class="source-metric-label">Конв. в подключение</div>
-                            <div class="source-metric-value gold">${pct(source.connection_conversion)}</div>
-                        </div>
-                        <div class="source-metric">
-                            <div class="source-metric-label">Конв. в продажу</div>
-                            <div class="source-metric-value gold">${pct(source.payment_conversion)}</div>
-                        </div>
-                    </div>
-                    <div class="source-tariffs">
-                        <div class="source-tariff-title">Платежи по тарифам</div>
-                        ${(source.tariffs || []).length
-                            ? `<div class="source-tariff-list">${source.tariffs.map((tariff) => `
-                                <div class="source-tariff">
-                                    <span class="source-tariff-name" title="${escapeHtml(tariff.name)}">${escapeHtml(tariff.name)}</span>
-                                    <span class="source-tariff-count">${tariff.count}</span>
-                                </div>
-                            `).join('')}</div>`
-                            : '<span class="muted">Платежей по тарифам нет</span>'}
-                    </div>
-                </article>
-                `;
-            }).join('');
+            lastStatsResult = result;
             target.innerHTML = `
                 <div class="metrics-grid five">
-                    ${metric('Подписок', result.totals.subscriptions, 'fa-users')}
-                    ${metric('Подключений', result.totals.connections, 'fa-plug')}
-                    ${metric('Покупателей', result.totals.unique_paying_users, 'fa-ticket')}
-                    ${metric('Платежей', result.totals.payments, 'fa-coins')}
+                    ${metric('Подписок', num(result.totals.subscriptions), 'fa-users')}
+                    ${metric('Подключений', num(result.totals.connections), 'fa-plug')}
+                    ${metric('Покупателей', num(result.totals.unique_paying_users), 'fa-ticket')}
+                    ${metric('Платежей', num(result.totals.payments), 'fa-coins')}
                     ${metric('Выручка', money(result.totals.revenue), 'fa-wallet')}
                 </div>
                 <section class="card chart-card sales-chart-card">
@@ -1862,24 +2004,22 @@
                         ? `<div class="sales-chart-canvas-wrap"><canvas id="stats-chart"></canvas><div id="sales-chart-tooltip" class="sales-chart-tooltip"></div></div><div class="sales-chart-legend">${legendItems}</div>`
                         : `<div class="empty-chart">${seriesMode.empty}</div>`}
                 </section>
-                <section class="sources-grid">
-                    ${sourceCards || '<div class="card info-card muted">Данных за период нет.</div>'}
-                </section>
+                <section id="sources-section">${renderSourcesSection(result)}</section>
                 <section class="metrics-grid two">
                     <div class="card info-card">
                         <h3 class="info-title">Итоги</h3>
                         <div class="stat-list">
                             ${statRow('Конверсия в подключения', pct(result.totals.connection_conversion), 'gold')}
                             ${statRow('Конверсия в продажи', pct(result.totals.payment_conversion), 'gold')}
-                            ${statRow('Рефералов за период', result.totals.referrals, 'green')}
-                            ${statRow('Рефералы начали пользоваться', result.totals.referral_traffic, 'green')}
-                            ${statRow('Рефералы оплатили', result.totals.referral_purchase, 'green')}
+                            ${statRow('Рефералов за период', num(result.totals.referrals), 'green')}
+                            ${statRow('Рефералы начали пользоваться', num(result.totals.referral_traffic), 'green')}
+                            ${statRow('Рефералы оплатили', num(result.totals.referral_purchase), 'green')}
                         </div>
                     </div>
                     <div class="card info-card">
                         <h3 class="info-title">Тарифы</h3>
                         ${(result.tariffs && result.tariffs.length)
-                            ? `<div class="stat-list">${result.tariffs.map((item) => statRow(item.name, item.count, 'green')).join('')}</div>`
+                            ? `<div class="stat-list">${result.tariffs.map((item) => statRow(item.name, num(item.count), 'green')).join('')}</div>`
                             : '<div class="stat-list-empty">Платежей по тарифам нет</div>'}
                     </div>
                 </section>
