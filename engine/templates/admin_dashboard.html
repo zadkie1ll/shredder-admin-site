@@ -188,6 +188,15 @@
         .info-title { margin: 0 0 12px; color: var(--text-main); font-size: 20px; line-height: 1.2; font-weight: 800; letter-spacing: -.015em; }
         .info-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
         .info-item { min-width: 0; }
+        .stat-list { display: flex; flex-direction: column; }
+        .stat-row { display: flex; align-items: baseline; justify-content: space-between; gap: 14px; padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
+        .stat-row:first-child { padding-top: 2px; }
+        .stat-row:last-child { border-bottom: 0; padding-bottom: 2px; }
+        .stat-row-label { min-width: 0; color: var(--muted); font-size: 13px; font-weight: 600; line-height: 1.3; }
+        .stat-row-value { flex-shrink: 0; color: var(--text-main); font-size: 17px; font-weight: 800; line-height: 1; letter-spacing: -.01em; font-variant-numeric: tabular-nums; }
+        .stat-row-value.gold { color: var(--brand-gold); }
+        .stat-row-value.green { color: var(--green); }
+        .stat-list-empty { padding: 6px 0 2px; color: var(--muted); font-size: 13px; font-weight: 600; }
         .sources-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; }
         .source-card { --source-accent: var(--brand-gold); padding: 16px; min-width: 0; overflow: hidden; border-color: rgba(255,199,0,.14); background: linear-gradient(155deg, rgba(255,199,0,.05) 0%, var(--card-bg) 44%); }
         .source-header { display: grid; grid-template-columns: minmax(0, 1fr); gap: 8px; margin-bottom: 12px; }
@@ -1562,6 +1571,11 @@
             return `<div class="card metric"><div class="metric-label"><i class="fas ${icon}"></i>${title}</div><div class="metric-value">${value}</div></div>`;
         }
 
+        function statRow(label, value, tone = '') {
+            const toneClass = tone ? ` ${tone}` : '';
+            return `<div class="stat-row"><span class="stat-row-label">${escapeHtml(label)}</span><span class="stat-row-value${toneClass}">${value}</span></div>`;
+        }
+
         function userCard(user) {
             return `
                 <section class="card p-5">
@@ -1854,15 +1868,19 @@
                 <section class="metrics-grid two">
                     <div class="card info-card">
                         <h3 class="info-title">Итоги</h3>
-                        <p>Конверсия в подключения: <span class="gold">${pct(result.totals.connection_conversion)}</span></p>
-                        <p>Конверсия в продажи: <span class="gold">${pct(result.totals.payment_conversion)}</span></p>
-                        <p>Рефералов за период: <span class="green">${result.totals.referrals}</span></p>
-                        <p>Рефералы начали пользоваться: <span class="green">${result.totals.referral_traffic}</span></p>
-                        <p>Рефералы оплатили: <span class="green">${result.totals.referral_purchase}</span></p>
+                        <div class="stat-list">
+                            ${statRow('Конверсия в подключения', pct(result.totals.connection_conversion), 'gold')}
+                            ${statRow('Конверсия в продажи', pct(result.totals.payment_conversion), 'gold')}
+                            ${statRow('Рефералов за период', result.totals.referrals, 'green')}
+                            ${statRow('Рефералы начали пользоваться', result.totals.referral_traffic, 'green')}
+                            ${statRow('Рефералы оплатили', result.totals.referral_purchase, 'green')}
+                        </div>
                     </div>
                     <div class="card info-card">
                         <h3 class="info-title">Тарифы</h3>
-                        ${(result.tariffs || []).map((item) => `<p>${escapeHtml(item.name)}: <span class="green">${item.count}</span></p>`).join('') || 'Нет платежей'}
+                        ${(result.tariffs && result.tariffs.length)
+                            ? `<div class="stat-list">${result.tariffs.map((item) => statRow(item.name, item.count, 'green')).join('')}</div>`
+                            : '<div class="stat-list-empty">Платежей по тарифам нет</div>'}
                     </div>
                 </section>
             `;

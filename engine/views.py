@@ -44,6 +44,14 @@ from sqlalchemy import update
 from sqlalchemy import delete as sa_delete
 from sqlalchemy import or_
 from sqlalchemy import union_all
+from sqlalchemy import BigInteger
+from sqlalchemy import Column
+from sqlalchemy import insert
+from sqlalchemy import MetaData
+from sqlalchemy import Table
+from sqlalchemy import text
+from sqlalchemy import Text
+from sqlalchemy import TIMESTAMP
 from sqlalchemy.exc import IntegrityError
 from common.models.db import User
 from common.models.db import EventLog
@@ -3233,9 +3241,89 @@ def admin_stats_source_key(value):
     return None if value is None else str(value)
 
 
+# Имя session-temp таблицы, в которую один раз материализуется когорта первых
+# подписок выбранного периода. См. build_admin_cohort_table.
+ADMIN_COHORT_TEMP_TABLE = "admin_cohort_events_tmp"
+
+
+def build_admin_cohort_table(db_session, start_datetime, end_datetime):
+    """Считает когорту "первая подписка пользователя" один раз и кладет во временную таблицу.
+
+    Раньше оконная функция row_number() по всему event_logs (тип события
+    subscription_created) пересчитывалась как inline-подзапрос в каждом из ~9
+    запросов аналитики. Эта стоимость не зависит от длины диапазона, поэтому даже
+    короткие периоды строились очень долго. Здесь когорта материализуется один раз,
+    а все последующие запросы джойнятся к легкой временной таблице по user_id.
+
+    Бизнес-логика идентична прежнему cohort_events:
+    - берется только ПЕРВОЕ событие subscription_created на пользователя
+      (row_number == 1) среди всех событий с timestamp <= end_datetime;
+    - в когорту попадают пользователи, чья первая подписка лежит в [start, end].
+
+    Возвращает SQLAlchemy Table со столбцами user_id, timestamp, traffic_source.
+    """
+    first_subscription_events = (
+        db_session.query(
+            EventLog.user_id.label("user_id"),
+            EventLog.event_payload.label("event_payload"),
+            EventLog.timestamp.label("timestamp"),
+            func.row_number()
+            .over(
+                partition_by=EventLog.user_id,
+                order_by=(EventLog.timestamp, EventLog.id),
+            )
+            .label("row_number"),
+        )
+        .filter(EventLog.event_type == "subscription_created")
+        .filter(EventLog.timestamp <= end_datetime)
+        .subquery()
+    )
+    cohort_select = (
+        db_session.query(
+            first_subscription_events.c.user_id.label("user_id"),
+            first_subscription_events.c.timestamp.label("timestamp"),
+            first_subscription_events.c.event_payload["traffic_source"].astext.label(
+                "traffic_source"
+            ),
+        )
+        .filter(first_subscription_events.c.row_number == 1)
+        .filter(first_subscription_events.c.timestamp >= start_datetime)
+        .filter(first_subscription_events.c.timestamp <= end_datetime)
+    )
+
+    cohort_table = Table(
+        ADMIN_COHORT_TEMP_TABLE,
+        MetaData(),
+        Column("user_id", BigInteger, primary_key=True, autoincrement=False),
+        Column("timestamp", TIMESTAMP),
+        Column("traffic_source", Text),
+        prefixes=["TEMPORARY"],
+    )
+    # Соединения берутся из пула и переиспользуются между запросами, а session-temp
+    # таблица живет на соединении до его закрытия. Поэтому от прошлого запроса на том
+    # же коннекте таблица может остаться — пересоздаем явно.
+    db_session.execute(text(f"DROP TABLE IF EXISTS {ADMIN_COHORT_TEMP_TABLE}"))
+    cohort_table.create(bind=db_session.connection())
+    db_session.execute(
+        insert(cohort_table).from_select(
+            ["user_id", "timestamp", "traffic_source"],
+            cohort_select.statement,
+        )
+    )
+    # Временные таблицы не анализируются автовакуумом, без статистики планировщик
+    # выбирает плохие планы для последующих джойнов — собираем статистику явно.
+    db_session.execute(text(f"ANALYZE {ADMIN_COHORT_TEMP_TABLE}"))
+    return cohort_table
+
+
+def drop_admin_cohort_table(db_session):
+    """Удаляет временную таблицу когорты, чтобы не держать ее на пуловом соединении."""
+    db_session.execute(text(f"DROP TABLE IF EXISTS {ADMIN_COHORT_TEMP_TABLE}"))
+
+
 def build_admin_sales_series(
     db_session,
-    first_subscription_events,
+    cohort_table,
     start_date,
     end_date,
     granularity,
@@ -3324,16 +3412,9 @@ def build_admin_sales_series(
             .filter(WataTransaction.payment_time <= end_datetime)
         )
     else:
-        cohort_events = (
-            db_session.query(
-                first_subscription_events.c.user_id,
-                first_subscription_events.c.timestamp,
-            )
-            .filter(first_subscription_events.c.row_number == 1)
-            .filter(first_subscription_events.c.timestamp >= start_datetime)
-            .filter(first_subscription_events.c.timestamp <= end_datetime)
-            .subquery()
-        )
+        # Когорта уже материализована в build_admin_cohort_table — переиспользуем
+        # ту же временную таблицу вместо повторного пересчета оконной функции.
+        cohort_events = cohort_table
         yk_rows = (
             db_session.query(
                 yk_bucket.label("bucket_start"),
@@ -3785,39 +3866,14 @@ def build_admin_interval_stats(
         admin_stats_normalize_granularity(requested_granularity, start_date, end_date)
     )
 
-    first_subscription_events = (
-        db_session.query(
-            EventLog.user_id.label("user_id"),
-            EventLog.event_payload.label("event_payload"),
-            EventLog.timestamp.label("timestamp"),
-            func.row_number()
-            .over(
-                partition_by=EventLog.user_id,
-                order_by=(EventLog.timestamp, EventLog.id),
-            )
-            .label("row_number"),
-        )
-        .filter(EventLog.event_type == "subscription_created")
-        .filter(EventLog.timestamp <= end_datetime)
-        .subquery()
-    )
-
     # Берем только первое создание подписки на пользователя.
     # При merge/site/magic-link сценариях повторные subscription_created не должны
     # превращать старого пользователя в новую регистрацию выбранного периода.
-    cohort_events = (
-        db_session.query(
-            first_subscription_events.c.user_id.label("user_id"),
-            first_subscription_events.c.timestamp.label("timestamp"),
-            first_subscription_events.c.event_payload["traffic_source"].astext.label(
-                "traffic_source"
-            ),
-        )
-        .filter(first_subscription_events.c.row_number == 1)
-        .filter(first_subscription_events.c.timestamp >= start_datetime)
-        .filter(first_subscription_events.c.timestamp <= end_datetime)
-        .subquery()
-    )
+    #
+    # Когорта считается ОДИН раз и кладется во временную таблицу: дальше все запросы
+    # джойнятся к ней по user_id, а не пересчитывают оконную функцию по всему
+    # event_logs на каждый показатель.
+    cohort_events = build_admin_cohort_table(db_session, start_datetime, end_datetime)
 
     source_stats = {}
     subscription_rows = (
@@ -4013,7 +4069,7 @@ def build_admin_interval_stats(
 
     sales_series = build_admin_sales_series(
         db_session,
-        first_subscription_events,
+        cohort_events,
         start_date,
         end_date,
         granularity,
@@ -4037,6 +4093,9 @@ def build_admin_interval_stats(
         if totals["subscriptions"]
         else 0
     )
+
+    # Не держим временную таблицу на пуловом соединении после ответа.
+    drop_admin_cohort_table(db_session)
 
     return {
         "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
