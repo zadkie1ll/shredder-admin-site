@@ -9,6 +9,7 @@ urlpatterns = [
     path("privacy/", views.privacy, name="privacy"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("update-email/", views.update_email, name="update_email"),
+    path("cancel-autopay/", views.cancel_autopay, name="cancel_autopay"),
     path("confirm-email/<path:token>/", views.confirm_email, name="confirm_email"),
     path(
         "support/tickets/create/",

@@ -2478,6 +2478,56 @@ def update_email(request):
         session.close()
 
 
+def cancel_autopay(request):
+    """Отключение автопродления из личного кабинета.
+
+    Полностью зеркалит поведение команды бота ``/cancelautopay``:
+    удаляет запись о рекуррентном платеже YooKassa (``yk_recurrent_payments``)
+    и выставляет флаг ``users.autopay_allow = False`` (Wata). Подписка и данные
+    в Remnawave при этом не трогаются — доступ продолжает работать до конца
+    оплаченного периода, просто следующее списание не произойдёт.
+    """
+    if request.method != "POST" or not request.user.is_authenticated:
+        return JsonResponse({"status": "error"}, status=403)
+
+    session = session_factory()
+    try:
+        db_user = session.query(User).filter(User.id == request.user.id).first()
+        if not db_user:
+            logging.warning(
+                f"user {request.user.id} not found while cancelling autopay"
+            )
+            return JsonResponse({"status": "error"}, status=404)
+
+        removed_recurrents = (
+            session.query(YkRecurrentPayment)
+            .filter(YkRecurrentPayment.user_id == db_user.id)
+            .delete(synchronize_session=False)
+        )
+        old_autopay_allow = bool(db_user.autopay_allow)
+        db_user.autopay_allow = False
+        session.commit()
+
+        logging.info(
+            "user %s cancelled autopay via cabinet "
+            "(removed %s yk recurrents, autopay_allow %s -> False)",
+            db_user.id,
+            removed_recurrents,
+            old_autopay_allow,
+        )
+        return JsonResponse(
+            {"status": "ok", "removed_recurrents": removed_recurrents}
+        )
+    except Exception as e:
+        session.rollback()
+        logging.exception(
+            f"failed to cancel autopay for user {request.user.id}: {e}"
+        )
+        return JsonResponse({"status": "error"}, status=500)
+    finally:
+        session.close()
+
+
 def confirm_email(request, token):
     try:
         payload = load_email_confirmation_token(token)

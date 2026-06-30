@@ -32,6 +32,7 @@ from engine.views import form_bool_enabled
 from engine.views import get_runtime_actual_tariffs
 from engine.views import get_telegram_auth_bot
 from engine.views import get_telegram_web_login_start_code
+from engine.views import cancel_autopay
 from engine.views import pay
 from engine.views import payment_session_url_key
 from engine.views import payment_retry
@@ -1091,3 +1092,116 @@ class WebsiteDockerRuntimeTests(SimpleTestCase):
             deploy_script,
         )
         self.assertIn("'${REMOTE_DIR}/certbot-www'", deploy_script)
+
+
+class CancelAutopayViewTests(SimpleTestCase):
+    def _build_session(self, db_user, deleted_count):
+        recorded = {"deleted": False}
+
+        class FakeQuery:
+            def __init__(self, kind):
+                self.kind = kind
+
+            def filter(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return db_user
+
+            def delete(self, synchronize_session=False):
+                recorded["deleted"] = True
+                return deleted_count
+
+        class FakeSession:
+            def query(self, model):
+                if model is User:
+                    return FakeQuery("user")
+                return FakeQuery("recurrent")
+
+            def commit(self):
+                recorded["committed"] = True
+
+            def rollback(self):
+                recorded["rolled_back"] = True
+
+            def close(self):
+                recorded["closed"] = True
+
+        return FakeSession(), recorded
+
+    def test_cancel_autopay_removes_recurrents_and_disables_flag(self):
+        db_user = SimpleNamespace(id=42, autopay_allow=True)
+        session, recorded = self._build_session(db_user, deleted_count=1)
+
+        request = RequestFactory().post("/cancel-autopay/")
+        request.user = SimpleNamespace(is_authenticated=True, id=42)
+
+        with mock.patch("engine.views.session_factory", return_value=session):
+            response = cancel_autopay(request)
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["removed_recurrents"], 1)
+        self.assertFalse(db_user.autopay_allow)
+        self.assertTrue(recorded["deleted"])
+        self.assertTrue(recorded["committed"])
+        self.assertTrue(recorded["closed"])
+
+    def test_cancel_autopay_rejects_get_requests(self):
+        request = RequestFactory().get("/cancel-autopay/")
+        request.user = SimpleNamespace(is_authenticated=True, id=42)
+
+        response = cancel_autopay(request)
+        self.assertEqual(response.status_code, 403)
+
+    def test_cancel_autopay_requires_authentication(self):
+        request = RequestFactory().post("/cancel-autopay/")
+        request.user = SimpleNamespace(is_authenticated=False, id=None)
+
+        response = cancel_autopay(request)
+        self.assertEqual(response.status_code, 403)
+
+    def test_cancel_autopay_handles_missing_user(self):
+        session, recorded = self._build_session(db_user=None, deleted_count=0)
+
+        request = RequestFactory().post("/cancel-autopay/")
+        request.user = SimpleNamespace(is_authenticated=True, id=999)
+
+        with mock.patch("engine.views.session_factory", return_value=session):
+            response = cancel_autopay(request)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(recorded["closed"])
+
+
+class SettingsTabTemplateTests(SimpleTestCase):
+    def test_settings_tab_present_with_autopay_and_faq(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn('data-tab="settings"', template)
+        self.assertIn('id="tab-settings"', template)
+        self.assertIn("Отключить автопродление", template)
+        self.assertIn("openAutopaySheet()", template)
+        self.assertIn("confirmCancelAutopay", template)
+        self.assertIn("{% url 'cancel_autopay' %}", template)
+        self.assertIn("toggleFaq", template)
+        self.assertIn("Как подключить ваш VPN?", template)
+
+    def test_autopay_button_always_clickable_with_nothing_to_cancel_sheet(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Кнопка отключения видна всегда и кликабельна, без обёртки {% if has_recurrent %}.
+        self.assertIn('onclick="onAutopayButtonClick()"', template)
+        # Клиент решает по has_recurrent, какой лист открыть.
+        self.assertIn(
+            "const HAS_RECURRENT = {% if has_recurrent %}true{% else %}false{% endif %};",
+            template,
+        )
+        # Информационный лист «отменять нечего».
+        self.assertIn('id="no-autopay-sheet"', template)
+        self.assertIn("openNoAutopaySheet", template)
+        self.assertIn("Автопродление не подключено", template)
+        self.assertIn("отменять нечего", template)
+        # Заглушки старого варианта быть не должно.
+        self.assertNotIn("Не подключено · оформляется при оплате", template)
