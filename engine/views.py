@@ -2963,7 +2963,12 @@ def support_admin_api_config_templates(request):
             template = db_session.get(CustomConfigTemplate, int(template_id or 0))
             if not template:
                 return JsonResponse({"status": "not_found"}, status=404)
+            deleted_template_id = template.id
             db_session.delete(template)
+            # Убираем удалённый шаблон из пер-юзерных пинов, чтобы не оставлять
+            # висячие id в system_settings (иначе админка покажет несуществующие
+            # закреплённые конфиги; на выдачу это не влияет — там всё равно fallback).
+            remove_config_template_id_from_pins(db_session, deleted_template_id)
             db_session.commit()
             return JsonResponse({"status": "ok"})
 
@@ -3060,6 +3065,149 @@ def support_admin_api_config_templates(request):
             {
                 "status": "ok",
                 "template": custom_config_template_payload(template),
+            }
+        )
+    finally:
+        db_session.close()
+
+
+# Пер-юзерный пиннинг конфигов. Ключ в system_settings — "cfg_pin:<username>",
+# значение — CSV из id активных CustomConfigTemplate, которые разрешено выдавать
+# этому пользователю. Читает и применяет этот пин сервис custom-config
+# (monkey-island-custom-config/main.py: apply_user_config_pin). Хранение в
+# system_settings выбрано намеренно, чтобы обойтись без миграции схемы.
+CONFIG_PIN_KEY_PREFIX = "cfg_pin:"
+
+
+def config_pin_setting_key(username):
+    return f"{CONFIG_PIN_KEY_PREFIX}{username}"
+
+
+def load_user_pinned_template_ids(db_session, username):
+    setting = db_session.get(SystemSetting, config_pin_setting_key(username))
+    if not setting or not setting.value:
+        return []
+    return [
+        int(part.strip())
+        for part in setting.value.split(",")
+        if part.strip().isdigit()
+    ]
+
+
+def remove_config_template_id_from_pins(db_session, template_id):
+    """Убирает удалённый шаблон из всех записей cfg_pin:*.
+
+    Если после удаления у пользователя не осталось закреплённых конфигов —
+    удаляет саму запись, чтобы в system_settings не копились висячие ключи.
+    Вызывать внутри транзакции до commit.
+    """
+    settings = (
+        db_session.query(SystemSetting)
+        .filter(SystemSetting.key.like(f"{CONFIG_PIN_KEY_PREFIX}%"))
+        .all()
+    )
+    for setting in settings:
+        ids = [
+            int(part.strip())
+            for part in (setting.value or "").split(",")
+            if part.strip().isdigit()
+        ]
+        if template_id not in ids:
+            continue
+        remaining = [i for i in ids if i != template_id]
+        if remaining:
+            setting.value = ",".join(str(i) for i in remaining)
+        else:
+            db_session.delete(setting)
+
+
+def config_pins_payload(db_session, user, templates=None):
+    if templates is None:
+        templates = load_custom_config_templates(db_session)
+    # Показываем только реально существующие закреплённые id — так админка не
+    # покажет висячие пины (например, если шаблон удалили напрямую в БД).
+    existing_ids = {template.id for template in templates}
+    pinned_ids = [
+        template_id
+        for template_id in load_user_pinned_template_ids(db_session, user.username)
+        if template_id in existing_ids
+    ]
+    pinned_set = set(pinned_ids)
+    return {
+        "user": admin_user_payload(user),
+        "pinned_ids": pinned_ids,
+        "templates": [
+            {
+                "id": template.id,
+                "name": template.name,
+                "is_active": bool(template.is_active),
+                "pinned": template.id in pinned_set,
+            }
+            for template in templates
+        ],
+    }
+
+
+def support_admin_api_config_pins(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    query = request.GET.get("q") if request.method == "GET" else request.POST.get("q")
+    db_session = session_factory()
+    try:
+        user = admin_find_user(db_session, query)
+        if not user:
+            return JsonResponse({"status": "not_found"}, status=404)
+
+        if request.method == "GET":
+            return JsonResponse(
+                {"status": "ok", "result": config_pins_payload(db_session, user)}
+            )
+
+        if request.method != "POST":
+            return JsonResponse({"status": "error"}, status=405)
+
+        action = request.POST.get("action", "save")
+        templates = load_custom_config_templates(db_session)
+        setting_key = config_pin_setting_key(user.username)
+
+        if action == "clear":
+            pinned_ids = []
+        else:
+            valid_ids = {template.id for template in templates}
+            requested = request.POST.get("template_ids", "")
+            # Сохраняем только существующие id, порядок и без дублей.
+            seen = set()
+            pinned_ids = []
+            for part in requested.split(","):
+                part = part.strip()
+                if not part.isdigit():
+                    continue
+                template_id = int(part)
+                if template_id in valid_ids and template_id not in seen:
+                    seen.add(template_id)
+                    pinned_ids.append(template_id)
+
+        existing = db_session.get(SystemSetting, setting_key)
+        if pinned_ids:
+            admin_upsert_system_setting(
+                db_session, setting_key, ",".join(str(i) for i in pinned_ids)
+            )
+        elif existing:
+            db_session.delete(existing)
+        db_session.commit()
+
+        logging.info(
+            "admin set config pin for user %s (username=%s): %s",
+            user.id,
+            user.username,
+            pinned_ids or "cleared",
+        )
+        return JsonResponse(
+            {
+                "status": "ok",
+                "result": config_pins_payload(db_session, user, templates),
             }
         )
     finally:

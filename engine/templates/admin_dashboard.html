@@ -410,6 +410,17 @@
         @keyframes toastIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         .config-message { min-height: 0; }
         .config-message .info-card { margin-bottom: 12px; }
+        .config-pins-card { margin-bottom: 16px; display: grid; gap: 14px; }
+        .config-pins-head { display: grid; gap: 6px; }
+        .config-pins-list { display: grid; gap: 8px; margin-bottom: 14px; }
+        .config-pin-row { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 12px; background: rgba(255,255,255,.02); cursor: pointer; }
+        .config-pin-row.inactive { opacity: .6; }
+        .config-pin-row input { width: 18px; height: 18px; flex: 0 0 auto; accent-color: var(--brand-gold); }
+        .config-pin-name { flex: 1 1 auto; color: #fff; font-weight: 700; overflow-wrap: anywhere; }
+        .config-pin-badge { flex: 0 0 auto; font-size: 10px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); padding: 3px 8px; border-radius: 999px; border: 1px solid var(--border); }
+        .config-pin-badge.active { color: var(--green); border-color: rgba(56,217,150,.3); }
+        .config-pins-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+        .config-pins-status { margin-top: 8px; }
         .config-template-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(420px, 1fr)); gap: 12px; align-items: stretch; }
         .config-template-card { display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; gap: 12px; min-height: 440px; padding: 16px; border-color: rgba(255,199,0,.16); background: radial-gradient(circle at 86% 10%, rgba(255,199,0,.08), transparent 10rem), var(--card-bg); }
         .config-template-card:has(.config-template-badge.active) { border-color: rgba(56,217,150,.24); background: linear-gradient(135deg, rgba(56,217,150,.07) 0%, var(--card-bg) 44%); }
@@ -559,6 +570,7 @@
         data-top-payments-url="{% url 'support_admin_api_top_payments' %}"
         data-reply-templates-url="{% url 'support_admin_api_reply_templates' %}"
         data-config-templates-url="{% url 'support_admin_api_config_templates' %}"
+        data-config-pins-url="{% url 'support_admin_api_config_pins' %}"
         data-tickets-url="{% url 'support_admin_tickets_json' %}?status={{ status_filter }}"
     >
         {% if support_admin_is_full_admin %}
@@ -892,6 +904,22 @@
                     <button class="btn" type="button" id="config-template-add"><i class="fas fa-plus"></i>Добавить конфиг</button>
                 </div>
             </header>
+
+            <section class="card form-card config-pins-card">
+                <div class="config-pins-head">
+                    <h2 class="system-card-title">Персональные конфиги для пользователя</h2>
+                    <p class="admin-subtitle">Обычно активные конфиги выдаются round-robin. Здесь можно закрепить за пользователем только выбранные — им будут выдаваться только они. Если ни один закреплённый конфиг не активен, снова включается round-robin.</p>
+                </div>
+                <form id="config-pins-form" class="config-pins-form">
+                    {% csrf_token %}
+                    <div class="form-grid-two">
+                        <input class="input" name="q" placeholder="username, email или telegram_id">
+                        <button class="btn btn-secondary" type="submit"><i class="fas fa-magnifying-glass"></i>Найти пользователя</button>
+                    </div>
+                </form>
+                <div id="config-pins-result"></div>
+            </section>
+
             <div id="config-templates-result" class="config-template-list"></div>
         </section>
         {% endif %}
@@ -1687,6 +1715,74 @@
             target.innerHTML = configTemplatesCache.length
                 ? configTemplatesCache.map(configTemplateCard).join('')
                 : '<div class="card info-card muted">Шаблонов пока нет. Нажмите “Добавить конфиг”, чтобы создать первый.</div>';
+        }
+
+        let configPinsUser = null;
+
+        function renderConfigPins(result) {
+            const target = document.getElementById('config-pins-result');
+            if (!target) return;
+            configPinsUser = result.user.username;
+            const templates = result.templates || [];
+            const rows = templates.map((template) => `
+                <label class="config-pin-row ${template.is_active ? '' : 'inactive'}">
+                    <input type="checkbox" value="${template.id}" ${template.pinned ? 'checked' : ''}>
+                    <span class="config-pin-name">${escapeHtml(template.name)}</span>
+                    <span class="config-pin-badge ${template.is_active ? 'active' : ''}">${template.is_active ? 'активен' : 'неактивен'}</span>
+                </label>
+            `).join('');
+            const pinnedCount = (result.pinned_ids || []).length;
+            target.innerHTML = `
+                <div class="result-stack">
+                    ${userCard(result.user)}
+                    <section class="card info-card">
+                        <div class="config-pins-list">${rows || '<div class="muted">Конфигов пока нет.</div>'}</div>
+                        <div class="config-pins-actions">
+                            <button type="button" class="btn" data-config-pins-save><i class="fas fa-save"></i>Сохранить выбор</button>
+                            <button type="button" class="btn btn-danger" data-config-pins-clear><i class="fas fa-rotate-left"></i>Сбросить (round-robin)</button>
+                        </div>
+                        <p class="admin-subtitle config-pins-status">${pinnedCount ? `Закреплено конфигов: ${pinnedCount}. Пользователю выдаются только отмеченные активные.` : 'Пин не задан — выдаётся round-robin по всем активным конфигам.'}</p>
+                    </section>
+                </div>
+            `;
+        }
+
+        async function submitConfigPinsSearch(event) {
+            event.preventDefault();
+            const q = event.target.querySelector('[name="q"]').value.trim();
+            const target = document.getElementById('config-pins-result');
+            if (!q) return setError(target, 'Введите пользователя');
+            setLoading(target, 'Ищем пользователя...');
+            const response = await fetch(`${main.dataset.configPinsUrl}?q=${encodeURIComponent(q)}`, {
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                cache: 'no-store',
+            });
+            if (response.status === 404) return setError(target, 'Пользователь не найден');
+            if (!response.ok) return setError(target, 'Не удалось загрузить конфиги пользователя');
+            const {result} = await response.json();
+            renderConfigPins(result);
+        }
+
+        async function saveConfigPins(clear) {
+            if (!configPinsUser) return;
+            const target = document.getElementById('config-pins-result');
+            const body = new FormData();
+            body.append('csrfmiddlewaretoken', csrfToken);
+            body.append('q', configPinsUser);
+            body.append('action', clear ? 'clear' : 'save');
+            if (!clear) {
+                const ids = Array.from(target.querySelectorAll('.config-pins-list input[type="checkbox"]:checked')).map((cb) => cb.value);
+                body.append('template_ids', ids.join(','));
+            }
+            setLoading(target, 'Сохраняем...');
+            const response = await fetch(main.dataset.configPinsUrl, {
+                method: 'POST',
+                body,
+                headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+            });
+            if (!response.ok) return setError(target, 'Не удалось сохранить');
+            const {result} = await response.json();
+            renderConfigPins(result);
         }
 
         function fillConfigTemplateForm(template) {
@@ -3130,6 +3226,11 @@
         if (referralBlockForm) referralBlockForm.addEventListener('submit', submitReferralBlock);
         if (replyTemplateForm) replyTemplateForm.addEventListener('submit', submitReplyTemplate);
         if (configTemplateForm) configTemplateForm.addEventListener('submit', submitConfigTemplate);
+        document.getElementById('config-pins-form')?.addEventListener('submit', submitConfigPinsSearch);
+        document.addEventListener('click', (event) => {
+            if (event.target.closest('[data-config-pins-save]')) saveConfigPins(false);
+            if (event.target.closest('[data-config-pins-clear]')) saveConfigPins(true);
+        });
         document.getElementById('reply-template-reset')?.addEventListener('click', resetReplyTemplateForm);
         document.getElementById('config-template-add')?.addEventListener('click', () => openConfigTemplateModal());
         document.getElementById('config-template-reset')?.addEventListener('click', resetConfigTemplateForm);

@@ -43,6 +43,9 @@ from engine.views import render_login
 from engine.views import should_create_trial_for_channel
 from engine.views import should_send_payment_login_email
 from engine.views import site_trial_registration_enabled
+from engine.views import config_pins_payload
+from engine.views import remove_config_template_id_from_pins
+from engine.views import support_admin_api_config_pins
 from engine.views import support_admin_api_config_templates
 from engine.views import verify_telegram_widget_auth
 from web_app.settings import telegram_web_login_start_codes
@@ -1407,3 +1410,219 @@ class SettingsTabTemplateTests(SimpleTestCase):
         self.assertIn("отменять нечего", template)
         # Заглушки старого варианта быть не должно.
         self.assertNotIn("Не подключено · оформляется при оплате", template)
+
+
+class ConfigPinsAdminApiTests(SimpleTestCase):
+    def _user(self):
+        return SimpleNamespace(
+            id=1,
+            username="alice",
+            email="alice@example.com",
+            telegram_id=None,
+            expire_at=None,
+            autopay_allow=True,
+        )
+
+    def _templates(self):
+        return [
+            SimpleNamespace(id=1, name="EU", is_active=True),
+            SimpleNamespace(id=2, name="US", is_active=True),
+            SimpleNamespace(id=3, name="Old", is_active=False),
+        ]
+
+    def _session(self, settings=None):
+        from common.models.db import SystemSetting
+
+        class FakeSession:
+            def __init__(self, seed):
+                self.settings = dict(seed or {})
+                self.deleted = []
+
+            def get(self, model, key):
+                return self.settings.get(key)
+
+            def add(self, obj):
+                self.settings[obj.key] = obj
+
+            def flush(self):
+                pass
+
+            def delete(self, obj):
+                self.deleted.append(obj.key)
+                self.settings.pop(obj.key, None)
+
+            def commit(self):
+                pass
+
+            def close(self):
+                pass
+
+        seed = {}
+        for key, value in (settings or {}).items():
+            seed[key] = SystemSetting(key=key, value=value)
+        return FakeSession(seed)
+
+    def test_get_returns_templates_with_pinned_flags(self):
+        session = self._session({"cfg_pin:alice": "2"})
+        request = RequestFactory().get("/support-admin/api/config-pins/?q=alice")
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+            mock.patch("engine.views.admin_find_user", return_value=self._user()),
+            mock.patch("engine.views.load_custom_config_templates", return_value=self._templates()),
+        ):
+            response = support_admin_api_config_pins(request)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)["result"]
+        self.assertEqual(result["pinned_ids"], [2])
+        pinned = {t["id"]: t["pinned"] for t in result["templates"]}
+        self.assertEqual(pinned, {1: False, 2: True, 3: False})
+
+    def test_save_keeps_only_existing_ids_and_persists_csv(self):
+        session = self._session()
+        request = RequestFactory().post(
+            "/support-admin/api/config-pins/",
+            data={"q": "alice", "action": "save", "template_ids": "1,3,99"},
+        )
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+            mock.patch("engine.views.admin_find_user", return_value=self._user()),
+            mock.patch("engine.views.load_custom_config_templates", return_value=self._templates()),
+        ):
+            response = support_admin_api_config_pins(request)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)["result"]
+        # 99 не существует → отбрасывается; 1 и 3 существуют (в т.ч. неактивный 3).
+        self.assertEqual(result["pinned_ids"], [1, 3])
+        self.assertEqual(session.settings["cfg_pin:alice"].value, "1,3")
+
+    def test_clear_deletes_setting(self):
+        session = self._session({"cfg_pin:alice": "1,2"})
+        request = RequestFactory().post(
+            "/support-admin/api/config-pins/",
+            data={"q": "alice", "action": "clear"},
+        )
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+            mock.patch("engine.views.admin_find_user", return_value=self._user()),
+            mock.patch("engine.views.load_custom_config_templates", return_value=self._templates()),
+        ):
+            response = support_admin_api_config_pins(request)
+        self.assertEqual(response.status_code, 200)
+        result = json.loads(response.content)["result"]
+        self.assertEqual(result["pinned_ids"], [])
+        self.assertIn("cfg_pin:alice", session.deleted)
+
+    def test_save_empty_selection_clears_existing(self):
+        session = self._session({"cfg_pin:alice": "2"})
+        request = RequestFactory().post(
+            "/support-admin/api/config-pins/",
+            data={"q": "alice", "action": "save", "template_ids": ""},
+        )
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+            mock.patch("engine.views.admin_find_user", return_value=self._user()),
+            mock.patch("engine.views.load_custom_config_templates", return_value=self._templates()),
+        ):
+            response = support_admin_api_config_pins(request)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content)["result"]["pinned_ids"], [])
+        self.assertIn("cfg_pin:alice", session.deleted)
+
+    def test_user_not_found_returns_404(self):
+        session = self._session()
+        request = RequestFactory().get("/support-admin/api/config-pins/?q=ghost")
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+            mock.patch("engine.views.admin_find_user", return_value=None),
+        ):
+            response = support_admin_api_config_pins(request)
+        self.assertEqual(response.status_code, 404)
+
+
+class ConfigPinsAdminTemplateTests(SimpleTestCase):
+    def test_admin_dashboard_has_config_pins_ui(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.assertIn('data-config-pins-url', template)
+        self.assertIn('id="config-pins-form"', template)
+        self.assertIn("submitConfigPinsSearch", template)
+        self.assertIn("saveConfigPins", template)
+        self.assertIn("data-config-pins-save", template)
+        self.assertIn("data-config-pins-clear", template)
+        self.assertIn("Персональные конфиги для пользователя", template)
+
+
+class ConfigPinsCleanupTests(SimpleTestCase):
+    def test_remove_config_template_id_prunes_and_drops_empty(self):
+        from common.models.db import SystemSetting
+
+        settings = {
+            "cfg_pin:alice": SystemSetting(key="cfg_pin:alice", value="1,3"),
+            "cfg_pin:bob": SystemSetting(key="cfg_pin:bob", value="3"),
+            "cfg_pin:carol": SystemSetting(key="cfg_pin:carol", value="1,2"),
+        }
+
+        class FakeQuery:
+            def __init__(self, rows):
+                self.rows = rows
+
+            def filter(self, *a, **k):
+                return self
+
+            def all(self):
+                return list(self.rows)
+
+        class FakeSession:
+            def __init__(self, store):
+                self.store = store
+
+            def query(self, model):
+                return FakeQuery(list(self.store.values()))
+
+            def delete(self, obj):
+                self.store.pop(obj.key, None)
+
+        remove_config_template_id_from_pins(FakeSession(settings), 3)
+
+        # У alice id=3 убран, осталась "1"; у bob id=3 был единственным — запись удалена;
+        # carol не трогаем.
+        self.assertEqual(settings["cfg_pin:alice"].value, "1")
+        self.assertNotIn("cfg_pin:bob", settings)
+        self.assertEqual(settings["cfg_pin:carol"].value, "1,2")
+
+    def test_config_pins_payload_ignores_missing_template_ids(self):
+        from common.models.db import SystemSetting
+
+        class FakeSession:
+            def __init__(self, setting):
+                self.setting = setting
+
+            def get(self, model, key):
+                return self.setting if key == self.setting.key else None
+
+        user = SimpleNamespace(
+            id=1,
+            username="alice",
+            email="",
+            telegram_id=None,
+            expire_at=None,
+            autopay_allow=True,
+        )
+        templates = [
+            SimpleNamespace(id=1, name="A", is_active=True),
+            SimpleNamespace(id=2, name="B", is_active=True),
+        ]
+        session = FakeSession(SystemSetting(key="cfg_pin:alice", value="2,999"))
+
+        payload = config_pins_payload(session, user, templates)
+
+        # 999 не существует → не попадает ни в pinned_ids, ни во флаги.
+        self.assertEqual(payload["pinned_ids"], [2])
+        self.assertEqual(
+            {t["id"]: t["pinned"] for t in payload["templates"]},
+            {1: False, 2: True},
+        )
