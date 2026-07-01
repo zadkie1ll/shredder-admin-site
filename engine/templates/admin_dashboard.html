@@ -238,16 +238,24 @@
         .sources-cell-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-weight: 800; }
         .sources-row-action { display: inline-flex; align-items: center; justify-content: center; justify-self: end; width: 30px; height: 30px; border: 0; border-radius: 8px; background: var(--inner-card-bg); color: var(--brand-gold); cursor: pointer; transition: all .13s; }
         .sources-row-action:hover { background: rgba(255,199,0,.14); }
-        .modal-overlay { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.76); backdrop-filter: blur(10px); }
+        .modal-overlay { position: fixed; inset: 0; z-index: 60; display: none; align-items: center; justify-content: center; padding: 24px; background: rgba(0,0,0,.76); backdrop-filter: blur(10px); overscroll-behavior: contain; }
         .modal-overlay.open { display: flex; }
+        /* Пока открыта модалка — фон под ней не скроллится. body фиксируется (iOS-safe),
+           JS проставляет top = -scrollY и восстанавливает позицию при закрытии. */
+        html.modal-open, html.modal-open body { overflow: hidden; overscroll-behavior: none; }
+        html.modal-open body { position: fixed; left: 0; right: 0; width: 100%; }
         .modal-card { position: relative; width: min(1120px, 100%); max-height: min(760px, calc(100vh - 48px)); display: flex; flex-direction: column; overflow: hidden; background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 14px; box-shadow: 0 30px 90px rgba(0,0,0,.5); }
-        .modal-card.config-template-modal-card { width: min(1320px, 100%); max-height: min(920px, calc(100vh - 48px)); }
+        .modal-card.config-template-modal-card { width: min(1320px, 100%); max-height: min(920px, calc(100vh - 48px)); overflow-y: auto; overscroll-behavior: contain; }
+        /* Скроллится вся карточка целиком, поэтому колесо/жест над шапкой тоже
+           прокручивает к кнопке сохранения. Шапка при этом остаётся закреплённой сверху. */
+        .config-template-modal-card .modal-header { position: sticky; top: 0; z-index: 3; background: #111217; }
+        .config-template-modal-card .modal-body { overflow: visible; }
         .modal-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding: 20px; border-bottom: 1px solid rgba(255,255,255,.06); }
         .modal-title { margin: 0; color: var(--text-main); font-size: 24px; line-height: 1.1; font-weight: 800; letter-spacing: -.015em; }
         .modal-subtitle { margin-top: 5px; color: var(--muted); font-size: 13px; font-weight: 600; }
         .modal-close { flex: 0 0 auto; width: 40px; height: 40px; border: 1px solid rgba(255,255,255,.09); border-radius: 10px; background: var(--inner-card-bg); color: var(--text-main); cursor: pointer; transition: all .13s; }
         .modal-close:hover { border-color: rgba(255,255,255,.16); }
-        .modal-body { overflow-y: auto; padding: 18px 20px; }
+        .modal-body { overflow-y: auto; padding: 18px 20px; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
         .modal-saving-overlay { position: absolute; inset: 0; z-index: 4; display: none; align-items: center; justify-content: center; background: rgba(5,7,10,.6); backdrop-filter: blur(3px); }
         .modal-saving-overlay.show { display: flex; }
         .saving-box { display: inline-flex; align-items: center; gap: 12px; border-radius: 14px; border: 1px solid rgba(255,199,0,.28); background: rgba(10,14,22,.96); color: var(--text-main); padding: 16px 20px; box-shadow: 0 20px 70px rgba(0,0,0,.45); font-size: 14px; font-weight: 800; }
@@ -1598,6 +1606,28 @@
             return true;
         }
 
+        let modalScrollLockCount = 0;
+        let modalSavedScrollY = 0;
+
+        function lockBodyScroll() {
+            if (modalScrollLockCount === 0) {
+                modalSavedScrollY = window.scrollY || window.pageYOffset || 0;
+                document.body.style.top = `-${modalSavedScrollY}px`;
+                document.documentElement.classList.add('modal-open');
+            }
+            modalScrollLockCount += 1;
+        }
+
+        function unlockBodyScroll() {
+            if (modalScrollLockCount === 0) return;
+            modalScrollLockCount -= 1;
+            if (modalScrollLockCount === 0) {
+                document.documentElement.classList.remove('modal-open');
+                document.body.style.top = '';
+                window.scrollTo(0, modalSavedScrollY);
+            }
+        }
+
         function openConfigTemplateModal(template = null) {
             const modal = document.getElementById('config-template-modal');
             if (!modal) return;
@@ -1608,8 +1638,10 @@
                 resetConfigTemplateForm();
             }
             document.getElementById('config-template-modal-title').textContent = template ? `Редактировать конфиг: ${template.name || ''}` : 'Добавить конфиг';
+            const wasOpen = modal.classList.contains('open');
             modal.classList.add('open');
             modal.setAttribute('aria-hidden', 'false');
+            if (!wasOpen) lockBodyScroll();
             setupConfigJsonEditor();
             setTimeout(() => configJsonEditor?.refresh(), 60);
         }
@@ -1620,6 +1652,7 @@
             if (!modal || !modal.classList.contains('open')) return;
             modal.classList.remove('open');
             modal.setAttribute('aria-hidden', 'true');
+            unlockBodyScroll();
             setConfigMessage('');
         }
 

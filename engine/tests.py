@@ -1626,3 +1626,28 @@ class ConfigPinsCleanupTests(SimpleTestCase):
             {t["id"]: t["pinned"] for t in payload["templates"]},
             {1: False, 2: True},
         )
+
+
+class ConfigModalScrollLockTests(SimpleTestCase):
+    def test_config_modal_locks_background_scroll(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        # Фон под модалкой фиксируется (iOS-safe), а инерционный скролл не пробрасывается.
+        self.assertIn("html.modal-open body { position: fixed", template)
+        self.assertIn("function lockBodyScroll", template)
+        self.assertIn("function unlockBodyScroll", template)
+        self.assertIn("if (!wasOpen) lockBodyScroll();", template)
+        self.assertIn("overscroll-behavior: contain", template)
+        # Открытие/закрытие модалки конфига действительно вызывают лок/анлок.
+        open_fn = template.split("function openConfigTemplateModal", 1)[1].split("function closeConfigTemplateModal", 1)[0]
+        self.assertIn("lockBodyScroll()", open_fn)
+        close_fn = template.split("function closeConfigTemplateModal", 1)[1].split("function setConfigSaving", 1)[0]
+        self.assertIn("unlockBodyScroll()", close_fn)
+
+    def test_config_modal_card_is_scroll_container_with_sticky_header(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        # Скроллится вся карточка (колесо/жест над шапкой тоже прокручивает к кнопке),
+        # шапка закреплена сверху и непрозрачна.
+        card_rule = template.split(".modal-card.config-template-modal-card {", 1)[1].split("}", 1)[0]
+        self.assertIn("overflow-y: auto", card_rule)
+        self.assertIn(".config-template-modal-card .modal-header { position: sticky", template)
+        self.assertIn(".config-template-modal-card .modal-body { overflow: visible", template)
