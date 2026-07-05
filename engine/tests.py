@@ -215,6 +215,40 @@ class AdminRuntimeSettingsTests(SimpleTestCase):
 
 
 class WataPaymentFlowTests(SimpleTestCase):
+    def test_public_landing_headers_use_animated_brand_logo(self):
+        animated_logo = "icons/monkey-island-logo-animated.gif"
+        self.assertTrue(Path(f"engine/static/{animated_logo}").is_file())
+
+        for template_name in (
+            "engine/templates/index_vpn.html",
+            "engine/templates/index_vps.html",
+            "engine/templates/index_vps_direct_sale.html",
+        ):
+            with self.subTest(template=template_name):
+                template = Path(template_name).read_text()
+                self.assertIn(animated_logo, template)
+
+        for template_name in (
+            "engine/templates/index_vpn.html",
+            "engine/templates/index_vps.html",
+        ):
+            with self.subTest(template=template_name):
+                template = Path(template_name).read_text()
+                self.assertIn(".landing-brand-mark", template)
+                self.assertIn("@media (max-width: 380px)", template)
+
+    def test_public_landing_hero_art_has_lightweight_animation(self):
+        for template_name in (
+            "engine/templates/index_vpn.html",
+            "engine/templates/index_vps.html",
+            "engine/templates/index_vps_direct_sale.html",
+        ):
+            with self.subTest(template=template_name):
+                template = Path(template_name).read_text()
+                self.assertIn("hero-art-scene", template)
+                self.assertIn("island-art-float", template)
+                self.assertIn("prefers-reduced-motion: reduce", template)
+
     def test_wata_views_do_not_embed_hosted_payment_page_in_iframe(self):
         views = Path("engine/views.py").read_text()
 

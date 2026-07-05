@@ -73,6 +73,34 @@
             text-shadow: 0 2px 10px rgba(0,0,0,0.8);
         }
 
+        .landing-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            min-width: 0;
+        }
+
+        .landing-brand-mark {
+            width: 42px;
+            height: 42px;
+            flex: 0 0 auto;
+            border: 1px solid rgba(255, 199, 0, 0.2);
+            border-radius: 12px;
+            background: rgba(255, 199, 0, 0.06);
+            object-fit: cover;
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+        }
+
+        .landing-brand-text {
+            display: block;
+            font-size: 20px;
+            line-height: 1;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0;
+            white-space: nowrap;
+        }
+
         .benefit-card {
             background: var(--island-panel);
             backdrop-filter: blur(18px);
@@ -203,8 +231,100 @@
             filter: drop-shadow(0 46px 80px rgba(0,0,0,0.55));
         }
 
+        .hero-art-scene {
+            position: relative;
+            display: inline-grid;
+            place-items: center;
+            isolation: isolate;
+            width: min(92vw, 560px);
+            max-width: 100%;
+        }
+
+        .hero-art-scene::before,
+        .hero-art-scene::after {
+            content: "";
+            position: absolute;
+            inset: 8%;
+            pointer-events: none;
+        }
+
+        .hero-art-scene::before {
+            z-index: -1;
+            border-radius: 999px;
+            background:
+                radial-gradient(circle at 50% 45%, rgba(255, 199, 0, 0.33), transparent 34%),
+                radial-gradient(circle at 28% 62%, rgba(255, 199, 0, 0.2), transparent 26%),
+                radial-gradient(circle at 72% 60%, rgba(255, 232, 130, 0.18), transparent 28%);
+            filter: blur(18px);
+            opacity: 0.72;
+            animation: island-art-glow 4.8s ease-in-out infinite;
+        }
+
+        .hero-art-scene::after {
+            z-index: 2;
+            background:
+                radial-gradient(circle, rgba(255, 232, 130, 0.95) 0 2px, transparent 3px) 18% 32% / 86px 86px,
+                radial-gradient(circle, rgba(255, 199, 0, 0.9) 0 1.5px, transparent 3px) 72% 40% / 112px 112px,
+                radial-gradient(circle, rgba(255, 255, 255, 0.72) 0 1px, transparent 2.5px) 58% 74% / 96px 96px;
+            mix-blend-mode: screen;
+            opacity: 0.38;
+            animation: island-art-sparks 7.2s linear infinite;
+        }
+
+        .hero-art-scene .hero-art,
+        .hero-art-scene .hero-art-mobile {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            transform-origin: 50% 58%;
+            animation: island-art-float 6.4s ease-in-out infinite;
+            will-change: transform;
+        }
+
+        .hero-art-scene-mobile {
+            display: none;
+        }
+
         .hero-art-mobile {
             display: none;
+        }
+
+        @keyframes island-art-float {
+            0%, 100% {
+                transform: translate3d(0, 0, 0) scale(1) rotate(-0.35deg);
+            }
+
+            50% {
+                transform: translate3d(0, -12px, 0) scale(1.015) rotate(0.35deg);
+            }
+        }
+
+        @keyframes island-art-glow {
+            0%, 100% {
+                opacity: 0.56;
+                transform: scale(0.96);
+            }
+
+            50% {
+                opacity: 0.9;
+                transform: scale(1.04);
+            }
+        }
+
+        @keyframes island-art-sparks {
+            0% {
+                opacity: 0.22;
+                transform: translate3d(-8px, 8px, 0);
+            }
+
+            45% {
+                opacity: 0.48;
+            }
+
+            100% {
+                opacity: 0.22;
+                transform: translate3d(10px, -12px, 0);
+            }
         }
 
         body > section,
@@ -230,6 +350,20 @@
                 padding-top: max(18px, env(safe-area-inset-top)) !important;
             }
 
+            .landing-brand {
+                gap: 10px;
+            }
+
+            .landing-brand-mark {
+                width: 36px;
+                height: 36px;
+                border-radius: 11px;
+            }
+
+            .landing-brand-text {
+                font-size: 15px;
+            }
+
             .hero-title {
                 font-size: clamp(2rem, 8vw, 3rem) !important;
                 line-height: 1.06 !important;
@@ -245,15 +379,49 @@
                 display: none;
             }
 
-            .hero-art-mobile {
-                display: block;
+            .hero-art-scene-desktop {
+                display: none;
+            }
+
+            .hero-art-scene-mobile {
+                display: inline-grid;
                 width: min(96vw, 430px);
                 margin: -8px auto 6px;
+            }
+
+            .hero-art-mobile {
+                display: block;
+                width: 100%;
+                margin: 0;
                 filter: drop-shadow(0 38px 70px rgba(0,0,0,0.52));
             }
 
             .tariff-card {
                 border-radius: 16px;
+            }
+        }
+
+        @media (max-width: 380px) {
+            .landing-brand {
+                gap: 9px;
+            }
+
+            .landing-brand-mark {
+                width: 34px;
+                height: 34px;
+            }
+
+            .landing-brand-text {
+                font-size: 13px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .hero-art-scene::before,
+            .hero-art-scene::after,
+            .hero-art-scene .hero-art,
+            .hero-art-scene .hero-art-mobile {
+                animation: none;
             }
         }
 
@@ -287,8 +455,11 @@
 
     <div class="hero-bg">
         <nav class="container mx-auto px-6 py-7 flex justify-between items-center relative z-10">
-            <div class="text-xl md:text-2xl font-black uppercase tracking-normal">
-                MONKEY ISLAND<span class="text-[#ffc700]"> VPS</span>
+            <div class="landing-brand" aria-label="Monkey Island VPS">
+                <img class="landing-brand-mark" src="{% static 'icons/monkey-island-logo-animated.gif' %}" alt="" width="42" height="42" decoding="async">
+                <span class="landing-brand-text">
+                    MONKEY ISLAND<span class="text-[#ffc700]"> VPS</span>
+                </span>
             </div>
             <div class="flex items-center space-x-4 md:space-x-10 font-bold text-xs md:text-sm uppercase">
                 <a href="#prices" class="hover:text-[#ffc700] transition hidden sm:inline">Тарифы</a>
@@ -308,7 +479,9 @@
                     Стриминг, игры и комфортная работа в интернете. Безлимитный трафик, до 10 Гбит/с и до 15 устройств на одной подписке.
                 </p>
 
-                <img class="hero-art-mobile" src="{% static 'img/onboarding/personal-server-hub.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
+                <div class="hero-art-scene hero-art-scene-mobile">
+                    <img class="hero-art-mobile" src="{% static 'img/onboarding/personal-server-hub.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
+                </div>
 
                 <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-4 mb-4 w-full sm:w-auto">
                     <a href="#prices" data-conversion-goal="tariff_cta_click" class="tilda-yellow w-full sm:w-auto px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95">
@@ -360,7 +533,9 @@
                 </div>
             </div>
             <div class="flex justify-center lg:justify-end">
-                <img class="hero-art" src="{% static 'img/onboarding/personal-server-hub.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
+                <div class="hero-art-scene hero-art-scene-desktop">
+                    <img class="hero-art" src="{% static 'img/onboarding/personal-server-hub.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
+                </div>
             </div>
         </section>
     </div>
