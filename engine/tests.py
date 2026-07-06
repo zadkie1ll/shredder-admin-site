@@ -1685,3 +1685,49 @@ class ConfigModalScrollLockTests(SimpleTestCase):
         self.assertIn("overflow-y: auto", card_rule)
         self.assertIn(".config-template-modal-card .modal-header { position: sticky", template)
         self.assertIn(".config-template-modal-card .modal-body { overflow: visible", template)
+
+
+class ConfigTemplatesAdminUiTests(SimpleTestCase):
+    def test_json_editor_selection_is_visible(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        # Выделение текста в CodeMirror перекрывает блеклый фон темы material-darker,
+        # иначе выделенный фрагмент почти не отличим от фона редактора.
+        self.assertIn(".cm-s-material-darker div.CodeMirror-selected", template)
+        self.assertIn(".cm-s-material-darker.CodeMirror-focused div.CodeMirror-selected", template)
+        self.assertIn(".cm-s-material-darker .CodeMirror-line::selection", template)
+
+    def test_config_modal_does_not_close_on_backdrop_or_escape(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        # Клик по фону и Escape не закрывают модалку конфига: это теряло
+        # несохранённый JSON. Закрытие — только кнопками «Отмена»/крестик.
+        self.assertNotIn("if (event.target.id === 'config-template-modal') closeConfigTemplateModal();", template)
+        escape_handler = template.split("if (event.key === 'Escape')", 1)[1].split("});", 1)[0]
+        self.assertNotIn("closeConfigTemplateModal", escape_handler)
+        # Обычные кнопки закрытия остаются.
+        self.assertIn("button.addEventListener('click', closeConfigTemplateModal);", template)
+        # Просмотровая модалка пользователей источника по-прежнему закрывается фоном и Escape.
+        self.assertIn("if (event.target.id === 'source-users-modal') closeSourceUsersModal();", template)
+        self.assertIn("closeSourceUsersModal();", escape_handler)
+
+    def test_config_pins_render_as_compact_chip_grid_with_filter(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        # Вместо вертикальной «колбасы» строк — сетка компактных чипов,
+        # фильтр по названию, счётчик выбранных и свёрнутые неактивные конфиги.
+        self.assertIn('class="config-pin-chip', template)
+        self.assertNotIn("config-pin-row", template)
+        self.assertIn("data-config-pins-filter", template)
+        self.assertIn("data-config-pins-counter", template)
+        self.assertIn('<details class="config-pins-inactive">', template)
+        pins_list_rule = template.split(".config-pins-list {", 1)[1].split("}", 1)[0]
+        self.assertIn("repeat(auto-fill", pins_list_rule)
+        # Сохранение собирает чекбоксы из обоих списков (активные + неактивные).
+        self.assertIn(".config-pins-list input[type=\"checkbox\"]:checked", template)
+
+    def test_config_template_cards_have_no_json_previews(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        # Превью template_json и additional_headers из карточек убраны — карточки
+        # компактные; наличие заголовков видно по бейджу.
+        self.assertNotIn("config-template-preview", template)
+        self.assertIn("+ заголовки", template)
+        card_rule = template.split(".config-template-card {", 1)[1].split("}", 1)[0]
+        self.assertNotIn("min-height: 440px", card_rule)
