@@ -104,24 +104,23 @@
         .btn-danger { background: rgba(251,113,133,.10); color: #fff; border: 1px solid rgba(251,113,133,.24); }
         .btn-danger i { color: var(--coral); }
         .btn-danger:hover { filter: none; background: rgba(251,113,133,.16); border-color: rgba(251,113,133,.36); }
-        .system-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px, .65fr); gap: 16px; align-items: start; }
-        .system-column { display: grid; gap: 16px; }
-        .settings-list { display: grid; gap: 0; }
-        .settings-group { display: grid; gap: 8px; }
-        .settings-group + .settings-group { margin-top: 22px; }
-        .settings-group-header { display: flex; align-items: center; gap: 7px; padding-bottom: 10px; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; border-bottom: 1px solid rgba(255,255,255,.06); margin-bottom: 2px; }
+        .system-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; align-items: start; }
+        .system-column { display: grid; gap: 16px; align-content: start; min-width: 0; }
+        .system-settings-card { max-width: 960px; }
+        .settings-list { display: grid; gap: 8px; }
         .setting-row { padding: 12px 14px; border: 1px solid rgba(255,255,255,.06); border-radius: 10px; background: rgba(255,255,255,.02); display: grid; gap: 9px; transition: border-color .14s, background .14s; }
         .setting-row:hover { border-color: rgba(255,255,255,.11); background: rgba(255,255,255,.038); }
         .setting-row-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; }
+        .setting-row-info { min-width: 0; }
         .setting-row-info { min-width: 0; flex: 1 1 0; }
         .setting-key { color: #fff; font-size: 12px; font-weight: 800; overflow-wrap: anywhere; }
-        .setting-meta { margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.35; font-weight: 600; }
+        .setting-meta { margin-top: 3px; color: var(--muted); font-size: 11px; line-height: 1.35; font-weight: 600; overflow-wrap: anywhere; }
         .setting-row-actions { flex: 0 0 auto; display: flex; align-items: center; gap: 5px; }
         .setting-state-pill { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 999px; font-size: 10px; font-weight: 800; border: 1px solid rgba(52,211,153,.22); background: rgba(52,211,153,.09); color: var(--green); white-space: nowrap; }
         .setting-state-pill.fallback { border-color: rgba(148,163,184,.14); background: rgba(255,255,255,.035); color: var(--muted); }
         .setting-state-date { display: block; font-size: 10px; font-weight: 600; color: var(--muted); margin-top: 1px; text-align: right; }
         .setting-row .btn { min-height: 30px; padding: 0 9px; font-size: 11px; border-radius: 7px; }
-        .system-card { padding: 16px; }
+        .system-card { padding: 16px; min-width: 0; }
         .system-card-title { margin: 0 0 14px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
         .system-form { display: grid; gap: 10px; }
         .system-form.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
@@ -853,61 +852,115 @@
                 <h1 class="admin-title">Система</h1>
                 <p class="admin-subtitle">Runtime-настройки, рефералка и админ-операции бота</p>
             </header>
-            <div class="system-grid">
-                <div class="system-column">
-                    <section class="card system-card">
-                        <h2 class="system-card-title">Runtime-настройки</h2>
-                        <div id="runtime-settings-list" class="settings-list"></div>
-                    </section>
+            <div class="subtabs" role="tablist" aria-label="Разделы системы">
+                <button type="button" class="subtab active" data-subtab="sys-tariffs" role="tab"><i class="fas fa-tag"></i>Тарифы</button>
+                <button type="button" class="subtab" data-subtab="sys-winback" role="tab"><i class="fas fa-rotate-left"></i>Win-back</button>
+                <button type="button" class="subtab" data-subtab="sys-payment" role="tab"><i class="fas fa-credit-card"></i>Платёж</button>
+                <button type="button" class="subtab" data-subtab="sys-referral" role="tab"><i class="fas fa-network-wired"></i>Рефералка</button>
+                <button type="button" class="subtab" data-subtab="sys-alerts" role="tab"><i class="fas fa-triangle-exclamation"></i>Алерты</button>
+                <button type="button" class="subtab" data-subtab="sys-general" role="tab"><i class="fas fa-sliders"></i>Общие</button>
+                <button type="button" class="subtab" data-subtab="sys-operations" role="tab"><i class="fas fa-list-check"></i>Операции</button>
+            </div>
+
+            <div id="subpanel-sys-tariffs" class="subtab-panel active">
+                <section class="card system-card system-settings-card">
+                    <h2 class="system-card-title">Цены тарифов</h2>
+                    <div class="settings-list" data-settings-group="tariffs"></div>
+                </section>
+            </div>
+
+            <div id="subpanel-sys-winback" class="subtab-panel">
+                <section class="card system-card system-settings-card">
+                    <h2 class="system-card-title">Win-back предложения</h2>
+                    <div class="settings-list" data-settings-group="winback"></div>
+                </section>
+            </div>
+
+            <div id="subpanel-sys-payment" class="subtab-panel">
+                <section class="card system-card system-settings-card">
+                    <h2 class="system-card-title">Платёжный шлюз</h2>
+                    <div class="settings-list" data-settings-group="payment"></div>
+                </section>
+            </div>
+
+            <div id="subpanel-sys-referral" class="subtab-panel">
+                <div class="system-grid">
+                    <div class="system-column">
+                        <section class="card system-card">
+                            <h2 class="system-card-title">Бонусы и лимиты</h2>
+                            <div class="settings-list" data-settings-group="referral"></div>
+                        </section>
+                    </div>
+                    <div class="system-column">
+                        <section class="card system-card">
+                            <h2 class="system-card-title">Антифрод рефералки</h2>
+                            <form id="referral-antifraud-form" class="system-form">
+                                {% csrf_token %}
+                                <div id="referral-antifraud-current" class="system-output"></div>
+                                <div class="form-grid-two">
+                                    <input class="input" name="limit" type="number" min="0" placeholder="Лимит">
+                                    <input class="input" name="window_minutes" type="number" min="1" placeholder="Минуты">
+                                </div>
+                                <div class="system-actions">
+                                    <button class="btn btn-secondary" type="submit" name="action" value="set"><i class="fas fa-floppy-disk"></i>Сохранить лимит</button>
+                                    <button class="btn" id="referral-antifraud-toggle" type="submit" name="action" value="enable"><i class="fas fa-toggle-on"></i><span>Включить</span></button>
+                                </div>
+                            </form>
+                        </section>
+                        <section class="card system-card">
+                            <h2 class="system-card-title">Блокировка рефералки</h2>
+                            <form id="referral-block-form" class="system-form">
+                                {% csrf_token %}
+                                <input class="input" name="q" placeholder="telegram_id, username или email">
+                                <input class="input" name="reason" placeholder="Причина">
+                                <div class="system-actions">
+                                    <button class="btn btn-secondary" type="submit" name="action" value="status"><i class="fas fa-magnifying-glass"></i>Проверить</button>
+                                    <button class="btn btn-danger" id="referral-block-toggle" type="submit" name="action" value="block" disabled><i class="fas fa-ban"></i><span>Заблокировать</span></button>
+                                </div>
+                            </form>
+                            <div id="referral-block-result" class="system-output"></div>
+                        </section>
+                    </div>
                 </div>
-                <div class="system-column">
-                    <section class="card system-card">
-                        <h2 class="system-card-title">Антифрод рефералки</h2>
-                        <form id="referral-antifraud-form" class="system-form">
-                            {% csrf_token %}
-                            <div id="referral-antifraud-current" class="system-output"></div>
-                            <div class="form-grid-two">
-                                <input class="input" name="limit" type="number" min="0" placeholder="Лимит">
-                                <input class="input" name="window_minutes" type="number" min="1" placeholder="Минуты">
-                            </div>
-                            <div class="system-actions">
-                                <button class="btn btn-secondary" type="submit" name="action" value="set"><i class="fas fa-floppy-disk"></i>Сохранить лимит</button>
-                                <button class="btn" id="referral-antifraud-toggle" type="submit" name="action" value="enable"><i class="fas fa-toggle-on"></i><span>Включить</span></button>
-                            </div>
-                        </form>
-                    </section>
-                    <section class="card system-card">
-                        <h2 class="system-card-title">Блокировка рефералки</h2>
-                        <form id="referral-block-form" class="system-form">
-                            {% csrf_token %}
-                            <input class="input" name="q" placeholder="telegram_id, username или email">
-                            <input class="input" name="reason" placeholder="Причина">
-                            <div class="system-actions">
-                                <button class="btn btn-secondary" type="submit" name="action" value="status"><i class="fas fa-magnifying-glass"></i>Проверить</button>
-                                <button class="btn btn-danger" id="referral-block-toggle" type="submit" name="action" value="block" disabled><i class="fas fa-ban"></i><span>Заблокировать</span></button>
-                            </div>
-                        </form>
-                        <div id="referral-block-result" class="system-output"></div>
-                    </section>
-                    <section class="card system-card">
-                        <h2 class="system-card-title">Операции</h2>
-                        <div class="command-row">
-                            <div>
-                                <div class="command-name">Автоплатежи</div>
-                                <div class="command-sub">Аналог /recurrents</div>
-                            </div>
-                            <button class="btn btn-secondary" type="button" id="load-recurrents"><i class="fas fa-rotate"></i>Показать</button>
+            </div>
+
+            <div id="subpanel-sys-alerts" class="subtab-panel">
+                <section class="card system-card system-settings-card">
+                    <h2 class="system-card-title">Пороги трафика</h2>
+                    <div class="settings-list" data-settings-group="alerts"></div>
+                </section>
+            </div>
+
+            <div id="subpanel-sys-general" class="subtab-panel">
+                <section class="card system-card system-settings-card">
+                    <h2 class="system-card-title">Общие настройки</h2>
+                    <div class="settings-list" data-settings-group="general"></div>
+                </section>
+                <section class="card system-card system-settings-card" data-settings-other-card hidden style="margin-top: 16px;">
+                    <h2 class="system-card-title">Прочие</h2>
+                    <div class="settings-list" data-settings-group="other"></div>
+                </section>
+            </div>
+
+            <div id="subpanel-sys-operations" class="subtab-panel">
+                <section class="card system-card system-settings-card">
+                    <h2 class="system-card-title">Операции</h2>
+                    <div class="command-row">
+                        <div>
+                            <div class="command-name">Автоплатежи</div>
+                            <div class="command-sub">Аналог /recurrents</div>
                         </div>
-                        <div class="command-row">
-                            <div>
-                                <div class="command-name">Топ оплат</div>
-                                <div class="command-sub">Аналог /top-payments</div>
-                            </div>
-                            <button class="btn btn-secondary" type="button" id="load-top-payments"><i class="fas fa-ranking-star"></i>Показать</button>
+                        <button class="btn btn-secondary" type="button" id="load-recurrents"><i class="fas fa-rotate"></i>Показать</button>
+                    </div>
+                    <div class="command-row">
+                        <div>
+                            <div class="command-name">Топ оплат</div>
+                            <div class="command-sub">Аналог /top-payments</div>
                         </div>
-                        <div id="system-operations-result" class="system-output"></div>
-                    </section>
-                </div>
+                        <button class="btn btn-secondary" type="button" id="load-top-payments"><i class="fas fa-ranking-star"></i>Показать</button>
+                    </div>
+                    <div id="system-operations-result" class="system-output"></div>
+                </section>
             </div>
         </section>
         {% endif %}
@@ -2386,18 +2439,20 @@
             });
         }
 
-        function showStatsSubtab(name) {
-            document.querySelectorAll('#panel-stats .subtab').forEach((button) => {
+        function showSubtab(panelId, name) {
+            const panel = document.getElementById(panelId);
+            if (!panel) return;
+            panel.querySelectorAll('.subtab').forEach((button) => {
                 button.classList.toggle('active', button.dataset.subtab === name);
             });
-            document.querySelectorAll('#panel-stats .subtab-panel').forEach((panel) => {
-                panel.classList.toggle('active', panel.id === `subpanel-${name}`);
+            panel.querySelectorAll('.subtab-panel').forEach((subpanel) => {
+                subpanel.classList.toggle('active', subpanel.id === `subpanel-${name}`);
             });
         }
 
-        function setupStatsSubtabs() {
-            document.querySelectorAll('#panel-stats .subtab').forEach((button) => {
-                button.addEventListener('click', () => showStatsSubtab(button.dataset.subtab));
+        function setupSubtabs(panelId) {
+            document.querySelectorAll(`#${panelId} .subtab`).forEach((button) => {
+                button.addEventListener('click', () => showSubtab(panelId, button.dataset.subtab));
             });
         }
 
@@ -2981,13 +3036,14 @@
             return setting.type === 'float' ? 'any' : '1';
         }
 
+        // slug соответствует контейнеру [data-settings-group] в подвкладках раздела «Система».
         const SETTING_GROUPS = [
-            {label: 'Тарифы', icon: 'fa-tag', color: 'var(--green)', keys: ['tariff_price_threedays', 'tariff_price_oneday', 'tariff_price_month', 'tariff_price_threemonths', 'tariff_price_sixmonths', 'tariff_price_year']},
-            {label: 'Win-back', icon: 'fa-rotate-left', color: 'var(--brand-gold)', keys: ['winback_price_month', 'winback_price_threemonths', 'winback_price_year', 'winback_send_hour_start', 'winback_send_hour_end', 'winback_offer_ttl_hours', 'winback_grace_hours']},
-            {label: 'Платёж', icon: 'fa-credit-card', color: 'var(--brand-gold)', keys: ['payment_gateway', 'yookassa_shop_id', 'yookassa_secret', 'wata_host', 'wata_token']},
-            {label: 'Рефералка', icon: 'fa-network-wired', color: 'var(--violet)', keys: ['join_referrer_bonus_days', 'traffic_referrer_bonus_days', 'purchase_referrer_bonus_days', 'referral_bonus_days', 'referral_registration_autoblock_enabled', 'referral_registration_burst_limit', 'referral_registration_burst_window_minutes']},
-            {label: 'Алерты', icon: 'fa-triangle-exclamation', color: 'var(--coral)', keys: ['traffic_usage_suspicious_gb', 'traffic_usage_alert_gb']},
-            {label: 'Общие', icon: 'fa-sliders', color: 'var(--blue)', keys: ['trial_period_days', 'site_trial_registration_enabled', 'banned_telegram_ids', 'web_login_url', 'redirect_url', 'internal_squads_uuids', 'technical_work_enabled', 'apple_recommended_app']},
+            {slug: 'tariffs', keys: ['tariff_price_threedays', 'tariff_price_oneday', 'tariff_price_month', 'tariff_price_threemonths', 'tariff_price_sixmonths', 'tariff_price_year']},
+            {slug: 'winback', keys: ['winback_price_month', 'winback_price_threemonths', 'winback_price_year', 'winback_send_hour_start', 'winback_send_hour_end', 'winback_offer_ttl_hours', 'winback_grace_hours']},
+            {slug: 'payment', keys: ['payment_gateway', 'yookassa_shop_id', 'yookassa_secret', 'wata_host', 'wata_token']},
+            {slug: 'referral', keys: ['join_referrer_bonus_days', 'traffic_referrer_bonus_days', 'purchase_referrer_bonus_days', 'referral_bonus_days', 'referral_registration_autoblock_enabled', 'referral_registration_burst_limit', 'referral_registration_burst_window_minutes']},
+            {slug: 'alerts', keys: ['traffic_usage_suspicious_gb', 'traffic_usage_alert_gb']},
+            {slug: 'general', keys: ['trial_period_days', 'site_trial_registration_enabled', 'banned_telegram_ids', 'web_login_url', 'redirect_url', 'internal_squads_uuids', 'technical_work_enabled', 'apple_recommended_app']},
         ];
 
         function settingRowHtml(setting) {
@@ -3014,44 +3070,35 @@
         }
 
         function renderRuntimeSettings(settings) {
-            const target = document.getElementById('runtime-settings-list');
-            if (!target) return;
-            if (!(settings && settings.length)) {
-                target.innerHTML = '<div class="info-card muted">Настроек нет.</div>';
-                return;
-            }
-            const byKey = Object.fromEntries(settings.map((s) => [s.key, s]));
-            const grouped = [];
-            for (const group of SETTING_GROUPS) {
-                const rows = group.keys.map((k) => byKey[k]).filter(Boolean);
-                if (!rows.length) continue;
-                grouped.push(`
-                    <div class="settings-group">
-                        <div class="settings-group-header" style="color:${group.color}">
-                            <i class="fas ${group.icon}"></i>${group.label}
-                        </div>
-                        ${rows.map(settingRowHtml).join('')}
-                    </div>
-                `);
-            }
+            const containers = document.querySelectorAll('[data-settings-group]');
+            if (!containers.length) return;
+            const byKey = Object.fromEntries((settings || []).map((s) => [s.key, s]));
             const groupedKeys = new Set(SETTING_GROUPS.flatMap((g) => g.keys));
-            const ungrouped = settings.filter((s) => !groupedKeys.has(s.key));
-            if (ungrouped.length) {
-                grouped.push(`<div class="settings-group">${ungrouped.map(settingRowHtml).join('')}</div>`);
-            }
-            target.innerHTML = grouped.join('');
+            const ungrouped = (settings || []).filter((s) => !groupedKeys.has(s.key));
+            containers.forEach((container) => {
+                const slug = container.dataset.settingsGroup;
+                const group = SETTING_GROUPS.find((g) => g.slug === slug);
+                const rows = slug === 'other'
+                    ? ungrouped
+                    : (group?.keys || []).map((k) => byKey[k]).filter(Boolean);
+                container.innerHTML = rows.length
+                    ? rows.map(settingRowHtml).join('')
+                    : '<div class="info-card muted">Настроек нет.</div>';
+            });
+            const otherCard = document.querySelector('[data-settings-other-card]');
+            if (otherCard) otherCard.hidden = !ungrouped.length;
         }
 
         async function loadRuntimeSettings(silent = false) {
-            const target = document.getElementById('runtime-settings-list');
-            if (!target || !main.dataset.runtimeSettingsUrl) return;
-            if (!silent) target.innerHTML = inlineLoading('Загружаем настройки...');
+            const containers = document.querySelectorAll('[data-settings-group]');
+            if (!containers.length || !main.dataset.runtimeSettingsUrl) return;
+            if (!silent) containers.forEach((container) => { container.innerHTML = inlineLoading('Загружаем настройки...'); });
             const response = await fetch(main.dataset.runtimeSettingsUrl, {
                 headers: {'X-Requested-With': 'XMLHttpRequest'},
                 cache: 'no-store',
             });
             if (!response.ok) {
-                if (!silent) target.innerHTML = inlineError('Не удалось загрузить настройки');
+                if (!silent) containers.forEach((container) => { container.innerHTML = inlineError('Не удалось загрузить настройки'); });
                 return;
             }
             const payload = await response.json();
@@ -3308,7 +3355,8 @@
             setStatsDateRange(addDays(today, -29), today, '30');
         }
 
-        setupStatsSubtabs();
+        setupSubtabs('panel-stats');
+        setupSubtabs('panel-system');
         const cohortForm = document.getElementById('cohort-form');
         if (cohortForm) {
             cohortForm.addEventListener('submit', loadCohortStats);

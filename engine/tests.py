@@ -740,8 +740,30 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn('id="subpanel-cohort"', template)
         self.assertIn('data-subtab="overview"', template)
         self.assertIn('data-subtab="cohort"', template)
-        self.assertIn("function showStatsSubtab", template)
-        self.assertIn("setupStatsSubtabs", template)
+        self.assertIn("function showSubtab", template)
+        self.assertIn("setupSubtabs('panel-stats')", template)
+
+    def test_system_tab_grouped_into_subtabs(self):
+        # Вкладка «Система» организована подвкладками (как «Аналитика»),
+        # вместо жёсткой двухколоночной сетки, вылезавшей за экран.
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        for slug in ("sys-tariffs", "sys-winback", "sys-payment", "sys-referral", "sys-alerts", "sys-general", "sys-operations"):
+            self.assertIn(f'data-subtab="{slug}"', template)
+            self.assertIn(f'id="subpanel-{slug}"', template)
+        # Runtime-настройки раскладываются по контейнерам групп.
+        for group in ("tariffs", "winback", "payment", "referral", "alerts", "general", "other"):
+            self.assertIn(f'data-settings-group="{group}"', template)
+        self.assertIn("setupSubtabs('panel-system')", template)
+        # Блоки рефералки (антифрод и блокировка) живут в подвкладке «Рефералка».
+        self.assertIn('id="referral-antifraud-form"', template)
+        self.assertIn('id="referral-block-form"', template)
+        self.assertIn('id="load-recurrents"', template)
+        self.assertIn('id="load-top-payments"', template)
+        # Сетка рефералки не должна использовать фиксированную минимальную ширину колонок,
+        # из-за которой контент вылезал за экран.
+        self.assertNotIn(".system-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px", template)
+        self.assertIn(".system-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)", template)
 
     def test_cohort_shows_invited_referrals_metrics(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
