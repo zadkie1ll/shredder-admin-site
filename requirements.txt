@@ -1,19 +1,22 @@
-django
-sqlalchemy
-psycopg2-binary
-gunicorn
-whitenoise
-resend
-yookassa
-pydantic
-python-dotenv
-grpcio
-grpcio-tools
-orjson
-black
-cryptography
-httpx
-python-decouple
-dj_database_url
-alembic
-Pillow
+# Все версии запинены (инцидент 2026-07-07: незапиненный remnawave в rwms
+# притянул 2.8.0 с breaking change). Обновлять версии только осознанно,
+# с прогоном тестов, а не через пересборку Docker-образа.
+django==6.0.6
+sqlalchemy==2.0.50
+psycopg2-binary==2.9.12
+gunicorn==26.0.0
+whitenoise==6.12.0
+resend==2.30.1
+yookassa==3.10.1
+pydantic==2.13.4
+python-dotenv==1.2.2
+grpcio==1.81.0
+grpcio-tools==1.81.0
+orjson==3.11.9
+black==26.5.1
+cryptography==48.0.1
+httpx==0.28.1
+python-decouple==3.8
+dj_database_url==3.1.2
+alembic==1.18.4
+Pillow==12.2.0
