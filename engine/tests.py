@@ -278,6 +278,67 @@ class WataPaymentFlowTests(SimpleTestCase):
         self.assertIn('target="_blank" rel="noopener"', template)
 
     @override_settings(PAYMENT_GATEWAY="wata", WATA_HOST="https://wata.example", WATA_TOKEN="token")
+    def test_pay_rejects_blocked_user(self):
+        """Полностью заблокированный (user_blocks) не может создать платёж —
+        иначе успешная оплата реактивировала бы отключённую подписку."""
+        tariff = SimpleNamespace(
+            price=100,
+            db_tariff_id="month",
+            description="1 месяц",
+        )
+        user = SimpleNamespace(
+            id=42,
+            email="user@example.com",
+            username="user-42",
+            telegram_id=None,
+        )
+
+        class SessionDict(dict):
+            modified = False
+
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return user
+
+        class FakeSession:
+            def query(self, model):
+                return FakeQuery()
+
+            def commit(self):
+                return None
+
+            def rollback(self):
+                return None
+
+            def close(self):
+                return None
+
+        request = RequestFactory().post(
+            "/pay/",
+            {"email": "user@example.com", "tariff_id": "month"},
+            HTTP_HOST="example.com",
+        )
+        request.user = SimpleNamespace(is_authenticated=False, id=None)
+        request.session = SessionDict()
+
+        with (
+            mock.patch("engine.views.session_factory", return_value=FakeSession()),
+            mock.patch("engine.views.is_user_blocked", return_value=True),
+            mock.patch("engine.views.get_runtime_actual_tariffs", return_value=[tariff]),
+            mock.patch(
+                "engine.views.get_registration_context",
+                return_value={"traffic_source": None, "ymid": None},
+            ),
+            mock.patch("engine.views.sync_existing_user_tracking"),
+        ):
+            response = pay(request)
+
+        self.assertEqual(response.status_code, 403)
+
+    @override_settings(PAYMENT_GATEWAY="wata", WATA_HOST="https://wata.example", WATA_TOKEN="token")
     def test_ajax_payment_launch_returns_provider_and_status_urls(self):
         tariff = SimpleNamespace(
             price=100,
@@ -345,6 +406,7 @@ class WataPaymentFlowTests(SimpleTestCase):
 
         with (
             mock.patch("engine.views.session_factory", return_value=FakeSession()),
+            mock.patch("engine.views.is_user_blocked", return_value=False),
             mock.patch("engine.views.get_runtime_actual_tariffs", return_value=[tariff]),
             mock.patch("engine.views.get_registration_context", return_value={"traffic_source": None, "ymid": None}),
             mock.patch("engine.views.sync_existing_user_tracking"),
@@ -444,6 +506,7 @@ class WataPaymentFlowTests(SimpleTestCase):
 
         with (
             mock.patch("engine.views.session_factory", return_value=FakeSession()),
+            mock.patch("engine.views.is_user_blocked", return_value=False),
             mock.patch("engine.views.get_runtime_actual_tariffs", return_value=[tariff]),
             mock.patch(
                 "engine.views.get_registration_context",

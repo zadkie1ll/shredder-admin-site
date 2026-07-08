@@ -397,10 +397,10 @@ Django-приложение `mobile_api` обслуживает мобильно
 
 | Метод/путь | Назначение |
 |---|---|
-| `POST /api/mobile/v1/auth/exchange` `{code}` | Обменять одноразовый код на `{access_token, subscription_url, user}` (код one-time, TTL 10 мин) |
+| `POST /api/mobile/v1/auth/exchange` `{code}` | Обменять одноразовый код на `{access_token, subscription_url, user}` (код one-time, TTL 10 мин). Rate-limit per-IP: 90 запросов/мин (Django cache, per-process LocMemCache) → `429 rate_limited`; приложение трактует 429 как transient и продолжает поллинг |
 | `POST /api/mobile/v1/auth/email/request` `{email}` | Сгенерировать 6-значный код и отправить письмо. Ответ `{ok, ttl_seconds}`. Всегда 200 для валидного email (не раскрывает, существует ли пользователь). `400 invalid_email`, `429 rate_limited` |
 | `POST /api/mobile/v1/auth/email/verify` `{email, code}` | Проверить код → `{access_token, subscription_url, user}` (тот же формат, что `/auth/exchange`). `401 invalid_or_expired_code`, `429 rate_limited` |
-| `GET /api/mobile/v1/me` (Bearer) | Статус подписки: `status`, `expire_at`, `days_left`, `subscription_url` |
+| `GET /api/mobile/v1/me` (Bearer) | Статус подписки: `status`, `expire_at`, `days_left` (округление вверх, как в кабинете: 23ч → 1 день), `subscription_url` |
 | `GET /api/mobile/v1/tariffs` | Список тарифов |
 | `POST /api/mobile/v1/auth/logout` (Bearer) | Отозвать access-токен |
 | `GET /app/auth-redirect?code=…` | Мост https → `monkeyisland://auth?code=…` (кнопка «Войти» в боте) |
@@ -663,6 +663,26 @@ tabular-nums`. Статичный pill «Источник» (одинаковы�
 
 Чтобы группа отобразилась, в `common` сайта должны присутствовать win-back ключи
 из `common/models/settings.py` — пропагируйте common, как и для остальных сервисов.
+
+---
+
+## Полная блокировка пользователя (user_blocks)
+
+Пользователи с записью в таблице `user_blocks` (ставится ботом командой
+`/block-user`) не могут пользоваться сайтом:
+
+- `engine/user_block_middleware.py` (`UserBlockMiddleware`, стоит после
+  `AuthenticationMiddleware`) разлогинивает заблокированного на любом запросе и
+  показывает страницу логина с сообщением о блокировке (403);
+- `pay` отклоняет создание платежа с 403 — в том числе анонимную оплату по
+  email заблокированного (иначе успешный платёж реактивировал бы отключённую
+  подписку);
+- мобильный API: `mobile_api/auth.py` не аутентифицирует заблокированных
+  (Bearer-токены перестают работать) и не выдаёт новые токены при
+  `auth/exchange`.
+
+Общий хелпер — `engine/user_block.py` (`is_user_blocked`). Модель `UserBlock`
+живёт в common; для таблицы нужна миграция common.
 
 ---
 

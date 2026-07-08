@@ -23,6 +23,7 @@ from common.models.db import (
     MobileAuthCode,
     User,
 )
+from engine.user_block import is_user_blocked
 
 # One-time login code lifetime.
 AUTH_CODE_TTL = timedelta(minutes=10)
@@ -95,6 +96,8 @@ def exchange_code(db_session, code, now=None):
     row.used_at = now
     user = db_session.query(User).filter(User.id == row.user_id).one_or_none()
     if user is None:
+        return None, None
+    if is_user_blocked(db_session, user.id):
         return None, None
     raw_token = _issue_access_token(db_session, user, now=now)
     return user, raw_token
@@ -185,7 +188,7 @@ def bearer_token(request):
 
 def authenticate(db_session, request, now=None):
     """Resolve a ``Authorization: Bearer <token>`` to ``(user, token_row)``, or
-    ``(None, None)`` if missing/unknown/revoked. Updates ``last_seen_at``."""
+    ``(None, None)`` if missing/unknown/revoked/blocked. Updates ``last_seen_at``."""
     raw_token = bearer_token(request)
     if not raw_token:
         return None, None
@@ -198,4 +201,7 @@ def authenticate(db_session, request, now=None):
         return None, None
     row.last_seen_at = now or datetime.utcnow()
     user = db_session.query(User).filter(User.id == row.user_id).one_or_none()
+    # Полностью заблокированный аккаунт (user_blocks) не аутентифицируется
+    if user is not None and is_user_blocked(db_session, user.id):
+        return None, None
     return user, row

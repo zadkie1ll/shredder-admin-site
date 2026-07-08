@@ -14,6 +14,7 @@ from common.models.db import (
     MobileAuthCode,
     EmailLoginCode,
     User,
+    UserBlock,
 )
 from mobile_api import auth
 
@@ -49,6 +50,7 @@ class MobileAuthHelpersTests(SimpleTestCase):
                 User.__table__,
                 MobileAuthCode.__table__,
                 MobileAccessToken.__table__,
+                UserBlock.__table__,
             ],
         )
         self.Session = sessionmaker(bind=self.engine)
@@ -109,6 +111,48 @@ class MobileAuthHelpersTests(SimpleTestCase):
         self.assertIsNone(token)
         session.close()
 
+    def test_is_user_blocked_fails_open_on_db_error(self):
+        """Ошибка проверки блокировки (например, таблицы user_blocks ещё нет)
+        не должна ронять кабинет/оплату/мобильный API — считаем незаблокированным."""
+        from engine.user_block import is_user_blocked
+
+        class BrokenSession:
+            def query(self, model):
+                raise RuntimeError("no such table: user_blocks")
+
+        self.assertFalse(is_user_blocked(BrokenSession(), 1))
+
+    def test_exchange_code_rejected_for_blocked_user(self):
+        session = self.Session()
+        session.add(UserBlock(user_id=1, reason="test block"))
+        auth.register_auth_code(session, user_id=1, code="code-blocked")
+        session.commit()
+
+        user, token = auth.exchange_code(session, "code-blocked")
+
+        self.assertIsNone(user)
+        self.assertIsNone(token)
+        self.assertEqual(session.query(MobileAccessToken).count(), 0)
+        session.close()
+
+    def test_authenticate_rejected_for_blocked_user(self):
+        session = self.Session()
+        auth.register_auth_code(session, user_id=1, code="code-pre-block")
+        session.commit()
+        _user, raw = auth.exchange_code(session, "code-pre-block")
+        session.commit()
+        self.assertIsNotNone(raw)
+
+        # Блокировка после выдачи токена: существующий токен перестаёт работать
+        session.add(UserBlock(user_id=1, reason="test block"))
+        session.commit()
+
+        user, row = auth.authenticate(session, _Req(raw))
+
+        self.assertIsNone(user)
+        self.assertIsNone(row)
+        session.close()
+
     def test_authenticate_valid_revoked_unknown_missing(self):
         session = self.Session()
         auth.register_auth_code(session, user_id=1, code="c")
@@ -153,6 +197,7 @@ def _make_engine():
             MobileAuthCode.__table__,
             MobileAccessToken.__table__,
             EmailLoginCode.__table__,
+            UserBlock.__table__,
         ],
     )
     return engine
@@ -485,3 +530,103 @@ class MobileEmailVerifyViewTests(SimpleTestCase):
         # Even the correct code is rejected once the cap is reached.
         resp = self._post({"email": "a@b.com", "code": "123456"})
         self.assertEqual(resp.status_code, 401)
+
+
+class ExpireFieldsTests(SimpleTestCase):
+    """days_left must round UP like the cabinet (engine/views.py), not truncate:
+    on the last paid day (23h remaining) the app card must not read «истекла»."""
+
+    def _days_left(self, expire_at):
+        from mobile_api import views
+
+        _iso, days_left = views._expire_fields(_FakeRwUser(expire_at=expire_at))
+        return days_left
+
+    def test_23h_remaining_is_one_day(self):
+        self.assertEqual(
+            self._days_left(datetime.utcnow() + timedelta(hours=23)), 1
+        )
+
+    def test_25h_remaining_is_two_days(self):
+        self.assertEqual(
+            self._days_left(datetime.utcnow() + timedelta(hours=25)), 2
+        )
+
+    def test_expired_is_zero(self):
+        self.assertEqual(
+            self._days_left(datetime.utcnow() - timedelta(hours=1)), 0
+        )
+
+    def test_no_rw_user_is_none(self):
+        from mobile_api import views
+
+        self.assertEqual(views._expire_fields(None), (None, None))
+
+
+class MobileExchangeRateLimitTests(SimpleTestCase):
+    """Per-IP throttle on POST auth/exchange (PLAN §3.2: rate limit against
+    device-code brute force). 429 is treated as transient by the app's poller."""
+
+    def setUp(self):
+        from django.core.cache import cache
+
+        cache.clear()
+        self.engine = _make_engine()
+        self.Session = sessionmaker(bind=self.engine)
+        self._sf_patch = mock.patch(
+            "mobile_api.views.session_factory", side_effect=self.Session
+        )
+        self._sf_patch.start()
+
+    def tearDown(self):
+        self._sf_patch.stop()
+
+    def _post(self, ip="10.0.0.1", forwarded=None):
+        from mobile_api import views
+
+        request = mock.Mock()
+        request.method = "POST"
+        request.body = json.dumps({"code": "deadbeef"}).encode()
+        request.META = {"REMOTE_ADDR": ip}
+        if forwarded is not None:
+            request.META["HTTP_X_FORWARDED_FOR"] = forwarded
+        return views.auth_exchange(request)
+
+    def test_within_limit_unknown_code_is_401(self):
+        resp = self._post()
+        self.assertEqual(resp.status_code, 401)
+        self.assertEqual(
+            json.loads(resp.content)["error"], "invalid_or_expired_code"
+        )
+
+    def test_over_limit_is_429(self):
+        from mobile_api import views
+
+        with mock.patch.object(views, "EXCHANGE_RATE_LIMIT", 3):
+            for _ in range(3):
+                self.assertEqual(self._post().status_code, 401)
+            resp = self._post()
+        self.assertEqual(resp.status_code, 429)
+        self.assertEqual(json.loads(resp.content)["error"], "rate_limited")
+
+    def test_limit_is_per_ip(self):
+        from mobile_api import views
+
+        with mock.patch.object(views, "EXCHANGE_RATE_LIMIT", 3):
+            for _ in range(4):
+                self._post(ip="10.0.0.1")
+            # A different client is not affected by the exhausted bucket.
+            resp = self._post(ip="10.0.0.2")
+        self.assertEqual(resp.status_code, 401)
+
+    def test_forwarded_header_wins_over_remote_addr(self):
+        from mobile_api import views
+
+        with mock.patch.object(views, "EXCHANGE_RATE_LIMIT", 3):
+            for _ in range(4):
+                self._post(ip="127.0.0.1", forwarded="203.0.113.7")
+            resp = self._post(ip="127.0.0.1", forwarded="203.0.113.7")
+            self.assertEqual(resp.status_code, 429)
+            # Same proxy, different original client → separate bucket.
+            other = self._post(ip="127.0.0.1", forwarded="203.0.113.8")
+        self.assertEqual(other.status_code, 401)

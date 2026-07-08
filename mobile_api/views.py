@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from urllib.parse import quote
 
 from django.conf import settings
+from django.core.cache import cache
 from django.http import HttpResponse, JsonResponse
 from django.utils.html import escape
 from django.views.decorators.csrf import csrf_exempt
@@ -35,6 +36,13 @@ EMAIL_RESEND_INTERVAL = timedelta(seconds=60)
 EMAIL_HOURLY_WINDOW = timedelta(hours=1)
 EMAIL_HOURLY_LIMIT = 5
 
+# Per-IP limit for POST auth/exchange (defense-in-depth against device-code
+# brute force; the 128-bit code space is the primary defense). Sized for the
+# app's legit polling (1 req / 3 s ≈ 20/min per device) plus several devices
+# behind one NAT. Backed by Django's cache (per-process LocMemCache by default).
+EXCHANGE_RATE_WINDOW_SECONDS = 60
+EXCHANGE_RATE_LIMIT = 90
+
 
 def _normalize_email(value):
     return (value or "").strip().lower()
@@ -56,7 +64,11 @@ def _expire_fields(rw):
     if rw is None or not rw.HasField("expire_at"):
         return None, None
     expire_dt = rw.expire_at.ToDatetime().replace(tzinfo=timezone.utc)
-    days_left = max(0, (expire_dt - datetime.now(timezone.utc)).days)
+    seconds_left = (expire_dt - datetime.now(timezone.utc)).total_seconds()
+    # Round UP, mirroring the cabinet (engine/views.py): 23h remaining is
+    # "1 day", not 0 — timedelta.days truncates and would flip the app's card
+    # to "истекла" on the last paid day while the panel is still ACTIVE.
+    days_left = int((seconds_left + 86399) // 86400) if seconds_left > 0 else 0
     return expire_dt.isoformat(), days_left
 
 
@@ -66,9 +78,33 @@ def _status_name(rw):
     return proto.UserStatus.Name(rw.status)
 
 
+def _client_ip(request):
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "") or "unknown"
+
+
+def _exchange_rate_limited(request):
+    """Sliding-window-ish per-IP counter on Django's cache. Returns True when the
+    IP exceeded EXCHANGE_RATE_LIMIT requests in the current window."""
+    key = f"mobile_api:exchange:{_client_ip(request)}"
+    if cache.add(key, 1, EXCHANGE_RATE_WINDOW_SECONDS):
+        return False
+    try:
+        count = cache.incr(key)
+    except ValueError:
+        # The key expired between add() and incr() — start a new window.
+        cache.add(key, 1, EXCHANGE_RATE_WINDOW_SECONDS)
+        return False
+    return count > EXCHANGE_RATE_LIMIT
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def auth_exchange(request):
+    if _exchange_rate_limited(request):
+        return JsonResponse({"error": "rate_limited"}, status=429)
     try:
         body = json.loads(request.body or b"{}")
     except json.JSONDecodeError:

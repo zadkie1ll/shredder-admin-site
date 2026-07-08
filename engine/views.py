@@ -75,6 +75,8 @@ from common.models.db import SupportTicketAttachment
 from common.models.db import SupportReplyTemplate
 from common.models.db import SystemSetting
 from common.models.db import ReferralProgramBlock
+from engine.user_block import ACCOUNT_BLOCKED_MESSAGE
+from engine.user_block import is_user_blocked
 from common.models.settings import BOOL_RUNTIME_SETTINGS
 from common.models.settings import BOT_JOIN_REFERRER_BONUS_DAYS_SETTING
 from common.models.settings import BOT_PURCHASE_REFERRER_BONUS_DAYS_SETTING
@@ -6043,6 +6045,17 @@ def pay(request):
                         user.username,
                         tariff.db_tariff_id,
                     )
+
+            # Полностью заблокированный аккаунт не может оплачивать — проверяем
+            # уже разрешённого пользователя, это закрывает и анонимную оплату
+            # по email заблокированного (иначе платёж реактивировал бы подписку).
+            if is_user_blocked(db_session, user.id):
+                logging.warning(
+                    "payment request rejected: user %s is blocked (email=%s)",
+                    user.id,
+                    email,
+                )
+                return HttpResponse(ACCOUNT_BLOCKED_MESSAGE, status=403)
 
             use_permanent_purchase_link = (
                 request.POST.get("login_link_kind") == "purchase_permanent"
