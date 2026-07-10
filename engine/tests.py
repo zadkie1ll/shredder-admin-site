@@ -1816,3 +1816,244 @@ class ConfigTemplatesAdminUiTests(SimpleTestCase):
         self.assertIn("+ заголовки", template)
         card_rule = template.split(".config-template-card {", 1)[1].split("}", 1)[0]
         self.assertNotIn("min-height: 440px", card_rule)
+
+
+class NodeTrafficReportTests(SimpleTestCase):
+    """Агрегация трафика нод для вкладки «Трафик нод» (engine/node_traffic.py)."""
+
+    def _nodes(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        return [
+            rw_proto.Node(uuid="n1", name="Германия", address="1.1.1.1", is_connected=True),
+            rw_proto.Node(uuid="n2", name="Швеция", address="2.2.2.2", is_connected=True),
+        ]
+
+    def _fake_client(self, usage_by_node, users_by_uuid=None):
+        import proto.rwmanager_pb2 as rw_proto
+
+        class FakeRwms:
+            def get_node_users_usage(self, request):
+                rows = usage_by_node.get(request.node_uuid)
+                if rows is None:
+                    return None
+                return rw_proto.GetNodeUsersUsageResponse(items=rows)
+
+            def get_user_by_uuid(self, uuid):
+                return (users_by_uuid or {}).get(uuid)
+
+        return FakeRwms()
+
+    def test_report_aggregates_users_across_nodes(self):
+        import proto.rwmanager_pb2 as rw_proto
+        from datetime import timedelta, timezone as tz
+        from engine import node_traffic
+
+        usage = {
+            "n1": [
+                rw_proto.NodeUserUsage(user_uuid="u1", username="111", total_bytes=100, date="2026-07-10"),
+            ],
+            "n2": [
+                rw_proto.NodeUserUsage(user_uuid="u1", username="111", total_bytes=50, date="2026-07-10"),
+                rw_proto.NodeUserUsage(user_uuid="u2", username="222", total_bytes=300, date="2026-07-10"),
+            ],
+        }
+        client = self._fake_client(usage)
+        end = datetime(2026, 7, 10, tzinfo=tz.utc)
+
+        report = node_traffic.build_report(
+            client, self._nodes(), end - timedelta(hours=1), end,
+            top=50, min_gib=0, with_details=False,
+        )
+
+        self.assertEqual(report["total_bytes"], 450)
+        self.assertEqual(report["users_with_traffic"], 2)
+        self.assertEqual(report["failed_nodes"], [])
+        first, second = report["users"]
+        self.assertEqual(first["username"], "222")
+        self.assertEqual(first["total_bytes"], 300)
+        self.assertEqual(second["username"], "111")
+        self.assertEqual(second["total_bytes"], 150)
+        # у "111" больше всего трафика на "Германия" (100 из 150)
+        self.assertEqual(second["top_node"], "Германия")
+
+    def test_report_excludes_service_users_and_reports_failed_nodes(self):
+        import proto.rwmanager_pb2 as rw_proto
+        from datetime import timedelta, timezone as tz
+        from engine import node_traffic
+
+        usage = {
+            "n1": [
+                rw_proto.NodeUserUsage(user_uuid="sys", username="SYS-REROUTE", total_bytes=10**12, date="2026-07-10"),
+                rw_proto.NodeUserUsage(user_uuid="u1", username="111", total_bytes=100, date="2026-07-10"),
+            ],
+            # ноды n2 нет в ответах — имитация HTTP 500 панели
+        }
+        client = self._fake_client(usage)
+        end = datetime(2026, 7, 10, tzinfo=tz.utc)
+
+        report = node_traffic.build_report(
+            client, self._nodes(), end - timedelta(hours=1), end,
+            top=50, min_gib=0, with_details=False,
+        )
+
+        # служебный пользователь не в выборке и не в totals
+        self.assertEqual(report["total_bytes"], 100)
+        self.assertEqual([u["username"] for u in report["users"]], ["111"])
+        self.assertEqual(report["excluded_users"][0]["username"], "SYS-REROUTE")
+        self.assertEqual(report["failed_nodes"], ["Швеция"])
+
+    def test_report_enriches_details_for_shown_rows(self):
+        import proto.rwmanager_pb2 as rw_proto
+        from datetime import timedelta, timezone as tz
+        from google.protobuf.timestamp_pb2 import Timestamp
+        from engine import node_traffic
+
+        expire = Timestamp()
+        expire.FromDatetime(datetime(2026, 8, 3))
+        details = rw_proto.UserResponse(
+            uuid="u1", username="111", status=rw_proto.UserStatus.ACTIVE,
+            expire_at=expire, telegram_id=111,
+        )
+        usage = {
+            "n1": [rw_proto.NodeUserUsage(user_uuid="u1", username="111", total_bytes=100, date="2026-07-10")],
+            "n2": [],
+        }
+        client = self._fake_client(usage, users_by_uuid={"u1": details})
+        end = datetime(2026, 7, 10, tzinfo=tz.utc)
+
+        report = node_traffic.build_report(
+            client, self._nodes(), end - timedelta(hours=1), end,
+            top=50, min_gib=0,
+        )
+
+        row = report["users"][0]
+        self.assertEqual(row["status"], "ACTIVE")
+        self.assertEqual(row["expire_at"], "2026-08-03")
+        self.assertEqual(row["telegram_id"], 111)
+
+
+class NodeTrafficAdminApiTests(SimpleTestCase):
+    def test_node_traffic_rejects_invalid_period(self):
+        from engine.views import support_admin_api_node_traffic
+
+        request = RequestFactory().get("/support-admin/api/node-traffic/?hours=0")
+        with mock.patch("engine.views.require_support_admin_role", return_value=None):
+            response = support_admin_api_node_traffic(request)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_node_traffic_returns_502_when_rwms_unavailable(self):
+        from engine.views import support_admin_api_node_traffic
+
+        request = RequestFactory().get("/support-admin/api/node-traffic/")
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.node_traffic.list_nodes", return_value=None),
+        ):
+            response = support_admin_api_node_traffic(request)
+
+        self.assertEqual(response.status_code, 502)
+
+    def test_node_traffic_unknown_node_returns_404(self):
+        import proto.rwmanager_pb2 as rw_proto
+        from engine.views import support_admin_api_node_traffic
+
+        nodes = [rw_proto.Node(uuid="n1", name="Германия")]
+        request = RequestFactory().get("/support-admin/api/node-traffic/?node=missing")
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.node_traffic.list_nodes", return_value=nodes),
+        ):
+            response = support_admin_api_node_traffic(request)
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_node_traffic_happy_path_filters_selected_node(self):
+        import proto.rwmanager_pb2 as rw_proto
+        from engine.views import support_admin_api_node_traffic
+
+        nodes = [
+            rw_proto.Node(uuid="n1", name="Германия"),
+            rw_proto.Node(uuid="n2", name="Швеция"),
+        ]
+        request = RequestFactory().get(
+            "/support-admin/api/node-traffic/?node=n1&hours=1&top=10"
+        )
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.node_traffic.list_nodes", return_value=nodes),
+            mock.patch(
+                "engine.node_traffic.build_report", return_value={"users": []}
+            ) as build_report,
+        ):
+            response = support_admin_api_node_traffic(request)
+
+        self.assertEqual(response.status_code, 200)
+        passed_nodes = build_report.call_args.args[1]
+        self.assertEqual([n.uuid for n in passed_nodes], ["n1"])
+
+    def test_traffic_nodes_endpoint_lists_nodes(self):
+        import proto.rwmanager_pb2 as rw_proto
+        from engine.views import support_admin_api_traffic_nodes
+
+        nodes = [rw_proto.Node(uuid="n1", name="Германия", is_connected=True)]
+        request = RequestFactory().get("/support-admin/api/traffic-nodes/")
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.node_traffic.list_nodes", return_value=nodes),
+        ):
+            response = support_admin_api_traffic_nodes(request)
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["result"][0]["name"], "Германия")
+
+
+class NodeTrafficTemplateTests(SimpleTestCase):
+    def test_admin_dashboard_has_node_traffic_tab(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('data-tab="node-traffic"', template)
+        self.assertIn('id="panel-node-traffic"', template)
+        self.assertIn('id="node-traffic-form"', template)
+        self.assertIn("data-traffic-nodes-url", template)
+        self.assertIn("data-node-traffic-url", template)
+        # вкладка доступна только полному админу
+        admin_only_block = template.split('{% if support_admin_is_full_admin %}')
+        self.assertTrue(
+            any('data-tab="node-traffic"' in part.split("{% endif %}")[0] for part in admin_only_block[1:])
+        )
+
+
+class NodeTrafficDayGranularityTests(SimpleTestCase):
+    """Панель хранит трафик посуточно (created_at = 00:00 дня, UTC); начало
+    периода внутри дня отбрасывало весь этот день (инцидент 2026-07-10)."""
+
+    def test_build_report_floors_start_to_day_boundary(self):
+        import proto.rwmanager_pb2 as rw_proto
+        from datetime import timezone as tz
+        from engine import node_traffic
+
+        captured = {}
+
+        class FakeRwms:
+            def get_node_users_usage(self, request):
+                captured["start"] = request.start.ToDatetime()
+                return rw_proto.GetNodeUsersUsageResponse(items=[])
+
+        nodes = [rw_proto.Node(uuid="n1", name="Германия")]
+        report = node_traffic.build_report(
+            FakeRwms(),
+            nodes,
+            datetime(2026, 7, 9, 1, 36, tzinfo=tz.utc),
+            datetime(2026, 7, 10, 1, 36, tzinfo=tz.utc),
+            top=50,
+            min_gib=0,
+            with_details=False,
+        )
+
+        # запрос к rwms ушёл с началом в полночь — суточный бакет 9 июля
+        # (created_at = 09.07 00:00) не будет отброшен фильтром панели
+        self.assertEqual(captured["start"], datetime(2026, 7, 9, 0, 0))
+        self.assertEqual(report["start"], "2026-07-09 00:00")

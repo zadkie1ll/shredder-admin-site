@@ -107,6 +107,7 @@ from common.models.tariff import OneYearTariff
 from common.models.tariff import ThreeMonthsTariff
 from common.rwms_client_sync import RwmsClientSync
 
+from . import node_traffic
 from .rwms_helpers import create_user
 from .rwms_helpers import create_user_until
 from .encrypt_happ_url import encrypt_happ_url1
@@ -6345,3 +6346,92 @@ def dynamic_manifest(request):
         ],
     }
     return JsonResponse(data)
+
+
+def support_admin_api_traffic_nodes(request):
+    """Список нод Remnawave для вкладки «Трафик нод» (только admin)."""
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    nodes = node_traffic.list_nodes(rwms_client)
+    if nodes is None:
+        return JsonResponse(
+            {"status": "error", "message": "rwms недоступен, список нод не получен"},
+            status=502,
+        )
+
+    return JsonResponse(
+        {
+            "status": "ok",
+            "result": [
+                {
+                    "uuid": node.uuid,
+                    "name": node.name,
+                    "country_code": (
+                        node.country_code if node.HasField("country_code") else None
+                    ),
+                    "is_connected": node.is_connected,
+                    "is_disabled": node.is_disabled,
+                }
+                for node in nodes
+            ],
+        }
+    )
+
+
+def support_admin_api_node_traffic(request):
+    """Отчет по потреблению трафика подписками на ноде/всех нодах (только admin).
+
+    GET-параметры: node ("all" или uuid ноды), hours (период от текущего
+    момента назад, по умолчанию 24, максимум 2160 = 90 дней), top (сколько
+    строк вернуть, по умолчанию 50), min_gib (порог трафика в GiB).
+    """
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    node_param = request.GET.get("node", "all")
+    try:
+        hours = float(request.GET.get("hours", "24"))
+        top = int(request.GET.get("top", "50"))
+        min_gib = float(request.GET.get("min_gib", "0"))
+    except ValueError:
+        return JsonResponse(
+            {"status": "error", "message": "Неверный формат параметров"}, status=400
+        )
+
+    if not 0 < hours <= 90 * 24:
+        return JsonResponse(
+            {"status": "error", "message": "Период должен быть от 0 до 90 дней"},
+            status=400,
+        )
+
+    all_nodes = node_traffic.list_nodes(rwms_client)
+    if all_nodes is None:
+        return JsonResponse(
+            {"status": "error", "message": "rwms недоступен, список нод не получен"},
+            status=502,
+        )
+
+    if node_param == "all":
+        nodes = all_nodes
+    else:
+        nodes = [node for node in all_nodes if node.uuid == node_param]
+        if not nodes:
+            return JsonResponse(
+                {"status": "error", "message": "Нода не найдена"}, status=404
+            )
+
+    end = datetime.now(timezone.utc)
+    start = end - timedelta(hours=hours)
+
+    report = node_traffic.build_report(
+        rwms_client,
+        nodes,
+        start,
+        end,
+        top=top,
+        min_gib=min_gib,
+    )
+    return JsonResponse({"status": "ok", "result": report})

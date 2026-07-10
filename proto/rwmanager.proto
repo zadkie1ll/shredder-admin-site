@@ -149,6 +149,37 @@ message GetInboundsResponse {
 
 message Empty {}
 
+message Node {
+  string uuid = 1;
+  string name = 2;
+  string address = 3;
+  bool is_connected = 4;
+  bool is_disabled = 5;
+  optional string country_code = 6;
+}
+
+message GetNodesResponse {
+  repeated Node nodes = 1;
+}
+
+message GetNodeUsersUsageRequest {
+  string node_uuid = 1;
+  google.protobuf.Timestamp start = 2;
+  google.protobuf.Timestamp end = 3;
+}
+
+// Трафик пользователя на ноде за один день (агрегация панели Remnawave)
+message NodeUserUsage {
+  string user_uuid = 1;
+  string username = 2;
+  int64 total_bytes = 3;
+  string date = 4;
+}
+
+message GetNodeUsersUsageResponse {
+  repeated NodeUserUsage items = 1;
+}
+
 service RwManager {
   rpc GetUserByUuid(GetUserByUuidRequest) returns (UserResponse) {}
   rpc GetUserByUsername(GetUserByUsernameRequest) returns (UserResponse) {}
@@ -158,4 +189,8 @@ service RwManager {
   rpc DeleteUser(DeleteUserRequest) returns (DeleteUserResponse) {}
 
   rpc GetInbounds(Empty) returns (GetInboundsResponse) {}
+
+  // Read-only статистика для поиска аномального потребления трафика
+  rpc GetNodes(Empty) returns (GetNodesResponse) {}
+  rpc GetNodeUsersUsage(GetNodeUsersUsageRequest) returns (GetNodeUsersUsageResponse) {}
 }

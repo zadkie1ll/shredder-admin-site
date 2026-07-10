@@ -36,6 +36,7 @@
         .tab-btn[data-tab="subscription-manage"] i { color: var(--brand-gold); }
         .tab-btn[data-tab="system"] i { color: var(--brand-gold); }
         .tab-btn[data-tab="config-templates"] i { color: var(--brand-gold); }
+        .tab-btn[data-tab="node-traffic"] i { color: var(--brand-gold); }
         .tab-btn[data-tab="reply-templates"] i { color: var(--brand-gold); }
         .tab-btn[data-tab="support"] i { color: var(--brand-gold); }
         .tab-btn.active { color: #050505; background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #efb200 100%); border: 1px solid rgba(255,199,0,.34); box-shadow: 0 14px 34px rgba(255,199,0,.18), inset 0 -2px 0 rgba(0,0,0,.16); }
@@ -63,6 +64,13 @@
         .form-card:has(.date-field.open) { z-index: 120; }
         .form-grid-two { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
         .form-grid-stats { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(170px, .42fr) minmax(210px, .55fr) auto; gap: 10px; align-items: center; }
+        .node-traffic-form { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(120px, .8fr) minmax(90px, .5fr) minmax(110px, .6fr) auto; gap: 10px; align-items: center; }
+        .node-traffic-row { grid-template-columns: 34px minmax(160px, 1.4fr) repeat(3, minmax(90px, .7fr)) minmax(86px, .6fr) minmax(96px, .7fr) minmax(110px, .8fr) minmax(150px, 1.1fr); min-width: 1040px; }
+        .node-traffic-row.table-head { background: rgba(255,255,255,.04); }
+        .node-traffic-scroll .node-traffic-row:not(.table-head):nth-child(odd) { background: rgba(255,255,255,.02); }
+        .node-traffic-scroll .node-traffic-row:not(.table-head):hover { background: rgba(255,199,0,.05); }
+        .node-traffic-cell-num { text-align: right; font-variant-numeric: tabular-nums; }
+        .node-traffic-share-hot { color: #ff6b6b; font-weight: 800; }
         .subscription-actions { display: grid; grid-template-columns: 160px repeat(3, auto); gap: 10px; align-items: center; margin-top: 10px; }
         .input { width: 100%; min-width: 0; max-width: 100%; min-height: 40px; border: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.22); color: var(--text-main); border-radius: 9px; padding: 0 13px; font-size: 13px; font-weight: 600; outline: none; transition: border-color .15s, background .15s; }
         .input:focus { border-color: rgba(255,199,0,.38); background: rgba(0,0,0,.28); }
@@ -469,6 +477,7 @@
             .sources-grid,
             .form-grid-two,
             .form-grid-stats,
+            .node-traffic-form,
             .cohort-grid,
             .metrics-legend-grid,
             .system-grid,
@@ -565,6 +574,7 @@
                 <button class="tab-btn" data-tab="subscription-manage"><i class="fas fa-hourglass-half"></i><span>Подписка</span></button>
                 <button class="tab-btn" data-tab="system"><i class="fas fa-sliders"></i><span>Система</span></button>
                 <button class="tab-btn" data-tab="config-templates"><i class="fas fa-file-code"></i><span>Конфиги</span></button>
+                <button class="tab-btn" data-tab="node-traffic"><i class="fas fa-tower-broadcast"></i><span>Трафик нод</span></button>
             {% endif %}
             <button class="tab-btn" data-tab="reply-templates"><i class="fas fa-comments"></i><span>Шаблоны</span></button>
             <button class="tab-btn" data-tab="support"><i class="fas fa-headset"></i><span>Тикеты</span></button>
@@ -589,6 +599,8 @@
         data-reply-templates-url="{% url 'support_admin_api_reply_templates' %}"
         data-config-templates-url="{% url 'support_admin_api_config_templates' %}"
         data-config-pins-url="{% url 'support_admin_api_config_pins' %}"
+        data-traffic-nodes-url="{% url 'support_admin_api_traffic_nodes' %}"
+        data-node-traffic-url="{% url 'support_admin_api_node_traffic' %}"
         data-tickets-url="{% url 'support_admin_tickets_json' %}?status={{ status_filter }}"
     >
         {% if support_admin_is_full_admin %}
@@ -994,6 +1006,30 @@
 
             <div id="config-templates-result" class="config-template-list"></div>
         </section>
+
+        <section id="panel-node-traffic" class="tab-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Трафик нод</h1>
+                <p class="admin-subtitle">Потребление трафика подписками — поиск расшаренных подписок по аномальному объёму</p>
+            </header>
+            <form id="node-traffic-form" class="card form-card node-traffic-form">
+                <select class="input" name="node" id="node-traffic-node">
+                    <option value="all">Все ноды</option>
+                </select>
+                <!-- Статистика панели посуточная (UTC): начало периода выравнивается
+                     вниз до полуночи, поэтому пресеты короче суток не имеют смысла -->
+                <select class="input" name="hours">
+                    <option value="1">Сегодня (UTC)</option>
+                    <option value="24" selected>Вчера + сегодня</option>
+                    <option value="168">7 дней</option>
+                    <option value="720">30 дней</option>
+                </select>
+                <input class="input" name="top" type="number" min="1" max="500" value="50" title="Сколько строк показать">
+                <input class="input" name="min_gib" type="number" min="0" step="0.1" placeholder="мин. GiB" title="Порог трафика в GiB">
+                <button class="btn" type="submit"><i class="fas fa-magnifying-glass-chart"></i>Показать</button>
+            </form>
+            <div id="node-traffic-result"></div>
+        </section>
         {% endif %}
 
         <section id="panel-reply-templates" class="tab-panel">
@@ -1390,6 +1426,7 @@
                 loadRuntimeSettings();
                 loadReferralAntifraud();
             }
+            if (tabId === 'node-traffic') initNodeTrafficTab();
             history.replaceState(null, '', `#${tabId}`);
         }
 
@@ -3313,6 +3350,122 @@
             }
         }
 
+        let nodeTrafficNodesLoaded = false;
+        async function initNodeTrafficTab() {
+            if (nodeTrafficNodesLoaded) return;
+            const select = document.getElementById('node-traffic-node');
+            if (!select || !main.dataset.trafficNodesUrl) return;
+            try {
+                const response = await fetch(main.dataset.trafficNodesUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    showAdminToast(payload.message || 'Не удалось загрузить список нод', 'error');
+                    return;
+                }
+                payload.result.forEach((node) => {
+                    const option = document.createElement('option');
+                    option.value = node.uuid;
+                    const flags = [];
+                    if (node.is_disabled) flags.push('выключена');
+                    else if (!node.is_connected) flags.push('offline');
+                    option.textContent = flags.length ? `${node.name} (${flags.join(', ')})` : node.name;
+                    select.appendChild(option);
+                });
+                nodeTrafficNodesLoaded = true;
+            } catch (error) {
+                console.warn('Не удалось загрузить список нод', error);
+            }
+        }
+
+        function formatTrafficBytes(value) {
+            let n = Number(value || 0);
+            const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+            let i = 0;
+            while (Math.abs(n) >= 1024 && i < units.length - 1) { n /= 1024; i += 1; }
+            return `${n.toFixed(2)} ${units[i]}`;
+        }
+
+        async function loadNodeTraffic(event) {
+            event.preventDefault();
+            const target = document.getElementById('node-traffic-result');
+            const params = new URLSearchParams(new FormData(event.target));
+            if (!params.get('min_gib')) params.set('min_gib', '0');
+            setLoading(target, 'Собираем статистику трафика — на длинных периодах это может занять до минуты...');
+            try {
+                const response = await fetch(`${main.dataset.nodeTrafficUrl}?${params.toString()}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    setError(target, payload.message || 'Не удалось получить статистику');
+                    return;
+                }
+                renderNodeTraffic(target, payload.result);
+            } catch (error) {
+                setError(target, 'Ошибка запроса статистики трафика');
+            }
+        }
+
+        function renderNodeTraffic(target, report) {
+            const periodHours = Number(report.period_hours || 1);
+            const avgIsDaily = periodHours >= 48;
+            const avgLabel = avgIsDaily ? 'AVG/день' : 'AVG/час';
+            const failedHtml = (report.failed_nodes || []).length
+                ? `<div class="card info-card red">Данные неполные — не ответили ноды: ${report.failed_nodes.map(escapeHtml).join(', ')}. Попробуйте период короче.</div>`
+                : '';
+            const excludedHtml = (report.excluded_users || []).length
+                ? `<div class="muted" style="margin:0 0 10px;">Исключены служебные подписки: ${report.excluded_users.map((u) => `${escapeHtml(u.username)} (${formatTrafficBytes(u.total_bytes)})`).join(', ')}</div>`
+                : '';
+            const summaryHtml = `
+                <div class="card info-card" style="margin-bottom:10px;">
+                    Период: ${escapeHtml(report.start)} — ${escapeHtml(report.end)} UTC
+                    <span class="muted">(статистика посуточная, начало выровнено до полуночи UTC)</span> ·
+                    Нод: ${num(report.nodes_total)} ·
+                    Всего трафика: <b>${formatTrafficBytes(report.total_bytes)}</b> ·
+                    Пользователей с трафиком: ${num(report.users_with_traffic)}
+                </div>`;
+            const users = report.users || [];
+            if (!users.length) {
+                target.innerHTML = `${failedHtml}${summaryHtml}${excludedHtml}<div class="card info-card muted">Нет пользователей, подходящих под фильтры.</div>`;
+                return;
+            }
+            const rowsHtml = users.map((user, index) => {
+                const share = Number(user.share_percent || 0);
+                const shareClass = share >= 10 ? ' node-traffic-share-hot' : '';
+                const avgValue = Number(user.avg_bytes_per_hour || 0) * (avgIsDaily ? 24 : 1);
+                const topNode = user.top_node
+                    ? `${escapeHtml(user.top_node)} (${Number(user.top_node_share_percent || 0).toFixed(0)}%)`
+                    : '—';
+                return `
+                    <div class="admin-table-row node-traffic-row">
+                        <span class="muted">${index + 1}</span>
+                        <span>${escapeHtml(user.username)}</span>
+                        <span class="node-traffic-cell-num">${formatTrafficBytes(user.total_bytes)}</span>
+                        <span class="node-traffic-cell-num${shareClass}">${pct(share)}</span>
+                        <span class="node-traffic-cell-num">${formatTrafficBytes(avgValue)}</span>
+                        <span>${user.status ? escapeHtml(user.status) : '?'}</span>
+                        <span>${user.expire_at ? escapeHtml(user.expire_at) : '—'}</span>
+                        <span class="node-traffic-cell-num">${user.hwid_device_limit ?? '—'}</span>
+                        <span>${topNode}</span>
+                    </div>`;
+            }).join('');
+            target.innerHTML = `
+                ${failedHtml}
+                ${summaryHtml}
+                ${excludedHtml}
+                <section class="card sources-table-card">
+                    <div class="data-table node-traffic-scroll">
+                        <div class="admin-table-row node-traffic-row table-head">
+                            <span>#</span><span>Пользователь</span>
+                            <span class="node-traffic-cell-num">Трафик</span>
+                            <span class="node-traffic-cell-num">Доля</span>
+                            <span class="node-traffic-cell-num">${avgLabel}</span>
+                            <span>Статус</span><span>Истекает</span>
+                            <span class="node-traffic-cell-num">HWID</span><span>Топ-нода</span>
+                        </div>
+                        ${rowsHtml}
+                    </div>
+                </section>`;
+        }
+
         const statsForm = document.getElementById('stats-form');
         const userPaymentsForm = document.getElementById('user-payments-form');
         const paymentInfoForm = document.getElementById('payment-info-form');
@@ -3335,6 +3488,7 @@
         if (referralBlockForm) referralBlockForm.addEventListener('submit', submitReferralBlock);
         if (replyTemplateForm) replyTemplateForm.addEventListener('submit', submitReplyTemplate);
         if (configTemplateForm) configTemplateForm.addEventListener('submit', submitConfigTemplate);
+        document.getElementById('node-traffic-form')?.addEventListener('submit', loadNodeTraffic);
         document.getElementById('config-pins-form')?.addEventListener('submit', submitConfigPinsSearch);
         document.addEventListener('click', (event) => {
             if (event.target.closest('[data-config-pins-save]')) saveConfigPins(false);

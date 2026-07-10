@@ -112,6 +112,16 @@ urlpatterns = [
         name="support_admin_api_top_payments",
     ),
     path(
+        "support-admin/api/traffic-nodes/",
+        views.support_admin_api_traffic_nodes,
+        name="support_admin_api_traffic_nodes",
+    ),
+    path(
+        "support-admin/api/node-traffic/",
+        views.support_admin_api_node_traffic,
+        name="support_admin_api_node_traffic",
+    ),
+    path(
         "support-admin/api/reply-templates/",
         views.support_admin_api_reply_templates,
         name="support_admin_api_reply_templates",
