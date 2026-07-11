@@ -182,6 +182,28 @@ class AdminDashboardTemplateTests(SimpleTestCase):
             template,
         )
 
+    def test_admin_tables_use_remnawave_like_table_skin(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        for selector in (
+            ".admin-table-row.table-head",
+            ".sources-table-row",
+            ".payments-list-row",
+            ".user-payments-row",
+            ".node-traffic-row",
+            ".cohort-table th",
+            ".sources-row-action",
+        ):
+            self.assertIn(selector, template)
+
+        self.assertIn("min-height: 64px;", template)
+        self.assertIn("font-size: 16px;", template)
+        self.assertIn("font-weight: 500;", template)
+        self.assertIn("text-transform: none;", template)
+        self.assertIn("border-bottom: 1px solid rgba(98,111,128,.48);", template)
+        self.assertIn("border: 2px solid rgba(var(--green-rgb), .82);", template)
+        self.assertIn("font-family: inherit;", template)
+
 
 class AdminRuntimeSettingsTests(SimpleTestCase):
     def test_apple_recommended_app_setting_is_enum(self):
@@ -806,6 +828,25 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn("function showSubtab", template)
         self.assertIn("setupSubtabs('panel-stats')", template)
 
+    def test_cohort_form_groups_period_and_cohort_ranges(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('class="card form-card cohort-builder"', template)
+        self.assertIn('aria-label="Диапазон графика"', template)
+        self.assertIn('aria-label="Окно когорты"', template)
+        self.assertIn("Быстрый диапазон", template)
+        self.assertIn("Окно от начала диапазона", template)
+        self.assertIn('data-cohort-window="range-7"', template)
+        self.assertIn('data-cohort-window="range-30"', template)
+        self.assertIn('data-cohort-window="range-90"', template)
+        self.assertIn('data-cohort-window="range-month-end"', template)
+        self.assertIn("До конца месяца", template)
+        self.assertIn("cohort-submit-row", template)
+        self.assertIn("clearCohortPresetActiveForField", template)
+        self.assertNotIn("Диапазон — начало", template)
+        self.assertNotIn("Когорта — начало", template)
+        self.assertNotIn("Месяц старта", template)
+
     def test_system_tab_grouped_into_subtabs(self):
         # Вкладка «Система» организована подвкладками (как «Аналитика»),
         # вместо жёсткой двухколоночной сетки, вылезавшей за экран.
@@ -866,6 +907,35 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn('id="stats-form"', template)
         self.assertIn('name="sales_mode"', template)
         self.assertIn("function loadStats", template)
+
+    def test_stats_period_presets_are_grouped_and_include_calendar_ranges(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        for label in (
+            "Текущие",
+            "Эта неделя",
+            "Этот месяц",
+            "Этот год",
+            "Прошлые",
+            "Прошлый месяц",
+            "Позапрошлый месяц",
+            "Скользящие",
+            "Быстро",
+        ):
+            self.assertIn(label, template)
+
+        for preset in (
+            "this-week",
+            "this-month",
+            "last-month",
+            "prev-month",
+            "this-year",
+        ):
+            self.assertIn(f'data-period-preset="{preset}"', template)
+
+        self.assertIn("function startOfIsoWeek", template)
+        self.assertIn("preset === 'last-month'", template)
+        self.assertIn("preset === 'prev-month'", template)
 
 
 class TelegramAuthBotTests(SimpleTestCase):
