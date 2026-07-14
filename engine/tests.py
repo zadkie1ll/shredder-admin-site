@@ -907,6 +907,8 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn('id="stats-form"', template)
         self.assertIn('name="sales_mode"', template)
         self.assertIn("function loadStats", template)
+        self.assertIn('<option value="auto" selected>Авто</option>', template)
+        self.assertIn('<option value="week">По неделям</option>', template)
 
     def test_stats_period_presets_are_grouped_and_include_calendar_ranges(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
