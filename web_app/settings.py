@@ -190,6 +190,9 @@ YANDEX_OAUTH_CLIENT_SECRET = config("YANDEX_OAUTH_CLIENT_SECRET", default="")
 YANDEX_OAUTH_REDIRECT_URI = config("YANDEX_OAUTH_REDIRECT_URI", default="")
 SUPPORT_ADMIN_PASSWORD = config("SUPPORT_ADMIN_PASSWORD", default="")
 SUPPORT_STAFF_PASSWORD = config("SUPPORT_STAFF_PASSWORD", default="")
+# Ключ RIPE Atlas для вкладки «Замеры ТСПУ» (права: schedule measurement,
+# get non-public results). Пустой ключ отключает вкладку.
+RIPE_ATLAS_API_KEY = config("RIPE_ATLAS_API_KEY", default="")
 SUPPORT_ATTACHMENT_MAX_BYTES = config(
     "SUPPORT_ATTACHMENT_MAX_BYTES",
     default=50 * 1024 * 1024,

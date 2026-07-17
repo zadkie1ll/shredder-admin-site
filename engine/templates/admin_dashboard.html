@@ -71,6 +71,30 @@
         .node-traffic-scroll .node-traffic-row:not(.table-head):hover { background: rgba(255,199,0,.05); }
         .node-traffic-cell-num { text-align: right; font-variant-numeric: tabular-nums; }
         .node-traffic-share-hot { color: #ff6b6b; font-weight: 800; }
+        .tab-btn[data-tab="censor-checks"] i { color: var(--brand-gold); }
+        .censor-check-form { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(0, 1.1fr) minmax(140px, .6fr) minmax(150px, .7fr) auto; gap: 10px; align-items: center; }
+        .censor-form-actions { display: flex; gap: 8px; }
+        .censor-keys-card { padding: 0; margin-bottom: 16px; }
+        .censor-keys-card > summary { cursor: pointer; padding: 14px 16px; font-weight: 800; list-style: none; display: flex; align-items: center; gap: 8px; }
+        .censor-keys-card > summary::-webkit-details-marker { display: none; }
+        .censor-keys-card > summary i { color: var(--brand-gold); }
+        .censor-keys-card[open] > summary { border-bottom: 1px solid rgba(255,255,255,.07); }
+        .censor-key-form { display: grid; grid-template-columns: minmax(150px, .8fr) minmax(0, 1.2fr) auto auto; gap: 10px; align-items: center; padding: 14px 16px; }
+        .censor-key-default { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
+        .censor-key-row { grid-template-columns: minmax(140px, 1fr) minmax(120px, .7fr) minmax(120px, .6fr) minmax(200px, auto); min-width: 640px; }
+        .censor-key-row.table-head { background: rgba(255,255,255,.04); }
+        .censor-key-default-badge { color: #22c55e; font-weight: 800; }
+        .censor-check-row { grid-template-columns: minmax(130px, .8fr) minmax(150px, 1fr) minmax(110px, .6fr) minmax(110px, .6fr) minmax(190px, 1.2fr) minmax(230px, auto); min-width: 1020px; }
+        .censor-check-row.table-head { background: rgba(255,255,255,.04); }
+        .censor-run-row { grid-template-columns: 70px 150px 130px minmax(200px, 1fr) minmax(0, 1.6fr) auto; min-width: 860px; }
+        .censor-run-row.table-head { background: rgba(255,255,255,.04); }
+        .censor-probe-row { grid-template-columns: 90px minmax(130px, 1fr) 100px 110px minmax(0, 2fr); min-width: 620px; }
+        .censor-probe-row.table-head { background: rgba(255,255,255,.04); }
+        .censor-status-ok { color: #22c55e; font-weight: 800; }
+        .censor-status-warn { color: var(--brand-gold); font-weight: 800; }
+        .censor-status-bad { color: #ff6b6b; font-weight: 800; }
+        .censor-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .censor-row-actions .btn { padding: 5px 10px; font-size: 11px; }
         .subscription-actions { display: grid; grid-template-columns: 160px repeat(3, auto); gap: 10px; align-items: center; margin-top: 10px; }
         .input { width: 100%; min-width: 0; max-width: 100%; min-height: 40px; border: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.22); color: var(--text-main); border-radius: 9px; padding: 0 13px; font-size: 13px; font-weight: 600; outline: none; transition: border-color .15s, background .15s; }
         .input:focus { border-color: rgba(255,199,0,.38); background: rgba(0,0,0,.28); }
@@ -674,6 +698,7 @@
         #panel-system .panel-header::before { content: "\f1de"; }
         #panel-config-templates .panel-header::before { content: "\f1c9"; }
         #panel-node-traffic .panel-header::before { content: "\e51d"; }
+        #panel-censor-checks .panel-header::before { content: "\f7c0"; }
         #panel-reply-templates .panel-header::before { content: "\f4ad"; }
         #panel-support .panel-header::before { content: "\f590"; }
         .panel-header > .admin-title { grid-column: 2; grid-row: 1; min-width: 0; }
@@ -1258,6 +1283,7 @@
                 <button class="tab-btn" data-tab="system"><i class="fas fa-sliders"></i><span>Система</span></button>
                 <button class="tab-btn" data-tab="config-templates"><i class="fas fa-file-code"></i><span>Конфиги</span></button>
                 <button class="tab-btn" data-tab="node-traffic"><i class="fas fa-tower-broadcast"></i><span>Трафик нод</span></button>
+                <button class="tab-btn" data-tab="censor-checks"><i class="fas fa-satellite-dish"></i><span>Замеры ТСПУ</span></button>
             {% endif %}
             <span class="nav-section-label">Поддержка</span>
             <button class="tab-btn" data-tab="reply-templates"><i class="fas fa-comments"></i><span>Шаблоны</span></button>
@@ -1285,6 +1311,9 @@
         data-config-pins-url="{% url 'support_admin_api_config_pins' %}"
         data-traffic-nodes-url="{% url 'support_admin_api_traffic_nodes' %}"
         data-node-traffic-url="{% url 'support_admin_api_node_traffic' %}"
+        data-censor-checks-url="{% url 'support_admin_api_censor_checks' %}"
+        data-censor-check-runs-url="{% url 'support_admin_api_censor_check_runs' %}"
+        data-ripe-keys-url="{% url 'support_admin_api_ripe_keys' %}"
         data-tickets-url="{% url 'support_admin_tickets_json' %}?status={{ status_filter }}"
     >
         <header class="admin-topbar">
@@ -1769,6 +1798,53 @@
             </form>
             <div id="node-traffic-result"></div>
         </section>
+
+        <section id="panel-censor-checks" class="tab-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Замеры ТСПУ</h1>
+                <p class="admin-subtitle">Доступность точек входа из сетей провайдеров РФ — зонды RIPE Atlas делают TLS-подключение к IP с клиентским SNI</p>
+            </header>
+
+            <details class="card censor-keys-card">
+                <summary><i class="fas fa-key"></i> Ключи RIPE Atlas <span id="censor-keys-count" class="muted"></span></summary>
+                <form id="ripe-key-form" class="censor-key-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="key_id">
+                    <input class="input" name="name" maxlength="160" placeholder="Название ключа (напр.: основной)" required>
+                    <input class="input" name="api_key" maxlength="128" placeholder="UUID ключа RIPE Atlas" autocomplete="off">
+                    <label class="censor-key-default"><input type="checkbox" name="is_default" value="1"> по умолчанию</label>
+                    <div class="censor-form-actions">
+                        <button class="btn" type="submit"><i class="fas fa-save"></i>Сохранить</button>
+                        <button class="btn btn-secondary" type="button" id="ripe-key-reset"><i class="fas fa-plus"></i>Новый</button>
+                    </div>
+                </form>
+                <div id="ripe-keys-result"></div>
+            </details>
+
+            <form id="censor-check-form" class="card form-card censor-check-form">
+                {% csrf_token %}
+                <input type="hidden" name="check_id">
+                <input class="input" name="target_ip" maxlength="64" placeholder="IP точки входа" required>
+                <input class="input" name="sni" maxlength="256" placeholder="SNI клиентов (uk.example.org)" required>
+                <select class="input" name="interval_minutes" title="Расписание запуска">
+                    <option value="">Только вручную</option>
+                    <option value="60">Каждый час</option>
+                    <option value="180">Каждые 3 часа</option>
+                    <option value="360">Каждые 6 часов</option>
+                    <option value="720">Каждые 12 часов</option>
+                    <option value="1440">Раз в сутки</option>
+                </select>
+                <select class="input" name="api_key_id" id="censor-check-key" title="Каким ключом RIPE запускать">
+                    <option value="">Ключ по умолчанию</option>
+                </select>
+                <div class="censor-form-actions">
+                    <button class="btn" type="submit"><i class="fas fa-save"></i>Сохранить</button>
+                    <button class="btn btn-secondary" type="button" id="censor-check-reset"><i class="fas fa-plus"></i>Новая</button>
+                </div>
+            </form>
+            <div id="censor-checks-result"></div>
+            <div id="censor-run-detail"></div>
+        </section>
         {% endif %}
 
         <section id="panel-reply-templates" class="tab-panel">
@@ -2197,6 +2273,7 @@
                 loadReferralAntifraud();
             }
             if (tabId === 'node-traffic') initNodeTrafficTab();
+            if (tabId === 'censor-checks') loadCensorChecks();
             history.replaceState(null, '', `#${tabId}`);
         }
 
@@ -4236,6 +4313,414 @@
                 </section>`;
         }
 
+        // ---------- Замеры ТСПУ (RIPE Atlas) ----------
+
+        const CENSOR_INTERVAL_LABELS = {
+            60: 'каждый час', 180: 'каждые 3 ч', 360: 'каждые 6 ч',
+            720: 'каждые 12 ч', 1440: 'раз в сутки',
+        };
+        let censorChecksCache = [];
+        let censorKeysCache = [];
+        let censorHasDefaultKey = false;
+        let censorRunRefreshTimer = null;
+
+        function censorRunStatusHtml(run) {
+            if (!run) return '<span class="muted">ещё не запускалась</span>';
+            if (run.status === 'pending') {
+                const progress = run.total ? ` (${num(run.total)} зондов ответило)` : '';
+                return `<span class="censor-status-warn"><i class="fas fa-circle-notch fa-spin"></i> идёт замер${progress}</span>`;
+            }
+            if (run.status === 'error') {
+                return `<span class="censor-status-bad" title="${escapeHtml(run.error_message || '')}">ошибка</span>`;
+            }
+            const total = Number(run.total || 0);
+            const okShare = total ? Math.round(Number(run.ok || 0) * 100 / total) : 0;
+            let cls = 'censor-status-bad';
+            let label = 'критичная блокировка';
+            if (okShare === 100) { cls = 'censor-status-ok'; label = 'полный доступ'; }
+            else if (okShare > 50) { cls = 'censor-status-warn'; label = 'частичная блокировка'; }
+            return `<span class="${cls}">${okShare}% — ${label}</span> <span class="muted">(${num(run.ok)}/${num(run.total)})</span>`;
+        }
+
+        function censorBlockedProvidersHtml(run) {
+            const blocked = run && run.blocked_by_provider ? Object.entries(run.blocked_by_provider) : [];
+            if (!blocked.length) return '';
+            const parts = blocked.map(([name, count]) => `<span class="censor-status-bad">${escapeHtml(name)}</span> <span class="muted">${num(count)}</span>`);
+            return `Блокируют: ${parts.join(', ')}`;
+        }
+
+        async function loadCensorChecks() {
+            const target = document.getElementById('censor-checks-result');
+            if (!target) return;
+            if (!target.innerHTML) setLoading(target, 'Загружаем список проверок...');
+            try {
+                const response = await fetch(main.dataset.censorChecksUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    setError(target, payload.message || 'Не удалось загрузить проверки');
+                    return;
+                }
+                censorChecksCache = payload.checks || [];
+                censorKeysCache = payload.keys || [];
+                censorHasDefaultKey = !!payload.has_default_key;
+                renderCensorKeys();
+                populateCensorKeySelect();
+                renderCensorChecks(target);
+                scheduleCensorAutoRefresh();
+            } catch (error) {
+                setError(target, 'Ошибка запроса списка проверок');
+            }
+        }
+
+        function scheduleCensorAutoRefresh() {
+            // Пока есть незавершённые прогоны — обновляем список сами, чтобы
+            // админ видел, как собираются ответы зондов.
+            clearTimeout(censorRunRefreshTimer);
+            const hasPending = censorChecksCache.some((check) => check.last_run && check.last_run.status === 'pending');
+            if (hasPending && activeAdminTab === 'censor-checks') {
+                censorRunRefreshTimer = setTimeout(loadCensorChecks, 7000);
+            }
+        }
+
+        function renderCensorKeys() {
+            const countEl = document.getElementById('censor-keys-count');
+            if (countEl) countEl.textContent = censorKeysCache.length ? `(${censorKeysCache.length})` : '(нет)';
+            const target = document.getElementById('ripe-keys-result');
+            if (!target) return;
+            if (!censorKeysCache.length) {
+                target.innerHTML = '<div class="muted" style="padding:0 16px 14px;">Ключей нет. Добавьте UUID ключа RIPE Atlas — первый ключ станет ключом по умолчанию.</div>';
+                return;
+            }
+            const rowsHtml = censorKeysCache.map((key) => `
+                <div class="admin-table-row censor-key-row">
+                    <span><b>${escapeHtml(key.name)}</b></span>
+                    <span class="muted">${escapeHtml(key.api_key_masked)}</span>
+                    <span>${key.is_default ? '<span class="censor-key-default-badge">по умолчанию</span>' : ''}</span>
+                    <span class="censor-row-actions">
+                        ${key.is_default ? '' : `<button class="btn btn-secondary" type="button" data-ripe-key-default="${key.id}" title="Сделать ключом по умолчанию"><i class="fas fa-star"></i></button>`}
+                        <button class="btn btn-secondary" type="button" data-ripe-key-edit="${key.id}" title="Переименовать / заменить ключ"><i class="fas fa-pen"></i></button>
+                        <button class="btn btn-secondary" type="button" data-ripe-key-delete="${key.id}" title="Удалить"><i class="fas fa-trash"></i></button>
+                    </span>
+                </div>`).join('');
+            target.innerHTML = `
+                <div class="data-table" style="padding:0 16px 14px;">
+                    <div class="admin-table-row censor-key-row table-head">
+                        <span>Название</span><span>Ключ</span><span></span><span>Действия</span>
+                    </div>
+                    ${rowsHtml}
+                </div>`;
+        }
+
+        function populateCensorKeySelect() {
+            const select = document.getElementById('censor-check-key');
+            if (!select) return;
+            const current = select.value;
+            const defaultKey = censorKeysCache.find((key) => key.is_default);
+            const defaultLabel = defaultKey ? `Ключ по умолчанию (${defaultKey.name})` : 'Ключ по умолчанию';
+            const options = [`<option value="">${escapeHtml(defaultLabel)}</option>`]
+                .concat(censorKeysCache.map((key) => `<option value="${key.id}">${escapeHtml(key.name)}</option>`));
+            select.innerHTML = options.join('');
+            select.value = current;
+        }
+
+        async function ripeKeyAction(payloadObject) {
+            const body = new FormData();
+            body.append('csrfmiddlewaretoken', csrfToken);
+            Object.entries(payloadObject).forEach(([key, value]) => body.append(key, value));
+            try {
+                const response = await fetch(main.dataset.ripeKeysUrl, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                    body,
+                });
+                const payload = await response.json();
+                if (payload.status !== 'ok') {
+                    showAdminToast(payload.message || 'Действие не выполнено', 'error');
+                    return false;
+                }
+                return true;
+            } catch (error) {
+                showAdminToast('Ошибка запроса', 'error');
+                return false;
+            }
+        }
+
+        async function submitRipeKey(event) {
+            event.preventDefault();
+            const form = event.target;
+            const ok = await ripeKeyAction({
+                action: 'save',
+                key_id: form.elements.key_id.value,
+                name: form.elements.name.value,
+                api_key: form.elements.api_key.value,
+                is_default: form.elements.is_default.checked ? '1' : '0',
+            });
+            if (ok) {
+                showAdminToast('Ключ сохранён');
+                resetRipeKeyForm();
+                loadCensorChecks();
+            }
+        }
+
+        function resetRipeKeyForm() {
+            const form = document.getElementById('ripe-key-form');
+            if (!form) return;
+            form.reset();
+            form.elements.key_id.value = '';
+            form.elements.api_key.placeholder = 'UUID ключа RIPE Atlas';
+        }
+
+        function fillRipeKeyForm(key) {
+            const form = document.getElementById('ripe-key-form');
+            if (!form) return;
+            form.elements.key_id.value = key.id;
+            form.elements.name.value = key.name;
+            form.elements.api_key.value = '';
+            // Ключ не приходит с бэкенда в открытом виде — оставляем пустым,
+            // пустое поле при сохранении означает «не менять ключ».
+            form.elements.api_key.placeholder = `${key.api_key_masked} — оставьте пустым, чтобы не менять`;
+            form.elements.is_default.checked = key.is_default;
+        }
+
+        function renderCensorChecks(target) {
+            if (!censorChecksCache.length) {
+                const hint = censorHasDefaultKey
+                    ? 'Проверок пока нет — добавьте первую через форму выше. Замер одной проверки стоит ~660 кредитов Atlas (33 зонда).'
+                    : 'Сначала добавьте ключ RIPE Atlas в разделе «Ключи RIPE Atlas» выше, затем создавайте проверки.';
+                target.innerHTML = `<div class="card info-card muted">${hint}</div>`;
+                return;
+            }
+            const rowsHtml = censorChecksCache.map((check) => {
+                const schedule = check.interval_minutes
+                    ? (CENSOR_INTERVAL_LABELS[check.interval_minutes] || `каждые ${check.interval_minutes} мин`)
+                    : 'вручную';
+                const enabledBadge = check.is_enabled ? '' : ' <span class="censor-status-bad">(выключена)</span>';
+                const lastRunAt = check.last_run ? `<span class="muted">${escapeHtml(check.last_run.created_at)}</span> ` : '';
+                const keyLabel = check.api_key_name ? escapeHtml(check.api_key_name) : '<span class="muted">по умолчанию</span>';
+                return `
+                    <div class="admin-table-row censor-check-row">
+                        <span><b>${escapeHtml(check.target_ip)}</b>${check.port !== 443 ? `:${check.port}` : ''}${enabledBadge}</span>
+                        <span>${escapeHtml(check.sni)}</span>
+                        <span>${schedule}</span>
+                        <span>${keyLabel}</span>
+                        <span>${lastRunAt}${censorRunStatusHtml(check.last_run)}</span>
+                        <span class="censor-row-actions">
+                            <button class="btn" type="button" data-censor-run="${check.id}" title="Запустить замер сейчас"><i class="fas fa-play"></i></button>
+                            <button class="btn btn-secondary" type="button" data-censor-history="${check.id}" title="История прогонов"><i class="fas fa-clock-rotate-left"></i></button>
+                            <button class="btn btn-secondary" type="button" data-censor-edit="${check.id}" title="Редактировать"><i class="fas fa-pen"></i></button>
+                            <button class="btn btn-secondary" type="button" data-censor-toggle="${check.id}" title="${check.is_enabled ? 'Выключить' : 'Включить'}"><i class="fas fa-power-off"></i></button>
+                            <button class="btn btn-secondary" type="button" data-censor-delete="${check.id}" title="Удалить"><i class="fas fa-trash"></i></button>
+                        </span>
+                    </div>`;
+            }).join('');
+            target.innerHTML = `
+                <section class="card sources-table-card">
+                    <div class="data-table">
+                        <div class="admin-table-row censor-check-row table-head">
+                            <span>IP</span><span>SNI</span><span>Расписание</span><span>Ключ</span><span>Последний замер</span><span>Действия</span>
+                        </div>
+                        ${rowsHtml}
+                    </div>
+                </section>`;
+        }
+
+        async function censorCheckAction(checkId, action) {
+            const body = new FormData();
+            body.append('csrfmiddlewaretoken', csrfToken);
+            body.append('action', action);
+            body.append('check_id', checkId);
+            try {
+                const response = await fetch(main.dataset.censorChecksUrl, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                    body,
+                });
+                const payload = await response.json();
+                if (payload.status !== 'ok') {
+                    showAdminToast(payload.message || 'Действие не выполнено', 'error');
+                } else if (action === 'run') {
+                    if (payload.run && payload.run.status === 'error') {
+                        showAdminToast(payload.run.error_message || 'Не удалось создать измерение', 'error');
+                    } else {
+                        showAdminToast('Замер запущен — зонды отвечают 1-3 минуты');
+                    }
+                }
+            } catch (error) {
+                showAdminToast('Ошибка запроса', 'error');
+            }
+            loadCensorChecks();
+        }
+
+        async function submitCensorCheck(event) {
+            event.preventDefault();
+            const form = event.target;
+            const body = new FormData(form);
+            body.append('csrfmiddlewaretoken', csrfToken);
+            body.append('action', 'save');
+            try {
+                const response = await fetch(main.dataset.censorChecksUrl, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                    body,
+                });
+                const payload = await response.json();
+                if (payload.status !== 'ok') {
+                    showAdminToast(payload.message || 'Не удалось сохранить проверку', 'error');
+                    return;
+                }
+                showAdminToast('Проверка сохранена');
+                resetCensorCheckForm();
+                loadCensorChecks();
+            } catch (error) {
+                showAdminToast('Ошибка запроса', 'error');
+            }
+        }
+
+        function resetCensorCheckForm() {
+            const form = document.getElementById('censor-check-form');
+            if (!form) return;
+            form.reset();
+            form.elements.check_id.value = '';
+        }
+
+        function fillCensorCheckForm(check) {
+            const form = document.getElementById('censor-check-form');
+            if (!form) return;
+            form.elements.check_id.value = check.id;
+            form.elements.target_ip.value = check.target_ip;
+            form.elements.sni.value = check.sni;
+            form.elements.interval_minutes.value = check.interval_minutes || '';
+            form.elements.api_key_id.value = check.api_key_id || '';
+            form.scrollIntoView({behavior: 'smooth', block: 'center'});
+        }
+
+        async function loadCensorHistory(checkId) {
+            const target = document.getElementById('censor-run-detail');
+            const check = censorChecksCache.find((item) => item.id === Number(checkId));
+            setLoading(target, 'Загружаем историю прогонов...');
+            try {
+                const response = await fetch(`${main.dataset.censorCheckRunsUrl}?check_id=${checkId}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    setError(target, payload.message || 'Не удалось загрузить историю');
+                    return;
+                }
+                const runs = payload.runs || [];
+                if (!runs.length) {
+                    target.innerHTML = '<div class="card info-card muted">Прогонов ещё не было.</div>';
+                    return;
+                }
+                const rowsHtml = runs.map((run) => `
+                    <div class="admin-table-row censor-run-row">
+                        <span class="muted">#${run.id}</span>
+                        <span>${escapeHtml(run.created_at)}</span>
+                        <span>${run.msm_id ? `msm ${run.msm_id}` : '—'}</span>
+                        <span>${censorRunStatusHtml(run)}</span>
+                        <span>${censorBlockedProvidersHtml(run) || '<span class="muted">—</span>'}</span>
+                        <span><button class="btn btn-secondary" type="button" data-censor-run-detail="${run.id}"><i class="fas fa-magnifying-glass"></i> Детали</button></span>
+                    </div>`).join('');
+                target.innerHTML = `
+                    <section class="card sources-table-card">
+                        <div class="admin-table-row censor-run-row table-head">
+                            <span>#</span><span>Запущен</span><span>Atlas</span><span>Результат</span><span>Провайдеры</span><span></span>
+                        </div>
+                        ${rowsHtml}
+                    </section>`;
+                if (check) target.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+            } catch (error) {
+                setError(target, 'Ошибка запроса истории');
+            }
+        }
+
+        async function loadCensorRunDetail(runId) {
+            const target = document.getElementById('censor-run-detail');
+            setLoading(target, 'Загружаем результат замера...');
+            try {
+                const response = await fetch(`${main.dataset.censorCheckRunsUrl}?run_id=${runId}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    setError(target, payload.message || 'Не удалось загрузить результат');
+                    return;
+                }
+                renderCensorRunDetail(target, payload.run, payload.check);
+                if (payload.run.status === 'pending') {
+                    clearTimeout(censorRunRefreshTimer);
+                    censorRunRefreshTimer = setTimeout(() => loadCensorRunDetail(runId), 7000);
+                }
+            } catch (error) {
+                setError(target, 'Ошибка запроса результата');
+            }
+        }
+
+        function renderCensorRunDetail(target, run, check) {
+            const title = check ? `${escapeHtml(check.target_ip)}:${check.port} — SNI ${escapeHtml(check.sni)}` : `Прогон #${run.id}`;
+            const blockedHtml = censorBlockedProvidersHtml(run);
+            const summaryHtml = `
+                <div class="card info-card" style="margin-bottom:10px;">
+                    <b>${title}</b><br>
+                    Запущен: ${escapeHtml(run.created_at)}${run.completed_at ? ` · Завершён: ${escapeHtml(run.completed_at)}` : ''} ·
+                    Зондов ответило: ${num(run.total)} · Пробились: <span class="censor-status-ok">${num(run.ok)}</span> ·
+                    Заблокированы: <span class="censor-status-bad">${num(run.blocked)}</span><br>
+                    Статус: ${censorRunStatusHtml(run)}
+                    ${blockedHtml ? `<br>${blockedHtml}` : ''}
+                </div>`;
+            const probes = run.probes || [];
+            if (!probes.length) {
+                target.innerHTML = `${summaryHtml}<div class="card info-card muted">${run.status === 'pending' ? 'Ответы зондов ещё не пришли — страница обновится сама.' : 'Нет по-зондовых данных.'}</div>`;
+                return;
+            }
+            const rowsHtml = probes.map((probe) => `
+                <div class="admin-table-row censor-probe-row">
+                    <span class="muted">#${probe.prb_id ?? '—'}</span>
+                    <span>${escapeHtml(probe.provider || '')}</span>
+                    <span>${probe.asn ? `AS${probe.asn}` : '—'}</span>
+                    <span>${probe.ok ? '<span class="censor-status-ok">пробился</span>' : '<span class="censor-status-bad">блок</span>'}</span>
+                    <span class="muted">${probe.ok ? (probe.rt_ms ? `${Number(probe.rt_ms).toFixed(0)} ms` : '') : escapeHtml(probe.err || 'нет ответа')}</span>
+                </div>`).join('');
+            target.innerHTML = `
+                ${summaryHtml}
+                <section class="card sources-table-card">
+                    <div class="admin-table-row censor-probe-row table-head">
+                        <span>Зонд</span><span>Провайдер</span><span>ASN</span><span>Статус</span><span>Детали</span>
+                    </div>
+                    ${rowsHtml}
+                </section>`;
+        }
+
+        document.addEventListener('click', (event) => {
+            const runButton = event.target.closest('[data-censor-run]');
+            if (runButton) censorCheckAction(runButton.dataset.censorRun, 'run');
+            const toggleButton = event.target.closest('[data-censor-toggle]');
+            if (toggleButton) censorCheckAction(toggleButton.dataset.censorToggle, 'toggle');
+            const deleteButton = event.target.closest('[data-censor-delete]');
+            if (deleteButton && confirm('Удалить проверку и всю её историю?')) censorCheckAction(deleteButton.dataset.censorDelete, 'delete');
+            const editButton = event.target.closest('[data-censor-edit]');
+            if (editButton) {
+                const check = censorChecksCache.find((item) => item.id === Number(editButton.dataset.censorEdit));
+                if (check) fillCensorCheckForm(check);
+            }
+            const historyButton = event.target.closest('[data-censor-history]');
+            if (historyButton) loadCensorHistory(historyButton.dataset.censorHistory);
+            const runDetailButton = event.target.closest('[data-censor-run-detail]');
+            if (runDetailButton) loadCensorRunDetail(runDetailButton.dataset.censorRunDetail);
+
+            const keyDefaultButton = event.target.closest('[data-ripe-key-default]');
+            if (keyDefaultButton) {
+                ripeKeyAction({action: 'set_default', key_id: keyDefaultButton.dataset.ripeKeyDefault})
+                    .then((ok) => { if (ok) { showAdminToast('Ключ по умолчанию обновлён'); loadCensorChecks(); } });
+            }
+            const keyEditButton = event.target.closest('[data-ripe-key-edit]');
+            if (keyEditButton) {
+                const key = censorKeysCache.find((item) => item.id === Number(keyEditButton.dataset.ripeKeyEdit));
+                if (key) fillRipeKeyForm(key);
+            }
+            const keyDeleteButton = event.target.closest('[data-ripe-key-delete]');
+            if (keyDeleteButton && confirm('Удалить ключ? Проверки с этим ключом переключатся на ключ по умолчанию.')) {
+                ripeKeyAction({action: 'delete', key_id: keyDeleteButton.dataset.ripeKeyDelete})
+                    .then((ok) => { if (ok) { showAdminToast('Ключ удалён'); loadCensorChecks(); } });
+            }
+        });
+
         const statsForm = document.getElementById('stats-form');
         const userPaymentsForm = document.getElementById('user-payments-form');
         const paymentInfoForm = document.getElementById('payment-info-form');
@@ -4259,6 +4744,10 @@
         if (replyTemplateForm) replyTemplateForm.addEventListener('submit', submitReplyTemplate);
         if (configTemplateForm) configTemplateForm.addEventListener('submit', submitConfigTemplate);
         document.getElementById('node-traffic-form')?.addEventListener('submit', loadNodeTraffic);
+        document.getElementById('censor-check-form')?.addEventListener('submit', submitCensorCheck);
+        document.getElementById('censor-check-reset')?.addEventListener('click', resetCensorCheckForm);
+        document.getElementById('ripe-key-form')?.addEventListener('submit', submitRipeKey);
+        document.getElementById('ripe-key-reset')?.addEventListener('click', resetRipeKeyForm);
         document.getElementById('config-pins-form')?.addEventListener('submit', submitConfigPinsSearch);
         document.addEventListener('click', (event) => {
             if (event.target.closest('[data-config-pins-save]')) saveConfigPins(false);

@@ -122,6 +122,21 @@ urlpatterns = [
         name="support_admin_api_node_traffic",
     ),
     path(
+        "support-admin/api/ripe-keys/",
+        views.support_admin_api_ripe_keys,
+        name="support_admin_api_ripe_keys",
+    ),
+    path(
+        "support-admin/api/censor-checks/",
+        views.support_admin_api_censor_checks,
+        name="support_admin_api_censor_checks",
+    ),
+    path(
+        "support-admin/api/censor-check-runs/",
+        views.support_admin_api_censor_check_runs,
+        name="support_admin_api_censor_check_runs",
+    ),
+    path(
         "support-admin/api/reply-templates/",
         views.support_admin_api_reply_templates,
         name="support_admin_api_reply_templates",

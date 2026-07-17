@@ -75,6 +75,9 @@ from common.models.db import SupportTicketAttachment
 from common.models.db import SupportReplyTemplate
 from common.models.db import SystemSetting
 from common.models.db import ReferralProgramBlock
+from common.models.db import CensorCheck
+from common.models.db import CensorCheckRun
+from common.models.db import RipeApiKey
 from engine.user_block import ACCOUNT_BLOCKED_MESSAGE
 from engine.user_block import is_user_blocked
 from common.models.settings import BOOL_RUNTIME_SETTINGS
@@ -108,6 +111,7 @@ from common.models.tariff import ThreeMonthsTariff
 from common.rwms_client_sync import RwmsClientSync
 
 from . import node_traffic
+from . import ripe_atlas
 from .rwms_helpers import create_user
 from .rwms_helpers import create_user_until
 from .encrypt_happ_url import encrypt_happ_url1
@@ -6435,3 +6439,403 @@ def support_admin_api_node_traffic(request):
         min_gib=min_gib,
     )
     return JsonResponse({"status": "ok", "result": report})
+
+
+def admin_censor_run_payload(run, with_details=False):
+    payload = {
+        "id": run.id,
+        "msm_id": run.msm_id,
+        "status": run.status,
+        "error_message": run.error_message,
+        "total": run.total_probes,
+        "ok": run.ok_probes,
+        "blocked": run.blocked_probes,
+        "blocked_by_provider": run.blocked_asns or {},
+        "created_at": admin_date_label(run.created_at),
+        "completed_at": (
+            admin_date_label(run.completed_at) if run.completed_at else None
+        ),
+    }
+    if with_details:
+        payload["probes"] = run.results or []
+    return payload
+
+
+def admin_mask_api_key(value):
+    if not value:
+        return ""
+    return f"…{value[-6:]}" if len(value) > 6 else "…"
+
+
+def admin_ripe_key_payload(key):
+    return {
+        "id": key.id,
+        "name": key.name,
+        "api_key_masked": admin_mask_api_key(key.api_key),
+        "is_default": key.is_default,
+    }
+
+
+def admin_censor_check_payload(check, last_run=None, keys_by_id=None):
+    key_name = None
+    if check.api_key_id and keys_by_id is not None:
+        key = keys_by_id.get(check.api_key_id)
+        key_name = key.name if key else "удалённый ключ"
+    return {
+        "id": check.id,
+        "name": check.name,
+        "target_ip": check.target_ip,
+        "sni": check.sni,
+        "port": check.port,
+        "interval_minutes": check.interval_minutes,
+        "is_enabled": check.is_enabled,
+        "api_key_id": check.api_key_id,
+        "api_key_name": key_name,
+        "last_run": admin_censor_run_payload(last_run) if last_run else None,
+    }
+
+
+def support_admin_api_ripe_keys(request):
+    """Управление ключами RIPE Atlas (только admin).
+
+    GET — список ключей (сам ключ маскируется). POST action=save|delete|set_default.
+    Один ключ может быть «по умолчанию» — он используется проверками без
+    явно выбранного ключа.
+    """
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "POST":
+            action = request.POST.get("action", "save")
+
+            if action == "save":
+                key_id = request.POST.get("key_id")
+                name = request.POST.get("name", "").strip()
+                api_key = request.POST.get("api_key", "").strip()
+                make_default = request.POST.get("is_default") == "1"
+
+                if key_id:
+                    key = db_session.get(RipeApiKey, int(key_id))
+                    if not key:
+                        return JsonResponse({"status": "not_found"}, status=404)
+                    if not name:
+                        return JsonResponse(
+                            {"status": "error", "message": "Укажите название"},
+                            status=400,
+                        )
+                    key.name = name[:160]
+                    # Пустое поле ключа при редактировании — не менять значение
+                    if api_key:
+                        key.api_key = api_key[:128]
+                else:
+                    if not name or not api_key:
+                        return JsonResponse(
+                            {
+                                "status": "error",
+                                "message": "Заполните название и ключ",
+                            },
+                            status=400,
+                        )
+                    key = RipeApiKey(name=name[:160], api_key=api_key[:128])
+                    db_session.add(key)
+                    db_session.flush()
+                    # Первый добавленный ключ автоматически становится дефолтным
+                    if db_session.query(RipeApiKey).count() == 1:
+                        make_default = True
+
+                if make_default:
+                    db_session.query(RipeApiKey).filter(
+                        RipeApiKey.id != key.id
+                    ).update({RipeApiKey.is_default: False})
+                    key.is_default = True
+                key.updated_at = datetime.utcnow()
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            key = db_session.get(RipeApiKey, int(request.POST.get("key_id") or 0))
+            if not key:
+                return JsonResponse({"status": "not_found"}, status=404)
+
+            if action == "delete":
+                db_session.delete(key)
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            if action == "set_default":
+                db_session.query(RipeApiKey).filter(
+                    RipeApiKey.id != key.id
+                ).update({RipeApiKey.is_default: False})
+                key.is_default = True
+                key.updated_at = datetime.utcnow()
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            return JsonResponse(
+                {"status": "error", "message": "Неизвестное действие"}, status=400
+            )
+
+        if request.method != "GET":
+            return JsonResponse({"status": "error"}, status=405)
+
+        keys = db_session.query(RipeApiKey).order_by(RipeApiKey.id.asc()).all()
+        return JsonResponse(
+            {
+                "status": "ok",
+                "keys": [admin_ripe_key_payload(key) for key in keys],
+            }
+        )
+    finally:
+        db_session.close()
+
+
+def support_admin_api_censor_checks(request):
+    """Вкладка «Замеры ТСПУ»: список проверок и действия над ними (только admin).
+
+    GET — список проверок с последним прогоном. Заодно лениво закрывает
+    pending-прогоны и запускает просроченные по расписанию проверки, чтобы
+    расписание работало даже без крона (пока админку кто-то открывает);
+    основной путь для расписания — management-команда censor_checks по крону.
+
+    POST action=save|delete|toggle|run.
+    """
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    fallback_key = settings.RIPE_ATLAS_API_KEY
+
+    db_session = session_factory()
+    try:
+        if request.method == "POST":
+            action = request.POST.get("action", "save")
+
+            if action == "save":
+                check_id = request.POST.get("check_id")
+                target_ip = request.POST.get("target_ip", "").strip()
+                sni = request.POST.get("sni", "").strip()
+                # Отдельное имя в форме не спрашиваем — проверку идентифицирует SNI
+                name = request.POST.get("name", "").strip() or sni
+                api_key_raw = request.POST.get("api_key_id", "").strip()
+                if api_key_raw:
+                    try:
+                        api_key_id = int(api_key_raw)
+                    except ValueError:
+                        return JsonResponse(
+                            {"status": "error", "message": "Неверный ключ"},
+                            status=400,
+                        )
+                    if not db_session.get(RipeApiKey, api_key_id):
+                        return JsonResponse(
+                            {"status": "error", "message": "Ключ не найден"},
+                            status=400,
+                        )
+                else:
+                    api_key_id = None
+                try:
+                    port = int(request.POST.get("port") or 443)
+                except ValueError:
+                    port = 443
+                interval_raw = request.POST.get("interval_minutes", "").strip()
+                if interval_raw:
+                    try:
+                        interval_minutes = int(interval_raw)
+                    except ValueError:
+                        return JsonResponse(
+                            {"status": "error", "message": "Неверный интервал"},
+                            status=400,
+                        )
+                    # Прогон стоит ~660 кредитов Atlas: не даём случайно выставить
+                    # интервал, который сожжёт дневной доход зонда за пару часов.
+                    if interval_minutes < 60:
+                        return JsonResponse(
+                            {
+                                "status": "error",
+                                "message": "Минимальный интервал — 60 минут",
+                            },
+                            status=400,
+                        )
+                else:
+                    interval_minutes = None
+
+                if not target_ip or not sni:
+                    return JsonResponse(
+                        {"status": "error", "message": "Заполните IP и SNI"},
+                        status=400,
+                    )
+                if not 0 < port < 65536:
+                    return JsonResponse(
+                        {"status": "error", "message": "Неверный порт"}, status=400
+                    )
+
+                if check_id:
+                    check = db_session.get(CensorCheck, int(check_id))
+                    if not check:
+                        return JsonResponse({"status": "not_found"}, status=404)
+                else:
+                    check = CensorCheck()
+                    db_session.add(check)
+
+                check.name = name[:160]
+                check.target_ip = target_ip[:64]
+                check.sni = sni[:256]
+                check.port = port
+                check.interval_minutes = interval_minutes
+                check.api_key_id = api_key_id
+                check.updated_at = datetime.utcnow()
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            check = db_session.get(
+                CensorCheck, int(request.POST.get("check_id") or 0)
+            )
+            if not check:
+                return JsonResponse({"status": "not_found"}, status=404)
+
+            if action == "delete":
+                db_session.query(CensorCheckRun).filter(
+                    CensorCheckRun.check_id == check.id
+                ).delete()
+                db_session.delete(check)
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            if action == "toggle":
+                check.is_enabled = not check.is_enabled
+                check.updated_at = datetime.utcnow()
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            if action == "run":
+                api_key = ripe_atlas.resolve_api_key(
+                    db_session, check, fallback_key
+                )
+                if not api_key:
+                    return JsonResponse(
+                        {
+                            "status": "error",
+                            "message": "Нет ключа RIPE Atlas — добавьте ключ и назначьте его по умолчанию",
+                        },
+                        status=400,
+                    )
+                run = ripe_atlas.start_run(db_session, check, api_key)
+                status_code = 200 if run.status != ripe_atlas.RUN_STATUS_ERROR else 502
+                return JsonResponse(
+                    {"status": "ok", "run": admin_censor_run_payload(run)},
+                    status=status_code,
+                )
+
+            return JsonResponse(
+                {"status": "error", "message": "Неизвестное действие"}, status=400
+            )
+
+        if request.method != "GET":
+            return JsonResponse({"status": "error"}, status=405)
+
+        # Ленивое обслуживание: закрываем pending-прогоны и запускаем
+        # просроченные проверки. Ошибки сети Atlas не должны ронять список.
+        try:
+            ripe_atlas.finalize_pending_runs(db_session, fallback_key)
+            ripe_atlas.schedule_due_checks(db_session, fallback_key)
+        except Exception:
+            logging.exception("censor checks: lazy maintenance failed")
+            db_session.rollback()
+
+        keys = db_session.query(RipeApiKey).order_by(RipeApiKey.id.asc()).all()
+        keys_by_id = {key.id: key for key in keys}
+        checks = (
+            db_session.query(CensorCheck).order_by(CensorCheck.id.asc()).all()
+        )
+        last_runs = {}
+        for check in checks:
+            last_runs[check.id] = (
+                db_session.query(CensorCheckRun)
+                .filter(CensorCheckRun.check_id == check.id)
+                .order_by(CensorCheckRun.id.desc())
+                .first()
+            )
+        has_default = any(key.is_default for key in keys)
+        return JsonResponse(
+            {
+                "status": "ok",
+                "keys": [admin_ripe_key_payload(key) for key in keys],
+                "has_default_key": has_default or bool(fallback_key),
+                "env_key_present": bool(fallback_key),
+                "checks": [
+                    admin_censor_check_payload(
+                        check, last_runs.get(check.id), keys_by_id
+                    )
+                    for check in checks
+                ],
+            }
+        )
+    finally:
+        db_session.close()
+
+
+def support_admin_api_censor_check_runs(request):
+    """История и детали прогонов замеров (только admin).
+
+    GET ?check_id= — последние прогоны проверки;
+    GET ?run_id= — детальный результат прогона (по-зондовая разбивка);
+    pending-прогон при запросе деталей пытается дозабрать результаты.
+    """
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+    if request.method != "GET":
+        return JsonResponse({"status": "error"}, status=405)
+
+    db_session = session_factory()
+    try:
+        run_id = request.GET.get("run_id")
+        if run_id:
+            run = db_session.get(CensorCheckRun, int(run_id))
+            if not run:
+                return JsonResponse({"status": "not_found"}, status=404)
+            check = db_session.get(CensorCheck, run.check_id)
+            if run.status == ripe_atlas.RUN_STATUS_PENDING:
+                try:
+                    api_key = ripe_atlas.resolve_api_key(
+                        db_session, check, settings.RIPE_ATLAS_API_KEY
+                    )
+                    if api_key:
+                        ripe_atlas.finalize_run(db_session, run, api_key)
+                except Exception:
+                    logging.exception("censor checks: finalize on demand failed")
+                    db_session.rollback()
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "run": admin_censor_run_payload(run, with_details=True),
+                    "check": admin_censor_check_payload(check) if check else None,
+                }
+            )
+
+        check_id = request.GET.get("check_id")
+        if not check_id:
+            return JsonResponse(
+                {"status": "error", "message": "Нужен check_id или run_id"},
+                status=400,
+            )
+        runs = (
+            db_session.query(CensorCheckRun)
+            .filter(CensorCheckRun.check_id == int(check_id))
+            .order_by(CensorCheckRun.id.desc())
+            .limit(30)
+            .all()
+        )
+        return JsonResponse(
+            {
+                "status": "ok",
+                "runs": [admin_censor_run_payload(run) for run in runs],
+            }
+        )
+    except ValueError:
+        return JsonResponse(
+            {"status": "error", "message": "Неверный формат параметров"}, status=400
+        )
+    finally:
+        db_session.close()
