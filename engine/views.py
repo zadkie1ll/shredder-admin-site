@@ -6473,6 +6473,7 @@ def admin_ripe_key_payload(key):
         "name": key.name,
         "api_key_masked": admin_mask_api_key(key.api_key),
         "is_default": key.is_default,
+        "public_measurements": key.public_measurements,
     }
 
 
@@ -6516,6 +6517,7 @@ def support_admin_api_ripe_keys(request):
                 name = request.POST.get("name", "").strip()
                 api_key = request.POST.get("api_key", "").strip()
                 make_default = request.POST.get("is_default") == "1"
+                public_measurements = request.POST.get("public_measurements") == "1"
 
                 if key_id:
                     key = db_session.get(RipeApiKey, int(key_id))
@@ -6530,6 +6532,7 @@ def support_admin_api_ripe_keys(request):
                     # Пустое поле ключа при редактировании — не менять значение
                     if api_key:
                         key.api_key = api_key[:128]
+                    key.public_measurements = public_measurements
                 else:
                     if not name or not api_key:
                         return JsonResponse(
@@ -6539,7 +6542,11 @@ def support_admin_api_ripe_keys(request):
                             },
                             status=400,
                         )
-                    key = RipeApiKey(name=name[:160], api_key=api_key[:128])
+                    key = RipeApiKey(
+                        name=name[:160],
+                        api_key=api_key[:128],
+                        public_measurements=public_measurements,
+                    )
                     db_session.add(key)
                     db_session.flush()
                     # Первый добавленный ключ автоматически становится дефолтным
@@ -6720,7 +6727,8 @@ def support_admin_api_censor_checks(request):
                         },
                         status=400,
                     )
-                run = ripe_atlas.start_run(db_session, check, api_key)
+                is_public = ripe_atlas.resolve_public_flag(db_session, check)
+                run = ripe_atlas.start_run(db_session, check, api_key, is_public)
                 status_code = 200 if run.status != ripe_atlas.RUN_STATUS_ERROR else 502
                 return JsonResponse(
                     {"status": "ok", "run": admin_censor_run_payload(run)},

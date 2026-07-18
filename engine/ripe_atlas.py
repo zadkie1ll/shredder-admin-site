@@ -69,23 +69,38 @@ def default_api_key(db_session):
     )
 
 
-def resolve_api_key(db_session, check, fallback_key=""):
-    """Ключ для проверки: явный ключ проверки → ключ «по умолчанию» → env.
-
-    Возвращает строку ключа или None, если ни одного ключа нет.
-    """
+def resolve_key_row(db_session, check):
+    """Строка ключа для проверки: явный ключ проверки → ключ «по умолчанию»."""
     if check is not None and check.api_key_id:
         row = db_session.get(RipeApiKey, check.api_key_id)
         if row:
-            return row.api_key
-    default = default_api_key(db_session)
-    if default:
-        return default.api_key
+            return row
+    return default_api_key(db_session)
+
+
+def resolve_api_key(db_session, check, fallback_key=""):
+    """Строка ключа для проверки; None, если ни одного ключа нет."""
+    row = resolve_key_row(db_session, check)
+    if row:
+        return row.api_key
     return fallback_key or None
 
 
-def create_measurement(api_key: str, target_ip: str, sni: str, port: int) -> tuple:
-    """Создаёт one-off sslcert-измерение; возвращает (msm_id, error_message)."""
+def resolve_public_flag(db_session, check):
+    """Создавать ли публичное измерение для этой проверки (по флагу ключа)."""
+    row = resolve_key_row(db_session, check)
+    return bool(row.public_measurements) if row else False
+
+
+def create_measurement(
+    api_key: str, target_ip: str, sni: str, port: int, is_public: bool = False
+) -> tuple:
+    """Создаёт one-off sslcert-измерение; возвращает (msm_id, error_message).
+
+    is_public=True — публичное измерение (результаты читаются без спец-права,
+    нужно для ключей без права читать приватные результаты). По умолчанию
+    приватное, чтобы IP точек входа не светились в публичной базе Atlas.
+    """
     payload = {
         "definitions": [
             {
@@ -97,7 +112,7 @@ def create_measurement(api_key: str, target_ip: str, sni: str, port: int) -> tup
                 "port": port,
                 "hostname": sni,
                 "af": 4,
-                "is_public": False,
+                "is_public": is_public,
             }
         ],
         "probes": [
@@ -147,17 +162,30 @@ def create_measurement(api_key: str, target_ip: str, sni: str, port: int) -> tup
     return None, f"Atlas отклонил измерение: {detail or response.status_code}"
 
 
+class ResultsForbidden(Exception):
+    """Ключ не имеет права читать приватные результаты этого измерения."""
+
+
 def fetch_results(api_key: str, msm_id: int):
-    """Результаты измерения (список по зондам); None при ошибке запроса."""
+    """Результаты измерения (список по зондам); None при ошибке запроса.
+
+    Бросает ResultsForbidden при 403 — это значит, что ключ создал приватное
+    измерение, но не имеет права «Get non-public results». Такой ключ должен
+    создавать публичные измерения (флаг public_measurements).
+    """
     try:
         with httpx.Client(timeout=15) as client:
             response = client.get(
                 f"{ATLAS_API}/measurements/{msm_id}/results/",
                 headers={"Authorization": f"Key {api_key}"},
             )
+        if response.status_code == 403:
+            raise ResultsForbidden()
         if response.status_code != 200:
             return None
         payload = orjson.loads(response.content)
+    except ResultsForbidden:
+        raise
     except Exception:
         return None
     return payload if isinstance(payload, list) else None
@@ -224,10 +252,12 @@ def summarize_results(results: list) -> dict:
     }
 
 
-def start_run(db_session, check: CensorCheck, api_key: str) -> CensorCheckRun:
+def start_run(
+    db_session, check: CensorCheck, api_key: str, is_public: bool = False
+) -> CensorCheckRun:
     """Создаёт измерение и запись прогона (при ошибке — прогон со статусом error)."""
     msm_id, error = create_measurement(
-        api_key, check.target_ip, check.sni, check.port
+        api_key, check.target_ip, check.sni, check.port, is_public
     )
     run = CensorCheckRun(
         check_id=check.id,
@@ -251,7 +281,20 @@ def finalize_run(db_session, run: CensorCheckRun, api_key: str) -> bool:
     if run.status != RUN_STATUS_PENDING or not run.msm_id:
         return False
 
-    results = fetch_results(api_key, run.msm_id)
+    try:
+        results = fetch_results(api_key, run.msm_id)
+    except ResultsForbidden:
+        # Ключ создал приватное измерение, но не может его прочитать. Закрываем
+        # сразу — ждать бессмысленно.
+        run.status = RUN_STATUS_ERROR
+        run.error_message = (
+            "У ключа нет права читать приватные результаты. Включите «публичные "
+            "измерения» у этого ключа (для своего ключа добавьте право "
+            "Get non-public results)."
+        )
+        run.completed_at = datetime.utcnow()
+        db_session.commit()
+        return True
     deadline_passed = datetime.utcnow() - run.created_at >= COLLECT_DEADLINE
     if results is None:
         if deadline_passed:
@@ -331,4 +374,5 @@ def schedule_due_checks(db_session, fallback_key: str = "") -> None:
         )
         db_session.commit()
         if claimed:
-            start_run(db_session, check, api_key)
+            is_public = resolve_public_flag(db_session, check)
+            start_run(db_session, check, api_key, is_public)

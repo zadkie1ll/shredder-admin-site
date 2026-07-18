@@ -79,15 +79,23 @@
         .censor-keys-card > summary::-webkit-details-marker { display: none; }
         .censor-keys-card > summary i { color: var(--brand-gold); }
         .censor-keys-card[open] > summary { border-bottom: 1px solid rgba(255,255,255,.07); }
-        .censor-key-form { display: grid; grid-template-columns: minmax(150px, .8fr) minmax(0, 1.2fr) auto auto; gap: 10px; align-items: center; padding: 14px 16px; }
+        .censor-key-form { display: grid; grid-template-columns: minmax(140px, .7fr) minmax(0, 1.1fr) auto auto auto; gap: 10px; align-items: center; padding: 14px 16px; }
+        @media (max-width: 900px) { .censor-key-form { grid-template-columns: 1fr; } }
         .censor-key-default { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
         .censor-key-row { grid-template-columns: minmax(140px, 1fr) minmax(120px, .7fr) minmax(120px, .6fr) minmax(200px, auto); min-width: 640px; }
         .censor-key-row.table-head { background: rgba(255,255,255,.04); }
         .censor-key-default-badge { color: #22c55e; font-weight: 800; }
         .censor-check-row { grid-template-columns: minmax(130px, .8fr) minmax(150px, 1fr) minmax(110px, .6fr) minmax(110px, .6fr) minmax(190px, 1.2fr) minmax(230px, auto); min-width: 1020px; }
         .censor-check-row.table-head { background: rgba(255,255,255,.04); }
-        .censor-run-row { grid-template-columns: 70px 150px 130px minmax(200px, 1fr) minmax(0, 1.6fr) auto; min-width: 860px; }
+        .censor-run-row { grid-template-columns: 170px minmax(190px, 1fr) minmax(0, 1.6fr) 28px; min-width: 560px; }
         .censor-run-row.table-head { background: rgba(255,255,255,.04); }
+        .censor-run-clickable { cursor: pointer; transition: background .12s; }
+        .censor-run-clickable:hover { background: rgba(255,199,0,.06); }
+        .censor-run-chevron { color: var(--muted); text-align: center; }
+        .censor-last-run-link { cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+        .censor-last-run-link:hover { text-decoration: underline; }
+        .censor-open-icon { font-size: 10px; color: var(--muted); }
+        .censor-modal-back { margin-bottom: 12px; }
         .censor-probe-row { grid-template-columns: 90px minmax(130px, 1fr) 100px 110px minmax(0, 2fr); min-width: 620px; }
         .censor-probe-row.table-head { background: rgba(255,255,255,.04); }
         .censor-status-ok { color: #22c55e; font-weight: 800; }
@@ -1813,6 +1821,7 @@
                     <input class="input" name="name" maxlength="160" placeholder="Название ключа (напр.: основной)" required>
                     <input class="input" name="api_key" maxlength="128" placeholder="UUID ключа RIPE Atlas" autocomplete="off">
                     <label class="censor-key-default"><input type="checkbox" name="is_default" value="1"> по умолчанию</label>
+                    <label class="censor-key-default" title="Включите для ключа без права читать приватные результаты (напр. общий ключ censorcheck). Внимание: IP точек входа попадут в публичную базу RIPE Atlas."><input type="checkbox" name="public_measurements" value="1"> публичные</label>
                     <div class="censor-form-actions">
                         <button class="btn" type="submit"><i class="fas fa-save"></i>Сохранить</button>
                         <button class="btn btn-secondary" type="button" id="ripe-key-reset"><i class="fas fa-plus"></i>Новый</button>
@@ -1843,7 +1852,6 @@
                 </div>
             </form>
             <div id="censor-checks-result"></div>
-            <div id="censor-run-detail"></div>
         </section>
         {% endif %}
 
@@ -2028,6 +2036,21 @@
                     <button type="button" class="btn" data-source-modal-next>Дальше</button>
                 </div>
             </footer>
+        </section>
+    </div>
+
+    <div id="censor-runs-modal" class="modal-overlay" aria-hidden="true">
+        <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="censor-runs-modal-title">
+            <header class="modal-header">
+                <div>
+                    <h2 id="censor-runs-modal-title" class="modal-title">История замеров</h2>
+                    <div id="censor-runs-modal-subtitle" class="modal-subtitle"></div>
+                </div>
+                <button type="button" class="modal-close" data-censor-modal-close aria-label="Закрыть">
+                    <i class="fas fa-times"></i>
+                </button>
+            </header>
+            <div id="censor-runs-modal-body" class="modal-body"></div>
         </section>
     </div>
 
@@ -2334,6 +2357,10 @@
         document.getElementById('source-users-modal')?.addEventListener('click', (event) => {
             if (event.target.id === 'source-users-modal') closeSourceUsersModal();
         });
+        document.querySelector('[data-censor-modal-close]')?.addEventListener('click', closeCensorRunsModal);
+        document.getElementById('censor-runs-modal')?.addEventListener('click', (event) => {
+            if (event.target.id === 'censor-runs-modal') closeCensorRunsModal();
+        });
         // Модалку конфига нельзя закрыть кликом по фону: случайный клик терял отредактированный JSON
         document.querySelectorAll('[data-config-modal-close]').forEach((button) => {
             button.addEventListener('click', closeConfigTemplateModal);
@@ -2341,6 +2368,7 @@
         document.addEventListener('keydown', (event) => {
             if (event.key === 'Escape') {
                 closeSourceUsersModal();
+                closeCensorRunsModal();
             }
         });
 
@@ -4395,7 +4423,7 @@
                 <div class="admin-table-row censor-key-row">
                     <span><b>${escapeHtml(key.name)}</b></span>
                     <span class="muted">${escapeHtml(key.api_key_masked)}</span>
-                    <span>${key.is_default ? '<span class="censor-key-default-badge">по умолчанию</span>' : ''}</span>
+                    <span>${key.is_default ? '<span class="censor-key-default-badge">по умолчанию</span> ' : ''}${key.public_measurements ? '<span class="censor-status-warn" title="Измерения создаются публичными — IP видны в базе RIPE Atlas">публичные</span>' : ''}</span>
                     <span class="censor-row-actions">
                         ${key.is_default ? '' : `<button class="btn btn-secondary" type="button" data-ripe-key-default="${key.id}" title="Сделать ключом по умолчанию"><i class="fas fa-star"></i></button>`}
                         <button class="btn btn-secondary" type="button" data-ripe-key-edit="${key.id}" title="Переименовать / заменить ключ"><i class="fas fa-pen"></i></button>
@@ -4454,6 +4482,7 @@
                 name: form.elements.name.value,
                 api_key: form.elements.api_key.value,
                 is_default: form.elements.is_default.checked ? '1' : '0',
+                public_measurements: form.elements.public_measurements.checked ? '1' : '0',
             });
             if (ok) {
                 showAdminToast('Ключ сохранён');
@@ -4480,6 +4509,7 @@
             // пустое поле при сохранении означает «не менять ключ».
             form.elements.api_key.placeholder = `${key.api_key_masked} — оставьте пустым, чтобы не менять`;
             form.elements.is_default.checked = key.is_default;
+            form.elements.public_measurements.checked = key.public_measurements;
         }
 
         function renderCensorChecks(target) {
@@ -4497,13 +4527,16 @@
                 const enabledBadge = check.is_enabled ? '' : ' <span class="censor-status-bad">(выключена)</span>';
                 const lastRunAt = check.last_run ? `<span class="muted">${escapeHtml(check.last_run.created_at)}</span> ` : '';
                 const keyLabel = check.api_key_name ? escapeHtml(check.api_key_name) : '<span class="muted">по умолчанию</span>';
+                const lastRunCell = check.last_run
+                    ? `<span class="censor-last-run-link" data-censor-run-detail="${check.last_run.id}" title="Открыть результат замера">${lastRunAt}${censorRunStatusHtml(check.last_run)} <i class="fas fa-up-right-from-square censor-open-icon"></i></span>`
+                    : `<span>${censorRunStatusHtml(null)}</span>`;
                 return `
                     <div class="admin-table-row censor-check-row">
                         <span><b>${escapeHtml(check.target_ip)}</b>${check.port !== 443 ? `:${check.port}` : ''}${enabledBadge}</span>
                         <span>${escapeHtml(check.sni)}</span>
                         <span>${schedule}</span>
                         <span>${keyLabel}</span>
-                        <span>${lastRunAt}${censorRunStatusHtml(check.last_run)}</span>
+                        ${lastRunCell}
                         <span class="censor-row-actions">
                             <button class="btn" type="button" data-censor-run="${check.id}" title="Запустить замер сейчас"><i class="fas fa-play"></i></button>
                             <button class="btn btn-secondary" type="button" data-censor-history="${check.id}" title="История прогонов"><i class="fas fa-clock-rotate-left"></i></button>
@@ -4594,10 +4627,45 @@
             form.scrollIntoView({behavior: 'smooth', block: 'center'});
         }
 
+        // Модалка истории/деталей замеров. view: 'history' | 'detail'
+        const censorModalState = {checkId: null, view: null, detailTimer: null};
+
+        function censorModalTitleFor(check) {
+            if (!check) return 'Замер';
+            const port = check.port !== 443 ? `:${check.port}` : '';
+            return `${check.target_ip}${port} — ${check.sni}`;
+        }
+
+        function openCensorRunsModal(checkId, view = 'history') {
+            const modal = document.getElementById('censor-runs-modal');
+            if (!modal) return;
+            const wasOpen = modal.classList.contains('open');
+            censorModalState.checkId = checkId ? Number(checkId) : null;
+            censorModalState.view = view;
+            const check = censorChecksCache.find((item) => item.id === censorModalState.checkId);
+            document.getElementById('censor-runs-modal-title').textContent = view === 'history' ? 'История замеров' : 'Результат замера';
+            document.getElementById('censor-runs-modal-subtitle').textContent = check ? censorModalTitleFor(check) : '';
+            modal.classList.add('open');
+            modal.setAttribute('aria-hidden', 'false');
+            if (!wasOpen) lockBodyScroll();
+        }
+
+        function closeCensorRunsModal() {
+            const modal = document.getElementById('censor-runs-modal');
+            if (!modal || !modal.classList.contains('open')) return;
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+            clearTimeout(censorModalState.detailTimer);
+            censorModalState.checkId = null;
+            censorModalState.view = null;
+            unlockBodyScroll();
+        }
+
         async function loadCensorHistory(checkId) {
-            const target = document.getElementById('censor-run-detail');
-            const check = censorChecksCache.find((item) => item.id === Number(checkId));
-            setLoading(target, 'Загружаем историю прогонов...');
+            openCensorRunsModal(checkId, 'history');
+            const target = document.getElementById('censor-runs-modal-body');
+            clearTimeout(censorModalState.detailTimer);
+            setLoading(target, 'Загружаем историю замеров...');
             try {
                 const response = await fetch(`${main.dataset.censorCheckRunsUrl}?check_id=${checkId}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
                 const payload = await response.json();
@@ -4607,33 +4675,34 @@
                 }
                 const runs = payload.runs || [];
                 if (!runs.length) {
-                    target.innerHTML = '<div class="card info-card muted">Прогонов ещё не было.</div>';
+                    target.innerHTML = '<div class="card info-card muted">Замеров ещё не было — запустите первый кнопкой ▶ в списке проверок.</div>';
                     return;
                 }
                 const rowsHtml = runs.map((run) => `
-                    <div class="admin-table-row censor-run-row">
-                        <span class="muted">#${run.id}</span>
-                        <span>${escapeHtml(run.created_at)}</span>
-                        <span>${run.msm_id ? `msm ${run.msm_id}` : '—'}</span>
+                    <div class="admin-table-row censor-run-row censor-run-clickable" data-censor-run-detail="${run.id}" title="Открыть по-зондовый результат">
+                        <span class="muted">${escapeHtml(run.created_at)}</span>
                         <span>${censorRunStatusHtml(run)}</span>
                         <span>${censorBlockedProvidersHtml(run) || '<span class="muted">—</span>'}</span>
-                        <span><button class="btn btn-secondary" type="button" data-censor-run-detail="${run.id}"><i class="fas fa-magnifying-glass"></i> Детали</button></span>
+                        <span class="censor-run-chevron"><i class="fas fa-chevron-right"></i></span>
                     </div>`).join('');
                 target.innerHTML = `
-                    <section class="card sources-table-card">
+                    <div class="muted" style="margin-bottom:10px;">Нажмите на замер, чтобы увидеть разбивку по зондам и провайдерам.</div>
+                    <div class="data-table">
                         <div class="admin-table-row censor-run-row table-head">
-                            <span>#</span><span>Запущен</span><span>Atlas</span><span>Результат</span><span>Провайдеры</span><span></span>
+                            <span>Запущен</span><span>Результат</span><span>Блокирующие провайдеры</span><span></span>
                         </div>
                         ${rowsHtml}
-                    </section>`;
-                if (check) target.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+                    </div>`;
             } catch (error) {
                 setError(target, 'Ошибка запроса истории');
             }
         }
 
         async function loadCensorRunDetail(runId) {
-            const target = document.getElementById('censor-run-detail');
+            const target = document.getElementById('censor-runs-modal-body');
+            clearTimeout(censorModalState.detailTimer);
+            // Модалку открываем сразу (checkId уточним из ответа, если открыли из таблицы)
+            openCensorRunsModal(censorModalState.checkId, 'detail');
             setLoading(target, 'Загружаем результат замера...');
             try {
                 const response = await fetch(`${main.dataset.censorCheckRunsUrl}?run_id=${runId}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
@@ -4642,10 +4711,16 @@
                     setError(target, payload.message || 'Не удалось загрузить результат');
                     return;
                 }
+                if (payload.check) {
+                    censorModalState.checkId = payload.check.id;
+                    document.getElementById('censor-runs-modal-subtitle').textContent = censorModalTitleFor(payload.check);
+                }
                 renderCensorRunDetail(target, payload.run, payload.check);
                 if (payload.run.status === 'pending') {
-                    clearTimeout(censorRunRefreshTimer);
-                    censorRunRefreshTimer = setTimeout(() => loadCensorRunDetail(runId), 7000);
+                    censorModalState.detailTimer = setTimeout(() => {
+                        // Обновляем, только пока модалка открыта в режиме деталей
+                        if (censorModalState.view === 'detail') loadCensorRunDetail(runId);
+                    }, 7000);
                 }
             } catch (error) {
                 setError(target, 'Ошибка запроса результата');
@@ -4653,12 +4728,13 @@
         }
 
         function renderCensorRunDetail(target, run, check) {
-            const title = check ? `${escapeHtml(check.target_ip)}:${check.port} — SNI ${escapeHtml(check.sni)}` : `Прогон #${run.id}`;
             const blockedHtml = censorBlockedProvidersHtml(run);
+            const backHtml = censorModalState.checkId
+                ? `<button class="btn btn-secondary censor-modal-back" type="button" data-censor-history="${censorModalState.checkId}"><i class="fas fa-arrow-left"></i> Ко всем замерам</button>`
+                : '';
             const summaryHtml = `
-                <div class="card info-card" style="margin-bottom:10px;">
-                    <b>${title}</b><br>
-                    Запущен: ${escapeHtml(run.created_at)}${run.completed_at ? ` · Завершён: ${escapeHtml(run.completed_at)}` : ''} ·
+                <div class="card info-card" style="margin-bottom:12px;">
+                    Запущен: ${escapeHtml(run.created_at)}${run.completed_at ? ` · Завершён: ${escapeHtml(run.completed_at)}` : ''}<br>
                     Зондов ответило: ${num(run.total)} · Пробились: <span class="censor-status-ok">${num(run.ok)}</span> ·
                     Заблокированы: <span class="censor-status-bad">${num(run.blocked)}</span><br>
                     Статус: ${censorRunStatusHtml(run)}
@@ -4666,7 +4742,7 @@
                 </div>`;
             const probes = run.probes || [];
             if (!probes.length) {
-                target.innerHTML = `${summaryHtml}<div class="card info-card muted">${run.status === 'pending' ? 'Ответы зондов ещё не пришли — страница обновится сама.' : 'Нет по-зондовых данных.'}</div>`;
+                target.innerHTML = `${backHtml}${summaryHtml}<div class="card info-card muted">${run.status === 'pending' ? 'Ответы зондов ещё не пришли — окно обновится само через несколько секунд.' : 'Нет по-зондовых данных.'}</div>`;
                 return;
             }
             const rowsHtml = probes.map((probe) => `
@@ -4678,13 +4754,14 @@
                     <span class="muted">${probe.ok ? (probe.rt_ms ? `${Number(probe.rt_ms).toFixed(0)} ms` : '') : escapeHtml(probe.err || 'нет ответа')}</span>
                 </div>`).join('');
             target.innerHTML = `
+                ${backHtml}
                 ${summaryHtml}
-                <section class="card sources-table-card">
+                <div class="data-table">
                     <div class="admin-table-row censor-probe-row table-head">
                         <span>Зонд</span><span>Провайдер</span><span>ASN</span><span>Статус</span><span>Детали</span>
                     </div>
                     ${rowsHtml}
-                </section>`;
+                </div>`;
         }
 
         document.addEventListener('click', (event) => {
