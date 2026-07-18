@@ -6490,6 +6490,7 @@ def admin_censor_check_payload(check, last_run=None, keys_by_id=None):
         "port": check.port,
         "interval_minutes": check.interval_minutes,
         "is_enabled": check.is_enabled,
+        "geo_mode": check.geo_mode,
         "api_key_id": check.api_key_id,
         "api_key_name": key_name,
         "last_run": admin_censor_run_payload(last_run) if last_run else None,
@@ -6690,6 +6691,7 @@ def support_admin_api_censor_checks(request):
                 check.sni = sni[:256]
                 check.port = port
                 check.interval_minutes = interval_minutes
+                check.geo_mode = request.POST.get("geo_mode") == "1"
                 check.api_key_id = api_key_id
                 check.updated_at = datetime.utcnow()
                 db_session.commit()
@@ -6728,7 +6730,9 @@ def support_admin_api_censor_checks(request):
                         status=400,
                     )
                 is_public = ripe_atlas.resolve_public_flag(db_session, check)
-                run = ripe_atlas.start_run(db_session, check, api_key, is_public)
+                run = ripe_atlas.start_run(
+                    db_session, check, api_key, is_public, bool(check.geo_mode)
+                )
                 status_code = 200 if run.status != ripe_atlas.RUN_STATUS_ERROR else 502
                 return JsonResponse(
                     {"status": "ok", "run": admin_censor_run_payload(run)},

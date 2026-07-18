@@ -12,6 +12,7 @@
 """
 
 import logging
+import math
 from datetime import datetime
 from datetime import timedelta
 
@@ -23,6 +24,74 @@ from common.models.db import CensorCheckRun
 from common.models.db import RipeApiKey
 
 ATLAS_API = "https://atlas.ripe.net/api/v2"
+
+# Сколько зондов запрашивать в географическом режиме (выбор по country:RU,
+# группировка по федеральным округам). Atlas раздаёт их по стране, но с сильным
+# перекосом в Москву и Питер — где зондов физически больше. ~20 кредитов/зонд.
+GEO_PROBE_COUNT = 50
+
+# Опорные города с федеральным округом. Округ зонда определяется по ближайшему
+# городу из этого списка (зонды и так стоят в городах, поэтому это точнее, чем
+# грубые прямоугольники округов, которые у РФ сильно изрезаны).
+FEDERAL_DISTRICT_ANCHORS: list[tuple[float, float, str]] = [
+    # Центральный
+    (55.75, 37.62, "Центральный"), (51.67, 39.18, "Центральный"),
+    (52.60, 39.60, "Центральный"), (54.20, 37.62, "Центральный"),
+    (57.63, 39.87, "Центральный"), (51.73, 36.19, "Центральный"),
+    (56.86, 35.92, "Центральный"), (50.60, 36.59, "Центральный"),
+    # Северо-Западный
+    (59.94, 30.31, "Северо-Западный"), (54.71, 20.51, "Северо-Западный"),
+    (68.97, 33.08, "Северо-Западный"), (64.54, 40.54, "Северо-Западный"),
+    (61.79, 34.35, "Северо-Западный"), (59.22, 39.90, "Северо-Западный"),
+    (57.81, 28.33, "Северо-Западный"), (61.67, 50.83, "Северо-Западный"),
+    # Южный
+    (47.24, 39.70, "Южный"), (45.04, 38.98, "Южный"),
+    (48.70, 44.52, "Южный"), (46.35, 48.03, "Южный"),
+    (43.60, 39.73, "Южный"), (44.95, 34.10, "Южный"),
+    # Северо-Кавказский
+    (45.04, 41.97, "Северо-Кавказский"), (42.98, 47.50, "Северо-Кавказский"),
+    (43.02, 44.68, "Северо-Кавказский"), (43.32, 45.69, "Северо-Кавказский"),
+    # Приволжский
+    (55.79, 49.12, "Приволжский"), (56.33, 44.00, "Приволжский"),
+    (53.20, 50.15, "Приволжский"), (54.74, 55.97, "Приволжский"),
+    (58.01, 56.25, "Приволжский"), (51.53, 46.03, "Приволжский"),
+    (51.77, 55.10, "Приволжский"), (56.85, 53.20, "Приволжский"),
+    (53.20, 45.00, "Приволжский"), (58.60, 49.66, "Приволжский"),
+    (54.32, 48.40, "Приволжский"), (56.14, 47.25, "Приволжский"),
+    # Уральский
+    (56.84, 60.60, "Уральский"), (55.16, 61.40, "Уральский"),
+    (57.15, 65.53, "Уральский"), (55.44, 65.34, "Уральский"),
+    (61.25, 73.40, "Уральский"),
+    # Сибирский
+    (55.03, 82.92, "Сибирский"), (56.01, 92.85, "Сибирский"),
+    (54.99, 73.37, "Сибирский"), (53.35, 83.76, "Сибирский"),
+    (52.29, 104.28, "Сибирский"), (55.35, 86.08, "Сибирский"),
+    (56.49, 84.95, "Сибирский"), (53.72, 91.44, "Сибирский"),
+    # Дальневосточный
+    (43.12, 131.90, "Дальневосточный"), (48.48, 135.08, "Дальневосточный"),
+    (62.03, 129.73, "Дальневосточный"), (51.83, 107.58, "Дальневосточный"),
+    (52.03, 113.50, "Дальневосточный"), (50.29, 127.53, "Дальневосточный"),
+    (46.96, 142.74, "Дальневосточный"), (53.02, 158.65, "Дальневосточный"),
+    (59.56, 150.80, "Дальневосточный"),
+]
+
+
+def federal_district(lat, lon) -> str:
+    """Федеральный округ по координатам — по ближайшему опорному городу."""
+    if lat is None or lon is None:
+        return "неизвестно"
+    best_district = "неизвестно"
+    best_dist = None
+    for a_lat, a_lon, district in FEDERAL_DISTRICT_ANCHORS:
+        # Равнопромежуточная аппроксимация: по долготе масштабируем на cos(lat),
+        # иначе на севере расстояния по долготе завышаются.
+        dx = (lon - a_lon) * math.cos(math.radians((lat + a_lat) / 2))
+        dy = lat - a_lat
+        dist = dx * dx + dy * dy
+        if best_dist is None or dist < best_dist:
+            best_dist = dist
+            best_district = district
+    return best_district
 
 # Провайдеры и количество зондов на ASN — как в censorcheck (33 зонда суммарно).
 # Стоимость прогона ~20 кредитов на зонд.
@@ -92,14 +161,48 @@ def resolve_public_flag(db_session, check):
     return bool(row.public_measurements) if row else False
 
 
+def _probes_spec(geo: bool) -> list:
+    """Выбор зондов: гео-режим — по country:RU; иначе — по 12 ASN операторов."""
+    if geo:
+        return [
+            {
+                "requested": GEO_PROBE_COUNT,
+                "type": "country",
+                "value": "RU",
+                "tags": {"include": ["system-ipv4-works"]},
+            }
+        ]
+    return [
+        {
+            "requested": count,
+            "type": "asn",
+            "value": asn,
+            "tags": {"include": ["system-ipv4-works"]},
+        }
+        for asn, count, _ in ASN_PROBE_SPEC
+    ]
+
+
+def expected_probe_total(geo: bool) -> int:
+    return GEO_PROBE_COUNT if geo else REQUESTED_TOTAL
+
+
 def create_measurement(
-    api_key: str, target_ip: str, sni: str, port: int, is_public: bool = False
+    api_key: str,
+    target_ip: str,
+    sni: str,
+    port: int,
+    is_public: bool = False,
+    geo: bool = False,
 ) -> tuple:
     """Создаёт one-off sslcert-измерение; возвращает (msm_id, error_message).
 
     is_public=True — публичное измерение (результаты читаются без спец-права,
     нужно для ключей без права читать приватные результаты). По умолчанию
     приватное, чтобы IP точек входа не светились в публичной базе Atlas.
+
+    geo=True — зонды выбираются по всей РФ (country:RU) для разбивки по
+    федеральным округам; иначе — по сетям операторов.
     """
     payload = {
         "definitions": [
@@ -115,15 +218,7 @@ def create_measurement(
                 "is_public": is_public,
             }
         ],
-        "probes": [
-            {
-                "requested": count,
-                "type": "asn",
-                "value": asn,
-                "tags": {"include": ["system-ipv4-works"]},
-            }
-            for asn, count, _ in ASN_PROBE_SPEC
-        ],
+        "probes": _probes_spec(geo),
         "is_oneoff": True,
     }
     try:
@@ -191,8 +286,11 @@ def fetch_results(api_key: str, msm_id: int):
     return payload if isinstance(payload, list) else None
 
 
-def fetch_probe_asns(prb_ids: list[int]) -> dict:
-    """ASN v4 по id зондов: в результатах sslcert самого ASN нет."""
+def fetch_probe_geo(prb_ids: list[int]) -> dict:
+    """ASN и координаты по id зондов: в результатах sslcert их нет.
+
+    Возвращает {prb_id: {"asn": asn, "lat": lat, "lon": lon}}.
+    """
     if not prb_ids:
         return {}
     ids = ",".join(str(prb_id) for prb_id in sorted(set(prb_ids)))
@@ -200,64 +298,82 @@ def fetch_probe_asns(prb_ids: list[int]) -> dict:
         with httpx.Client(timeout=15) as client:
             response = client.get(
                 f"{ATLAS_API}/probes/",
-                params={"id__in": ids, "fields": "id,asn_v4"},
+                params={"id__in": ids, "fields": "id,asn_v4,geometry"},
             )
         if response.status_code != 200:
             return {}
         payload = orjson.loads(response.content)
     except Exception:
         return {}
-    return {
-        probe["id"]: probe.get("asn_v4")
-        for probe in payload.get("results", [])
-        if isinstance(probe, dict) and probe.get("id")
-    }
+    info = {}
+    for probe in payload.get("results", []):
+        if not isinstance(probe, dict) or not probe.get("id"):
+            continue
+        geometry = probe.get("geometry") or {}
+        coords = geometry.get("coordinates") or [None, None]
+        lon, lat = coords[0], coords[1]
+        info[probe["id"]] = {"asn": probe.get("asn_v4"), "lat": lat, "lon": lon}
+    return info
 
 
-def summarize_results(results: list) -> dict:
-    """Сводка по зондам: пробился/заблокирован + разбивка по провайдерам."""
-    probe_asns = fetch_probe_asns(
+def summarize_results(results: list, geo: bool = False) -> dict:
+    """Сводка по зондам: пробился/заблокирован + разбивка по группам.
+
+    geo=True — группировка по федеральным округам, иначе по провайдерам.
+    В карточку каждого зонда кладутся и провайдер, и округ.
+    """
+    probe_info = fetch_probe_geo(
         [row.get("prb_id") for row in results if row.get("prb_id")]
     )
     probes = []
-    blocked_by_provider: dict[str, int] = {}
+    blocked_by_group: dict[str, int] = {}
     ok_count = 0
     for row in results:
         # TLS-обмен состоялся (пусть даже alert'ом) — значит пакеты дошли.
         ok = any(key in row for key in ("cert", "method", "alert"))
         prb_id = row.get("prb_id")
-        asn = probe_asns.get(prb_id)
+        info = probe_info.get(prb_id) or {}
+        asn = info.get("asn")
         provider = provider_name(asn)
+        district = federal_district(info.get("lat"), info.get("lon"))
+        group = district if geo else provider
         if ok:
             ok_count += 1
         else:
-            blocked_by_provider[provider] = blocked_by_provider.get(provider, 0) + 1
+            blocked_by_group[group] = blocked_by_group.get(group, 0) + 1
         probes.append(
             {
                 "prb_id": prb_id,
                 "asn": asn,
                 "provider": provider,
+                "district": district,
                 "ok": ok,
                 "err": str(row.get("err", ""))[:200] if not ok else "",
                 "rt_ms": row.get("rt"),
             }
         )
-    probes.sort(key=lambda probe: (probe["ok"], probe["provider"]))
+    probes.sort(key=lambda probe: (probe["ok"], probe["district"] if geo else probe["provider"]))
     return {
         "probes": probes,
         "total": len(probes),
         "ok": ok_count,
         "blocked": len(probes) - ok_count,
-        "blocked_by_provider": blocked_by_provider,
+        # Ключ исторически называется blocked_by_provider; в гео-режиме здесь
+        # округа. Фронт рендерит его как «Блокируют: <label> N» независимо.
+        "blocked_by_provider": blocked_by_group,
     }
 
 
 def start_run(
-    db_session, check: CensorCheck, api_key: str, is_public: bool = False
+    db_session,
+    check: CensorCheck,
+    api_key: str,
+    is_public: bool = False,
+    geo: bool = False,
 ) -> CensorCheckRun:
     """Создаёт измерение и запись прогона (при ошибке — прогон со статусом error)."""
     msm_id, error = create_measurement(
-        api_key, check.target_ip, check.sni, check.port, is_public
+        api_key, check.target_ip, check.sni, check.port, is_public, geo
     )
     run = CensorCheckRun(
         check_id=check.id,
@@ -305,14 +421,17 @@ def finalize_run(db_session, run: CensorCheckRun, api_key: str) -> bool:
             return True
         return False
 
-    summary = summarize_results(results)
+    check = db_session.get(CensorCheck, run.check_id)
+    geo = bool(check.geo_mode) if check else False
+
+    summary = summarize_results(results, geo=geo)
     run.total_probes = summary["total"]
     run.ok_probes = summary["ok"]
     run.blocked_probes = summary["blocked"]
     run.results = summary["probes"]
     run.blocked_asns = summary["blocked_by_provider"]
 
-    if summary["total"] >= REQUESTED_TOTAL or deadline_passed:
+    if summary["total"] >= expected_probe_total(geo) or deadline_passed:
         if summary["total"] == 0:
             run.status = RUN_STATUS_ERROR
             run.error_message = "Ни один зонд не ответил"
@@ -375,4 +494,4 @@ def schedule_due_checks(db_session, fallback_key: str = "") -> None:
         db_session.commit()
         if claimed:
             is_public = resolve_public_flag(db_session, check)
-            start_run(db_session, check, api_key, is_public)
+            start_run(db_session, check, api_key, is_public, bool(check.geo_mode))

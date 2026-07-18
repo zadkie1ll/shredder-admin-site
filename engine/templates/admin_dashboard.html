@@ -70,8 +70,12 @@
         .node-traffic-cell-num { text-align: right; font-variant-numeric: tabular-nums; }
         .node-traffic-share-hot { color: #ff6b6b; font-weight: 800; }
         .tab-btn[data-tab="censor-checks"] i { color: var(--brand-gold); }
-        .censor-check-form { display: grid; grid-template-columns: minmax(130px, .8fr) minmax(0, 1.1fr) minmax(140px, .6fr) minmax(150px, .7fr) auto; gap: 10px; align-items: center; }
+        .censor-check-form { display: grid; grid-template-columns: minmax(120px, .8fr) minmax(0, 1fr) minmax(150px, .7fr) minmax(130px, .6fr) minmax(140px, .6fr) auto; gap: 10px; align-items: center; }
+        @media (max-width: 1100px) { .censor-check-form { grid-template-columns: 1fr 1fr; } }
         .censor-form-actions { display: flex; gap: 8px; }
+        .censor-mode-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; border: 1px solid rgba(132,204,22,.4); color: var(--blue); background: rgba(132,204,22,.08); }
+        .censor-district-row { grid-template-columns: minmax(150px, 1.4fr) 90px 90px minmax(150px, 1.2fr); min-width: 520px; }
+        .censor-district-row.table-head { background: rgba(255,255,255,.04); }
         .censor-keys-card { padding: 0; margin-bottom: 16px; }
         .censor-keys-card > summary { cursor: pointer; padding: 14px 16px; font-weight: 800; list-style: none; display: flex; align-items: center; gap: 8px; }
         .censor-keys-card > summary::-webkit-details-marker { display: none; }
@@ -1811,6 +1815,10 @@
                 <input type="hidden" name="check_id">
                 <input class="input" name="target_ip" maxlength="64" placeholder="IP точки входа" required>
                 <input class="input" name="sni" maxlength="256" placeholder="SNI клиентов (uk.example.org)" required>
+                <select class="input" name="geo_mode" title="Как выбирать зонды и группировать результат">
+                    <option value="0">По операторам (33 зонда)</option>
+                    <option value="1">По регионам — округа (50 зондов)</option>
+                </select>
                 <select class="input" name="interval_minutes" title="Расписание запуска">
                     <option value="">Только вручную</option>
                     <option value="60">Каждый час</option>
@@ -4602,9 +4610,9 @@
                 return;
             }
             const rowsHtml = censorChecksCache.map((check) => {
-                const schedule = check.interval_minutes
+                const schedule = (check.interval_minutes
                     ? (CENSOR_INTERVAL_LABELS[check.interval_minutes] || `каждые ${check.interval_minutes} мин`)
-                    : 'вручную';
+                    : 'вручную') + (check.geo_mode ? '<span class="censor-mode-badge" title="Замер по регионам РФ, группировка по округам">регионы</span>' : '');
                 const enabledBadge = check.is_enabled ? '' : ' <span class="censor-status-bad">(выключена)</span>';
                 const lastRunAt = check.last_run ? `<span class="muted">${escapeHtml(check.last_run.created_at)}</span> ` : '';
                 const keyLabel = check.api_key_name ? escapeHtml(check.api_key_name) : '<span class="muted">по умолчанию</span>';
@@ -4704,6 +4712,7 @@
             form.elements.target_ip.value = check.target_ip;
             form.elements.sni.value = check.sni;
             form.elements.interval_minutes.value = check.interval_minutes || '';
+            form.elements.geo_mode.value = check.geo_mode ? '1' : '0';
             form.elements.api_key_id.value = check.api_key_id || '';
             form.scrollIntoView({behavior: 'smooth', block: 'center'});
         }
@@ -4808,38 +4817,77 @@
             }
         }
 
+        function censorDistrictRollupHtml(probes) {
+            // Свод по округам: сколько зондов пробилось / заблокировано в каждом.
+            const byDistrict = {};
+            probes.forEach((probe) => {
+                const d = probe.district || 'неизвестно';
+                if (!byDistrict[d]) byDistrict[d] = {ok: 0, blocked: 0};
+                if (probe.ok) byDistrict[d].ok += 1; else byDistrict[d].blocked += 1;
+            });
+            const rows = Object.entries(byDistrict).sort((a, b) => (b[1].ok + b[1].blocked) - (a[1].ok + a[1].blocked));
+            const rowsHtml = rows.map(([district, c]) => {
+                const total = c.ok + c.blocked;
+                const okShare = total ? Math.round(c.ok * 100 / total) : 0;
+                let cls = 'censor-status-bad', label = 'нет доступа';
+                if (okShare === 100) { cls = 'censor-status-ok'; label = 'полный доступ'; }
+                else if (okShare > 0) { cls = 'censor-status-warn'; label = 'частично'; }
+                return `
+                    <div class="admin-table-row censor-district-row">
+                        <span><b>${escapeHtml(district)}</b></span>
+                        <span class="censor-status-ok" style="text-align:right">${c.ok}</span>
+                        <span class="censor-status-bad" style="text-align:right">${c.blocked}</span>
+                        <span class="${cls}">${okShare}% · ${label}</span>
+                    </div>`;
+            }).join('');
+            return `
+                <div class="muted" style="margin:2px 0 8px;">Доступность по федеральным округам (где есть зонды):</div>
+                <div class="data-table" style="margin-bottom:14px;">
+                    <div class="admin-table-row censor-district-row table-head">
+                        <span>Округ</span><span style="text-align:right">Проб.</span><span style="text-align:right">Блок</span><span>Статус</span>
+                    </div>
+                    ${rowsHtml}
+                </div>`;
+        }
+
         function renderCensorRunDetail(target, run, check) {
+            const geo = !!(check && check.geo_mode);
             const blockedHtml = censorBlockedProvidersHtml(run);
             const backHtml = censorModalState.checkId
                 ? `<button class="btn btn-secondary censor-modal-back" type="button" data-censor-history="${censorModalState.checkId}"><i class="fas fa-arrow-left"></i> Ко всем замерам</button>`
                 : '';
+            const blockedLabel = geo ? 'Нет доступа в округах' : 'Блокируют';
             const summaryHtml = `
                 <div class="card info-card" style="margin-bottom:12px;">
+                    Режим: <b>${geo ? 'по регионам (округа)' : 'по операторам'}</b><br>
                     Запущен: ${escapeHtml(run.created_at)}${run.completed_at ? ` · Завершён: ${escapeHtml(run.completed_at)}` : ''}<br>
                     Зондов ответило: ${num(run.total)} · Пробились: <span class="censor-status-ok">${num(run.ok)}</span> ·
                     Заблокированы: <span class="censor-status-bad">${num(run.blocked)}</span><br>
                     Статус: ${censorRunStatusHtml(run)}
-                    ${blockedHtml ? `<br>${blockedHtml}` : ''}
+                    ${blockedHtml ? `<br>${blockedLabel}: ${blockedHtml.replace('Блокируют: ', '')}` : ''}
                 </div>`;
             const probes = run.probes || [];
             if (!probes.length) {
                 target.innerHTML = `${backHtml}${summaryHtml}<div class="card info-card muted">${run.status === 'pending' ? 'Ответы зондов ещё не пришли — окно обновится само через несколько секунд.' : 'Нет по-зондовых данных.'}</div>`;
                 return;
             }
+            const rollupHtml = geo ? censorDistrictRollupHtml(probes) : '';
             const rowsHtml = probes.map((probe) => `
                 <div class="admin-table-row censor-probe-row">
                     <span class="muted">#${probe.prb_id ?? '—'}</span>
-                    <span>${escapeHtml(probe.provider || '')}</span>
-                    <span>${probe.asn ? `AS${probe.asn}` : '—'}</span>
+                    <span>${geo ? escapeHtml(probe.district || '') : escapeHtml(probe.provider || '')}</span>
+                    <span>${geo ? escapeHtml(probe.provider || '') : (probe.asn ? `AS${probe.asn}` : '—')}</span>
                     <span>${probe.ok ? '<span class="censor-status-ok">пробился</span>' : '<span class="censor-status-bad">блок</span>'}</span>
                     <span class="muted">${probe.ok ? (probe.rt_ms ? `${Number(probe.rt_ms).toFixed(0)} ms` : '') : escapeHtml(probe.err || 'нет ответа')}</span>
                 </div>`).join('');
             target.innerHTML = `
                 ${backHtml}
                 ${summaryHtml}
+                ${rollupHtml}
+                <div class="muted" style="margin:2px 0 8px;">Все зонды:</div>
                 <div class="data-table">
                     <div class="admin-table-row censor-probe-row table-head">
-                        <span>Зонд</span><span>Провайдер</span><span>ASN</span><span>Статус</span><span>Детали</span>
+                        <span>Зонд</span><span>${geo ? 'Округ' : 'Провайдер'}</span><span>${geo ? 'Оператор' : 'ASN'}</span><span>Статус</span><span>Детали</span>
                     </div>
                     ${rowsHtml}
                 </div>`;
