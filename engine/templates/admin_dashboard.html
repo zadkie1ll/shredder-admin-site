@@ -31,9 +31,7 @@
         .tab-btn span { min-width: 0; overflow-wrap: anywhere; }
         .tab-btn[data-tab="stats"] i { color: var(--brand-gold); }
         .tab-btn[data-tab="user-payments"] i { color: var(--brand-gold); }
-        .tab-btn[data-tab="referrals"] i { color: var(--brand-gold); }
         .tab-btn[data-tab="payment-info"] i { color: var(--brand-gold); }
-        .tab-btn[data-tab="subscription-manage"] i { color: var(--brand-gold); }
         .tab-btn[data-tab="system"] i { color: var(--brand-gold); }
         .tab-btn[data-tab="config-templates"] i { color: var(--brand-gold); }
         .tab-btn[data-tab="node-traffic"] i { color: var(--brand-gold); }
@@ -96,6 +94,24 @@
         .censor-last-run-link:hover { text-decoration: underline; }
         .censor-open-icon { font-size: 10px; color: var(--muted); }
         .censor-modal-back { margin-bottom: 12px; }
+        .client-sub-card { padding: 16px; }
+        .client-sub-card .info-title { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .client-sub-card .info-title i { color: var(--brand-gold); }
+        .client-sub-last-action { margin-bottom: 12px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(34,197,94,.28); background: rgba(34,197,94,.08); font-size: 13px; font-weight: 700; }
+        .client-sub-last-action i { color: #22c55e; margin-right: 6px; }
+        .client-sub-actions { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .client-sub-action { display: flex; flex-direction: column; gap: 8px; padding: 14px; border-radius: 12px; border: 1px solid rgba(255,255,255,.07); background: rgba(255,255,255,.02); }
+        .client-sub-action-title { font-size: 13px; font-weight: 800; color: var(--text-main); }
+        .client-sub-action-desc { flex: 1; font-size: 12px; line-height: 1.45; color: var(--muted); }
+        .client-sub-action-controls { display: flex; gap: 8px; align-items: center; }
+        .client-sub-action-controls .input { max-width: 110px; }
+        @media (max-width: 900px) { .client-sub-actions { grid-template-columns: 1fr; } }
+        .client-subtabs { margin: 4px 0 0; }
+        .client-section { display: none; }
+        .client-section.active { display: block; }
+        .client-ref-blocked { border-color: rgba(255,107,107,.35); color: #ff8f8f; font-weight: 700; }
+        .client-ref-blocked i { margin-right: 6px; }
+        .client-empty { text-align: center; padding: 26px; }
         .censor-probe-row { grid-template-columns: 90px minmax(130px, 1fr) 100px 110px minmax(0, 2fr); min-width: 620px; }
         .censor-probe-row.table-head { background: rgba(255,255,255,.04); }
         .censor-status-ok { color: #22c55e; font-weight: 800; }
@@ -103,7 +119,6 @@
         .censor-status-bad { color: #ff6b6b; font-weight: 800; }
         .censor-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .censor-row-actions .btn { padding: 5px 10px; font-size: 11px; }
-        .subscription-actions { display: grid; grid-template-columns: 160px repeat(3, auto); gap: 10px; align-items: center; margin-top: 10px; }
         .input { width: 100%; min-width: 0; max-width: 100%; min-height: 40px; border: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.22); color: var(--text-main); border-radius: 9px; padding: 0 13px; font-size: 13px; font-weight: 600; outline: none; transition: border-color .15s, background .15s; }
         .input:focus { border-color: rgba(255,199,0,.38); background: rgba(0,0,0,.28); }
         .input:-webkit-autofill,
@@ -699,10 +714,8 @@
             box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
         }
         #panel-stats .panel-header::before { content: "\f201"; }
-        #panel-user-payments .panel-header::before { content: "\f2bd"; }
-        #panel-referrals .panel-header::before { content: "\f0c0"; }
+        #panel-user-payments .panel-header::before { content: "\f007"; }
         #panel-payment-info .panel-header::before { content: "\f09d"; }
-        #panel-subscription-manage .panel-header::before { content: "\f017"; }
         #panel-system .panel-header::before { content: "\f1de"; }
         #panel-config-templates .panel-header::before { content: "\f1c9"; }
         #panel-node-traffic .panel-header::before { content: "\e51d"; }
@@ -1193,7 +1206,6 @@
             .metrics-legend-grid,
             .system-grid,
             .system-form.two,
-            .subscription-actions,
             .info-grid { grid-template-columns: 1fr; }
             .btn { width: 100%; }
             .source-metrics { grid-template-columns: 1fr; }
@@ -1283,11 +1295,9 @@
                 <button class="tab-btn active" data-tab="stats"><i class="fas fa-chart-line"></i><span>Аналитика</span></button>
             {% endif %}
             <span class="nav-section-label">Управление</span>
-            <button class="tab-btn {% if not support_admin_is_full_admin %}active{% endif %}" data-tab="user-payments"><i class="fas fa-receipt"></i><span>Клиент</span></button>
-            <button class="tab-btn" data-tab="referrals"><i class="fas fa-network-wired"></i><span>Рефералы</span></button>
+            <button class="tab-btn {% if not support_admin_is_full_admin %}active{% endif %}" data-tab="user-payments"><i class="fas fa-user"></i><span>Клиент</span></button>
             <button class="tab-btn" data-tab="payment-info"><i class="fas fa-credit-card"></i><span>Найти платёж</span></button>
             {% if support_admin_is_full_admin %}
-                <button class="tab-btn" data-tab="subscription-manage"><i class="fas fa-hourglass-half"></i><span>Подписка</span></button>
                 <button class="tab-btn" data-tab="system"><i class="fas fa-sliders"></i><span>Система</span></button>
                 <button class="tab-btn" data-tab="config-templates"><i class="fas fa-file-code"></i><span>Конфиги</span></button>
                 <button class="tab-btn" data-tab="node-traffic"><i class="fas fa-tower-broadcast"></i><span>Трафик нод</span></button>
@@ -1323,6 +1333,7 @@
         data-censor-check-runs-url="{% url 'support_admin_api_censor_check_runs' %}"
         data-ripe-keys-url="{% url 'support_admin_api_ripe_keys' %}"
         data-tickets-url="{% url 'support_admin_tickets_json' %}?status={{ status_filter }}"
+        data-full-admin="{% if support_admin_is_full_admin %}1{% endif %}"
     >
         <header class="admin-topbar">
             <div class="admin-topbar-title"><i class="fas fa-signal"></i><span>Monkey Island Control</span></div>
@@ -1562,26 +1573,14 @@
 
         <section id="panel-user-payments" class="tab-panel {% if not support_admin_is_full_admin %}active{% endif %}">
             <header class="panel-header">
-                <h1 class="admin-title">Пользователь и платежи</h1>
-                <p class="admin-subtitle">Поиск по username, email или Telegram ID</p>
+                <h1 class="admin-title">Клиент</h1>
+                <p class="admin-subtitle">Профиль, подписка, платежи и рефералы — всё по одному пользователю</p>
             </header>
             <form id="user-payments-form" class="card form-card form-grid-two">
                 <input class="input" name="q" placeholder="username, email или telegram_id">
                 <button class="btn" type="submit"><i class="fas fa-search"></i>Найти</button>
             </form>
             <div id="user-payments-result"></div>
-        </section>
-
-        <section id="panel-referrals" class="tab-panel">
-            <header class="panel-header">
-                <h1 class="admin-title">Реферальная сеть</h1>
-                <p class="admin-subtitle">Бонусы, оплаты рефералов и граф приглашений</p>
-            </header>
-            <form id="referrals-form" class="card form-card form-grid-two">
-                <input class="input" name="q" placeholder="username, email или telegram_id">
-                <button class="btn" type="submit"><i class="fas fa-search"></i>Показать</button>
-            </form>
-            <div id="referrals-result" class="result-stack"></div>
         </section>
 
         <section id="panel-payment-info" class="tab-panel">
@@ -1610,29 +1609,6 @@
             </form>
             <div id="payment-info-result"></div>
         </section>
-
-        {% if support_admin_is_full_admin %}
-        <section id="panel-subscription-manage" class="tab-panel">
-            <header class="panel-header">
-                <h1 class="admin-title">Срок подписки</h1>
-                <p class="admin-subtitle">Проверка пользователя, продление и установка пробного часа</p>
-            </header>
-            <form id="subscription-form" class="card form-card">
-                {% csrf_token %}
-                <div class="form-grid-two">
-                    <input class="input" name="q" placeholder="username, email или telegram_id">
-                    <button class="btn btn-secondary" type="submit" name="action" value="preview"><i class="fas fa-eye"></i>Проверить</button>
-                </div>
-                <div class="subscription-actions">
-                    <input class="input" name="days" type="number" min="1" placeholder="Дни">
-                    <button class="btn" type="submit" name="action" value="extend"><i class="fas fa-plus"></i>Продлить</button>
-                    <button class="btn btn-secondary" type="submit" name="action" value="set_trial_hour"><i class="fas fa-clock"></i>Установить срок: 1 час</button>
-                    <button class="btn btn-danger" type="submit" name="action" value="stop_autopay"><i class="fas fa-ban"></i>Отключить автоплатеж</button>
-                </div>
-            </form>
-            <div id="subscription-result"></div>
-        </section>
-        {% endif %}
 
         {% if support_admin_is_full_admin %}
         <section id="panel-system" class="tab-panel">
@@ -3685,14 +3661,159 @@
             nextButton.disabled = sourceUsersModalState.page >= sourceUsersModalState.totalPages;
         }
 
-        async function loadUserPayments(event) {
+        // ---------- Карточка клиента: профиль + подписка + платежи + рефералы ----------
+
+        const clientCardState = {q: '', lastAction: ''};
+
+        async function loadClientCard(event) {
             event.preventDefault();
+            const q = (new FormData(event.target).get('q') || '').trim();
+            if (!q) return;
+            clientCardState.q = q;
+            clientCardState.lastAction = '';
+            await renderClientCard();
+        }
+
+        function clientPaymentsSectionHtml(result) {
+            const history = result.history || [];
+            return `
+                <section class="card payments-board">
+                    <div class="payments-board-scroll">
+                        ${history.length ? `
+                            <div class="admin-table-row table-head user-payments-row">
+                                <div>ID Платежа</div>
+                                <div>Дата</div>
+                                <div>Система</div>
+                                <div>Тариф</div>
+                                <div>Сумма</div>
+                                <div>Статус</div>
+                            </div>
+                            ${history.map((item) => `
+                                <div class="admin-table-row user-payments-row">
+                                    <div class="payment-id-cell" title="${escapeHtml(item.id)}">${escapeHtml(item.id)}</div>
+                                    <div>${escapeHtml(item.date)}</div>
+                                    <div>${escapeHtml(item.system)}</div>
+                                    <div class="cell-value" title="${escapeHtml(item.tariff)}">${escapeHtml(item.tariff)}${item.trial ? ' · Trial' : ''}</div>
+                                    <div>${escapeHtml(item.amount)} ${escapeHtml(item.currency)}</div>
+                                    <div><span class="payment-status-pill ${item.success ? 'ok' : ''}">${item.success ? 'Успешен' : 'Ошибка'}</span></div>
+                                </div>
+                            `).join('')}
+                        ` : '<div class="info-card muted">Платежей не найдено.</div>'}
+                    </div>
+                    <footer class="payments-board-footer">
+                        <span>Платежи: ${history.length ? `1 - ${history.length}` : '0'}</span>
+                    </footer>
+                </section>`;
+        }
+
+        function clientReferralsSectionHtml(refResult) {
+            if (!refResult) return '<div class="card info-card muted">Данные по рефералам недоступны.</div>';
+            const referrals = refResult.referrals || [];
+            const blockHtml = refResult.referral_block?.blocked
+                ? `<section class="card info-card client-ref-blocked"><i class="fas fa-ban"></i>Рефералка заблокирована${refResult.referral_block.reason ? ` — ${escapeHtml(refResult.referral_block.reason)}` : ''}</section>`
+                : '';
+            const metricsHtml = `
+                <div class="metrics-grid three">
+                    ${metric('Рефералов', refResult.summary.referrals, 'fa-user-plus')}
+                    ${metric('Оплатили', refResult.summary.paid_referrals, 'fa-coins')}
+                    ${metric('Бонусных дней', refResult.summary.bonus_days, 'fa-gift')}
+                </div>`;
+            if (!referrals.length) {
+                return `${blockHtml}${metricsHtml}<div class="card info-card muted client-empty">У клиента пока нет приглашённых рефералов.</div>`;
+            }
+            return `
+                ${blockHtml}
+                ${metricsHtml}
+                <section class="card info-card"><h3 class="info-title">Граф приглашений</h3><div id="referral-graph"></div></section>
+                <section class="referral-cards">
+                    ${referrals.map((row) => `
+                        <article class="card referral-card">
+                            <div class="referral-card-head">
+                                <div>
+                                    <div class="referral-name">${escapeHtml(row.user.username ? '@' + row.user.username : 'ID ' + (row.user.telegram_id || row.user.id))}</div>
+                                    <div class="referral-sub">${escapeHtml(row.user.email || row.user.telegram_id || 'Контакты не указаны')}</div>
+                                </div>
+                                <div class="referral-pill ${row.paid ? 'paid' : ''}">${row.paid ? 'Платил' : 'Без оплат'}</div>
+                            </div>
+                            <div class="referral-detail-grid">
+                                <div class="referral-detail">
+                                    <div class="referral-detail-label">Бонусные дни</div>
+                                    <div class="referral-detail-value">${row.bonus_days}</div>
+                                </div>
+                                <div class="referral-detail">
+                                    <div class="referral-detail-label">Платежи</div>
+                                    <div class="referral-detail-value ${row.paid ? 'green' : ''}">${row.payments_count}</div>
+                                </div>
+                                <div class="referral-detail">
+                                    <div class="referral-detail-label">Второй уровень</div>
+                                    <div class="referral-detail-value">${row.children_count}</div>
+                                </div>
+                            </div>
+                            <div class="referral-bonuses">
+                                ${(row.bonuses || []).map((bonus) => `${escapeHtml(bonus.created_at)} · ${escapeHtml(bonus.type)} · +${bonus.days} дн.`).join('<br>') || 'Бонусов по этому рефералу нет.'}
+                            </div>
+                        </article>
+                    `).join('')}
+                </section>`;
+        }
+
+        function clientSubscriptionManageHtml() {
+            if (main.dataset.fullAdmin !== '1') return '';
+            return `
+                <section class="card client-sub-card">
+                    <h3 class="info-title"><i class="fas fa-hourglass-half"></i> Управление подпиской</h3>
+                    ${clientCardState.lastAction ? `<div class="client-sub-last-action">${clientCardState.lastAction}</div>` : ''}
+                    <div class="client-sub-actions">
+                        <div class="client-sub-action">
+                            <div class="client-sub-action-title">Продлить подписку</div>
+                            <div class="client-sub-action-desc">Добавит дней к текущему сроку — бонусы, компенсации.</div>
+                            <div class="client-sub-action-controls">
+                                <input class="input" id="client-extend-days" type="number" min="1" placeholder="Дней">
+                                <button class="btn" type="button" data-client-sub-action="extend"><i class="fas fa-plus"></i>Продлить</button>
+                            </div>
+                        </div>
+                        <div class="client-sub-action">
+                            <div class="client-sub-action-title">Сброс для возврата</div>
+                            <div class="client-sub-action-desc">Срок станет 1 час: подписка гасится, но клиент дорабатывает, пока идёт возврат денег.</div>
+                            <div class="client-sub-action-controls">
+                                <button class="btn btn-secondary" type="button" data-client-sub-action="set_trial_hour"><i class="fas fa-clock"></i>Установить 1 час</button>
+                            </div>
+                        </div>
+                        <div class="client-sub-action">
+                            <div class="client-sub-action-title">Автоплатёж</div>
+                            <div class="client-sub-action-desc">Отключает автосписание — по просьбе клиента или при возврате.</div>
+                            <div class="client-sub-action-controls">
+                                <button class="btn btn-danger" type="button" data-client-sub-action="stop_autopay"><i class="fas fa-ban"></i>Отключить</button>
+                            </div>
+                        </div>
+                    </div>
+                </section>`;
+        }
+
+        async function renderClientCard(activeSection = null) {
             const target = document.getElementById('user-payments-result');
-            setLoading(target);
-            const params = new URLSearchParams(new FormData(event.target));
-            const response = await fetch(`${main.dataset.userPaymentsUrl}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
-            if (!response.ok) return setError(target, 'Пользователь не найден');
-            const {result} = await response.json();
+            const section = activeSection
+                || document.querySelector('#user-payments-result [data-client-subtab].active')?.dataset.clientSubtab
+                || 'payments';
+            setLoading(target, 'Собираем карточку клиента...');
+            const params = new URLSearchParams({q: clientCardState.q});
+            const fetchOptions = {headers: {'X-Requested-With': 'XMLHttpRequest'}};
+            let paymentsResponse, referralsResponse;
+            try {
+                [paymentsResponse, referralsResponse] = await Promise.all([
+                    fetch(`${main.dataset.userPaymentsUrl}?${params}`, fetchOptions),
+                    fetch(`${main.dataset.referralsUrl}?${params}`, fetchOptions),
+                ]);
+            } catch (error) {
+                return setError(target, 'Ошибка запроса');
+            }
+            if (!paymentsResponse.ok) return setError(target, 'Пользователь не найден');
+            const {result} = await paymentsResponse.json();
+            let refPayload = null;
+            if (referralsResponse.ok) {
+                try { refPayload = await referralsResponse.json(); } catch (error) { refPayload = null; }
+            }
+            const refCount = refPayload?.result?.summary?.referrals;
             target.innerHTML = `
                 <div class="result-stack">
                     ${userCard(result.user)}
@@ -3701,36 +3822,78 @@
                         ${metric('Использование', escapeHtml(result.traffic), 'fa-signal')}
                         ${metric('Регистрация', escapeHtml(result.first_seen), 'fa-calendar')}
                     </div>
-                    <section class="card payments-board">
-                        <h2 class="payments-board-title">История платежей</h2>
-                        <div class="payments-board-scroll">
-                            ${(result.history || []).length ? `
-                                <div class="admin-table-row table-head user-payments-row">
-                                    <div>ID Платежа</div>
-                                    <div>Дата</div>
-                                    <div>Система</div>
-                                    <div>Тариф</div>
-                                    <div>Сумма</div>
-                                    <div>Статус</div>
-                                </div>
-                                ${(result.history || []).map((item) => `
-                                    <div class="admin-table-row user-payments-row">
-                                        <div class="payment-id-cell" title="${escapeHtml(item.id)}">${escapeHtml(item.id)}</div>
-                                        <div>${escapeHtml(item.date)}</div>
-                                        <div>${escapeHtml(item.system)}</div>
-                                        <div class="cell-value" title="${escapeHtml(item.tariff)}">${escapeHtml(item.tariff)}${item.trial ? ' · Trial' : ''}</div>
-                                        <div>${escapeHtml(item.amount)} ${escapeHtml(item.currency)}</div>
-                                        <div><span class="payment-status-pill ${item.success ? 'ok' : ''}">${item.success ? 'Успешен' : 'Ошибка'}</span></div>
-                                    </div>
-                                `).join('')}
-                            ` : '<div class="info-card muted">Платежей не найдено.</div>'}
-                        </div>
-                        <footer class="payments-board-footer">
-                            <span>Платежи: ${(result.history || []).length ? `1 - ${(result.history || []).length}` : '0'}</span>
-                        </footer>
-                    </section>
+                    ${clientSubscriptionManageHtml()}
+                    <div class="subtabs client-subtabs" role="tablist" aria-label="Разделы клиента">
+                        <button type="button" class="subtab ${section === 'payments' ? 'active' : ''}" data-client-subtab="payments" role="tab"><i class="fas fa-receipt"></i>Платежи (${(result.history || []).length})</button>
+                        <button type="button" class="subtab ${section === 'referrals' ? 'active' : ''}" data-client-subtab="referrals" role="tab"><i class="fas fa-network-wired"></i>Рефералы${typeof refCount === 'number' ? ` (${refCount})` : ''}</button>
+                    </div>
+                    <div class="client-section ${section === 'payments' ? 'active' : ''}" data-client-section="payments">
+                        ${clientPaymentsSectionHtml(result)}
+                    </div>
+                    <div class="client-section ${section === 'referrals' ? 'active' : ''}" data-client-section="referrals">
+                        <div class="result-stack">${clientReferralsSectionHtml(refPayload?.result)}</div>
+                    </div>
                 </div>
             `;
+            if (refPayload?.result?.graph) {
+                drawReferralGraph(document.getElementById('referral-graph'), refPayload.result.graph);
+            }
+        }
+
+        function showClientSection(sectionName) {
+            document.querySelectorAll('#user-payments-result [data-client-subtab]').forEach((button) => {
+                button.classList.toggle('active', button.dataset.clientSubtab === sectionName);
+            });
+            document.querySelectorAll('#user-payments-result [data-client-section]').forEach((block) => {
+                block.classList.toggle('active', block.dataset.clientSection === sectionName);
+            });
+        }
+
+        const CLIENT_SUB_CONFIRMS = {
+            set_trial_hour: 'Сбросить подписку до 1 часа? Используется при возврате средств.',
+            stop_autopay: 'Отключить автоплатёж этому клиенту?',
+        };
+
+        async function clientSubscriptionAction(action) {
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', csrfToken);
+            formData.append('q', clientCardState.q);
+            formData.append('action', action);
+            if (action === 'extend') {
+                const days = document.getElementById('client-extend-days')?.value;
+                if (!days || Number(days) < 1) {
+                    showAdminToast('Укажите, на сколько дней продлить', 'error');
+                    return;
+                }
+                formData.append('days', days);
+            }
+            if (CLIENT_SUB_CONFIRMS[action] && !confirm(CLIENT_SUB_CONFIRMS[action])) return;
+            let response;
+            try {
+                response = await fetch(main.dataset.subscriptionManageUrl, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                });
+            } catch (error) {
+                showAdminToast('Ошибка запроса', 'error');
+                return;
+            }
+            if (!response.ok) {
+                showAdminToast('Не удалось выполнить действие', 'error');
+                return;
+            }
+            const {result} = await response.json();
+            const parts = [];
+            if (result.old_expire_at) parts.push(`Было: <span class="green">${escapeHtml(result.old_expire_at)}</span>`);
+            if (result.new_expire_at) parts.push(`Стало: <span class="green">${escapeHtml(result.new_expire_at)}</span>`);
+            if (typeof result.rwms_updated !== 'undefined') parts.push(`RWMS: <span class="${result.rwms_updated ? 'green' : 'red'}">${result.rwms_updated ? 'обновлен' : 'не обновлен'}</span>`);
+            clientCardState.lastAction = parts.length
+                ? `<i class="fas fa-circle-check"></i> ${parts.join(' · ')}`
+                : '<i class="fas fa-circle-check"></i> Готово';
+            showAdminToast('Действие выполнено');
+            // Перерисовываем карточку: новый срок подписки сразу виден в профиле
+            renderClientCard();
         }
 
         async function loadPaymentInfo(event) {
@@ -3808,61 +3971,6 @@
             if (count) count.textContent = payments.length ? `Платежи: 1 - ${payments.length}` : 'Платежи: 0';
         }
 
-        async function loadReferrals(event) {
-            event.preventDefault();
-            const target = document.getElementById('referrals-result');
-            setLoading(target);
-            const params = new URLSearchParams(new FormData(event.target));
-            const response = await fetch(`${main.dataset.referralsUrl}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
-            if (!response.ok) return setError(target, 'Пользователь не найден');
-            const {result, top} = await response.json();
-            target.innerHTML = `
-                ${userCard(result.user)}
-                ${result.referral_block?.blocked ? `<section class="card info-card"><p>Рефералка: <span class="red">заблокирована</span></p><p>Причина: <span class="cell-value">${escapeHtml(result.referral_block.reason || '')}</span></p></section>` : ''}
-                <div class="metrics-grid three">
-                    ${metric('Рефералов', result.summary.referrals, 'fa-user-plus')}
-                    ${metric('Оплатили', result.summary.paid_referrals, 'fa-coins')}
-                    ${metric('Бонусных дней', result.summary.bonus_days, 'fa-gift')}
-                </div>
-                <section class="card info-card"><h3 class="info-title">Граф приглашений</h3><div id="referral-graph"></div></section>
-                <section class="referral-cards">
-                    ${(result.referrals || []).map((row) => `
-                        <article class="card referral-card">
-                            <div class="referral-card-head">
-                                <div>
-                                    <div class="referral-name">${escapeHtml(row.user.username ? '@' + row.user.username : 'ID ' + (row.user.telegram_id || row.user.id))}</div>
-                                    <div class="referral-sub">${escapeHtml(row.user.email || row.user.telegram_id || 'Контакты не указаны')}</div>
-                                </div>
-                                <div class="referral-pill ${row.paid ? 'paid' : ''}">${row.paid ? 'Платил' : 'Без оплат'}</div>
-                            </div>
-                            <div class="referral-detail-grid">
-                                <div class="referral-detail">
-                                    <div class="referral-detail-label">Бонусные дни</div>
-                                    <div class="referral-detail-value">${row.bonus_days}</div>
-                                </div>
-                                <div class="referral-detail">
-                                    <div class="referral-detail-label">Платежи</div>
-                                    <div class="referral-detail-value ${row.paid ? 'green' : ''}">${row.payments_count}</div>
-                                </div>
-                                <div class="referral-detail">
-                                    <div class="referral-detail-label">Второй уровень</div>
-                                    <div class="referral-detail-value">${row.children_count}</div>
-                                </div>
-                            </div>
-                            <div class="referral-bonuses">
-                                ${(row.bonuses || []).map((bonus) => `${escapeHtml(bonus.created_at)} · ${escapeHtml(bonus.type)} · +${bonus.days} дн.`).join('<br>') || 'Бонусов по этому рефералу нет.'}
-                            </div>
-                        </article>
-                    `).join('') || '<div class="info-card muted">Рефералов нет.</div>'}
-                </section>
-                <section class="card info-card">
-                    <h3 class="info-title">Топ рефереров</h3>
-                    ${(top || []).map((row, index) => `<p>${index + 1}. ${escapeHtml(row.name)} — <span class="green">${row.ref_count}</span> чел. (+${row.total_days} дн.)</p>`).join('') || '<p class="muted">Топ пока пуст.</p>'}
-                </section>
-            `;
-            drawReferralGraph(document.getElementById('referral-graph'), result.graph);
-        }
-
         function drawReferralGraph(container, graph) {
             if (!container) return;
             const nodes = graph.nodes || [];
@@ -3909,33 +4017,6 @@
                     <div class="referral-map-grid">
                         ${firstLevelIds.map(renderFirstLevel).join('') || '<div class="muted">Прямых рефералов нет.</div>'}
                     </div>
-                </div>
-            `;
-        }
-
-        async function submitSubscription(event) {
-            event.preventDefault();
-            const target = document.getElementById('subscription-result');
-            const submitter = event.submitter;
-            const formData = new FormData(event.target);
-            formData.set('action', submitter.value);
-            setLoading(target, 'Обновляем подписку...');
-            const response = await fetch(main.dataset.subscriptionManageUrl, {
-                method: 'POST',
-                body: formData,
-                headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
-            });
-            if (!response.ok) return setError(target, 'Не удалось выполнить действие');
-            const {result} = await response.json();
-            const actionInfo = [
-                result.old_expire_at ? `<p>Было: <span class="green">${escapeHtml(result.old_expire_at)}</span></p>` : '',
-                result.new_expire_at ? `<p>Стало: <span class="green">${escapeHtml(result.new_expire_at)}</span></p>` : '',
-                typeof result.rwms_updated !== 'undefined' ? `<p>RWMS: <span class="${result.rwms_updated ? 'green' : 'red'}">${result.rwms_updated ? 'обновлен' : 'не обновлен'}</span></p>` : '',
-            ].filter(Boolean).join('');
-            target.innerHTML = `
-                <div class="result-stack">
-                    ${userCard(result.user)}
-                    ${actionInfo ? `<section class="card info-card">${actionInfo}</section>` : ''}
                 </div>
             `;
         }
@@ -4796,13 +4877,16 @@
                 ripeKeyAction({action: 'delete', key_id: keyDeleteButton.dataset.ripeKeyDelete})
                     .then((ok) => { if (ok) { showAdminToast('Ключ удалён'); loadCensorChecks(); } });
             }
+
+            const clientSubtabButton = event.target.closest('[data-client-subtab]');
+            if (clientSubtabButton) showClientSection(clientSubtabButton.dataset.clientSubtab);
+            const clientSubActionButton = event.target.closest('[data-client-sub-action]');
+            if (clientSubActionButton) clientSubscriptionAction(clientSubActionButton.dataset.clientSubAction);
         });
 
         const statsForm = document.getElementById('stats-form');
         const userPaymentsForm = document.getElementById('user-payments-form');
         const paymentInfoForm = document.getElementById('payment-info-form');
-        const referralsForm = document.getElementById('referrals-form');
-        const subscriptionForm = document.getElementById('subscription-form');
         const referralAntifraudForm = document.getElementById('referral-antifraud-form');
         const referralBlockForm = document.getElementById('referral-block-form');
         const replyTemplateForm = document.getElementById('reply-template-form');
@@ -4812,10 +4896,8 @@
             if (event.target.matches('[data-setting-form]')) submitRuntimeSetting(event);
         });
         if (statsForm) statsForm.addEventListener('submit', loadStats);
-        if (userPaymentsForm) userPaymentsForm.addEventListener('submit', loadUserPayments);
+        if (userPaymentsForm) userPaymentsForm.addEventListener('submit', loadClientCard);
         if (paymentInfoForm) paymentInfoForm.addEventListener('submit', loadPaymentInfo);
-        if (referralsForm) referralsForm.addEventListener('submit', loadReferrals);
-        if (subscriptionForm) subscriptionForm.addEventListener('submit', submitSubscription);
         if (referralAntifraudForm) referralAntifraudForm.addEventListener('submit', submitReferralAntifraud);
         if (referralBlockForm) referralBlockForm.addEventListener('submit', submitReferralBlock);
         if (replyTemplateForm) replyTemplateForm.addEventListener('submit', submitReplyTemplate);
