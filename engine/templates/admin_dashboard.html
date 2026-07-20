@@ -385,13 +385,19 @@
         .sales-chart-title { margin: 0; color: #fff; font-size: 15px; line-height: 1.2; font-weight: 900; }
         .sales-chart-subtitle { margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.35; font-weight: 700; }
         .sales-chart-note { color: var(--brand-gold); font-size: 11px; line-height: 1.35; font-weight: 800; text-align: right; }
-        .sales-chart-canvas-wrap { position: relative; min-height: 300px; }
-        .sales-chart-canvas-wrap canvas { height: 300px; }
+        .sales-chart-canvas-wrap { position: relative; min-height: 320px; overflow-x: auto; overflow-y: hidden; scrollbar-color: rgba(127,143,163,.44) transparent; }
+        .sales-chart-canvas-wrap canvas { height: 320px; min-width: 100%; max-width: none; }
         .sales-chart-tooltip { position: absolute; z-index: 5; display: none; min-width: 190px; max-width: 280px; padding: 10px 12px; border-radius: 11px; border: 1px solid rgba(255,199,0,.2); background: rgba(9,10,15,.96); box-shadow: 0 18px 50px rgba(0,0,0,.42); color: #fff; font-size: 11px; line-height: 1.45; font-weight: 700; pointer-events: none; }
         .sales-chart-tooltip strong { display: block; color: var(--brand-gold); font-size: 12px; margin-bottom: 4px; }
-        .sales-chart-legend { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; color: var(--muted); font-size: 11px; font-weight: 800; }
-        .sales-chart-legend-item { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; border-radius: 999px; background: rgba(255,255,255,.045); border: 1px solid rgba(255,255,255,.075); }
-        .sales-chart-swatch { width: 8px; height: 8px; border-radius: 999px; background: var(--swatch, var(--brand-gold)); }
+        .sales-chart-tooltip-row { display: grid; grid-template-columns: 9px minmax(0, 1fr) auto; gap: 7px; align-items: center; margin-top: 4px; }
+        .sales-chart-tooltip-dot { width: 8px; height: 8px; border-radius: 2px; background: var(--swatch, var(--brand-gold)); }
+        .sales-chart-tooltip-value { color: #fff; font-weight: 900; white-space: nowrap; }
+        .sales-chart-tooltip-divider { height: 1px; margin: 8px 0 5px; background: rgba(255,255,255,.1); }
+        .sales-chart-legend { display: flex; flex-wrap: wrap; gap: 8px 18px; align-items: center; color: var(--muted); font-size: 11px; font-weight: 800; }
+        .sales-chart-legend-item { display: inline-flex; align-items: center; gap: 6px; min-width: 0; }
+        .sales-chart-swatch { width: 9px; height: 9px; border-radius: 1px; background: var(--swatch, var(--brand-gold)); }
+        .sales-chart-line-swatch { position: relative; width: 18px; height: 2px; border-radius: 999px; background: var(--swatch, #22c55e); }
+        .sales-chart-line-swatch::after { content: ""; position: absolute; left: 7px; top: -3px; width: 8px; height: 8px; border: 2px solid #111720; border-radius: 50%; background: var(--swatch, #22c55e); }
         .empty-chart { min-height: 210px; display: flex; align-items: center; justify-content: center; color: rgba(138,149,163,.6); font-weight: 700; font-size: 13px; }
         .subtabs { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid rgba(255,255,255,.08); }
         .subtab { display: inline-flex; align-items: center; gap: 8px; padding: 11px 16px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13px; font-weight: 800; cursor: pointer; transition: color .14s, border-color .14s; }
@@ -1208,6 +1214,16 @@
             .sidebar-nav { flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; overflow-y: auto; padding-right: 2px; }
             .tab-btn { width: 100%; min-width: 0; margin: 0 0 2px; justify-content: flex-start; height: auto; }
             .main { margin-left: 0; padding: 18px; }
+            #panel-censor-checks { min-width: 0; }
+            #panel-censor-checks .censor-form-actions {
+                width: 100%;
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            #panel-censor-checks .censor-form-actions .btn {
+                min-width: 0;
+                padding-inline: 10px;
+            }
             .chat-grid { grid-template-columns: 1fr; }
             .user-grid { grid-template-columns: 1fr; }
             .metrics-grid,
@@ -1291,6 +1307,65 @@
             .modal-body { padding: 14px; }
             .modal-footer { padding: 12px; }
             .referral-cards { grid-template-columns: 1fr; }
+            #panel-censor-checks .censor-check-form { grid-template-columns: minmax(0, 1fr); }
+            #panel-censor-checks .censor-key-form { padding: 12px; }
+            #panel-censor-checks .censor-keys-card > summary {
+                flex-wrap: wrap;
+                padding: 13px 14px;
+                line-height: 1.35;
+            }
+            #panel-censor-checks .data-table { overflow: visible; }
+            #panel-censor-checks .censor-key-row,
+            #panel-censor-checks .censor-check-row {
+                min-width: 0;
+                grid-template-columns: minmax(0, 1fr);
+                gap: 0;
+                margin: 12px;
+                padding: 0;
+                overflow: hidden;
+                border: 1px solid rgba(98,111,128,.48);
+                border-radius: 12px;
+                background: #171d25;
+            }
+            #panel-censor-checks .censor-key-row.table-head,
+            #panel-censor-checks .censor-check-row.table-head { display: none; }
+            #panel-censor-checks .censor-key-row > span,
+            #panel-censor-checks .censor-check-row > span {
+                min-width: 0;
+                display: grid;
+                grid-template-columns: 104px minmax(0, 1fr);
+                gap: 10px;
+                align-items: start;
+                padding: 10px 12px;
+                border-bottom: 1px solid rgba(98,111,128,.34);
+                overflow-wrap: anywhere;
+            }
+            #panel-censor-checks .censor-key-row > span:last-child,
+            #panel-censor-checks .censor-check-row > span:last-child { border-bottom: 0; }
+            #panel-censor-checks .censor-key-row > span::before,
+            #panel-censor-checks .censor-check-row > span::before {
+                content: attr(data-label);
+                color: var(--muted);
+                font-size: 11px;
+                line-height: 1.35;
+                font-weight: 800;
+            }
+            #panel-censor-checks .censor-row-actions {
+                gap: 8px;
+            }
+            #panel-censor-checks .censor-check-row > .censor-row-actions {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+            }
+            #panel-censor-checks .censor-key-row > .censor-row-actions {
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+            }
+            #panel-censor-checks .censor-row-actions::before { grid-column: 1 / -1; }
+            #panel-censor-checks .censor-row-actions .btn {
+                min-width: 0;
+                min-height: 40px;
+                padding: 0;
+            }
+            #panel-censor-checks .censor-last-run-link { display: inline; }
         }
     </style>
     {% include "includes/yandex_metrika.html" %}
@@ -1612,6 +1687,36 @@
                 <button type="button" class="subtab" data-subtab="acq-pushes" role="tab"><i class="fas fa-bell"></i>Пуши</button>
                 <button type="button" class="subtab" data-subtab="acq-patterns" role="tab"><i class="fas fa-clock"></i>Паттерны</button>
             </div>
+
+            <details id="acq-new-revenue-help" class="metrics-legend">
+                <summary><i class="fas fa-circle-question legend-icon"></i>Как считаются «Новые покупатели» и «Выручка новых»<i class="fas fa-chevron-down legend-chevron"></i></summary>
+                <dl class="metrics-legend-grid">
+                    <div class="metrics-legend-item">
+                        <dt>Новый покупатель</dt>
+                        <dd>Пользователь, у которого в этот период произошёл самый ранний успешный платёж за всю доступную историю Wata и YooKassa.</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>Выручка новых</dt>
+                        <dd>Сумма только первых успешных платежей, совершённых в показанный день или неделю по московскому времени. <span class="formula">Это не LTV пришедших за период.</span></dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>Если клиент оплатил позже</dt>
+                        <dd>Регистрация или подписка могли появиться раньше: первый платёж попадёт в тот день или неделю, когда он действительно состоялся.</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>Продления</dt>
+                        <dd>Все следующие платежи попадут в «Повторную выручку» будущего периода и не увеличат уже показанную «Выручку новых».</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>Пересчёт истории</dt>
+                        <dd>Значение не хранится как зафиксированный снимок: оно пересчитывается из текущей БД. Исправление, удаление или дозагрузка платёжных данных может изменить прошлые периоды.</dd>
+                    </div>
+                    <div class="metrics-legend-item">
+                        <dt>Подписка→покупатель в воронке</dt>
+                        <dd><span class="formula">Новые покупатели недели ÷ подписки, созданные на той же неделе.</span> Это сопоставление недельных итогов, а не строгая когортная конверсия. Для привязки к неделе создания подписки используйте «Аналитика → Когортный анализ».</dd>
+                    </div>
+                </dl>
+            </details>
 
             <div id="subpanel-acq-newrep" class="subtab-panel active">
                 <div class="card" style="padding:18px;">
@@ -3109,173 +3214,230 @@
             `;
         }
 
-        function drawSalesSeriesChart(canvas, series, options = {}) {
-            if (!canvas) return;
-            const buckets = series?.buckets || [];
-            // По умолчанию (без options) поведение идентично прежнему: числа платежей
-            // рисуются над каждым баром. Для плотных графиков (например когортного по
-            // неделям) их можно скрыть, чтобы подписи не наезжали друг на друга.
-            const maxBarCountLabels = options.maxBarCountLabels ?? Infinity;
-            const showBarCounts = buckets.length <= maxBarCountLabels;
-            const ctx = canvas.getContext('2d');
-            const dpr = window.devicePixelRatio || 1;
-            const width = canvas.clientWidth * dpr;
-            const height = canvas.clientHeight * dpr;
-            canvas.width = width;
-            canvas.height = height;
-            ctx.clearRect(0, 0, width, height);
-            if (!buckets.length) return;
-            const maxRevenue = Math.max(1, ...buckets.map((row) => Number(row.revenue || 0)));
-            const maxPayments = Math.max(1, ...buckets.map((row) => Number(row.payments || 0)));
-            const leftPadding = 70 * dpr;
-            const topPadding = 24 * dpr;
-            const rightPadding = 24 * dpr;
-            const bottomPadding = 64 * dpr;
-            const plotWidth = width - leftPadding - rightPadding;
-            const plotHeight = height - topPadding - bottomPadding;
-
-            const xForIndex = (index) => {
-                if (buckets.length === 1) return leftPadding + plotWidth / 2;
-                return leftPadding + (plotWidth * index) / (buckets.length - 1);
-            };
-            const revenueY = (value) => topPadding + plotHeight - (plotHeight * Number(value || 0)) / maxRevenue;
-            const paymentBarHeight = (value) => Math.max(2 * dpr, (plotHeight * .34 * Number(value || 0)) / maxPayments);
-            const barSlot = buckets.length > 1 ? plotWidth / (buckets.length - 1) : plotWidth;
-            const barWidth = Math.min(40 * dpr, Math.max(8 * dpr, barSlot * .34));
-
-            ctx.lineWidth = 1 * dpr;
-            ctx.strokeStyle = 'rgba(255,255,255,.07)';
-            ctx.fillStyle = 'rgba(255,255,255,.46)';
-            ctx.font = `700 ${11 * dpr}px Montserrat, system-ui, sans-serif`;
-            ctx.textAlign = 'right';
-            ctx.textBaseline = 'middle';
-            [0, .25, .5, .75, 1].forEach((step) => {
-                const y = topPadding + plotHeight - plotHeight * step;
-                ctx.beginPath();
-                ctx.moveTo(leftPadding, y);
-                ctx.lineTo(leftPadding + plotWidth, y);
-                ctx.stroke();
-                ctx.fillText(money(Math.round(maxRevenue * step)).replace(' ₽', ''), leftPadding - 10 * dpr, y);
-            });
-
-            const points = buckets.map((row, index) => ({
-                x: xForIndex(index),
-                y: revenueY(row.revenue),
-                row,
-            }));
-
-            buckets.forEach((row, index) => {
-                const x = xForIndex(index);
-                let y = topPadding + plotHeight;
-                const tariffs = row.tariffs || [];
-                if (tariffs.length) {
-                    tariffs.forEach((tariff, tariffIndex) => {
-                        const segmentHeight = paymentBarHeight(tariff.count);
-                        y -= segmentHeight;
-                        ctx.fillStyle = tariffChartColors[tariffIndex % tariffChartColors.length];
-                        ctx.fillRect(x - barWidth / 2, y, barWidth, segmentHeight);
-                    });
-                } else {
-                    ctx.fillStyle = 'rgba(255,255,255,.12)';
-                    ctx.fillRect(x - barWidth / 2, y - 2 * dpr, barWidth, 2 * dpr);
-                }
-                ctx.fillStyle = 'rgba(255,255,255,.62)';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'bottom';
-                if (row.payments && showBarCounts) {
-                    ctx.fillText(String(row.payments), x, Math.max(topPadding + 10 * dpr, y - 6 * dpr));
-                }
-                ctx.fillStyle = 'rgba(255,255,255,.42)';
-                ctx.textBaseline = 'top';
-                if (buckets.length <= 8 || index % Math.ceil(buckets.length / 8) === 0 || index === buckets.length - 1) {
-                    ctx.save();
-                    ctx.translate(x, topPadding + plotHeight + 16 * dpr);
-                    if (buckets.length > 7) {
-                        ctx.rotate(-0.45);
-                        ctx.textAlign = 'right';
-                    } else {
-                        ctx.textAlign = 'center';
-                    }
-                    ctx.fillText(String(row.label || '').slice(0, 18), 0, 0);
-                    ctx.restore();
-                }
-            });
-
-            const gradient = ctx.createLinearGradient(0, topPadding, 0, topPadding + plotHeight);
-            gradient.addColorStop(0, 'rgba(34,197,94,.22)');
-            gradient.addColorStop(1, 'rgba(34,197,94,0)');
-            ctx.beginPath();
-            points.forEach((point, index) => {
-                if (index === 0) ctx.moveTo(point.x, point.y);
-                else ctx.lineTo(point.x, point.y);
-            });
-            ctx.lineTo(points[points.length - 1].x, topPadding + plotHeight);
-            ctx.lineTo(points[0].x, topPadding + plotHeight);
-            ctx.closePath();
-            ctx.fillStyle = gradient;
-            ctx.fill();
-
-            ctx.beginPath();
-            points.forEach((point, index) => {
-                if (index === 0) ctx.moveTo(point.x, point.y);
-                else ctx.lineTo(point.x, point.y);
-            });
-            ctx.strokeStyle = '#22c55e';
-            ctx.lineWidth = 3 * dpr;
-            ctx.stroke();
-
-            points.forEach((point) => {
-                ctx.beginPath();
-                ctx.arc(point.x, point.y, 4 * dpr, 0, Math.PI * 2);
-                ctx.fillStyle = '#111720';
-                ctx.fill();
-                ctx.strokeStyle = '#22c55e';
-                ctx.lineWidth = 2 * dpr;
-                ctx.stroke();
-            });
-
-            canvas.__salesChartPoints = points.map((point) => ({
-                x: point.x / dpr,
-                y: point.y / dpr,
-                row: point.row,
-            }));
+        function salesTariffColor(series, tariffName, fallbackIndex = 0) {
+            const configuredIndex = (series?.tariff_names || []).indexOf(tariffName);
+            const index = configuredIndex >= 0 ? configuredIndex : fallbackIndex;
+            return tariffChartColors[index % tariffChartColors.length];
         }
 
-        function bindSalesChartTooltip(canvas) {
-            const tooltip = document.getElementById('sales-chart-tooltip');
+        function renderSalesChartLegend(series) {
+            const tariffItems = (series?.tariff_names || []).map((name, index) => `
+                <span class="sales-chart-legend-item">
+                    <span class="sales-chart-swatch" style="--swatch:${salesTariffColor(series, name, index)}"></span>
+                    ${escapeHtml(name)}, ₽
+                </span>
+            `);
+            tariffItems.push(`
+                <span class="sales-chart-legend-item">
+                    <span class="sales-chart-line-swatch" style="--swatch:#4fda9a"></span>
+                    Покупатели (правая ось)
+                </span>
+            `);
+            return tariffItems.join('');
+        }
+
+        function drawSalesSeriesChart(canvas, series) {
+            if (!canvas) return;
+            const buckets = series?.buckets || [];
+            const wrapper = canvas.closest('.sales-chart-canvas-wrap');
+            const wrapperWidth = Math.max(280, wrapper?.clientWidth || canvas.clientWidth || 720);
+            const mobileWidth = window.matchMedia('(max-width: 640px)').matches
+                ? buckets.length * 30 + 124
+                : 0;
+            canvas.style.width = `${Math.ceil(Math.max(wrapperWidth, mobileWidth))}px`;
+
+            const ctx = canvas.getContext('2d');
+            const dpr = window.devicePixelRatio || 1;
+            const width = canvas.clientWidth;
+            const height = canvas.clientHeight || 320;
+            canvas.width = Math.round(width * dpr);
+            canvas.height = Math.round(height * dpr);
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, width, height);
+            if (!buckets.length) return;
+
+            const leftPadding = 66;
+            const rightPadding = 54;
+            const topPadding = 18;
+            const bottomPadding = 34;
+            const plotWidth = Math.max(1, width - leftPadding - rightPadding);
+            const plotHeight = Math.max(1, height - topPadding - bottomPadding);
+            const step = plotWidth / buckets.length;
+            const barWidth = Math.min(22, Math.max(4, step * .64));
+            const maxRevenue = Math.max(1, ...buckets.map((row) => Number(row.revenue || 0)));
+            const maxPayers = Math.max(1, ...buckets.map((row) => Number(row.unique_paying_users || 0)));
+            const pointForIndex = (index) => ({
+                x: leftPadding + step * index + step / 2,
+                y: topPadding + plotHeight - plotHeight * Number(buckets[index].unique_paying_users || 0) / maxPayers,
+            });
+
+            function render(highlightedIndex = null) {
+                ctx.clearRect(0, 0, width, height);
+                ctx.font = '700 10px Montserrat, system-ui, sans-serif';
+                ctx.lineWidth = 1;
+                ctx.textBaseline = 'middle';
+
+                if (highlightedIndex !== null) {
+                    ctx.fillStyle = 'rgba(255,255,255,.055)';
+                    ctx.fillRect(leftPadding + step * highlightedIndex, topPadding, step, plotHeight);
+                }
+
+                [0, .25, .5, .75, 1].forEach((ratio) => {
+                    const y = topPadding + plotHeight - plotHeight * ratio;
+                    ctx.strokeStyle = 'rgba(127,143,163,.2)';
+                    ctx.setLineDash([]);
+                    ctx.beginPath();
+                    ctx.moveTo(leftPadding, y);
+                    ctx.lineTo(leftPadding + plotWidth, y);
+                    ctx.stroke();
+
+                    ctx.fillStyle = 'rgba(196,205,218,.62)';
+                    ctx.textAlign = 'right';
+                    ctx.fillText(num(Math.round(maxRevenue * ratio)), leftPadding - 8, y);
+                    ctx.textAlign = 'left';
+                    ctx.fillText(num(Math.round(maxPayers * ratio)), leftPadding + plotWidth + 8, y);
+                });
+
+                buckets.forEach((row, index) => {
+                    const x = leftPadding + step * index + step / 2;
+                    let y = topPadding + plotHeight;
+                    const tariffs = row.tariffs || [];
+                    tariffs.forEach((tariff, tariffIndex) => {
+                        const revenue = Number(tariff.revenue || 0);
+                        if (revenue <= 0) return;
+                        const segmentHeight = Math.max(.8, plotHeight * revenue / maxRevenue);
+                        y -= segmentHeight;
+                        ctx.fillStyle = salesTariffColor(series, tariff.name, tariffIndex);
+                        ctx.fillRect(x - barWidth / 2, y, barWidth, segmentHeight);
+                    });
+                    if (!tariffs.length && Number(row.revenue || 0) > 0) {
+                        const totalHeight = plotHeight * Number(row.revenue || 0) / maxRevenue;
+                        ctx.fillStyle = 'rgba(127,143,255,.86)';
+                        ctx.fillRect(x - barWidth / 2, y - totalHeight, barWidth, totalHeight);
+                    }
+                });
+
+                const points = buckets.map((_, index) => pointForIndex(index));
+                ctx.beginPath();
+                points.forEach((point, index) => {
+                    if (index === 0) ctx.moveTo(point.x, point.y);
+                    else ctx.lineTo(point.x, point.y);
+                });
+                ctx.strokeStyle = '#4fda9a';
+                ctx.lineWidth = 2.5;
+                ctx.setLineDash([]);
+                ctx.stroke();
+
+                if (highlightedIndex !== null) {
+                    const point = points[highlightedIndex];
+                    ctx.strokeStyle = 'rgba(196,205,218,.52)';
+                    ctx.lineWidth = 1;
+                    ctx.setLineDash([3, 4]);
+                    ctx.beginPath();
+                    ctx.moveTo(point.x, topPadding);
+                    ctx.lineTo(point.x, topPadding + plotHeight);
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                    ctx.beginPath();
+                    ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+                    ctx.fillStyle = '#4fda9a';
+                    ctx.fill();
+                    ctx.strokeStyle = '#111720';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                }
+
+                const maxLabels = Math.max(3, Math.floor(plotWidth / 90));
+                const every = Math.max(1, Math.ceil(buckets.length / maxLabels));
+                ctx.fillStyle = 'rgba(196,205,218,.62)';
+                ctx.font = '700 9px Montserrat, system-ui, sans-serif';
+                ctx.textBaseline = 'top';
+                buckets.forEach((row, index) => {
+                    if (index % every !== 0 && index !== buckets.length - 1) return;
+                    const point = pointForIndex(index);
+                    ctx.textAlign = index === buckets.length - 1 ? 'right' : 'center';
+                    ctx.fillText(String(row.label || '').slice(0, 18), point.x, topPadding + plotHeight + 10);
+                });
+            }
+
+            canvas.__salesChartMeta = {
+                buckets,
+                leftPadding,
+                plotWidth,
+                step,
+                render,
+                colorForTariff: (name, index) => salesTariffColor(series, name, index),
+            };
+            render(null);
+        }
+
+        function bindSalesChartTooltip(canvas, tooltip, labelFormatter = (row) => row.label) {
             if (!canvas || !tooltip) return;
+            const wrapper = canvas.closest('.sales-chart-canvas-wrap');
             const hide = () => {
                 tooltip.style.display = 'none';
+                canvas.__salesChartMeta?.render(null);
+                canvas.__salesChartHover = null;
             };
-            canvas.addEventListener('mouseleave', hide);
-            canvas.addEventListener('mousemove', (event) => {
-                const points = canvas.__salesChartPoints || [];
-                if (!points.length) return hide();
-                const rect = canvas.getBoundingClientRect();
-                const x = event.clientX - rect.left;
-                const nearest = points.reduce((best, point) => {
-                    const distance = Math.abs(point.x - x);
-                    return !best || distance < best.distance ? {point, distance} : best;
-                }, null);
-                if (!nearest || nearest.distance > 34) return hide();
-                const row = nearest.point.row;
-                const tariffLines = (row.tariffs || []).map((tariff) => (
-                    `<div>${escapeHtml(tariff.name)}: <span class="gold">${tariff.count}</span> · ${money(tariff.revenue)}</div>`
-                )).join('') || '<div class="muted">Продаж по тарифам нет</div>';
+            const show = (event) => {
+                const meta = canvas.__salesChartMeta;
+                if (!meta || !meta.buckets.length) return hide();
+                const canvasRect = canvas.getBoundingClientRect();
+                const x = event.clientX - canvasRect.left;
+                const index = Math.floor((x - meta.leftPadding) / meta.step);
+                if (index < 0 || index >= meta.buckets.length) return hide();
+                if (canvas.__salesChartHover !== index) {
+                    canvas.__salesChartHover = index;
+                    meta.render(index);
+                }
+                const row = meta.buckets[index];
+                const tariffLines = (row.tariffs || []).map((tariff, tariffIndex) => `
+                    <div class="sales-chart-tooltip-row">
+                        <span class="sales-chart-tooltip-dot" style="--swatch:${meta.colorForTariff(tariff.name, tariffIndex)}"></span>
+                        <span>${escapeHtml(tariff.name)}: ${num(tariff.count)}</span>
+                        <span class="sales-chart-tooltip-value">${money(tariff.revenue)}</span>
+                    </div>
+                `).join('') || '<div class="muted">Продаж по тарифам нет</div>';
                 tooltip.innerHTML = `
-                    <strong>${escapeHtml(row.label)}</strong>
-                    <div>Выручка: <span class="green">${money(row.revenue)}</span></div>
-                    <div>Платежей: <span class="gold">${row.payments}</span></div>
-                    <div>Покупателей: ${row.unique_paying_users}</div>
-                    <div class="mt-1">${tariffLines}</div>
+                    <strong>${escapeHtml(labelFormatter(row) || '')}</strong>
+                    <div class="sales-chart-tooltip-row">
+                        <span class="sales-chart-tooltip-dot" style="--swatch:#4fda9a"></span>
+                        <span>Покупатели</span>
+                        <span class="sales-chart-tooltip-value">${num(row.unique_paying_users)}</span>
+                    </div>
+                    <div class="sales-chart-tooltip-row">
+                        <span class="sales-chart-tooltip-dot" style="--swatch:#f5c518"></span>
+                        <span>Выручка</span>
+                        <span class="sales-chart-tooltip-value">${money(row.revenue)}</span>
+                    </div>
+                    <div class="sales-chart-tooltip-row">
+                        <span class="sales-chart-tooltip-dot" style="--swatch:#8c9cff"></span>
+                        <span>Платежи</span>
+                        <span class="sales-chart-tooltip-value">${num(row.payments)}</span>
+                    </div>
+                    <div class="sales-chart-tooltip-divider"></div>
+                    ${tariffLines}
                 `;
-                const tooltipWidth = 240;
-                const left = Math.min(rect.width - tooltipWidth - 10, Math.max(10, nearest.point.x + 12));
-                const top = Math.max(10, nearest.point.y - 26);
+                tooltip.style.display = 'block';
+                const wrapperRect = wrapper?.getBoundingClientRect() || canvasRect;
+                const scrollLeft = wrapper?.scrollLeft || 0;
+                const scrollTop = wrapper?.scrollTop || 0;
+                const cursorLeft = event.clientX - wrapperRect.left + scrollLeft;
+                const cursorTop = event.clientY - wrapperRect.top + scrollTop;
+                const minLeft = scrollLeft + 8;
+                const maxLeft = scrollLeft + (wrapper?.clientWidth || canvasRect.width) - tooltip.offsetWidth - 8;
+                const left = Math.min(maxLeft, Math.max(minLeft, cursorLeft + 14));
+                const minTop = scrollTop + 8;
+                const maxTop = scrollTop + (wrapper?.clientHeight || canvasRect.height) - tooltip.offsetHeight - 8;
+                let top = cursorTop - tooltip.offsetHeight - 12;
+                if (top < minTop && cursorTop + 16 <= maxTop) top = cursorTop + 16;
+                top = Math.max(minTop, Math.min(maxTop, top));
                 tooltip.style.left = `${left}px`;
                 tooltip.style.top = `${top}px`;
-                tooltip.style.display = 'block';
-            });
+            };
+            canvas.addEventListener('mouseleave', hide);
+            canvas.addEventListener('mousemove', show);
+            canvas.addEventListener('click', show);
         }
 
         let lastCohortResult = null;
@@ -3371,42 +3533,6 @@
             markCohortPresetActive('cohort-period', preset);
         }
 
-        function bindCohortChartTooltip(canvas, tooltip, granularity) {
-            if (!canvas || !tooltip) return;
-            const hide = () => {
-                tooltip.style.display = 'none';
-            };
-            canvas.addEventListener('mouseleave', hide);
-            canvas.addEventListener('mousemove', (event) => {
-                const points = canvas.__salesChartPoints || [];
-                if (!points.length) return hide();
-                const rect = canvas.getBoundingClientRect();
-                const x = event.clientX - rect.left;
-                const nearest = points.reduce((best, point) => {
-                    const distance = Math.abs(point.x - x);
-                    return !best || distance < best.distance ? {point, distance} : best;
-                }, null);
-                if (!nearest || nearest.distance > 34) return hide();
-                const row = nearest.point.row;
-                const tariffLines = (row.tariffs || []).map((tariff) => (
-                    `<div>${escapeHtml(tariff.name)}: <span class="gold">${tariff.count}</span> · ${money(tariff.revenue)}</div>`
-                )).join('') || '<div class="muted">Продаж по тарифам нет</div>';
-                tooltip.innerHTML = `
-                    <strong>${escapeHtml(cohortBucketLabel(row.label, granularity))}</strong>
-                    <div>Выручка: <span class="green">${money(row.revenue)}</span></div>
-                    <div>Платежей: <span class="gold">${row.payments}</span></div>
-                    <div>Покупателей: ${row.unique_paying_users}</div>
-                    <div class="mt-1">${tariffLines}</div>
-                `;
-                const tooltipWidth = 240;
-                const left = Math.min(rect.width - tooltipWidth - 10, Math.max(10, nearest.point.x + 12));
-                const top = Math.max(10, nearest.point.y - 26);
-                tooltip.style.left = `${left}px`;
-                tooltip.style.top = `${top}px`;
-                tooltip.style.display = 'block';
-            });
-        }
-
         function renderCohortSources(result) {
             const sources = (result && result.sources) || [];
             if (!sources.length) {
@@ -3469,14 +3595,7 @@
             const period = result.period || {};
             const cohort = result.cohort || {};
             const subtitle = `Когорта ${displayDate(cohort.start)} – ${displayDate(cohort.end)} · платежи за ${displayDate(period.start)} – ${displayDate(period.end)}`;
-            const legendItems = [
-                '<span class="sales-chart-legend-item"><span class="sales-chart-swatch" style="--swatch:#22c55e"></span>Выручка</span>',
-                ...(series.tariff_names || []).map((name, index) => `
-                    <span class="sales-chart-legend-item">
-                        <span class="sales-chart-swatch" style="--swatch:${tariffChartColors[index % tariffChartColors.length]}"></span>${escapeHtml(name)}
-                    </span>
-                `),
-            ].join('');
+            const legendItems = renderSalesChartLegend(series);
             target.innerHTML = `
                 <div class="metrics-grid five">
                     ${metric('Размер когорты', num(result.totals.cohort_size), 'fa-users')}
@@ -3495,23 +3614,25 @@
                 <section class="card chart-card sales-chart-card">
                     <div class="sales-chart-head">
                         <div>
-                            <h3 class="sales-chart-title">Платежи когорты за период</h3>
+                            <h3 class="sales-chart-title">Выручка когорты за период</h3>
                             <div class="sales-chart-subtitle">${escapeHtml(subtitle)}, ${escapeHtml(granularityLabels[series.granularity] || 'по месяцам')}</div>
                         </div>
                         ${series.note ? `<div class="sales-chart-note">${escapeHtml(series.note)}</div>` : ''}
                     </div>
                     ${hasSeries
-                        ? `<div class="sales-chart-canvas-wrap"><canvas id="cohort-chart"></canvas><div id="cohort-chart-tooltip" class="sales-chart-tooltip"></div></div><div class="sales-chart-legend">${legendItems}</div>`
+                        ? `<div class="sales-chart-legend">${legendItems}</div><div class="sales-chart-canvas-wrap"><canvas id="cohort-chart"></canvas><div id="cohort-chart-tooltip" class="sales-chart-tooltip"></div></div>`
                         : '<div class="empty-chart">У когорты нет платежей за выбранный период.</div>'}
                 </section>
                 <section>${renderCohortSources(result)}</section>
             `;
             if (hasSeries) {
                 const chart = document.getElementById('cohort-chart');
-                // На плотных графиках (много корзин) числа над барами скрываем, чтобы
-                // подписи не наезжали и график читался.
-                drawSalesSeriesChart(chart, series, {maxBarCountLabels: 18});
-                bindCohortChartTooltip(chart, document.getElementById('cohort-chart-tooltip'), series.granularity);
+                drawSalesSeriesChart(chart, series);
+                bindSalesChartTooltip(
+                    chart,
+                    document.getElementById('cohort-chart-tooltip'),
+                    (row) => cohortBucketLabel(row.label, series.granularity),
+                );
             }
         }
 
@@ -3704,24 +3825,17 @@
             const seriesModeLabels = {
                 cohort: {
                     title: 'Продажи новых клиентов',
-                    subtitle: 'Выручка и платежи по тарифам в когортах новых клиентов',
+                    subtitle: 'Выручка по тарифам и уникальные покупатели в когортах новых клиентов',
                     empty: 'Продаж новых клиентов за период нет.',
                 },
                 absolute: {
                     title: 'Все платежи',
-                    subtitle: 'Абсолютная выручка и все успешные платежи по тарифам',
+                    subtitle: 'Абсолютная выручка по тарифам и уникальные покупатели',
                     empty: 'Платежей за период нет.',
                 },
             };
             const seriesMode = seriesModeLabels[series.mode] || seriesModeLabels.cohort;
-            const legendItems = [
-                '<span class="sales-chart-legend-item"><span class="sales-chart-swatch" style="--swatch:#22c55e"></span>Выручка</span>',
-                ...(series.tariff_names || []).map((name, index) => `
-                    <span class="sales-chart-legend-item">
-                        <span class="sales-chart-swatch" style="--swatch:${tariffChartColors[index % tariffChartColors.length]}"></span>${escapeHtml(name)}
-                    </span>
-                `),
-            ].join('');
+            const legendItems = renderSalesChartLegend(series);
             lastStatsResult = result;
             target.innerHTML = `
                 <div class="metrics-grid five">
@@ -3740,7 +3854,7 @@
                         ${series.note ? `<div class="sales-chart-note">${escapeHtml(series.note)}</div>` : ''}
                     </div>
                     ${hasSalesSeries
-                        ? `<div class="sales-chart-canvas-wrap"><canvas id="stats-chart"></canvas><div id="sales-chart-tooltip" class="sales-chart-tooltip"></div></div><div class="sales-chart-legend">${legendItems}</div>`
+                        ? `<div class="sales-chart-legend">${legendItems}</div><div class="sales-chart-canvas-wrap"><canvas id="stats-chart"></canvas><div id="sales-chart-tooltip" class="sales-chart-tooltip"></div></div>`
                         : `<div class="empty-chart">${seriesMode.empty}</div>`}
                 </section>
                 <section id="sources-section">${renderSourcesSection(result)}</section>
@@ -3766,7 +3880,7 @@
             if (hasSalesSeries) {
                 const chart = document.getElementById('stats-chart');
                 drawSalesSeriesChart(chart, series);
-                bindSalesChartTooltip(chart);
+                bindSalesChartTooltip(chart, document.getElementById('sales-chart-tooltip'));
             }
         }
 
@@ -4732,10 +4846,10 @@
             }
             const rowsHtml = censorKeysCache.map((key) => `
                 <div class="admin-table-row censor-key-row">
-                    <span><b>${escapeHtml(key.name)}</b></span>
-                    <span class="muted">${escapeHtml(key.api_key_masked)}</span>
-                    <span>${key.is_default ? '<span class="censor-key-default-badge">по умолчанию</span> ' : ''}${key.public_measurements ? '<span class="censor-status-warn" title="Измерения создаются публичными — IP видны в базе RIPE Atlas">публичные</span>' : ''}</span>
-                    <span class="censor-row-actions">
+                    <span data-label="Название"><b>${escapeHtml(key.name)}</b></span>
+                    <span class="muted" data-label="Ключ">${escapeHtml(key.api_key_masked)}</span>
+                    <span data-label="Статус">${key.is_default ? '<span class="censor-key-default-badge">по умолчанию</span> ' : ''}${key.public_measurements ? '<span class="censor-status-warn" title="Измерения создаются публичными — IP видны в базе RIPE Atlas">публичные</span>' : ''}</span>
+                    <span class="censor-row-actions" data-label="Действия">
                         ${key.is_default ? '' : `<button class="btn btn-secondary" type="button" data-ripe-key-default="${key.id}" title="Сделать ключом по умолчанию"><i class="fas fa-star"></i></button>`}
                         <button class="btn btn-secondary" type="button" data-ripe-key-edit="${key.id}" title="Переименовать / заменить ключ"><i class="fas fa-pen"></i></button>
                         <button class="btn btn-secondary" type="button" data-ripe-key-delete="${key.id}" title="Удалить"><i class="fas fa-trash"></i></button>
@@ -4843,12 +4957,12 @@
                     : `<span>${censorRunStatusHtml(null)}</span>`;
                 return `
                     <div class="admin-table-row censor-check-row">
-                        <span><b>${escapeHtml(check.target_ip)}</b>${check.port !== 443 ? `:${check.port}` : ''}${enabledBadge}</span>
-                        <span>${escapeHtml(check.sni)}</span>
-                        <span>${schedule}</span>
-                        <span>${keyLabel}</span>
-                        ${lastRunCell}
-                        <span class="censor-row-actions">
+                        <span data-label="IP"><b>${escapeHtml(check.target_ip)}</b>${check.port !== 443 ? `:${check.port}` : ''}${enabledBadge}</span>
+                        <span data-label="SNI">${escapeHtml(check.sni)}</span>
+                        <span data-label="Расписание">${schedule}</span>
+                        <span data-label="Ключ">${keyLabel}</span>
+                        <span data-label="Последний замер">${lastRunCell}</span>
+                        <span class="censor-row-actions" data-label="Действия">
                             <button class="btn" type="button" data-censor-run="${check.id}" title="Запустить замер сейчас"><i class="fas fa-play"></i></button>
                             <button class="btn btn-secondary" type="button" data-censor-history="${check.id}" title="История прогонов"><i class="fas fa-clock-rotate-left"></i></button>
                             <button class="btn btn-secondary" type="button" data-censor-edit="${check.id}" title="Редактировать"><i class="fas fa-pen"></i></button>

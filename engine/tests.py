@@ -204,6 +204,28 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn("border: 2px solid rgba(var(--green-rgb), .82);", template)
         self.assertIn("font-family: inherit;", template)
 
+    def test_censor_checks_have_dedicated_mobile_layout(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn(
+            "#panel-censor-checks .censor-check-form { grid-template-columns: minmax(0, 1fr); }",
+            template,
+        )
+        self.assertIn("#panel-censor-checks .censor-check-row > span::before", template)
+        self.assertIn("#panel-censor-checks .censor-key-row > span::before", template)
+        self.assertIn('data-label="Последний замер"', template)
+        self.assertIn('class="censor-row-actions" data-label="Действия"', template)
+
+    def test_acquisition_explains_new_revenue_calculation(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('id="acq-new-revenue-help"', template)
+        self.assertIn("Как считаются «Новые покупатели» и «Выручка новых»", template)
+        self.assertIn("самый ранний успешный платёж за всю доступную историю Wata и YooKassa", template)
+        self.assertIn("Это не LTV пришедших за период", template)
+        self.assertIn("не хранится как зафиксированный снимок", template)
+        self.assertIn("Это сопоставление недельных итогов, а не строгая когортная конверсия", template)
+
 
 class AdminRuntimeSettingsTests(SimpleTestCase):
     def test_apple_recommended_app_setting_is_enum(self):
@@ -814,9 +836,23 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn("data-cohort-window", template)
         self.assertIn("function loadCohortStats", template)
         self.assertIn("applyCohortPeriodPreset", template)
-        # Когортный график переиспользует существующий построитель серии (с опцией
-        # плотности подписей), не дублируя отрисовку.
-        self.assertIn("drawSalesSeriesChart(chart, series, {maxBarCountLabels", template)
+        # Когортный график переиспользует тот же интерактивный renderer, что и
+        # сквозная аналитика, не дублируя отрисовку и tooltip.
+        self.assertIn("drawSalesSeriesChart(chart, series);", template)
+        self.assertIn("bindSalesChartTooltip(\n                    chart,", template)
+
+    def test_both_analytics_charts_use_acquisition_style_renderer(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("function renderSalesChartLegend(series)", template)
+        self.assertIn("Покупатели (правая ось)", template)
+        self.assertIn("Number(tariff.revenue || 0)", template)
+        self.assertIn("Number(row.unique_paying_users || 0)", template)
+        self.assertIn("canvas.__salesChartMeta", template)
+        self.assertIn("meta.render(index);", template)
+        self.assertIn('id="stats-chart"', template)
+        self.assertIn('id="cohort-chart"', template)
+        self.assertNotIn("function bindCohortChartTooltip", template)
 
     def test_analytics_has_overview_and_cohort_subtabs(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
@@ -889,7 +925,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
         self.assertIn("function cohortBucketLabel", template)
-        self.assertIn("cohortBucketLabel(row.label, granularity)", template)
+        self.assertIn("cohortBucketLabel(row.label, series.granularity)", template)
 
     def test_cohort_panel_has_metrics_legend(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
