@@ -2344,7 +2344,22 @@
         // более читаемые карточки. Пользователь может переключать вид вручную.
         let sourcesViewMode = window.matchMedia('(max-width: 1024px)').matches ? 'cards' : 'table';
         let sourcesSort = {key: 'subscriptions', dir: 'desc'};
-        const tariffChartColors = ['#22c55e', '#84cc16', '#a3e635', '#f5b85b', '#f472b6', '#d8dde8', '#9b6dff'];
+        const acquisitionChartColors = Object.freeze({
+            repeat: 'rgba(120,140,255,.75)',
+            new: 'rgba(255,199,0,.9)',
+            payers: 'rgba(90,220,150,.95)',
+        });
+        // Первые два цвета буквально совпадают с «Новые vs повторные»; остальные
+        // намеренно различаются по тону, а не являются соседними оттенками зелёного.
+        const tariffChartColors = [
+            acquisitionChartColors.repeat,
+            acquisitionChartColors.new,
+            '#9b6dff',
+            '#f5b85b',
+            '#d8dde8',
+            '#38bdf8',
+            '#f472b6',
+        ];
 
         function escapeHtml(value) {
             return String(value || '')
@@ -3229,7 +3244,7 @@
             `);
             tariffItems.push(`
                 <span class="sales-chart-legend-item">
-                    <span class="sales-chart-line-swatch" style="--swatch:#4fda9a"></span>
+                    <span class="sales-chart-line-swatch" style="--swatch:${acquisitionChartColors.payers}"></span>
                     Покупатели (правая ось)
                 </span>
             `);
@@ -3312,7 +3327,7 @@
                     });
                     if (!tariffs.length && Number(row.revenue || 0) > 0) {
                         const totalHeight = plotHeight * Number(row.revenue || 0) / maxRevenue;
-                        ctx.fillStyle = 'rgba(127,143,255,.86)';
+                        ctx.fillStyle = acquisitionChartColors.repeat;
                         ctx.fillRect(x - barWidth / 2, y - totalHeight, barWidth, totalHeight);
                     }
                 });
@@ -3323,7 +3338,7 @@
                     if (index === 0) ctx.moveTo(point.x, point.y);
                     else ctx.lineTo(point.x, point.y);
                 });
-                ctx.strokeStyle = '#4fda9a';
+                ctx.strokeStyle = acquisitionChartColors.payers;
                 ctx.lineWidth = 2.5;
                 ctx.setLineDash([]);
                 ctx.stroke();
@@ -3340,7 +3355,7 @@
                     ctx.setLineDash([]);
                     ctx.beginPath();
                     ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
-                    ctx.fillStyle = '#4fda9a';
+                    ctx.fillStyle = acquisitionChartColors.payers;
                     ctx.fill();
                     ctx.strokeStyle = '#111720';
                     ctx.lineWidth = 2;
@@ -3401,17 +3416,17 @@
                 tooltip.innerHTML = `
                     <strong>${escapeHtml(labelFormatter(row) || '')}</strong>
                     <div class="sales-chart-tooltip-row">
-                        <span class="sales-chart-tooltip-dot" style="--swatch:#4fda9a"></span>
+                        <span class="sales-chart-tooltip-dot" style="--swatch:${acquisitionChartColors.payers}"></span>
                         <span>Покупатели</span>
                         <span class="sales-chart-tooltip-value">${num(row.unique_paying_users)}</span>
                     </div>
                     <div class="sales-chart-tooltip-row">
-                        <span class="sales-chart-tooltip-dot" style="--swatch:#f5c518"></span>
+                        <span class="sales-chart-tooltip-dot" style="--swatch:${acquisitionChartColors.new}"></span>
                         <span>Выручка</span>
                         <span class="sales-chart-tooltip-value">${money(row.revenue)}</span>
                     </div>
                     <div class="sales-chart-tooltip-row">
-                        <span class="sales-chart-tooltip-dot" style="--swatch:#8c9cff"></span>
+                        <span class="sales-chart-tooltip-dot" style="--swatch:${acquisitionChartColors.repeat}"></span>
                         <span>Платежи</span>
                         <span class="sales-chart-tooltip-value">${num(row.payments)}</span>
                     </div>
@@ -5515,10 +5530,10 @@
             acqDraw(document.getElementById('acq-newrep-chart'),
                 rows.map((r) => dayLabel(r.day)),
                 [
-                    {label: 'Повторные, ₽', color: 'rgba(120,140,255,.75)', data: rows.map((r) => r.repeat_rub), fmt: 'rub'},
-                    {label: 'Новые, ₽', color: 'rgba(255,199,0,.9)', data: rows.map((r) => r.new_rub), fmt: 'rub'},
+                    {label: 'Повторные, ₽', color: acquisitionChartColors.repeat, data: rows.map((r) => r.repeat_rub), fmt: 'rub'},
+                    {label: 'Новые, ₽', color: acquisitionChartColors.new, data: rows.map((r) => r.new_rub), fmt: 'rub'},
                 ],
-                [{label: 'Новых покупателей (правая ось)', color: 'rgba(90,220,150,.95)', data: rows.map((r) => r.new_payers), fmt: 'raw'}],
+                [{label: 'Новых покупателей (правая ось)', color: acquisitionChartColors.payers, data: rows.map((r) => r.new_payers), fmt: 'raw'}],
                 {fullLabels: rows.map((r) => r.day)});
             const last14 = rows.slice(-14);
             const nSum = last14.reduce((a, r) => a + r.new_rub, 0), rSum = last14.reduce((a, r) => a + r.repeat_rub, 0);

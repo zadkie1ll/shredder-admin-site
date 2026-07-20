@@ -844,6 +844,12 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
     def test_both_analytics_charts_use_acquisition_style_renderer(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
+        self.assertIn("const acquisitionChartColors = Object.freeze", template)
+        self.assertIn("repeat: 'rgba(120,140,255,.75)'", template)
+        self.assertIn("new: 'rgba(255,199,0,.9)'", template)
+        self.assertIn("payers: 'rgba(90,220,150,.95)'", template)
+        self.assertIn("acquisitionChartColors.repeat,\n            acquisitionChartColors.new", template)
+        self.assertNotIn("['#22c55e', '#84cc16', '#a3e635'", template)
         self.assertIn("function renderSalesChartLegend(series)", template)
         self.assertIn("Покупатели (правая ось)", template)
         self.assertIn("Number(tariff.revenue || 0)", template)
