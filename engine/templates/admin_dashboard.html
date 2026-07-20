@@ -1721,7 +1721,7 @@
             <div id="subpanel-acq-newrep" class="subtab-panel active">
                 <div class="card" style="padding:18px;">
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-                        <strong>Выручка: новые vs повторные покупатели (по дням, МСК)</strong>
+                        <span class="chart-title-wrap"><strong>Выручка: новые vs повторные покупатели (по дням, МСК)</strong><button type="button" class="chart-info" data-help="newrep" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
                             <select id="acq-newrep-days" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
                                 <option value="30">30 дней</option>
@@ -1741,7 +1741,7 @@
 
             <div id="subpanel-acq-funnel" class="subtab-panel">
                 <div class="card" style="padding:18px;margin-bottom:14px;">
-                    <strong>Воронка по неделям: подписки → инвойсы → новые покупатели</strong>
+                    <span class="chart-title-wrap"><strong>Воронка по неделям: подписки → инвойсы → новые покупатели</strong><button type="button" class="chart-info" data-help="funnel" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                     <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
                         <b>Подписки</b> — созданные подписки в панели (событие subscription_created, то же, что «Подписки» в таблице у партнёра).
                         <b>Инвойсы</b> — сколько раз нажали кнопку оплаты (создан счёт).
@@ -1752,7 +1752,7 @@
                     <div id="acq-funnel-table" style="margin-top:12px;overflow-x:auto;"></div>
                 </div>
                 <div class="card" style="padding:18px;">
-                    <strong>Подписки по дням и конверсия в первую оплату</strong>
+                    <span class="chart-title-wrap"><strong>Подписки по дням и конверсия в первую оплату</strong><button type="button" class="chart-info" data-help="trials" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                     <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
                         Синие столбики — сколько подписок создано за день (левая ось).
                         Зелёная линия — какой % из созданных в этот день подписок оплатил впервые в течение 10 дней (правая ось, в процентах).
@@ -1778,7 +1778,7 @@
                     <div id="acq-spends-table" style="margin-top:12px;overflow-x:auto;"></div>
                 </div>
                 <div class="card" style="padding:18px;">
-                    <strong>Эффективность рекламы по неделям</strong>
+                    <span class="chart-title-wrap"><strong>Эффективность рекламы по неделям</strong><button type="button" class="chart-info" data-help="ads" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                     <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
                         <b>Цена подписки</b> = траты / созданные подписки.
                         <b>CPA (цена продажи)</b> = траты / новые покупатели.
@@ -1791,7 +1791,7 @@
 
             <div id="subpanel-acq-cohorts" class="subtab-panel">
                 <div class="card" style="padding:18px;margin-bottom:14px;">
-                    <strong>Сколько денег приносит один покупатель со временем (LTV)</strong>
+                    <span class="chart-title-wrap"><strong>Сколько денег приносит один покупатель со временем (LTV)</strong><button type="button" class="chart-info" data-help="ltv" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                     <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6;">
                         Каждая строка — «когорта»: все, кто впервые заплатил в указанном месяце. Колонки — сколько в среднем ₽
                         принёс один такой покупатель нарастающим итогом: <b>1-й мес</b> — в месяц первой оплаты, <b>+1 мес</b> —
@@ -1802,7 +1802,7 @@
                     <div id="acq-ltv-table" style="margin-top:12px;overflow-x:auto;"></div>
                 </div>
                 <div class="card" style="padding:18px;">
-                    <strong>Возвращаемость: доля купивших повторно</strong>
+                    <span class="chart-title-wrap"><strong>Возвращаемость: доля купивших повторно</strong><button type="button" class="chart-info" data-help="retention" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                     <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6;">
                         Из каждой когорты — какой % сделал вторую покупку в течение 30/60/90/180/365 дней после своей первой.
                         Колонки <b>кумулятивные</b>: каждая включает предыдущую. Пример: у когорты 2025-11 (109 покупателей)
@@ -1818,12 +1818,12 @@
 
             <div id="subpanel-acq-pushes" class="subtab-panel">
                 <div class="card" style="padding:18px;margin-bottom:14px;">
-                    <strong>Продающие пуши vs выручка (по дням)</strong>
+                    <span class="chart-title-wrap"><strong>Продающие пуши vs выручка (по дням)</strong><button type="button" class="chart-info" data-help="pushes" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                     <div style="font-size:11px;color:var(--muted);margin-top:4px;">Данные копятся с момента деплоя бота с событием notification_sent</div>
                     <canvas id="acq-pushes-chart" style="width:100%;height:260px;display:block;margin-top:10px;"></canvas>
                 </div>
                 <div class="card" style="padding:18px;">
-                    <strong>Эффективность winback/истечений: оплата в 72 часа после пуша</strong>
+                    <span class="chart-title-wrap"><strong>Эффективность winback/истечений: оплата в 72 часа после пуша</strong><button type="button" class="chart-info" data-help="winback" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                     <div id="acq-winback-table" style="margin-top:12px;overflow-x:auto;"></div>
                 </div>
             </div>
@@ -1838,7 +1838,7 @@
                 </div>
                 <div class="card" style="padding:18px;margin-bottom:14px;">
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                        <strong>Сегодня vs типичный день (кумулятивная выручка по часам МСК)</strong>
+                        <span class="chart-title-wrap"><strong>Сегодня vs типичный день (кумулятивная выручка по часам МСК)</strong><button type="button" class="chart-info" data-help="today" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                         <select id="acq-patterns-days" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
                             <option value="14">типичный = 14 дней</option>
                             <option value="30" selected>типичный = 30 дней</option>
@@ -1850,7 +1850,7 @@
                     <div style="font-size:11px;color:var(--muted);margin-top:6px;">Золотая — сегодня (до текущего часа); белая — медиана за выбранный период; пунктирные серые — коридор 25/75 перцентилей («обычный разброс»)</div>
                 </div>
                 <div class="card" style="padding:18px;">
-                    <strong>Heatmap оплат: час × день недели (60 дней, МСК)</strong>
+                    <span class="chart-title-wrap"><strong>Heatmap оплат: час × день недели (60 дней, МСК)</strong><button type="button" class="chart-info" data-help="heatmap" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                     <div id="acq-heatmap" style="margin-top:12px;overflow-x:auto;"></div>
                 </div>
             </div>
@@ -3648,9 +3648,13 @@
         }
 
         function showSubtab(panelId, name) {
+            // name пустой => клик пришёл с кнопки, у которой класс subtab взят
+            // только ради стиля (без data-subtab). Ничего не переключаем, иначе
+            // спрятали бы все суб-панели.
+            if (!name) return;
             const panel = document.getElementById(panelId);
             if (!panel) return;
-            panel.querySelectorAll('.subtab').forEach((button) => {
+            panel.querySelectorAll('.subtab[data-subtab]').forEach((button) => {
                 button.classList.toggle('active', button.dataset.subtab === name);
             });
             panel.querySelectorAll('.subtab-panel').forEach((subpanel) => {
@@ -3659,7 +3663,9 @@
         }
 
         function setupSubtabs(panelId) {
-            document.querySelectorAll(`#${panelId} .subtab`).forEach((button) => {
+            // Только реальные суб-табы (с data-subtab). Кнопки вроде «Показать»/
+            // «Сохранить» носят класс subtab лишь ради стиля — их не трогаем.
+            document.querySelectorAll(`#${panelId} .subtab[data-subtab]`).forEach((button) => {
                 button.addEventListener('click', () => showSubtab(panelId, button.dataset.subtab));
             });
         }
@@ -3825,7 +3831,7 @@
             const seriesModeLabels = {
                 cohort: {
                     title: 'Продажи новых клиентов',
-                    subtitle: 'Выручка по тарифам и уникальные покупатели в когортах новых клиентов',
+                    subtitle: 'Когорта по дате первой подписки (не оплаты). Для кассы новых по дню оплаты — «Привлечение → Воронка»',
                     empty: 'Продаж новых клиентов за период нет.',
                 },
                 absolute: {
@@ -3848,7 +3854,7 @@
                 <section class="card chart-card sales-chart-card">
                     <div class="sales-chart-head">
                         <div>
-                            <h3 class="sales-chart-title">${seriesMode.title}</h3>
+                            <h3 class="sales-chart-title" style="display:inline-flex;align-items:center;gap:7px;">${seriesMode.title}${series.mode === 'cohort' && window.chartHelpButton ? window.chartHelpButton('stats-cohort') : ''}</h3>
                             <div class="sales-chart-subtitle">${seriesMode.subtitle}, ${escapeHtml(granularityLabels[series.granularity] || 'по неделям')}</div>
                         </div>
                         ${series.note ? `<div class="sales-chart-note">${escapeHtml(series.note)}</div>` : ''}
@@ -5676,6 +5682,235 @@
             if (payload.status === 'ok') { ev.target.reset(); loadAcqSection('acq-ads', true); }
             else alert(payload.message || 'Ошибка сохранения');
         });
+    })();
+    </script>
+    <style id="chart-help-styles">
+        .chart-title-wrap { display: inline-flex; align-items: center; gap: 7px; }
+        .chart-info { display: inline-flex; align-items: center; justify-content: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 50%; background: rgba(255,255,255,.07); color: var(--muted); font-size: 12px; cursor: pointer; transition: background .14s, color .14s; flex: 0 0 auto; }
+        .chart-info:hover, .chart-info:focus-visible { background: var(--brand-gold); color: #050505; outline: none; }
+        .chart-info[aria-expanded="true"] { background: var(--brand-gold); color: #050505; }
+        .chart-help-pop { position: fixed; z-index: 1200; width: min(420px, calc(100vw - 24px)); max-height: 70vh; overflow-y: auto; background: #15171c; border: 1px solid rgba(255,199,0,.28); border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.6); padding: 0; display: none; }
+        .chart-help-pop.open { display: block; animation: chartHelpIn .13s ease-out; }
+        @keyframes chartHelpIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+        .chart-help-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 14px 16px 10px; border-bottom: 1px solid rgba(255,255,255,.07); position: sticky; top: 0; background: #15171c; }
+        .chart-help-title { font-size: 13px; font-weight: 800; color: #fff; line-height: 1.35; }
+        .chart-help-close { flex: 0 0 auto; width: 26px; height: 26px; border: 0; border-radius: 8px; background: rgba(255,255,255,.06); color: var(--muted); font-size: 13px; cursor: pointer; }
+        .chart-help-close:hover { background: rgba(255,255,255,.14); color: #fff; }
+        .chart-help-body { padding: 12px 16px 16px; }
+        .chart-help-sec { margin-bottom: 12px; }
+        .chart-help-sec:last-child { margin-bottom: 0; }
+        .chart-help-sec-label { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 800; letter-spacing: .03em; text-transform: uppercase; margin-bottom: 6px; }
+        .chart-help-sec.calc .chart-help-sec-label { color: #7cc0ff; }
+        .chart-help-sec.read .chart-help-sec-label { color: var(--brand-gold); }
+        .chart-help-sec.warn .chart-help-sec-label { color: #ff9d6b; }
+        .chart-help-list { margin: 0; padding: 0; list-style: none; }
+        .chart-help-list li { position: relative; padding-left: 15px; font-size: 12px; line-height: 1.55; color: rgba(230,235,242,.9); margin-bottom: 4px; }
+        .chart-help-list li::before { content: ""; position: absolute; left: 3px; top: 8px; width: 4px; height: 4px; border-radius: 50%; background: rgba(255,255,255,.35); }
+        .chart-help-list li b { color: #fff; }
+        .chart-help-list li code { background: rgba(255,255,255,.08); padding: 1px 5px; border-radius: 5px; font-size: 11px; }
+        .chart-help-backdrop { position: fixed; inset: 0; z-index: 1190; display: none; }
+        .chart-help-backdrop.open { display: block; }
+    </style>
+    <div class="chart-help-backdrop" id="chart-help-backdrop"></div>
+    <div class="chart-help-pop" id="chart-help-pop" role="dialog" aria-modal="false" aria-labelledby="chart-help-title-el"></div>
+    <script>
+    // ===== Поповеры «как считается / как читать» для графиков аналитики =====
+    (function () {
+        // calc — источник данных и формула построения; read — как правильно
+        // трактовать; warn — типичные ошибки чтения (необязательный блок).
+        const HELP = {
+            newrep: {
+                t: 'Выручка: новые vs повторные покупатели',
+                calc: [
+                    'Все успешные платежи Wata (<code>Paid</code>) и YooKassa (<code>succeeded</code>) объединяются в один поток и раскладываются по дням <b>по московскому времени</b>.',
+                    'Для каждого пользователя вычисляется дата его <b>самого первого платежа</b> за всю историю. Платёж в этот день считается «новым» (жёлтый), все последующие — «повторными» (синий).',
+                    'Зелёная линия — количество уникальных новых покупателей за день (правая ось).',
+                ],
+                read: [
+                    'Жёлтая часть — то, что реально приносит <b>реклама</b> (новые люди). Оценивайте её отдельно от синей.',
+                    'Синяя часть — <b>эхо продлений</b> прошлых месяцев: она инерционна и слабо зависит от сегодняшней рекламы.',
+                    'Рост общей высоты за счёт синего ≠ успех рекламы — смотрите на динамику жёлтого и зелёной линии.',
+                ],
+            },
+            funnel: {
+                t: 'Воронка по неделям: подписки → инвойсы → новые покупатели',
+                calc: [
+                    '<b>Подписки</b> — события <code>subscription_created</code> за неделю (создание подписки/триала в панели).',
+                    '<b>Инвойсы</b> — события <code>create_invoice_*</code> (нажатий на оплату).',
+                    '<b>Новые покупатели</b> — пользователи, чей <b>первый в истории платёж</b> попал в эту неделю (МСК).',
+                    '<b>Подписка→покупатель</b> = новые покупатели недели ÷ подписки той же недели.',
+                ],
+                read: [
+                    'Это сопоставление <b>недельных итогов</b>, а не строгая когорта: покупатель недели мог подписаться раньше. Для когорты по дате подписки — вкладка «Аналитика → Когортный анализ».',
+                    'Падают подписки при том же бюджете — реклама подорожала/выгорела. Падает «Подписка→покупатель» — трафик есть, но не платит (оффер/цена/продукт).',
+                    'Текущая неделя всегда неполная — не сравнивайте её итог с завершёнными.',
+                ],
+            },
+            trials: {
+                t: 'Подписки по дням и конверсия в первую оплату',
+                calc: [
+                    'Столбики — число подписок (<code>subscription_created</code>) за день, МСК (левая ось).',
+                    'Линия — доля этих подписок, чей владелец <b>впервые заплатил в течение 10 дней</b> после создания подписки (правая ось, %).',
+                ],
+                read: [
+                    'Ранний детектор проблем: <b>столбики</b> падают — приток людей просел (закупка); <b>линия</b> падает — люди приходят, но не покупают (качество трафика/оффер).',
+                    'Последние ~10 дней по линии «недозрелые»: окно оплаты ещё не вышло, конверсия дорастёт — не паникуйте по хвосту.',
+                ],
+            },
+            ads: {
+                t: 'Эффективность рекламы по неделям',
+                calc: [
+                    'Траты берутся из введённых вручную сумм (вкладка «Реклама»), суммируются по неделям.',
+                    '<b>Цена подписки</b> = траты ÷ созданные подписки. <b>CPA</b> = траты ÷ новые покупатели.',
+                    '<b>ДРР</b> = траты ÷ выручка новых × 100% (как в таблице партнёра). <b>ROMI</b> = выручка новых ÷ траты.',
+                ],
+                read: [
+                    'ДРР и ROMI считаются <b>только по первому платежу</b> новых — продления не входят, поэтому реальная окупаемость <b>выше</b> показанной.',
+                    'Главный ориентир окупаемости — сравнение <b>LTV</b> (вкладка «Когорты») с <b>CPA</b>: реклама в плюс, когда LTV > CPA.',
+                    'Неделя без внесённых трат покажет пустые CPA/ДРР — это не ноль, а «нет данных».',
+                ],
+            },
+            ltv: {
+                t: 'LTV: сколько приносит один покупатель со временем',
+                calc: [
+                    'Когорта — все, у кого <b>первый платёж</b> пришёлся на указанный месяц.',
+                    'Колонки — средняя выручка на одного покупателя когорты <b>нарастающим итогом</b>: «1-й мес» + «+1 мес» + … (все платежи, включая продления).',
+                ],
+                read: [
+                    'Сравнивайте последнюю доступную колонку когорты с её <b>CPA</b> — это ответ «окупается ли привлечение».',
+                    'Свежие когорты по правым колонкам ещё не дозрели (времени не прошло) — их LTV будет расти.',
+                    'Рост LTV вправо — работают продления; плато — клиенты уходят после первой-второй оплаты.',
+                ],
+            },
+            retention: {
+                t: 'Возвращаемость: доля купивших повторно',
+                calc: [
+                    'Из каждой когорты (по первому платежу) — доля, сделавшая <b>вторую покупку</b> в пределах 30/60/90/180/365 дней.',
+                    'Колонки <b>кумулятивные</b>: каждая включает предыдущую (≤60 содержит всех из ≤30).',
+                ],
+                read: [
+                    'Показывает, удерживаем ли клиентов. Резкое падение по строкам вниз = что-то ухудшилось (например, отказ от автосписаний).',
+                    'Серые ячейки «идёт» — окно ещё не истекло для всей когорты, процент дорастёт; <b>не сравнивайте</b> их с дожитыми.',
+                ],
+            },
+            pushes: {
+                t: 'Продающие пуши vs выручка',
+                calc: [
+                    'Столбики — число отправленных «продающих» пушей за день (истечения, winback), событие <code>notification_sent</code>.',
+                    'Линия — выручка за день (МСК). Данные копятся с момента деплоя бота с логированием пушей.',
+                ],
+                read: [
+                    'Провал столбиков — сбой рассыльщика (<code>user-notify</code>): выручка обычно проседает следом. Быстрый индикатор «доставка сломалась».',
+                    'Связь «больше пушей → больше выручки» есть, но пушей столько, сколько истекающих подписок — их число задаёт когорта, а не рассыльщик.',
+                ],
+            },
+            winback: {
+                t: 'Эффективность winback/истечений',
+                calc: [
+                    'Для каждого типа пуша: сколько отправлено и у скольких получателей был <b>успешный платёж в течение 72 часов</b> после пуша.',
+                    'Конверсия = оплатившие в 72ч ÷ отправленные.',
+                ],
+                read: [
+                    'Показывает, какой шаг серии реально продаёт. Слабый шаг — кандидат на переписывание текста/скидки.',
+                    'Это <b>атрибуция по времени</b> (оплатил после пуша ≠ строго из-за пуша) — сравнивайте шаги между собой, не как абсолютную причину.',
+                ],
+            },
+            today: {
+                t: 'Сегодня vs типичный день',
+                calc: [
+                    'Золотая линия — <b>накопленная выручка сегодня</b> по часам МСК (до текущего часа).',
+                    'Белая — медиана, серый пунктир — коридор 25/75 перцентилей по каждому часу за выбранный период (14–90 дней).',
+                ],
+                read: [
+                    'Золотая внутри коридора — день обычный; ниже — проседаем; выше — растём. Отвечает на «сегодня в норме или сломалось».',
+                    'Сравнение честное только к текущему часу — вечерний пик (20:00–01:00 МСК) ещё впереди, не делайте вывод по утру.',
+                ],
+            },
+            heatmap: {
+                t: 'Heatmap оплат: час × день недели',
+                calc: [
+                    'Сумма выручки по каждой паре (день недели × час) за 60 дней, МСК. Чем ярче ячейка — тем больше денег.',
+                ],
+                read: [
+                    'Ищите самые яркие полосы — это лучшее время для промо и рассылок.',
+                    'Тёмные зоны (ночь/утро) — окно для техработ и деплоев с минимальными потерями.',
+                ],
+            },
+            'stats-cohort': {
+                t: 'Продажи новых клиентов (когортный режим)',
+                calc: [
+                    'Когорта строится по <b>дате первой подписки</b> (первое <code>subscription_created</code>), а не по дате оплаты.',
+                    'Показывается выручка и покупатели <b>из этой когорты</b> в выбранном периоде.',
+                ],
+                read: [
+                    'За «Сегодня» цифры малы: большинство подписавшихся сегодня — на триале и заплатят позже. Когорта наполняется задним числом.',
+                    'Чтобы увидеть <b>всех, кто заплатил впервые за день</b> (реальная касса новых), смотрите «Привлечение → Воронка / Новые покупатели» — там якорь по дате оплаты.',
+                    'Режим «Все платежи» показывает абсолютную выручку без когортной привязки.',
+                ],
+            },
+        };
+
+        const pop = document.getElementById('chart-help-pop');
+        const backdrop = document.getElementById('chart-help-backdrop');
+        let currentBtn = null;
+
+        function sectionHtml(cls, label, icon, items) {
+            if (!items || !items.length) return '';
+            const lis = items.map((x) => `<li>${x}</li>`).join('');
+            return `<div class="chart-help-sec ${cls}"><span class="chart-help-sec-label"><i class="fas ${icon}"></i>${label}</span><ul class="chart-help-list">${lis}</ul></div>`;
+        }
+
+        function openHelp(btn) {
+            const key = btn.dataset.help;
+            const h = HELP[key];
+            if (!h) return;
+            pop.innerHTML =
+                `<div class="chart-help-head"><div class="chart-help-title" id="chart-help-title-el">${h.t}</div>` +
+                `<button type="button" class="chart-help-close" aria-label="Закрыть">✕</button></div>` +
+                `<div class="chart-help-body">` +
+                sectionHtml('calc', 'Как считается', 'fa-calculator', h.calc) +
+                sectionHtml('read', 'Как читать', 'fa-lightbulb', h.read) +
+                sectionHtml('warn', 'Осторожно', 'fa-triangle-exclamation', h.warn) +
+                `</div>`;
+            pop.classList.add('open');
+            backdrop.classList.add('open');
+            btn.setAttribute('aria-expanded', 'true');
+            currentBtn = btn;
+            // позиционируем под кнопкой, не вылезая за экран
+            const r = btn.getBoundingClientRect();
+            const pw = pop.offsetWidth, ph = pop.offsetHeight;
+            let left = r.left;
+            if (left + pw > window.innerWidth - 12) left = window.innerWidth - pw - 12;
+            if (left < 12) left = 12;
+            let top = r.bottom + 8;
+            if (top + ph > window.innerHeight - 12) top = Math.max(12, r.top - ph - 8);
+            pop.style.left = left + 'px';
+            pop.style.top = top + 'px';
+            pop.querySelector('.chart-help-close').addEventListener('click', closeHelp);
+        }
+
+        function closeHelp() {
+            pop.classList.remove('open');
+            backdrop.classList.remove('open');
+            if (currentBtn) currentBtn.setAttribute('aria-expanded', 'false');
+            currentBtn = null;
+        }
+
+        document.addEventListener('click', (e) => {
+            const btn = e.target.closest('.chart-info');
+            if (btn) {
+                e.preventDefault();
+                if (currentBtn === btn) { closeHelp(); return; }
+                closeHelp();
+                openHelp(btn);
+            }
+        });
+        backdrop.addEventListener('click', closeHelp);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeHelp(); });
+        window.addEventListener('resize', closeHelp);
+        // экспортируем, чтобы JS-рендер старой Аналитики мог добавить свою кнопку
+        window.chartHelpButton = (key) =>
+            `<button type="button" class="chart-info" data-help="${key}" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button>`;
     })();
     </script>
 </body>
