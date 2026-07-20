@@ -1188,11 +1188,25 @@
         .ticket-meta { color: rgba(196,205,218,.72); }
         .payments-board-title { border-bottom: 1px solid rgba(127,143,163,.16); }
         canvas { width: 100%; height: 230px; display: block; }
+        /* Мобильный топбар с гамбургером — скрыт на десктопе */
+        .mobile-topbar { display: none; }
+        .drawer-overlay { display: none; }
         @media (max-width: 1024px) {
-            .sidebar { position: sticky; top: 0; width: 100%; height: auto; flex-direction: row; gap: 7px; overflow-x: auto; padding: 10px 12px; border-right: 0; border-bottom: 1px solid rgba(255,255,255,.07); }
-            .sidebar .brand, .sidebar .logout { display: none; }
-            .sidebar-nav { flex: 1 0 auto; display: flex; gap: 7px; overflow: visible; padding-right: 0; }
-            .tab-btn { min-width: 160px; margin: 0; justify-content: flex-start; }
+            /* Sidebar → off-canvas drawer, выезжает слева поверх контента */
+            .mobile-topbar { display: flex; position: sticky; top: 0; z-index: 40; align-items: center; gap: 12px; padding: 12px 16px; background: rgba(13,13,15,.96); backdrop-filter: blur(16px); border-bottom: 1px solid rgba(255,255,255,.08); }
+            .mobile-burger { display: inline-flex; align-items: center; justify-content: center; width: 42px; height: 42px; border-radius: 11px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.05); color: #fff; font-size: 17px; cursor: pointer; flex: 0 0 auto; }
+            .mobile-burger:active { background: rgba(255,255,255,.12); }
+            .mobile-topbar-title { font-size: 15px; font-weight: 800; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+            .mobile-topbar-brand { margin-left: auto; font-size: 12px; font-weight: 800; color: var(--brand-gold); letter-spacing: .04em; }
+            .sidebar { position: fixed; inset: 0 auto 0 0; width: min(84vw, 320px); height: 100%; flex-direction: column; gap: 0; padding: 18px 12px 16px; border-right: 1px solid rgba(255,255,255,.08); border-bottom: 0; transform: translateX(-104%); transition: transform .22s cubic-bezier(.4,0,.2,1); overflow-y: auto; z-index: 60; }
+            body.drawer-open .sidebar { transform: translateX(0); box-shadow: 0 0 60px rgba(0,0,0,.6); }
+            .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); opacity: 0; pointer-events: none; transition: opacity .22s; z-index: 50; }
+            body.drawer-open .drawer-overlay { opacity: 1; pointer-events: auto; }
+            body.drawer-open { overflow: hidden; }
+            .sidebar .brand { display: block; margin-bottom: 14px; }
+            .sidebar .logout { display: flex; }
+            .sidebar-nav { flex: 1 1 auto; display: flex; flex-direction: column; gap: 3px; overflow-y: auto; padding-right: 2px; }
+            .tab-btn { width: 100%; min-width: 0; margin: 0 0 2px; justify-content: flex-start; height: auto; }
             .main { margin-left: 0; padding: 18px; }
             .chat-grid { grid-template-columns: 1fr; }
             .user-grid { grid-template-columns: 1fr; }
@@ -1228,11 +1242,11 @@
             .cohort-controls .input { width: 100%; }
         }
         @media (max-width: 640px) {
-            .sidebar { width: 100vw; max-width: 100vw; gap: 8px; padding: 9px 12px; overscroll-behavior-x: contain; scroll-snap-type: x proximity; }
-            .tab-btn { flex: 0 0 128px; width: 128px; min-width: 128px; height: 56px; justify-content: flex-start; gap: 8px; padding: 9px 11px; border-radius: 12px; font-size: 11px; line-height: 1.2; scroll-snap-align: start; }
-            .tab-btn i { width: auto; flex: 0 0 auto; font-size: 14px; }
-            .tab-btn span { display: -webkit-box; min-width: 0; max-width: 100%; overflow: hidden; overflow-wrap: normal; word-break: normal; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-            .main { width: 100%; max-width: none; padding: 20px 14px 110px; overflow: hidden; }
+            .sidebar { width: min(86vw, 300px); }
+            .tab-btn { font-size: 12px; padding: 10px 11px; }
+            .tab-btn i { width: 18px; flex: 0 0 18px; font-size: 13px; }
+            .tab-btn span { display: block; overflow-wrap: anywhere; }
+            .main { width: 100%; max-width: none; padding: 18px 14px 90px; overflow: hidden; }
             .admin-title { font-size: 26px; line-height: 1.1; }
             .admin-subtitle { font-size: 13px; line-height: 1.45; }
             .panel-header { margin-bottom: 16px; }
@@ -1283,6 +1297,12 @@
 </head>
 <body>
     <div class="page-bg"></div>
+    <header class="mobile-topbar">
+        <button type="button" class="mobile-burger" id="mobile-burger" aria-label="Меню разделов"><i class="fas fa-bars"></i></button>
+        <span class="mobile-topbar-title" id="mobile-topbar-title">Аналитика</span>
+        <span class="mobile-topbar-brand">MONKEY ISLAND</span>
+    </header>
+    <div class="drawer-overlay" id="drawer-overlay"></div>
     <aside class="sidebar">
         <div class="brand">
             <div class="brand-logo">
@@ -1297,6 +1317,7 @@
             <span class="nav-section-label">Обзор</span>
             {% if support_admin_is_full_admin %}
                 <button class="tab-btn active" data-tab="stats"><i class="fas fa-chart-line"></i><span>Аналитика</span></button>
+                <button class="tab-btn" data-tab="acquisition"><i class="fas fa-magnet"></i><span>Привлечение</span></button>
             {% endif %}
             <span class="nav-section-label">Управление</span>
             <button class="tab-btn {% if not support_admin_is_full_admin %}active{% endif %}" data-tab="user-payments"><i class="fas fa-user"></i><span>Клиент</span></button>
@@ -1316,6 +1337,8 @@
 
     <main class="main"
         data-stats-url="{% url 'support_admin_api_stats' %}"
+        data-acquisition-url="{% url 'support_admin_api_acquisition' %}"
+        data-ad-spends-url="{% url 'support_admin_api_ad_spends' %}"
         data-stats-source-users-url="{% url 'support_admin_api_stats_source_users' %}"
         data-cohort-stats-url="{% url 'support_admin_api_cohort_stats' %}"
         data-user-payments-url="{% url 'support_admin_api_user_payments' %}"
@@ -1575,6 +1598,159 @@
         </section>
         {% endif %}
 
+        {% if support_admin_is_full_admin %}
+        <section id="panel-acquisition" class="tab-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Привлечение</h1>
+                <p class="admin-subtitle">Новые vs повторные, воронка, реклама, когорты, пуши и паттерны оплат</p>
+            </header>
+            <div class="subtabs" role="tablist" aria-label="Разделы привлечения">
+                <button type="button" class="subtab active" data-subtab="acq-newrep" role="tab"><i class="fas fa-people-arrows"></i>Новые vs повторные</button>
+                <button type="button" class="subtab" data-subtab="acq-funnel" role="tab"><i class="fas fa-filter"></i>Воронка</button>
+                <button type="button" class="subtab" data-subtab="acq-ads" role="tab"><i class="fas fa-bullhorn"></i>Реклама</button>
+                <button type="button" class="subtab" data-subtab="acq-cohorts" role="tab"><i class="fas fa-layer-group"></i>Когорты</button>
+                <button type="button" class="subtab" data-subtab="acq-pushes" role="tab"><i class="fas fa-bell"></i>Пуши</button>
+                <button type="button" class="subtab" data-subtab="acq-patterns" role="tab"><i class="fas fa-clock"></i>Паттерны</button>
+            </div>
+
+            <div id="subpanel-acq-newrep" class="subtab-panel active">
+                <div class="card" style="padding:18px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                        <strong>Выручка: новые vs повторные покупатели (по дням, МСК)</strong>
+                        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                            <select id="acq-newrep-days" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                                <option value="30">30 дней</option>
+                                <option value="60" selected>60 дней</option>
+                                <option value="90">90 дней</option>
+                            </select>
+                            <span style="font-size:11px;color:var(--muted);">или период:</span>
+                            <input type="date" id="acq-newrep-start" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                            <input type="date" id="acq-newrep-end" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                            <button type="button" id="acq-newrep-apply" class="subtab active" style="border:1px solid rgba(255,199,0,.4);border-radius:8px;">Показать</button>
+                        </div>
+                    </div>
+                    <canvas id="acq-newrep-chart" style="width:100%;height:280px;display:block;"></canvas>
+                    <div id="acq-newrep-summary" style="margin-top:12px;font-size:12px;color:var(--muted);"></div>
+                </div>
+            </div>
+
+            <div id="subpanel-acq-funnel" class="subtab-panel">
+                <div class="card" style="padding:18px;margin-bottom:14px;">
+                    <strong>Воронка по неделям: подписки → инвойсы → новые покупатели</strong>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        <b>Подписки</b> — созданные подписки в панели (событие subscription_created, то же, что «Подписки» в таблице у партнёра).
+                        <b>Инвойсы</b> — сколько раз нажали кнопку оплаты (создан счёт).
+                        <b>Новые покупатели</b> — люди, оплатившие впервые за всю историю.
+                        <b>Подписка→покупатель</b> — какой % созданных на неделе подписок стал новым покупателем.
+                    </div>
+                    <canvas id="acq-funnel-chart" style="width:100%;height:260px;display:block;margin-top:10px;"></canvas>
+                    <div id="acq-funnel-table" style="margin-top:12px;overflow-x:auto;"></div>
+                </div>
+                <div class="card" style="padding:18px;">
+                    <strong>Подписки по дням и конверсия в первую оплату</strong>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        Синие столбики — сколько подписок создано за день (левая ось).
+                        Зелёная линия — какой % из созданных в этот день подписок оплатил впервые в течение 10 дней (правая ось, в процентах).
+                        Падение столбиков = реклама приводит меньше людей; падение линии = люди приходят, но не покупают.
+                    </div>
+                    <canvas id="acq-trials-chart" style="width:100%;height:240px;display:block;margin-top:10px;"></canvas>
+                </div>
+            </div>
+
+            <div id="subpanel-acq-ads" class="subtab-panel">
+                <div id="acq-ads-migration" class="card" style="padding:14px;display:none;border-color:rgba(255,120,80,.4);">
+                    Таблица <code>ad_spends</code> ещё не создана — нужно прогнать alembic-миграцию в common (autogenerate по модели AdSpend).
+                </div>
+                <div class="card" style="padding:18px;margin-bottom:14px;">
+                    <strong>Добавить/обновить траты на рекламу</strong>
+                    <form id="acq-spend-form" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
+                        <input type="date" name="day" required style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                        <input type="text" name="channel" placeholder="канал (default)" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;width:140px;">
+                        <input type="number" name="amount_rub" step="0.01" min="0" placeholder="сумма, ₽ (чистая)" required style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;width:150px;">
+                        <input type="text" name="comment" placeholder="комментарий" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;flex:1;min-width:120px;">
+                        <button type="submit" class="subtab active" style="border:1px solid rgba(255,199,0,.4);border-radius:8px;">Сохранить</button>
+                    </form>
+                    <div id="acq-spends-table" style="margin-top:12px;overflow-x:auto;"></div>
+                </div>
+                <div class="card" style="padding:18px;">
+                    <strong>Эффективность рекламы по неделям</strong>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        <b>Цена подписки</b> = траты / созданные подписки.
+                        <b>CPA (цена продажи)</b> = траты / новые покупатели.
+                        <b>ДРР</b> = траты / выручка новых × 100% (как в таблице партнёра; продления сюда не входят, поэтому реальная ДРР ниже).
+                        <b>ROMI</b> = выручка новых / траты.
+                    </div>
+                    <div id="acq-ads-table" style="margin-top:12px;overflow-x:auto;"></div>
+                </div>
+            </div>
+
+            <div id="subpanel-acq-cohorts" class="subtab-panel">
+                <div class="card" style="padding:18px;margin-bottom:14px;">
+                    <strong>Сколько денег приносит один покупатель со временем (LTV)</strong>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6;">
+                        Каждая строка — «когорта»: все, кто впервые заплатил в указанном месяце. Колонки — сколько в среднем ₽
+                        принёс один такой покупатель нарастающим итогом: <b>1-й мес</b> — в месяц первой оплаты, <b>+1 мес</b> —
+                        плюс следующий месяц, и так далее. Пример: когорта 2026-03 размером 900 и «+3 мес» = 620 ₽ значит:
+                        те, кто впервые купил в марте, за 4 месяца принесли в среднем по 620 ₽ каждый.
+                        <b>Зачем:</b> сравнивайте LTV с ценой продажи (CPA) на вкладке «Реклама» — реклама окупается, когда LTV выше CPA.
+                    </div>
+                    <div id="acq-ltv-table" style="margin-top:12px;overflow-x:auto;"></div>
+                </div>
+                <div class="card" style="padding:18px;">
+                    <strong>Возвращаемость: доля купивших повторно</strong>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.6;">
+                        Из каждой когорты — какой % сделал вторую покупку в течение 30/60/90/180/365 дней после своей первой.
+                        Колонки <b>кумулятивные</b>: каждая включает предыдущую. Пример: у когорты 2025-11 (109 покупателей)
+                        «≤30 дней» = 59.6% — это ~65 человек, продлившихся сразу; «≤60 дней» = 67.9% — те же 65 плюс ещё ~9,
+                        вернувшихся на втором месяце; «≤90» = 70.6% — добавились ещё ~3 поздних. Остальные ~29% за три месяца
+                        так и не купили второй раз.
+                        Серые значения с пометкой «идёт» — окно ещё не истекло для всей когорты (например, для июньской когорты
+                        365 дней ещё не прошло), процент дорастёт со временем — сравнивать такие ячейки с дожитыми нельзя.
+                    </div>
+                    <div id="acq-retention-table" style="margin-top:12px;overflow-x:auto;"></div>
+                </div>
+            </div>
+
+            <div id="subpanel-acq-pushes" class="subtab-panel">
+                <div class="card" style="padding:18px;margin-bottom:14px;">
+                    <strong>Продающие пуши vs выручка (по дням)</strong>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;">Данные копятся с момента деплоя бота с событием notification_sent</div>
+                    <canvas id="acq-pushes-chart" style="width:100%;height:260px;display:block;margin-top:10px;"></canvas>
+                </div>
+                <div class="card" style="padding:18px;">
+                    <strong>Эффективность winback/истечений: оплата в 72 часа после пуша</strong>
+                    <div id="acq-winback-table" style="margin-top:12px;overflow-x:auto;"></div>
+                </div>
+            </div>
+
+            <div id="subpanel-acq-patterns" class="subtab-panel">
+                <div class="card" style="padding:14px 18px;margin-bottom:14px;">
+                    <div style="font-size:12px;color:var(--muted);line-height:1.6;">
+                        Эта вкладка отвечает на вопрос «сегодня продажи в норме или что-то сломалось?» и «в какие часы/дни люди платят».
+                        Верхний график — накопленная выручка сегодняшнего дня на фоне обычных дней: если золотая линия внутри серого коридора — день обычный, ниже — проседаем, выше — растём.
+                        Нижняя карта — в какие часы какого дня недели платят чаще всего (чем ярче, тем больше денег): по ней удобно выбирать время промо и рассылок.
+                    </div>
+                </div>
+                <div class="card" style="padding:18px;margin-bottom:14px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <strong>Сегодня vs типичный день (кумулятивная выручка по часам МСК)</strong>
+                        <select id="acq-patterns-days" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                            <option value="14">типичный = 14 дней</option>
+                            <option value="30" selected>типичный = 30 дней</option>
+                            <option value="60">типичный = 60 дней</option>
+                            <option value="90">типичный = 90 дней</option>
+                        </select>
+                    </div>
+                    <canvas id="acq-today-chart" style="width:100%;height:260px;display:block;margin-top:10px;"></canvas>
+                    <div style="font-size:11px;color:var(--muted);margin-top:6px;">Золотая — сегодня (до текущего часа); белая — медиана за выбранный период; пунктирные серые — коридор 25/75 перцентилей («обычный разброс»)</div>
+                </div>
+                <div class="card" style="padding:18px;">
+                    <strong>Heatmap оплат: час × день недели (60 дней, МСК)</strong>
+                    <div id="acq-heatmap" style="margin-top:12px;overflow-x:auto;"></div>
+                </div>
+            </div>
+        </section>
+        {% endif %}
         <section id="panel-user-payments" class="tab-panel {% if not support_admin_is_full_admin %}active{% endif %}">
             <header class="panel-header">
                 <h1 class="admin-title">Клиент</h1>
@@ -2282,11 +2458,26 @@
             if (tabId === 'node-traffic') initNodeTrafficTab();
             if (tabId === 'censor-checks') loadCensorChecks();
             history.replaceState(null, '', `#${tabId}`);
+            const activeBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
+            const titleEl = document.getElementById('mobile-topbar-title');
+            if (activeBtn && titleEl) titleEl.textContent = activeBtn.querySelector('span')?.textContent || '';
+            closeDrawer();
         }
+
+        function openDrawer() { document.body.classList.add('drawer-open'); }
+        function closeDrawer() { document.body.classList.remove('drawer-open'); }
 
         document.querySelectorAll('.tab-btn').forEach((button) => {
             button.addEventListener('click', () => showAdminTab(button.dataset.tab));
         });
+        document.getElementById('mobile-burger')?.addEventListener('click', openDrawer);
+        document.getElementById('drawer-overlay')?.addEventListener('click', closeDrawer);
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeDrawer(); });
+        (function initTopbarTitle() {
+            const active = document.querySelector('.tab-btn.active');
+            const titleEl = document.getElementById('mobile-topbar-title');
+            if (active && titleEl) titleEl.textContent = active.querySelector('span')?.textContent || '';
+        })();
         document.addEventListener('click', (event) => {
             const sourceDetailsButton = event.target.closest('[data-source-details]');
             if (sourceDetailsButton) openSourceUsersModal(sourceDetailsButton);
@@ -3794,6 +3985,21 @@
                                 <button class="btn btn-danger" type="button" data-client-sub-action="stop_autopay"><i class="fas fa-ban"></i>Отключить</button>
                             </div>
                         </div>
+                        <div class="client-sub-action">
+                            <div class="client-sub-action-title">Отключить подписку</div>
+                            <div class="client-sub-action-desc">Статус RWMS → DISABLED, автоплатёж выключается. Реактивируется ручной оплатой. Как в трафик-алертах бота.</div>
+                            <div class="client-sub-action-controls">
+                                <button class="btn btn-danger" type="button" data-client-sub-action="disable_subscription"><i class="fas fa-power-off"></i>Отключить подписку</button>
+                            </div>
+                        </div>
+                        <div class="client-sub-action">
+                            <div class="client-sub-action-title">Временный бан</div>
+                            <div class="client-sub-action-desc">Подписка уходит в ban-сквад на заданный срок; снимет бот автоматически. Против шеринга/абуза.</div>
+                            <div class="client-sub-action-controls">
+                                <input class="input" id="client-ban-hours" type="number" min="1" step="1" placeholder="Часов">
+                                <button class="btn btn-danger" type="button" data-client-sub-action="temp_ban"><i class="fas fa-user-lock"></i>Забанить</button>
+                            </div>
+                        </div>
                     </div>
                 </section>`;
         }
@@ -3860,6 +4066,8 @@
         const CLIENT_SUB_CONFIRMS = {
             set_trial_hour: 'Сбросить подписку до 1 часа? Используется при возврате средств.',
             stop_autopay: 'Отключить автоплатёж этому клиенту?',
+            disable_subscription: 'Отключить подписку (DISABLED) и автоплатёж? Клиент потеряет доступ до ручной оплаты.',
+            temp_ban: 'Временно забанить подписку (ban-сквад)? Снимется автоматически по истечении срока.',
         };
 
         async function clientSubscriptionAction(action) {
@@ -3874,6 +4082,14 @@
                     return;
                 }
                 formData.append('days', days);
+            }
+            if (action === 'temp_ban') {
+                const hours = document.getElementById('client-ban-hours')?.value;
+                if (!hours || Number(hours) < 1) {
+                    showAdminToast('Укажите длительность бана в часах', 'error');
+                    return;
+                }
+                formData.append('hours', hours);
             }
             if (CLIENT_SUB_CONFIRMS[action] && !confirm(CLIENT_SUB_CONFIRMS[action])) return;
             let response;
@@ -3891,8 +4107,14 @@
                 showAdminToast('Не удалось выполнить действие', 'error');
                 return;
             }
-            const {result} = await response.json();
+            const payload = await response.json();
+            if (payload.status !== 'ok') {
+                showAdminToast(payload.message || 'Не удалось выполнить действие', 'error');
+                return;
+            }
+            const {result} = payload;
             const parts = [];
+            if (result.action_label) parts.push(`<span class="green">${escapeHtml(result.action_label)}</span>`);
             if (result.old_expire_at) parts.push(`Было: <span class="green">${escapeHtml(result.old_expire_at)}</span>`);
             if (result.new_expire_at) parts.push(`Стало: <span class="green">${escapeHtml(result.new_expire_at)}</span>`);
             if (typeof result.rwms_updated !== 'undefined') parts.push(`RWMS: <span class="${result.rwms_updated ? 'green' : 'red'}">${result.rwms_updated ? 'обновлен' : 'не обновлен'}</span>`);
@@ -4997,6 +5219,350 @@
         document.addEventListener('visibilitychange', () => {
             if (!document.hidden) refreshTickets();
         });
+    </script>
+    <script>
+    // ===== Вкладка «Привлечение» (аналитика привлечения клиентов) =====
+    (function () {
+        const mainEl = document.querySelector('main.main');
+        if (!mainEl || !mainEl.dataset.acquisitionUrl) return;
+        const API = mainEl.dataset.acquisitionUrl;
+        const SPENDS_API = mainEl.dataset.adSpendsUrl;
+        const loaded = {};
+        const fmtRub = (v) => Math.round(v).toLocaleString('ru-RU');
+
+        // --- общий тултип для всех canvas-графиков вкладки ---
+        const tipEl = document.createElement('div');
+        tipEl.style.cssText = 'position:fixed;z-index:9999;display:none;background:#15161a;border:1px solid rgba(255,199,0,.35);border-radius:9px;padding:8px 11px;font-size:11px;line-height:1.55;pointer-events:none;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:280px;';
+        document.body.appendChild(tipEl);
+
+        function acqBindTooltip(canvas) {
+            if (canvas.__acqTipBound) return;
+            canvas.__acqTipBound = true;
+            canvas.addEventListener('mousemove', (ev) => {
+                const m = canvas.__acqMeta;
+                if (!m || !m.step) return;
+                const rect = canvas.getBoundingClientRect();
+                const i = Math.floor((ev.clientX - rect.left - m.padL) / m.step);
+                if (i < 0 || i >= m.labels.length) {
+                    if (canvas.__acqHover != null) { canvas.__acqHover = null; m.render(null); }
+                    tipEl.style.display = 'none';
+                    return;
+                }
+                if (canvas.__acqHover !== i) { canvas.__acqHover = i; m.render(i); }
+                const rows = m.series
+                    .filter((sr) => sr.label && sr.data[i] != null)
+                    .map((sr) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${sr.color};margin-right:6px;"></span>${sr.label}: <b>${sr.fmt === 'pct' ? sr.data[i].toFixed(1) + '%' : sr.fmt === 'raw' ? sr.data[i] : fmtRub(sr.data[i]) + (sr.fmt === 'rub' ? ' ₽' : '')}</b></div>`)
+                    .join('');
+                tipEl.innerHTML = `<div style="color:rgba(255,255,255,.55);margin-bottom:3px;">${m.fullLabels ? m.fullLabels[i] : m.labels[i]}</div>${rows}`;
+                tipEl.style.display = 'block';
+                const tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
+                let tx = ev.clientX + 14, ty = ev.clientY - th - 10;
+                if (tx + tw > window.innerWidth - 8) tx = ev.clientX - tw - 14;
+                if (ty < 8) ty = ev.clientY + 16;
+                tipEl.style.left = tx + 'px'; tipEl.style.top = ty + 'px';
+            });
+            canvas.addEventListener('mouseleave', () => {
+                const m = canvas.__acqMeta;
+                canvas.__acqHover = null;
+                if (m && m.render) m.render(null);
+                tipEl.style.display = 'none';
+            });
+        }
+
+        function acqSetupCanvas(canvas) {
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = canvas.clientWidth * dpr;
+            canvas.height = canvas.clientHeight * dpr;
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            return {ctx, w: canvas.clientWidth, h: canvas.clientHeight};
+        }
+
+        // Универсальный график: stacked-бары (левая ось) + линии (правая ось).
+        // render(hi) перерисовывает всё; при hi != null подсвечивает колонку:
+        // вертикальная направляющая, точки-чекпоинты на линиях, подсветка бара.
+        function acqDraw(canvas, labels, barSeries, lineSeries, opts = {}) {
+            const meta = {
+                labels,
+                fullLabels: opts.fullLabels || null,
+                series: [...barSeries, ...lineSeries],
+            };
+            meta.render = function (hi) {
+                const {ctx, w, h} = acqSetupCanvas(canvas);
+                const padL = 46, padR = lineSeries.length ? 46 : 12, padT = 14, padB = 26;
+                const plotW = w - padL - padR, plotH = h - padT - padB;
+                const n = labels.length;
+                meta.padL = padL;
+                meta.step = n ? plotW / n : 0;
+                if (!n) { ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = '12px sans-serif'; ctx.fillText('Нет данных', padL, h / 2); return; }
+                const barTotals = labels.map((_, i2) => barSeries.reduce((acc, sr) => acc + (sr.data[i2] || 0), 0));
+                const maxBar = Math.max(1, ...barTotals);
+                const maxLine = Math.max(1, ...lineSeries.flatMap((sr) => sr.data.filter((v) => v != null)));
+                const step = meta.step, barW = Math.max(2, step * 0.62);
+                if (hi != null && hi >= 0 && hi < n) {
+                    ctx.fillStyle = 'rgba(255,255,255,.06)';
+                    ctx.fillRect(padL + hi * step, padT, step, plotH);
+                }
+                ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.fillStyle = 'rgba(255,255,255,.45)';
+                ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+                for (let g = 0; g <= 4; g++) {
+                    const y = padT + plotH - (plotH * g) / 4;
+                    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+                    ctx.fillText(fmtRub((maxBar * g) / 4), padL - 5, y + 3);
+                    if (lineSeries.length) { ctx.textAlign = 'left'; ctx.fillText(fmtRub((maxLine * g) / 4), w - padR + 5, y + 3); ctx.textAlign = 'right'; }
+                }
+                barSeries.length && labels.forEach((_, i2) => {
+                    let y = padT + plotH;
+                    barSeries.forEach((sr) => {
+                        const v = sr.data[i2] || 0;
+                        const bh = (v / maxBar) * plotH;
+                        ctx.fillStyle = sr.color;
+                        if (hi === i2) { ctx.save(); ctx.globalAlpha = 1; }
+                        ctx.fillRect(padL + i2 * step + (step - barW) / 2, y - bh, barW, bh);
+                        if (hi === i2) ctx.restore();
+                        y -= bh;
+                    });
+                });
+                lineSeries.forEach((sr) => {
+                    ctx.strokeStyle = sr.color; ctx.lineWidth = sr.width || 2;
+                    if (sr.dash) ctx.setLineDash(sr.dash); else ctx.setLineDash([]);
+                    ctx.beginPath();
+                    let started = false;
+                    sr.data.forEach((v, i2) => {
+                        if (v == null) return;
+                        const x = padL + i2 * step + step / 2;
+                        const y = padT + plotH - (v / maxLine) * plotH;
+                        if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+                    });
+                    ctx.stroke(); ctx.setLineDash([]);
+                });
+                if (hi != null && hi >= 0 && hi < n) {
+                    const x = padL + hi * step + step / 2;
+                    ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.lineWidth = 1;
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
+                    ctx.setLineDash([]);
+                    lineSeries.forEach((sr) => {
+                        const v = sr.data[hi];
+                        if (v == null) return;
+                        const y = padT + plotH - (v / maxLine) * plotH;
+                        ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2);
+                        ctx.fillStyle = sr.color; ctx.fill();
+                        ctx.lineWidth = 2; ctx.strokeStyle = '#0c0d10'; ctx.stroke();
+                    });
+                }
+                ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.textAlign = 'center'; ctx.font = '9px sans-serif';
+                const every = Math.ceil(n / 14);
+                labels.forEach((lb, i2) => { if (i2 % every === 0) ctx.fillText(lb, padL + i2 * step + step / 2, h - 8); });
+                const legend = [...barSeries, ...lineSeries].filter((sr) => sr.label);
+                let lx = padL; ctx.textAlign = 'left'; ctx.font = '10px sans-serif';
+                legend.forEach((sr) => {
+                    ctx.fillStyle = sr.color; ctx.fillRect(lx, 2, 8, 8);
+                    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillText(sr.label, lx + 12, 10);
+                    lx += 12 + ctx.measureText(sr.label).width + 14;
+                });
+            };
+            canvas.__acqMeta = meta;
+            canvas.__acqHover = null;
+            meta.render(null);
+            acqBindTooltip(canvas);
+        }
+
+        function acqTable(headers, rows) {
+            const th = headers.map((x) => `<th style="text-align:left;padding:6px 10px;color:rgba(255,255,255,.5);font-size:11px;white-space:nowrap;">${x}</th>`).join('');
+            const trs = rows.map((r) => '<tr>' + r.map((c) => `<td style="padding:6px 10px;font-size:12px;border-top:1px solid rgba(255,255,255,.06);white-space:nowrap;">${c}</td>`).join('') + '</tr>').join('');
+            return `<table style="border-collapse:collapse;min-width:100%;">${'<thead><tr>' + th + '</tr></thead>'}<tbody>${trs}</tbody></table>`;
+        }
+
+        async function acqFetch(section, params = {}) {
+            const q = new URLSearchParams({section, ...params});
+            const resp = await fetch(`${API}?${q}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            const payload = await resp.json();
+            if (payload.status !== 'ok') throw new Error(payload.message || 'error');
+            return payload.result;
+        }
+
+        const dayLabel = (iso) => iso.slice(8, 10) + '.' + iso.slice(5, 7);
+
+        async function loadNewRepeat() {
+            const start = document.getElementById('acq-newrep-start').value;
+            const end = document.getElementById('acq-newrep-end').value;
+            const params = (start && end)
+                ? {start, end}
+                : {days: document.getElementById('acq-newrep-days').value};
+            const res = await acqFetch('new_repeat', params);
+            const rows = res.days;
+            acqDraw(document.getElementById('acq-newrep-chart'),
+                rows.map((r) => dayLabel(r.day)),
+                [
+                    {label: 'Повторные, ₽', color: 'rgba(120,140,255,.75)', data: rows.map((r) => r.repeat_rub), fmt: 'rub'},
+                    {label: 'Новые, ₽', color: 'rgba(255,199,0,.9)', data: rows.map((r) => r.new_rub), fmt: 'rub'},
+                ],
+                [{label: 'Новых покупателей (правая ось)', color: 'rgba(90,220,150,.95)', data: rows.map((r) => r.new_payers), fmt: 'raw'}],
+                {fullLabels: rows.map((r) => r.day)});
+            const last14 = rows.slice(-14);
+            const nSum = last14.reduce((a, r) => a + r.new_rub, 0), rSum = last14.reduce((a, r) => a + r.repeat_rub, 0);
+            document.getElementById('acq-newrep-summary').innerHTML =
+                `За последние 14 дней выборки: новые <b style="color:#ffc700">${fmtRub(nSum)} ₽</b> (${Math.round(100 * nSum / Math.max(1, nSum + rSum))}%), повторные <b style="color:#8c9cff">${fmtRub(rSum)} ₽</b>. Повторные — эхо продаж прошлых месяцев; рекламу оценивайте по жёлтой части.`;
+        }
+
+        async function loadFunnel() {
+            const res = await acqFetch('funnel', {weeks: 12});
+            const wk = res.weeks;
+            acqDraw(document.getElementById('acq-funnel-chart'),
+                wk.map((r) => dayLabel(r.week)),
+                [],
+                [
+                    {label: 'Подписки', color: 'rgba(120,140,255,.9)', data: wk.map((r) => r.trials), fmt: 'raw'},
+                    {label: 'Инвойсы', color: 'rgba(255,199,0,.9)', data: wk.map((r) => r.invoice_clicks), fmt: 'raw'},
+                    {label: 'Новые покупатели', color: 'rgba(90,220,150,.95)', data: wk.map((r) => r.new_payers), fmt: 'raw'},
+                ],
+                {fullLabels: wk.map((r) => 'неделя с ' + r.week)});
+            document.getElementById('acq-funnel-table').innerHTML = acqTable(
+                ['Неделя', 'Подписки', 'Инвойсы', 'Оплат всего', 'Новых покупателей', 'Подписка→покупатель', 'Выручка новых'],
+                wk.map((r) => [r.week, r.trials, r.invoice_clicks, r.payments, r.new_payers,
+                    r.trials ? (100 * r.new_payers / r.trials).toFixed(1) + '%' : '—',
+                    fmtRub(r.new_rub) + ' ₽']));
+            const tr = await acqFetch('trials', {days: 60});
+            acqDraw(document.getElementById('acq-trials-chart'),
+                tr.days.map((r) => dayLabel(r.day)),
+                [{label: 'Подписок создано', color: 'rgba(120,140,255,.65)', data: tr.days.map((r) => r.trials), fmt: 'raw'}],
+                [{label: 'Оплатили в течение 10 дней, %', color: 'rgba(90,220,150,.95)', data: tr.days.map((r) => r.conv_pct), fmt: 'pct'}],
+                {fullLabels: tr.days.map((r) => r.day)});
+        }
+
+        async function loadAds() {
+            const res = await acqFetch('ads', {weeks: 12});
+            document.getElementById('acq-ads-migration').style.display = res.needs_migration ? 'block' : 'none';
+            document.getElementById('acq-spends-table').innerHTML = acqTable(
+                ['Дата', 'Канал', 'Сумма, ₽', 'Комментарий', ''],
+                res.spends.map((r) => [r.day, r.channel, fmtRub(r.amount_rub), r.comment,
+                    `<button data-spend-del="${r.id}" style="background:none;border:0;color:rgba(255,120,80,.8);cursor:pointer;">удалить</button>`]));
+            document.getElementById('acq-ads-table').innerHTML = acqTable(
+                ['Неделя', 'Траты, ₽', 'Подписки', 'Цена подписки', 'Новых', 'CPA, ₽', 'Выручка новых', 'ДРР', 'ROMI'],
+                res.weeks.map((r) => [r.week, fmtRub(r.spend), r.subs,
+                    r.cost_per_sub == null ? '—' : r.cost_per_sub.toFixed(2) + ' ₽',
+                    r.new_payers,
+                    r.cpa == null ? '—' : fmtRub(r.cpa) + ' ₽',
+                    fmtRub(r.new_rub) + ' ₽',
+                    r.drr == null ? '—' : r.drr + '%',
+                    r.romi == null ? '—' : ('x' + r.romi.toFixed(2))]));
+            document.querySelectorAll('[data-spend-del]').forEach((btn) => btn.addEventListener('click', async () => {
+                const body = new FormData();
+                body.append('action', 'delete'); body.append('id', btn.dataset.spendDel);
+                await fetch(SPENDS_API, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                loadAcqSection('acq-ads', true);
+            }));
+        }
+
+        async function loadCohorts() {
+            const res = await acqFetch('cohorts', {months: 14});
+            document.getElementById('acq-ltv-table').innerHTML = acqTable(
+                ['Когорта (месяц 1-й оплаты)', 'Покупателей', '1-й мес', '+1 мес', '+2 мес', '+3 мес', '+4 мес', '+5 мес', '+6 мес'],
+                res.ltv.map((r) => [r.cohort, r.size, ...r.ltv_per_user.map((v) =>
+                    v ? fmtRub(v) + ' ₽' : '—')]));
+            const retCell = (r, h) => {
+                const v = r['r' + h] + '%';
+                return r['r' + h + '_matured']
+                    ? v
+                    : `<span style="color:rgba(255,255,255,.35);" title="Окно ${h} дней ещё не истекло для всей когорты — процент дорастёт">${v} <i>(идёт)</i></span>`;
+            };
+            document.getElementById('acq-retention-table').innerHTML = acqTable(
+                ['Когорта', 'Покупателей', 'Купили 2-й раз ≤30 дней', '≤60 дней', '≤90 дней', '≤180 дней', '≤365 дней'],
+                res.retention.map((r) => [r.cohort, r.size,
+                    retCell(r, 30), retCell(r, 60), retCell(r, 90), retCell(r, 180), retCell(r, 365)]));
+        }
+
+        async function loadPushes() {
+            const res = await acqFetch('pushes', {days: 30});
+            const days = {};
+            res.revenue_days.forEach((r) => { days[r.day] = {rub: r.rub, selling: 0}; });
+            res.days.forEach((r) => { (days[r.day] = days[r.day] || {rub: 0}).selling = r.selling; });
+            const keys = Object.keys(days).sort();
+            acqDraw(document.getElementById('acq-pushes-chart'),
+                keys.map(dayLabel),
+                [{label: 'Продающих пушей', color: 'rgba(120,140,255,.65)', data: keys.map((k) => days[k].selling || 0), fmt: 'raw'}],
+                [{label: 'Выручка, ₽ (правая ось)', color: 'rgba(255,199,0,.95)', data: keys.map((k) => days[k].rub || 0), fmt: 'rub'}],
+                {fullLabels: keys});
+            document.getElementById('acq-winback-table').innerHTML = res.winback.length
+                ? acqTable(['Тип пуша', 'Отправлено', 'Оплатили ≤72ч', 'Конверсия'],
+                    res.winback.map((r) => [r.type, r.sent, r.paid_72h, r.conv_pct + '%']))
+                : '<div style="color:var(--muted);font-size:12px;">Пока нет данных — события notification_sent копятся после деплоя бота.</div>';
+        }
+
+        async function loadPatterns() {
+            const days = document.getElementById('acq-patterns-days').value;
+            const res = await acqFetch('patterns', {days});
+            const hrs = [...Array(24).keys()];
+            const cutoff = res.current_hour_msk;
+            acqDraw(document.getElementById('acq-today-chart'),
+                hrs.map((h) => h + ':00'),
+                [],
+                [
+                    {label: 'коридор p25', color: 'rgba(255,255,255,.25)', data: res.typical.p25, dash: [4, 3], width: 1, fmt: 'rub'},
+                    {label: 'коридор p75', color: 'rgba(255,255,255,.25)', data: res.typical.p75, dash: [4, 3], width: 1, fmt: 'rub'},
+                    {label: 'Медиана', color: 'rgba(255,255,255,.8)', data: res.typical.p50, fmt: 'rub'},
+                    {label: 'Сегодня', color: 'rgba(255,199,0,1)', width: 3, data: res.today.map((v, h) => (h <= cutoff ? v : null)), fmt: 'rub'},
+                ],
+                {fullLabels: hrs.map((h) => `к ${h}:59 МСК (накопленная выручка)`)});
+            const cell = {};
+            let maxRub = 1;
+            res.heatmap.forEach((r) => { cell[`${r.dow}-${r.hr}`] = r; maxRub = Math.max(maxRub, r.rub); });
+            const dows = ['Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб', 'Вс'];
+            let html = '<table style="border-collapse:collapse;">';
+            html += '<tr><td></td>' + hrs.map((h) => `<td style="font-size:9px;color:rgba(255,255,255,.4);padding:2px 3px;text-align:center;">${h}</td>`).join('') + '</tr>';
+            for (let d = 1; d <= 7; d++) {
+                html += `<tr><td style="font-size:10px;color:rgba(255,255,255,.6);padding:2px 6px;">${dows[d - 1]}</td>`;
+                hrs.forEach((h) => {
+                    const r = cell[`${d}-${h}`];
+                    const a = r ? Math.min(1, 0.08 + 0.92 * r.rub / maxRub) : 0.03;
+                    const title = r ? `${dows[d - 1]} ${h}:00–${h}:59 — ${r.payments} оплат, ${fmtRub(r.rub)} ₽ за 60 дней` : 'нет оплат';
+                    html += `<td title="${title}" style="width:22px;height:18px;background:rgba(255,199,0,${a.toFixed(2)});border:1px solid rgba(0,0,0,.35);cursor:default;"></td>`;
+                });
+                html += '</tr>';
+            }
+            document.getElementById('acq-heatmap').innerHTML = html + '</table>';
+        }
+
+        const loaders = {
+            'acq-newrep': loadNewRepeat, 'acq-funnel': loadFunnel, 'acq-ads': loadAds,
+            'acq-cohorts': loadCohorts, 'acq-pushes': loadPushes, 'acq-patterns': loadPatterns,
+        };
+
+        function loadAcqSection(name, force = false) {
+            const loader = loaders[name];
+            if (!loader || (loaded[name] && !force)) return;
+            loaded[name] = true;
+            loader().catch((e) => { loaded[name] = false; console.error('acquisition load failed', name, e); });
+        }
+
+        document.querySelectorAll('#panel-acquisition .subtab').forEach((btn) => {
+            btn.addEventListener('click', () => loadAcqSection(btn.dataset.subtab));
+        });
+        setupSubtabs('panel-acquisition');
+
+        document.querySelector('.tab-btn[data-tab="acquisition"]')?.addEventListener('click', () => {
+            loadAcqSection(document.querySelector('#panel-acquisition .subtab.active')?.dataset.subtab || 'acq-newrep');
+        });
+        if (location.hash === '#acquisition') loadAcqSection('acq-newrep');
+
+        document.getElementById('acq-newrep-days')?.addEventListener('change', () => {
+            document.getElementById('acq-newrep-start').value = '';
+            document.getElementById('acq-newrep-end').value = '';
+            loadNewRepeat().catch(console.error);
+        });
+        document.getElementById('acq-newrep-apply')?.addEventListener('click', () => loadNewRepeat().catch(console.error));
+        document.getElementById('acq-patterns-days')?.addEventListener('change', () => loadPatterns().catch(console.error));
+        document.getElementById('acq-spend-form')?.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            const body = new FormData(ev.target);
+            body.append('action', 'upsert');
+            const resp = await fetch(SPENDS_API, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+            const payload = await resp.json();
+            if (payload.status === 'ok') { ev.target.reset(); loadAcqSection('acq-ads', true); }
+            else alert(payload.message || 'Ошибка сохранения');
+        });
+    })();
     </script>
 </body>
 </html>

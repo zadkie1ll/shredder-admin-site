@@ -1,3 +1,4 @@
+import os
 import uuid
 import hmac
 import hashlib
@@ -54,6 +55,7 @@ from sqlalchemy import Text
 from sqlalchemy import TIMESTAMP
 from sqlalchemy.exc import IntegrityError
 from common.models.db import User
+from common.models.db import TemporarySquadBan
 from common.models.db import EventLog
 from common.models.db import ReferralBonus
 from common.models.db import ReferralBonusType
@@ -5235,6 +5237,97 @@ def support_admin_api_subscription_manage(request):
                 {"status": "ok", "result": {"user": admin_user_payload(user)}}
             )
 
+        BAN_SQUAD_UUID = os.getenv(
+            "BAN_SQUAD_UUID", "be4e12f0-098a-4d44-88d4-37cff58bf2d7"
+        )
+
+        if action == "disable_subscription":
+            # Как «Отключение подписки» в трафик-алертах бота: статус RWMS
+            # DISABLED + выключаем автоплатёж. Ручная оплата реактивирует.
+            user.autopay_allow = False
+            removed_recurrents = (
+                db_session.query(YkRecurrentPayment)
+                .filter(YkRecurrentPayment.user_id == user.id)
+                .delete(synchronize_session=False)
+            )
+            db_session.commit()
+            rwms_updated = False
+            rwms_user = rwms_client.get_user_by_username(user.username)
+            if rwms_user:
+                response = rwms_client.update_user(
+                    proto.UpdateUserRequest(
+                        uuid=rwms_user.uuid,
+                        status=proto.UserStatus.DISABLED,
+                    )
+                )
+                rwms_updated = response is not None
+            return JsonResponse({
+                "status": "ok",
+                "result": {
+                    "user": admin_user_payload(user),
+                    "action_label": "Подписка отключена (DISABLED)",
+                    "removed_recurrents": removed_recurrents,
+                    "rwms_updated": rwms_updated,
+                },
+            })
+
+        if action == "temp_ban":
+            # Как «Временный бан» в трафик-алертах бота: переводим подписку в
+            # ban-сквад и пишем TemporarySquadBan(unban_at). Снимает бан фоновый
+            # unban-watcher бота (process_due_unbans) по достижении unban_at.
+            try:
+                hours = float(request.POST.get("hours") or "0")
+            except ValueError:
+                return JsonResponse(
+                    {"status": "error", "message": "Часы должны быть числом"}, status=400
+                )
+            if hours <= 0:
+                return JsonResponse(
+                    {"status": "error", "message": "Длительность должна быть больше 0"},
+                    status=400,
+                )
+            rwms_user = rwms_client.get_user_by_username(user.username)
+            if rwms_user is None:
+                return JsonResponse(
+                    {"status": "error", "message": "Подписка в RWMS не найдена"},
+                    status=404,
+                )
+            response = rwms_client.update_user(
+                proto.UpdateUserRequest(
+                    uuid=rwms_user.uuid,
+                    active_internal_squads=[BAN_SQUAD_UUID],
+                )
+            )
+            if response is None:
+                return JsonResponse(
+                    {"status": "error", "message": "RWMS не применил ban-сквад"},
+                    status=502,
+                )
+            now_naive = datetime.utcnow()
+            unban_at = now_naive + timedelta(hours=hours)
+            ban = (
+                db_session.query(TemporarySquadBan)
+                .filter(TemporarySquadBan.user_id == user.id)
+                .one_or_none()
+            )
+            if ban is None:
+                db_session.add(TemporarySquadBan(
+                    user_id=user.id, banned_at=now_naive, unban_at=unban_at,
+                ))
+            else:
+                ban.banned_at = now_naive
+                ban.unban_at = unban_at
+                ban.restored_at = None
+            db_session.commit()
+            return JsonResponse({
+                "status": "ok",
+                "result": {
+                    "user": admin_user_payload(user),
+                    "action_label": f"Временный бан до {unban_at:%Y-%m-%d %H:%M} UTC (снимет бот)",
+                    "rwms_updated": True,
+                },
+            })
+
         if action == "stop_autopay":
             old_value = bool(user.autopay_allow)
             user.autopay_allow = False
@@ -6848,6 +6941,527 @@ def support_admin_api_censor_check_runs(request):
     except ValueError:
         return JsonResponse(
             {"status": "error", "message": "Неверный формат параметров"}, status=400
+        )
+    finally:
+        db_session.close()
+
+
+# ---------------------------------------------------------------------------
+# Аналитика привлечения (вкладка «Привлечение» в админ-дашборде)
+# ---------------------------------------------------------------------------
+# Все платежи (Wata + исторические YooKassa) объединяются в единый поток
+# (user_id, paid_at UTC-naive, amount RUB); дни бакетируются по МСК, чтобы
+# графики совпадали с «московскими» сутками, которыми оперирует бизнес.
+
+from sqlalchemy import text as sa_text  # noqa: E402
+
+ACQ_PAYS_CTE = """
+    pays AS (
+        SELECT wi.user_id AS user_id,
+               (t.payment_time AT TIME ZONE 'UTC') AS paid_at,
+               t.amount::numeric AS amount
+        FROM wata_transactions t
+        JOIN wata_invoices wi ON wi.order_id = t.order_id
+        WHERE t.transaction_status = 'Paid'
+        UNION ALL
+        SELECT p.user_id, p.created_at, p.amount::numeric
+        FROM yk_payments p
+        WHERE p.status = 'succeeded'
+    ),
+    first_pay AS (
+        SELECT user_id, min(paid_at) AS first_at
+        FROM pays GROUP BY user_id
+    )
+"""
+
+ACQ_MSK_DAY = "((paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date"
+
+ACQ_SELLING_TYPES = (
+    "winback-1", "winback-2", "winback-3", "winback-4",
+    "subscription-expired", "1-day-left", "3-days-left",
+)
+
+
+def _acq_rows(db_session, sql, **params):
+    return db_session.execute(sa_text(sql), params).mappings().all()
+
+
+def _acq_new_repeat(db_session, days, start=None, end=None):
+    if start and end:
+        where = f"{ACQ_MSK_DAY} BETWEEN :start AND :end"
+        params = {"start": start, "end": end}
+    else:
+        where = "paid_at >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)"
+        params = {"days": days}
+    rows = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE}
+        SELECT {ACQ_MSK_DAY} AS day,
+               count(*) FILTER (WHERE paid_at = first_at) AS new_payers,
+               COALESCE(sum(amount) FILTER (WHERE paid_at = first_at), 0) AS new_rub,
+               count(*) FILTER (WHERE paid_at <> first_at) AS repeat_payers,
+               COALESCE(sum(amount) FILTER (WHERE paid_at <> first_at), 0) AS repeat_rub
+        FROM pays JOIN first_pay USING (user_id)
+        WHERE {where}
+        GROUP BY 1 ORDER BY 1
+        """,
+        **params,
+    )
+    return {
+        "days": [
+            {
+                "day": r["day"].isoformat(),
+                "new_payers": r["new_payers"],
+                "new_rub": float(r["new_rub"]),
+                "repeat_payers": r["repeat_payers"],
+                "repeat_rub": float(r["repeat_rub"]),
+            }
+            for r in rows
+        ]
+    }
+
+
+def _acq_funnel(db_session, weeks):
+    events = _acq_rows(
+        db_session,
+        """
+        SELECT date_trunc('week', (timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS week,
+               count(*) FILTER (WHERE event_type = 'subscription_created') AS trials,
+               count(*) FILTER (WHERE event_type LIKE 'create_invoice%') AS invoice_clicks
+        FROM event_logs
+        WHERE timestamp >= now() AT TIME ZONE 'UTC' - make_interval(weeks => :weeks)
+          AND (event_type = 'subscription_created' OR event_type LIKE 'create_invoice%')
+        GROUP BY 1 ORDER BY 1
+        """,
+        weeks=weeks,
+    )
+    pays = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE}
+        SELECT date_trunc('week', (paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS week,
+               count(*) AS payments,
+               count(DISTINCT user_id) AS payers,
+               count(*) FILTER (WHERE paid_at = first_at) AS new_payers,
+               COALESCE(sum(amount) FILTER (WHERE paid_at = first_at), 0) AS new_rub
+        FROM pays JOIN first_pay USING (user_id)
+        WHERE paid_at >= now() AT TIME ZONE 'UTC' - make_interval(weeks => :weeks)
+        GROUP BY 1 ORDER BY 1
+        """,
+        weeks=weeks,
+    )
+    merged = {}
+    for r in events:
+        merged.setdefault(r["week"], {}).update(
+            trials=r["trials"], invoice_clicks=r["invoice_clicks"]
+        )
+    for r in pays:
+        merged.setdefault(r["week"], {}).update(
+            payments=r["payments"], payers=r["payers"],
+            new_payers=r["new_payers"], new_rub=float(r["new_rub"]),
+        )
+    return {
+        "weeks": [
+            {"week": wk.isoformat(),
+             "trials": v.get("trials", 0),
+             "invoice_clicks": v.get("invoice_clicks", 0),
+             "payments": v.get("payments", 0),
+             "payers": v.get("payers", 0),
+             "new_payers": v.get("new_payers", 0),
+             "new_rub": v.get("new_rub", 0.0)}
+            for wk, v in sorted(merged.items())
+        ]
+    }
+
+
+def _acq_ads(db_session, weeks):
+    # Таблица ad_spends появляется alembic-миграцией в common; до её наката
+    # отдаём флаг needs_migration, чтобы вкладка объяснила, что делать.
+    try:
+        spends = _acq_rows(
+            db_session,
+            """
+            SELECT id, day, channel, amount_rub, comment
+            FROM ad_spends
+            WHERE day >= (now() AT TIME ZONE 'Europe/Moscow')::date - make_interval(weeks => :weeks)
+            ORDER BY day DESC, channel
+            """,
+            weeks=weeks,
+        )
+    except Exception:
+        db_session.rollback()
+        return {"needs_migration": True, "weeks": [], "spends": []}
+
+    weekly_spend = {}
+    for r in spends:
+        wk = (r["day"] - timedelta(days=r["day"].weekday())).isoformat()
+        weekly_spend[wk] = weekly_spend.get(wk, 0.0) + float(r["amount_rub"])
+
+    pays = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE}
+        SELECT date_trunc('week', (paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS week,
+               count(*) FILTER (WHERE paid_at = first_at) AS new_payers,
+               COALESCE(sum(amount) FILTER (WHERE paid_at = first_at), 0) AS new_rub
+        FROM pays JOIN first_pay USING (user_id)
+        WHERE paid_at >= now() AT TIME ZONE 'UTC' - make_interval(weeks => :weeks)
+        GROUP BY 1 ORDER BY 1
+        """,
+        weeks=weeks,
+    )
+    subs_rows = _acq_rows(
+        db_session,
+        """
+        SELECT date_trunc('week', (timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS week,
+               count(*) AS subs
+        FROM event_logs
+        WHERE event_type = 'subscription_created'
+          AND timestamp >= now() AT TIME ZONE 'UTC' - make_interval(weeks => :weeks)
+        GROUP BY 1
+        """,
+        weeks=weeks,
+    )
+    weekly_subs = {r["week"].isoformat(): r["subs"] for r in subs_rows}
+    out = []
+    for r in pays:
+        wk = r["week"].isoformat()
+        spend = weekly_spend.get(wk, 0.0)
+        new_payers = r["new_payers"]
+        new_rub = float(r["new_rub"])
+        subs = weekly_subs.get(wk, 0)
+        out.append({
+            "week": wk,
+            "spend": round(spend, 2),
+            "subs": subs,
+            "cost_per_sub": round(spend / subs, 2) if spend and subs else None,
+            "new_payers": new_payers,
+            "new_rub": round(new_rub, 2),
+            "cpa": round(spend / new_payers, 2) if spend and new_payers else None,
+            "romi": round(new_rub / spend, 2) if spend else None,
+            "drr": round(100.0 * spend / new_rub, 1) if spend and new_rub else None,
+        })
+    return {
+        "needs_migration": False,
+        "weeks": out,
+        "spends": [
+            {"id": r["id"], "day": r["day"].isoformat(), "channel": r["channel"],
+             "amount_rub": float(r["amount_rub"]), "comment": r["comment"] or ""}
+            for r in spends
+        ],
+    }
+
+
+def _acq_cohorts(db_session, months):
+    ltv = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE}
+        SELECT to_char(date_trunc('month', (f.first_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow'), 'YYYY-MM') AS cohort,
+               (EXTRACT(YEAR FROM p.paid_at)::int * 12 + EXTRACT(MONTH FROM p.paid_at)::int)
+             - (EXTRACT(YEAR FROM f.first_at)::int * 12 + EXTRACT(MONTH FROM f.first_at)::int) AS offset_m,
+               sum(p.amount) AS rub
+        FROM pays p JOIN first_pay f USING (user_id)
+        WHERE f.first_at >= now() AT TIME ZONE 'UTC' - make_interval(months => :months)
+        GROUP BY 1, 2 ORDER BY 1, 2
+        """,
+        months=months,
+    )
+    retention = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE},
+        ranked AS (
+            SELECT user_id, paid_at,
+                   row_number() OVER (PARTITION BY user_id ORDER BY paid_at) AS rn
+            FROM pays
+        ),
+        seconds AS (SELECT user_id, paid_at AS second_at FROM ranked WHERE rn = 2)
+        SELECT to_char(date_trunc('month', (f.first_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow'), 'YYYY-MM') AS cohort,
+               count(*) AS size,
+               count(*) FILTER (WHERE s.second_at <= f.first_at + interval '30 days') AS r30,
+               count(*) FILTER (WHERE s.second_at <= f.first_at + interval '60 days') AS r60,
+               count(*) FILTER (WHERE s.second_at <= f.first_at + interval '90 days') AS r90,
+               count(*) FILTER (WHERE s.second_at <= f.first_at + interval '180 days') AS r180,
+               count(*) FILTER (WHERE s.second_at <= f.first_at + interval '365 days') AS r365
+        FROM first_pay f
+        LEFT JOIN seconds s USING (user_id)
+        WHERE f.first_at >= now() AT TIME ZONE 'UTC' - make_interval(months => :months)
+        GROUP BY 1 ORDER BY 1
+        """,
+        months=months,
+    )
+    sizes = {r["cohort"]: r["size"] for r in retention}
+    matrix = {}
+    for r in ltv:
+        matrix.setdefault(r["cohort"], {})[int(r["offset_m"])] = float(r["rub"])
+    cohorts = []
+    for cohort in sorted(matrix):
+        size = sizes.get(cohort, 0)
+        cumulative, acc = [], 0.0
+        for off in range(0, 7):
+            acc += matrix[cohort].get(off, 0.0)
+            cumulative.append(round(acc / size, 1) if size else 0.0)
+        cohorts.append({"cohort": cohort, "size": size, "ltv_per_user": cumulative})
+    # Зрелость окна: горизонт "дожит", если у ПОСЛЕДНЕГО первого платежа
+    # когорты (конец месяца) уже прошло h дней. Иначе процент занижен просто
+    # потому, что время ещё не вышло, — фронт помечает такие значения.
+    today_msk = (datetime.utcnow() + timedelta(hours=3)).date()
+
+    def _matured(cohort_ym, horizon_days):
+        year, month = int(cohort_ym[:4]), int(cohort_ym[5:7])
+        if month == 12:
+            month_end = date(year + 1, 1, 1) - timedelta(days=1)
+        else:
+            month_end = date(year, month + 1, 1) - timedelta(days=1)
+        return month_end + timedelta(days=horizon_days) <= today_msk
+
+    retention_out = []
+    for r in retention:
+        row = {"cohort": r["cohort"], "size": r["size"]}
+        for horizon in (30, 60, 90, 180, 365):
+            key = f"r{horizon}"
+            row[key] = round(100.0 * r[key] / r["size"], 1) if r["size"] else 0
+            row[f"{key}_matured"] = _matured(r["cohort"], horizon)
+        retention_out.append(row)
+
+    return {"ltv": cohorts, "retention": retention_out}
+
+
+def _acq_trials(db_session, days):
+    rows = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE},
+        ev AS (
+            SELECT user_id, timestamp AS ts,
+                   ((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS day
+            FROM event_logs
+            WHERE event_type = 'subscription_created'
+              AND timestamp >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+        )
+        SELECT ev.day, count(*) AS trials,
+               count(*) FILTER (
+                   WHERE f.first_at >= ev.ts AND f.first_at <= ev.ts + interval '10 days'
+               ) AS converted
+        FROM ev LEFT JOIN first_pay f USING (user_id)
+        GROUP BY 1 ORDER BY 1
+        """,
+        days=days,
+    )
+    return {
+        "days": [
+            {"day": r["day"].isoformat(), "trials": r["trials"],
+             "converted": r["converted"],
+             "conv_pct": round(100.0 * r["converted"] / r["trials"], 1) if r["trials"] else 0}
+            for r in rows
+        ]
+    }
+
+
+def _acq_pushes(db_session, days):
+    selling = list(ACQ_SELLING_TYPES)
+    daily = _acq_rows(
+        db_session,
+        """
+        SELECT ((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS day,
+               count(*) FILTER (WHERE event_payload->>'notification_type' = ANY(:selling)) AS selling,
+               count(*) FILTER (WHERE NOT (event_payload->>'notification_type' = ANY(:selling))) AS other
+        FROM event_logs
+        WHERE event_type = 'notification_sent'
+          AND timestamp >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+        GROUP BY 1 ORDER BY 1
+        """,
+        days=days, selling=selling,
+    )
+    revenue = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE}
+        SELECT {ACQ_MSK_DAY} AS day, COALESCE(sum(amount), 0) AS rub
+        FROM pays
+        WHERE paid_at >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+        GROUP BY 1 ORDER BY 1
+        """,
+        days=days,
+    )
+    winback = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE},
+        ev AS (
+            SELECT id, user_id, timestamp AS ts,
+                   event_payload->>'notification_type' AS ntype
+            FROM event_logs
+            WHERE event_type = 'notification_sent'
+              AND event_payload->>'notification_type' = ANY(:selling)
+              AND timestamp >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+        ),
+        per_event AS (
+            SELECT ev.id, ev.ntype,
+                   bool_or(p.paid_at >= ev.ts AND p.paid_at <= ev.ts + interval '72 hours') AS paid_72h
+            FROM ev
+            LEFT JOIN pays p ON p.user_id = ev.user_id
+            GROUP BY ev.id, ev.ntype
+        )
+        SELECT ntype, count(*) AS sent,
+               count(*) FILTER (WHERE paid_72h) AS paid_72h
+        FROM per_event GROUP BY 1 ORDER BY 1
+        """,
+        days=days, selling=selling,
+    )
+    rev_by_day = {r["day"].isoformat(): float(r["rub"]) for r in revenue}
+    return {
+        "days": [
+            {"day": r["day"].isoformat(), "selling": r["selling"], "other": r["other"],
+             "rub": rev_by_day.get(r["day"].isoformat(), 0.0)}
+            for r in daily
+        ],
+        "revenue_days": [
+            {"day": r["day"].isoformat(), "rub": float(r["rub"])} for r in revenue
+        ],
+        "winback": [
+            {"type": r["ntype"], "sent": r["sent"], "paid_72h": r["paid_72h"],
+             "conv_pct": round(100.0 * r["paid_72h"] / r["sent"], 1) if r["sent"] else 0}
+            for r in winback
+        ],
+    }
+
+
+def _acq_patterns(db_session, days=30):
+    heatmap = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE}
+        SELECT EXTRACT(ISODOW FROM (paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::int AS dow,
+               EXTRACT(HOUR FROM (paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::int AS hr,
+               count(*) AS payments, COALESCE(sum(amount), 0) AS rub
+        FROM pays
+        WHERE paid_at >= now() AT TIME ZONE 'UTC' - interval '60 days'
+        GROUP BY 1, 2
+        """,
+    )
+    hourly = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE}
+        SELECT {ACQ_MSK_DAY} AS day,
+               EXTRACT(HOUR FROM (paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::int AS hr,
+               COALESCE(sum(amount), 0) AS rub
+        FROM pays
+        WHERE paid_at >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+        GROUP BY 1, 2 ORDER BY 1, 2
+        """,
+        days=days + 2,
+    )
+    today_msk = (datetime.utcnow() + timedelta(hours=3)).date()
+    by_day = {}
+    for r in hourly:
+        by_day.setdefault(r["day"], [0.0] * 24)[r["hr"]] = float(r["rub"])
+    def cumulative(vals):
+        out, acc = [], 0.0
+        for v in vals:
+            acc += v
+            out.append(round(acc))
+        return out
+    history = [cumulative(v) for d, v in by_day.items() if d != today_msk]
+    p25, p50, p75 = [], [], []
+    for hr in range(24):
+        col = sorted(day[hr] for day in history) or [0]
+        n = len(col)
+        p25.append(col[max(0, int(n * 0.25) - 1)])
+        p50.append(col[max(0, int(n * 0.50) - 1)])
+        p75.append(col[max(0, int(n * 0.75) - 1)])
+    return {
+        "heatmap": [
+            {"dow": r["dow"], "hr": r["hr"], "payments": r["payments"], "rub": float(r["rub"])}
+            for r in heatmap
+        ],
+        "today": cumulative(by_day.get(today_msk, [0.0] * 24)),
+        "current_hour_msk": (datetime.utcnow() + timedelta(hours=3)).hour,
+        "typical": {"p25": p25, "p50": p50, "p75": p75},
+    }
+
+
+ACQ_SECTIONS = {
+    "new_repeat": lambda s, req: _acq_new_repeat(
+        s, int(req.GET.get("days", 60)),
+        req.GET.get("start") or None, req.GET.get("end") or None,
+    ),
+    "funnel": lambda s, req: _acq_funnel(s, int(req.GET.get("weeks", 12))),
+    "ads": lambda s, req: _acq_ads(s, int(req.GET.get("weeks", 12))),
+    "cohorts": lambda s, req: _acq_cohorts(s, int(req.GET.get("months", 14))),
+    "trials": lambda s, req: _acq_trials(s, int(req.GET.get("days", 60))),
+    "pushes": lambda s, req: _acq_pushes(s, int(req.GET.get("days", 30))),
+    "patterns": lambda s, req: _acq_patterns(s, int(req.GET.get("days", 30))),
+}
+
+
+def support_admin_api_acquisition(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+    section = request.GET.get("section", "")
+    handler = ACQ_SECTIONS.get(section)
+    if handler is None:
+        return JsonResponse({"status": "error", "message": "unknown section"}, status=400)
+    db_session = session_factory()
+    try:
+        return JsonResponse({"status": "ok", "result": handler(db_session, request)})
+    except ValueError:
+        return JsonResponse({"status": "error", "message": "bad params"}, status=400)
+    finally:
+        db_session.close()
+
+
+def support_admin_api_ad_spends(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+    if request.method != "POST":
+        return JsonResponse({"status": "error"}, status=405)
+
+    db_session = session_factory()
+    try:
+        action = request.POST.get("action")
+        if action == "upsert":
+            day = date.fromisoformat(request.POST.get("day", ""))
+            channel = (request.POST.get("channel") or "default").strip()[:128]
+            amount = float(request.POST.get("amount_rub", ""))
+            comment = (request.POST.get("comment") or "").strip()[:512] or None
+            db_session.execute(
+                sa_text(
+                    """
+                    INSERT INTO ad_spends (day, channel, amount_rub, comment)
+                    VALUES (:day, :channel, :amount, :comment)
+                    ON CONFLICT ON CONSTRAINT uq_ad_spends_day_channel
+                    DO UPDATE SET amount_rub = EXCLUDED.amount_rub,
+                                  comment = EXCLUDED.comment,
+                                  updated_at = now()
+                    """
+                ),
+                {"day": day, "channel": channel, "amount": amount, "comment": comment},
+            )
+            db_session.commit()
+            return JsonResponse({"status": "ok"})
+        if action == "delete":
+            db_session.execute(
+                sa_text("DELETE FROM ad_spends WHERE id = :id"),
+                {"id": int(request.POST.get("id", ""))},
+            )
+            db_session.commit()
+            return JsonResponse({"status": "ok"})
+        return JsonResponse({"status": "error", "message": "unknown action"}, status=400)
+    except (ValueError, TypeError):
+        db_session.rollback()
+        return JsonResponse({"status": "error", "message": "bad params"}, status=400)
+    except Exception:
+        db_session.rollback()
+        logging.exception("ad_spends update failed")
+        return JsonResponse(
+            {"status": "error", "message": "ошибка (миграция ad_spends накатана?)"},
+            status=500,
         )
     finally:
         db_session.close()
