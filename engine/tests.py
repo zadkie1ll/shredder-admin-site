@@ -4,6 +4,7 @@ import json
 import time
 from datetime import date
 from datetime import datetime
+from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
@@ -38,6 +39,8 @@ from engine.views import get_telegram_web_login_start_code
 from engine.views import cancel_autopay
 from engine.views import pay
 from engine.views import payment_session_url_key
+from engine.views import ACQ_PUSH_ATTRIBUTION_CTE
+from engine.views import _acq_pushes
 from engine.views import payment_retry
 from engine.views import render_login
 from engine.views import should_create_trial_for_channel
@@ -225,6 +228,74 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn("Это не LTV пришедших за период", template)
         self.assertIn("не хранится как зафиксированный снимок", template)
         self.assertIn("Это сопоставление недельных итогов, а не строгая когортная конверсия", template)
+
+    def test_winback_table_shows_conversion_segments(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("'Новые', 'Повторные', 'Медиана до оплаты', 'Выручка', 'Чеки'", template)
+        self.assertIn("Last-touch атрибуция", template)
+        self.assertIn("«Новые» — это была первая оплата пользователя за всю историю", template)
+
+
+class AcquisitionPushAttributionTests(SimpleTestCase):
+    def test_attribution_cte_uses_last_touch(self):
+        # Оплата привязывается к последнему продающему пушу перед ней,
+        # а пуш засчитывается сконвертившим не более одного раза.
+        self.assertIn("SELECT DISTINCT ON (p.user_id, p.paid_at)", ACQ_PUSH_ATTRIBUTION_CTE)
+        self.assertIn("ORDER BY p.user_id, p.paid_at, ev.ts DESC", ACQ_PUSH_ATTRIBUTION_CTE)
+        self.assertIn("SELECT DISTINCT ON (a.event_id) a.*", ACQ_PUSH_ATTRIBUTION_CTE)
+        self.assertIn("interval '72 hours'", ACQ_PUSH_ATTRIBUTION_CTE)
+
+    @mock.patch("engine.views._acq_rows")
+    def test_acq_pushes_builds_winback_segments(self, rows_mock):
+        rows_mock.side_effect = [
+            [{"day": date(2026, 7, 1), "selling": 5, "other": 2}],
+            [{"day": date(2026, 7, 1), "rub": Decimal("1000")}],
+            [{
+                "ntype": "winback-1", "sent": 100, "paid_72h": 3,
+                "new_payers": 1, "repeat_payers": 2,
+                "rub": Decimal("1497"), "median_hours": 5.25,
+            }],
+            [
+                {"ntype": "winback-1", "amount": Decimal("499"), "cnt": 2},
+                {"ntype": "winback-1", "amount": Decimal("199"), "cnt": 1},
+            ],
+        ]
+
+        result = _acq_pushes(object(), 30)
+
+        self.assertEqual(len(result["winback"]), 1)
+        row = result["winback"][0]
+        self.assertEqual(row["type"], "winback-1")
+        self.assertEqual(row["conv_pct"], 3.0)
+        self.assertEqual(row["new_payers"], 1)
+        self.assertEqual(row["repeat_payers"], 2)
+        self.assertEqual(row["rub"], 1497.0)
+        self.assertEqual(row["median_hours"], 5.2)
+        self.assertEqual(
+            row["amounts"],
+            [{"amount": 499.0, "count": 2}, {"amount": 199.0, "count": 1}],
+        )
+
+    @mock.patch("engine.views._acq_rows")
+    def test_acq_pushes_keeps_zero_conversion_rows(self, rows_mock):
+        rows_mock.side_effect = [
+            [],
+            [],
+            [{
+                "ntype": "winback-4", "sent": 50, "paid_72h": 0,
+                "new_payers": 0, "repeat_payers": 0,
+                "rub": Decimal("0"), "median_hours": None,
+            }],
+            [],
+        ]
+
+        result = _acq_pushes(object(), 30)
+
+        row = result["winback"][0]
+        self.assertEqual(row["conv_pct"], 0)
+        self.assertIsNone(row["median_hours"])
+        self.assertEqual(row["amounts"], [])
 
 
 class AdminRuntimeSettingsTests(SimpleTestCase):

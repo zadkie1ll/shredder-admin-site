@@ -6981,6 +6981,37 @@ ACQ_SELLING_TYPES = (
     "subscription-expired", "1-day-left", "3-days-left",
 )
 
+# Last-touch атрибуция оплат к продающим пушам: окна разных пушей серии
+# (3-days-left → 1-day-left → expired → winback-N) перекрываются, поэтому
+# каждая оплата привязывается только к ПОСЛЕДНЕМУ продающему пушу перед ней
+# (DISTINCT ON по оплате, ORDER BY ts DESC), а каждый пуш засчитывается
+# сконвертившим не более одного раза (первая атрибутированная оплата).
+ACQ_PUSH_ATTRIBUTION_CTE = """
+    ev AS (
+        SELECT id, user_id, timestamp AS ts,
+               event_payload->>'notification_type' AS ntype
+        FROM event_logs
+        WHERE event_type = 'notification_sent'
+          AND event_payload->>'notification_type' = ANY(:selling)
+          AND timestamp >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+    ),
+    attributed AS (
+        SELECT DISTINCT ON (p.user_id, p.paid_at)
+               ev.id AS event_id, ev.ntype, ev.ts,
+               p.user_id, p.paid_at, p.amount
+        FROM ev
+        JOIN pays p ON p.user_id = ev.user_id
+         AND p.paid_at >= ev.ts
+         AND p.paid_at <= ev.ts + interval '72 hours'
+        ORDER BY p.user_id, p.paid_at, ev.ts DESC
+    ),
+    conv_pay AS (
+        SELECT DISTINCT ON (a.event_id) a.*
+        FROM attributed a
+        ORDER BY a.event_id, a.paid_at
+    )
+"""
+
 
 def _acq_rows(db_session, sql, **params):
     return db_session.execute(sa_text(sql), params).mappings().all()
@@ -7290,27 +7321,47 @@ def _acq_pushes(db_session, days):
         db_session,
         f"""
         WITH {ACQ_PAYS_CTE},
-        ev AS (
-            SELECT id, user_id, timestamp AS ts,
-                   event_payload->>'notification_type' AS ntype
-            FROM event_logs
-            WHERE event_type = 'notification_sent'
-              AND event_payload->>'notification_type' = ANY(:selling)
-              AND timestamp >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
-        ),
-        per_event AS (
-            SELECT ev.id, ev.ntype,
-                   bool_or(p.paid_at >= ev.ts AND p.paid_at <= ev.ts + interval '72 hours') AS paid_72h
-            FROM ev
-            LEFT JOIN pays p ON p.user_id = ev.user_id
-            GROUP BY ev.id, ev.ntype
+        {ACQ_PUSH_ATTRIBUTION_CTE},
+        sent AS (SELECT ntype, count(*) AS sent FROM ev GROUP BY 1),
+        conv AS (
+            SELECT cp.ntype,
+                   count(*) AS converted,
+                   count(*) FILTER (WHERE cp.paid_at = fp.first_at) AS new_payers,
+                   COALESCE(sum(cp.amount), 0) AS rub,
+                   percentile_cont(0.5) WITHIN GROUP (
+                       ORDER BY EXTRACT(epoch FROM cp.paid_at - cp.ts) / 3600.0
+                   ) AS median_hours
+            FROM conv_pay cp
+            JOIN first_pay fp USING (user_id)
+            GROUP BY 1
         )
-        SELECT ntype, count(*) AS sent,
-               count(*) FILTER (WHERE paid_72h) AS paid_72h
-        FROM per_event GROUP BY 1 ORDER BY 1
+        SELECT s.ntype, s.sent,
+               COALESCE(c.converted, 0) AS paid_72h,
+               COALESCE(c.new_payers, 0) AS new_payers,
+               COALESCE(c.converted, 0) - COALESCE(c.new_payers, 0) AS repeat_payers,
+               COALESCE(c.rub, 0) AS rub,
+               c.median_hours
+        FROM sent s LEFT JOIN conv c USING (ntype) ORDER BY 1
         """,
         days=days, selling=selling,
     )
+    # Распределение чеков по атрибутированным оплатам — показывает,
+    # какие тарифы реально покупают с каждого типа пуша.
+    amounts = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE},
+        {ACQ_PUSH_ATTRIBUTION_CTE}
+        SELECT ntype, amount, count(*) AS cnt
+        FROM conv_pay GROUP BY 1, 2 ORDER BY 1, cnt DESC, 2
+        """,
+        days=days, selling=selling,
+    )
+    amounts_by_type = {}
+    for r in amounts:
+        amounts_by_type.setdefault(r["ntype"], []).append(
+            {"amount": float(r["amount"]), "count": r["cnt"]}
+        )
     rev_by_day = {r["day"].isoformat(): float(r["rub"]) for r in revenue}
     return {
         "days": [
@@ -7323,7 +7374,12 @@ def _acq_pushes(db_session, days):
         ],
         "winback": [
             {"type": r["ntype"], "sent": r["sent"], "paid_72h": r["paid_72h"],
-             "conv_pct": round(100.0 * r["paid_72h"] / r["sent"], 1) if r["sent"] else 0}
+             "conv_pct": round(100.0 * r["paid_72h"] / r["sent"], 1) if r["sent"] else 0,
+             "new_payers": r["new_payers"], "repeat_payers": r["repeat_payers"],
+             "rub": float(r["rub"]),
+             "median_hours": round(float(r["median_hours"]), 1)
+             if r["median_hours"] is not None else None,
+             "amounts": amounts_by_type.get(r["ntype"], [])}
             for r in winback
         ],
     }
