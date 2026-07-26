@@ -6584,6 +6584,8 @@ def admin_censor_check_payload(check, last_run=None, keys_by_id=None):
         "interval_minutes": check.interval_minutes,
         "is_enabled": check.is_enabled,
         "geo_mode": check.geo_mode,
+        "light_mode": check.light_mode,
+        "alerts_enabled": check.alerts_enabled,
         "api_key_id": check.api_key_id,
         "api_key_name": key_name,
         "last_run": admin_censor_run_payload(last_run) if last_run else None,
@@ -6784,7 +6786,11 @@ def support_admin_api_censor_checks(request):
                 check.sni = sni[:256]
                 check.port = port
                 check.interval_minutes = interval_minutes
-                check.geo_mode = request.POST.get("geo_mode") == "1"
+                # Режим приходит одной опцией: op-full | op-light | geo-full | geo-light
+                mode = request.POST.get("mode", "op-full")
+                check.geo_mode = mode.startswith("geo")
+                check.light_mode = mode.endswith("light")
+                check.alerts_enabled = request.POST.get("alerts_enabled") == "1"
                 check.api_key_id = api_key_id
                 check.updated_at = datetime.utcnow()
                 db_session.commit()
@@ -6824,7 +6830,12 @@ def support_admin_api_censor_checks(request):
                     )
                 is_public = ripe_atlas.resolve_public_flag(db_session, check)
                 run = ripe_atlas.start_run(
-                    db_session, check, api_key, is_public, bool(check.geo_mode)
+                    db_session,
+                    check,
+                    api_key,
+                    is_public,
+                    bool(check.geo_mode),
+                    bool(check.light_mode),
                 )
                 status_code = 200 if run.status != ripe_atlas.RUN_STATUS_ERROR else 502
                 return JsonResponse(
@@ -7440,6 +7451,236 @@ def _acq_patterns(db_session, days=30):
     }
 
 
+# Тарифный поток платежей: как ACQ_PAYS_CTE, но с тарифом каждого платежа
+# (yk: subscription_period, wata: tariff_id инвойса) — для аналитики переходов
+# между тарифами.
+ACQ_PAYS_TARIFF_CTE = """
+    pays_t AS (
+        SELECT wi.user_id AS user_id,
+               (t.payment_time AT TIME ZONE 'UTC') AS paid_at,
+               t.amount::numeric AS amount,
+               COALESCE(wi.tariff_id, '?') AS tariff
+        FROM wata_transactions t
+        JOIN wata_invoices wi ON wi.order_id = t.order_id
+        WHERE t.transaction_status = 'Paid'
+        UNION ALL
+        SELECT p.user_id, p.created_at, p.amount::numeric,
+               COALESCE(p.subscription_period, '?')
+        FROM yk_payments p
+        WHERE p.status = 'succeeded'
+    )
+"""
+
+# Границы бакетов «на какой день после старта триала пришла первая оплата».
+ACQ_TIMING_BUCKETS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 10, 14, 21, 30, 60]
+ACQ_TIMING_LABELS = [
+    "0–1", "1–2", "2–3", "3–4", "4–5", "5–6", "6–7", "7–8",
+    "8–10", "10–14", "14–21", "21–30", "30–60", "60+",
+]
+
+
+def _acq_trial_timing(db_session, days=365):
+    """Распределение дня первой оплаты относительно старта триала.
+
+    Когорта — пользователи, чья ПЕРВАЯ подписка (subscription_created) создана
+    за последние :days. Показывает, на каком этапе триала конвертятся новые
+    клиенты: сразу, в зоне пушей об окончании, в момент истечения или сильно
+    позже (winback).
+    """
+    edges = ",".join(str(e) for e in ACQ_TIMING_BUCKETS)
+    totals = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE},
+        subs AS (
+            SELECT user_id, min(timestamp) AS created_at
+            FROM event_logs
+            WHERE event_type = 'subscription_created'
+            GROUP BY user_id
+        )
+        SELECT count(*) AS trials,
+               count(*) FILTER (
+                   WHERE f.first_at IS NOT NULL AND f.first_at >= s.created_at
+               ) AS converted
+        FROM subs s
+        LEFT JOIN first_pay f USING (user_id)
+        WHERE s.created_at >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+        """,
+        days=days,
+    )[0]
+    rows = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE},
+        subs AS (
+            SELECT user_id, min(timestamp) AS created_at
+            FROM event_logs
+            WHERE event_type = 'subscription_created'
+            GROUP BY user_id
+        )
+        SELECT width_bucket(
+                   EXTRACT(EPOCH FROM (f.first_at - s.created_at)) / 86400.0,
+                   ARRAY[{edges}]
+               ) AS bucket,
+               count(*) AS users
+        FROM subs s
+        JOIN first_pay f USING (user_id)
+        WHERE s.created_at >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+          AND f.first_at >= s.created_at
+        GROUP BY 1
+        """,
+        days=days,
+    )
+    by_bucket = {int(r["bucket"]): int(r["users"]) for r in rows}
+    converted = int(totals["converted"] or 0)
+    trials = int(totals["trials"] or 0)
+    buckets = []
+    for idx, label in enumerate(ACQ_TIMING_LABELS, start=1):
+        users = by_bucket.get(idx, 0)
+        buckets.append({
+            "label": label,
+            "users": users,
+            "pct": round(100.0 * users / converted, 1) if converted else 0,
+        })
+    return {
+        "trials": trials,
+        "converted": converted,
+        "conversion_pct": round(100.0 * converted / trials, 1) if trials else 0,
+        "buckets": buckets,
+    }
+
+
+def _acq_renewal_ladder(db_session, months=12):
+    """Лестница продлений по когортам месяца привлечения.
+
+    Когорта — месяц (МСК) первой подписки пользователя. Для каждой когорты:
+    привлечено → оплатили ≥1 раз → ≥2 → ≥3 → ≥4 раз. Проценты шагов
+    считаются на фронте/потребителе от предыдущей ступени.
+    """
+    rows = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE},
+        subs AS (
+            SELECT user_id, min(timestamp) AS created_at
+            FROM event_logs
+            WHERE event_type = 'subscription_created'
+            GROUP BY user_id
+        ),
+        pay_counts AS (
+            SELECT user_id, count(*) AS n FROM pays GROUP BY user_id
+        )
+        SELECT to_char(
+                   date_trunc('month',
+                       (s.created_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow'),
+                   'YYYY-MM'
+               ) AS cohort,
+               count(*) AS attracted,
+               count(*) FILTER (WHERE pc.n >= 1) AS paid1,
+               count(*) FILTER (WHERE pc.n >= 2) AS paid2,
+               count(*) FILTER (WHERE pc.n >= 3) AS paid3,
+               count(*) FILTER (WHERE pc.n >= 4) AS paid4
+        FROM subs s
+        LEFT JOIN pay_counts pc USING (user_id)
+        WHERE s.created_at >= now() AT TIME ZONE 'UTC' - make_interval(months => :months)
+        GROUP BY 1 ORDER BY 1
+        """,
+        months=months,
+    )
+    cohorts = []
+    totals = {"attracted": 0, "paid1": 0, "paid2": 0, "paid3": 0, "paid4": 0}
+    for r in rows:
+        item = {
+            "cohort": r["cohort"],
+            "attracted": int(r["attracted"] or 0),
+            "paid1": int(r["paid1"] or 0),
+            "paid2": int(r["paid2"] or 0),
+            "paid3": int(r["paid3"] or 0),
+            "paid4": int(r["paid4"] or 0),
+        }
+        for key in totals:
+            totals[key] += item[key]
+        cohorts.append(item)
+    return {"cohorts": cohorts, "totals": totals}
+
+
+def _acq_tariff_paths(db_session, months=12):
+    """Переходы между тарифами: откуда пришли покупатели каждого тарифа.
+
+    Для каждого пользователя берётся ПЕРВАЯ покупка каждого тарифа за окно
+    :months; prev_tariff — тариф платежа, непосредственно предшествовавшего
+    этой покупке (lag по всем платежам пользователя за всю историю).
+    prev_tariff IS NULL — тариф куплен самой первой покупкой в жизни.
+    """
+    transitions = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_TARIFF_CTE},
+        ordered AS (
+            SELECT user_id, tariff, paid_at,
+                   lag(tariff) OVER (PARTITION BY user_id ORDER BY paid_at) AS prev_tariff,
+                   row_number() OVER (
+                       PARTITION BY user_id, tariff ORDER BY paid_at
+                   ) AS rn_tariff
+            FROM pays_t
+        )
+        SELECT tariff, prev_tariff, count(*) AS users
+        FROM ordered
+        WHERE rn_tariff = 1
+          AND paid_at >= now() AT TIME ZONE 'UTC' - make_interval(months => :months)
+        GROUP BY 1, 2
+        """,
+        months=months,
+    )
+    volumes = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_TARIFF_CTE}
+        SELECT tariff,
+               count(*) AS payments,
+               count(DISTINCT user_id) AS buyers,
+               COALESCE(sum(amount), 0) AS rub
+        FROM pays_t
+        WHERE paid_at >= now() AT TIME ZONE 'UTC' - make_interval(months => :months)
+        GROUP BY 1
+        """,
+        months=months,
+    )
+    stats = {}
+    for r in volumes:
+        stats[r["tariff"]] = {
+            "tariff": r["tariff"],
+            "payments": int(r["payments"] or 0),
+            "buyers": int(r["buyers"] or 0),
+            "rub": float(r["rub"]),
+            "adopters": 0,
+            "first_purchase": 0,
+            "from": [],
+        }
+    for r in transitions:
+        entry = stats.setdefault(
+            r["tariff"],
+            {"tariff": r["tariff"], "payments": 0, "buyers": 0, "rub": 0.0,
+             "adopters": 0, "first_purchase": 0, "from": []},
+        )
+        users = int(r["users"] or 0)
+        entry["adopters"] += users
+        if r["prev_tariff"] is None:
+            entry["first_purchase"] += users
+        else:
+            entry["from"].append({"tariff": r["prev_tariff"], "users": users})
+    result = []
+    for entry in stats.values():
+        entry["from"].sort(key=lambda item: item["users"], reverse=True)
+        adopters = entry["adopters"]
+        entry["first_purchase_pct"] = (
+            round(100.0 * entry["first_purchase"] / adopters, 1) if adopters else 0
+        )
+        result.append(entry)
+    result.sort(key=lambda item: item["rub"], reverse=True)
+    return {"tariffs": result}
+
+
 ACQ_SECTIONS = {
     "new_repeat": lambda s, req: _acq_new_repeat(
         s, int(req.GET.get("days", 60)),
@@ -7451,6 +7692,13 @@ ACQ_SECTIONS = {
     "trials": lambda s, req: _acq_trials(s, int(req.GET.get("days", 60))),
     "pushes": lambda s, req: _acq_pushes(s, int(req.GET.get("days", 30))),
     "patterns": lambda s, req: _acq_patterns(s, int(req.GET.get("days", 30))),
+    "trial_timing": lambda s, req: _acq_trial_timing(s, int(req.GET.get("days", 365))),
+    "renewal_ladder": lambda s, req: _acq_renewal_ladder(
+        s, int(req.GET.get("months", 12))
+    ),
+    "tariff_paths": lambda s, req: _acq_tariff_paths(
+        s, int(req.GET.get("months", 12))
+    ),
 }
 
 

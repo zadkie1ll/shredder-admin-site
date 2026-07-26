@@ -193,6 +193,17 @@ SUPPORT_STAFF_PASSWORD = config("SUPPORT_STAFF_PASSWORD", default="")
 # Ключ RIPE Atlas для вкладки «Замеры ТСПУ» (права: schedule measurement,
 # get non-public results). Пустой ключ отключает вкладку.
 RIPE_ATLAS_API_KEY = config("RIPE_ATLAS_API_KEY", default="")
+# Токен для алертов «Замеров ТСПУ» — по умолчанию тот же бот, что и для авторизации.
+TELEGRAM_ALERT_BOT_TOKEN = config(
+    "TELEGRAM_ALERT_BOT_TOKEN",
+    default=config("MI_VPN_BOT_TOKEN", default=TELEGRAM_AUTH_BOT_TOKEN),
+)
+# Telegram user id(ы) для алертов (через запятую). Пусто — алерты отключены.
+TELEGRAM_ALERT_CHAT_ID = config("TELEGRAM_ALERT_CHAT_ID", default="")
+# Фоновый воркер «Замеров ТСПУ» (расписание + сбор результатов + алерты) внутри
+# процесса сайта. Отключите, если крутите обслуживание отдельно (крон/воркер).
+CENSOR_WORKER_ENABLED = config("CENSOR_WORKER_ENABLED", default=True, cast=bool)
+CENSOR_WORKER_INTERVAL = config("CENSOR_WORKER_INTERVAL", default=60, cast=int)
 SUPPORT_ATTACHMENT_MAX_BYTES = config(
     "SUPPORT_ATTACHMENT_MAX_BYTES",
     default=50 * 1024 * 1024,

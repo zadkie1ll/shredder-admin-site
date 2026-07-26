@@ -40,7 +40,12 @@ from engine.views import cancel_autopay
 from engine.views import pay
 from engine.views import payment_session_url_key
 from engine.views import ACQ_PUSH_ATTRIBUTION_CTE
+from engine.views import ACQ_PAYS_TARIFF_CTE
+from engine.views import ACQ_TIMING_LABELS
 from engine.views import _acq_pushes
+from engine.views import _acq_renewal_ladder
+from engine.views import _acq_tariff_paths
+from engine.views import _acq_trial_timing
 from engine.views import payment_retry
 from engine.views import render_login
 from engine.views import should_create_trial_for_channel
@@ -2242,3 +2247,111 @@ class NodeTrafficDayGranularityTests(SimpleTestCase):
         # (created_at = 09.07 00:00) не будет отброшен фильтром панели
         self.assertEqual(captured["start"], datetime(2026, 7, 9, 0, 0))
         self.assertEqual(report["start"], "2026-07-09 00:00")
+
+
+class AcquisitionJourneyTests(SimpleTestCase):
+    """Секции «Путь клиента»: тайминг первой оплаты, лестница продлений,
+    переходы между тарифами."""
+
+    @mock.patch("engine.views._acq_rows")
+    def test_trial_timing_builds_buckets_with_shares(self, rows_mock):
+        rows_mock.side_effect = [
+            [{"trials": 1000, "converted": 100}],
+            [{"bucket": 1, "users": 40}, {"bucket": 8, "users": 60}],
+        ]
+
+        result = _acq_trial_timing(object(), 365)
+
+        self.assertEqual(result["trials"], 1000)
+        self.assertEqual(result["converted"], 100)
+        self.assertEqual(result["conversion_pct"], 10.0)
+        self.assertEqual(len(result["buckets"]), len(ACQ_TIMING_LABELS))
+        self.assertEqual(result["buckets"][0], {"label": "0–1", "users": 40, "pct": 40.0})
+        self.assertEqual(result["buckets"][7], {"label": "7–8", "users": 60, "pct": 60.0})
+        # Пустые бакеты присутствуют с нулями, а не пропущены.
+        self.assertEqual(result["buckets"][1], {"label": "1–2", "users": 0, "pct": 0})
+
+    @mock.patch("engine.views._acq_rows")
+    def test_trial_timing_zero_division_safe(self, rows_mock):
+        rows_mock.side_effect = [[{"trials": 0, "converted": 0}], []]
+
+        result = _acq_trial_timing(object(), 30)
+
+        self.assertEqual(result["conversion_pct"], 0)
+        self.assertTrue(all(b["pct"] == 0 for b in result["buckets"]))
+
+    @mock.patch("engine.views._acq_rows")
+    def test_renewal_ladder_cohorts_and_totals(self, rows_mock):
+        rows_mock.return_value = [
+            {"cohort": "2026-05", "attracted": 100, "paid1": 20, "paid2": 10,
+             "paid3": 5, "paid4": 2},
+            {"cohort": "2026-06", "attracted": 200, "paid1": 30, "paid2": 12,
+             "paid3": 6, "paid4": 3},
+        ]
+
+        result = _acq_renewal_ladder(object(), 12)
+
+        self.assertEqual(len(result["cohorts"]), 2)
+        self.assertEqual(result["cohorts"][0]["attracted"], 100)
+        self.assertEqual(
+            result["totals"],
+            {"attracted": 300, "paid1": 50, "paid2": 22, "paid3": 11, "paid4": 5},
+        )
+
+    @mock.patch("engine.views._acq_rows")
+    def test_tariff_paths_first_purchase_and_transitions(self, rows_mock):
+        rows_mock.side_effect = [
+            [
+                {"tariff": "year", "prev_tariff": None, "users": 198},
+                {"tariff": "year", "prev_tariff": "month", "users": 105},
+                {"tariff": "year", "prev_tariff": "threemonths", "users": 54},
+            ],
+            [
+                {"tariff": "year", "payments": 400, "buyers": 357,
+                 "rub": Decimal("600000")},
+            ],
+        ]
+
+        result = _acq_tariff_paths(object(), 12)
+
+        self.assertEqual(len(result["tariffs"]), 1)
+        year = result["tariffs"][0]
+        self.assertEqual(year["adopters"], 357)
+        self.assertEqual(year["first_purchase"], 198)
+        self.assertEqual(year["first_purchase_pct"], 55.5)
+        # Переходы отсортированы по убыванию людей.
+        self.assertEqual(year["from"][0], {"tariff": "month", "users": 105})
+        self.assertEqual(year["from"][1], {"tariff": "threemonths", "users": 54})
+
+    @mock.patch("engine.views._acq_rows")
+    def test_tariff_paths_transition_without_volume_row(self, rows_mock):
+        # Тариф встречается в переходах, но не в объёмах окна (куплен на границе)
+        # — не должен падать с KeyError.
+        rows_mock.side_effect = [
+            [{"tariff": "oneday", "prev_tariff": None, "users": 3}],
+            [],
+        ]
+
+        result = _acq_tariff_paths(object(), 3)
+
+        self.assertEqual(result["tariffs"][0]["tariff"], "oneday")
+        self.assertEqual(result["tariffs"][0]["first_purchase_pct"], 100.0)
+
+    def test_tariff_cte_covers_both_gateways(self):
+        self.assertIn("wata_transactions", ACQ_PAYS_TARIFF_CTE)
+        self.assertIn("yk_payments", ACQ_PAYS_TARIFF_CTE)
+        self.assertIn("subscription_period", ACQ_PAYS_TARIFF_CTE)
+        self.assertIn("tariff_id", ACQ_PAYS_TARIFF_CTE)
+
+    def test_journey_subtab_present_in_template(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('data-subtab="acq-journey"', template)
+        self.assertIn('id="subpanel-acq-journey"', template)
+        self.assertIn('id="acq-timing-table"', template)
+        self.assertIn('id="acq-ladder-table"', template)
+        self.assertIn('id="acq-tariff-paths-table"', template)
+        self.assertIn("'acq-journey': loadJourney", template)
+        self.assertIn("acqFetch('trial_timing'", template)
+        self.assertIn("acqFetch('renewal_ladder'", template)
+        self.assertIn("acqFetch('tariff_paths'", template)

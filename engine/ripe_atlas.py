@@ -112,6 +112,20 @@ ASN_PROBE_SPEC: list[tuple[int, int, str]] = [
 ASN_NAMES = {asn: name for asn, _, name in ASN_PROBE_SPEC}
 REQUESTED_TOTAL = sum(count for _, count, _ in ASN_PROBE_SPEC)
 
+# Лёгкий набор для частого мониторинга большого числа нод: ~10 зондов по
+# крупнейшим операторам (≈200 кредитов вместо 660). Для «заблокирован ли IP
+# в РФ» этого достаточно — сигнал бинарный.
+LIGHT_ASN_PROBE_SPEC: list[tuple[int, int, str]] = [
+    (12389, 2, "Ростелеком"),
+    (8402, 2, "Билайн"),
+    (8359, 2, "МТС"),
+    (12714, 1, "Мегафон"),
+    (25513, 1, "МГТС"),
+    (12768, 1, "Дом.ру"),
+    (20485, 1, "ТТК"),
+]
+GEO_PROBE_COUNT_LIGHT = 20
+
 # Сколько ждём результаты после создания измерения: зонды отвечают волнами,
 # основная масса приходит за 1-2 минуты. После дедлайна прогон закрывается с
 # тем, что успело прийти (не ответившие зонды не считаются заблокированными —
@@ -121,6 +135,14 @@ COLLECT_DEADLINE = timedelta(minutes=4)
 RUN_STATUS_PENDING = "pending"
 RUN_STATUS_COMPLETE = "complete"
 RUN_STATUS_ERROR = "error"
+
+# Пороги алертов (доступность = % пробившихся зондов). Гистерезис, чтобы
+# состояние не «дрожало» на границе: в «заблокировано» уходим ниже 50%,
+# обратно в «доступно» — только выше 70%.
+ALERT_BLOCKED_BELOW = 50
+ALERT_RECOVER_AT = 70
+ALERT_STATE_OK = "ok"
+ALERT_STATE_BLOCKED = "blocked"
 
 
 def provider_name(asn) -> str:
@@ -161,17 +183,21 @@ def resolve_public_flag(db_session, check):
     return bool(row.public_measurements) if row else False
 
 
-def _probes_spec(geo: bool) -> list:
-    """Выбор зондов: гео-режим — по country:RU; иначе — по 12 ASN операторов."""
+def _probes_spec(geo: bool, light: bool = False) -> list:
+    """Выбор зондов: гео-режим — по country:RU; иначе — по ASN операторов.
+
+    light=True — уменьшенный набор для дешёвого частого мониторинга.
+    """
     if geo:
         return [
             {
-                "requested": GEO_PROBE_COUNT,
+                "requested": GEO_PROBE_COUNT_LIGHT if light else GEO_PROBE_COUNT,
                 "type": "country",
                 "value": "RU",
                 "tags": {"include": ["system-ipv4-works"]},
             }
         ]
+    spec = LIGHT_ASN_PROBE_SPEC if light else ASN_PROBE_SPEC
     return [
         {
             "requested": count,
@@ -179,12 +205,15 @@ def _probes_spec(geo: bool) -> list:
             "value": asn,
             "tags": {"include": ["system-ipv4-works"]},
         }
-        for asn, count, _ in ASN_PROBE_SPEC
+        for asn, count, _ in spec
     ]
 
 
-def expected_probe_total(geo: bool) -> int:
-    return GEO_PROBE_COUNT if geo else REQUESTED_TOTAL
+def expected_probe_total(geo: bool, light: bool = False) -> int:
+    if geo:
+        return GEO_PROBE_COUNT_LIGHT if light else GEO_PROBE_COUNT
+    spec = LIGHT_ASN_PROBE_SPEC if light else ASN_PROBE_SPEC
+    return sum(count for _, count, _ in spec)
 
 
 def create_measurement(
@@ -194,6 +223,7 @@ def create_measurement(
     port: int,
     is_public: bool = False,
     geo: bool = False,
+    light: bool = False,
 ) -> tuple:
     """Создаёт one-off sslcert-измерение; возвращает (msm_id, error_message).
 
@@ -218,7 +248,7 @@ def create_measurement(
                 "is_public": is_public,
             }
         ],
-        "probes": _probes_spec(geo),
+        "probes": _probes_spec(geo, light),
         "is_oneoff": True,
     }
     try:
@@ -364,16 +394,85 @@ def summarize_results(results: list, geo: bool = False) -> dict:
     }
 
 
+def run_availability_percent(run: CensorCheckRun) -> int:
+    if not run.total_probes:
+        return 0
+    return round(run.ok_probes * 100 / run.total_probes)
+
+
+def _blocked_summary_text(run: CensorCheckRun) -> str:
+    groups = run.blocked_asns or {}
+    if not groups:
+        return "—"
+    return ", ".join(f"{name} {count}" for name, count in groups.items())
+
+
+def maybe_send_alert(db_session, check: CensorCheck, run: CensorCheckRun) -> None:
+    """Шлёт TG-алерт при СМЕНЕ состояния ноды (доступна↔заблокирована).
+
+    Только для завершённых прогонов с данными. Спама нет: пока состояние не
+    меняется, повторных алертов не будет (last_alert_state).
+    """
+    # Импорт внутри функции — модуль notify тянет django.conf.settings, а
+    # ripe_atlas может импортироваться в контексте без готовых настроек.
+    from engine import notify
+
+    if not check.alerts_enabled or run.status != RUN_STATUS_COMPLETE:
+        return
+
+    pct = run_availability_percent(run)
+    prev = check.last_alert_state
+    if pct < ALERT_BLOCKED_BELOW:
+        new_state = ALERT_STATE_BLOCKED
+    elif pct >= ALERT_RECOVER_AT:
+        new_state = ALERT_STATE_OK
+    else:
+        # Зона гистерезиса — состояние не меняем.
+        return
+
+    if new_state == prev:
+        return
+
+    label = check.name or check.sni
+    port = f":{check.port}" if check.port != 443 else ""
+    if new_state == ALERT_STATE_BLOCKED:
+        text = (
+            f"🚨 <b>Нода недоступна из РФ</b>\n"
+            f"{label}\n"
+            f"IP: <code>{check.target_ip}{port}</code> · SNI: <code>{check.sni}</code>\n"
+            f"Доступность: <b>{pct}%</b> "
+            f"({run.ok_probes}/{run.total_probes} зондов)\n"
+            f"Не проходят: {_blocked_summary_text(run)}"
+        )
+        notify.send_admin_telegram_alert(text)
+        check.last_alert_state = ALERT_STATE_BLOCKED
+        db_session.commit()
+    elif new_state == ALERT_STATE_OK:
+        # «Восстановилась» шлём только если раньше был бан.
+        if prev == ALERT_STATE_BLOCKED:
+            text = (
+                f"✅ <b>Нода снова доступна из РФ</b>\n"
+                f"{label}\n"
+                f"IP: <code>{check.target_ip}{port}</code>\n"
+                f"Доступность: <b>{pct}%</b> "
+                f"({run.ok_probes}/{run.total_probes} зондов)"
+            )
+            notify.send_admin_telegram_alert(text)
+        check.last_alert_state = ALERT_STATE_OK
+        db_session.commit()
+
+
 def start_run(
     db_session,
     check: CensorCheck,
     api_key: str,
     is_public: bool = False,
     geo: bool = False,
+    light: bool = False,
 ) -> CensorCheckRun:
     """Создаёт измерение и запись прогона (при ошибке — прогон со статусом error)."""
     msm_id, error = create_measurement(
-        api_key, check.target_ip, check.sni, check.port, is_public, geo
+        api_key, check.target_ip, check.sni, check.port, is_public, geo, light
     )
     run = CensorCheckRun(
         check_id=check.id,
@@ -423,6 +522,7 @@ def finalize_run(db_session, run: CensorCheckRun, api_key: str) -> bool:
 
     check = db_session.get(CensorCheck, run.check_id)
     geo = bool(check.geo_mode) if check else False
+    light = bool(check.light_mode) if check else False
 
     summary = summarize_results(results, geo=geo)
     run.total_probes = summary["total"]
@@ -431,7 +531,7 @@ def finalize_run(db_session, run: CensorCheckRun, api_key: str) -> bool:
     run.results = summary["probes"]
     run.blocked_asns = summary["blocked_by_provider"]
 
-    if summary["total"] >= expected_probe_total(geo) or deadline_passed:
+    if summary["total"] >= expected_probe_total(geo, light) or deadline_passed:
         if summary["total"] == 0:
             run.status = RUN_STATUS_ERROR
             run.error_message = "Ни один зонд не ответил"
@@ -439,6 +539,8 @@ def finalize_run(db_session, run: CensorCheckRun, api_key: str) -> bool:
             run.status = RUN_STATUS_COMPLETE
         run.completed_at = datetime.utcnow()
         db_session.commit()
+        if check:
+            maybe_send_alert(db_session, check, run)
         return True
 
     db_session.commit()
@@ -494,4 +596,11 @@ def schedule_due_checks(db_session, fallback_key: str = "") -> None:
         db_session.commit()
         if claimed:
             is_public = resolve_public_flag(db_session, check)
-            start_run(db_session, check, api_key, is_public, bool(check.geo_mode))
+            start_run(
+                db_session,
+                check,
+                api_key,
+                is_public,
+                bool(check.geo_mode),
+                bool(check.light_mode),
+            )

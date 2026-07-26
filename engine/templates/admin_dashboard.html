@@ -70,10 +70,18 @@
         .node-traffic-cell-num { text-align: right; font-variant-numeric: tabular-nums; }
         .node-traffic-share-hot { color: #ff6b6b; font-weight: 800; }
         .tab-btn[data-tab="censor-checks"] i { color: var(--brand-gold); }
-        .censor-check-form { display: grid; grid-template-columns: minmax(120px, .8fr) minmax(0, 1fr) minmax(150px, .7fr) minmax(130px, .6fr) minmax(140px, .6fr) auto; gap: 10px; align-items: center; }
-        @media (max-width: 1100px) { .censor-check-form { grid-template-columns: 1fr 1fr; } }
-        .censor-form-actions { display: flex; gap: 8px; }
+        .censor-check-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+        .censor-check-form .input[name="target_ip"] { flex: 1 1 130px; min-width: 120px; }
+        .censor-check-form .input[name="sni"] { flex: 2 1 200px; min-width: 150px; }
+        .censor-check-form .input[name="mode"] { flex: 2 1 240px; min-width: 200px; }
+        .censor-check-form .input[name="interval_minutes"] { flex: 1 1 140px; min-width: 120px; }
+        .censor-check-form .input[name="api_key_id"] { flex: 1 1 150px; min-width: 130px; }
+        .censor-alerts-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
+        .censor-alerts-toggle i { color: var(--brand-gold); }
+        .censor-form-actions { display: flex; gap: 8px; flex: 0 0 auto; }
         .censor-mode-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; border: 1px solid rgba(132,204,22,.4); color: var(--blue); background: rgba(132,204,22,.08); }
+        .censor-mode-badge.light { border-color: rgba(255,199,0,.4); color: var(--brand-gold); background: rgba(255,199,0,.08); }
+        .censor-mode-badge.alert { border-color: rgba(34,197,94,.4); color: #22c55e; background: rgba(34,197,94,.08); }
         .censor-district-row { grid-template-columns: minmax(150px, 1.4fr) 90px 90px minmax(150px, 1.2fr); min-width: 520px; }
         .censor-district-row.table-head { background: rgba(255,255,255,.04); }
         .censor-keys-card { padding: 0; margin-bottom: 16px; }
@@ -1686,6 +1694,7 @@
                 <button type="button" class="subtab" data-subtab="acq-cohorts" role="tab"><i class="fas fa-layer-group"></i>Когорты</button>
                 <button type="button" class="subtab" data-subtab="acq-pushes" role="tab"><i class="fas fa-bell"></i>Пуши</button>
                 <button type="button" class="subtab" data-subtab="acq-patterns" role="tab"><i class="fas fa-clock"></i>Паттерны</button>
+                <button type="button" class="subtab" data-subtab="acq-journey" role="tab"><i class="fas fa-route"></i>Путь клиента</button>
             </div>
 
             <details id="acq-new-revenue-help" class="metrics-legend">
@@ -1852,6 +1861,53 @@
                 <div class="card" style="padding:18px;">
                     <span class="chart-title-wrap"><strong>Heatmap оплат: час × день недели (60 дней, МСК)</strong><button type="button" class="chart-info" data-help="heatmap" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                     <div id="acq-heatmap" style="margin-top:12px;overflow-x:auto;"></div>
+                </div>
+            </div>
+
+            <div id="subpanel-acq-journey" class="subtab-panel">
+                <div class="card" style="padding:18px;margin-bottom:14px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <span class="chart-title-wrap"><strong>Когда платят первый раз (день от старта триала)</strong></span>
+                        <select id="acq-timing-days" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                            <option value="90">когорта за 90 дней</option>
+                            <option value="180">когорта за 180 дней</option>
+                            <option value="365" selected>когорта за 365 дней</option>
+                            <option value="3650">за всю историю</option>
+                        </select>
+                    </div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        Когорта — пользователи, чья первая подписка создана за выбранный период.
+                        Строка — на какой день после старта триала случилась первая оплата.
+                        Пики: день 0–1 — импульсные; дни 4–7 — пуши об окончании триала; день 7–8 — истечение; день 8+ — winback-серия.
+                    </div>
+                    <div id="acq-timing-summary" style="margin-top:10px;font-size:12px;color:var(--muted);"></div>
+                    <div id="acq-timing-table" style="margin-top:8px;overflow-x:auto;"></div>
+                </div>
+                <div class="card" style="padding:18px;margin-bottom:14px;">
+                    <span class="chart-title-wrap"><strong>Лестница продлений по когортам привлечения</strong></span>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        Когорта — месяц создания первой подписки (МСК). <b>Оплатил</b> — % от привлечённых;
+                        <b>2-я, 3-я, 4-я оплата</b> — % от предыдущей ступени (в скобках — люди).
+                        Свежие когорты ещё дозревают: их проценты дорастут со временем.
+                    </div>
+                    <div id="acq-ladder-table" style="margin-top:12px;overflow-x:auto;"></div>
+                </div>
+                <div class="card" style="padding:18px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <span class="chart-title-wrap"><strong>Переходы между тарифами</strong></span>
+                        <select id="acq-paths-months" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                            <option value="3">за 3 месяца</option>
+                            <option value="6">за 6 месяцев</option>
+                            <option value="12" selected>за 12 месяцев</option>
+                            <option value="120">за всю историю</option>
+                        </select>
+                    </div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        Для каждого тарифа: кто его купил впервые за период — самой первой покупкой в жизни
+                        (<b>первая покупка</b>) или пересев с другого тарифа (<b>пришли с</b> — тариф платежа,
+                        который был непосредственно перед этим).
+                    </div>
+                    <div id="acq-tariff-paths-table" style="margin-top:12px;overflow-x:auto;"></div>
                 </div>
             </div>
         </section>
@@ -2096,9 +2152,11 @@
                 <input type="hidden" name="check_id">
                 <input class="input" name="target_ip" maxlength="64" placeholder="IP точки входа" required>
                 <input class="input" name="sni" maxlength="256" placeholder="SNI клиентов (uk.example.org)" required>
-                <select class="input" name="geo_mode" title="Как выбирать зонды и группировать результат">
-                    <option value="0">По операторам (33 зонда)</option>
-                    <option value="1">По регионам — округа (50 зондов)</option>
+                <select class="input" name="mode" title="Как выбирать зонды и группировать результат">
+                    <option value="op-full">Операторы · полный (33 зонда, 660 кр)</option>
+                    <option value="op-light">Операторы · лёгкий (10 зондов, 200 кр)</option>
+                    <option value="geo-full">Регионы · полный (50 зондов, 1000 кр)</option>
+                    <option value="geo-light">Регионы · лёгкий (20 зондов, 400 кр)</option>
                 </select>
                 <select class="input" name="interval_minutes" title="Расписание запуска">
                     <option value="">Только вручную</option>
@@ -2111,6 +2169,7 @@
                 <select class="input" name="api_key_id" id="censor-check-key" title="Каким ключом RIPE запускать">
                     <option value="">Ключ по умолчанию</option>
                 </select>
+                <label class="censor-alerts-toggle" title="Слать алерт в Telegram при бане/восстановлении ноды"><input type="checkbox" name="alerts_enabled" value="1" checked> <i class="fas fa-bell"></i> TG-алерт</label>
                 <div class="censor-form-actions">
                     <button class="btn" type="submit"><i class="fas fa-save"></i>Сохранить</button>
                     <button class="btn btn-secondary" type="button" id="censor-check-reset"><i class="fas fa-plus"></i>Новая</button>
@@ -4967,9 +5026,12 @@
                 return;
             }
             const rowsHtml = censorChecksCache.map((check) => {
+                const modeBadges = (check.geo_mode ? '<span class="censor-mode-badge" title="Замер по регионам РФ, группировка по округам">регионы</span>' : '')
+                    + (check.light_mode ? '<span class="censor-mode-badge light" title="Лёгкий набор зондов (дешевле)">лёгкий</span>' : '')
+                    + (check.alerts_enabled ? '<span class="censor-mode-badge alert" title="Алерты в Telegram включены"><i class="fas fa-bell"></i></span>' : '');
                 const schedule = (check.interval_minutes
                     ? (CENSOR_INTERVAL_LABELS[check.interval_minutes] || `каждые ${check.interval_minutes} мин`)
-                    : 'вручную') + (check.geo_mode ? '<span class="censor-mode-badge" title="Замер по регионам РФ, группировка по округам">регионы</span>' : '');
+                    : 'вручную') + modeBadges;
                 const enabledBadge = check.is_enabled ? '' : ' <span class="censor-status-bad">(выключена)</span>';
                 const lastRunAt = check.last_run ? `<span class="muted">${escapeHtml(check.last_run.created_at)}</span> ` : '';
                 const keyLabel = check.api_key_name ? escapeHtml(check.api_key_name) : '<span class="muted">по умолчанию</span>';
@@ -5069,7 +5131,8 @@
             form.elements.target_ip.value = check.target_ip;
             form.elements.sni.value = check.sni;
             form.elements.interval_minutes.value = check.interval_minutes || '';
-            form.elements.geo_mode.value = check.geo_mode ? '1' : '0';
+            form.elements.mode.value = `${check.geo_mode ? 'geo' : 'op'}-${check.light_mode ? 'light' : 'full'}`;
+            form.elements.alerts_enabled.checked = check.alerts_enabled !== false;
             form.elements.api_key_id.value = check.api_key_id || '';
             form.scrollIntoView({behavior: 'smooth', block: 'center'});
         }
@@ -5668,9 +5731,62 @@
             document.getElementById('acq-heatmap').innerHTML = html + '</table>';
         }
 
+        const TARIFF_LABELS = {
+            month: '1 месяц', threemonths: '3 месяца', sixmonths: '6 месяцев',
+            year: '12 месяцев', oneday: '1 день', threedays: '3 дня (промо)',
+            oneweek: '1 неделя', '?': 'не определён',
+        };
+        const tariffLabel = (t) => TARIFF_LABELS[t] || t;
+        // Полоска-бар внутри ячейки таблицы: доля pct от максимума maxPct.
+        const pctBar = (pct, maxPct) => {
+            const w = maxPct ? Math.max(1, Math.round(100 * pct / maxPct)) : 0;
+            return `<div style="display:flex;align-items:center;gap:8px;min-width:180px;"><div style="height:10px;width:${w}%;max-width:100%;background:rgba(255,199,0,.8);border-radius:3px;"></div><span>${pct.toFixed(1)}%</span></div>`;
+        };
+
+        async function loadJourney() {
+            const timing = await acqFetch('trial_timing', {days: document.getElementById('acq-timing-days').value});
+            document.getElementById('acq-timing-summary').innerHTML =
+                `Подписок в когорте: <b style="color:#fff;">${timing.trials.toLocaleString('ru-RU')}</b> · ` +
+                `оплатили: <b style="color:#fff;">${timing.converted.toLocaleString('ru-RU')}</b> · ` +
+                `конверсия в оплату: <b style="color:#fff;">${timing.conversion_pct}%</b>`;
+            const maxPct = Math.max(1, ...timing.buckets.map((b) => b.pct));
+            document.getElementById('acq-timing-table').innerHTML = acqTable(
+                ['День первой оплаты', 'Людей', 'Доля оплативших'],
+                timing.buckets.map((b) => [b.label, b.users.toLocaleString('ru-RU'), pctBar(b.pct, maxPct)]));
+
+            const ladder = await acqFetch('renewal_ladder', {months: 12});
+            const step = (cur, prev) => prev
+                ? `${(100 * cur / prev).toFixed(1)}% <span style="color:rgba(255,255,255,.4);">(${cur.toLocaleString('ru-RU')})</span>`
+                : '—';
+            const ladderRow = (r, name) => [name, r.attracted.toLocaleString('ru-RU'),
+                step(r.paid1, r.attracted), step(r.paid2, r.paid1),
+                step(r.paid3, r.paid2), step(r.paid4, r.paid3)];
+            document.getElementById('acq-ladder-table').innerHTML = acqTable(
+                ['Когорта', 'Привлечено', 'Оплатил', '2-я оплата', '3-я оплата', '4-я оплата'],
+                [...ladder.cohorts.map((r) => ladderRow(r, r.cohort)),
+                 ladderRow(ladder.totals, '<b>Итого</b>')]);
+
+            await loadTariffPaths();
+        }
+
+        async function loadTariffPaths() {
+            const res = await acqFetch('tariff_paths', {months: document.getElementById('acq-paths-months').value});
+            const fromCell = (r) => r.from.length
+                ? r.from.map((f) => `${tariffLabel(f.tariff)} × ${f.users.toLocaleString('ru-RU')}`).join(' · ')
+                : '—';
+            document.getElementById('acq-tariff-paths-table').innerHTML = acqTable(
+                ['Тариф', 'Покупателей', 'Оплат', 'Выручка', 'Впервые купили тариф', 'Из них первая покупка', 'Пришли с'],
+                res.tariffs.map((r) => [tariffLabel(r.tariff),
+                    r.buyers.toLocaleString('ru-RU'), r.payments.toLocaleString('ru-RU'),
+                    fmtRub(r.rub) + ' ₽', r.adopters.toLocaleString('ru-RU'),
+                    `${r.first_purchase.toLocaleString('ru-RU')} (${r.first_purchase_pct}%)`,
+                    fromCell(r)]));
+        }
+
         const loaders = {
             'acq-newrep': loadNewRepeat, 'acq-funnel': loadFunnel, 'acq-ads': loadAds,
             'acq-cohorts': loadCohorts, 'acq-pushes': loadPushes, 'acq-patterns': loadPatterns,
+            'acq-journey': loadJourney,
         };
 
         function loadAcqSection(name, force = false) {
@@ -5697,6 +5813,8 @@
         });
         document.getElementById('acq-newrep-apply')?.addEventListener('click', () => loadNewRepeat().catch(console.error));
         document.getElementById('acq-patterns-days')?.addEventListener('change', () => loadPatterns().catch(console.error));
+        document.getElementById('acq-timing-days')?.addEventListener('change', () => loadJourney().catch(console.error));
+        document.getElementById('acq-paths-months')?.addEventListener('change', () => loadTariffPaths().catch(console.error));
         document.getElementById('acq-spend-form')?.addEventListener('submit', async (ev) => {
             ev.preventDefault();
             const body = new FormData(ev.target);
