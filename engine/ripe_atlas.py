@@ -444,22 +444,51 @@ def maybe_send_alert(db_session, check: CensorCheck, run: CensorCheckRun) -> Non
             f"({run.ok_probes}/{run.total_probes} зондов)\n"
             f"Не проходят: {_blocked_summary_text(run)}"
         )
-        notify.send_admin_telegram_alert(text)
-        check.last_alert_state = ALERT_STATE_BLOCKED
-        db_session.commit()
-    elif new_state == ALERT_STATE_OK:
+    elif prev == ALERT_STATE_BLOCKED:
         # «Восстановилась» шлём только если раньше был бан.
-        if prev == ALERT_STATE_BLOCKED:
-            text = (
-                f"✅ <b>Нода снова доступна из РФ</b>\n"
-                f"{label}\n"
-                f"IP: <code>{check.target_ip}{port}</code>\n"
-                f"Доступность: <b>{pct}%</b> "
-                f"({run.ok_probes}/{run.total_probes} зондов)"
-            )
-            notify.send_admin_telegram_alert(text)
-        check.last_alert_state = ALERT_STATE_OK
+        text = (
+            f"✅ <b>Нода снова доступна из РФ</b>\n"
+            f"{label}\n"
+            f"IP: <code>{check.target_ip}{port}</code>\n"
+            f"Доступность: <b>{pct}%</b> "
+            f"({run.ok_probes}/{run.total_probes} зондов)"
+        )
+    else:
+        # Первый успешный замер: уведомлять не о чем, просто запоминаем «ok».
+        logging.info(
+            "censor alert: check %s initial state -> %s (%s%%), нечего слать",
+            check.id,
+            new_state,
+            pct,
+        )
+        check.last_alert_state = new_state
         db_session.commit()
+        return
+
+    delivered = notify.send_admin_telegram_alert(text)
+    if delivered:
+        # Состояние двигаем ТОЛЬКО после успешной доставки: иначе при пустом
+        # TELEGRAM_ALERT_CHAT_ID или неотправленном /start авария была бы
+        # помечена как «уведомлено» и алерт по ней потерялся бы навсегда.
+        check.last_alert_state = new_state
+        db_session.commit()
+        logging.info(
+            "censor alert: check %s %s -> %s (%s%%), отправлено",
+            check.id,
+            prev,
+            new_state,
+            pct,
+        )
+    else:
+        logging.warning(
+            "censor alert: check %s %s -> %s (%s%%) НЕ доставлено — проверьте "
+            "TELEGRAM_ALERT_CHAT_ID и что админ нажал /start боту; повторим на "
+            "следующем прогоне",
+            check.id,
+            prev,
+            new_state,
+            pct,
+        )
 
 
 def start_run(
