@@ -431,6 +431,12 @@ def maybe_send_alert(db_session, check: CensorCheck, run: CensorCheckRun) -> Non
         return
 
     if new_state == prev:
+        logging.info(
+            "censor alert: check %s состояние не изменилось (%s, %s%%), алерт не нужен",
+            check.id,
+            new_state,
+            pct,
+        )
         return
 
     label = check.name or check.sni

@@ -6829,6 +6829,12 @@ def support_admin_api_censor_checks(request):
                         status=400,
                     )
                 is_public = ripe_atlas.resolve_public_flag(db_session, check)
+                # Ручной запуск — явное действие админа «покажи, как сейчас».
+                # Сбрасываем запомненное состояние, чтобы результат оценился с
+                # нуля и алерт пришёл, даже если нода уже числилась
+                # заблокированной (иначе залипшее состояние глушит уведомление).
+                check.last_alert_state = None
+                db_session.commit()
                 run = ripe_atlas.start_run(
                     db_session,
                     check,
