@@ -39,7 +39,26 @@ def _run_maintenance(fallback_key: str) -> None:
         db.close()
 
 
+def _simple_loop(interval: int, fallback_key: str) -> None:
+    """Цикл без выбора лидера — для не-Postgres (dev на SQLite).
+
+    Advisory-lock есть только в Postgres. В деве процесс один, поэтому просто
+    крутим обслуживание без блокировки.
+    """
+    logging.info("censor worker: non-postgres backend, running without leader lock")
+    while True:
+        try:
+            _run_maintenance(fallback_key)
+        except Exception:
+            logging.exception("censor worker: maintenance iteration failed")
+        time.sleep(interval)
+
+
 def _leader_loop(interval: int, fallback_key: str) -> None:
+    if engine.dialect.name != "postgresql":
+        _simple_loop(interval, fallback_key)
+        return
+
     while True:
         # AUTOCOMMIT: не держим открытую транзакцию; session-level advisory-lock
         # висит на соединении, пока оно живо.
