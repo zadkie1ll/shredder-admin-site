@@ -6541,6 +6541,7 @@ def admin_censor_run_payload(run, with_details=False):
         "status": run.status,
         "error_message": run.error_message,
         "total": run.total_probes,
+        "scheduled": run.scheduled_probes,
         "ok": run.ok_probes,
         "blocked": run.blocked_probes,
         "blocked_by_provider": run.blocked_asns or {},

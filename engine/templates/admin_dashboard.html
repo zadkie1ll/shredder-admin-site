@@ -82,6 +82,7 @@
         .censor-mode-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; border: 1px solid rgba(132,204,22,.4); color: var(--blue); background: rgba(132,204,22,.08); }
         .censor-mode-badge.light { border-color: rgba(255,199,0,.4); color: var(--brand-gold); background: rgba(255,199,0,.08); }
         .censor-mode-badge.alert { border-color: rgba(34,197,94,.4); color: #22c55e; background: rgba(34,197,94,.08); }
+        .censor-sample-warn { color: var(--brand-gold); cursor: help; }
         .censor-district-row { grid-template-columns: minmax(150px, 1.4fr) 90px 90px minmax(150px, 1.2fr); min-width: 520px; }
         .censor-district-row.table-head { background: rgba(255,255,255,.04); }
         .censor-keys-card { padding: 0; margin-bottom: 16px; }
@@ -4872,7 +4873,13 @@
             let label = 'критичная блокировка';
             if (okShare === 100) { cls = 'censor-status-ok'; label = 'полный доступ'; }
             else if (okShare > 50) { cls = 'censor-status-warn'; label = 'частичная блокировка'; }
-            return `<span class="${cls}">${okShare}% — ${label}</span> <span class="muted">(${num(run.ok)}/${num(run.total)})</span>`;
+            // Отвечают не все назначенные зонды: показываем «из скольких», иначе
+            // «100% (6/6)» скрывает, что молчали ещё два десятка зондов.
+            const scheduled = Number(run.scheduled || 0);
+            const sample = scheduled > total
+                ? `<span class="censor-sample-warn" title="Ответили ${total} из ${scheduled} назначенных зондов — выборка неполная, проценты считаются по ответившим">(${num(run.ok)}/${num(total)} из ${num(scheduled)})</span>`
+                : `<span class="muted">(${num(run.ok)}/${num(total)})</span>`;
+            return `<span class="${cls}">${okShare}% — ${label}</span> ${sample}`;
         }
 
         function censorBlockedProvidersHtml(run) {
@@ -5281,7 +5288,7 @@
                 <div class="card info-card" style="margin-bottom:12px;">
                     Режим: <b>${geo ? 'по регионам (округа)' : 'по операторам'}</b><br>
                     Запущен: ${escapeHtml(run.created_at)}${run.completed_at ? ` · Завершён: ${escapeHtml(run.completed_at)}` : ''}<br>
-                    Зондов ответило: ${num(run.total)} · Пробились: <span class="censor-status-ok">${num(run.ok)}</span> ·
+                    Зондов ответило: ${num(run.total)}${run.scheduled && Number(run.scheduled) > Number(run.total) ? ` <span class="censor-sample-warn">из ${num(run.scheduled)} назначенных</span>` : ''} · Пробились: <span class="censor-status-ok">${num(run.ok)}</span> ·
                     Заблокированы: <span class="censor-status-bad">${num(run.blocked)}</span><br>
                     Статус: ${censorRunStatusHtml(run)}
                     ${blockedHtml ? `<br>${blockedLabel}: ${blockedHtml.replace('Блокируют: ', '')}` : ''}

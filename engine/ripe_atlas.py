@@ -137,9 +137,13 @@ RUN_STATUS_COMPLETE = "complete"
 RUN_STATUS_ERROR = "error"
 
 # Пороги алертов (доступность = % пробившихся зондов). Гистерезис, чтобы
-# состояние не «дрожало» на границе: в «заблокировано» уходим ниже 50%,
-# обратно в «доступно» — только выше 70%.
-ALERT_BLOCKED_BELOW = 50
+# состояние не «дрожало» на границе: в «заблокировано» уходим при 50% и ниже,
+# обратно в «доступно» — только с 70%.
+#
+# Граница блокировки совпадает с красным статусом «критичная блокировка» в UI
+# (там оно тоже <= 50%): иначе замер, покрашенный красным, мог не дать алерт.
+# Частный случай, на котором это ловилось: 3 из 6 зондов = ровно 50%.
+ALERT_BLOCKED_MAX = 50
 ALERT_RECOVER_AT = 70
 ALERT_STATE_OK = "ok"
 ALERT_STATE_BLOCKED = "blocked"
@@ -316,6 +320,28 @@ def fetch_results(api_key: str, msm_id: int):
     return payload if isinstance(payload, list) else None
 
 
+def fetch_scheduled_probes(api_key: str, msm_id: int):
+    """Сколько зондов Atlas назначил на измерение; None при ошибке.
+
+    Отвечают обычно не все назначенные (часть зондов молчит), поэтому это число
+    нужно, чтобы в интерфейсе было видно представительность выборки.
+    """
+    try:
+        with httpx.Client(timeout=15) as client:
+            response = client.get(
+                f"{ATLAS_API}/measurements/{msm_id}/",
+                headers={"Authorization": f"Key {api_key}"},
+                params={"fields": "probes_scheduled"},
+            )
+        if response.status_code != 200:
+            return None
+        payload = orjson.loads(response.content)
+    except Exception:
+        return None
+    scheduled = payload.get("probes_scheduled") if isinstance(payload, dict) else None
+    return scheduled or None
+
+
 def fetch_probe_geo(prb_ids: list[int]) -> dict:
     """ASN и координаты по id зондов: в результатах sslcert их нет.
 
@@ -422,7 +448,7 @@ def maybe_send_alert(db_session, check: CensorCheck, run: CensorCheckRun) -> Non
 
     pct = run_availability_percent(run)
     prev = check.last_alert_state
-    if pct < ALERT_BLOCKED_BELOW:
+    if pct <= ALERT_BLOCKED_MAX:
         new_state = ALERT_STATE_BLOCKED
     elif pct >= ALERT_RECOVER_AT:
         new_state = ALERT_STATE_OK
@@ -567,6 +593,8 @@ def finalize_run(db_session, run: CensorCheckRun, api_key: str) -> bool:
     run.blocked_asns = summary["blocked_by_provider"]
 
     if summary["total"] >= expected_probe_total(geo, light) or deadline_passed:
+        # Один запрос на завершение прогона: сколько зондов Atlas реально назначил.
+        run.scheduled_probes = fetch_scheduled_probes(api_key, run.msm_id)
         if summary["total"] == 0:
             run.status = RUN_STATUS_ERROR
             run.error_message = "Ни один зонд не ответил"
