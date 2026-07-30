@@ -16,6 +16,7 @@ from django.test import override_settings
 from common.models.settings import BOT_APPLE_RECOMMENDED_APP_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_MONTH_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_YEAR_SETTING
+from common.models.db import ClientUaRule
 from common.models.db import CustomConfigTemplate
 from common.models.db import MagicToken
 from common.models.db import User
@@ -55,6 +56,11 @@ from engine.views import config_pins_payload
 from engine.views import remove_config_template_id_from_pins
 from engine.views import support_admin_api_config_pins
 from engine.views import support_admin_api_config_templates
+from engine.views import support_admin_api_ua_rules
+from engine.views import client_ua_rule_payload
+from engine.views import client_ua_rule_scenarios
+from engine.views import validate_client_ua_rule_fields
+from engine.views import validate_config_template_json
 from engine.views import verify_telegram_widget_auth
 from web_app.settings import telegram_web_login_start_codes
 
@@ -722,11 +728,24 @@ class CustomConfigTemplatePayloadTests(SimpleTestCase):
             updated_at=None,
         )
 
+        class FakeUaRuleQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def order_by(self, *args, **kwargs):
+                return self
+
+            def all(self):
+                return []
+
         class FakeSession:
             def get(self, model, template_id):
                 return template
 
             def query(self, model):
+                # Валидация шаблона читает UA-правила — это разрешено.
+                if model is ClientUaRule:
+                    return FakeUaRuleQuery()
                 raise AssertionError("saving an active template must not deactivate others")
 
             def commit(self):
@@ -756,6 +775,151 @@ class CustomConfigTemplatePayloadTests(SimpleTestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(template.is_active)
+
+
+class ConfigTemplateJinjaValidationTests(SimpleTestCase):
+    JINJA_TEMPLATE = """{
+      "dns": {
+        "servers": [
+          {% if CLIENT == "happ" %}
+          "1.1.1.1",
+          {% else %}
+          "https://dns.google/dns-query",
+          {% endif %}
+          "77.88.8.8"
+        ]
+      },
+      "user": "{{VLESS_USER}}"
+    }"""
+
+    def test_plain_json_passes(self):
+        self.assertIsNone(validate_config_template_json('{"log": {}}'))
+
+    def test_plain_invalid_json_reports_default_scenario(self):
+        error = validate_config_template_json('{"log": }')
+        self.assertIn("без клиентских переменных", error)
+
+    def test_jinja_branches_validated_per_scenario(self):
+        scenarios = [
+            ("CLIENT=happ", {"CLIENT": "happ"}),
+            ("CLIENT=incy", {"CLIENT": "incy"}),
+        ]
+        self.assertIsNone(
+            validate_config_template_json(self.JINJA_TEMPLATE, scenarios)
+        )
+
+    def test_broken_branch_reports_scenario_label(self):
+        template = """{
+          {% if CLIENT == "incy" %}
+          "servers": [,]
+          {% else %}
+          "servers": []
+          {% endif %}
+        }"""
+        error = validate_config_template_json(
+            template, [("CLIENT=incy", {"CLIENT": "incy"})]
+        )
+        self.assertIn("CLIENT=incy", error)
+
+    def test_jinja_syntax_error_reported(self):
+        error = validate_config_template_json('{"a": {% if %}}')
+        self.assertIn("Jinja", error)
+
+    def test_reserved_variables_substituted(self):
+        # Ветка else рендерится без клиентских переменных, {{VLESS_USER}}
+        # подставляется тестовым значением — шаблон валиден как есть.
+        self.assertIsNone(validate_config_template_json(self.JINJA_TEMPLATE))
+
+
+class ClientUaRuleTests(SimpleTestCase):
+    def test_rule_fields_validation(self):
+        self.assertIsNotNone(validate_client_ua_rule_fields("", "CLIENT", "incy"))
+        self.assertIsNotNone(validate_client_ua_rule_fields("incy", "", "incy"))
+        self.assertIsNotNone(
+            validate_client_ua_rule_fields("incy", "2CLIENT", "incy")
+        )
+        self.assertIsNotNone(
+            validate_client_ua_rule_fields("incy", "CLI-ENT", "incy")
+        )
+        self.assertIsNotNone(validate_client_ua_rule_fields("incy", "CLIENT", ""))
+        for reserved in ("VLESS_USER", "REMARKS", "ENTRY_NAME"):
+            self.assertIsNotNone(
+                validate_client_ua_rule_fields("incy", reserved, "incy")
+            )
+        self.assertIsNone(validate_client_ua_rule_fields("incy", "CLIENT", "incy"))
+
+    def test_scenarios_built_from_rules(self):
+        rules = [
+            SimpleNamespace(variable_name="CLIENT", value="happ"),
+            SimpleNamespace(variable_name="CLIENT", value="incy"),
+        ]
+        self.assertEqual(
+            client_ua_rule_scenarios(rules),
+            [
+                ("CLIENT=happ", {"CLIENT": "happ"}),
+                ("CLIENT=incy", {"CLIENT": "incy"}),
+            ],
+        )
+
+    def test_rule_payload(self):
+        rule = SimpleNamespace(
+            id=7,
+            match_substring="incy",
+            variable_name="CLIENT",
+            value="incy",
+            priority=100,
+            is_active=True,
+        )
+        payload = client_ua_rule_payload(rule)
+        self.assertEqual(payload["match_substring"], "incy")
+        self.assertEqual(payload["variable_name"], "CLIENT")
+
+    def test_save_rejects_reserved_variable_name(self):
+        request = RequestFactory().post(
+            "/support-admin/api/ua-rules/",
+            data={
+                "match_substring": "incy",
+                "variable_name": "VLESS_USER",
+                "value": "incy",
+            },
+        )
+
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=mock.MagicMock()),
+        ):
+            response = support_admin_api_ua_rules(request)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_save_creates_rule_with_default_variable(self):
+        session = mock.MagicMock()
+        request = RequestFactory().post(
+            "/support-admin/api/ua-rules/",
+            data={
+                "match_substring": "Incy",
+                "value": "incy",
+                "priority": "50",
+            },
+        )
+
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+            mock.patch("engine.views.load_client_ua_rules", return_value=[]),
+            mock.patch(
+                "engine.views.collect_ua_rule_template_warnings", return_value=[]
+            ),
+        ):
+            response = support_admin_api_ua_rules(request)
+
+        self.assertEqual(response.status_code, 200)
+        session.add.assert_called_once()
+        session.commit.assert_called_once()
+        added_rule = session.add.call_args[0][0]
+        self.assertEqual(added_rule.variable_name, "CLIENT")
+        self.assertEqual(added_rule.match_substring, "Incy")
+        self.assertEqual(added_rule.priority, 50)
 
 
 class AdminSalesSeriesTests(SimpleTestCase):

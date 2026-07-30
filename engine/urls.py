@@ -162,6 +162,11 @@ urlpatterns = [
         name="support_admin_api_config_pins",
     ),
     path(
+        "support-admin/api/ua-rules/",
+        views.support_admin_api_ua_rules,
+        name="support_admin_api_ua_rules",
+    ),
+    path(
         "support-admin/tickets/<int:ticket_id>/",
         views.support_admin_ticket_detail,
         name="support_admin_ticket_detail",

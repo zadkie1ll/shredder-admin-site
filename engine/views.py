@@ -8,6 +8,7 @@ import json
 import resend
 import secrets
 import httpx
+import jinja2
 from time import monotonic
 from pathlib import Path
 from datetime import datetime
@@ -68,6 +69,7 @@ from common.models.db import WataTransaction
 from common.models.db import MagicToken
 from common.models.db import TelegramLoginToken
 from common.models.db import PurchaseLoginToken
+from common.models.db import ClientUaRule
 from common.models.db import CustomConfigTemplate
 from common.models.db import SupportTicket
 from common.models.db import SupportTicketMessage
@@ -563,6 +565,87 @@ def custom_config_template_payload(template):
         "additional_headers": template.additional_headers or {},
         "is_active": template.is_active,
     }
+
+
+# Переменные, которые custom-config всегда передаёт в рендер шаблона.
+# UA-правилам запрещено их переопределять.
+CONFIG_TEMPLATE_RESERVED_VARIABLES = ("VLESS_USER", "REMARKS", "ENTRY_NAME")
+
+CONFIG_TEMPLATE_SAMPLE_CONTEXT = {
+    "VLESS_USER": "00000000-0000-0000-0000-000000000000",
+    "REMARKS": "🇩🇪 Германия",
+    "ENTRY_NAME": "proxy",
+}
+
+
+def validate_config_template_json(template_json, client_variable_scenarios=()):
+    """Рендерит Jinja-шаблон конфига и проверяет, что каждая ветка — валидный JSON.
+
+    Возвращает текст ошибки или None. Сценарий «без клиентских переменных»
+    проверяется всегда: так шаблон рендерится для клиентов, не попавших ни под
+    одно UA-правило (и старыми версиями custom-config, не знающими про правила).
+    """
+    try:
+        template = jinja2.Environment().from_string(template_json)
+    except jinja2.TemplateError as error:
+        return f"Ошибка Jinja шаблона: {error}"
+
+    scenarios = [("без клиентских переменных", {})]
+    scenarios.extend(client_variable_scenarios)
+    for label, variables in scenarios:
+        try:
+            rendered = template.render(**CONFIG_TEMPLATE_SAMPLE_CONTEXT, **variables)
+        except jinja2.TemplateError as error:
+            return f"Ошибка Jinja шаблона ({label}): {error}"
+        try:
+            json.loads(rendered)
+        except json.JSONDecodeError as error:
+            return (
+                f"Ошибка JSON шаблона ({label}): строка {error.lineno}, "
+                f"колонка {error.colno}: {error.msg}"
+            )
+    return None
+
+
+def load_client_ua_rules(db_session, active_only=False):
+    query = db_session.query(ClientUaRule)
+    if active_only:
+        query = query.filter(ClientUaRule.is_active.is_(True))
+    return query.order_by(ClientUaRule.priority.asc(), ClientUaRule.id.asc()).all()
+
+
+def client_ua_rule_scenarios(rules):
+    # По сценарию на каждое правило: ветки шаблона проверяются поодиночке,
+    # комбинации разных переменных не строим.
+    return [
+        (f"{rule.variable_name}={rule.value}", {rule.variable_name: rule.value})
+        for rule in rules
+    ]
+
+
+def client_ua_rule_payload(rule):
+    return {
+        "id": rule.id,
+        "match_substring": rule.match_substring,
+        "variable_name": rule.variable_name,
+        "value": rule.value,
+        "priority": rule.priority,
+        "is_active": rule.is_active,
+    }
+
+
+def validate_client_ua_rule_fields(match_substring, variable_name, value):
+    if not match_substring:
+        return "Заполните строку поиска в User-Agent"
+    if not variable_name:
+        return "Заполните имя переменной"
+    if not variable_name.isidentifier():
+        return "Имя переменной должно быть идентификатором: буквы, цифры и _"
+    if variable_name in CONFIG_TEMPLATE_RESERVED_VARIABLES:
+        return f"Имя переменной {variable_name} зарезервировано шаблоном"
+    if not value:
+        return "Заполните значение переменной"
+    return None
 
 
 def load_custom_config_templates(db_session):
@@ -3001,14 +3084,16 @@ def support_admin_api_config_templates(request):
                 status=400,
             )
 
-        try:
-            json.loads(template_json)
-        except json.JSONDecodeError as error:
+        # Шаблон может содержать Jinja-ветки ({% if CLIENT == "happ" %} ...),
+        # поэтому валидируем не сырой текст, а результат рендера по каждому
+        # клиентскому сценарию из UA-правил.
+        ua_rules = load_client_ua_rules(db_session, active_only=True)
+        validation_error = validate_config_template_json(
+            template_json, client_ua_rule_scenarios(ua_rules)
+        )
+        if validation_error:
             return JsonResponse(
-                {
-                    "status": "error",
-                    "message": f"Ошибка JSON шаблона: строка {error.lineno}, колонка {error.colno}: {error.msg}",
-                },
+                {"status": "error", "message": validation_error},
                 status=400,
             )
 
@@ -3074,6 +3159,112 @@ def support_admin_api_config_templates(request):
             {
                 "status": "ok",
                 "template": custom_config_template_payload(template),
+            }
+        )
+    finally:
+        db_session.close()
+
+
+def collect_ua_rule_template_warnings(db_session, ua_rules):
+    """Проверяет активные шаблоны против сценариев UA-правил.
+
+    Возвращает список предупреждений (не блокирует сохранение правила): ветка
+    шаблона под новое правило могла ещё не проверяться при сохранении шаблона.
+    """
+    scenarios = client_ua_rule_scenarios(ua_rules)
+    warnings = []
+    for template in load_custom_config_templates(db_session):
+        if not template.is_active:
+            continue
+        error = validate_config_template_json(template.template_json, scenarios)
+        if error:
+            warnings.append(f"Шаблон «{template.name}»: {error}")
+    return warnings
+
+
+def support_admin_api_ua_rules(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "GET":
+            rules = load_client_ua_rules(db_session)
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "rules": [client_ua_rule_payload(rule) for rule in rules],
+                }
+            )
+
+        if request.method != "POST":
+            return JsonResponse({"status": "error"}, status=405)
+
+        action = request.POST.get("action", "save")
+        rule_id = request.POST.get("rule_id")
+
+        if action == "delete":
+            rule = db_session.get(ClientUaRule, int(rule_id or 0))
+            if not rule:
+                return JsonResponse({"status": "not_found"}, status=404)
+            db_session.delete(rule)
+            db_session.commit()
+            return JsonResponse({"status": "ok"})
+
+        match_substring = request.POST.get("match_substring", "").strip()
+        variable_name = request.POST.get("variable_name", "").strip() or "CLIENT"
+        value = request.POST.get("value", "").strip()
+        priority_raw = request.POST.get("priority", "").strip()
+        is_active = request.POST.get("is_active", "1") == "1"
+
+        validation_error = validate_client_ua_rule_fields(
+            match_substring, variable_name, value
+        )
+        if validation_error:
+            return JsonResponse(
+                {"status": "error", "message": validation_error}, status=400
+            )
+
+        try:
+            priority = int(priority_raw) if priority_raw else 100
+        except ValueError:
+            return JsonResponse(
+                {"status": "error", "message": "Приоритет должен быть целым числом"},
+                status=400,
+            )
+
+        if rule_id:
+            rule = db_session.get(ClientUaRule, int(rule_id))
+            if not rule:
+                return JsonResponse({"status": "not_found"}, status=404)
+        else:
+            rule = ClientUaRule()
+            db_session.add(rule)
+
+        rule.match_substring = match_substring[:160]
+        rule.variable_name = variable_name[:64]
+        rule.value = value[:160]
+        rule.priority = priority
+        rule.is_active = is_active
+        rule.updated_at = datetime.utcnow()
+        db_session.commit()
+
+        # Ветка шаблона под новое правило могла не проверяться при сохранении
+        # шаблона — предупреждаем, но правило не блокируем.
+        warnings = (
+            collect_ua_rule_template_warnings(
+                db_session, load_client_ua_rules(db_session, active_only=True)
+            )
+            if rule.is_active
+            else []
+        )
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "rule": client_ua_rule_payload(rule),
+                "warnings": warnings,
             }
         )
     finally:

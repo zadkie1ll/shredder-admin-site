@@ -540,6 +540,17 @@
         .config-template-badge.active { color: var(--green); border-color: rgba(52,211,153,.20); background: rgba(52,211,153,.07); }
         .config-template-card-actions { display: flex; flex-wrap: wrap; gap: 7px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.07); align-self: end; }
         .config-template-card-actions .mini-btn { background: rgba(255,255,255,.065); border-color: rgba(255,255,255,.12); }
+        .ua-rule-form { display: grid; gap: 8px; margin-bottom: 12px; }
+        .ua-rule-form-grid { display: grid; grid-template-columns: 1.3fr 1fr 1fr 110px auto auto; gap: 8px; align-items: center; }
+        .ua-rule-form-actions { display: flex; gap: 7px; }
+        .ua-rule-row { grid-template-columns: 1.3fr 1fr 1fr 110px 110px auto; }
+        .ua-rule-row .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; overflow-wrap: anywhere; }
+        .ua-rule-row.inactive { opacity: .5; }
+        .ua-rule-actions { display: flex; gap: 6px; justify-content: flex-end; }
+        @media (max-width: 900px) {
+            .ua-rule-form-grid { grid-template-columns: 1fr 1fr; }
+            .ua-rule-row { grid-template-columns: 1fr 1fr; }
+        }
 
         /* Remnawave-inspired admin skin */
         body { min-height: 100vh; background: var(--bg-color); color: var(--text-main); letter-spacing: 0; }
@@ -1438,6 +1449,7 @@
         data-reply-templates-url="{% url 'support_admin_api_reply_templates' %}"
         data-config-templates-url="{% url 'support_admin_api_config_templates' %}"
         data-config-pins-url="{% url 'support_admin_api_config_pins' %}"
+        data-ua-rules-url="{% url 'support_admin_api_ua_rules' %}"
         data-traffic-nodes-url="{% url 'support_admin_api_traffic_nodes' %}"
         data-node-traffic-url="{% url 'support_admin_api_node_traffic' %}"
         data-censor-checks-url="{% url 'support_admin_api_censor_checks' %}"
@@ -2098,6 +2110,32 @@
                 <div id="config-pins-result"></div>
             </section>
 
+            <section class="card form-card config-pins-card">
+                <div class="config-pins-head">
+                    <h2 class="system-card-title">Правила User-Agent</h2>
+                    <p class="admin-subtitle">Определение клиентского приложения при выдаче конфига. Если User-Agent запроса содержит подстроку (без учёта регистра), в Jinja-рендер шаблона передаётся переменная с указанным значением — например, подстрока «incy» → CLIENT=incy, и в шаблоне работает {% templatetag openblock %} if CLIENT == "incy" {% templatetag closeblock %}. Правила проверяются по возрастанию приоритета, для каждой переменной побеждает первое совпадение.</p>
+                </div>
+                <form id="ua-rule-form" class="ua-rule-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="rule_id">
+                    <div class="ua-rule-form-grid">
+                        <input class="input" name="match_substring" maxlength="160" placeholder="Подстрока в UA, например incy" required>
+                        <input class="input" name="variable_name" maxlength="64" placeholder="Переменная (CLIENT)" value="CLIENT">
+                        <input class="input" name="value" maxlength="160" placeholder="Значение, например incy" required>
+                        <input class="input" name="priority" type="number" step="1" placeholder="Приоритет (100)">
+                        <label class="reply-template-active">
+                            <input type="checkbox" name="is_active" checked>
+                            Активно
+                        </label>
+                        <div class="ua-rule-form-actions">
+                            <button class="btn" type="submit" data-ua-rule-submit><i class="fas fa-save"></i>Сохранить</button>
+                            <button class="btn btn-secondary" type="button" id="ua-rule-reset">Очистить</button>
+                        </div>
+                    </div>
+                </form>
+                <div id="ua-rules-result"></div>
+            </section>
+
             <div id="config-templates-result" class="config-template-list"></div>
         </section>
 
@@ -2393,6 +2431,7 @@
         let ticketsRefreshInFlight = false;
         let replyTemplatesCache = [];
         let configTemplatesCache = [];
+        let uaRulesCache = [];
         let configJsonEditor = null;
         let adminToastTimer = null;
         let configSaveInFlight = false;
@@ -2630,6 +2669,7 @@
             if (tabId === 'payment-info') loadPaymentsList();
             if (tabId === 'config-templates') {
                 loadConfigTemplates();
+                loadUaRules();
             }
             if (tabId === 'system') {
                 loadRuntimeSettings();
@@ -2701,6 +2741,15 @@
             if (configDeleteButton) {
                 deleteConfigTemplate(configDeleteButton.dataset.configTemplateDelete);
             }
+
+            const uaRuleEditButton = event.target.closest('[data-ua-rule-edit]');
+            if (uaRuleEditButton) {
+                const rule = uaRulesCache.find((item) => String(item.id) === String(uaRuleEditButton.dataset.uaRuleEdit));
+                fillUaRuleForm(rule);
+            }
+
+            const uaRuleDeleteButton = event.target.closest('[data-ua-rule-delete]');
+            if (uaRuleDeleteButton) deleteUaRule(uaRuleDeleteButton.dataset.uaRuleDelete);
         });
         document.querySelector('[data-source-modal-close]')?.addEventListener('click', closeSourceUsersModal);
         document.querySelector('[data-source-modal-prev]')?.addEventListener('click', () => {
@@ -2925,7 +2974,12 @@
         }
 
         function validateConfigJson(showSuccess = true) {
-            const parsed = parseJsonWithMessage(getConfigJsonValue(), 'template_json');
+            const value = getConfigJsonValue();
+            if (configJsonHasJinjaTags(value)) {
+                if (showSuccess) showAdminToast('Шаблон содержит Jinja-теги — ветки проверит сервер при сохранении');
+                return true;
+            }
+            const parsed = parseJsonWithMessage(value, 'template_json');
             if (!parsed.ok) {
                 showAdminToast(parsed.message, 'error');
                 return false;
@@ -3003,8 +3057,20 @@
             });
         }
 
+        // Шаблон с Jinja-тегами (условия по CLIENT) — не валидный JSON до
+        // рендера, поэтому локальные JSON.parse-проверки для него пропускаются:
+        // сервер при сохранении рендерит и валидирует каждую ветку отдельно.
+        function configJsonHasJinjaTags(value) {
+            return value.includes('{%');
+        }
+
         function formatConfigJson() {
-            const parsed = parseJsonWithMessage(getConfigJsonValue(), 'template_json');
+            const value = getConfigJsonValue();
+            if (configJsonHasJinjaTags(value)) {
+                showAdminToast('Шаблон содержит Jinja-теги — автоформатирование недоступно', 'error');
+                return;
+            }
+            const parsed = parseJsonWithMessage(value, 'template_json');
             if (!parsed.ok) {
                 showAdminToast(parsed.message, 'error');
                 return;
@@ -3066,6 +3132,109 @@
             target.innerHTML = configTemplatesCache.length
                 ? configTemplatesCache.map(configTemplateCard).join('')
                 : '<div class="card info-card muted">Шаблонов пока нет. Нажмите “Добавить конфиг”, чтобы создать первый.</div>';
+        }
+
+        function uaRuleRow(rule) {
+            return `
+                <div class="admin-table-row ua-rule-row ${rule.is_active ? '' : 'inactive'}" data-ua-rule-id="${rule.id}">
+                    <span class="mono">${escapeHtml(rule.match_substring)}</span>
+                    <span class="mono">${escapeHtml(rule.variable_name)}</span>
+                    <span class="mono">${escapeHtml(rule.value)}</span>
+                    <span>${rule.priority}</span>
+                    <span>${rule.is_active ? 'активно' : 'выключено'}</span>
+                    <div class="ua-rule-actions">
+                        <button type="button" class="mini-btn" data-ua-rule-edit="${rule.id}"><i class="fas fa-pen"></i></button>
+                        <button type="button" class="mini-btn danger" data-ua-rule-delete="${rule.id}"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            `;
+        }
+
+        async function loadUaRules() {
+            const target = document.getElementById('ua-rules-result');
+            if (!target || !main.dataset.uaRulesUrl) return;
+            if (!target.innerHTML.trim()) target.innerHTML = inlineLoading('Загружаем правила...');
+            const response = await fetch(main.dataset.uaRulesUrl, {
+                headers: {'X-Requested-With': 'XMLHttpRequest'},
+                cache: 'no-store',
+            });
+            if (!response.ok) {
+                target.innerHTML = '<div class="card info-card red">Не удалось загрузить правила User-Agent</div>';
+                return;
+            }
+            const payload = await response.json();
+            uaRulesCache = payload.rules || [];
+            target.innerHTML = uaRulesCache.length
+                ? `
+                    <div class="admin-table-row ua-rule-row table-head">
+                        <span>Подстрока UA</span><span>Переменная</span><span>Значение</span><span>Приоритет</span><span>Статус</span><span></span>
+                    </div>
+                    ${uaRulesCache.map(uaRuleRow).join('')}
+                `
+                : '<div class="card info-card muted">Правил пока нет. Например: подстрока «incy» → CLIENT=incy.</div>';
+        }
+
+        function resetUaRuleForm() {
+            const form = document.getElementById('ua-rule-form');
+            if (!form) return;
+            form.reset();
+            form.querySelector('[name="rule_id"]').value = '';
+            form.querySelector('[name="variable_name"]').value = 'CLIENT';
+            form.querySelector('[name="is_active"]').checked = true;
+        }
+
+        function fillUaRuleForm(rule) {
+            const form = document.getElementById('ua-rule-form');
+            if (!form || !rule) return;
+            form.querySelector('[name="rule_id"]').value = rule.id;
+            form.querySelector('[name="match_substring"]').value = rule.match_substring;
+            form.querySelector('[name="variable_name"]').value = rule.variable_name;
+            form.querySelector('[name="value"]').value = rule.value;
+            form.querySelector('[name="priority"]').value = rule.priority;
+            form.querySelector('[name="is_active"]').checked = Boolean(rule.is_active);
+            form.querySelector('[name="match_substring"]').focus();
+        }
+
+        async function submitUaRule(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            formData.set('action', 'save');
+            formData.set('is_active', form.querySelector('[name="is_active"]').checked ? '1' : '0');
+            const response = await fetch(main.dataset.uaRulesUrl, {
+                method: 'POST',
+                body: formData,
+                headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+            });
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok) {
+                showAdminToast(payload.message || 'Не удалось сохранить правило', 'error');
+                return;
+            }
+            resetUaRuleForm();
+            await loadUaRules();
+            (payload.warnings || []).forEach((warning) => showAdminToast(warning, 'error'));
+            showAdminToast('Правило сохранено');
+        }
+
+        async function deleteUaRule(ruleId) {
+            const rule = uaRulesCache.find((item) => String(item.id) === String(ruleId));
+            if (!rule) return;
+            if (!confirm(`Удалить правило «${rule.match_substring} → ${rule.variable_name}=${rule.value}»?`)) return;
+            const formData = new FormData();
+            formData.set('action', 'delete');
+            formData.set('rule_id', ruleId);
+            const response = await fetch(main.dataset.uaRulesUrl, {
+                method: 'POST',
+                body: formData,
+                headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+            });
+            if (!response.ok) {
+                showAdminToast('Не удалось удалить правило', 'error');
+                return;
+            }
+            await loadUaRules();
+            showAdminToast('Правило удалено');
         }
 
         let configPinsUser = null;
@@ -3191,8 +3360,10 @@
             if (configSaveInFlight) return;
             const form = event.target;
             const templateJson = getConfigJsonValue();
-            const parsedTemplate = parseJsonWithMessage(templateJson, 'template_json');
-            if (!parsedTemplate.ok) return showAdminToast(parsedTemplate.message, 'error');
+            if (!configJsonHasJinjaTags(templateJson)) {
+                const parsedTemplate = parseJsonWithMessage(templateJson, 'template_json');
+                if (!parsedTemplate.ok) return showAdminToast(parsedTemplate.message, 'error');
+            }
 
             const headersRaw = form.querySelector('[name="additional_headers"]').value.trim();
             if (headersRaw) {
@@ -5383,6 +5554,8 @@
         document.getElementById('ripe-key-form')?.addEventListener('submit', submitRipeKey);
         document.getElementById('ripe-key-reset')?.addEventListener('click', resetRipeKeyForm);
         document.getElementById('config-pins-form')?.addEventListener('submit', submitConfigPinsSearch);
+        document.getElementById('ua-rule-form')?.addEventListener('submit', submitUaRule);
+        document.getElementById('ua-rule-reset')?.addEventListener('click', resetUaRuleForm);
         document.addEventListener('click', (event) => {
             if (event.target.closest('[data-config-pins-save]')) saveConfigPins(false);
             if (event.target.closest('[data-config-pins-clear]')) saveConfigPins(true);
