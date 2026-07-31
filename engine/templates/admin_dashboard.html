@@ -1806,10 +1806,43 @@
 
             <div id="subpanel-acq-ads" class="subtab-panel">
                 <div id="acq-ads-migration" class="card" style="padding:14px;display:none;border-color:rgba(255,120,80,.4);">
-                    Таблица <code>ad_spends</code> ещё не создана — нужно прогнать alembic-миграцию в common (autogenerate по модели AdSpend).
+                    Таблица <code>ad_spends</code> не создана или в ней нет колонок <code>impressions</code>/<code>clicks</code> —
+                    нужно прогнать alembic-миграцию в common (autogenerate по модели AdSpend).
                 </div>
                 <div class="card" style="padding:18px;margin-bottom:14px;">
-                    <strong>Добавить/обновить траты на рекламу</strong>
+                    <strong>Импорт CSV из Яндекс Директа</strong>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        Выгрузка «по дням» (День, Показы, Клики, Расход). Строка «Итого» игнорируется.
+                        Повторная загрузка того же файла перезаписывает те же дни теми же данными — дублей не будет.
+                    </div>
+                    <form id="acq-csv-form" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
+                        <input type="file" name="file" accept=".csv,text/csv" required style="color:#fff;font-size:12px;max-width:260px;">
+                        <input type="text" name="channel" placeholder="канал (yandex-direct)" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;width:170px;">
+                        <button type="submit" class="subtab active" style="border:1px solid rgba(255,199,0,.4);border-radius:8px;">Загрузить</button>
+                        <span id="acq-csv-status" style="font-size:11px;color:var(--muted);"></span>
+                    </form>
+                </div>
+                <div class="card" style="padding:18px;margin-bottom:14px;">
+                    <span class="chart-title-wrap"><strong>Расходы и воронка: подписки → подключения → продажи</strong><button type="button" class="chart-info" data-help="ads_daily" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;font-size:12px;">
+                        <select id="acq-ads-group" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                            <option value="day">По дням</option>
+                            <option value="month">По месяцам</option>
+                        </select>
+                        <select id="acq-ads-days" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                            <option value="31">31 день</option>
+                            <option value="92" selected>92 дня</option>
+                            <option value="183">183 дня</option>
+                            <option value="365">365 дней</option>
+                        </select>
+                    </div>
+                    <canvas id="acq-ads-daily-chart" style="width:100%;height:250px;display:block;margin-top:10px;"></canvas>
+                    <div style="font-size:11px;color:var(--muted);margin-top:12px;">Стоимость привлечения, ₽: CPC (клик), подписка, подключение, продажа</div>
+                    <canvas id="acq-ads-cost-chart" style="width:100%;height:220px;display:block;margin-top:6px;"></canvas>
+                    <div id="acq-ads-daily-table" style="margin-top:12px;overflow-x:auto;max-height:420px;overflow-y:auto;"></div>
+                </div>
+                <div class="card" style="padding:18px;margin-bottom:14px;">
+                    <strong>Добавить/обновить траты на рекламу вручную</strong>
                     <form id="acq-spend-form" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
                         <input type="date" name="day" required style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
                         <input type="text" name="channel" placeholder="канал (default)" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;width:140px;">
@@ -1817,13 +1850,14 @@
                         <input type="text" name="comment" placeholder="комментарий" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;flex:1;min-width:120px;">
                         <button type="submit" class="subtab active" style="border:1px solid rgba(255,199,0,.4);border-radius:8px;">Сохранить</button>
                     </form>
-                    <div id="acq-spends-table" style="margin-top:12px;overflow-x:auto;"></div>
+                    <div id="acq-spends-table" style="margin-top:12px;overflow-x:auto;max-height:420px;overflow-y:auto;"></div>
                 </div>
                 <div class="card" style="padding:18px;">
                     <span class="chart-title-wrap"><strong>Эффективность рекламы по неделям</strong><button type="button" class="chart-info" data-help="ads" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                     <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
                         <b>Цена подписки</b> = траты / созданные подписки.
-                        <b>CPA (цена продажи)</b> = траты / новые покупатели.
+                        <b>Цена подключения</b> = траты / подключения (первый трафик).
+                        <b>Цена продажи</b> = траты / новые покупатели.
                         <b>ДРР</b> = траты / выручка новых × 100% (как в таблице партнёра; продления сюда не входят, поэтому реальная ДРР ниже).
                         <b>ROMI</b> = выручка новых / траты.
                     </div>
@@ -5899,19 +5933,58 @@
                 {fullLabels: tr.days.map((r) => r.day)});
         }
 
+        const fmtCost = (v) => v == null ? '—' : v.toFixed(2) + ' ₽';
+        const fmtInt = (v) => v == null ? '—' : v.toLocaleString('ru-RU');
+
+        async function loadAdsDaily() {
+            const group = document.getElementById('acq-ads-group').value;
+            const days = document.getElementById('acq-ads-days').value;
+            const res = await acqFetch('ads_daily', {group, days});
+            if (res.needs_migration) return;
+            const rows = res.rows;
+            const label = (p) => group === 'month' ? p : dayLabel(p);
+            acqDraw(document.getElementById('acq-ads-daily-chart'),
+                rows.map((r) => label(r.period)),
+                [{label: 'Расход, ₽', color: 'rgba(255,199,0,.55)', data: rows.map((r) => r.spend), fmt: 'rub'}],
+                [
+                    {label: 'Подписки', color: 'rgba(120,140,255,.9)', data: rows.map((r) => r.subs), fmt: 'raw'},
+                    {label: 'Подключения', color: 'rgba(90,220,150,.95)', data: rows.map((r) => r.conns), fmt: 'raw'},
+                    {label: 'Продажи', color: 'rgba(255,110,160,.95)', data: rows.map((r) => r.sales), fmt: 'raw'},
+                ],
+                {fullLabels: rows.map((r) => r.period)});
+            acqDraw(document.getElementById('acq-ads-cost-chart'),
+                rows.map((r) => label(r.period)),
+                [],
+                [
+                    {label: 'CPC', color: 'rgba(255,199,0,.95)', data: rows.map((r) => r.cpc), fmt: 'rub'},
+                    {label: 'Цена подписки', color: 'rgba(120,140,255,.9)', data: rows.map((r) => r.cost_per_sub), fmt: 'rub'},
+                    {label: 'Цена подключения', color: 'rgba(90,220,150,.95)', data: rows.map((r) => r.cost_per_conn), fmt: 'rub'},
+                    {label: 'Цена продажи', color: 'rgba(255,110,160,.95)', data: rows.map((r) => r.cost_per_sale), fmt: 'rub'},
+                ],
+                {fullLabels: rows.map((r) => r.period)});
+            document.getElementById('acq-ads-daily-table').innerHTML = acqTable(
+                [group === 'month' ? 'Месяц' : 'День', 'Расход, ₽', 'Показы', 'Клики', 'CPC',
+                 'Подписки', 'Цена подписки', 'Подключения', 'Цена подключения', 'Продажи', 'Цена продажи'],
+                rows.slice().reverse().map((r) => [r.period, fmtRub(r.spend), fmtInt(r.impressions), fmtInt(r.clicks),
+                    fmtCost(r.cpc), r.subs, fmtCost(r.cost_per_sub),
+                    r.conns, fmtCost(r.cost_per_conn), r.sales, fmtCost(r.cost_per_sale)]));
+        }
+
         async function loadAds() {
             const res = await acqFetch('ads', {weeks: 12});
             document.getElementById('acq-ads-migration').style.display = res.needs_migration ? 'block' : 'none';
             document.getElementById('acq-spends-table').innerHTML = acqTable(
-                ['Дата', 'Канал', 'Сумма, ₽', 'Комментарий', ''],
-                res.spends.map((r) => [r.day, r.channel, fmtRub(r.amount_rub), r.comment,
+                ['Дата', 'Канал', 'Сумма, ₽', 'Показы', 'Клики', 'Комментарий', ''],
+                res.spends.map((r) => [r.day, r.channel, fmtRub(r.amount_rub),
+                    fmtInt(r.impressions), fmtInt(r.clicks), r.comment,
                     `<button data-spend-del="${r.id}" style="background:none;border:0;color:rgba(255,120,80,.8);cursor:pointer;">удалить</button>`]));
             document.getElementById('acq-ads-table').innerHTML = acqTable(
-                ['Неделя', 'Траты, ₽', 'Подписки', 'Цена подписки', 'Новых', 'CPA, ₽', 'Выручка новых', 'ДРР', 'ROMI'],
+                ['Неделя', 'Траты, ₽', 'Подписки', 'Цена подписки', 'Подключения', 'Цена подключения', 'Новых', 'Цена продажи', 'Выручка новых', 'ДРР', 'ROMI'],
                 res.weeks.map((r) => [r.week, fmtRub(r.spend), r.subs,
-                    r.cost_per_sub == null ? '—' : r.cost_per_sub.toFixed(2) + ' ₽',
+                    fmtCost(r.cost_per_sub),
+                    r.conns, fmtCost(r.cost_per_conn),
                     r.new_payers,
-                    r.cpa == null ? '—' : fmtRub(r.cpa) + ' ₽',
+                    r.cost_per_sale == null ? '—' : fmtRub(r.cost_per_sale) + ' ₽',
                     fmtRub(r.new_rub) + ' ₽',
                     r.drr == null ? '—' : r.drr + '%',
                     r.romi == null ? '—' : ('x' + r.romi.toFixed(2))]));
@@ -5921,6 +5994,7 @@
                 await fetch(SPENDS_API, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
                 loadAcqSection('acq-ads', true);
             }));
+            await loadAdsDaily();
         }
 
         async function loadCohorts() {
@@ -6094,6 +6168,28 @@
             if (payload.status === 'ok') { ev.target.reset(); loadAcqSection('acq-ads', true); }
             else alert(payload.message || 'Ошибка сохранения');
         });
+        document.getElementById('acq-ads-group')?.addEventListener('change', () => loadAdsDaily().catch(console.error));
+        document.getElementById('acq-ads-days')?.addEventListener('change', () => loadAdsDaily().catch(console.error));
+        document.getElementById('acq-csv-form')?.addEventListener('submit', async (ev) => {
+            ev.preventDefault();
+            const statusEl = document.getElementById('acq-csv-status');
+            statusEl.textContent = 'загрузка…';
+            const body = new FormData(ev.target);
+            body.append('action', 'import_csv');
+            try {
+                const resp = await fetch(SPENDS_API, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await resp.json();
+                if (payload.status === 'ok') {
+                    statusEl.textContent = `импортировано дней: ${payload.imported} (${payload.from} — ${payload.to})`;
+                    ev.target.reset();
+                    loadAcqSection('acq-ads', true);
+                } else {
+                    statusEl.textContent = payload.message || 'ошибка импорта';
+                }
+            } catch (e) {
+                statusEl.textContent = 'ошибка импорта';
+            }
+        });
     })();
     </script>
     <style id="chart-help-styles">
@@ -6169,17 +6265,30 @@
                     'Последние ~10 дней по линии «недозрелые»: окно оплаты ещё не вышло, конверсия дорастёт — не паникуйте по хвосту.',
                 ],
             },
+            ads_daily: {
+                t: 'Расходы, воронка и стоимость привлечения по дням',
+                calc: [
+                    'Расход, показы и клики — из CSV-выгрузки Яндекс Директа (или ручного ввода трат), суммируются по дням/месяцам МСК.',
+                    '<b>CPC</b> = расход ÷ клики. <b>Подписки</b> — события создания подписки; <b>подключения</b> — первый трафик по подписке (как в разделе «Аналитика»); <b>продажи</b> — новые покупатели (первая оплата).',
+                    '<b>Цена подписки/подключения/продажи</b> = расход ÷ соответствующий счётчик. При группировке по месяцам делятся месячные суммы, а не усредняются дневные значения.',
+                ],
+                read: [
+                    'Три «цены» — это ступени одного CPA: подписка → подключение → продажа. Разрыв между соседними ступенями показывает, где теряются люди.',
+                    'Рост CPC при том же расходе = аукцион дорожает; рост цены продажи при стабильном CPC = хуже конвертит продукт/оффер, а не реклама.',
+                    'Дни без загруженных трат показывают «—» в ценах — это «нет данных», а не ноль.',
+                ],
+            },
             ads: {
                 t: 'Эффективность рекламы по неделям',
                 calc: [
-                    'Траты берутся из введённых вручную сумм (вкладка «Реклама»), суммируются по неделям.',
-                    '<b>Цена подписки</b> = траты ÷ созданные подписки. <b>CPA</b> = траты ÷ новые покупатели.',
+                    'Траты берутся из загруженного CSV Директа и введённых вручную сумм (вкладка «Реклама»), суммируются по неделям.',
+                    '<b>Цена подписки</b> = траты ÷ созданные подписки. <b>Цена подключения</b> = траты ÷ подключения. <b>Цена продажи</b> = траты ÷ новые покупатели.',
                     '<b>ДРР</b> = траты ÷ выручка новых × 100% (как в таблице партнёра). <b>ROMI</b> = выручка новых ÷ траты.',
                 ],
                 read: [
                     'ДРР и ROMI считаются <b>только по первому платежу</b> новых — продления не входят, поэтому реальная окупаемость <b>выше</b> показанной.',
-                    'Главный ориентир окупаемости — сравнение <b>LTV</b> (вкладка «Когорты») с <b>CPA</b>: реклама в плюс, когда LTV > CPA.',
-                    'Неделя без внесённых трат покажет пустые CPA/ДРР — это не ноль, а «нет данных».',
+                    'Главный ориентир окупаемости — сравнение <b>LTV</b> (вкладка «Когорты») с <b>ценой продажи</b>: реклама в плюс, когда LTV выше.',
+                    'Неделя без внесённых трат покажет пустые цены/ДРР — это не ноль, а «нет данных».',
                 ],
             },
             ltv: {

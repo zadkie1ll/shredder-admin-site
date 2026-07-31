@@ -7334,13 +7334,14 @@ def _acq_funnel(db_session, weeks):
 
 
 def _acq_ads(db_session, weeks):
-    # Таблица ad_spends появляется alembic-миграцией в common; до её наката
-    # отдаём флаг needs_migration, чтобы вкладка объяснила, что делать.
+    # Таблица ad_spends (и колонки impressions/clicks под CSV Директа)
+    # появляются alembic-миграцией в common; до её наката отдаём флаг
+    # needs_migration, чтобы вкладка объяснила, что делать.
     try:
         spends = _acq_rows(
             db_session,
             """
-            SELECT id, day, channel, amount_rub, comment
+            SELECT id, day, channel, amount_rub, impressions, clicks, comment
             FROM ad_spends
             WHERE day >= (now() AT TIME ZONE 'Europe/Moscow')::date - make_interval(weeks => :weeks)
             ORDER BY day DESC, channel
@@ -7382,6 +7383,22 @@ def _acq_ads(db_session, weeks):
         weeks=weeks,
     )
     weekly_subs = {r["week"].isoformat(): r["subs"] for r in subs_rows}
+    # Подключение = первый трафик по подписке (traffic_threshold_reached
+    # с threshold=0) — та же метрика, что в разделе «Аналитика».
+    conn_rows = _acq_rows(
+        db_session,
+        """
+        SELECT date_trunc('week', (timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS week,
+               count(DISTINCT user_id) AS conns
+        FROM event_logs
+        WHERE event_type = 'traffic_threshold_reached'
+          AND (event_payload->>'threshold')::int = 0
+          AND timestamp >= now() AT TIME ZONE 'UTC' - make_interval(weeks => :weeks)
+        GROUP BY 1
+        """,
+        weeks=weeks,
+    )
+    weekly_conns = {r["week"].isoformat(): r["conns"] for r in conn_rows}
     out = []
     for r in pays:
         wk = r["week"].isoformat()
@@ -7389,14 +7406,18 @@ def _acq_ads(db_session, weeks):
         new_payers = r["new_payers"]
         new_rub = float(r["new_rub"])
         subs = weekly_subs.get(wk, 0)
+        conns = weekly_conns.get(wk, 0)
         out.append({
             "week": wk,
             "spend": round(spend, 2),
             "subs": subs,
             "cost_per_sub": round(spend / subs, 2) if spend and subs else None,
+            "conns": conns,
+            "cost_per_conn": round(spend / conns, 2) if spend and conns else None,
             "new_payers": new_payers,
             "new_rub": round(new_rub, 2),
-            "cpa": round(spend / new_payers, 2) if spend and new_payers else None,
+            "cost_per_sale": round(spend / new_payers, 2)
+            if spend and new_payers else None,
             "romi": round(new_rub / spend, 2) if spend else None,
             "drr": round(100.0 * spend / new_rub, 1) if spend and new_rub else None,
         })
@@ -7405,10 +7426,199 @@ def _acq_ads(db_session, weeks):
         "weeks": out,
         "spends": [
             {"id": r["id"], "day": r["day"].isoformat(), "channel": r["channel"],
-             "amount_rub": float(r["amount_rub"]), "comment": r["comment"] or ""}
+             "amount_rub": float(r["amount_rub"]),
+             "impressions": r["impressions"], "clicks": r["clicks"],
+             "comment": r["comment"] or ""}
             for r in spends
         ],
     }
+
+
+def _acq_ads_daily(db_session, days=92, group="day"):
+    """Ежедневная (или помесячная) экономика рекламы.
+
+    Для каждого дня (МСК): траты/показы/клики из ad_spends, созданные
+    подписки, подключения (первый трафик, threshold=0) и продажи (новые
+    покупатели — первая оплата пользователя). Производные метрики (CPC,
+    цена подписки/подключения/продажи) считаются после агрегации, чтобы
+    помесячная группировка делила суммы, а не усредняла дневные ratio.
+    """
+    try:
+        spend_rows = _acq_rows(
+            db_session,
+            """
+            SELECT day, COALESCE(sum(amount_rub), 0) AS spend,
+                   sum(impressions) AS impressions, sum(clicks) AS clicks
+            FROM ad_spends
+            WHERE day >= (now() AT TIME ZONE 'Europe/Moscow')::date - make_interval(days => :days)
+            GROUP BY 1
+            """,
+            days=days,
+        )
+    except Exception:
+        db_session.rollback()
+        return {"needs_migration": True, "rows": []}
+
+    subs_rows = _acq_rows(
+        db_session,
+        """
+        SELECT ((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS day,
+               count(*) AS subs
+        FROM event_logs
+        WHERE event_type = 'subscription_created'
+          AND timestamp >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+        GROUP BY 1
+        """,
+        days=days,
+    )
+    conn_rows = _acq_rows(
+        db_session,
+        """
+        SELECT ((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS day,
+               count(DISTINCT user_id) AS conns
+        FROM event_logs
+        WHERE event_type = 'traffic_threshold_reached'
+          AND (event_payload->>'threshold')::int = 0
+          AND timestamp >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+        GROUP BY 1
+        """,
+        days=days,
+    )
+    sale_rows = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE}
+        SELECT ((first_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS day,
+               count(*) AS sales
+        FROM first_pay
+        WHERE first_at >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+        GROUP BY 1
+        """,
+        days=days,
+    )
+
+    merged = {}
+
+    def bucket(day):
+        iso = day.isoformat()
+        key = iso[:7] if group == "month" else iso
+        return merged.setdefault(key, {
+            "spend": 0.0, "impressions": 0, "clicks": 0,
+            "has_traffic": False, "subs": 0, "conns": 0, "sales": 0,
+        })
+
+    for r in spend_rows:
+        b = bucket(r["day"])
+        b["spend"] += float(r["spend"])
+        if r["impressions"] is not None or r["clicks"] is not None:
+            b["has_traffic"] = True
+            b["impressions"] += int(r["impressions"] or 0)
+            b["clicks"] += int(r["clicks"] or 0)
+    for r in subs_rows:
+        bucket(r["day"])["subs"] += int(r["subs"])
+    for r in conn_rows:
+        bucket(r["day"])["conns"] += int(r["conns"])
+    for r in sale_rows:
+        bucket(r["day"])["sales"] += int(r["sales"])
+
+    def ratio(spend, count):
+        return round(spend / count, 2) if spend and count else None
+
+    rows = []
+    for key in sorted(merged):
+        b = merged[key]
+        spend = round(b["spend"], 2)
+        rows.append({
+            "period": key,
+            "spend": spend,
+            "impressions": b["impressions"] if b["has_traffic"] else None,
+            "clicks": b["clicks"] if b["has_traffic"] else None,
+            "cpc": ratio(spend, b["clicks"]) if b["has_traffic"] else None,
+            "subs": b["subs"],
+            "cost_per_sub": ratio(spend, b["subs"]),
+            "conns": b["conns"],
+            "cost_per_conn": ratio(spend, b["conns"]),
+            "sales": b["sales"],
+            "cost_per_sale": ratio(spend, b["sales"]),
+        })
+    return {"needs_migration": False, "group": group, "rows": rows}
+
+
+# --- Импорт CSV из рекламного кабинета Яндекс Директа ----------------------
+# Формат выгрузки «по дням»: заголовок (День,Показы,Клики,"Расход, ₽",...),
+# строка «Итого» и дневные строки с датой dd.mm.yyyy. Числа могут быть
+# с запятой-десятичным разделителем, пробелами-разрядами и «-» вместо
+# пустых значений.
+
+def _parse_direct_number(raw):
+    value = (raw or "").strip().strip('"').replace("\xa0", "").replace(" ", "")
+    value = value.replace("₽", "").replace("%", "")
+    if not value or value in ("-", "—"):
+        return None
+    if "," in value and "." in value:
+        value = value.replace(",", "")
+    else:
+        value = value.replace(",", ".")
+    try:
+        return float(value)
+    except ValueError:
+        return None
+
+
+def _parse_yandex_direct_csv(text):
+    """Возвращает список {day, amount_rub, impressions, clicks}.
+
+    Заголовок ищется по всему файлу (перед ним Директ может добавлять
+    строки с названием отчёта); строки без даты в первой колонке
+    («Итого», подвал) молча пропускаются.
+    """
+    import csv
+    import io
+
+    reader = csv.reader(io.StringIO(text))
+    columns = None
+    rows = []
+    for row in reader:
+        if not row or not any(cell.strip() for cell in row):
+            continue
+        if columns is None:
+            lowered = [cell.strip().lstrip("﻿").lower() for cell in row]
+            if (
+                any(cell in ("день", "дата") for cell in lowered)
+                and any(cell.startswith("расход") for cell in lowered)
+            ):
+                columns = {}
+                for i, cell in enumerate(lowered):
+                    if cell in ("день", "дата"):
+                        columns["day"] = i
+                    elif cell == "показы":
+                        columns["impressions"] = i
+                    elif cell == "клики":
+                        columns["clicks"] = i
+                    elif cell.startswith("расход"):
+                        columns["spend"] = i
+            continue
+
+        def cell(name):
+            i = columns.get(name)
+            return row[i] if i is not None and i < len(row) else ""
+
+        try:
+            day = datetime.strptime(cell("day").strip(), "%d.%m.%Y").date()
+        except ValueError:
+            continue
+        spend = _parse_direct_number(cell("spend"))
+        if spend is None:
+            continue
+        impressions = _parse_direct_number(cell("impressions"))
+        clicks = _parse_direct_number(cell("clicks"))
+        rows.append({
+            "day": day,
+            "amount_rub": round(spend, 2),
+            "impressions": int(impressions) if impressions is not None else None,
+            "clicks": int(clicks) if clicks is not None else None,
+        })
+    return rows
 
 
 def _acq_cohorts(db_session, months):
@@ -7904,6 +8114,10 @@ ACQ_SECTIONS = {
     ),
     "funnel": lambda s, req: _acq_funnel(s, int(req.GET.get("weeks", 12))),
     "ads": lambda s, req: _acq_ads(s, int(req.GET.get("weeks", 12))),
+    "ads_daily": lambda s, req: _acq_ads_daily(
+        s, int(req.GET.get("days", 92)),
+        "month" if req.GET.get("group") == "month" else "day",
+    ),
     "cohorts": lambda s, req: _acq_cohorts(s, int(req.GET.get("months", 14))),
     "trials": lambda s, req: _acq_trials(s, int(req.GET.get("days", 60))),
     "pushes": lambda s, req: _acq_pushes(s, int(req.GET.get("days", 30))),
@@ -7972,6 +8186,64 @@ def support_admin_api_ad_spends(request):
             )
             db_session.commit()
             return JsonResponse({"status": "ok"})
+        if action == "import_csv":
+            channel = (
+                request.POST.get("channel") or "yandex-direct"
+            ).strip()[:128] or "yandex-direct"
+            upload = request.FILES.get("file")
+            if upload is None:
+                return JsonResponse(
+                    {"status": "error", "message": "нет файла"}, status=400
+                )
+            raw = upload.read()
+            try:
+                text_content = raw.decode("utf-8-sig")
+            except UnicodeDecodeError:
+                text_content = raw.decode("cp1251")
+            parsed = _parse_yandex_direct_csv(text_content)
+            if not parsed:
+                return JsonResponse(
+                    {"status": "error",
+                     "message": "в файле не найдено дневных строк Директа"},
+                    status=400,
+                )
+            # Идемпотентный импорт: повторная загрузка того же файла
+            # перезаписывает те же дни теми же значениями.
+            for item in parsed:
+                db_session.execute(
+                    sa_text(
+                        """
+                        INSERT INTO ad_spends
+                            (day, channel, amount_rub, impressions, clicks, comment)
+                        VALUES (:day, :channel, :amount, :impressions, :clicks, :comment)
+                        ON CONFLICT ON CONSTRAINT uq_ad_spends_day_channel
+                        DO UPDATE SET amount_rub = EXCLUDED.amount_rub,
+                                      impressions = EXCLUDED.impressions,
+                                      clicks = EXCLUDED.clicks,
+                                      comment = EXCLUDED.comment,
+                                      updated_at = now()
+                        """
+                    ),
+                    {
+                        "day": item["day"], "channel": channel,
+                        "amount": item["amount_rub"],
+                        "impressions": item["impressions"],
+                        "clicks": item["clicks"],
+                        "comment": "csv-import",
+                    },
+                )
+            db_session.commit()
+            days_sorted = sorted(item["day"] for item in parsed)
+            logging.info(
+                "ad_spends csv import: %s rows, %s..%s, channel=%s",
+                len(parsed), days_sorted[0], days_sorted[-1], channel,
+            )
+            return JsonResponse({
+                "status": "ok",
+                "imported": len(parsed),
+                "from": days_sorted[0].isoformat(),
+                "to": days_sorted[-1].isoformat(),
+            })
         return JsonResponse({"status": "error", "message": "unknown action"}, status=400)
     except (ValueError, TypeError):
         db_session.rollback()

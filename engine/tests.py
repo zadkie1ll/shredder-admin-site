@@ -43,8 +43,12 @@ from engine.views import payment_session_url_key
 from engine.views import ACQ_PUSH_ATTRIBUTION_CTE
 from engine.views import ACQ_PAYS_TARIFF_CTE
 from engine.views import ACQ_TIMING_LABELS
+from engine.views import _acq_ads
+from engine.views import _acq_ads_daily
 from engine.views import _acq_pushes
 from engine.views import _acq_renewal_ladder
+from engine.views import _parse_direct_number
+from engine.views import _parse_yandex_direct_csv
 from engine.views import _acq_tariff_paths
 from engine.views import _acq_trial_timing
 from engine.views import payment_retry
@@ -246,6 +250,188 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn("'Новые', 'Повторные', 'Медиана до оплаты', 'Выручка', 'Чеки'", template)
         self.assertIn("Last-touch атрибуция", template)
         self.assertIn("«Новые» — это была первая оплата пользователя за всю историю", template)
+
+
+YANDEX_DIRECT_CSV_SAMPLE = """День,Показы,Клики,"Расход, ₽",Конверсии,"CR, %","CPA, ₽","CPC, ₽"
+Итого,406662,32520,204336.59,0,0.00,,6.28
+29.06.2026,13773,1023,5030.16,0,0.00,-,4.92
+30.06.2026,13422,1057,5154.73,0,0.00,-,4.88
+01.07.2026,17860,1478,7261.73,0,0.00,-,4.91
+"""
+
+
+class YandexDirectCsvParserTests(SimpleTestCase):
+    def test_parses_daily_rows_and_skips_totals(self):
+        rows = _parse_yandex_direct_csv(YANDEX_DIRECT_CSV_SAMPLE)
+
+        self.assertEqual(len(rows), 3)
+        self.assertEqual(rows[0], {
+            "day": date(2026, 6, 29),
+            "amount_rub": 5030.16,
+            "impressions": 13773,
+            "clicks": 1023,
+        })
+        self.assertEqual(rows[2]["day"], date(2026, 7, 1))
+        self.assertEqual(rows[2]["amount_rub"], 7261.73)
+
+    def test_reparse_is_deterministic_for_overwrite(self):
+        # Повторная загрузка того же файла должна дать ровно те же строки —
+        # upsert по (day, channel) перезапишет дни теми же значениями.
+        self.assertEqual(
+            _parse_yandex_direct_csv(YANDEX_DIRECT_CSV_SAMPLE),
+            _parse_yandex_direct_csv(YANDEX_DIRECT_CSV_SAMPLE),
+        )
+
+    def test_parses_russian_number_formats_and_report_preamble(self):
+        text = (
+            "Статистика по дням\n"
+            "\n"
+            "Дата,Показы,Клики,\"Расход (руб.)\"\n"
+            "05.07.2026,\"1 500\",\"1 023\",\"5 030,16\"\n"
+        )
+        rows = _parse_yandex_direct_csv(text)
+
+        self.assertEqual(rows, [{
+            "day": date(2026, 7, 5),
+            "amount_rub": 5030.16,
+            "impressions": 1500,
+            "clicks": 1023,
+        }])
+
+    def test_returns_empty_without_direct_header(self):
+        self.assertEqual(_parse_yandex_direct_csv("a,b,c\n1,2,3\n"), [])
+
+    def test_number_parser_edge_cases(self):
+        self.assertEqual(_parse_direct_number("204336.59"), 204336.59)
+        self.assertEqual(_parse_direct_number("5 030,16"), 5030.16)
+        self.assertEqual(_parse_direct_number("1,234.56"), 1234.56)
+        self.assertIsNone(_parse_direct_number("-"))
+        self.assertIsNone(_parse_direct_number(""))
+        self.assertIsNone(_parse_direct_number(None))
+
+
+class AcquisitionAdsDailyTests(SimpleTestCase):
+    @mock.patch("engine.views._acq_rows")
+    def test_daily_rows_merge_spend_funnel_and_costs(self, rows_mock):
+        rows_mock.side_effect = [
+            [{"day": date(2026, 7, 1), "spend": Decimal("7261.73"),
+              "impressions": 17860, "clicks": 1478}],
+            [{"day": date(2026, 7, 1), "subs": 100}],
+            [{"day": date(2026, 7, 1), "conns": 40}],
+            [{"day": date(2026, 7, 1), "sales": 10}],
+        ]
+
+        result = _acq_ads_daily(object(), 92, "day")
+
+        self.assertFalse(result["needs_migration"])
+        self.assertEqual(len(result["rows"]), 1)
+        row = result["rows"][0]
+        self.assertEqual(row["period"], "2026-07-01")
+        self.assertEqual(row["spend"], 7261.73)
+        self.assertEqual(row["cpc"], round(7261.73 / 1478, 2))
+        self.assertEqual(row["cost_per_sub"], round(7261.73 / 100, 2))
+        self.assertEqual(row["cost_per_conn"], round(7261.73 / 40, 2))
+        self.assertEqual(row["cost_per_sale"], round(7261.73 / 10, 2))
+
+    @mock.patch("engine.views._acq_rows")
+    def test_month_grouping_divides_sums_not_daily_ratios(self, rows_mock):
+        rows_mock.side_effect = [
+            [
+                {"day": date(2026, 7, 1), "spend": Decimal("100"),
+                 "impressions": 1000, "clicks": 10},
+                {"day": date(2026, 7, 2), "spend": Decimal("300"),
+                 "impressions": 3000, "clicks": 30},
+            ],
+            [
+                {"day": date(2026, 7, 1), "subs": 5},
+                {"day": date(2026, 7, 2), "subs": 15},
+            ],
+            [{"day": date(2026, 7, 1), "conns": 8}],
+            [{"day": date(2026, 7, 2), "sales": 4}],
+        ]
+
+        result = _acq_ads_daily(object(), 92, "month")
+
+        self.assertEqual(len(result["rows"]), 1)
+        row = result["rows"][0]
+        self.assertEqual(row["period"], "2026-07")
+        self.assertEqual(row["spend"], 400.0)
+        self.assertEqual(row["impressions"], 4000)
+        self.assertEqual(row["clicks"], 40)
+        self.assertEqual(row["cpc"], 10.0)
+        self.assertEqual(row["subs"], 20)
+        self.assertEqual(row["cost_per_sub"], 20.0)
+        self.assertEqual(row["conns"], 8)
+        self.assertEqual(row["cost_per_conn"], 50.0)
+        self.assertEqual(row["sales"], 4)
+        self.assertEqual(row["cost_per_sale"], 100.0)
+
+    @mock.patch("engine.views._acq_rows")
+    def test_day_without_traffic_data_hides_cpc(self, rows_mock):
+        rows_mock.side_effect = [
+            [{"day": date(2026, 7, 1), "spend": Decimal("500"),
+              "impressions": None, "clicks": None}],
+            [{"day": date(2026, 7, 1), "subs": 10}],
+            [],
+            [],
+        ]
+
+        result = _acq_ads_daily(object(), 92, "day")
+
+        row = result["rows"][0]
+        self.assertIsNone(row["impressions"])
+        self.assertIsNone(row["clicks"])
+        self.assertIsNone(row["cpc"])
+        self.assertEqual(row["cost_per_sub"], 50.0)
+        self.assertIsNone(row["cost_per_conn"])
+        self.assertIsNone(row["cost_per_sale"])
+
+    @mock.patch("engine.views._acq_rows")
+    def test_reports_missing_migration(self, rows_mock):
+        rows_mock.side_effect = Exception("no such column: impressions")
+
+        result = _acq_ads_daily(mock.Mock(), 92, "day")
+
+        self.assertTrue(result["needs_migration"])
+        self.assertEqual(result["rows"], [])
+
+    @mock.patch("engine.views._acq_rows")
+    def test_weekly_ads_split_cpa_into_stage_costs(self, rows_mock):
+        week = date(2026, 7, 6)
+        rows_mock.side_effect = [
+            [{"id": 1, "day": date(2026, 7, 7), "channel": "yandex-direct",
+              "amount_rub": Decimal("1000"), "impressions": 5000, "clicks": 200,
+              "comment": "csv-import"}],
+            [{"week": week, "new_payers": 4, "new_rub": Decimal("2000")}],
+            [{"week": week, "subs": 50}],
+            [{"week": week, "conns": 20}],
+        ]
+
+        result = _acq_ads(object(), 12)
+
+        row = result["weeks"][0]
+        self.assertEqual(row["cost_per_sub"], 20.0)
+        self.assertEqual(row["conns"], 20)
+        self.assertEqual(row["cost_per_conn"], 50.0)
+        self.assertEqual(row["cost_per_sale"], 250.0)
+        self.assertNotIn("cpa", row)
+        spend_row = result["spends"][0]
+        self.assertEqual(spend_row["impressions"], 5000)
+        self.assertEqual(spend_row["clicks"], 200)
+
+
+class AcquisitionAdsTemplateTests(SimpleTestCase):
+    def test_ads_tab_has_csv_import_and_daily_analytics(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('id="acq-csv-form"', template)
+        self.assertIn("action', 'import_csv'", template.replace('"', "'"))
+        self.assertIn('id="acq-ads-daily-chart"', template)
+        self.assertIn('id="acq-ads-cost-chart"', template)
+        self.assertIn('id="acq-ads-group"', template)
+        self.assertIn('data-help="ads_daily"', template)
+        self.assertIn("'Подключения', 'Цена подключения', 'Продажи', 'Цена продажи'", template)
+        self.assertNotIn("'CPA, ₽'", template)
 
 
 class AcquisitionPushAttributionTests(SimpleTestCase):
