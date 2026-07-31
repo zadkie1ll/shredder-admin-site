@@ -56,7 +56,7 @@
     <header class="border-b border-white/5 bg-[#111111]">
         <nav class="container mx-auto px-6 py-6 flex items-center justify-between gap-6">
             <a href="/" class="text-xl md:text-2xl font-black uppercase tracking-tighter">
-                MONKEY ISLAND<span class="text-[#ffc700]"> VPS</span>
+                MONKEY ISLAND<span class="text-[#ffc700]">{% if site_role == 'vps' or site_role == 'vps_direct_sale' %} VPS{% else %} VPN{% endif %}</span>
             </a>
             <a href="/" class="inline-flex items-center gap-2 rounded-full border border-[#ffc700] px-5 py-2 text-[#ffc700] text-xs font-black uppercase tracking-widest hover:bg-[#ffc700] hover:text-black transition">
                 <i class="fas fa-arrow-left"></i>

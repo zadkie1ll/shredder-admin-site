@@ -594,6 +594,19 @@ class OfferTemplateTests(SimpleTestCase):
         self.assertNotIn("19 ₽", template)
         self.assertIn("покупка является разовой", template)
 
+    def test_offer_brand_follows_site_role(self):
+        # Шапка оферты обязана подстраиваться под тип домена: на VPS-доменах
+        # "MONKEY ISLAND VPS", на VPN/кабинетных — "MONKEY ISLAND VPN".
+        # Регресс: бренд был захардкожен как VPS и светился на VPN-доменах.
+        template = Path("engine/templates/offer.html").read_text()
+
+        self.assertIn(
+            "{% if site_role == 'vps' or site_role == 'vps_direct_sale' %}"
+            " VPS{% else %} VPN{% endif %}",
+            template,
+        )
+        self.assertNotIn('<span class="text-[#ffc700]"> VPS</span>', template)
+
     def test_runtime_offer_tariffs_use_database_prices(self):
         class FakeSession:
             def get(self, model, key):

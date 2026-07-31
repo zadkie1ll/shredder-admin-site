@@ -2275,6 +2275,7 @@ def offer(request):
         request,
         "offer.html",
         {
+            "site_role": get_site_role(request),
             "tariffs": [
                 offer_tariffs[tariff.db_tariff_id] for tariff in ACTUAL_TARIFFS
             ],
