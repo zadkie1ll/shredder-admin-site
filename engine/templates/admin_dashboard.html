@@ -79,10 +79,26 @@
         .censor-alerts-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 700; color: var(--muted); white-space: nowrap; }
         .censor-alerts-toggle i { color: var(--brand-gold); }
         .censor-form-actions { display: flex; gap: 8px; flex: 0 0 auto; }
-        .censor-mode-badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10px; font-weight: 800; border: 1px solid rgba(132,204,22,.4); color: var(--blue); background: rgba(132,204,22,.08); }
+        .censor-mode-badge { display: inline-block; margin-left: 6px; padding: 2px 9px; border-radius: 999px; font-size: 12px; font-weight: 600; border: 1px solid rgba(132,204,22,.4); color: var(--blue); background: rgba(132,204,22,.08); }
         .censor-mode-badge.light { border-color: rgba(255,199,0,.4); color: var(--brand-gold); background: rgba(255,199,0,.08); }
         .censor-mode-badge.alert { border-color: rgba(34,197,94,.4); color: #22c55e; background: rgba(34,197,94,.08); }
         .censor-sample-warn { color: var(--brand-gold); cursor: help; }
+        /* Сворачиваемая карточка-раздел: тот же приём, что у «Ключей RIPE Atlas» */
+        .admin-collapse { padding: 0; margin-bottom: 16px; }
+        .admin-collapse > summary { cursor: pointer; padding: 16px 18px; list-style: none; display: flex; align-items: center; gap: 10px; color: var(--text-main); font-size: 16px; font-weight: 800; }
+        .admin-collapse > summary::-webkit-details-marker { display: none; }
+        .admin-collapse > summary > i:first-child { color: var(--brand-gold); }
+        .admin-collapse > summary::after { content: "\f078"; font: var(--fa-font-solid); font-size: 11px; color: var(--muted); margin-left: auto; transition: transform .15s; }
+        .admin-collapse[open] > summary::after { transform: rotate(180deg); }
+        .admin-collapse[open] > summary { border-bottom: 1px solid rgba(255,255,255,.07); }
+        .admin-collapse-body { padding: 16px 18px; }
+        .admin-collapse-hint { margin-left: 4px; color: var(--muted); font-size: 13px; font-weight: 600; }
+        /* Пояснение к правилам: вместо сплошного жирного текста — абзац, список и код */
+        .help-block { margin: 0 0 14px; color: var(--muted); font-size: 14px; font-weight: 500; line-height: 1.55; }
+        .help-block p { margin: 0 0 8px; }
+        .help-block ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+        .help-block li::marker { color: var(--brand-gold); }
+        .help-block code { padding: 1px 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,.09); background: rgba(255,255,255,.05); color: var(--text-main); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
         .censor-district-row { grid-template-columns: minmax(150px, 1.4fr) 90px 90px minmax(150px, 1.2fr); min-width: 520px; }
         .censor-district-row.table-head { background: rgba(255,255,255,.04); }
         .censor-keys-card { padding: 0; margin-bottom: 16px; }
@@ -95,7 +111,7 @@
         .censor-key-default { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); white-space: nowrap; }
         .censor-key-row { grid-template-columns: minmax(140px, 1fr) minmax(120px, .7fr) minmax(120px, .6fr) minmax(200px, auto); min-width: 640px; }
         .censor-key-row.table-head { background: rgba(255,255,255,.04); }
-        .censor-key-default-badge { color: #22c55e; font-weight: 800; }
+        .censor-key-default-badge { color: #22c55e; font-weight: 600; }
         .censor-check-row { grid-template-columns: minmax(130px, .8fr) minmax(150px, 1fr) minmax(110px, .6fr) minmax(110px, .6fr) minmax(190px, 1.2fr) minmax(230px, auto); min-width: 1020px; }
         .censor-check-row.table-head { background: rgba(255,255,255,.04); }
         .censor-run-row { grid-template-columns: 170px minmax(190px, 1fr) minmax(0, 1.6fr) 28px; min-width: 560px; }
@@ -127,9 +143,13 @@
         .client-empty { text-align: center; padding: 26px; }
         .censor-probe-row { grid-template-columns: 90px minmax(130px, 1fr) 100px 110px minmax(0, 2fr); min-width: 620px; }
         .censor-probe-row.table-head { background: rgba(255,255,255,.04); }
-        .censor-status-ok { color: #22c55e; font-weight: 800; }
-        .censor-status-warn { color: var(--brand-gold); font-weight: 800; }
-        .censor-status-bad { color: #ff6b6b; font-weight: 800; }
+        /* Вес и размер держим как в остальных таблицах админки (16px/500-600):
+           статусы выделяются цветом, а не жирностью, иначе строки выглядят
+           «тяжелее» соседних таблиц. */
+        .censor-status-ok { color: #22c55e; font-weight: 600; }
+        .censor-status-warn { color: var(--brand-gold); font-weight: 600; }
+        .censor-status-bad { color: #ff6b6b; font-weight: 600; }
+        .censor-check-row b, .censor-key-row b, .censor-district-row b { font-weight: 600; }
         .censor-row-actions { display: flex; gap: 6px; flex-wrap: wrap; }
         .censor-row-actions .btn { padding: 5px 10px; font-size: 11px; }
         .input { width: 100%; min-width: 0; max-width: 100%; min-height: 40px; border: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.22); color: var(--text-main); border-radius: 9px; padding: 0 13px; font-size: 13px; font-weight: 600; outline: none; transition: border-color .15s, background .15s; }
@@ -2095,27 +2115,36 @@
                 </div>
             </header>
 
-            <section class="card form-card config-pins-card">
-                <div class="config-pins-head">
-                    <h2 class="system-card-title">Персональные конфиги для пользователя</h2>
-                    <p class="admin-subtitle">Обычно активные конфиги выдаются round-robin. Здесь можно закрепить за пользователем только выбранные — им будут выдаваться только они. Если ни один закреплённый конфиг не активен, снова включается round-robin.</p>
-                </div>
-                <form id="config-pins-form" class="config-pins-form">
-                    {% csrf_token %}
-                    <div class="form-grid-two">
-                        <input class="input" name="q" placeholder="username, email или telegram_id">
-                        <button class="btn btn-secondary" type="submit"><i class="fas fa-magnifying-glass"></i>Найти пользователя</button>
+            <details class="card admin-collapse">
+                <summary><i class="fas fa-user-gear"></i>Персональные конфиги для пользователя<span class="admin-collapse-hint">закрепить конкретные конфиги вместо round-robin</span></summary>
+                <div class="admin-collapse-body">
+                    <div class="help-block">
+                        <p>Обычно активные конфиги выдаются по кругу (round-robin). Здесь можно закрепить за пользователем только выбранные — тогда выдаваться будут только они.</p>
+                        <p>Если ни один закреплённый конфиг не активен, снова включается round-robin.</p>
                     </div>
-                </form>
-                <div id="config-pins-result"></div>
-            </section>
-
-            <section class="card form-card config-pins-card">
-                <div class="config-pins-head">
-                    <h2 class="system-card-title">Правила User-Agent</h2>
-                    <p class="admin-subtitle">Определение клиентского приложения при выдаче конфига. Если User-Agent запроса содержит подстроку (без учёта регистра), в Jinja-рендер шаблона передаётся переменная с указанным значением — например, подстрока «incy» → CLIENT=incy, и в шаблоне работает {% templatetag openblock %} if CLIENT == "incy" {% templatetag closeblock %}. Правила проверяются по возрастанию приоритета, для каждой переменной побеждает первое совпадение.</p>
+                    <form id="config-pins-form" class="config-pins-form">
+                        {% csrf_token %}
+                        <div class="form-grid-two">
+                            <input class="input" name="q" placeholder="username, email или telegram_id">
+                            <button class="btn btn-secondary" type="submit"><i class="fas fa-magnifying-glass"></i>Найти пользователя</button>
+                        </div>
+                    </form>
+                    <div id="config-pins-result"></div>
                 </div>
-                <form id="ua-rule-form" class="ua-rule-form">
+            </details>
+
+            <details class="card admin-collapse">
+                <summary><i class="fas fa-fingerprint"></i>Правила User-Agent<span class="admin-collapse-hint">определение клиентского приложения при выдаче конфига</span></summary>
+                <div class="admin-collapse-body">
+                    <div class="help-block">
+                        <p>Если User-Agent запроса содержит подстроку (без учёта регистра), в Jinja-рендер шаблона передаётся переменная с указанным значением.</p>
+                        <ul>
+                            <li>Пример: подстрока <code>incy</code> → <code>CLIENT=incy</code>, и в шаблоне работает <code>{% templatetag openblock %} if CLIENT == "incy" {% templatetag closeblock %}</code></li>
+                            <li>Правила проверяются по возрастанию приоритета</li>
+                            <li>Для каждой переменной побеждает первое совпадение</li>
+                        </ul>
+                    </div>
+                    <form id="ua-rule-form" class="ua-rule-form">
                     {% csrf_token %}
                     <input type="hidden" name="rule_id">
                     <div class="ua-rule-form-grid">
@@ -2132,9 +2161,10 @@
                             <button class="btn btn-secondary" type="button" id="ua-rule-reset">Очистить</button>
                         </div>
                     </div>
-                </form>
-                <div id="ua-rules-result"></div>
-            </section>
+                    </form>
+                    <div id="ua-rules-result"></div>
+                </div>
+            </details>
 
             <div id="config-templates-result" class="config-template-list"></div>
         </section>
@@ -2973,10 +3003,32 @@
             if (message) message.innerHTML = text ? `<div class="card info-card ${kind}">${escapeHtml(text)}</div>` : '';
         }
 
+        async function validateConfigJsonOnServer() {
+            const formData = new FormData();
+            formData.set('action', 'validate');
+            formData.set('template_json', getConfigJsonValue());
+            try {
+                const response = await fetch(main.dataset.configTemplatesUrl, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                });
+                const payload = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    showAdminToast(payload.message || 'Шаблон не прошёл проверку', 'error');
+                    return;
+                }
+                showAdminToast(`Шаблон валиден: проверено веток — ${payload.scenarios_checked}`);
+            } catch (error) {
+                showAdminToast('Не удалось проверить шаблон на сервере', 'error');
+            }
+        }
+
         function validateConfigJson(showSuccess = true) {
             const value = getConfigJsonValue();
             if (configJsonHasJinjaTags(value)) {
-                if (showSuccess) showAdminToast('Шаблон содержит Jinja-теги — ветки проверит сервер при сохранении');
+                // Ветки умеет проверять только сервер; результат придёт тостом.
+                validateConfigJsonOnServer();
                 return true;
             }
             const parsed = parseJsonWithMessage(value, 'template_json');
@@ -3064,10 +3116,48 @@
             return value.includes('{%');
         }
 
+        function jsonBraceDelta(line) {
+            // Баланс скобок вне строковых литералов; Jinja-теги вырезаются,
+            // чтобы их фигурные скобки не считались.
+            const withoutTags = line.replace(/\{%.*?%\}/g, '');
+            let delta = 0;
+            let minDelta = 0;
+            let inString = false;
+            for (let i = 0; i < withoutTags.length; i += 1) {
+                const ch = withoutTags[i];
+                if (inString) {
+                    if (ch === '\\') i += 1;
+                    else if (ch === '"') inString = false;
+                    continue;
+                }
+                if (ch === '"') inString = true;
+                else if (ch === '{' || ch === '[') delta += 1;
+                else if (ch === '}' || ch === ']') {
+                    delta -= 1;
+                    minDelta = Math.min(minDelta, delta);
+                }
+            }
+            return {delta, minDelta};
+        }
+
+        function reindentConfigTemplate(value) {
+            // Пере-отступы без JSON.parse: работает и для шаблонов с Jinja-тегами.
+            let depth = 0;
+            return value.split('\n').map((rawLine) => {
+                const line = rawLine.trim();
+                if (!line) return '';
+                const {delta, minDelta} = jsonBraceDelta(line);
+                const indent = Math.max(0, depth + Math.min(0, minDelta));
+                depth = Math.max(0, depth + delta);
+                return '  '.repeat(indent) + line;
+            }).join('\n');
+        }
+
         function formatConfigJson() {
             const value = getConfigJsonValue();
             if (configJsonHasJinjaTags(value)) {
-                showAdminToast('Шаблон содержит Jinja-теги — автоформатирование недоступно', 'error');
+                setConfigJsonValue(reindentConfigTemplate(value));
+                showAdminToast('Отступы выровнены (шаблон с Jinja-тегами)');
                 return;
             }
             const parsed = parseJsonWithMessage(value, 'template_json');
@@ -5104,7 +5194,7 @@
             }
             const rowsHtml = censorKeysCache.map((key) => `
                 <div class="admin-table-row censor-key-row">
-                    <span data-label="Название"><b>${escapeHtml(key.name)}</b></span>
+                    <span data-label="Название">${escapeHtml(key.name)}</span>
                     <span class="muted" data-label="Ключ">${escapeHtml(key.api_key_masked)}</span>
                     <span data-label="Статус">${key.is_default ? '<span class="censor-key-default-badge">по умолчанию</span> ' : ''}${key.public_measurements ? '<span class="censor-status-warn" title="Измерения создаются публичными — IP видны в базе RIPE Atlas">публичные</span>' : ''}</span>
                     <span class="censor-row-actions" data-label="Действия">
@@ -5218,7 +5308,7 @@
                     : `<span>${censorRunStatusHtml(null)}</span>`;
                 return `
                     <div class="admin-table-row censor-check-row">
-                        <span data-label="IP"><b>${escapeHtml(check.target_ip)}</b>${check.port !== 443 ? `:${check.port}` : ''}${enabledBadge}</span>
+                        <span data-label="IP">${escapeHtml(check.target_ip)}${check.port !== 443 ? `:${check.port}` : ''}${enabledBadge}</span>
                         <span data-label="SNI">${escapeHtml(check.sni)}</span>
                         <span data-label="Расписание">${schedule}</span>
                         <span data-label="Ключ">${keyLabel}</span>
@@ -5432,7 +5522,7 @@
                 else if (okShare > 0) { cls = 'censor-status-warn'; label = 'частично'; }
                 return `
                     <div class="admin-table-row censor-district-row">
-                        <span><b>${escapeHtml(district)}</b></span>
+                        <span>${escapeHtml(district)}</span>
                         <span class="censor-status-ok" style="text-align:right">${c.ok}</span>
                         <span class="censor-status-bad" style="text-align:right">${c.blocked}</span>
                         <span class="${cls}">${okShare}% · ${label}</span>

@@ -3064,6 +3064,24 @@ def support_admin_api_config_templates(request):
             db_session.commit()
             return JsonResponse({"status": "ok"})
 
+        if action == "validate":
+            # Проверка без сохранения — для кнопки «Проверить JSON» в админке:
+            # шаблон с Jinja-ветками нельзя провалидировать на клиенте.
+            template_json = request.POST.get("template_json", "").strip()
+            if not template_json:
+                return JsonResponse(
+                    {"status": "error", "message": "Пустой шаблон"}, status=400
+                )
+            ua_rules = load_client_ua_rules(db_session, active_only=True)
+            validation_error = validate_config_template_json(
+                template_json, client_ua_rule_scenarios(ua_rules)
+            )
+            if validation_error:
+                return JsonResponse(
+                    {"status": "error", "message": validation_error}, status=400
+                )
+            return JsonResponse({"status": "ok", "scenarios_checked": 1 + len(ua_rules)})
+
         name = request.POST.get("name", "").strip()
         template_json = request.POST.get("template_json", "").strip()
         entry_name = request.POST.get("entry_name", "").strip() or None

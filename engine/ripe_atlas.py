@@ -13,6 +13,7 @@
 
 import logging
 import math
+import time
 from datetime import datetime
 from datetime import timedelta
 
@@ -187,21 +188,84 @@ def resolve_public_flag(db_session, check):
     return bool(row.public_measurements) if row else False
 
 
+# Списки подключённых зондов меняются медленно, а замеров много (десятки нод
+# по расписанию), поэтому держим их в памяти процесса недолгое время.
+PROBE_LIST_TTL_SECONDS = 900
+_probe_list_cache: dict = {}
+
+
+def fetch_connected_probe_ids(params: dict, count: int) -> list:
+    """ID зондов, подключённых ПРЯМО СЕЙЧАС, по фильтру params.
+
+    Нужно потому, что выбор Atlas по asn/country назначает зонды из общего
+    списка сети, включая давно неработающие: измеренная выдача была 6 ответов
+    из 30 назначенных. При явном списке ID отвечают 28 из 31, причём приходят
+    ответы от всех крупных операторов, а не только от мелких.
+    """
+    cache_key = (tuple(sorted(params.items())), count)
+    cached = _probe_list_cache.get(cache_key)
+    if cached and time.time() - cached[0] < PROBE_LIST_TTL_SECONDS:
+        return list(cached[1])
+
+    query = dict(params)
+    query.update({"status": 1, "fields": "id", "page_size": count})
+    try:
+        with httpx.Client(timeout=15) as client:
+            response = client.get(f"{ATLAS_API}/probes/", params=query)
+        if response.status_code != 200:
+            return []
+        payload = orjson.loads(response.content)
+    except Exception:
+        return []
+    probe_ids = [
+        p["id"] for p in payload.get("results", []) if isinstance(p, dict) and p.get("id")
+    ]
+    if probe_ids:
+        _probe_list_cache[cache_key] = (time.time(), list(probe_ids))
+    return probe_ids
+
+
+def _explicit_probes_spec(probe_ids: list) -> list:
+    return [
+        {
+            "requested": len(probe_ids),
+            "type": "probes",
+            "value": ",".join(str(pid) for pid in probe_ids),
+        }
+    ]
+
+
 def _probes_spec(geo: bool, light: bool = False) -> list:
-    """Выбор зондов: гео-режим — по country:RU; иначе — по ASN операторов.
+    """Выбор зондов: гео-режим — по всей РФ; иначе — по сетям операторов.
+
+    Зонды выбираются ЯВНО (по id тех, что подключены сейчас) — выбор силами
+    Atlas по asn/country назначает много мёртвых зондов, и до цели доходит
+    лишь пятая часть. Если список получить не удалось, откатываемся на
+    прежний выбор по asn/country, чтобы замер всё равно состоялся.
 
     light=True — уменьшенный набор для дешёвого частого мониторинга.
     """
     if geo:
+        wanted = GEO_PROBE_COUNT_LIGHT if light else GEO_PROBE_COUNT
+        probe_ids = fetch_connected_probe_ids({"country_code": "RU"}, wanted)
+        if probe_ids:
+            return _explicit_probes_spec(probe_ids)
         return [
             {
-                "requested": GEO_PROBE_COUNT_LIGHT if light else GEO_PROBE_COUNT,
+                "requested": wanted,
                 "type": "country",
                 "value": "RU",
                 "tags": {"include": ["system-ipv4-works"]},
             }
         ]
+
     spec = LIGHT_ASN_PROBE_SPEC if light else ASN_PROBE_SPEC
+    probe_ids = []
+    for asn, count, _ in spec:
+        probe_ids.extend(fetch_connected_probe_ids({"asn_v4": asn}, count))
+    if probe_ids:
+        return _explicit_probes_spec(probe_ids)
+
     return [
         {
             "requested": count,

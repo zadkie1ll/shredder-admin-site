@@ -874,6 +874,42 @@ class ClientUaRuleTests(SimpleTestCase):
         self.assertEqual(payload["match_substring"], "incy")
         self.assertEqual(payload["variable_name"], "CLIENT")
 
+    def test_config_template_validate_action_accepts_jinja_branches(self):
+        template = '{"a": {% if CLIENT == "happ" %}1{% else %}2{% endif %}}'
+        request = RequestFactory().post(
+            "/support-admin/api/config-templates/",
+            data={"action": "validate", "template_json": template},
+        )
+
+        rules = [SimpleNamespace(variable_name="CLIENT", value="happ")]
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=mock.MagicMock()),
+            mock.patch("engine.views.load_client_ua_rules", return_value=rules),
+        ):
+            response = support_admin_api_config_templates(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content)["scenarios_checked"], 2)
+
+    def test_config_template_validate_action_reports_broken_branch(self):
+        template = '{"a": {% if CLIENT == "happ" %}broken{% else %}2{% endif %}}'
+        request = RequestFactory().post(
+            "/support-admin/api/config-templates/",
+            data={"action": "validate", "template_json": template},
+        )
+
+        rules = [SimpleNamespace(variable_name="CLIENT", value="happ")]
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=mock.MagicMock()),
+            mock.patch("engine.views.load_client_ua_rules", return_value=rules),
+        ):
+            response = support_admin_api_config_templates(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("CLIENT=happ", json.loads(response.content)["message"])
+
     def test_save_rejects_reserved_variable_name(self):
         request = RequestFactory().post(
             "/support-admin/api/ua-rules/",
