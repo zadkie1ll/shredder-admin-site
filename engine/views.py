@@ -109,6 +109,8 @@ from common.models.settings import SITE_TRIAL_REGISTRATION_ENABLED_SETTING
 from common.models.settings import TARIFF_PRICE_SETTINGS
 from common.models import analytics_event
 from common.models.tariff import Tariff
+from common.models.tariff import TrialPromotionTariff
+from common.models.tariff import OneDayTariff
 from common.models.tariff import OneMonthTariff
 from common.models.tariff import OneYearTariff
 from common.models.tariff import ThreeMonthsTariff
@@ -131,6 +133,11 @@ ACTUAL_TARIFFS: list[Tariff] = [
     OneMonthTariff(),
     ThreeMonthsTariff(),
     OneYearTariff(),
+]
+OFFER_TARIFFS: list[Tariff] = [
+    TrialPromotionTariff(),
+    OneDayTariff(),
+    *ACTUAL_TARIFFS,
 ]
 TRACKING_PARAM_KEYS = ("ymid", "ts", "a")
 TRACKING_COOKIE_MAX_AGE = 30 * 24 * 60 * 60
@@ -2263,11 +2270,15 @@ def render_vps_direct_sale(request):
 
 
 def offer(request):
+    offer_tariffs = get_runtime_offer_tariffs()
     return render(
         request,
         "offer.html",
         {
-            "tariffs": get_runtime_actual_tariffs(),
+            "tariffs": [
+                offer_tariffs[tariff.db_tariff_id] for tariff in ACTUAL_TARIFFS
+            ],
+            "offer_tariffs": offer_tariffs,
             "trial_period_days_label": format_days_ru(settings.SITE_TRIAL_PERIOD_DAYS),
             "referral_trial_period_days_label": format_days_ru(
                 settings.SITE_REFERRAL_TRIAL_PERIOD_DAYS
@@ -3526,19 +3537,30 @@ def runtime_int_from_db(db_session, key, default_value, min_value=0):
 
 
 def get_runtime_actual_tariffs(db_session=None):
+    return get_runtime_tariffs(ACTUAL_TARIFFS, db_session)
+
+
+def get_runtime_offer_tariffs(db_session=None):
+    return {
+        tariff.db_tariff_id: tariff
+        for tariff in get_runtime_tariffs(OFFER_TARIFFS, db_session)
+    }
+
+
+def get_runtime_tariffs(tariffs, db_session=None):
     should_close_session = db_session is None
     if should_close_session:
         db_session = session_factory()
     try:
-        tariffs = []
-        for tariff in ACTUAL_TARIFFS:
+        runtime_tariffs = []
+        for tariff in tariffs:
             key = TARIFF_PRICE_SETTINGS.get(tariff.db_tariff_id)
             if key is None:
-                tariffs.append(tariff)
+                runtime_tariffs.append(tariff)
                 continue
             price = runtime_int_from_db(db_session, key, tariff.price, min_value=1)
-            tariffs.append(tariff.model_copy(update={"price": price}))
-        return tariffs
+            runtime_tariffs.append(tariff.model_copy(update={"price": price}))
+        return runtime_tariffs
     finally:
         if should_close_session:
             db_session.close()
@@ -6446,6 +6468,7 @@ def pay(request):
                     username=user.username,
                     telegram_id=user.telegram_id or 0,
                     return_url=payment_success_redirect_url,
+                    email=email or user.email,
                 )
                 confirmation_url = created_payment.confirmation_url
                 login_token = get_purchase_login_token(

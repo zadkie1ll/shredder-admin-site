@@ -9,6 +9,27 @@ from yookassa import Configuration
 from common.models.tariff import Tariff
 from common.models.tariff import TrialPromotionTariff
 
+# Фискализация (54-ФЗ): магазин ЮКассы требует объект receipt в каждом
+# платеже. Ставка НДС "без НДС" (УСН). У пользователей сайта email есть
+# всегда (это их логин в кабинете).
+RECEIPT_VAT_CODE = 1
+
+
+def build_receipt(email: str, description: str, price: int) -> dict:
+    return {
+        "customer": {"email": email},
+        "items": [
+            {
+                "description": description,
+                "quantity": "1.00",
+                "amount": {"value": f"{price}.00", "currency": "RUB"},
+                "vat_code": RECEIPT_VAT_CODE,
+                "payment_subject": "service",
+                "payment_mode": "full_payment",
+            }
+        ],
+    }
+
 
 @dataclass(frozen=True)
 class CreatedPayment:
@@ -24,6 +45,7 @@ def create_yk_payment_sync(
     username: str,
     telegram_id: int | None,
     return_url: str,
+    email: str | None = None,
 ) -> CreatedPayment:
     Configuration.account_id = shop_id
     Configuration.secret_key = secret
@@ -31,27 +53,31 @@ def create_yk_payment_sync(
     # Генерируем ключ идемпотентности, чтобы избежать дублей при сбоях
     idempotency_key = str(uuid4())
 
-    payment = Payment.create(
-        {
-            "save_payment_method": True,
-            "amount": {"value": tariff.price, "currency": "RUB"},
-            "confirmation": {
-                "type": "redirect",
-                "return_url": return_url,
-            },
-            "metadata": {
-                "username": username,
-                "telegram_id": telegram_id,
-                "subscription_period": tariff.db_tariff_id,
-                "autopay": False,
-                "trial_promotion": isinstance(tariff, TrialPromotionTariff),
-                "from_trial": False,
-            },
-            "capture": True,
-            "description": tariff.description,
+    payment_data = {
+        "save_payment_method": True,
+        "amount": {"value": tariff.price, "currency": "RUB"},
+        "confirmation": {
+            "type": "redirect",
+            "return_url": return_url,
         },
-        idempotency_key,
-    )
+        "metadata": {
+            "username": username,
+            "telegram_id": telegram_id,
+            "subscription_period": tariff.db_tariff_id,
+            "autopay": False,
+            "trial_promotion": isinstance(tariff, TrialPromotionTariff),
+            "from_trial": False,
+        },
+        "capture": True,
+        "description": tariff.description,
+    }
+
+    if email:
+        payment_data["receipt"] = build_receipt(
+            email, tariff.description, tariff.price
+        )
+
+    payment = Payment.create(payment_data, idempotency_key)
 
     return CreatedPayment(
         confirmation_url=payment.confirmation.confirmation_url,

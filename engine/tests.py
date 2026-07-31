@@ -14,7 +14,10 @@ from django.test import SimpleTestCase
 from django.test import override_settings
 
 from common.models.settings import BOT_APPLE_RECOMMENDED_APP_SETTING
+from common.models.settings import BOT_TARIFF_PRICE_ONEDAY_SETTING
+from common.models.settings import BOT_TARIFF_PRICE_THREEDAYS_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_MONTH_SETTING
+from common.models.settings import BOT_TARIFF_PRICE_THREEMONTHS_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_YEAR_SETTING
 from common.models.db import ClientUaRule
 from common.models.db import CustomConfigTemplate
@@ -35,6 +38,7 @@ from engine.views import create_site_user
 from engine.views import custom_config_template_payload
 from engine.views import form_bool_enabled
 from engine.views import get_runtime_actual_tariffs
+from engine.views import get_runtime_offer_tariffs
 from engine.views import get_telegram_auth_bot
 from engine.views import get_telegram_web_login_start_code
 from engine.views import cancel_autopay
@@ -569,6 +573,50 @@ class AdminRuntimeSettingsTests(SimpleTestCase):
 
         self.assertIsNone(normalized_value)
         self.assertIn("Допустимые значения", error)
+
+
+class OfferTemplateTests(SimpleTestCase):
+    def test_offer_has_current_prices_and_gateway_autopay_terms(self):
+        template = Path("engine/templates/offer.html").read_text()
+
+        self.assertIn("Дата вступления в силу: 01.08.2026", template)
+        self.assertIn("{{ offer_tariffs.oneday.price }} ₽", template)
+        self.assertIn("{{ offer_tariffs.month.price }} ₽", template)
+        self.assertIn("{{ offer_tariffs.threemonths.price }} ₽", template)
+        self.assertIn("{{ offer_tariffs.year.price }} ₽", template)
+        self.assertIn("<code>payment_gateway</code>", template)
+        self.assertIn("<code>yookassa</code>", template)
+        self.assertIn("автоматически подключается", template)
+        self.assertIn("<code>wata</code>", template)
+        self.assertNotIn("299 ₽", template)
+        self.assertNotIn("19 ₽", template)
+        self.assertIn("покупка является разовой", template)
+
+    def test_runtime_offer_tariffs_use_database_prices(self):
+        class FakeSession:
+            def get(self, model, key):
+                values = {
+                    BOT_TARIFF_PRICE_THREEDAYS_SETTING: "11",
+                    BOT_TARIFF_PRICE_ONEDAY_SETTING: "19",
+                    BOT_TARIFF_PRICE_MONTH_SETTING: "299",
+                    BOT_TARIFF_PRICE_THREEMONTHS_SETTING: "609",
+                    BOT_TARIFF_PRICE_YEAR_SETTING: "1809",
+                }
+                value = values.get(key)
+                return SimpleNamespace(value=value) if value is not None else None
+
+        tariffs = get_runtime_offer_tariffs(FakeSession())
+
+        self.assertEqual(
+            {tariff_id: tariff.price for tariff_id, tariff in tariffs.items()},
+            {
+                "threedays": 11,
+                "oneday": 19,
+                "month": 299,
+                "threemonths": 609,
+                "year": 1809,
+            },
+        )
 
 
 class WataPaymentFlowTests(SimpleTestCase):
@@ -1821,6 +1869,37 @@ class PaymentRedirectTests(SimpleTestCase):
             payload["confirmation"]["return_url"],
             "https://example.com/login/purchase/token/",
         )
+
+    def test_yookassa_payment_includes_receipt_when_email_given(self):
+        # Фискализация (54-ФЗ): с email платёж обязан содержать чек.
+        tariff = SimpleNamespace(
+            price=100,
+            db_tariff_id="one_month",
+            description="1 месяц",
+        )
+        confirmation = SimpleNamespace(confirmation_url="https://yk.example/pay")
+        payment = SimpleNamespace(id="yk-payment-id", confirmation=confirmation)
+
+        with mock.patch(
+            "engine.payments.Payment.create", return_value=payment
+        ) as create:
+            create_yk_payment_sync(
+                shop_id="shop-id",
+                secret="secret",
+                tariff=tariff,
+                username="user-1",
+                telegram_id=0,
+                return_url="https://example.com/login/purchase/token/",
+                email="user@example.com",
+            )
+
+        payload = create.call_args.args[0]
+        receipt = payload["receipt"]
+        self.assertEqual(receipt["customer"], {"email": "user@example.com"})
+        item = receipt["items"][0]
+        self.assertEqual(item["amount"], {"value": "100.00", "currency": "RUB"})
+        self.assertEqual(item["vat_code"], 1)  # без НДС (УСН)
+        self.assertEqual(item["payment_subject"], "service")
 
     def test_wata_payment_uses_success_and_fail_redirect_urls(self):
         tariff = SimpleNamespace(
