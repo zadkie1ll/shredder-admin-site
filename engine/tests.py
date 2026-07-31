@@ -584,10 +584,12 @@ class OfferTemplateTests(SimpleTestCase):
         self.assertIn("{{ offer_tariffs.month.price }} ₽", template)
         self.assertIn("{{ offer_tariffs.threemonths.price }} ₽", template)
         self.assertIn("{{ offer_tariffs.year.price }} ₽", template)
-        self.assertIn("<code>payment_gateway</code>", template)
-        self.assertIn("<code>yookassa</code>", template)
+        # Условия автопродления сформулированы через платёжный сервис, без
+        # внутренних технических деталей (настроек БД) в юридическом тексте.
+        self.assertIn("через платёжный сервис YooKassa", template)
         self.assertIn("автоматически подключается", template)
-        self.assertIn("<code>wata</code>", template)
+        self.assertIn("через иную платёжную систему (не YooKassa)", template)
+        self.assertNotIn("payment_gateway", template)
         self.assertNotIn("299 ₽", template)
         self.assertNotIn("19 ₽", template)
         self.assertIn("покупка является разовой", template)
