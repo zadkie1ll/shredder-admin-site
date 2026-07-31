@@ -7280,6 +7280,74 @@ def _acq_new_repeat(db_session, days, start=None, end=None):
     }
 
 
+def _acq_renew45(db_session, months):
+    """Отвал/удержание базы коротких тарифов по месяцам.
+
+    Когорта месяца — пользователи, оплатившие в нём короткий тариф
+    (день/3 дня/неделя/месяц). Продлившим считается тот, у кого в течение
+    45 дней после его последней оплаты в месяце есть любая следующая оплата
+    (включая апгрейд на длинный тариф). Длинные тарифы (3/6/12 мес) в когорту
+    не входят: их окно продления заведомо длиннее 45 дней. Когорты, у которых
+    45-дневное окно ещё не закрыто, помечаются mature=False — их процент
+    занижен и на графике не показывается.
+    """
+    rows = _acq_rows(
+        db_session,
+        """
+        WITH pays AS (
+            SELECT wi.user_id AS user_id,
+                   (t.payment_time AT TIME ZONE 'UTC') AS paid_at,
+                   COALESCE(wi.tariff_id, '') AS tariff
+            FROM wata_transactions t
+            JOIN wata_invoices wi ON wi.order_id = t.order_id
+            WHERE t.transaction_status = 'Paid'
+            UNION ALL
+            SELECT p.user_id, p.created_at, p.subscription_period
+            FROM yk_payments p
+            WHERE p.status = 'succeeded'
+        ),
+        cohort AS (
+            SELECT date_trunc('month', (paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS m,
+                   user_id,
+                   max(paid_at) AS last_in_month
+            FROM pays
+            WHERE tariff IN ('oneday', 'threedays', 'oneweek', 'month')
+            GROUP BY 1, 2
+        ),
+        renew AS (
+            SELECT c.m, c.user_id,
+                   bool_or(p.paid_at <= c.last_in_month + interval '45 days') AS renewed
+            FROM cohort c
+            LEFT JOIN pays p ON p.user_id = c.user_id AND p.paid_at > c.last_in_month
+            GROUP BY 1, 2
+        )
+        SELECT m AS month, count(*) AS payers,
+               count(*) FILTER (WHERE renewed) AS renewed
+        FROM renew
+        WHERE m >= date_trunc('month', (now() AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date
+                   - make_interval(months => :months)
+        GROUP BY 1 ORDER BY 1
+        """,
+        months=months,
+    )
+    result = []
+    for r in rows:
+        m = r["month"]
+        next_month = date(m.year + (m.month == 12), m.month % 12 + 1, 1)
+        payers = r["payers"]
+        renewed = r["renewed"]
+        result.append(
+            {
+                "month": m.isoformat(),
+                "payers": payers,
+                "renewed": renewed,
+                "renew_pct": round(100.0 * renewed / payers, 1) if payers else 0.0,
+                "mature": date.today() >= next_month + timedelta(days=45),
+            }
+        )
+    return {"months": result}
+
+
 def _acq_funnel(db_session, weeks):
     events = _acq_rows(
         db_session,
@@ -8112,6 +8180,7 @@ ACQ_SECTIONS = {
         s, int(req.GET.get("days", 60)),
         req.GET.get("start") or None, req.GET.get("end") or None,
     ),
+    "renew45": lambda s, req: _acq_renew45(s, int(req.GET.get("months", 12))),
     "funnel": lambda s, req: _acq_funnel(s, int(req.GET.get("weeks", 12))),
     "ads": lambda s, req: _acq_ads(s, int(req.GET.get("weeks", 12))),
     "ads_daily": lambda s, req: _acq_ads_daily(

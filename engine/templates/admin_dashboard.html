@@ -1765,6 +1765,9 @@
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
                         <span class="chart-title-wrap"><strong>Выручка: новые vs повторные покупатели (по дням, МСК)</strong><button type="button" class="chart-info" data-help="newrep" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                         <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                            <select id="acq-newrep-month" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                                <option value="" selected>Месяц…</option>
+                            </select>
                             <select id="acq-newrep-days" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
                                 <option value="30">30 дней</option>
                                 <option value="60" selected>60 дней</option>
@@ -1778,6 +1781,11 @@
                     </div>
                     <canvas id="acq-newrep-chart" style="width:100%;height:280px;display:block;"></canvas>
                     <div id="acq-newrep-summary" style="margin-top:12px;font-size:12px;color:var(--muted);"></div>
+                </div>
+                <div class="card" style="padding:18px;margin-top:14px;">
+                    <span class="chart-title-wrap"><strong>Отвал базы: % продливших в течение 45 дней (короткие тарифы, по месяцам)</strong><button type="button" class="chart-info" data-help="renew45" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
+                    <canvas id="acq-renew45-chart" style="width:100%;height:260px;display:block;margin-top:10px;"></canvas>
+                    <div id="acq-renew45-summary" style="margin-top:12px;font-size:12px;color:var(--muted);"></div>
                 </div>
             </div>
 
@@ -5902,10 +5910,33 @@
                 ],
                 [{label: 'Новых покупателей (правая ось)', color: acquisitionChartColors.payers, data: rows.map((r) => r.new_payers), fmt: 'raw'}],
                 {fullLabels: rows.map((r) => r.day)});
-            const last14 = rows.slice(-14);
-            const nSum = last14.reduce((a, r) => a + r.new_rub, 0), rSum = last14.reduce((a, r) => a + r.repeat_rub, 0);
-            document.getElementById('acq-newrep-summary').innerHTML =
-                `За последние 14 дней выборки: новые <b style="color:#ffc700">${fmtRub(nSum)} ₽</b> (${Math.round(100 * nSum / Math.max(1, nSum + rSum))}%), повторные <b style="color:#8c9cff">${fmtRub(rSum)} ₽</b>. Повторные — эхо продаж прошлых месяцев; рекламу оценивайте по жёлтой части.`;
+            const nSum = rows.reduce((a, r) => a + r.new_rub, 0), rSum = rows.reduce((a, r) => a + r.repeat_rub, 0);
+            const nPayers = rows.reduce((a, r) => a + r.new_payers, 0);
+            const fullDay = (iso) => dayLabel(iso) + '.' + iso.slice(0, 4);
+            document.getElementById('acq-newrep-summary').innerHTML = rows.length
+                ? `За период <b>${fullDay(rows[0].day)} — ${fullDay(rows[rows.length - 1].day)}</b>: новые <b style="color:#ffc700">${fmtRub(nSum)} ₽</b> (${Math.round(100 * nSum / Math.max(1, nSum + rSum))}%), повторные <b style="color:#8c9cff">${fmtRub(rSum)} ₽</b>, итого <b>${fmtRub(nSum + rSum)} ₽</b>; новых покупателей: <b>${fmtRub(nPayers)}</b>. Повторные — эхо продаж прошлых месяцев; рекламу оценивайте по жёлтой части.`
+                : 'Нет данных за выбранный период.';
+            await loadRenew45();
+        }
+
+        // Отвал базы: % продливших за 45 дней. Не зависит от выбранного
+        // периода верхнего графика, поэтому грузится один раз.
+        async function loadRenew45() {
+            if (loaded.renew45) return;
+            const ret = await acqFetch('renew45', {months: 12});
+            loaded.renew45 = true;
+            const mrows = ret.months;
+            const monthLabel = (iso) => iso.slice(5, 7) + '.' + iso.slice(0, 4);
+            acqDraw(document.getElementById('acq-renew45-chart'),
+                mrows.map((r) => monthLabel(r.month)),
+                [{label: 'Платили в месяце (короткие тарифы)', color: 'rgba(120,140,255,.65)', data: mrows.map((r) => r.payers), fmt: 'raw'}],
+                [{label: 'Продлили в течение 45 дней, % (правая ось)', color: 'rgba(90,220,150,.95)', data: mrows.map((r) => r.mature ? r.renew_pct : null), fmt: 'pct'}],
+                {fullLabels: mrows.map((r) => monthLabel(r.month) + (r.mature ? '' : ' — окно 45 дней ещё не закрыто'))});
+            const matureRows = mrows.filter((r) => r.mature);
+            const lastM = matureRows[matureRows.length - 1];
+            document.getElementById('acq-renew45-summary').innerHTML = lastM
+                ? `Последний месяц с закрытым окном — <b>${monthLabel(lastM.month)}</b>: платили <b>${fmtRub(lastM.payers)}</b> чел., продлили <b style="color:#5adc96">${lastM.renew_pct}%</b>, отвал <b style="color:#ff6ea0">${(100 - lastM.renew_pct).toFixed(1)}%</b>. Месяцы без закрытого 45-дневного окна на линии не показываются — их процент был бы занижен.`
+                : 'Ещё нет месяцев с закрытым 45-дневным окном.';
         }
 
         async function loadFunnel() {
@@ -6153,9 +6184,38 @@
         document.getElementById('acq-newrep-days')?.addEventListener('change', () => {
             document.getElementById('acq-newrep-start').value = '';
             document.getElementById('acq-newrep-end').value = '';
+            const monthSel = document.getElementById('acq-newrep-month');
+            if (monthSel) monthSel.value = '';
             loadNewRepeat().catch(console.error);
         });
         document.getElementById('acq-newrep-apply')?.addEventListener('click', () => loadNewRepeat().catch(console.error));
+        // Переключатель по месяцам: заполняем список последних месяцев и по выбору
+        // подставляем границы месяца в календарные поля периода.
+        (function () {
+            const monthSel = document.getElementById('acq-newrep-month');
+            if (!monthSel) return;
+            const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+            const now = new Date();
+            for (let i = 0; i < 18; i++) {
+                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                const opt = document.createElement('option');
+                opt.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                opt.textContent = `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
+                monthSel.appendChild(opt);
+            }
+            monthSel.addEventListener('change', () => {
+                if (!monthSel.value) return;
+                const [y, m] = monthSel.value.split('-').map(Number);
+                const lastDay = new Date(y, m, 0).getDate();
+                document.getElementById('acq-newrep-start').value = `${monthSel.value}-01`;
+                document.getElementById('acq-newrep-end').value = `${monthSel.value}-${String(lastDay).padStart(2, '0')}`;
+                loadNewRepeat().catch(console.error);
+            });
+            // Ручная правка календарных дат снимает выбор месяца
+            ['acq-newrep-start', 'acq-newrep-end'].forEach((id) => {
+                document.getElementById(id)?.addEventListener('input', () => { monthSel.value = ''; });
+            });
+        })();
         document.getElementById('acq-patterns-days')?.addEventListener('change', () => loadPatterns().catch(console.error));
         document.getElementById('acq-timing-days')?.addEventListener('change', () => loadJourney().catch(console.error));
         document.getElementById('acq-paths-months')?.addEventListener('change', () => loadTariffPaths().catch(console.error));
@@ -6238,6 +6298,19 @@
                     'Жёлтая часть — то, что реально приносит <b>реклама</b> (новые люди). Оценивайте её отдельно от синей.',
                     'Синяя часть — <b>эхо продлений</b> прошлых месяцев: она инерционна и слабо зависит от сегодняшней рекламы.',
                     'Рост общей высоты за счёт синего ≠ успех рекламы — смотрите на динамику жёлтого и зелёной линии.',
+                ],
+            },
+            renew45: {
+                t: 'Отвал базы: % продливших в течение 45 дней',
+                calc: [
+                    'Когорта месяца — все, кто в этом месяце оплатил <b>короткий тариф</b> (день, 3 дня, неделя, месяц). Длинные тарифы (3/6/12 мес) в когорту не входят: их окно продления заведомо дольше 45 дней.',
+                    'Для каждого берётся его <b>последняя оплата в месяце</b>; если в течение <b>45 дней</b> после неё есть любая следующая оплата (включая апгрейд на длинный тариф) — человек «продлил».',
+                    'Зелёная линия — % продливших (правая ось), синие столбики — размер когорты (левая ось).',
+                ],
+                read: [
+                    '<b>Отвал = 100% − значение линии.</b> Снижение линии от месяца к месяцу — база «протекает» быстрее, чем её пополняет реклама.',
+                    'Равновесие: когда потери когорты (размер × отвал) сравниваются с притоком новых покупателей, выручка выходит на плато.',
+                    'Последние месяцы без закрытого 45-дневного окна на линии не показываются — их процент ещё занижен.',
                 ],
             },
             funnel: {

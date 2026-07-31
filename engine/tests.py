@@ -46,6 +46,7 @@ from engine.views import ACQ_TIMING_LABELS
 from engine.views import _acq_ads
 from engine.views import _acq_ads_daily
 from engine.views import _acq_pushes
+from engine.views import _acq_renew45
 from engine.views import _acq_renewal_ladder
 from engine.views import _parse_direct_number
 from engine.views import _parse_yandex_direct_csv
@@ -308,6 +309,50 @@ class YandexDirectCsvParserTests(SimpleTestCase):
         self.assertIsNone(_parse_direct_number("-"))
         self.assertIsNone(_parse_direct_number(""))
         self.assertIsNone(_parse_direct_number(None))
+
+
+class AcquisitionRenew45Tests(SimpleTestCase):
+    @mock.patch("engine.views._acq_rows")
+    def test_pct_and_maturity_flags(self, rows_mock):
+        current_month = date.today().replace(day=1)
+        rows_mock.return_value = [
+            {"month": date(2020, 1, 1), "payers": 4, "renewed": 3},
+            {"month": current_month, "payers": 10, "renewed": 1},
+        ]
+
+        result = _acq_renew45(object(), 12)
+
+        old, cur = result["months"]
+        self.assertEqual(old["renew_pct"], 75.0)
+        # Давно закрытое 45-дневное окно — процент финальный.
+        self.assertTrue(old["mature"])
+        # У текущего месяца окно не закрыто — процент занижен.
+        self.assertFalse(cur["mature"])
+        self.assertEqual(cur["renew_pct"], 10.0)
+
+    @mock.patch("engine.views._acq_rows")
+    def test_zero_cohort_does_not_divide_by_zero(self, rows_mock):
+        rows_mock.return_value = [{"month": date(2020, 1, 1), "payers": 0, "renewed": 0}]
+
+        result = _acq_renew45(object(), 12)
+
+        self.assertEqual(result["months"][0]["renew_pct"], 0.0)
+
+    def test_renew45_section_registered(self):
+        from engine.views import ACQ_SECTIONS
+
+        self.assertIn("renew45", ACQ_SECTIONS)
+
+    def test_template_has_renew45_chart_and_month_switcher(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('id="acq-renew45-chart"', template)
+        self.assertIn("Отвал базы: % продливших в течение 45 дней", template)
+        self.assertIn('data-help="renew45"', template)
+        self.assertIn("окно 45 дней ещё не закрыто", template)
+        # Переключатель месяцев и итоги за выбранный период.
+        self.assertIn('id="acq-newrep-month"', template)
+        self.assertIn("За период <b>${fullDay(rows[0].day)}", template)
 
 
 class AcquisitionAdsDailyTests(SimpleTestCase):
