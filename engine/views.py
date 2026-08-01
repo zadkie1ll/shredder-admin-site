@@ -8099,8 +8099,10 @@ def _acq_pushes(db_session, days):
         db_session,
         """
         SELECT ((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS day,
-               count(*) FILTER (WHERE event_payload->>'notification_type' = ANY(:selling)) AS selling,
-               count(*) FILTER (WHERE NOT (event_payload->>'notification_type' = ANY(:selling))) AS other
+               count(DISTINCT (user_id, event_payload->>'notification_type'))
+                   FILTER (WHERE event_payload->>'notification_type' = ANY(:selling)) AS selling,
+               count(DISTINCT (user_id, event_payload->>'notification_type'))
+                   FILTER (WHERE NOT (event_payload->>'notification_type' = ANY(:selling))) AS other
         FROM event_logs
         WHERE event_type = 'notification_sent'
           AND timestamp >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
@@ -8124,7 +8126,13 @@ def _acq_pushes(db_session, days):
         f"""
         WITH {ACQ_PAYS_CTE},
         {ACQ_PUSH_ATTRIBUTION_CTE},
-        sent AS (SELECT ntype, count(*) AS sent FROM ev GROUP BY 1),
+        -- Пуш одному юзеру логируется каждым ботом (vpn/vps) отдельно, поэтому
+        -- считаем уникальные (юзер, день), а не сырые события — иначе
+        -- «Отправлено» задваивается и конверсия занижается.
+        sent AS (
+            SELECT ntype, count(DISTINCT (user_id, ts::date)) AS sent
+            FROM ev GROUP BY 1
+        ),
         conv AS (
             SELECT cp.ntype,
                    count(*) AS converted,

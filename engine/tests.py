@@ -663,6 +663,23 @@ class AcquisitionPushAttributionTests(SimpleTestCase):
         self.assertIn("interval '72 hours'", ACQ_PUSH_ATTRIBUTION_CTE)
 
     @mock.patch("engine.views._acq_rows")
+    def test_acq_pushes_sent_deduplicates_bot_copies(self, rows_mock):
+        # Один пуш логируется каждым ботом (vpn/vps) отдельным событием, поэтому
+        # «Отправлено» и дневной график считают уникальные (юзер, тип/день),
+        # а не сырые строки event_logs — иначе метрики задваиваются.
+        rows_mock.side_effect = [[], [], [], []]
+
+        _acq_pushes(object(), 30)
+
+        daily_sql = rows_mock.call_args_list[0].args[1]
+        self.assertIn(
+            "count(DISTINCT (user_id, event_payload->>'notification_type'))",
+            daily_sql,
+        )
+        winback_sql = rows_mock.call_args_list[2].args[1]
+        self.assertIn("count(DISTINCT (user_id, ts::date)) AS sent", winback_sql)
+
+    @mock.patch("engine.views._acq_rows")
     def test_acq_pushes_builds_winback_segments(self, rows_mock):
         rows_mock.side_effect = [
             [{"day": date(2026, 7, 1), "selling": 5, "other": 2}],
