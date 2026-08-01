@@ -20,8 +20,10 @@ from common.models.settings import BOT_TARIFF_PRICE_MONTH_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_THREEMONTHS_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_YEAR_SETTING
 from common.models.db import ClientUaRule
+from common.models.db import CensorCheck
 from common.models.db import CustomConfigTemplate
 from common.models.db import MagicToken
+from common.models.db import RipeApiKey
 from common.models.db import User
 from engine.payments import create_wata_payment_sync
 from engine.payments import create_yk_payment_sync
@@ -33,6 +35,7 @@ from engine.views import admin_runtime_setting_type
 from engine.views import admin_validate_runtime_setting
 from engine.views import admin_stats_row_bucket_key
 from engine.views import support_admin_api_cohort_stats
+from engine.views import support_admin_api_censor_checks
 from engine.views import auth_by_telegram_widget
 from engine.views import create_site_user
 from engine.views import custom_config_template_payload
@@ -71,6 +74,8 @@ from engine.views import client_ua_rule_scenarios
 from engine.views import validate_client_ua_rule_fields
 from engine.views import validate_config_template_json
 from engine.views import verify_telegram_widget_auth
+from engine.views import verify_telegram_webapp_init_data
+from engine.views import get_telegram_webapp_user_id
 from web_app.settings import telegram_web_login_start_codes
 
 
@@ -205,8 +210,21 @@ class AdminDashboardTemplateTests(SimpleTestCase):
             template,
         )
 
-    def test_admin_tables_use_remnawave_like_table_skin(self):
+    def test_admin_dashboard_loads_black_gold_control_skin(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
+        stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        self.assertIn("family=Manrope", template)
+        self.assertIn("{% static 'css/admin_dashboard.css' %}", template)
+        self.assertIn("/* Black Gold Control", stylesheet)
+
+        for token in (
+            "--admin-accent: #ffc700;",
+            "--admin-highlight: #fff2b3;",
+            "--admin-surface: #111217;",
+            "--admin-text: #fff;",
+        ):
+            self.assertIn(token, stylesheet)
 
         for selector in (
             ".admin-table-row.table-head",
@@ -217,15 +235,31 @@ class AdminDashboardTemplateTests(SimpleTestCase):
             ".cohort-table th",
             ".sources-row-action",
         ):
-            self.assertIn(selector, template)
+            self.assertIn(selector, stylesheet)
 
-        self.assertIn("min-height: 64px;", template)
-        self.assertIn("font-size: 16px;", template)
-        self.assertIn("font-weight: 500;", template)
-        self.assertIn("text-transform: none;", template)
-        self.assertIn("border-bottom: 1px solid rgba(98,111,128,.48);", template)
-        self.assertIn("border: 2px solid rgba(var(--green-rgb), .82);", template)
-        self.assertIn("font-family: inherit;", template)
+        self.assertIn("min-height: 50px;", stylesheet)
+        self.assertIn("font-size: 13px;", stylesheet)
+        self.assertIn("font-variant-numeric: tabular-nums;", stylesheet)
+        self.assertIn("text-transform: uppercase;", stylesheet)
+        self.assertIn("position: sticky;", stylesheet)
+        self.assertIn("border: 1px solid rgba(var(--accent-rgb), .34);", stylesheet)
+        self.assertIn("@media (max-width: 640px)", stylesheet)
+        self.assertIn(":where(button, a, input, select, textarea):focus-visible", stylesheet)
+
+    def test_light_theme_table_headers_have_distinct_surface(self):
+        stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        self.assertIn(
+            'html[data-admin-theme="light"] .admin-table-row.table-head,',
+            stylesheet,
+        )
+        self.assertIn("background: #e5e9ee;", stylesheet)
+        self.assertIn("color: #59616d;", stylesheet)
+        self.assertIn("border-color: rgba(29, 34, 42, .18);", stylesheet)
+        self.assertIn(
+            "box-shadow: inset 0 -1px 0 rgba(29, 34, 42, .08);",
+            stylesheet,
+        )
 
     def test_censor_checks_have_dedicated_mobile_layout(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
@@ -238,6 +272,140 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn("#panel-censor-checks .censor-key-row > span::before", template)
         self.assertIn('data-label="Последний замер"', template)
         self.assertIn('class="censor-row-actions" data-label="Действия"', template)
+
+    def test_censor_checks_offer_safe_bulk_settings_form(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        censor_panel = template[template.index('<section id="panel-censor-checks"'):]
+        bulk_position = censor_panel.index('<details class="card censor-bulk-card">')
+        single_form_position = censor_panel.index('<form id="censor-check-form"')
+        self.assertLess(bulk_position, single_form_position)
+        self.assertIn('<summary class="censor-bulk-summary">', censor_panel)
+        self.assertNotIn('<details class="card censor-bulk-card" open>', censor_panel)
+        self.assertIn('id="censor-bulk-form"', template)
+        for flag_name in (
+            "apply_mode",
+            "apply_api_key",
+            "apply_interval",
+            "apply_alerts",
+            "apply_enabled",
+        ):
+            self.assertIn(f'name="{flag_name}"', template)
+        self.assertIn('id="censor-bulk-key"', template)
+        self.assertIn("function submitCensorBulk(event)", template)
+        self.assertIn("body.append('action', 'bulk_update')", template)
+        self.assertIn("Текущие и завершённые замеры не изменятся", template)
+        self.assertIn(".censor-bulk-grid", stylesheet)
+        self.assertIn(".censor-bulk-field.is-selected", stylesheet)
+        self.assertIn(".censor-bulk-card[open] > .censor-bulk-summary", stylesheet)
+
+    def test_runtime_setting_actions_use_modern_tonal_buttons(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        self.assertIn('class="setting-action setting-action-save"', template)
+        self.assertIn('class="setting-action setting-action-reset"', template)
+        self.assertIn('<i class="fas fa-check"></i><span>Сохранить</span>', template)
+        self.assertIn('<i class="fas fa-arrow-rotate-left"></i><span>Сбросить</span>', template)
+        self.assertNotIn('value="save" title="Сохранить"><i class="fas fa-floppy-disk"', template)
+        self.assertIn(".setting-action-save:hover", stylesheet)
+        self.assertIn(".setting-action-reset:hover", stylesheet)
+        self.assertIn(".setting-row .setting-action", stylesheet)
+
+    def test_runtime_settings_use_responsive_cross_browser_property_grid(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        self.assertIn("function settingControlHtml(setting)", template)
+        self.assertIn("function settingsListHtml(rows)", template)
+        self.assertIn("function updateSettingDirtyState(control)", template)
+        self.assertIn('class="settings-list-head"', template)
+        self.assertIn("Источник и действия", template)
+        self.assertIn("data-setting-control", template)
+        self.assertIn("data-initial-value", template)
+        self.assertIn("setting-select-shell", template)
+        self.assertIn("setting.sensitive ? 'password'", template)
+        self.assertIn("form.classList.toggle('is-dirty', isDirty)", template)
+        self.assertIn("saveButton.disabled = !isDirty", template)
+        self.assertIn("container.classList.toggle('has-settings'", template)
+
+        self.assertIn(".settings-list.has-settings", stylesheet)
+        self.assertIn(
+            "grid-template-columns: minmax(220px, 1.15fr) minmax(220px, 1fr) minmax(270px, .9fr);",
+            stylesheet,
+        )
+        self.assertIn("-webkit-appearance: none;", stylesheet)
+        self.assertIn("-moz-appearance: none;", stylesheet)
+        self.assertIn('.setting-control[type="number"]::-webkit-inner-spin-button', stylesheet)
+        self.assertIn("-webkit-backdrop-filter: blur(20px);", stylesheet)
+        self.assertIn("@media (max-width: 900px)", stylesheet)
+        self.assertIn("box-shadow: inset 2px 0 0 var(--admin-accent);", stylesheet)
+        self.assertIn(".setting-value-editor {\n    padding-right: 18px;", stylesheet)
+        self.assertIn(".setting-value-editor {\n        padding-right: 0;", stylesheet)
+
+    def test_payment_search_is_rendered_before_payment_history(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        payment_panel = template[template.index('<section id="panel-payment-info"'):]
+        search_position = payment_panel.index('<form id="payment-info-form"')
+        history_position = payment_panel.index('<section class="card payments-board">')
+        result_position = payment_panel.index('<div id="payment-info-result">')
+
+        self.assertLess(search_position, history_position)
+        self.assertLess(history_position, result_position)
+
+    def test_expandable_controls_have_consistent_chevron_affordances(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        for selector in (
+            "details > summary::marker",
+            "details > summary::-webkit-details-marker",
+            "details[class] > summary::after",
+            "details[class][open] > summary::after",
+            "details[class] > summary:focus-visible",
+            ".date-trigger::after",
+            ".date-field.open .date-trigger::after",
+            "select:not(.setting-control)",
+        ):
+            self.assertIn(selector, stylesheet)
+
+        self.assertIn("function setDatePickerExpanded(field, isExpanded)", template)
+        self.assertIn("trigger.setAttribute('aria-controls', popover.id)", template)
+        self.assertIn("trigger.setAttribute('aria-haspopup', 'dialog')", template)
+        self.assertIn("setDatePickerExpanded(field, shouldOpen)", template)
+        self.assertIn("background-image: url(\"data:image/svg+xml", stylesheet)
+
+    def test_client_tab_has_session_only_start_state_and_recent_searches(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        self.assertIn("function renderClientStartState()", template)
+        self.assertIn("Начните с поиска клиента", template)
+        self.assertIn("Недавно просмотренные", template)
+        self.assertIn("Как искать", template)
+        self.assertIn("<kbd>Enter</kbd>", template)
+        self.assertIn("CLIENT_RECENT_STORAGE_KEY", template)
+        self.assertIn("sessionStorage.getItem(CLIENT_RECENT_STORAGE_KEY)", template)
+        self.assertIn("sessionStorage.setItem(CLIENT_RECENT_STORAGE_KEY", template)
+        self.assertIn("sessionStorage.removeItem(CLIENT_RECENT_STORAGE_KEY)", template)
+        self.assertNotIn("localStorage.getItem(CLIENT_RECENT_STORAGE_KEY)", template)
+        self.assertIn("clients.slice(0, 5)", template)
+        self.assertIn("rememberRecentClient(result.user)", template)
+        self.assertIn("data-client-recent-query", template)
+        self.assertIn("form.requestSubmit()", template)
+        self.assertIn("renderClientStartState();", template)
+
+        for selector in (
+            ".client-start-state",
+            ".client-start-hero",
+            ".client-start-grid",
+            ".client-recent-button",
+            ".client-search-hints",
+            ".client-enter-hint kbd",
+        ):
+            self.assertIn(selector, stylesheet)
 
     def test_acquisition_explains_new_revenue_calculation(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
@@ -1415,10 +1583,12 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
         self.assertIn("const acquisitionChartColors = Object.freeze", template)
-        self.assertIn("repeat: 'rgba(120,140,255,.75)'", template)
-        self.assertIn("new: 'rgba(255,199,0,.9)'", template)
-        self.assertIn("payers: 'rgba(90,220,150,.95)'", template)
-        self.assertIn("acquisitionChartColors.repeat,\n            acquisitionChartColors.new", template)
+        # Серии берут разнотонную палитру: серо-жёлтый вариант делал соседние
+        # серии неразличимыми (см. AdminChartPaletteTests).
+        self.assertIn("repeat: CHART_TONES.indigo.dark,", template)
+        self.assertIn("new: CHART_TONES.amber.dark,", template)
+        self.assertIn("payers: CHART_TONES.green.dark,", template)
+        self.assertIn("const tariffChartColors = tariffChartTones.map", template)
         self.assertNotIn("['#22c55e', '#84cc16', '#a3e635'", template)
         self.assertIn("function renderSalesChartLegend(series)", template)
         self.assertIn("Покупатели (правая ось)", template)
@@ -1429,6 +1599,62 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn('id="stats-chart"', template)
         self.assertIn('id="cohort-chart"', template)
         self.assertNotIn("function bindCohortChartTooltip", template)
+
+    def test_admin_theme_switch_defaults_dark_and_persists_light_choice(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        css = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        self.assertIn('<meta name="color-scheme" content="dark light">', template)
+        self.assertLess(template.index('monkey_island_admin_theme_v1'), template.index('<script src="https://cdn.tailwindcss.com'))
+        self.assertIn("let theme = 'dark'", template)
+        self.assertIn("localStorage.getItem(storageKey) === 'light'", template)
+        self.assertEqual(template.count('data-admin-theme-toggle'), 4)
+        self.assertEqual(template.count('role="switch" aria-checked="false" aria-label="Включить светлую тему"'), 2)
+        self.assertEqual(template.count('class="admin-theme-switch-label"'), 2)
+        desktop_actions_start = template.index('<div class="admin-topbar-actions">')
+        desktop_actions = template[desktop_actions_start:template.index('</header>', desktop_actions_start)]
+        self.assertLess(
+            desktop_actions.index('data-admin-theme-toggle'),
+            desktop_actions.index('class="admin-pill role"'),
+        )
+        self.assertIn("function applyAdminTheme(theme, persist = false)", template)
+        self.assertIn("localStorage.setItem(ADMIN_THEME_STORAGE_KEY, normalizedTheme)", template)
+        self.assertIn("button.setAttribute('aria-label', actionLabel)", template)
+        self.assertIn("visibleLabel.textContent = isLight ? 'Светлая' : 'Тёмная'", template)
+        self.assertIn("window.addEventListener('storage'", template)
+        self.assertIn("configJsonEditor.setOption('theme', isLight ? 'default' : 'material-darker')", template)
+        self.assertIn("canvas.__salesChartMeta.render(null)", template)
+        self.assertIn("canvas.__acqMeta.render(null)", template)
+        self.assertIn(
+            "tipEl.className = 'sales-chart-tooltip acquisition-chart-tooltip';",
+            template,
+        )
+        self.assertNotIn("display:none;background:#15161c", template)
+        self.assertIn('html[data-admin-theme="light"]', css)
+        self.assertIn("color-scheme: light", css)
+        self.assertIn('html[data-admin-theme="light"] .sales-chart-tooltip', css)
+        self.assertIn("background: rgba(255, 255, 255, .98);", css)
+        self.assertIn('.admin-theme-switch[aria-checked="true"] .admin-theme-thumb', css)
+        self.assertIn("min-width: 136px;", css)
+        self.assertIn(".admin-theme-switch-label", css)
+        self.assertIn("border-color: rgba(var(--accent-rgb), .42);", css)
+
+    def test_light_theme_chart_help_uses_readable_content_colors(self):
+        css = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        for selector in (
+            'html[data-admin-theme="light"] body .chart-help-title',
+            'html[data-admin-theme="light"] body .chart-help-list li',
+            'html[data-admin-theme="light"] body .chart-help-list li b',
+            'html[data-admin-theme="light"] body .chart-help-list li code',
+            'html[data-admin-theme="light"] body .chart-help-close',
+            'html[data-admin-theme="light"] body .chart-help-sec.calc .chart-help-sec-label',
+            'html[data-admin-theme="light"] body .chart-help-sec.warn .chart-help-sec-label',
+        ):
+            self.assertIn(selector, css)
+        self.assertIn("color: rgba(34, 39, 47, .78);", css)
+        self.assertIn("color: #1f242c;", css)
+        self.assertIn("background: #edf0f4;", css)
 
     def test_analytics_has_overview_and_cohort_subtabs(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
@@ -1464,22 +1690,73 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         # вместо жёсткой двухколоночной сетки, вылезавшей за экран.
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
-        for slug in ("sys-tariffs", "sys-winback", "sys-payment", "sys-referral", "sys-alerts", "sys-general", "sys-operations"):
+        for slug in ("sys-tariffs", "sys-winback", "sys-payment", "sys-referral", "sys-alerts", "sys-general"):
             self.assertIn(f'data-subtab="{slug}"', template)
             self.assertIn(f'id="subpanel-{slug}"', template)
         # Runtime-настройки раскладываются по контейнерам групп.
         for group in ("tariffs", "winback", "payment", "referral", "alerts", "general", "other"):
             self.assertIn(f'data-settings-group="{group}"', template)
+        self.assertIn(
+            'data-subtab="sys-payment" role="tab"><i class="fas fa-credit-card"></i>Платёжные шлюзы',
+            template,
+        )
+        self.assertIn('<h2 class="system-card-title">Платёжные шлюзы</h2>', template)
+        self.assertNotIn('</i>Платёж</button>', template)
         self.assertIn("setupSubtabs('panel-system')", template)
-        # Блоки рефералки (антифрод и блокировка) живут в подвкладке «Рефералка».
+        # Во вкладке остаются глобальные бонусы и антифрод. Ручная блокировка
+        # относится к конкретному найденному клиенту и сюда не дублируется.
         self.assertIn('id="referral-antifraud-form"', template)
-        self.assertIn('id="referral-block-form"', template)
-        self.assertIn('id="load-recurrents"', template)
-        self.assertIn('id="load-top-payments"', template)
+        self.assertIn('class="card system-card system-settings-card referral-bonus-card"', template)
+        self.assertIn('class="card system-card referral-antifraud-card"', template)
+        self.assertNotIn('id="referral-block-form"', template)
+        self.assertNotIn("function submitReferralBlock", template)
+        self.assertNotIn('data-subtab="sys-operations"', template)
+        self.assertNotIn('id="subpanel-sys-operations"', template)
+        self.assertNotIn('data-recurrents-url=', template)
+        self.assertNotIn('data-top-payments-url=', template)
+        self.assertNotIn("function loadRecurrents", template)
+        self.assertNotIn("function loadTopPayments", template)
         # Сетка рефералки не должна использовать фиксированную минимальную ширину колонок,
         # из-за которой контент вылезал за экран.
         self.assertNotIn(".system-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px", template)
         self.assertIn(".system-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)", template)
+
+    def test_referral_block_management_is_part_of_found_client(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        css = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        self.assertIn("function clientReferralControlHtml", template)
+        self.assertIn("function clientSubscriptionManageHtml(refResult)", template)
+        self.assertIn("${clientReferralControlHtml(refResult)}", template)
+        self.assertIn("${clientSubscriptionManageHtml(refPayload?.result)}", template)
+        self.assertIn("Управление клиентом", template)
+        self.assertIn('data-client-referral-block-action="block"', template)
+        self.assertIn('data-client-referral-block-action="unblock"', template)
+        self.assertIn("function clientReferralBlockAction", template)
+        self.assertIn("formData.set('q', clientCardState.q)", template)
+        self.assertIn("await renderClientCard();", template)
+        self.assertNotIn("await renderClientCard('referrals')", template)
+        self.assertNotIn("const controlHtml = clientReferralControlHtml(refResult);", template)
+        self.assertIn("Заблокировать рефералку", template)
+        self.assertIn("Разблокировать рефералку", template)
+        self.assertIn(".client-ref-control", css)
+        self.assertIn(".client-ref-control-actions", css)
+
+    def test_referral_settings_match_standard_system_width_without_duplicate_antifraud_rows(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        css = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        self.assertIn("{slug: 'referral', keys: ['join_referrer_bonus_days', 'traffic_referrer_bonus_days', 'purchase_referrer_bonus_days', 'referral_bonus_days']}", template)
+        self.assertIn("{slug: 'referral-antifraud', keys: ['referral_registration_autoblock_enabled', 'referral_registration_burst_limit', 'referral_registration_burst_window_minutes']}", template)
+        self.assertIn("#subpanel-sys-referral .referral-bonus-card", css)
+        self.assertIn(".referral-settings-stack {\n    display: grid;\n    gap: 16px;\n    width: 100%;\n    max-width: 960px;", css)
+        # Антифрод — единый блок в стиле таблицы настроек, без дублирования
+        # лимита и окна в отдельных статус-карточках.
+        self.assertIn(".antifraud-panel", css)
+        self.assertIn(".antifraud-row", css)
+        self.assertNotIn(".referral-antifraud-layout", css)
+        self.assertNotIn(".referral-antifraud-fields", css)
+        self.assertNotIn(".referral-antifraud-stat {", css)
 
     def test_cohort_shows_invited_referrals_metrics(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
@@ -1639,6 +1916,25 @@ class TelegramAuthBotTests(SimpleTestCase):
         self.assertTrue(verify_telegram_widget_auth(auth_data, bot_token))
         self.assertFalse(verify_telegram_widget_auth(auth_data, "111:first-token"))
 
+    def test_verify_telegram_widget_auth_stale_auth_date_fails(self):
+        auth_data = {
+            "id": "123456",
+            "first_name": "Alex",
+            "auth_date": str(int(time.time()) - 90000),
+        }
+        bot_token = "222:second-token"
+        data_check_string = "\n".join(
+            f"{key}={auth_data[key]}" for key in sorted(auth_data)
+        )
+        secret_key = hashlib.sha256(bot_token.encode()).digest()
+        auth_data["hash"] = hmac.new(
+            secret_key,
+            data_check_string.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+
+        self.assertFalse(verify_telegram_widget_auth(auth_data, bot_token))
+
     @override_settings(
         ALLOWED_HOSTS=["monkey-island-vpn.com"],
         CABINET_DOMAINS=["monkey-island-vpn.com"],
@@ -1693,6 +1989,72 @@ class TelegramAuthBotTests(SimpleTestCase):
         content = response.content.decode()
 
         self.assertIn("https://t.me/vpn_auth_bot?start=web", content)
+
+
+class TelegramWebappAuthTests(SimpleTestCase):
+    """Авторизация Telegram Mini App (кабинет в WebView из кнопки меню бота)."""
+
+    BOT_TOKEN = "222:second-token"
+
+    def build_init_data(self, bot_token=None, auth_date=None, user_id=123456):
+        from urllib.parse import urlencode
+
+        fields = {
+            "auth_date": str(auth_date or int(time.time())),
+            "query_id": "AAE-test",
+            "user": json.dumps({"id": user_id, "first_name": "Alex"}),
+        }
+        data_check_string = "\n".join(
+            f"{key}={fields[key]}" for key in sorted(fields)
+        )
+        secret_key = hmac.new(
+            b"WebAppData",
+            (bot_token or self.BOT_TOKEN).encode(),
+            hashlib.sha256,
+        ).digest()
+        fields["hash"] = hmac.new(
+            secret_key,
+            data_check_string.encode(),
+            hashlib.sha256,
+        ).hexdigest()
+        return urlencode(fields)
+
+    def test_valid_init_data_passes_verification(self):
+        init_data = self.build_init_data()
+
+        fields = verify_telegram_webapp_init_data(init_data, self.BOT_TOKEN)
+
+        self.assertIsNotNone(fields)
+        self.assertEqual(get_telegram_webapp_user_id(fields), 123456)
+
+    def test_wrong_bot_token_fails_verification(self):
+        init_data = self.build_init_data()
+
+        self.assertIsNone(
+            verify_telegram_webapp_init_data(init_data, "111:first-token")
+        )
+
+    def test_stale_auth_date_fails_verification(self):
+        init_data = self.build_init_data(auth_date=int(time.time()) - 90000)
+
+        self.assertIsNone(verify_telegram_webapp_init_data(init_data, self.BOT_TOKEN))
+
+    def test_missing_hash_fails_verification(self):
+        self.assertIsNone(
+            verify_telegram_webapp_init_data("auth_date=123", self.BOT_TOKEN)
+        )
+        self.assertIsNone(verify_telegram_webapp_init_data("", self.BOT_TOKEN))
+
+    def test_tampered_user_fails_verification(self):
+        init_data = self.build_init_data(user_id=123456)
+        tampered = init_data.replace("123456", "999999")
+
+        self.assertIsNone(verify_telegram_webapp_init_data(tampered, self.BOT_TOKEN))
+
+    def test_invalid_user_payload_returns_none_id(self):
+        self.assertIsNone(get_telegram_webapp_user_id({}))
+        self.assertIsNone(get_telegram_webapp_user_id({"user": "not-json"}))
+        self.assertIsNone(get_telegram_webapp_user_id({"user": "{}"}))
 
 
 class PaymentRedirectTests(SimpleTestCase):
@@ -2214,6 +2576,30 @@ class CancelAutopayViewTests(SimpleTestCase):
         self.assertTrue(recorded["closed"])
 
 
+class PricingFilterTests(SimpleTestCase):
+    def test_floor_div_gives_marketing_monthly_price(self):
+        from engine.templatetags.pricing import floor_div
+
+        # widthratio округлял бы 599/3 к 200 — на витрине нужно 199/149.
+        self.assertEqual(floor_div(599, 3), 199)
+        self.assertEqual(floor_div(1799, 12), 149)
+        self.assertEqual(floor_div(249, 1), 249)
+        self.assertEqual(floor_div("599", "3"), 199)
+        self.assertEqual(floor_div(None, 3), "")
+        self.assertEqual(floor_div(599, 0), "")
+
+    def test_templates_use_floor_div_for_monthly_price(self):
+        for name in (
+            "dashboard.html",
+            "index_vpn.html",
+            "index_vps.html",
+            "index_vps_direct_sale.html",
+        ):
+            template = Path(f"engine/templates/{name}").read_text()
+            self.assertIn("floor_div", template, name)
+            self.assertNotIn("widthratio tariff.price", template, name)
+
+
 class SettingsTabTemplateTests(SimpleTestCase):
     def test_settings_tab_present_with_autopay_and_faq(self):
         template = Path("engine/templates/dashboard.html").read_text()
@@ -2224,8 +2610,26 @@ class SettingsTabTemplateTests(SimpleTestCase):
         self.assertIn("openAutopaySheet()", template)
         self.assertIn("confirmCancelAutopay", template)
         self.assertIn("{% url 'cancel_autopay' %}", template)
-        self.assertIn("toggleFaq", template)
-        self.assertIn("Как подключить ваш VPN?", template)
+        # FAQ по схеме Akenai: разделы -> вопросы -> статья в bottom-sheet.
+        # Данные — в FAQ_DATA, разделы согласованы с разделом «Вопросы» бота.
+        self.assertIn("const FAQ_DATA", template)
+        for title in (
+            "Подключение",
+            "Блокировки и «белые списки»",
+            "Подписка и оплата",
+            "Безопасность и приватность",
+            "Скорость и стабильность",
+        ):
+            self.assertIn(f"title: '{title}'", template)
+        self.assertIn("Как подключить VPN?", template)
+        self.assertIn("Может ли кто-то узнать, что я пользуюсь VPN?", template)
+        self.assertIn('id="faq-article-sheet"', template)
+        self.assertIn("Следующая статья", template)
+        self.assertIn("Не нашли ответ?", template)
+        # Документы и webapp-режим
+        self.assertIn("{% url 'offer' %}", template)
+        self.assertIn("{% url 'privacy' %}", template)
+        self.assertIn("tg_webapp_mode", template)
 
     def test_autopay_button_always_clickable_with_nothing_to_cancel_sheet(self):
         template = Path("engine/templates/dashboard.html").read_text()
@@ -2740,6 +3144,17 @@ class NodeTrafficTemplateTests(SimpleTestCase):
             any('data-tab="node-traffic"' in part.split("{% endif %}")[0] for part in admin_only_block[1:])
         )
 
+    def test_node_traffic_loads_today_report_on_first_tab_open(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('<option value="1" selected>Сегодня (UTC)</option>', template)
+        self.assertIn('<option value="24">Вчера + сегодня</option>', template)
+        self.assertIn("let nodeTrafficInitialReportLoaded = false;", template)
+        self.assertIn("if (!nodeTrafficInitialReportLoaded && form)", template)
+        self.assertIn("nodeTrafficInitialReportLoaded = true;", template)
+        self.assertIn("loadNodeTrafficForForm(form);", template)
+        self.assertIn("function loadNodeTraffic(event)", template)
+
 
 class NodeTrafficDayGranularityTests(SimpleTestCase):
     """Панель хранит трафик посуточно (created_at = 00:00 дня, UTC); начало
@@ -2880,3 +3295,315 @@ class AcquisitionJourneyTests(SimpleTestCase):
         self.assertIn("acqFetch('trial_timing'", template)
         self.assertIn("acqFetch('renewal_ladder'", template)
         self.assertIn("acqFetch('tariff_paths'", template)
+
+
+class AdminCensorBulkUpdateTests(SimpleTestCase):
+    def test_bulk_update_changes_only_selected_fields_for_all_checks(self):
+        request = RequestFactory().post(
+            "/support-admin/api/censor-checks/",
+            {
+                "action": "bulk_update",
+                "apply_mode": "1",
+                "mode": "geo-light",
+                "apply_api_key": "1",
+                "api_key_id": "7",
+                "apply_interval": "1",
+                "interval_minutes": "360",
+                "apply_alerts": "1",
+                "alerts_enabled": "0",
+                "apply_enabled": "1",
+                "is_enabled": "1",
+            },
+        )
+        session = mock.MagicMock()
+        session.get.return_value = SimpleNamespace(id=7)
+        session.query.return_value.update.return_value = 4
+
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+        ):
+            response = support_admin_api_censor_checks(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content)["updated"], 4)
+        session.get.assert_called_once_with(RipeApiKey, 7)
+        session.query.assert_called_once_with(CensorCheck)
+        updates = session.query.return_value.update.call_args.args[0]
+        self.assertIs(updates[CensorCheck.geo_mode], True)
+        self.assertIs(updates[CensorCheck.light_mode], True)
+        self.assertEqual(updates[CensorCheck.api_key_id], 7)
+        self.assertEqual(updates[CensorCheck.interval_minutes], 360)
+        self.assertIs(updates[CensorCheck.alerts_enabled], False)
+        self.assertIs(updates[CensorCheck.is_enabled], True)
+        self.assertIn(CensorCheck.updated_at, updates)
+        self.assertEqual(
+            session.query.return_value.update.call_args.kwargs,
+            {"synchronize_session": False},
+        )
+        session.commit.assert_called_once_with()
+        session.close.assert_called_once_with()
+
+    def test_bulk_update_requires_an_explicit_field_selection(self):
+        request = RequestFactory().post(
+            "/support-admin/api/censor-checks/",
+            {"action": "bulk_update", "mode": "geo-full"},
+        )
+        session = mock.MagicMock()
+
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+        ):
+            response = support_admin_api_censor_checks(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            json.loads(response.content)["message"],
+            "Выберите хотя бы один параметр",
+        )
+        session.query.assert_not_called()
+        session.commit.assert_not_called()
+        session.close.assert_called_once_with()
+
+    @override_settings(RIPE_ATLAS_API_KEY="")
+    def test_bulk_update_rejects_missing_default_key(self):
+        request = RequestFactory().post(
+            "/support-admin/api/censor-checks/",
+            {
+                "action": "bulk_update",
+                "apply_api_key": "1",
+                "api_key_id": "",
+            },
+        )
+        session = mock.MagicMock()
+        session.query.return_value.filter.return_value.first.return_value = None
+
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+        ):
+            response = support_admin_api_censor_checks(request)
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(
+            json.loads(response.content)["message"],
+            "Ключ по умолчанию не настроен",
+        )
+        session.query.assert_called_once_with(RipeApiKey)
+        session.commit.assert_not_called()
+        session.close.assert_called_once_with()
+
+
+class AdminChartPaletteTests(SimpleTestCase):
+    """Расцветка серий на графиках админки."""
+
+    def setUp(self):
+        self.template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.css = Path("engine/static/css/admin_dashboard.css").read_text()
+
+    def test_dark_theme_keeps_historical_multi_hue_series_palette(self):
+        # Тёмная тема должна использовать ровно ту палитру, что была до
+        # редизайна: серо-жёлтые оттенки делали соседние серии неразличимыми.
+        for token in (
+            "indigo: {dark: 'rgba(120,140,255,.75)'",
+            "amber: {dark: 'rgba(255,199,0,.9)'",
+            "green: {dark: 'rgba(90,220,150,.95)'",
+            "violet: {dark: '#9b6dff'",
+            "orange: {dark: '#f5b85b'",
+            "slate: {dark: '#d8dde8'",
+            "sky: {dark: '#38bdf8'",
+            "pink: {dark: '#f472b6'",
+        ):
+            self.assertIn(token, self.template)
+
+        self.assertIn(
+            "const tariffChartTones = Object.freeze(['indigo', 'amber', 'violet', 'orange', 'slate', 'sky', 'pink']);",
+            self.template,
+        )
+        self.assertIn(
+            "const tariffChartColors = tariffChartTones.map((tone) => CHART_TONES[tone].dark);",
+            self.template,
+        )
+        self.assertIn(
+            "const acquisitionChartTones = Object.freeze({repeat: 'indigo', new: 'amber', payers: 'green'});",
+            self.template,
+        )
+
+    def test_greyscale_series_colors_are_gone_everywhere(self):
+        # Ни одна серия не должна остаться на сером/белом/жёлтом варианте
+        # редизайна — ни в определениях серий, ни в текстовых сводках.
+        for leftover in (
+            "'rgba(214,218,226,.58)'",
+            "'rgba(214,218,226,.68)'",
+            "'rgba(214,218,226,.80)'",
+            "'rgba(214,218,226,.82)'",
+            "'rgba(255,255,255,.92)'",
+            "'rgba(255,255,255,.94)'",
+            "'rgba(255,255,255,.96)'",
+            "'rgba(255,226,122,.95)'",
+            "'#fff2b3'",
+            "'#d8a900'",
+            "'#8b8f99'",
+            "'#ffe27a'",
+        ):
+            self.assertNotIn(leftover, self.template)
+
+        # Серии описываются токеном тона, а не готовой строкой цвета.
+        self.assertNotIn("label: 'Подписки', color:", self.template)
+        self.assertNotIn("label: 'Продажи', color:", self.template)
+        self.assertIn("{label: 'Подписки', tone: 'indigo',", self.template)
+        self.assertIn("{label: 'Продажи', tone: 'pink',", self.template)
+        self.assertIn("{label: 'Расход, ₽', tone: 'amberSoft',", self.template)
+        self.assertIn("{label: 'Медиана', tone: 'neutral',", self.template)
+
+    def test_light_theme_series_palette_is_saturated_not_grey_yellow(self):
+        # Светлой темы в старой версии не было: тона подобраны как затемнённые
+        # аналоги тех же оттенков, а не как серо-жёлтая гамма.
+        for token in (
+            "light: 'rgba(67,80,207,.92)'",
+            "light: 'rgba(169,116,0,.95)'",
+            "light: 'rgba(9,120,76,.95)'",
+            "light: '#8021d0'",
+            "light: '#c8500a'",
+            "light: '#4d5768'",
+            "light: '#046f9f'",
+            "light: '#b82a70'",
+        ):
+            self.assertIn(token, self.template)
+
+        self.assertIn(
+            "const tariffChartColorsLight = tariffChartTones.map((tone) => CHART_TONES[tone].light);",
+            self.template,
+        )
+        # Прежние приглушённые светлые оттенки удалены.
+        for leftover in ("'#8a6500'", "'#5f6876'", "'#a97900'", "'#7a8493'", "'#bd8a00'"):
+            self.assertNotIn(leftover, self.template)
+
+    def test_series_color_resolves_lazily_by_tone(self):
+        # Цвет берётся из тона на каждой перерисовке, поэтому смена темы
+        # перекрашивает уже нарисованные графики без перезагрузки данных.
+        self.assertIn("if (series?.tone) return chartTone(series.tone);", self.template)
+        self.assertIn("function chartTone(name)", self.template)
+        # Хрупкое сопоставление по подписи и по подстроке цвета убрано.
+        self.assertNotIn("label.startsWith('повторн')", self.template)
+        self.assertNotIn("color.includes('214,218,226')", self.template)
+
+    def test_summary_highlights_use_theme_aware_classes(self):
+        # В сводках под графиками цвет задавался инлайном, из-за чего на
+        # светлой теме белый текст был не виден.
+        self.assertNotIn('<b style="color:#fff;">', self.template)
+        self.assertNotIn('<b style="color:#ffc700">', self.template)
+        for cls in ("chart-tone-amber", "chart-tone-indigo", "chart-tone-green", "chart-tone-pink", "chart-tone-strong"):
+            self.assertIn(f'class="{cls}"', self.template)
+            self.assertIn(f".{cls}", self.css)
+        for cls in ("chart-tone-indigo", "chart-tone-amber", "chart-tone-green", "chart-tone-pink"):
+            self.assertIn(f'html[data-admin-theme="light"] .{cls}', self.css)
+
+
+class AdminChartReadabilityTests(SimpleTestCase):
+    """Читаемость графиков: сетка, подписи осей, легенда, тултипы."""
+
+    def setUp(self):
+        self.template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.css = Path("engine/static/css/admin_dashboard.css").read_text()
+
+    def test_axis_labels_are_compact_and_carry_units(self):
+        self.assertIn("function adminChartAxisLabel(value, fmt = 'raw')", self.template)
+        self.assertIn("млн", self.template)
+        self.assertIn("тыс", self.template)
+        self.assertIn("if (fmt === 'pct') return `${Math.round(value)}%`;", self.template)
+        # Обе оси обоих графиков используют общий форматтер.
+        self.assertEqual(self.template.count("adminChartAxisLabel("), 5)
+
+    def test_tooltip_values_have_separators_and_units(self):
+        self.assertIn("function acqFmtValue(series, value)", self.template)
+        self.assertIn("if (series.fmt === 'rub') return `${fmtRub(value)} ₽`;", self.template)
+        self.assertIn("if (series.fmt === 'pct') return `${Number(value).toFixed(1)}%`;", self.template)
+        # Штучные метрики раньше печатались без разделителей тысяч.
+        self.assertNotIn("sr.fmt === 'raw' ? sr.data[i]", self.template)
+        self.assertIn(".acq-tooltip-value", self.css)
+        self.assertIn(".acq-tooltip-name", self.css)
+
+    def test_legend_wraps_on_narrow_canvas(self):
+        self.assertIn("function acqLegendRows(ctx, legend, availableWidth)", self.template)
+        self.assertIn("const legendRows = acqLegendRows(ctx", self.template)
+        self.assertIn("padT = 6 + legendRows.length * legendRowH + 6", self.template)
+        # Старая однострочная легенда уезжала за правый край канвы.
+        self.assertNotIn("let lx = padL; ctx.textAlign = 'left';", self.template)
+
+    def test_grid_and_axis_labels_gained_contrast(self):
+        for token in ("gridStrong:", "barSeparator:", "label: 'rgba(206,215,228,.84)'", "label: 'rgba(44,51,62,.86)'"):
+            self.assertIn(token, self.template)
+        # Прежние блёклые значения убраны.
+        self.assertNotIn("label: 'rgba(196,205,218,.62)'", self.template)
+        self.assertNotIn("legend: 'rgba(255,255,255,.7)'", self.template)
+
+    def test_x_axis_label_density_follows_measured_width(self):
+        self.assertIn("ctx.measureText(String(lb)).width", self.template)
+        self.assertNotIn("const every = Math.ceil(n / 14);", self.template)
+
+    def test_stacked_segments_are_visually_separated(self):
+        self.assertEqual(self.template.count("adminChartUiColor('barSeparator')"), 2)
+        self.assertIn("adminChartUiColor(ratio === 0 ? 'gridStrong' : 'grid')", self.template)
+        self.assertIn("adminChartUiColor(g === 0 ? 'gridStrong' : 'grid')", self.template)
+
+
+class ReferralAntifraudPanelTests(SimpleTestCase):
+    """Блок антифрода: одна панель вместо статус-карточек и отдельной формы."""
+
+    def setUp(self):
+        self.template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.css = Path("engine/static/css/admin_dashboard.css").read_text()
+
+    def test_single_panel_replaces_duplicated_status_cards(self):
+        self.assertIn('<div class="antifraud-panel">', self.template)
+        self.assertIn('class="antifraud-row antifraud-row-state"', self.template)
+        self.assertIn('data-antifraud-current="limit"', self.template)
+        self.assertIn('data-antifraud-current="window_minutes"', self.template)
+        # Дублирующие карточки удалены и в разметке, и в рендере.
+        self.assertNotIn("referral-antifraud-stat-icon", self.template)
+        self.assertNotIn('"referral-antifraud-stat ', self.template)
+        self.assertNotIn("referral-antifraud-fields", self.template)
+        self.assertNotIn("referral-antifraud-actions", self.template)
+        self.assertNotIn("Сохранить параметры", self.template)
+
+    def test_state_control_is_a_real_switch(self):
+        self.assertIn('role="switch"', self.template)
+        self.assertIn('aria-checked="false"', self.template)
+        self.assertIn('class="antifraud-switch-track"', self.template)
+        self.assertIn("toggle.setAttribute('aria-checked', String(isEnabled));", self.template)
+        for selector in (
+            ".antifraud-switch {",
+            '.antifraud-switch[aria-checked="true"] .antifraud-switch-thumb',
+            ".antifraud-switch:focus-visible",
+        ):
+            self.assertIn(selector, self.css)
+
+    def test_business_contract_is_unchanged(self):
+        # Имена полей, значения action и эндпоинт остаются прежними.
+        self.assertIn('name="limit"', self.template)
+        self.assertIn('name="window_minutes"', self.template)
+        self.assertIn('name="action" value="set"', self.template)
+        self.assertIn('name="action" value="enable"', self.template)
+        self.assertIn("toggle.value = isEnabled ? 'disable' : 'enable';", self.template)
+        self.assertIn("data-referral-antifraud-url=", self.template)
+        self.assertIn("formData.set('action', event.submitter?.value || 'set');", self.template)
+
+    def test_enter_in_a_field_still_saves_instead_of_toggling(self):
+        # Переключатель стоит визуально первым, поэтому неявную отправку формы
+        # держит скрытая кнопка action=set — иначе Enter включал бы автоблок.
+        self.assertIn('class="antifraud-implicit-submit"', self.template)
+        implicit = self.template.index('class="antifraud-implicit-submit"')
+        toggle = self.template.index('id="referral-antifraud-toggle"')
+        self.assertLess(implicit, toggle)
+        self.assertIn(".antifraud-implicit-submit", self.css)
+
+    def test_panel_matches_neighbouring_settings_table_styling(self):
+        for selector in (".antifraud-panel {", ".antifraud-row {", ".antifraud-footer {"):
+            self.assertIn(selector, self.css)
+        self.assertIn('html[data-admin-theme="light"] .antifraud-panel,', self.css)
+        self.assertIn('html[data-admin-theme="light"] .antifraud-row,', self.css)
+        # Слот статуса остаётся только под загрузку/ошибку и скрыт, когда пуст.
+        self.assertIn(".referral-antifraud-status:empty", self.css)
+        self.assertIn("target.innerHTML = '';", self.template)

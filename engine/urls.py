@@ -233,6 +233,12 @@ urlpatterns = [
         views.auth_by_telegram_widget,
         name="telegram_widget_auth",
     ),
+    path("tg-webapp/", views.telegram_webapp_entry, name="telegram_webapp_entry"),
+    path(
+        "tg-webapp/auth/",
+        views.auth_by_telegram_webapp,
+        name="telegram_webapp_auth",
+    ),
     path("login/magic/<uuid:token>/", views.auth_by_magic_link, name="magic_auth"),
     path(
         "login/purchase/<str:token>/",

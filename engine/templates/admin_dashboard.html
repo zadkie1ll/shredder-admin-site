@@ -4,6 +4,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark light">
+    <meta name="theme-color" content="#090a0f" id="admin-theme-color">
+    <script>
+        (() => {
+            const storageKey = 'monkey_island_admin_theme_v1';
+            let theme = 'dark';
+            try {
+                if (localStorage.getItem(storageKey) === 'light') theme = 'light';
+            } catch (error) { /* localStorage may be unavailable in private contexts */ }
+            document.documentElement.dataset.adminTheme = theme;
+            document.documentElement.style.colorScheme = theme;
+            document.getElementById('admin-theme-color')?.setAttribute('content', theme === 'light' ? '#f4f5f7' : '#090a0f');
+        })();
+    </script>
     <title>Админ-панель Monkey Island</title>
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
@@ -12,11 +26,11 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root { --brand-gold: #22c55e; --bg-color: #111720; --card-bg: rgba(25,30,39,.92); --inner-card-bg: rgba(255,255,255,.045); --input-bg: rgba(31,37,48,.9); --card-border: rgba(127,143,163,.22); --muted: rgba(196,205,218,.66); --green: #22c55e; --red: #ff5f6d; --blue: #84cc16; --violet: #9b6dff; --coral: #f56f8d; --mint: #86efac; --text-main: #f4f7fb; --panel-border: rgba(127,143,163,.25); --sidebar-w: 300px; --admin-radius: 8px; --admin-radius-lg: 16px; --accent-rgb: 34,197,94; --green-rgb: 34,197,94; }
+        :root { --brand-gold: #ffc700; --bg-color: #090a0f; --card-bg: rgba(17,18,23,.92); --inner-card-bg: rgba(255,255,255,.045); --input-bg: rgba(13,14,19,.92); --card-border: rgba(255,255,255,.08); --muted: rgba(255,255,255,.58); --green: #38d996; --red: #ff5c67; --blue: #e5e7eb; --violet: #ffc700; --coral: #ff6b7a; --mint: #ffe27a; --text-main: #fff; --panel-border: rgba(255,255,255,.08); --sidebar-w: 300px; --admin-radius: 8px; --admin-radius-lg: 16px; --accent-rgb: 255,199,0; --green-rgb: 56,217,150; }
         * { box-sizing: border-box; }
-        body { margin: 0; overflow-x: hidden; font-family: 'Montserrat', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg-color); color: var(--text-main); }
+        body { margin: 0; overflow-x: hidden; font-family: 'Manrope', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg-color); color: var(--text-main); }
         .page-bg { position: fixed; inset: 0; overflow: hidden; background: #090a0f; pointer-events: none; }
         .page-bg::before { content: ""; position: absolute; inset: 0; background-image: url("{% static 'img/bg6.png' %}"); background-size: cover; background-position: center; opacity: .18; filter: saturate(.9) contrast(1.05); transform: translateZ(0); }
         .page-bg::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 62% 6%, rgba(255,199,0,.11), transparent 28rem), radial-gradient(circle at 13% 78%, rgba(255,199,0,.08), transparent 30rem), linear-gradient(180deg, rgba(9,10,15,.78) 0%, rgba(9,10,15,.94) 48%, #090a0f 100%); }
@@ -217,11 +231,6 @@
         .system-form { display: grid; gap: 10px; }
         .system-form.two { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
         .system-actions { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
-        .system-output { margin-top: 12px; display: grid; gap: 8px; overflow-x: hidden; min-width: 0; }
-        .command-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255,255,255,.06); }
-        .command-row:last-child { border-bottom: 0; }
-        .command-name { color: #fff; font-size: 12px; font-weight: 800; }
-        .command-sub { margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 600; }
         .result-stack { display: grid; gap: 14px; }
         .metrics-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .metrics-grid.five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
@@ -926,8 +935,7 @@
         .source-card:has(.source-pill),
         .config-template-card:has(.config-template-badge.active) { border-top-color: var(--green); }
         .table-row,
-        .admin-table-row,
-        .command-row {
+        .admin-table-row {
             border-bottom-color: rgba(127,143,163,.16);
             color: rgba(234,240,248,.82);
         }
@@ -1104,7 +1112,6 @@
         .source-metric-value,
         .referral-detail-value,
         .setting-key,
-        .command-name,
         .ticket-subject { color: #edf3f8; }
         .gold { color: var(--brand-gold); }
         .green { color: var(--green); }
@@ -1408,6 +1415,7 @@
             #panel-censor-checks .censor-last-run-link { display: inline; }
         }
     </style>
+    <link href="{% static 'css/admin_dashboard.css' %}" rel="stylesheet">
     {% include "includes/yandex_metrika.html" %}
 </head>
 <body>
@@ -1415,6 +1423,12 @@
     <header class="mobile-topbar">
         <button type="button" class="mobile-burger" id="mobile-burger" aria-label="Меню разделов"><i class="fas fa-bars"></i></button>
         <span class="mobile-topbar-title" id="mobile-topbar-title">Аналитика</span>
+        <button class="admin-theme-switch admin-theme-switch-mobile" type="button" role="switch" aria-checked="false" aria-label="Включить светлую тему" title="Включить светлую тему" data-admin-theme-toggle>
+            <span class="admin-theme-switch-label" data-admin-theme-label>Тёмная</span>
+            <i class="fas fa-moon admin-theme-icon admin-theme-icon-dark" aria-hidden="true"></i>
+            <span class="admin-theme-track" aria-hidden="true"><span class="admin-theme-thumb"></span></span>
+            <i class="fas fa-sun admin-theme-icon admin-theme-icon-light" aria-hidden="true"></i>
+        </button>
         <span class="mobile-topbar-brand">MONKEY ISLAND</span>
     </header>
     <div class="drawer-overlay" id="drawer-overlay"></div>
@@ -1464,8 +1478,6 @@
         data-runtime-settings-url="{% url 'support_admin_api_runtime_settings' %}"
         data-referral-antifraud-url="{% url 'support_admin_api_referral_antifraud' %}"
         data-referral-block-url="{% url 'support_admin_api_referral_block' %}"
-        data-recurrents-url="{% url 'support_admin_api_recurrents' %}"
-        data-top-payments-url="{% url 'support_admin_api_top_payments' %}"
         data-reply-templates-url="{% url 'support_admin_api_reply_templates' %}"
         data-config-templates-url="{% url 'support_admin_api_config_templates' %}"
         data-config-pins-url="{% url 'support_admin_api_config_pins' %}"
@@ -1481,6 +1493,12 @@
         <header class="admin-topbar">
             <div class="admin-topbar-title"><i class="fas fa-signal"></i><span>Monkey Island Control</span></div>
             <div class="admin-topbar-actions">
+                <button class="admin-theme-switch" type="button" role="switch" aria-checked="false" aria-label="Включить светлую тему" title="Включить светлую тему" data-admin-theme-toggle>
+                    <span class="admin-theme-switch-label" data-admin-theme-label>Тёмная</span>
+                    <i class="fas fa-moon admin-theme-icon admin-theme-icon-dark" aria-hidden="true"></i>
+                    <span class="admin-theme-track" aria-hidden="true"><span class="admin-theme-thumb"></span></span>
+                    <i class="fas fa-sun admin-theme-icon admin-theme-icon-light" aria-hidden="true"></i>
+                </button>
                 <span class="admin-pill role"><i class="fas fa-user-shield"></i>{{ support_admin_role|default:"support" }}</span>
                 <span class="admin-pill live"><i class="fas fa-wave-square"></i>online</span>
                 <button class="admin-icon-btn" type="button" onclick="window.location.reload()" aria-label="Обновить страницу" title="Обновить">
@@ -1776,7 +1794,7 @@
                             <span style="font-size:11px;color:var(--muted);">или период:</span>
                             <input type="date" id="acq-newrep-start" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
                             <input type="date" id="acq-newrep-end" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
-                            <button type="button" id="acq-newrep-apply" class="subtab active" style="border:1px solid rgba(255,199,0,.4);border-radius:8px;">Показать</button>
+                            <button type="button" id="acq-newrep-apply" class="subtab active" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Показать</button>
                         </div>
                     </div>
                     <canvas id="acq-newrep-chart" style="width:100%;height:280px;display:block;"></canvas>
@@ -1826,7 +1844,7 @@
                     <form id="acq-csv-form" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
                         <input type="file" name="file" accept=".csv,text/csv" required style="color:#fff;font-size:12px;max-width:260px;">
                         <input type="text" name="channel" placeholder="канал (yandex-direct)" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;width:170px;">
-                        <button type="submit" class="subtab active" style="border:1px solid rgba(255,199,0,.4);border-radius:8px;">Загрузить</button>
+                        <button type="submit" class="subtab active" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Загрузить</button>
                         <span id="acq-csv-status" style="font-size:11px;color:var(--muted);"></span>
                     </form>
                 </div>
@@ -1856,7 +1874,7 @@
                         <input type="text" name="channel" placeholder="канал (default)" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;width:140px;">
                         <input type="number" name="amount_rub" step="0.01" min="0" placeholder="сумма, ₽ (чистая)" required style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;width:150px;">
                         <input type="text" name="comment" placeholder="комментарий" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;flex:1;min-width:120px;">
-                        <button type="submit" class="subtab active" style="border:1px solid rgba(255,199,0,.4);border-radius:8px;">Сохранить</button>
+                        <button type="submit" class="subtab active" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Сохранить</button>
                     </form>
                     <div id="acq-spends-table" style="margin-top:12px;overflow-x:auto;max-height:420px;overflow-y:auto;"></div>
                 </div>
@@ -1931,7 +1949,7 @@
                         </select>
                     </div>
                     <canvas id="acq-today-chart" style="width:100%;height:260px;display:block;margin-top:10px;"></canvas>
-                    <div style="font-size:11px;color:var(--muted);margin-top:6px;">Золотая — сегодня (до текущего часа); белая — медиана за выбранный период; пунктирные серые — коридор 25/75 перцентилей («обычный разброс»)</div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:6px;">Золотая — сегодня (до текущего часа); контрастная — медиана за выбранный период; пунктирные серые — коридор 25/75 перцентилей («обычный разброс»)</div>
                 </div>
                 <div class="card" style="padding:18px;">
                     <span class="chart-title-wrap"><strong>Heatmap оплат: час × день недели (60 дней, МСК)</strong><button type="button" class="chart-info" data-help="heatmap" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
@@ -2004,6 +2022,10 @@
                 <h1 class="admin-title">Платежи</h1>
                 <p class="admin-subtitle">История платежей и поиск деталей по ID</p>
             </header>
+            <form id="payment-info-form" class="card form-card form-grid-two">
+                <input class="input" name="payment_id" placeholder="payment_id или transaction_id">
+                <button class="btn" type="submit"><i class="fas fa-search"></i>Найти</button>
+            </form>
             <section class="card payments-board">
                 <h2 class="payments-board-title">История платежей</h2>
                 <div id="payments-list" class="payments-board-scroll"></div>
@@ -2019,10 +2041,6 @@
                     </span>
                 </footer>
             </section>
-            <form id="payment-info-form" class="card form-card form-grid-two">
-                <input class="input" name="payment_id" placeholder="payment_id или transaction_id">
-                <button class="btn" type="submit"><i class="fas fa-search"></i>Найти</button>
-            </form>
             <div id="payment-info-result"></div>
         </section>
 
@@ -2035,11 +2053,10 @@
             <div class="subtabs" role="tablist" aria-label="Разделы системы">
                 <button type="button" class="subtab active" data-subtab="sys-tariffs" role="tab"><i class="fas fa-tag"></i>Тарифы</button>
                 <button type="button" class="subtab" data-subtab="sys-winback" role="tab"><i class="fas fa-rotate-left"></i>Win-back</button>
-                <button type="button" class="subtab" data-subtab="sys-payment" role="tab"><i class="fas fa-credit-card"></i>Платёж</button>
+                <button type="button" class="subtab" data-subtab="sys-payment" role="tab"><i class="fas fa-credit-card"></i>Платёжные шлюзы</button>
                 <button type="button" class="subtab" data-subtab="sys-referral" role="tab"><i class="fas fa-network-wired"></i>Рефералка</button>
                 <button type="button" class="subtab" data-subtab="sys-alerts" role="tab"><i class="fas fa-triangle-exclamation"></i>Алерты</button>
                 <button type="button" class="subtab" data-subtab="sys-general" role="tab"><i class="fas fa-sliders"></i>Общие</button>
-                <button type="button" class="subtab" data-subtab="sys-operations" role="tab"><i class="fas fa-list-check"></i>Операции</button>
             </div>
 
             <div id="subpanel-sys-tariffs" class="subtab-panel active">
@@ -2058,49 +2075,95 @@
 
             <div id="subpanel-sys-payment" class="subtab-panel">
                 <section class="card system-card system-settings-card">
-                    <h2 class="system-card-title">Платёжный шлюз</h2>
+                    <h2 class="system-card-title">Платёжные шлюзы</h2>
                     <div class="settings-list" data-settings-group="payment"></div>
                 </section>
             </div>
 
             <div id="subpanel-sys-referral" class="subtab-panel">
-                <div class="system-grid">
-                    <div class="system-column">
-                        <section class="card system-card">
-                            <h2 class="system-card-title">Бонусы и лимиты</h2>
-                            <div class="settings-list" data-settings-group="referral"></div>
-                        </section>
-                    </div>
-                    <div class="system-column">
-                        <section class="card system-card">
-                            <h2 class="system-card-title">Антифрод рефералки</h2>
-                            <form id="referral-antifraud-form" class="system-form">
-                                {% csrf_token %}
-                                <div id="referral-antifraud-current" class="system-output"></div>
-                                <div class="form-grid-two">
-                                    <input class="input" name="limit" type="number" min="0" placeholder="Лимит">
-                                    <input class="input" name="window_minutes" type="number" min="1" placeholder="Минуты">
+                <div class="referral-settings-stack">
+                    <section class="card system-card system-settings-card referral-bonus-card">
+                        <div class="referral-section-heading">
+                            <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-gift"></i></span>
+                            <div>
+                                <h2 class="system-card-title">Бонусы реферальной программы</h2>
+                                <p>Сроки начислений за регистрацию, активность и покупку приглашённого клиента.</p>
+                            </div>
+                        </div>
+                        <div class="settings-list" data-settings-group="referral"></div>
+                    </section>
+
+                    <section class="card system-card referral-antifraud-card">
+                        <div class="referral-section-heading">
+                            <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-shield-halved"></i></span>
+                            <div>
+                                <h2 class="system-card-title">Антифрод регистрационных бонусов</h2>
+                                <p>Автоматически блокирует начисления при массовых регистрациях за короткий период.</p>
+                            </div>
+                        </div>
+                        <div id="referral-antifraud-current" class="referral-antifraud-status" aria-live="polite"></div>
+                        <form id="referral-antifraud-form" class="referral-antifraud-form">
+                            {% csrf_token %}
+                            {% comment %}
+                            Кнопка-«умолчание» формы: Enter в поле ввода должен сохранять
+                            параметры (action=set), а не переключать автоблокировку.
+                            Браузер выбирает для неявной отправки первую submit-кнопку
+                            в порядке DOM, поэтому она стоит здесь и скрыта.
+                            {% endcomment %}
+                            <button type="submit" name="action" value="set" class="antifraud-implicit-submit" tabindex="-1" aria-hidden="true"></button>
+                            <div class="antifraud-panel">
+                                <div class="antifraud-row antifraud-row-state">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Автоблокировка</div>
+                                        <div class="antifraud-row-desc">Останавливает начисление бонусов, когда регистраций по ссылке больше лимита за окно контроля.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <button class="antifraud-switch" id="referral-antifraud-toggle" type="submit" name="action" value="enable" role="switch" aria-checked="false">
+                                            <span class="antifraud-switch-track" aria-hidden="true"><span class="antifraud-switch-thumb"></span></span>
+                                            <span class="antifraud-switch-label" data-antifraud-toggle-label>Включить</span>
+                                        </button>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Состояние</span>
+                                        <strong data-antifraud-state>—</strong>
+                                    </div>
                                 </div>
-                                <div class="system-actions">
-                                    <button class="btn btn-secondary" type="submit" name="action" value="set"><i class="fas fa-floppy-disk"></i>Сохранить лимит</button>
-                                    <button class="btn" id="referral-antifraud-toggle" type="submit" name="action" value="enable"><i class="fas fa-toggle-on"></i><span>Включить</span></button>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Лимит регистраций</div>
+                                        <div class="antifraud-row-desc">Сколько регистраций по одной реферальной ссылке допустимо внутри окна контроля.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="limit" type="number" min="0" inputmode="numeric" placeholder="Например, 10">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antifraud-current="limit">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Окно контроля</div>
+                                        <div class="antifraud-row-desc">Длина интервала в минутах, за который считаются регистрации.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="window_minutes" type="number" min="1" inputmode="numeric" placeholder="Например, 1">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antifraud-current="window_minutes">—</strong>
+                                    </div>
+                                </label>
+
+                                <div class="antifraud-footer">
+                                    <p class="antifraud-footer-note">Пустое поле оставляет значение из env/default.</p>
+                                    <button class="btn btn-secondary" type="submit" name="action" value="set"><i class="fas fa-floppy-disk"></i>Сохранить</button>
                                 </div>
-                            </form>
-                        </section>
-                        <section class="card system-card">
-                            <h2 class="system-card-title">Блокировка рефералки</h2>
-                            <form id="referral-block-form" class="system-form">
-                                {% csrf_token %}
-                                <input class="input" name="q" placeholder="telegram_id, username или email">
-                                <input class="input" name="reason" placeholder="Причина">
-                                <div class="system-actions">
-                                    <button class="btn btn-secondary" type="submit" name="action" value="status"><i class="fas fa-magnifying-glass"></i>Проверить</button>
-                                    <button class="btn btn-danger" id="referral-block-toggle" type="submit" name="action" value="block" disabled><i class="fas fa-ban"></i><span>Заблокировать</span></button>
-                                </div>
-                            </form>
-                            <div id="referral-block-result" class="system-output"></div>
-                        </section>
-                    </div>
+                            </div>
+                        </form>
+                    </section>
                 </div>
             </div>
 
@@ -2122,26 +2185,6 @@
                 </section>
             </div>
 
-            <div id="subpanel-sys-operations" class="subtab-panel">
-                <section class="card system-card system-settings-card">
-                    <h2 class="system-card-title">Операции</h2>
-                    <div class="command-row">
-                        <div>
-                            <div class="command-name">Автоплатежи</div>
-                            <div class="command-sub">Аналог /recurrents</div>
-                        </div>
-                        <button class="btn btn-secondary" type="button" id="load-recurrents"><i class="fas fa-rotate"></i>Показать</button>
-                    </div>
-                    <div class="command-row">
-                        <div>
-                            <div class="command-name">Топ оплат</div>
-                            <div class="command-sub">Аналог /top-payments</div>
-                        </div>
-                        <button class="btn btn-secondary" type="button" id="load-top-payments"><i class="fas fa-ranking-star"></i>Показать</button>
-                    </div>
-                    <div id="system-operations-result" class="system-output"></div>
-                </section>
-            </div>
         </section>
         {% endif %}
 
@@ -2223,8 +2266,8 @@
                 <!-- Статистика панели посуточная (UTC): начало периода выравнивается
                      вниз до полуночи, поэтому пресеты короче суток не имеют смысла -->
                 <select class="input" name="hours">
-                    <option value="1">Сегодня (UTC)</option>
-                    <option value="24" selected>Вчера + сегодня</option>
+                    <option value="1" selected>Сегодня (UTC)</option>
+                    <option value="24">Вчера + сегодня</option>
                     <option value="168">7 дней</option>
                     <option value="720">30 дней</option>
                 </select>
@@ -2258,6 +2301,86 @@
                 <div id="ripe-keys-result"></div>
             </details>
 
+            <details class="card censor-bulk-card">
+                <summary class="censor-bulk-summary">
+                    <span class="censor-bulk-icon" aria-hidden="true"><i class="fas fa-layer-group"></i></span>
+                    <span class="censor-bulk-summary-copy">
+                        <strong id="censor-bulk-title">Массовая настройка проверок</strong>
+                        <span>Изменение выбранных параметров сразу во всех строках</span>
+                    </span>
+                    <span id="censor-bulk-count" class="censor-bulk-count" aria-live="polite">Проверок: 0</span>
+                </summary>
+                <div class="censor-bulk-body">
+                    <p class="censor-bulk-description">Отметьте только параметры, которые нужно изменить. Режим влияет на расход кредитов следующих запусков.</p>
+                    <form id="censor-bulk-form" class="censor-bulk-form">
+                        {% csrf_token %}
+                        <div class="censor-bulk-grid">
+                            <div class="censor-bulk-field" data-censor-bulk-field>
+                                <label class="censor-bulk-enable" for="censor-bulk-apply-mode">
+                                    <input id="censor-bulk-apply-mode" type="checkbox" name="apply_mode" value="1">
+                                    <span>Режим замера</span>
+                                </label>
+                                <select class="input" name="mode" aria-label="Режим для всех проверок">
+                                    <option value="op-full">Операторы · полный (33 зонда, 660 кр)</option>
+                                    <option value="op-light">Операторы · лёгкий (10 зондов, 200 кр)</option>
+                                    <option value="geo-full">Регионы · полный (50 зондов, 1000 кр)</option>
+                                    <option value="geo-light">Регионы · лёгкий (20 зондов, 400 кр)</option>
+                                </select>
+                            </div>
+                            <div class="censor-bulk-field" data-censor-bulk-field>
+                                <label class="censor-bulk-enable" for="censor-bulk-apply-key">
+                                    <input id="censor-bulk-apply-key" type="checkbox" name="apply_api_key" value="1">
+                                    <span>Ключ RIPE Atlas</span>
+                                </label>
+                                <select class="input" name="api_key_id" id="censor-bulk-key" aria-label="Ключ для всех проверок">
+                                    <option value="">Ключ по умолчанию</option>
+                                </select>
+                            </div>
+                            <div class="censor-bulk-field" data-censor-bulk-field>
+                                <label class="censor-bulk-enable" for="censor-bulk-apply-interval">
+                                    <input id="censor-bulk-apply-interval" type="checkbox" name="apply_interval" value="1">
+                                    <span>Расписание</span>
+                                </label>
+                                <select class="input" name="interval_minutes" aria-label="Расписание для всех проверок">
+                                    <option value="">Только вручную</option>
+                                    <option value="60">Каждый час</option>
+                                    <option value="180">Каждые 3 часа</option>
+                                    <option value="360">Каждые 6 часов</option>
+                                    <option value="720">Каждые 12 часов</option>
+                                    <option value="1440">Раз в сутки</option>
+                                </select>
+                            </div>
+                            <div class="censor-bulk-field" data-censor-bulk-field>
+                                <label class="censor-bulk-enable" for="censor-bulk-apply-alerts">
+                                    <input id="censor-bulk-apply-alerts" type="checkbox" name="apply_alerts" value="1">
+                                    <span>TG-алерты</span>
+                                </label>
+                                <select class="input" name="alerts_enabled" aria-label="TG-алерты для всех проверок">
+                                    <option value="1">Включить</option>
+                                    <option value="0">Выключить</option>
+                                </select>
+                            </div>
+                            <div class="censor-bulk-field" data-censor-bulk-field>
+                                <label class="censor-bulk-enable" for="censor-bulk-apply-enabled">
+                                    <input id="censor-bulk-apply-enabled" type="checkbox" name="apply_enabled" value="1">
+                                    <span>Состояние</span>
+                                </label>
+                                <select class="input" name="is_enabled" aria-label="Состояние всех проверок">
+                                    <option value="1">Включить проверки</option>
+                                    <option value="0">Выключить проверки</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="censor-bulk-actions">
+                            <p id="censor-bulk-help">Выберите хотя бы один параметр для массового изменения.</p>
+                            <button class="btn" id="censor-bulk-submit" type="submit" disabled>
+                                <i class="fas fa-check-double"></i><span>Применить ко всем</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </details>
+
             <form id="censor-check-form" class="card form-card censor-check-form">
                 {% csrf_token %}
                 <input type="hidden" name="check_id">
@@ -2286,6 +2409,7 @@
                     <button class="btn btn-secondary" type="button" id="censor-check-reset"><i class="fas fa-plus"></i>Новая</button>
                 </div>
             </form>
+
             <div id="censor-checks-result"></div>
         </section>
         {% endif %}
@@ -2498,6 +2622,7 @@
     <script>
         const main = document.querySelector('.main');
         const csrfToken = '{{ csrf_token }}';
+        const ADMIN_THEME_STORAGE_KEY = 'monkey_island_admin_theme_v1';
         const sourceUsersModalState = {source: null, label: '', page: 1, perPage: 20, totalPages: 1};
         let activeAdminTab = null;
         let ticketsRefreshInFlight = false;
@@ -2507,6 +2632,65 @@
         let configJsonEditor = null;
         let adminToastTimer = null;
         let configSaveInFlight = false;
+
+        function isAdminLightTheme() {
+            return document.documentElement.dataset.adminTheme === 'light';
+        }
+
+        function refreshAdminThemeCharts() {
+            document.querySelectorAll('canvas').forEach((canvas) => {
+                if (canvas.__salesChartMeta?.render) {
+                    canvas.__salesChartMeta.render(null);
+                    const palette = isAdminLightTheme() ? tariffChartColorsLight : tariffChartColors;
+                    canvas.closest('.sales-chart-card')?.querySelectorAll('.sales-chart-swatch').forEach((swatch, index) => {
+                        swatch.style.setProperty('--swatch', palette[index % palette.length]);
+                    });
+                    canvas.closest('.sales-chart-card')?.querySelector('.sales-chart-line-swatch')
+                        ?.style.setProperty('--swatch', acquisitionChartColor('payers'));
+                }
+                if (canvas.__acqMeta?.render) canvas.__acqMeta.render(null);
+            });
+            document.querySelectorAll('.sales-chart-tooltip').forEach((tooltip) => { tooltip.style.display = 'none'; });
+        }
+
+        function applyAdminTheme(theme, persist = false) {
+            const normalizedTheme = theme === 'light' ? 'light' : 'dark';
+            const isLight = normalizedTheme === 'light';
+            document.documentElement.dataset.adminTheme = normalizedTheme;
+            document.documentElement.style.colorScheme = normalizedTheme;
+            document.getElementById('admin-theme-color')?.setAttribute('content', isLight ? '#f4f5f7' : '#090a0f');
+            document.querySelectorAll('[data-admin-theme-toggle]').forEach((button) => {
+                button.setAttribute('aria-checked', String(isLight));
+                const actionLabel = isLight ? 'Включить тёмную тему' : 'Включить светлую тему';
+                button.title = actionLabel;
+                button.setAttribute('aria-label', actionLabel);
+                const visibleLabel = button.querySelector('[data-admin-theme-label]');
+                if (visibleLabel) visibleLabel.textContent = isLight ? 'Светлая' : 'Тёмная';
+            });
+            if (persist) {
+                try { localStorage.setItem(ADMIN_THEME_STORAGE_KEY, normalizedTheme); } catch (error) { /* noop */ }
+            }
+            if (configJsonEditor) {
+                configJsonEditor.setOption('theme', isLight ? 'default' : 'material-darker');
+                configJsonEditor.refresh();
+            }
+            window.requestAnimationFrame(refreshAdminThemeCharts);
+        }
+
+        function setupAdminThemeToggle() {
+            applyAdminTheme(isAdminLightTheme() ? 'light' : 'dark');
+            document.querySelectorAll('[data-admin-theme-toggle]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    applyAdminTheme(isAdminLightTheme() ? 'dark' : 'light', true);
+                });
+            });
+            window.addEventListener('storage', (event) => {
+                if (event.key === ADMIN_THEME_STORAGE_KEY) applyAdminTheme(event.newValue === 'light' ? 'light' : 'dark');
+            });
+        }
+
+        setupAdminThemeToggle();
+
         const money = (value) => `${Number(value || 0).toLocaleString('ru-RU')} ₽`;
         const num = (value) => Number(value || 0).toLocaleString('ru-RU');
         const pct = (value) => `${Number(value || 0).toFixed(1)}%`;
@@ -2515,22 +2699,104 @@
         // более читаемые карточки. Пользователь может переключать вид вручную.
         let sourcesViewMode = window.matchMedia('(max-width: 1024px)').matches ? 'cards' : 'table';
         let sourcesSort = {key: 'subscriptions', dir: 'desc'};
+        // Единая палитра серий данных на графиках.
+        //
+        // Тона намеренно разнесены по цветовому кругу: соседние серии в стеке
+        // должны отличаться тоном, а не только светлотой, иначе на баре из 5-7
+        // сегментов ничего не разобрать. Золотая тема интерфейса остаётся в
+        // рамках и акцентах, но серии данных ей не подчиняются — читаемость важнее.
+        //
+        // dark  — исторические цвета тёмной темы (совпадают с версией до редизайна);
+        // light — те же тона, но затемнённые и насыщенные под белый фон: светлый
+        //         пастельный тон на #f4f5f7 даёт недостаточный контраст.
+        const CHART_TONES = Object.freeze({
+            indigo: {dark: 'rgba(120,140,255,.75)', light: 'rgba(67,80,207,.92)'},
+            indigoSoft: {dark: 'rgba(120,140,255,.65)', light: 'rgba(67,80,207,.72)'},
+            amber: {dark: 'rgba(255,199,0,.9)', light: 'rgba(169,116,0,.95)'},
+            amberSoft: {dark: 'rgba(255,199,0,.55)', light: 'rgba(169,116,0,.58)'},
+            green: {dark: 'rgba(90,220,150,.95)', light: 'rgba(9,120,76,.95)'},
+            violet: {dark: '#9b6dff', light: '#8021d0'},
+            orange: {dark: '#f5b85b', light: '#c8500a'},
+            slate: {dark: '#d8dde8', light: '#4d5768'},
+            sky: {dark: '#38bdf8', light: '#046f9f'},
+            pink: {dark: '#f472b6', light: '#b82a70'},
+            // Нейтральные тона для вспомогательных линий (медиана, коридор p25/p75).
+            neutral: {dark: 'rgba(255,255,255,.8)', light: 'rgba(38,44,54,.84)'},
+            neutralSoft: {dark: 'rgba(255,255,255,.25)', light: 'rgba(38,44,54,.30)'},
+        });
+
+        // Резолвит имя тона в цвет текущей темы. Неизвестное значение возвращается
+        // как есть — так продолжают работать вызовы с готовой CSS-строкой.
+        function chartTone(name) {
+            const tone = CHART_TONES[name];
+            if (!tone) return name;
+            return isAdminLightTheme() ? tone.light : tone.dark;
+        }
+
+        const acquisitionChartTones = Object.freeze({repeat: 'indigo', new: 'amber', payers: 'green'});
+        const acquisitionChartColor = (key) => chartTone(acquisitionChartTones[key]);
         const acquisitionChartColors = Object.freeze({
-            repeat: 'rgba(120,140,255,.75)',
-            new: 'rgba(255,199,0,.9)',
-            payers: 'rgba(90,220,150,.95)',
+            repeat: CHART_TONES.indigo.dark,
+            new: CHART_TONES.amber.dark,
+            payers: CHART_TONES.green.dark,
+        });
+        const acquisitionChartColorsLight = Object.freeze({
+            repeat: CHART_TONES.indigo.light,
+            new: CHART_TONES.amber.light,
+            payers: CHART_TONES.green.light,
         });
         // Первые два цвета буквально совпадают с «Новые vs повторные»; остальные
-        // намеренно различаются по тону, а не являются соседними оттенками зелёного.
-        const tariffChartColors = [
-            acquisitionChartColors.repeat,
-            acquisitionChartColors.new,
-            '#9b6dff',
-            '#f5b85b',
-            '#d8dde8',
-            '#38bdf8',
-            '#f472b6',
-        ];
+        // намеренно различаются по тону, а не являются соседними оттенками жёлтого.
+        const tariffChartTones = Object.freeze(['indigo', 'amber', 'violet', 'orange', 'slate', 'sky', 'pink']);
+        const tariffChartColors = tariffChartTones.map((tone) => CHART_TONES[tone].dark);
+        const tariffChartColorsLight = tariffChartTones.map((tone) => CHART_TONES[tone].light);
+
+        // Служебные цвета «обвязки» графика (сетка, подписи, легенда).
+        // Подписи осей и легенда подняты по контрасту относительно фона: при
+        // прежних .62/.7 цифры на осях читались хуже самих данных.
+        function adminChartUiColor(token) {
+            const dark = {
+                highlight: 'rgba(255,255,255,.07)',
+                grid: 'rgba(127,143,163,.26)',
+                gridStrong: 'rgba(127,143,163,.42)',
+                label: 'rgba(206,215,228,.84)',
+                guide: 'rgba(206,215,228,.66)',
+                pointBorder: '#111720',
+                empty: 'rgba(255,255,255,.5)',
+                legend: 'rgba(255,255,255,.88)',
+                barSeparator: 'rgba(10,12,17,.55)',
+            };
+            const light = {
+                highlight: 'rgba(26,31,39,.065)',
+                grid: 'rgba(63,70,82,.20)',
+                gridStrong: 'rgba(63,70,82,.36)',
+                label: 'rgba(44,51,62,.86)',
+                guide: 'rgba(44,51,62,.60)',
+                pointBorder: '#ffffff',
+                empty: 'rgba(53,60,70,.66)',
+                legend: 'rgba(26,31,39,.90)',
+                barSeparator: 'rgba(255,255,255,.72)',
+            };
+            return (isAdminLightTheme() ? light : dark)[token];
+        }
+
+        // Подпись деления оси. Крупные суммы сокращаются, иначе числа не
+        // помещаются в отступ и налезают на область построения.
+        function adminChartAxisLabel(value, fmt = 'raw') {
+            if (fmt === 'pct') return `${Math.round(value)}%`;
+            const abs = Math.abs(value);
+            if (abs >= 1000000) return `${(value / 1000000).toFixed(abs >= 10000000 ? 0 : 1).replace('.', ',')} млн`;
+            if (abs >= 10000) return `${Math.round(value / 1000)} тыс`;
+            return num(Math.round(value));
+        }
+
+        // Цвет серии резолвится лениво, на каждой перерисовке: серии хранят имя
+        // тона, поэтому переключение темы перекрашивает уже отрисованные графики.
+        // Строка в series.color поддержана для совместимости со старыми вызовами.
+        function adminChartSeriesColor(series) {
+            if (series?.tone) return chartTone(series.tone);
+            return String(series?.color || '') || adminChartUiColor('legend');
+        }
 
         function escapeHtml(value) {
             return String(value || '')
@@ -2641,9 +2907,16 @@
             }
         }
 
+        function setDatePickerExpanded(field, isExpanded) {
+            field.querySelector('[data-date-trigger]')?.setAttribute('aria-expanded', String(isExpanded));
+        }
+
         function closeDatePickers(exceptField = null) {
             document.querySelectorAll('[data-date-picker].open').forEach((field) => {
-                if (field !== exceptField) field.classList.remove('open');
+                if (field !== exceptField) {
+                    field.classList.remove('open');
+                    setDatePickerExpanded(field, false);
+                }
             });
             document.querySelectorAll('.form-card.date-popover-open').forEach((form) => {
                 const hasOpenPicker = form.querySelector('[data-date-picker].open');
@@ -2690,10 +2963,12 @@
                 setDateFieldValue(field, isoFromLocalDate(new Date()));
                 clearCohortPresetActiveForField(field);
                 field.classList.remove('open');
+                setDatePickerExpanded(field, false);
                 field.closest('.form-card')?.classList.remove('date-popover-open');
             });
             popover.querySelector('[data-date-close]').addEventListener('click', () => {
                 field.classList.remove('open');
+                setDatePickerExpanded(field, false);
                 field.closest('.form-card')?.classList.remove('date-popover-open');
             });
             popover.querySelectorAll('[data-date-day]').forEach((button) => {
@@ -2702,25 +2977,33 @@
                     clearStatsPresetActive();
                     clearCohortPresetActiveForField(field);
                     field.classList.remove('open');
+                    setDatePickerExpanded(field, false);
                     field.closest('.form-card')?.classList.remove('date-popover-open');
                 });
             });
         }
 
         function setupDatePickers() {
-            document.querySelectorAll('[data-date-picker]').forEach((field) => {
+            document.querySelectorAll('[data-date-picker]').forEach((field, index) => {
                 const trigger = field.querySelector('[data-date-trigger]');
                 const input = field.querySelector('input[type="hidden"]');
+                const popover = field.querySelector('[data-date-popover]');
+                if (!popover.id) popover.id = `admin-date-popover-${index + 1}`;
+                popover.setAttribute('role', 'dialog');
+                trigger.setAttribute('aria-controls', popover.id);
+                trigger.setAttribute('aria-haspopup', 'dialog');
+                setDatePickerExpanded(field, false);
                 trigger.addEventListener('click', (event) => {
                     event.stopPropagation();
                     const selectedDate = localDateFromIso(input.value) || new Date();
                     const shouldOpen = !field.classList.contains('open');
                     closeDatePickers(field);
                     field.classList.toggle('open', shouldOpen);
+                    setDatePickerExpanded(field, shouldOpen);
                     field.closest('.form-card')?.classList.toggle('date-popover-open', shouldOpen);
                     if (shouldOpen) renderDatePicker(field, new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1));
                 });
-                field.querySelector('[data-date-popover]').addEventListener('click', (event) => event.stopPropagation());
+                popover.addEventListener('click', (event) => event.stopPropagation());
             });
             document.addEventListener('click', () => closeDatePickers());
         }
@@ -3000,7 +3283,7 @@
             if (!textarea || configJsonEditor || !window.CodeMirror) return;
             configJsonEditor = CodeMirror.fromTextArea(textarea, {
                 mode: {name: 'javascript', json: true},
-                theme: 'material-darker',
+                theme: isAdminLightTheme() ? 'default' : 'material-darker',
                 lineNumbers: true,
                 lineWrapping: false,
                 matchBrackets: true,
@@ -3595,7 +3878,8 @@
         function salesTariffColor(series, tariffName, fallbackIndex = 0) {
             const configuredIndex = (series?.tariff_names || []).indexOf(tariffName);
             const index = configuredIndex >= 0 ? configuredIndex : fallbackIndex;
-            return tariffChartColors[index % tariffChartColors.length];
+            const palette = isAdminLightTheme() ? tariffChartColorsLight : tariffChartColors;
+            return palette[index % palette.length];
         }
 
         function renderSalesChartLegend(series) {
@@ -3607,7 +3891,7 @@
             `);
             tariffItems.push(`
                 <span class="sales-chart-legend-item">
-                    <span class="sales-chart-line-swatch" style="--swatch:${acquisitionChartColors.payers}"></span>
+                    <span class="sales-chart-line-swatch" style="--swatch:${acquisitionChartColor('payers')}"></span>
                     Покупатели (правая ось)
                 </span>
             `);
@@ -3651,29 +3935,31 @@
 
             function render(highlightedIndex = null) {
                 ctx.clearRect(0, 0, width, height);
-                ctx.font = '700 10px Montserrat, system-ui, sans-serif';
+                ctx.font = '700 10px Manrope, system-ui, sans-serif';
                 ctx.lineWidth = 1;
                 ctx.textBaseline = 'middle';
 
                 if (highlightedIndex !== null) {
-                    ctx.fillStyle = 'rgba(255,255,255,.055)';
+                    ctx.fillStyle = adminChartUiColor('highlight');
                     ctx.fillRect(leftPadding + step * highlightedIndex, topPadding, step, plotHeight);
                 }
 
                 [0, .25, .5, .75, 1].forEach((ratio) => {
                     const y = topPadding + plotHeight - plotHeight * ratio;
-                    ctx.strokeStyle = 'rgba(127,143,163,.2)';
+                    // Нулевая линия контрастнее остальной сетки — от неё
+                    // считываются высоты столбиков.
+                    ctx.strokeStyle = adminChartUiColor(ratio === 0 ? 'gridStrong' : 'grid');
                     ctx.setLineDash([]);
                     ctx.beginPath();
                     ctx.moveTo(leftPadding, y);
                     ctx.lineTo(leftPadding + plotWidth, y);
                     ctx.stroke();
 
-                    ctx.fillStyle = 'rgba(196,205,218,.62)';
+                    ctx.fillStyle = adminChartUiColor('label');
                     ctx.textAlign = 'right';
-                    ctx.fillText(num(Math.round(maxRevenue * ratio)), leftPadding - 8, y);
+                    ctx.fillText(adminChartAxisLabel(maxRevenue * ratio), leftPadding - 8, y);
                     ctx.textAlign = 'left';
-                    ctx.fillText(num(Math.round(maxPayers * ratio)), leftPadding + plotWidth + 8, y);
+                    ctx.fillText(adminChartAxisLabel(maxPayers * ratio), leftPadding + plotWidth + 8, y);
                 });
 
                 buckets.forEach((row, index) => {
@@ -3684,13 +3970,20 @@
                         const revenue = Number(tariff.revenue || 0);
                         if (revenue <= 0) return;
                         const segmentHeight = Math.max(.8, plotHeight * revenue / maxRevenue);
+                        const isFirstSegment = y === topPadding + plotHeight;
                         y -= segmentHeight;
                         ctx.fillStyle = salesTariffColor(series, tariff.name, tariffIndex);
                         ctx.fillRect(x - barWidth / 2, y, barWidth, segmentHeight);
+                        // Разрез между сегментами стека, чтобы соседние тарифы
+                        // не читались как один сплошной столбик.
+                        if (!isFirstSegment && segmentHeight > 1.5) {
+                            ctx.fillStyle = adminChartUiColor('barSeparator');
+                            ctx.fillRect(x - barWidth / 2, y + segmentHeight - .5, barWidth, 1);
+                        }
                     });
                     if (!tariffs.length && Number(row.revenue || 0) > 0) {
                         const totalHeight = plotHeight * Number(row.revenue || 0) / maxRevenue;
-                        ctx.fillStyle = acquisitionChartColors.repeat;
+                        ctx.fillStyle = acquisitionChartColor('repeat');
                         ctx.fillRect(x - barWidth / 2, y - totalHeight, barWidth, totalHeight);
                     }
                 });
@@ -3701,14 +3994,14 @@
                     if (index === 0) ctx.moveTo(point.x, point.y);
                     else ctx.lineTo(point.x, point.y);
                 });
-                ctx.strokeStyle = acquisitionChartColors.payers;
+                ctx.strokeStyle = acquisitionChartColor('payers');
                 ctx.lineWidth = 2.5;
                 ctx.setLineDash([]);
                 ctx.stroke();
 
                 if (highlightedIndex !== null) {
                     const point = points[highlightedIndex];
-                    ctx.strokeStyle = 'rgba(196,205,218,.52)';
+                    ctx.strokeStyle = adminChartUiColor('guide');
                     ctx.lineWidth = 1;
                     ctx.setLineDash([3, 4]);
                     ctx.beginPath();
@@ -3718,23 +4011,32 @@
                     ctx.setLineDash([]);
                     ctx.beginPath();
                     ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
-                    ctx.fillStyle = acquisitionChartColors.payers;
+                    ctx.fillStyle = acquisitionChartColor('payers');
                     ctx.fill();
-                    ctx.strokeStyle = '#111720';
+                    ctx.strokeStyle = adminChartUiColor('pointBorder');
                     ctx.lineWidth = 2;
                     ctx.stroke();
                 }
 
                 const maxLabels = Math.max(3, Math.floor(plotWidth / 90));
                 const every = Math.max(1, Math.ceil(buckets.length / maxLabels));
-                ctx.fillStyle = 'rgba(196,205,218,.62)';
-                ctx.font = '700 9px Montserrat, system-ui, sans-serif';
+                ctx.fillStyle = adminChartUiColor('label');
+                ctx.font = '700 9px Manrope, system-ui, sans-serif';
                 ctx.textBaseline = 'top';
+                // Последняя подпись рисуется всегда, но не должна наезжать на
+                // предыдущую: раньше на краю получалась каша из двух дат.
+                let lastLabelRight = -Infinity;
                 buckets.forEach((row, index) => {
-                    if (index % every !== 0 && index !== buckets.length - 1) return;
+                    const isLast = index === buckets.length - 1;
+                    if (index % every !== 0 && !isLast) return;
+                    const text = String(row.label || '').slice(0, 18);
                     const point = pointForIndex(index);
-                    ctx.textAlign = index === buckets.length - 1 ? 'right' : 'center';
-                    ctx.fillText(String(row.label || '').slice(0, 18), point.x, topPadding + plotHeight + 10);
+                    const textWidth = ctx.measureText(text).width;
+                    const left = isLast ? point.x - textWidth : point.x - textWidth / 2;
+                    if (left < lastLabelRight + 6) return;
+                    lastLabelRight = left + textWidth;
+                    ctx.textAlign = isLast ? 'right' : 'center';
+                    ctx.fillText(text, point.x, topPadding + plotHeight + 10);
                 });
             }
 
@@ -3779,17 +4081,17 @@
                 tooltip.innerHTML = `
                     <strong>${escapeHtml(labelFormatter(row) || '')}</strong>
                     <div class="sales-chart-tooltip-row">
-                        <span class="sales-chart-tooltip-dot" style="--swatch:${acquisitionChartColors.payers}"></span>
+                        <span class="sales-chart-tooltip-dot" style="--swatch:${acquisitionChartColor('payers')}"></span>
                         <span>Покупатели</span>
                         <span class="sales-chart-tooltip-value">${num(row.unique_paying_users)}</span>
                     </div>
                     <div class="sales-chart-tooltip-row">
-                        <span class="sales-chart-tooltip-dot" style="--swatch:${acquisitionChartColors.new}"></span>
+                        <span class="sales-chart-tooltip-dot" style="--swatch:${acquisitionChartColor('new')}"></span>
                         <span>Выручка</span>
                         <span class="sales-chart-tooltip-value">${money(row.revenue)}</span>
                     </div>
                     <div class="sales-chart-tooltip-row">
-                        <span class="sales-chart-tooltip-dot" style="--swatch:${acquisitionChartColors.repeat}"></span>
+                        <span class="sales-chart-tooltip-dot" style="--swatch:${acquisitionChartColor('repeat')}"></span>
                         <span>Платежи</span>
                         <span class="sales-chart-tooltip-value">${num(row.payments)}</span>
                     </div>
@@ -4361,6 +4663,101 @@
         // ---------- Карточка клиента: профиль + подписка + платежи + рефералы ----------
 
         const clientCardState = {q: '', lastAction: ''};
+        const CLIENT_RECENT_STORAGE_KEY = 'monkey_island_admin_recent_clients_v1';
+
+        function readRecentClients() {
+            try {
+                const stored = JSON.parse(sessionStorage.getItem(CLIENT_RECENT_STORAGE_KEY) || '[]');
+                return Array.isArray(stored)
+                    ? stored.filter((item) => item && item.query && item.label).slice(0, 5)
+                    : [];
+            } catch (error) {
+                return [];
+            }
+        }
+
+        function writeRecentClients(clients) {
+            try {
+                sessionStorage.setItem(CLIENT_RECENT_STORAGE_KEY, JSON.stringify(clients.slice(0, 5)));
+            } catch (error) {
+                console.warn('Не удалось сохранить недавних клиентов в текущей сессии', error);
+            }
+        }
+
+        function compactClientIdentifier(value) {
+            const text = String(value || '').trim();
+            if (!text || text.length <= 8) return text;
+            return `${text.slice(0, 4)}…${text.slice(-4)}`;
+        }
+
+        function rememberRecentClient(user) {
+            if (!user) return;
+            const query = String(user.username || user.email || user.telegram_id || '').trim();
+            if (!query) return;
+            const label = user.username
+                ? `@${user.username}`
+                : (user.email || `Telegram ${user.telegram_id}`);
+            const secondary = user.username
+                ? (user.telegram_id || user.email)
+                : (user.telegram_id && user.email ? user.telegram_id : '');
+            const recent = {
+                id: String(user.id || query),
+                query,
+                label,
+                meta: compactClientIdentifier(secondary),
+            };
+            const clients = readRecentClients().filter((item) => item.id !== recent.id && item.query !== recent.query);
+            writeRecentClients([recent, ...clients]);
+        }
+
+        function renderClientStartState() {
+            const target = document.getElementById('user-payments-result');
+            if (!target) return;
+            const recentClients = readRecentClients();
+            const recentHtml = recentClients.length
+                ? recentClients.map((client) => `
+                    <button type="button" class="client-recent-button" data-client-recent-query="${escapeHtml(client.query)}">
+                        <span class="client-recent-identity">
+                            <strong>${escapeHtml(client.label)}</strong>
+                            ${client.meta ? `<span>${escapeHtml(client.meta)}</span>` : ''}
+                        </span>
+                        <i class="fas fa-arrow-right" aria-hidden="true"></i>
+                    </button>
+                `).join('')
+                : '<div class="client-recent-empty"><i class="fas fa-clock-rotate-left"></i><span>Здесь появятся последние пять найденных клиентов в текущей сессии.</span></div>';
+            target.innerHTML = `
+                <div class="client-start-state">
+                    <section class="card client-start-hero">
+                        <div class="client-start-icon"><i class="fas fa-user"></i></div>
+                        <div>
+                            <h2>Начните с поиска клиента</h2>
+                            <p>Введите один точный идентификатор. После поиска откроются профиль, подписка, платежи и реферальная история.</p>
+                            <div class="client-start-capabilities" aria-label="Данные карточки клиента">
+                                <span><i class="fas fa-address-card"></i>Профиль</span>
+                                <span><i class="fas fa-shield-halved"></i>Подписка</span>
+                                <span><i class="fas fa-receipt"></i>Платежи</span>
+                                <span><i class="fas fa-network-wired"></i>Рефералы</span>
+                            </div>
+                        </div>
+                    </section>
+                    <div class="client-start-grid">
+                        <section class="card client-start-card">
+                            <div class="client-start-card-title"><i class="fas fa-clock-rotate-left"></i><span>Недавно просмотренные</span><small>до 5</small></div>
+                            <div class="client-recent-list">${recentHtml}</div>
+                        </section>
+                        <section class="card client-start-card">
+                            <div class="client-start-card-title"><i class="fas fa-circle-info"></i><span>Как искать</span></div>
+                            <div class="client-search-hints">
+                                <div><strong>Username</strong><span>без символа @</span></div>
+                                <div><strong>Email</strong><span>полный адрес</span></div>
+                                <div><strong>Telegram ID</strong><span>только цифры</span></div>
+                            </div>
+                            <div class="client-enter-hint"><kbd>Enter</kbd><span>найти клиента</span></div>
+                        </section>
+                    </div>
+                </div>
+            `;
+        }
 
         async function loadClientCard(event) {
             event.preventDefault();
@@ -4403,12 +4800,37 @@
                 </section>`;
         }
 
+        function clientReferralControlHtml(refResult) {
+            if (!refResult) return '';
+            const block = refResult?.referral_block || {};
+            const isBlocked = Boolean(block.blocked);
+            const canManage = main.dataset.fullAdmin === '1';
+            const updatedAt = block.updated_at || block.created_at || '';
+            const actionsHtml = canManage
+                ? (isBlocked
+                    ? `<button class="btn btn-secondary" type="button" data-client-referral-block-action="unblock"><i class="fas fa-unlock"></i>Разблокировать рефералку</button>`
+                    : `
+                        <input class="input" type="text" maxlength="255" data-client-referral-block-reason placeholder="Причина блокировки">
+                        <button class="btn btn-danger" type="button" data-client-referral-block-action="block"><i class="fas fa-ban"></i>Заблокировать рефералку</button>
+                    `)
+                : '';
+            return `
+                <div class="client-sub-action client-ref-control ${isBlocked ? 'is-blocked' : ''}">
+                    <div class="client-ref-control-title-row">
+                        <div class="client-sub-action-title">Реферальная программа</div>
+                        <span class="client-ref-status ${isBlocked ? 'is-blocked' : 'is-active'}">${isBlocked ? 'Заблокирована' : 'Доступна'}</span>
+                    </div>
+                    <div class="client-sub-action-desc">${isBlocked ? 'Новые реферальные бонусы для этого клиента не начисляются.' : 'Запрещает клиенту получать новые бонусы за приглашённых пользователей.'}</div>
+                    ${block.reason ? `<div class="client-ref-control-meta"><strong>Причина:</strong> ${escapeHtml(block.reason)}</div>` : ''}
+                    ${updatedAt ? `<div class="client-ref-control-meta"><strong>Обновлено:</strong> ${escapeHtml(updatedAt)}</div>` : ''}
+                    ${actionsHtml ? `<div class="client-sub-action-controls client-ref-control-actions">${actionsHtml}</div>` : ''}
+                </div>
+            `;
+        }
+
         function clientReferralsSectionHtml(refResult) {
             if (!refResult) return '<div class="card info-card muted">Данные по рефералам недоступны.</div>';
             const referrals = refResult.referrals || [];
-            const blockHtml = refResult.referral_block?.blocked
-                ? `<section class="card info-card client-ref-blocked"><i class="fas fa-ban"></i>Рефералка заблокирована${refResult.referral_block.reason ? ` — ${escapeHtml(refResult.referral_block.reason)}` : ''}</section>`
-                : '';
             const metricsHtml = `
                 <div class="metrics-grid three">
                     ${metric('Рефералов', refResult.summary.referrals, 'fa-user-plus')}
@@ -4416,10 +4838,9 @@
                     ${metric('Бонусных дней', refResult.summary.bonus_days, 'fa-gift')}
                 </div>`;
             if (!referrals.length) {
-                return `${blockHtml}${metricsHtml}<div class="card info-card muted client-empty">У клиента пока нет приглашённых рефералов.</div>`;
+                return `${metricsHtml}<div class="card info-card muted client-empty">У клиента пока нет приглашённых рефералов.</div>`;
             }
             return `
-                ${blockHtml}
                 ${metricsHtml}
                 <section class="card info-card"><h3 class="info-title">Граф приглашений</h3><div id="referral-graph"></div></section>
                 <section class="referral-cards">
@@ -4454,11 +4875,11 @@
                 </section>`;
         }
 
-        function clientSubscriptionManageHtml() {
+        function clientSubscriptionManageHtml(refResult) {
             if (main.dataset.fullAdmin !== '1') return '';
             return `
                 <section class="card client-sub-card">
-                    <h3 class="info-title"><i class="fas fa-hourglass-half"></i> Управление подпиской</h3>
+                    <h3 class="info-title"><i class="fas fa-user-gear"></i> Управление клиентом</h3>
                     ${clientCardState.lastAction ? `<div class="client-sub-last-action">${clientCardState.lastAction}</div>` : ''}
                     <div class="client-sub-actions">
                         <div class="client-sub-action">
@@ -4498,6 +4919,7 @@
                                 <button class="btn btn-danger" type="button" data-client-sub-action="temp_ban"><i class="fas fa-user-lock"></i>Забанить</button>
                             </div>
                         </div>
+                        ${clientReferralControlHtml(refResult)}
                     </div>
                 </section>`;
         }
@@ -4521,6 +4943,7 @@
             }
             if (!paymentsResponse.ok) return setError(target, 'Пользователь не найден');
             const {result} = await paymentsResponse.json();
+            rememberRecentClient(result.user);
             let refPayload = null;
             if (referralsResponse.ok) {
                 try { refPayload = await referralsResponse.json(); } catch (error) { refPayload = null; }
@@ -4534,7 +4957,7 @@
                         ${metric('Использование', escapeHtml(result.traffic), 'fa-signal')}
                         ${metric('Регистрация', escapeHtml(result.first_seen), 'fa-calendar')}
                     </div>
-                    ${clientSubscriptionManageHtml()}
+                    ${clientSubscriptionManageHtml(refPayload?.result)}
                     <div class="subtabs client-subtabs" role="tablist" aria-label="Разделы клиента">
                         <button type="button" class="subtab ${section === 'payments' ? 'active' : ''}" data-client-subtab="payments" role="tab"><i class="fas fa-receipt"></i>Платежи (${(result.history || []).length})</button>
                         <button type="button" class="subtab ${section === 'referrals' ? 'active' : ''}" data-client-subtab="referrals" role="tab"><i class="fas fa-network-wired"></i>Рефералы${typeof refCount === 'number' ? ` (${refCount})` : ''}</button>
@@ -4757,37 +5180,112 @@
             return setting.type === 'float' ? 'any' : '1';
         }
 
+        function settingTypeLabel(setting) {
+            return {
+                int: 'число',
+                float: 'число',
+                bool: 'вкл / выкл',
+                enum: 'список',
+                csv: 'список',
+                csv_int: 'список ID',
+                string: 'текст',
+            }[setting.type] || setting.type;
+        }
+
+        function settingSelectOptions(setting) {
+            if (setting.type === 'bool') {
+                return [
+                    {value: '1', label: 'Включено'},
+                    {value: '0', label: 'Выключено'},
+                ];
+            }
+            return (setting.allowed_values || []).map((value) => ({value, label: value}));
+        }
+
+        function settingControlHtml(setting) {
+            const currentValue = setting.sensitive ? '' : String(setting.value || '');
+            const label = `Значение настройки ${setting.key}`;
+            const selectOptions = settingSelectOptions(setting);
+            if (selectOptions.length) {
+                return `
+                    <div class="setting-select-shell">
+                        <select class="input setting-control" name="value" data-setting-control data-initial-value="${escapeHtml(currentValue)}" aria-label="${escapeHtml(label)}">
+                            <option value="" ${currentValue ? '' : 'selected'} disabled>Выберите значение</option>
+                            ${selectOptions.map((option) => `<option value="${escapeHtml(option.value)}" ${currentValue === option.value ? 'selected' : ''}>${escapeHtml(option.label)}</option>`).join('')}
+                        </select>
+                    </div>
+                `;
+            }
+            const inputType = setting.sensitive ? 'password' : settingInputType(setting);
+            const step = ['int', 'float'].includes(setting.type) ? ` step="${settingInputStep(setting)}"` : '';
+            return `<input class="input setting-control" name="value" type="${inputType}"${step} value="${escapeHtml(currentValue)}" data-setting-control data-initial-value="${escapeHtml(currentValue)}" placeholder="${escapeHtml(setting.display_value || 'env/default')}" aria-label="${escapeHtml(label)}" autocomplete="off" spellcheck="false">`;
+        }
+
         // slug соответствует контейнеру [data-settings-group] в подвкладках раздела «Система».
         const SETTING_GROUPS = [
             {slug: 'tariffs', keys: ['tariff_price_threedays', 'tariff_price_oneday', 'tariff_price_month', 'tariff_price_threemonths', 'tariff_price_sixmonths', 'tariff_price_year']},
             {slug: 'winback', keys: ['winback_price_month', 'winback_price_threemonths', 'winback_price_year', 'winback_send_hour_start', 'winback_send_hour_end', 'winback_offer_ttl_hours', 'winback_grace_hours']},
             {slug: 'payment', keys: ['payment_gateway', 'yookassa_shop_id', 'yookassa_secret', 'wata_host', 'wata_token']},
-            {slug: 'referral', keys: ['join_referrer_bonus_days', 'traffic_referrer_bonus_days', 'purchase_referrer_bonus_days', 'referral_bonus_days', 'referral_registration_autoblock_enabled', 'referral_registration_burst_limit', 'referral_registration_burst_window_minutes']},
+            {slug: 'referral', keys: ['join_referrer_bonus_days', 'traffic_referrer_bonus_days', 'purchase_referrer_bonus_days', 'referral_bonus_days']},
+            // Антифрод отрисовывается отдельной компактной карточкой, но ключи
+            // остаются сгруппированными, чтобы не дублироваться в «Прочих».
+            {slug: 'referral-antifraud', keys: ['referral_registration_autoblock_enabled', 'referral_registration_burst_limit', 'referral_registration_burst_window_minutes']},
             {slug: 'alerts', keys: ['traffic_usage_suspicious_gb', 'traffic_usage_alert_gb']},
             {slug: 'general', keys: ['trial_period_days', 'site_trial_registration_enabled', 'banned_telegram_ids', 'web_login_url', 'redirect_url', 'internal_squads_uuids', 'technical_work_enabled', 'apple_recommended_app']},
         ];
 
         function settingRowHtml(setting) {
             const statePill = setting.is_set
-                ? `<div><span class="setting-state-pill"><i class="fas fa-database" style="font-size:9px"></i>БД</span><span class="setting-state-date">${escapeHtml(setting.updated_at || '')}</span></div>`
+                ? `<span class="setting-state-pill"><i class="fas fa-database" style="font-size:9px"></i>БД</span>`
                 : `<span class="setting-state-pill fallback">env/default</span>`;
             return `
                 <form class="setting-row" data-setting-form>
                     <input type="hidden" name="key" value="${escapeHtml(setting.key)}">
-                    <div class="setting-row-head">
-                        <div class="setting-row-info">
+                    <div class="setting-row-info">
+                        <div class="setting-key-line">
                             <div class="setting-key">${escapeHtml(setting.key)}</div>
-                            <div class="setting-meta">${escapeHtml(setting.description || setting.type)}${setting.allowed_values?.length ? ` · ${escapeHtml(setting.allowed_values.join(', '))}` : ''}</div>
+                            <span class="setting-type-badge">${escapeHtml(settingTypeLabel(setting))}</span>
+                        </div>
+                        <div class="setting-meta">${escapeHtml(setting.description || setting.type)}</div>
+                        <span class="setting-dirty-indicator" data-setting-dirty hidden>Не сохранено</span>
+                    </div>
+                    <div class="setting-value-editor">
+                        ${settingControlHtml(setting)}
+                    </div>
+                    <div class="setting-row-side">
+                        <div class="setting-row-origin">
+                            ${statePill}
+                            ${setting.is_set ? `<span class="setting-state-date">${escapeHtml(setting.updated_at || '')}</span>` : ''}
                         </div>
                         <div class="setting-row-actions">
-                            ${statePill}
-                            <button class="btn btn-secondary" type="submit" name="action" value="save" title="Сохранить"><i class="fas fa-floppy-disk"></i></button>
-                            <button class="btn btn-danger" type="submit" name="action" value="delete" title="Сбросить к env/default"><i class="fas fa-rotate-left"></i></button>
+                            <button class="setting-action setting-action-save" type="submit" name="action" value="save" title="Сохранить значение в БД" aria-label="Сохранить значение в БД" disabled><i class="fas fa-check"></i><span>Сохранить</span></button>
+                            <button class="setting-action setting-action-reset" type="submit" name="action" value="delete" title="Сбросить к env/default" aria-label="Сбросить к env/default" ${setting.is_set ? '' : 'disabled'}><i class="fas fa-arrow-rotate-left"></i><span>Сбросить</span></button>
                         </div>
                     </div>
-                    <input class="input" name="value" type="${settingInputType(setting)}" step="${settingInputStep(setting)}" value="${escapeHtml(setting.sensitive ? '' : setting.value)}" placeholder="${escapeHtml(setting.display_value || 'env/default')}">
                 </form>
             `;
+        }
+
+        function settingsListHtml(rows) {
+            return `
+                <div class="settings-list-head" aria-hidden="true">
+                    <span>Параметр</span>
+                    <span>Значение</span>
+                    <span>Источник и действия</span>
+                </div>
+                ${rows.map(settingRowHtml).join('')}
+            `;
+        }
+
+        function updateSettingDirtyState(control) {
+            const form = control.closest('[data-setting-form]');
+            if (!form) return;
+            const isDirty = control.value !== control.dataset.initialValue;
+            form.classList.toggle('is-dirty', isDirty);
+            const saveButton = form.querySelector('.setting-action-save');
+            if (saveButton) saveButton.disabled = !isDirty;
+            const indicator = form.querySelector('[data-setting-dirty]');
+            if (indicator) indicator.hidden = !isDirty;
         }
 
         function renderRuntimeSettings(settings) {
@@ -4802,8 +5300,9 @@
                 const rows = slug === 'other'
                     ? ungrouped
                     : (group?.keys || []).map((k) => byKey[k]).filter(Boolean);
+                container.classList.toggle('has-settings', Boolean(rows.length));
                 container.innerHTML = rows.length
-                    ? rows.map(settingRowHtml).join('')
+                    ? settingsListHtml(rows)
                     : '<div class="info-card muted">Настроек нет.</div>';
             });
             const otherCard = document.querySelector('[data-settings-other-card]');
@@ -4813,7 +5312,10 @@
         async function loadRuntimeSettings(silent = false) {
             const containers = document.querySelectorAll('[data-settings-group]');
             if (!containers.length || !main.dataset.runtimeSettingsUrl) return;
-            if (!silent) containers.forEach((container) => { container.innerHTML = inlineLoading('Загружаем настройки...'); });
+            if (!silent) containers.forEach((container) => {
+                container.classList.remove('has-settings');
+                container.innerHTML = inlineLoading('Загружаем настройки...');
+            });
             const response = await fetch(main.dataset.runtimeSettingsUrl, {
                 headers: {'X-Requested-With': 'XMLHttpRequest'},
                 cache: 'no-store',
@@ -4831,6 +5333,7 @@
             if (!form) return;
             event.preventDefault();
             const submitter = event.submitter;
+            if ((submitter?.value || 'save') === 'save' && !form.classList.contains('is-dirty')) return;
             const formData = new FormData(form);
             formData.set('action', submitter?.value || 'save');
             const response = await fetch(main.dataset.runtimeSettingsUrl, {
@@ -4862,18 +5365,33 @@
                 form.elements.limit.value = limit?.value || '';
                 form.elements.window_minutes.value = windowMinutes?.value || '';
             }
+            // Переключатель остаётся submit-кнопкой формы: значение value —
+            // это action ('enable'/'disable'), который уходит на тот же эндпоинт.
             if (toggle) {
                 toggle.value = isEnabled ? 'disable' : 'enable';
-                toggle.classList.toggle('btn-danger', isEnabled);
-                toggle.classList.toggle('btn-secondary', !isEnabled);
-                toggle.querySelector('i').className = `fas ${isEnabled ? 'fa-toggle-off' : 'fa-toggle-on'}`;
-                toggle.querySelector('span').textContent = isEnabled ? 'Выключить' : 'Включить';
+                toggle.setAttribute('aria-checked', String(isEnabled));
+                const actionLabel = isEnabled ? 'Выключить' : 'Включить';
+                toggle.title = actionLabel;
+                const label = toggle.querySelector('[data-antifraud-toggle-label]');
+                if (label) label.textContent = actionLabel;
             }
-            target.innerHTML = `
-                <div class="info-item"><div class="cell-label">Автоблокировка</div><div class="cell-value ${isEnabled ? 'green' : 'red'}">${isEnabled ? 'Включена' : 'Выключена или env/default'}</div></div>
-                <div class="info-item"><div class="cell-label">Лимит</div><div class="cell-value">${escapeHtml(limit?.display_value || 'env/default')}</div></div>
-                <div class="info-item"><div class="cell-label">Окно</div><div class="cell-value">${escapeHtml(windowMinutes?.display_value || 'env/default')} мин.</div></div>
-            `;
+            const panel = form?.querySelector('.antifraud-panel');
+            if (panel) {
+                panel.classList.toggle('is-enabled', isEnabled);
+                const state = panel.querySelector('[data-antifraud-state]');
+                if (state) state.textContent = isEnabled ? 'Включена' : 'Выключена';
+                const currentLimit = panel.querySelector('[data-antifraud-current="limit"]');
+                if (currentLimit) currentLimit.textContent = limit?.display_value || 'env/default';
+                const currentWindow = panel.querySelector('[data-antifraud-current="window_minutes"]');
+                if (currentWindow) {
+                    currentWindow.textContent = windowMinutes?.display_value
+                        ? `${windowMinutes.display_value} мин.`
+                        : 'env/default';
+                }
+            }
+            // Слот статуса используется только под индикатор загрузки и ошибки:
+            // сами значения теперь живут в единой панели и не дублируются.
+            target.innerHTML = '';
         }
 
         async function loadReferralAntifraud() {
@@ -4912,79 +5430,42 @@
             showAdminToast('Антифрод обновлен');
         }
 
-        async function submitReferralBlock(event) {
-            event.preventDefault();
-            const target = document.getElementById('referral-block-result');
-            const formData = new FormData(event.target);
-            formData.set('action', event.submitter?.value || 'status');
-            target.innerHTML = inlineLoading('Проверяем...');
-            const response = await fetch(main.dataset.referralBlockUrl, {
-                method: 'POST',
-                body: formData,
-                headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
-            });
-            if (!response.ok) {
-                target.innerHTML = inlineError('Пользователь не найден');
+        async function clientReferralBlockAction(button) {
+            const action = button.dataset.clientReferralBlockAction;
+            const reason = document.querySelector('[data-client-referral-block-reason]')?.value.trim() || '';
+            if (action === 'block' && !reason) {
+                showAdminToast('Укажите причину блокировки рефералки', 'error');
                 return;
             }
-            const {result} = await response.json();
-            updateReferralBlockToggle(result.blocked);
-            const u = result.user || {};
-            target.innerHTML = `
-                <section class="card info-card">
-                    <p style="font-size:13px;font-weight:800;margin-bottom:8px;overflow-wrap:anywhere">@${escapeHtml(u.username || '—')}</p>
-                    ${u.email ? `<p style="font-size:12px;color:var(--muted);font-weight:700;margin-bottom:4px;overflow-wrap:anywhere">${escapeHtml(u.email)}</p>` : ''}
-                    ${u.telegram_id ? `<p style="font-size:12px;color:var(--muted);font-weight:700;margin-bottom:8px">tg ${escapeHtml(u.telegram_id)}</p>` : ''}
-                    <p>Рефералка: <span class="${result.blocked ? 'red' : 'green'}">${result.blocked ? 'заблокирована' : 'доступна'}</span></p>
-                    ${result.reason ? `<p>Причина: <span class="cell-value">${escapeHtml(result.reason)}</span></p>` : ''}
-                    ${result.updated_at ? `<p>Обновлено: <span class="muted">${escapeHtml(result.updated_at)}</span></p>` : ''}
-                </section>
-            `;
-        }
+            const confirmation = action === 'unblock'
+                ? 'Разблокировать реферальную программу этого клиента?'
+                : 'Заблокировать реферальную программу этого клиента? Новые бонусы перестанут начисляться.';
+            if (!confirm(confirmation)) return;
 
-        function updateReferralBlockToggle(isBlocked) {
-            const toggle = document.getElementById('referral-block-toggle');
-            if (!toggle) return;
-            toggle.value = isBlocked ? 'unblock' : 'block';
-            toggle.disabled = false;
-            toggle.classList.toggle('btn-danger', !isBlocked);
-            toggle.classList.toggle('btn-secondary', isBlocked);
-            toggle.querySelector('i').className = `fas ${isBlocked ? 'fa-unlock' : 'fa-ban'}`;
-            toggle.querySelector('span').textContent = isBlocked ? 'Разблокировать' : 'Заблокировать';
-        }
-
-        async function loadRecurrents() {
-            const target = document.getElementById('system-operations-result');
-            target.innerHTML = inlineLoading('Загружаем автоплатежи...');
-            const response = await fetch(`${main.dataset.recurrentsUrl}?limit=50`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
-            if (!response.ok) {
-                target.innerHTML = inlineError('Не удалось загрузить автоплатежи');
-                return;
+            const formData = new FormData();
+            formData.set('csrfmiddlewaretoken', csrfToken);
+            formData.set('q', clientCardState.q);
+            formData.set('action', action);
+            if (reason) formData.set('reason', reason);
+            button.disabled = true;
+            try {
+                const response = await fetch(main.dataset.referralBlockUrl, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                });
+                if (!response.ok) {
+                    const payload = await response.json().catch(() => ({}));
+                    showAdminToast(payload.message || 'Не удалось изменить доступ к рефералке', 'error');
+                    return;
+                }
+                showAdminToast(action === 'unblock' ? 'Рефералка разблокирована' : 'Рефералка заблокирована');
+                await renderClientCard();
+            } catch (error) {
+                showAdminToast('Ошибка запроса блокировки рефералки', 'error');
+            } finally {
+                if (button.isConnected) button.disabled = false;
             }
-            const payload = await response.json();
-            target.innerHTML = `
-                <section class="card info-card">
-                    <h3 class="info-title">Автоплатежи</h3>
-                    ${(payload.recurrents || []).map((row) => `<p>${escapeHtml(row.user.username || row.user.telegram_id)} · ${escapeHtml(row.tariff)} · ${money(row.amount)} · ${escapeHtml(row.captured_at)}</p>`).join('') || '<p class="muted">Автоплатежей нет.</p>'}
-                </section>
-            `;
-        }
-
-        async function loadTopPayments() {
-            const target = document.getElementById('system-operations-result');
-            target.innerHTML = inlineLoading('Загружаем топ оплат...');
-            const response = await fetch(`${main.dataset.topPaymentsUrl}?limit=20`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
-            if (!response.ok) {
-                target.innerHTML = inlineError('Не удалось загрузить топ оплат');
-                return;
-            }
-            const payload = await response.json();
-            target.innerHTML = `
-                <section class="card info-card">
-                    <h3 class="info-title">Топ оплат</h3>
-                    ${(payload.top || []).map((row, index) => `<p>${index + 1}. ${escapeHtml(row.user.username || row.user.telegram_id)} · ${money(row.amount)} · ${row.payments_count} оплат</p>`).join('') || '<p class="muted">Оплат нет.</p>'}
-                </section>
-            `;
         }
 
         function ticketCardHtml(ticket, shouldHighlight) {
@@ -5035,7 +5516,13 @@
         }
 
         let nodeTrafficNodesLoaded = false;
+        let nodeTrafficInitialReportLoaded = false;
         async function initNodeTrafficTab() {
+            const form = document.getElementById('node-traffic-form');
+            if (!nodeTrafficInitialReportLoaded && form) {
+                nodeTrafficInitialReportLoaded = true;
+                loadNodeTrafficForForm(form);
+            }
             if (nodeTrafficNodesLoaded) return;
             const select = document.getElementById('node-traffic-node');
             if (!select || !main.dataset.trafficNodesUrl) return;
@@ -5069,10 +5556,9 @@
             return `${n.toFixed(2)} ${units[i]}`;
         }
 
-        async function loadNodeTraffic(event) {
-            event.preventDefault();
+        async function loadNodeTrafficForForm(form) {
             const target = document.getElementById('node-traffic-result');
-            const params = new URLSearchParams(new FormData(event.target));
+            const params = new URLSearchParams(new FormData(form));
             if (!params.get('min_gib')) params.set('min_gib', '0');
             setLoading(target, 'Собираем статистику трафика — на длинных периодах это может занять до минуты...');
             try {
@@ -5086,6 +5572,11 @@
             } catch (error) {
                 setError(target, 'Ошибка запроса статистики трафика');
             }
+        }
+
+        function loadNodeTraffic(event) {
+            event.preventDefault();
+            return loadNodeTrafficForForm(event.currentTarget || event.target);
         }
 
         function renderNodeTraffic(target, report) {
@@ -5209,6 +5700,7 @@
                 renderCensorKeys();
                 populateCensorKeySelect();
                 renderCensorChecks(target);
+                updateCensorBulkFormState();
                 scheduleCensorAutoRefresh();
             } catch (error) {
                 setError(target, 'Ошибка запроса списка проверок');
@@ -5255,15 +5747,92 @@
         }
 
         function populateCensorKeySelect() {
-            const select = document.getElementById('censor-check-key');
-            if (!select) return;
-            const current = select.value;
             const defaultKey = censorKeysCache.find((key) => key.is_default);
             const defaultLabel = defaultKey ? `Ключ по умолчанию (${defaultKey.name})` : 'Ключ по умолчанию';
             const options = [`<option value="">${escapeHtml(defaultLabel)}</option>`]
                 .concat(censorKeysCache.map((key) => `<option value="${key.id}">${escapeHtml(key.name)}</option>`));
-            select.innerHTML = options.join('');
-            select.value = current;
+            ['censor-check-key', 'censor-bulk-key'].forEach((selectId) => {
+                const select = document.getElementById(selectId);
+                if (!select) return;
+                const current = select.value;
+                select.innerHTML = options.join('');
+                select.value = Array.from(select.options).some((option) => option.value === current) ? current : '';
+            });
+        }
+
+        function censorBulkSelection(form) {
+            if (!form) return [];
+            return [
+                {flag: 'apply_mode', control: 'mode', label: 'Режим'},
+                {flag: 'apply_api_key', control: 'api_key_id', label: 'Ключ'},
+                {flag: 'apply_interval', control: 'interval_minutes', label: 'Расписание'},
+                {flag: 'apply_alerts', control: 'alerts_enabled', label: 'TG-алерты'},
+                {flag: 'apply_enabled', control: 'is_enabled', label: 'Состояние'},
+            ].filter((item) => form.elements[item.flag]?.checked).map((item) => {
+                const control = form.elements[item.control];
+                const value = control?.selectedOptions?.[0]?.textContent?.trim() || control?.value || '';
+                return {...item, value};
+            });
+        }
+
+        function updateCensorBulkFormState() {
+            const form = document.getElementById('censor-bulk-form');
+            if (!form) return;
+            const selection = censorBulkSelection(form);
+            form.querySelectorAll('[data-censor-bulk-field]').forEach((field) => {
+                const checkbox = field.querySelector('.censor-bulk-enable input[type="checkbox"]');
+                field.classList.toggle('is-selected', !!checkbox?.checked);
+            });
+            const count = censorChecksCache.length;
+            const countElement = document.getElementById('censor-bulk-count');
+            if (countElement) countElement.textContent = `Проверок: ${num(count)}`;
+            const help = document.getElementById('censor-bulk-help');
+            if (help) {
+                help.textContent = selection.length
+                    ? `Будут изменены: ${selection.map((item) => item.label.toLowerCase()).join(', ')}.`
+                    : 'Выберите хотя бы один параметр для массового изменения.';
+            }
+            const submit = document.getElementById('censor-bulk-submit');
+            if (submit) submit.disabled = !count || !selection.length;
+        }
+
+        async function submitCensorBulk(event) {
+            event.preventDefault();
+            const form = event.target;
+            const selection = censorBulkSelection(form);
+            const count = censorChecksCache.length;
+            if (!selection.length || !count) {
+                updateCensorBulkFormState();
+                return;
+            }
+            const summary = selection.map((item) => `${item.label}: ${item.value}`).join('\n');
+            if (!confirm(`Применить настройки ко всем проверкам (${count})?\n\n${summary}\n\nТекущие и завершённые замеры не изменятся.`)) return;
+
+            const body = new FormData(form);
+            body.append('action', 'bulk_update');
+            const submit = document.getElementById('censor-bulk-submit');
+            if (submit) submit.disabled = true;
+            try {
+                const response = await fetch(main.dataset.censorChecksUrl, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                    body,
+                });
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    showAdminToast(payload.message || 'Не удалось применить массовые настройки', 'error');
+                    return;
+                }
+                showAdminToast(`Обновлено проверок: ${num(payload.updated || 0)}`);
+                form.querySelectorAll('input[type="checkbox"][name^="apply_"]').forEach((checkbox) => {
+                    checkbox.checked = false;
+                });
+                await loadCensorChecks();
+            } catch (error) {
+                showAdminToast('Ошибка массового обновления проверок', 'error');
+            } finally {
+                updateCensorBulkFormState();
+            }
         }
 
         async function ripeKeyAction(payloadObject) {
@@ -5624,6 +6193,15 @@
         }
 
         document.addEventListener('click', (event) => {
+            const recentClientButton = event.target.closest('[data-client-recent-query]');
+            if (recentClientButton) {
+                const form = document.getElementById('user-payments-form');
+                if (form) {
+                    form.elements.q.value = recentClientButton.dataset.clientRecentQuery;
+                    form.requestSubmit();
+                }
+            }
+
             const runButton = event.target.closest('[data-censor-run]');
             if (runButton) censorCheckAction(runButton.dataset.censorRun, 'run');
             const toggleButton = event.target.closest('[data-censor-toggle]');
@@ -5660,29 +6238,40 @@
             if (clientSubtabButton) showClientSection(clientSubtabButton.dataset.clientSubtab);
             const clientSubActionButton = event.target.closest('[data-client-sub-action]');
             if (clientSubActionButton) clientSubscriptionAction(clientSubActionButton.dataset.clientSubAction);
+            const clientReferralBlockButton = event.target.closest('[data-client-referral-block-action]');
+            if (clientReferralBlockButton) clientReferralBlockAction(clientReferralBlockButton);
         });
 
         const statsForm = document.getElementById('stats-form');
         const userPaymentsForm = document.getElementById('user-payments-form');
         const paymentInfoForm = document.getElementById('payment-info-form');
         const referralAntifraudForm = document.getElementById('referral-antifraud-form');
-        const referralBlockForm = document.getElementById('referral-block-form');
         const replyTemplateForm = document.getElementById('reply-template-form');
         const configTemplateForm = document.getElementById('config-template-form');
 
         document.addEventListener('submit', (event) => {
             if (event.target.matches('[data-setting-form]')) submitRuntimeSetting(event);
         });
+        document.addEventListener('input', (event) => {
+            if (event.target.matches('[data-setting-control]')) updateSettingDirtyState(event.target);
+        });
+        document.addEventListener('change', (event) => {
+            if (event.target.matches('[data-setting-control]')) updateSettingDirtyState(event.target);
+        });
         if (statsForm) statsForm.addEventListener('submit', loadStats);
-        if (userPaymentsForm) userPaymentsForm.addEventListener('submit', loadClientCard);
+        if (userPaymentsForm) {
+            userPaymentsForm.addEventListener('submit', loadClientCard);
+            renderClientStartState();
+        }
         if (paymentInfoForm) paymentInfoForm.addEventListener('submit', loadPaymentInfo);
         if (referralAntifraudForm) referralAntifraudForm.addEventListener('submit', submitReferralAntifraud);
-        if (referralBlockForm) referralBlockForm.addEventListener('submit', submitReferralBlock);
         if (replyTemplateForm) replyTemplateForm.addEventListener('submit', submitReplyTemplate);
         if (configTemplateForm) configTemplateForm.addEventListener('submit', submitConfigTemplate);
         document.getElementById('node-traffic-form')?.addEventListener('submit', loadNodeTraffic);
         document.getElementById('censor-check-form')?.addEventListener('submit', submitCensorCheck);
         document.getElementById('censor-check-reset')?.addEventListener('click', resetCensorCheckForm);
+        document.getElementById('censor-bulk-form')?.addEventListener('submit', submitCensorBulk);
+        document.getElementById('censor-bulk-form')?.addEventListener('change', updateCensorBulkFormState);
         document.getElementById('ripe-key-form')?.addEventListener('submit', submitRipeKey);
         document.getElementById('ripe-key-reset')?.addEventListener('click', resetRipeKeyForm);
         document.getElementById('config-pins-form')?.addEventListener('submit', submitConfigPinsSearch);
@@ -5697,8 +6286,11 @@
         document.getElementById('config-template-reset')?.addEventListener('click', resetConfigTemplateForm);
         document.getElementById('config-json-validate')?.addEventListener('click', () => validateConfigJson(true));
         document.getElementById('config-json-format')?.addEventListener('click', formatConfigJson);
-        document.getElementById('load-recurrents')?.addEventListener('click', loadRecurrents);
-        document.getElementById('load-top-payments')?.addEventListener('click', loadTopPayments);
+        document.querySelectorAll('a.logout, .admin-icon-btn[aria-label="Выйти"]').forEach((link) => {
+            link.addEventListener('click', () => {
+                try { sessionStorage.removeItem(CLIENT_RECENT_STORAGE_KEY); } catch (error) { /* noop */ }
+            });
+        });
 
         const today = new Date();
         setupDatePickers();
@@ -5740,9 +6332,20 @@
         const loaded = {};
         const fmtRub = (v) => Math.round(v).toLocaleString('ru-RU');
 
+        // Значение серии для тултипа: разделители тысяч везде (в том числе для
+        // штучных метрик) и явная единица измерения — ₽ или %.
+        function acqFmtValue(series, value) {
+            if (value == null) return '—';
+            if (series.fmt === 'pct') return `${Number(value).toFixed(1)}%`;
+            if (series.fmt === 'rub') return `${fmtRub(value)} ₽`;
+            return fmtRub(value);
+        }
+
+
         // --- общий тултип для всех canvas-графиков вкладки ---
         const tipEl = document.createElement('div');
-        tipEl.style.cssText = 'position:fixed;z-index:9999;display:none;background:#15161a;border:1px solid rgba(255,199,0,.35);border-radius:9px;padding:8px 11px;font-size:11px;line-height:1.55;pointer-events:none;box-shadow:0 10px 30px rgba(0,0,0,.5);max-width:280px;';
+        tipEl.className = 'sales-chart-tooltip acquisition-chart-tooltip';
+        tipEl.style.cssText = 'position:fixed;z-index:9999;display:none;pointer-events:none;max-width:min(320px, calc(100vw - 24px));';
         document.body.appendChild(tipEl);
 
         function acqBindTooltip(canvas) {
@@ -5761,9 +6364,9 @@
                 if (canvas.__acqHover !== i) { canvas.__acqHover = i; m.render(i); }
                 const rows = m.series
                     .filter((sr) => sr.label && sr.data[i] != null)
-                    .map((sr) => `<div><span style="display:inline-block;width:8px;height:8px;border-radius:2px;background:${sr.color};margin-right:6px;"></span>${sr.label}: <b>${sr.fmt === 'pct' ? sr.data[i].toFixed(1) + '%' : sr.fmt === 'raw' ? sr.data[i] : fmtRub(sr.data[i]) + (sr.fmt === 'rub' ? ' ₽' : '')}</b></div>`)
+                    .map((sr) => `<div class="acq-tooltip-row"><span class="acq-tooltip-dot" style="background:${adminChartSeriesColor(sr)}"></span><span class="acq-tooltip-name">${sr.label}</span><b class="acq-tooltip-value">${acqFmtValue(sr, sr.data[i])}</b></div>`)
                     .join('');
-                tipEl.innerHTML = `<div style="color:rgba(255,255,255,.55);margin-bottom:3px;">${m.fullLabels ? m.fullLabels[i] : m.labels[i]}</div>${rows}`;
+                tipEl.innerHTML = `<div class="acq-tooltip-head">${m.fullLabels ? m.fullLabels[i] : m.labels[i]}</div>${rows}`;
                 tipEl.style.display = 'block';
                 const tw = tipEl.offsetWidth, th = tipEl.offsetHeight;
                 let tx = ev.clientX + 14, ty = ev.clientY - th - 10;
@@ -5777,6 +6380,27 @@
                 if (m && m.render) m.render(null);
                 tipEl.style.display = 'none';
             });
+        }
+
+        // Раскладывает легенду по строкам под ширину канвы. Возвращает массив
+        // строк, каждая — список {series, x} с уже посчитанной позицией.
+        function acqLegendRows(ctx, legend, availableWidth) {
+            ctx.font = '10px sans-serif';
+            const rows = [];
+            let row = [];
+            let x = 6;
+            legend.forEach((series) => {
+                const itemWidth = 12 + ctx.measureText(series.label).width + 14;
+                if (row.length && x + itemWidth > availableWidth) {
+                    rows.push(row);
+                    row = [];
+                    x = 6;
+                }
+                row.push({series, x});
+                x += itemWidth;
+            });
+            if (row.length) rows.push(row);
+            return rows;
         }
 
         function acqSetupCanvas(canvas) {
@@ -5799,42 +6423,58 @@
             };
             meta.render = function (hi) {
                 const {ctx, w, h} = acqSetupCanvas(canvas);
-                const padL = 46, padR = lineSeries.length ? 46 : 12, padT = 14, padB = 26;
-                const plotW = w - padL - padR, plotH = h - padT - padB;
                 const n = labels.length;
+                const legend = [...barSeries, ...lineSeries].filter((sr) => sr.label);
+                // Легенда переносится по строкам: в одну строку она не влезает на
+                // узких экранах и раньше просто уезжала за правый край канвы.
+                const legendRowH = 14;
+                const legendRows = acqLegendRows(ctx, legend, Math.max(80, w - 12));
+                const padL = 54, padR = lineSeries.length ? 54 : 14;
+                const padT = 6 + legendRows.length * legendRowH + 6, padB = 26;
+                const plotW = w - padL - padR, plotH = Math.max(1, h - padT - padB);
                 meta.padL = padL;
                 meta.step = n ? plotW / n : 0;
-                if (!n) { ctx.fillStyle = 'rgba(255,255,255,.4)'; ctx.font = '12px sans-serif'; ctx.fillText('Нет данных', padL, h / 2); return; }
+                if (!n) { ctx.fillStyle = adminChartUiColor('empty'); ctx.font = '12px sans-serif'; ctx.fillText('Нет данных', padL, h / 2); return; }
                 const barTotals = labels.map((_, i2) => barSeries.reduce((acc, sr) => acc + (sr.data[i2] || 0), 0));
                 const maxBar = Math.max(1, ...barTotals);
                 const maxLine = Math.max(1, ...lineSeries.flatMap((sr) => sr.data.filter((v) => v != null)));
+                const barFmt = barSeries[0]?.fmt || 'raw';
+                const lineFmt = lineSeries[0]?.fmt || 'raw';
                 const step = meta.step, barW = Math.max(2, step * 0.62);
                 if (hi != null && hi >= 0 && hi < n) {
-                    ctx.fillStyle = 'rgba(255,255,255,.06)';
+                    ctx.fillStyle = adminChartUiColor('highlight');
                     ctx.fillRect(padL + hi * step, padT, step, plotH);
                 }
-                ctx.strokeStyle = 'rgba(255,255,255,.08)'; ctx.fillStyle = 'rgba(255,255,255,.45)';
+                ctx.fillStyle = adminChartUiColor('label');
                 ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
                 for (let g = 0; g <= 4; g++) {
                     const y = padT + plotH - (plotH * g) / 4;
+                    // Нулевая линия заметнее прочих: от неё считываются высоты баров.
+                    ctx.strokeStyle = adminChartUiColor(g === 0 ? 'gridStrong' : 'grid');
                     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
-                    ctx.fillText(fmtRub((maxBar * g) / 4), padL - 5, y + 3);
-                    if (lineSeries.length) { ctx.textAlign = 'left'; ctx.fillText(fmtRub((maxLine * g) / 4), w - padR + 5, y + 3); ctx.textAlign = 'right'; }
+                    ctx.fillStyle = adminChartUiColor('label');
+                    ctx.fillText(adminChartAxisLabel((maxBar * g) / 4, barFmt), padL - 6, y + 3);
+                    if (lineSeries.length) { ctx.textAlign = 'left'; ctx.fillText(adminChartAxisLabel((maxLine * g) / 4, lineFmt), w - padR + 6, y + 3); ctx.textAlign = 'right'; }
                 }
                 barSeries.length && labels.forEach((_, i2) => {
                     let y = padT + plotH;
+                    const bx = padL + i2 * step + (step - barW) / 2;
                     barSeries.forEach((sr) => {
                         const v = sr.data[i2] || 0;
                         const bh = (v / maxBar) * plotH;
-                        ctx.fillStyle = sr.color;
-                        if (hi === i2) { ctx.save(); ctx.globalAlpha = 1; }
-                        ctx.fillRect(padL + i2 * step + (step - barW) / 2, y - bh, barW, bh);
-                        if (hi === i2) ctx.restore();
+                        ctx.fillStyle = adminChartSeriesColor(sr);
+                        ctx.fillRect(bx, y - bh, barW, bh);
+                        // Тонкий разрез между сегментами стека: без него соседние
+                        // сегменты сливаются в одну полосу.
+                        if (barSeries.length > 1 && bh > 1.5 && y < padT + plotH) {
+                            ctx.fillStyle = adminChartUiColor('barSeparator');
+                            ctx.fillRect(bx, y - 0.5, barW, 1);
+                        }
                         y -= bh;
                     });
                 });
                 lineSeries.forEach((sr) => {
-                    ctx.strokeStyle = sr.color; ctx.lineWidth = sr.width || 2;
+                    ctx.strokeStyle = adminChartSeriesColor(sr); ctx.lineWidth = sr.width || 2;
                     if (sr.dash) ctx.setLineDash(sr.dash); else ctx.setLineDash([]);
                     ctx.beginPath();
                     let started = false;
@@ -5848,7 +6488,7 @@
                 });
                 if (hi != null && hi >= 0 && hi < n) {
                     const x = padL + hi * step + step / 2;
-                    ctx.strokeStyle = 'rgba(255,255,255,.28)'; ctx.lineWidth = 1;
+                    ctx.strokeStyle = adminChartUiColor('guide'); ctx.lineWidth = 1;
                     ctx.setLineDash([3, 3]);
                     ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
                     ctx.setLineDash([]);
@@ -5857,19 +6497,25 @@
                         if (v == null) return;
                         const y = padT + plotH - (v / maxLine) * plotH;
                         ctx.beginPath(); ctx.arc(x, y, 4.5, 0, Math.PI * 2);
-                        ctx.fillStyle = sr.color; ctx.fill();
-                        ctx.lineWidth = 2; ctx.strokeStyle = '#0c0d10'; ctx.stroke();
+                        ctx.fillStyle = adminChartSeriesColor(sr); ctx.fill();
+                        ctx.lineWidth = 2; ctx.strokeStyle = adminChartUiColor('pointBorder'); ctx.stroke();
                     });
                 }
-                ctx.fillStyle = 'rgba(255,255,255,.5)'; ctx.textAlign = 'center'; ctx.font = '9px sans-serif';
-                const every = Math.ceil(n / 14);
+                ctx.fillStyle = adminChartUiColor('label'); ctx.textAlign = 'center'; ctx.font = '9px sans-serif';
+                // Шаг подписей считается по реальной ширине текста, а не по
+                // фиксированному «каждая n/14»: иначе на узком экране даты слипаются.
+                const widestLabel = labels.reduce((acc, lb) => Math.max(acc, ctx.measureText(String(lb)).width), 0);
+                const every = Math.max(1, Math.ceil((widestLabel + 10) / Math.max(1, step)));
                 labels.forEach((lb, i2) => { if (i2 % every === 0) ctx.fillText(lb, padL + i2 * step + step / 2, h - 8); });
-                const legend = [...barSeries, ...lineSeries].filter((sr) => sr.label);
-                let lx = padL; ctx.textAlign = 'left'; ctx.font = '10px sans-serif';
-                legend.forEach((sr) => {
-                    ctx.fillStyle = sr.color; ctx.fillRect(lx, 2, 8, 8);
-                    ctx.fillStyle = 'rgba(255,255,255,.7)'; ctx.fillText(sr.label, lx + 12, 10);
-                    lx += 12 + ctx.measureText(sr.label).width + 14;
+                ctx.textAlign = 'left'; ctx.font = '10px sans-serif';
+                legendRows.forEach((row, rowIndex) => {
+                    const ly = 4 + rowIndex * legendRowH;
+                    row.forEach((item) => {
+                        ctx.fillStyle = adminChartSeriesColor(item.series);
+                        ctx.fillRect(item.x, ly, 8, 8);
+                        ctx.fillStyle = adminChartUiColor('legend');
+                        ctx.fillText(item.series.label, item.x + 12, ly + 8);
+                    });
                 });
             };
             canvas.__acqMeta = meta;
@@ -5905,16 +6551,16 @@
             acqDraw(document.getElementById('acq-newrep-chart'),
                 rows.map((r) => dayLabel(r.day)),
                 [
-                    {label: 'Повторные, ₽', color: acquisitionChartColors.repeat, data: rows.map((r) => r.repeat_rub), fmt: 'rub'},
-                    {label: 'Новые, ₽', color: acquisitionChartColors.new, data: rows.map((r) => r.new_rub), fmt: 'rub'},
+                    {label: 'Повторные, ₽', tone: 'indigo', data: rows.map((r) => r.repeat_rub), fmt: 'rub'},
+                    {label: 'Новые, ₽', tone: 'amber', data: rows.map((r) => r.new_rub), fmt: 'rub'},
                 ],
-                [{label: 'Новых покупателей (правая ось)', color: acquisitionChartColors.payers, data: rows.map((r) => r.new_payers), fmt: 'raw'}],
+                [{label: 'Новых покупателей (правая ось)', tone: 'green', data: rows.map((r) => r.new_payers), fmt: 'raw'}],
                 {fullLabels: rows.map((r) => r.day)});
             const nSum = rows.reduce((a, r) => a + r.new_rub, 0), rSum = rows.reduce((a, r) => a + r.repeat_rub, 0);
             const nPayers = rows.reduce((a, r) => a + r.new_payers, 0);
             const fullDay = (iso) => dayLabel(iso) + '.' + iso.slice(0, 4);
             document.getElementById('acq-newrep-summary').innerHTML = rows.length
-                ? `За период <b>${fullDay(rows[0].day)} — ${fullDay(rows[rows.length - 1].day)}</b>: новые <b style="color:#ffc700">${fmtRub(nSum)} ₽</b> (${Math.round(100 * nSum / Math.max(1, nSum + rSum))}%), повторные <b style="color:#8c9cff">${fmtRub(rSum)} ₽</b>, итого <b>${fmtRub(nSum + rSum)} ₽</b>; новых покупателей: <b>${fmtRub(nPayers)}</b>. Повторные — эхо продаж прошлых месяцев; рекламу оценивайте по жёлтой части.`
+                ? `За период <b>${fullDay(rows[0].day)} — ${fullDay(rows[rows.length - 1].day)}</b>: новые <b class="chart-tone-amber">${fmtRub(nSum)} ₽</b> (${Math.round(100 * nSum / Math.max(1, nSum + rSum))}%), повторные <b class="chart-tone-indigo">${fmtRub(rSum)} ₽</b>, итого <b>${fmtRub(nSum + rSum)} ₽</b>; новых покупателей: <b>${fmtRub(nPayers)}</b>. Повторные — эхо продаж прошлых месяцев; рекламу оценивайте по жёлтой части.`
                 : 'Нет данных за выбранный период.';
             await loadRenew45();
         }
@@ -5929,13 +6575,13 @@
             const monthLabel = (iso) => iso.slice(5, 7) + '.' + iso.slice(0, 4);
             acqDraw(document.getElementById('acq-renew45-chart'),
                 mrows.map((r) => monthLabel(r.month)),
-                [{label: 'Платили в месяце (короткие тарифы)', color: 'rgba(120,140,255,.65)', data: mrows.map((r) => r.payers), fmt: 'raw'}],
-                [{label: 'Продлили в течение 45 дней, % (правая ось)', color: 'rgba(90,220,150,.95)', data: mrows.map((r) => r.mature ? r.renew_pct : null), fmt: 'pct'}],
+                [{label: 'Платили в месяце (короткие тарифы)', tone: 'indigoSoft', data: mrows.map((r) => r.payers), fmt: 'raw'}],
+                [{label: 'Продлили в течение 45 дней, % (правая ось)', tone: 'green', data: mrows.map((r) => r.mature ? r.renew_pct : null), fmt: 'pct'}],
                 {fullLabels: mrows.map((r) => monthLabel(r.month) + (r.mature ? '' : ' — окно 45 дней ещё не закрыто'))});
             const matureRows = mrows.filter((r) => r.mature);
             const lastM = matureRows[matureRows.length - 1];
             document.getElementById('acq-renew45-summary').innerHTML = lastM
-                ? `Последний месяц с закрытым окном — <b>${monthLabel(lastM.month)}</b>: платили <b>${fmtRub(lastM.payers)}</b> чел., продлили <b style="color:#5adc96">${lastM.renew_pct}%</b>, отвал <b style="color:#ff6ea0">${(100 - lastM.renew_pct).toFixed(1)}%</b>. Месяцы без закрытого 45-дневного окна на линии не показываются — их процент был бы занижен.`
+                ? `Последний месяц с закрытым окном — <b>${monthLabel(lastM.month)}</b>: платили <b>${fmtRub(lastM.payers)}</b> чел., продлили <b class="chart-tone-green">${lastM.renew_pct}%</b>, отвал <b class="chart-tone-pink">${(100 - lastM.renew_pct).toFixed(1)}%</b>. Месяцы без закрытого 45-дневного окна на линии не показываются — их процент был бы занижен.`
                 : 'Ещё нет месяцев с закрытым 45-дневным окном.';
         }
 
@@ -5946,9 +6592,9 @@
                 wk.map((r) => dayLabel(r.week)),
                 [],
                 [
-                    {label: 'Подписки', color: 'rgba(120,140,255,.9)', data: wk.map((r) => r.trials), fmt: 'raw'},
-                    {label: 'Инвойсы', color: 'rgba(255,199,0,.9)', data: wk.map((r) => r.invoice_clicks), fmt: 'raw'},
-                    {label: 'Новые покупатели', color: 'rgba(90,220,150,.95)', data: wk.map((r) => r.new_payers), fmt: 'raw'},
+                    {label: 'Подписки', tone: 'indigo', data: wk.map((r) => r.trials), fmt: 'raw'},
+                    {label: 'Инвойсы', tone: 'amber', data: wk.map((r) => r.invoice_clicks), fmt: 'raw'},
+                    {label: 'Новые покупатели', tone: 'green', data: wk.map((r) => r.new_payers), fmt: 'raw'},
                 ],
                 {fullLabels: wk.map((r) => 'неделя с ' + r.week)});
             document.getElementById('acq-funnel-table').innerHTML = acqTable(
@@ -5959,8 +6605,8 @@
             const tr = await acqFetch('trials', {days: 60});
             acqDraw(document.getElementById('acq-trials-chart'),
                 tr.days.map((r) => dayLabel(r.day)),
-                [{label: 'Подписок создано', color: 'rgba(120,140,255,.65)', data: tr.days.map((r) => r.trials), fmt: 'raw'}],
-                [{label: 'Оплатили в течение 10 дней, %', color: 'rgba(90,220,150,.95)', data: tr.days.map((r) => r.conv_pct), fmt: 'pct'}],
+                [{label: 'Подписок создано', tone: 'indigoSoft', data: tr.days.map((r) => r.trials), fmt: 'raw'}],
+                [{label: 'Оплатили в течение 10 дней, %', tone: 'green', data: tr.days.map((r) => r.conv_pct), fmt: 'pct'}],
                 {fullLabels: tr.days.map((r) => r.day)});
         }
 
@@ -5976,21 +6622,21 @@
             const label = (p) => group === 'month' ? p : dayLabel(p);
             acqDraw(document.getElementById('acq-ads-daily-chart'),
                 rows.map((r) => label(r.period)),
-                [{label: 'Расход, ₽', color: 'rgba(255,199,0,.55)', data: rows.map((r) => r.spend), fmt: 'rub'}],
+                [{label: 'Расход, ₽', tone: 'amberSoft', data: rows.map((r) => r.spend), fmt: 'rub'}],
                 [
-                    {label: 'Подписки', color: 'rgba(120,140,255,.9)', data: rows.map((r) => r.subs), fmt: 'raw'},
-                    {label: 'Подключения', color: 'rgba(90,220,150,.95)', data: rows.map((r) => r.conns), fmt: 'raw'},
-                    {label: 'Продажи', color: 'rgba(255,110,160,.95)', data: rows.map((r) => r.sales), fmt: 'raw'},
+                    {label: 'Подписки', tone: 'indigo', data: rows.map((r) => r.subs), fmt: 'raw'},
+                    {label: 'Подключения', tone: 'green', data: rows.map((r) => r.conns), fmt: 'raw'},
+                    {label: 'Продажи', tone: 'pink', data: rows.map((r) => r.sales), fmt: 'raw'},
                 ],
                 {fullLabels: rows.map((r) => r.period)});
             acqDraw(document.getElementById('acq-ads-cost-chart'),
                 rows.map((r) => label(r.period)),
                 [],
                 [
-                    {label: 'CPC', color: 'rgba(255,199,0,.95)', data: rows.map((r) => r.cpc), fmt: 'rub'},
-                    {label: 'Цена подписки', color: 'rgba(120,140,255,.9)', data: rows.map((r) => r.cost_per_sub), fmt: 'rub'},
-                    {label: 'Цена подключения', color: 'rgba(90,220,150,.95)', data: rows.map((r) => r.cost_per_conn), fmt: 'rub'},
-                    {label: 'Цена продажи', color: 'rgba(255,110,160,.95)', data: rows.map((r) => r.cost_per_sale), fmt: 'rub'},
+                    {label: 'CPC', tone: 'amber', data: rows.map((r) => r.cpc), fmt: 'rub'},
+                    {label: 'Цена подписки', tone: 'indigo', data: rows.map((r) => r.cost_per_sub), fmt: 'rub'},
+                    {label: 'Цена подключения', tone: 'green', data: rows.map((r) => r.cost_per_conn), fmt: 'rub'},
+                    {label: 'Цена продажи', tone: 'pink', data: rows.map((r) => r.cost_per_sale), fmt: 'rub'},
                 ],
                 {fullLabels: rows.map((r) => r.period)});
             document.getElementById('acq-ads-daily-table').innerHTML = acqTable(
@@ -6054,8 +6700,8 @@
             const keys = Object.keys(days).sort();
             acqDraw(document.getElementById('acq-pushes-chart'),
                 keys.map(dayLabel),
-                [{label: 'Продающих пушей', color: 'rgba(120,140,255,.65)', data: keys.map((k) => days[k].selling || 0), fmt: 'raw'}],
-                [{label: 'Выручка, ₽ (правая ось)', color: 'rgba(255,199,0,.95)', data: keys.map((k) => days[k].rub || 0), fmt: 'rub'}],
+                [{label: 'Продающих пушей', tone: 'indigoSoft', data: keys.map((k) => days[k].selling || 0), fmt: 'raw'}],
+                [{label: 'Выручка, ₽ (правая ось)', tone: 'amber', data: keys.map((k) => days[k].rub || 0), fmt: 'rub'}],
                 {fullLabels: keys});
             const wbAmounts = (r) => {
                 const items = (r.amounts || []);
@@ -6081,10 +6727,10 @@
                 hrs.map((h) => h + ':00'),
                 [],
                 [
-                    {label: 'коридор p25', color: 'rgba(255,255,255,.25)', data: res.typical.p25, dash: [4, 3], width: 1, fmt: 'rub'},
-                    {label: 'коридор p75', color: 'rgba(255,255,255,.25)', data: res.typical.p75, dash: [4, 3], width: 1, fmt: 'rub'},
-                    {label: 'Медиана', color: 'rgba(255,255,255,.8)', data: res.typical.p50, fmt: 'rub'},
-                    {label: 'Сегодня', color: 'rgba(255,199,0,1)', width: 3, data: res.today.map((v, h) => (h <= cutoff ? v : null)), fmt: 'rub'},
+                    {label: 'коридор p25', tone: 'neutralSoft', data: res.typical.p25, dash: [4, 3], width: 1, fmt: 'rub'},
+                    {label: 'коридор p75', tone: 'neutralSoft', data: res.typical.p75, dash: [4, 3], width: 1, fmt: 'rub'},
+                    {label: 'Медиана', tone: 'neutral', data: res.typical.p50, fmt: 'rub'},
+                    {label: 'Сегодня', tone: 'amber', width: 3, data: res.today.map((v, h) => (h <= cutoff ? v : null)), fmt: 'rub'},
                 ],
                 {fullLabels: hrs.map((h) => `к ${h}:59 МСК (накопленная выручка)`)});
             const cell = {};
@@ -6115,15 +6761,15 @@
         // Полоска-бар внутри ячейки таблицы: доля pct от максимума maxPct.
         const pctBar = (pct, maxPct) => {
             const w = maxPct ? Math.max(1, Math.round(100 * pct / maxPct)) : 0;
-            return `<div style="display:flex;align-items:center;gap:8px;min-width:180px;"><div style="height:10px;width:${w}%;max-width:100%;background:rgba(255,199,0,.8);border-radius:3px;"></div><span>${pct.toFixed(1)}%</span></div>`;
+            return `<div style="display:flex;align-items:center;gap:8px;min-width:180px;"><div style="height:10px;width:${w}%;max-width:100%;background:rgba(255,199,0,.82);border-radius:3px;"></div><span>${pct.toFixed(1)}%</span></div>`;
         };
 
         async function loadJourney() {
             const timing = await acqFetch('trial_timing', {days: document.getElementById('acq-timing-days').value});
             document.getElementById('acq-timing-summary').innerHTML =
-                `Подписок в когорте: <b style="color:#fff;">${timing.trials.toLocaleString('ru-RU')}</b> · ` +
-                `оплатили: <b style="color:#fff;">${timing.converted.toLocaleString('ru-RU')}</b> · ` +
-                `конверсия в оплату: <b style="color:#fff;">${timing.conversion_pct}%</b>`;
+                `Подписок в когорте: <b class="chart-tone-strong">${timing.trials.toLocaleString('ru-RU')}</b> · ` +
+                `оплатили: <b class="chart-tone-strong">${timing.converted.toLocaleString('ru-RU')}</b> · ` +
+                `конверсия в оплату: <b class="chart-tone-strong">${timing.conversion_pct}%</b>`;
             const maxPct = Math.max(1, ...timing.buckets.map((b) => b.pct));
             document.getElementById('acq-timing-table').innerHTML = acqTable(
                 ['День первой оплаты', 'Людей', 'Доля оплативших'],

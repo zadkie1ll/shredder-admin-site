@@ -1,4 +1,4 @@
-{% load static %}
+{% load static pricing %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -16,6 +16,166 @@
     <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <title>VPN Monkey Island</title>
+    {% if tg_webapp_mode %}
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            var tg = window.Telegram && window.Telegram.WebApp;
+            if (!tg) return;
+            tg.ready();
+            tg.expand();
+            // Не даём случайному вертикальному свайпу свернуть Mini App
+            // (метод появился в Bot API 7.7 — на старых клиентах его нет).
+            if (typeof tg.disableVerticalSwipes === 'function') {
+                tg.disableVerticalSwipes();
+            }
+            // Полноэкранный режим как у Akenai (Bot API 8.0+): без телеграм-шапки,
+            // отступ под статусбар берётся из safe-area переменных Telegram.
+            // На десктопе fullscreen не поддержан — requestFullscreen там no-op/ошибка,
+            // которую Telegram сам игнорирует.
+            if (
+                typeof tg.requestFullscreen === 'function'
+                && typeof tg.isVersionAtLeast === 'function'
+                && tg.isVersionAtLeast('8.0')
+                && ['ios', 'android'].includes(tg.platform)
+            ) {
+                try { tg.requestFullscreen(); } catch (e) {}
+            }
+        });
+    </script>
+    <style>
+        /* Режим Mini App: вкладки Главная / Поддержка / Рефералы / Настройки.
+           «Установка» доступна кнопками с Главной. */
+        .tg-webapp .nav-btn[data-tab="setup"] {
+            display: none !important;
+        }
+
+        /* Подсказки, видимые только внутри Mini App */
+        .tg-webapp .tg-webapp-show-note {
+            display: block !important;
+        }
+
+        /* Нижняя навигация — плавающая «пилюля» по центру, как у Akenai.
+           Переопределяем мобильные правила: кнопки не растягиваются на равные
+           колонки (иначе подписи режутся многоточием), контент центрирован
+           по вертикали, без принудительной высоты 56px. */
+        .tg-webapp .nav-mobile {
+            left: 50%;
+            right: auto;
+            transform: translateX(-50%);
+            bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px));
+            width: auto;
+            max-width: calc(100% - 1rem);
+            height: auto;
+            min-height: 0;
+            align-items: center;
+            justify-content: center;
+            padding: 0.35rem 0.6rem;
+            gap: 0.35rem;
+            border-radius: 9999px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(18, 18, 22, 0.92);
+            backdrop-filter: blur(18px);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+        }
+
+        .tg-webapp .nav-mobile .nav-btn {
+            flex: 0 0 auto;
+            width: auto;
+            min-width: 0;
+            min-height: 0;
+            padding: 7px 11px;
+            overflow: visible;
+        }
+
+        .tg-webapp .nav-mobile .nav-btn i {
+            font-size: 18px;
+        }
+
+        .tg-webapp .nav-mobile .nav-btn span {
+            max-width: none;
+            overflow: visible;
+            text-overflow: clip;
+            font-size: 10px;
+        }
+
+        /* В fullscreen-режиме контент не должен заезжать под статусбар —
+           Telegram отдаёт отступы через свои safe-area переменные (вне
+           fullscreen они равны нулю, правило безвредно). */
+        .tg-webapp #app-container {
+            padding-top: calc(
+                var(--tg-safe-area-inset-top, 0px) +
+                var(--tg-content-safe-area-inset-top, 0px)
+            );
+        }
+
+        /* Типографика как у Akenai: спокойные веса вместо 900, обычный
+           регистр вместо капса, компактный rem-базис. */
+        html {
+            font-size: 15px;
+        }
+
+        .tg-webapp .font-black {
+            font-weight: 700;
+        }
+
+        .tg-webapp h1.font-black,
+        .tg-webapp h1 {
+            text-transform: none;
+            letter-spacing: -0.01em;
+            font-weight: 800;
+        }
+
+        .tg-webapp #days-left-count {
+            font-size: 3rem;
+            font-weight: 800;
+        }
+
+        /* Секционные лейблы (FAQ и другие) — маленькие, с акцентной чертой
+           слева, как у Akenai, без крика капсом на всю ширину. */
+        .tg-webapp .tracking-widest {
+            letter-spacing: 0.08em;
+        }
+
+        /* Нижняя навигация: обычный регистр, средний вес, мягче активный цвет */
+        .tg-webapp .nav-mobile span {
+            font-size: 11px;
+            letter-spacing: 0;
+            text-transform: none;
+            font-weight: 600;
+        }
+
+        /* Иконки в списке настроек — монохромные, как у Akenai */
+        .tg-webapp #tab-settings .w-11.h-11 {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #fff !important;
+        }
+
+        /* Плавающий реферальный бейдж «+40» в Mini App не показываем —
+           рефералка доступна отдельной вкладкой, бейдж поверх контента выглядит чужеродно */
+        .tg-webapp #ref-pill {
+            display: none !important;
+        }
+
+        /* Кнопка «Оплатить» всегда в пределах экрана: фиксируем к низу,
+           контенту добавляем запас, чтобы ничего не пряталось под кнопкой */
+        .tg-webapp .plans-form .plans-submit {
+            position: fixed;
+            left: 1rem;
+            right: 1rem;
+            bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+            width: auto;
+            z-index: 60;
+            box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.55);
+        }
+
+        .tg-webapp .plans-form {
+            padding-bottom: 6rem;
+        }
+    </style>
+    {% endif %}
     <script>
         (function () {
             var standalone = window.matchMedia('(display-mode: standalone)').matches
@@ -29,6 +189,7 @@
     </script>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
 
@@ -51,6 +212,35 @@
 
         * {
             box-sizing: border-box;
+        }
+
+        /* Режим Telegram Mini App: внутри Telegram не показываем выход из
+           аккаунта и PWA-подсказки — сессия управляется самим Telegram. */
+        .tg-webapp .tg-webapp-hide {
+            display: none !important;
+        }
+
+        /* Единая типографика по образцу экрана тарифов (.plans-title):
+           заголовки weight 700, обычный регистр, без сжатого трекинга.
+           Мелкие капс-лейблы и бейджи (скидки, kickers) не трогаем. */
+        .dashboard-v2 h1,
+        .dashboard-v2 h2,
+        .dashboard-v2 h3,
+        .dashboard-v2 h4 {
+            text-transform: none !important;
+            letter-spacing: -0.01em !important;
+            font-weight: 700 !important;
+        }
+
+        .dashboard-v2 .font-black {
+            font-weight: 700;
+        }
+
+        .dashboard-v2 .nav-mobile span,
+        .dashboard-v2 .nav-desktop .nav-btn {
+            text-transform: none;
+            letter-spacing: 0;
+            font-weight: 600;
         }
         
         :root {
@@ -1054,12 +1244,15 @@
         }
 
         .plan-row {
-            min-height: 68px;
+            position: relative;
+            min-height: 56px;
+            /* запас сверху под чип-подпись, сидящий на рамке */
+            margin-top: 10px;
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto auto;
             align-items: center;
             gap: 14px;
-            padding: 14px 16px;
+            padding: 12px 16px;
             border-radius: 16px;
             border: 1px solid rgba(255, 255, 255, 0.055);
             background: rgba(255, 255, 255, 0.075);
@@ -1089,12 +1282,39 @@
             line-height: 1.2;
         }
 
+        /* Состояние «Скопировано» для кнопок копирования */
+        .copied-green {
+            background: #00ff88 !important;
+            border-color: #00ff88 !important;
+            color: #0a0a0a !important;
+        }
+
+        /* Пункт списка «Настройки» — отдельная карточка (как у Akenai),
+           а не строки внутри одной большой рамки: пункты читаются по одному. */
+        .settings-item {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+        }
+
+        /* Чип «Максимальная выгода» на верхней рамке годового тарифа, как
+           «ЛУЧШИЙ ВЫБОР» у Akenai — всегда подсвечен фирменным жёлтым. */
         .plan-note {
-            margin-top: 4px;
-            color: rgba(255, 255, 255, 0.5);
-            font-size: 12px;
-            font-weight: 600;
-            line-height: 1.25;
+            position: absolute;
+            top: 0;
+            left: 14px;
+            transform: translateY(-50%);
+            padding: 2px 10px;
+            border-radius: 999px;
+            border: 1px solid rgba(255, 199, 0, 0.45);
+            background: #141419;
+            color: #ffc700;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            line-height: 1.5;
+            white-space: nowrap;
         }
 
         .plan-badge {
@@ -2143,19 +2363,10 @@
             }
         }
 
-        /* FAQ accordion (вкладка «Настройки») */
-        .faq-q i { transition: transform 0.25s ease; }
-        .faq-item.open .faq-q i { transform: rotate(180deg); }
-        .faq-a {
-            max-height: 0;
-            overflow: hidden;
-            transition: max-height 0.3s ease;
-        }
-        .faq-item.open .faq-a { max-height: 340px; }
     </style>
     {% include "includes/yandex_metrika.html" %}
 </head>
-<body class="dashboard-v2" style="--dashboard-bg-image: url('{% static 'img/bg6.png' %}');">
+<body class="dashboard-v2{% if tg_webapp_mode %} tg-webapp{% endif %}" style="--dashboard-bg-image: url('{% static 'img/bg6.png' %}');">
 
     <div class="page-background">
         <div class="page-background-image">
@@ -2198,24 +2409,16 @@
                                     {{ tariff.description }}
                                 {% endif %}
                             </span>
-                            <span class="plan-note">
-                                {% if tariff.db_tariff_id == "month" %}
-                                    Здесь и сейчас
-                                {% elif tariff.db_tariff_id == "threemonths" %}
-                                    Разумная экономия
-                                {% elif tariff.db_tariff_id == "year" %}
-                                    Максимальная выгода
-                                {% else %}
-                                    Быстрый доступ
-                                {% endif %}
-                            </span>
+                            {% if tariff.db_tariff_id == "year" %}
+                                <span class="plan-note">Максимальная выгода</span>
+                            {% endif %}
                         </span>
                         <span class="plan-price">
                             <strong>
                                 {% if tariff.db_tariff_id == "threemonths" %}
-                                    {% widthratio tariff.price 3 1 %} ₽ / месяц
+                                    {{ tariff.price|floor_div:3 }} ₽ / месяц
                                 {% elif tariff.db_tariff_id == "year" %}
-                                    {% widthratio tariff.price 12 1 %} ₽ / месяц
+                                    {{ tariff.price|floor_div:12 }} ₽ / месяц
                                 {% else %}
                                     {{ tariff.price }} ₽ / месяц
                                 {% endif %}
@@ -2258,7 +2461,7 @@
                 <button type="button" onclick="showTab('settings')" class="nav-btn" data-tab="settings"><i class="fas fa-cog"></i> Настройки</button>
             </nav>
             <div class="sidebar-footer">
-                <button type="button" onclick="window.location.href='{% url 'logout' %}'" class="nav-btn sidebar-logout-btn">
+                <button type="button" onclick="window.location.href='{% url 'logout' %}'" class="nav-btn sidebar-logout-btn tg-webapp-hide">
                     <i class="fas fa-sign-out-alt"></i> Выйти
                 </button>
             </div>
@@ -2268,7 +2471,7 @@
             <button type="button" onclick="showTab('home')" class="nav-btn active" data-tab="home"><i class="fas fa-th-large"></i><span>Главная</span></button>
             <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i><span>Установка</span></button>
             <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-friends"></i><span>Рефералы</span></button>
-            <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-headset"></i><span>Помощь</span></button>
+            <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-headset"></i><span>Поддержка</span></button>
             <button type="button" onclick="showTab('settings')" class="nav-btn" data-tab="settings"><i class="fas fa-cog"></i><span>Настройки</span></button>
         </nav>
 
@@ -2289,7 +2492,7 @@
                         {% endif %}
                     </header>
 
-                    <button type="button" onclick="quickAccessInstall()" class="quick-access-btn inline-flex items-center gap-2 mb-8 hover:brightness-105 active:scale-95 transition">
+                    <button type="button" onclick="quickAccessInstall()" class="quick-access-btn tg-webapp-hide inline-flex items-center gap-2 mb-8 hover:brightness-105 active:scale-95 transition">
                         <i class="fas fa-bolt"></i> Быстрый доступ
                     </button>
 
@@ -2418,7 +2621,7 @@
                                             {% endif %}
                                         </div>
                                         <button type="button" onclick="showTab('setup')" class="setup-cta-btn dashboard-action-btn !w-full sm:!w-auto !mb-0 !mr-0">
-                                            <i class="fas fa-book-open"></i> Открыть инструкцию
+                                            <i class="fas fa-plug"></i> Подключить VPN
                                         </button>
                                     </div>
                                 {% endif %}
@@ -2437,7 +2640,7 @@
                             </section>
                         {% endif %}
 
-                        <section class="grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                        <section class="tg-webapp-hide grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                             {% if has_subscription_access %}
                             <button type="button" onclick="showTab('setup')" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
                                 <div class="w-11 h-11 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
@@ -2553,93 +2756,66 @@
                 <header class="mb-7 referral-mobile-header">
                     <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Приглашения и бонусы</h1>
                 </header>
-                <div class="overview-grid space-y-7">
-                    <section class="grid grid-cols-1 md:grid-cols-3 gap-5 referral-rule-grid">
-                        <div class="setup-step-card metric-card flex items-start gap-4 !mb-0 referral-rule-card">
-                            <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
-                                <i class="fas fa-user-check text-lg"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-lg font-black mb-2">+{{ join_referrer_bonus_days|default:"3" }} дня за регистрацию</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Добавим, когда друг создаст аккаунт по вашей ссылке.</p>
-                            </div>
-                        </div>
-                        <div class="setup-step-card metric-card flex items-start gap-4 !mb-0 referral-rule-card">
-                            <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
-                                <i class="fas fa-user-plus text-lg"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-lg font-black mb-2">+{{ traffic_referrer_bonus_days|default:"7" }} дней за трафик</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Начислим, когда приглашенный друг израсходует больше 100 МБ.</p>
-                            </div>
-                        </div>
-                        <div class="setup-step-card metric-card flex items-start gap-4 !mb-0 referral-rule-card">
-                            <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
-                                <i class="fas fa-gem text-lg"></i>
-                            </div>
-                            <div>
-                                <h3 class="text-lg font-black mb-2">+{{ purchase_referrer_bonus_days|default:"30" }} дней за покупку</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Добавим сверху, если друг оплатит подписку от 1 месяца.</p>
-                            </div>
-                        </div>
-                    </section>
+                <div class="overview-grid space-y-5">
+                    {# Условия программы показываются модалкой по «?» — контент здесь #}
+                    <div id="referral-terms-content" class="hidden">
+                        <p class="pb-3">Приглашайте друзей и получайте бонусные дни:</p>
+                        <p class="pb-2">✅ <b>+{{ join_referrer_bonus_days|default:"3" }} дн. за регистрацию</b> — когда друг создаст аккаунт по вашей ссылке.</p>
+                        <p class="pb-2">📶 <b>+{{ traffic_referrer_bonus_days|default:"7" }} дн. за трафик</b> — когда друг израсходует больше 100 МБ.</p>
+                        <p>💎 <b>+{{ purchase_referrer_bonus_days|default:"30" }} дн. за покупку</b> — если друг оплатит подписку от 1 месяца.</p>
+                    </div>
 
-                    <section class="grid grid-cols-2 lg:grid-cols-4 gap-4 referral-stat-grid">
-                        <div class="setup-step-card metric-card p-5 !mb-0 referral-stat-card">
-                            <p class="text-gray-500 text-sm font-bold mb-2">Приглашено</p>
-                            <p class="text-4xl font-black">{{ ref_invited_count|default:"0" }}</p>
-                        </div>
-                        <div class="setup-step-card metric-card p-5 !mb-0 referral-stat-card">
-                            <p class="text-gray-500 text-sm font-bold mb-2">Активны</p>
-                            <p class="text-4xl font-black text-[#00ff88]">{{ ref_connected_count|default:"0" }}</p>
-                        </div>
-                        <div class="setup-step-card metric-card p-5 !mb-0 referral-stat-card">
-                            <p class="text-gray-500 text-sm font-bold mb-2">Покупок</p>
-                            <p class="text-4xl font-black">{{ ref_purchased_count|default:"0" }}</p>
-                        </div>
-                        <div class="setup-step-card metric-card p-5 border-[#ffc700]/30 bg-[#ffc700]/5 !mb-0 referral-stat-card">
-                            <p class="text-[#ffc700] text-sm font-bold mb-2">Бонусные дни</p>
-                            <p class="text-4xl font-black text-[#ffc700]">+{{ bonus_days|default:"0" }}</p>
-                        </div>
-                    </section>
-
-                    <section class="setup-shell p-6 md:p-8 referral-link-card">
+                    <section class="setup-shell p-5 md:p-6 referral-link-card">
                         <div class="flex flex-col gap-5">
                             <div>
                                 <h3 class="text-lg font-black mb-2">Пригласительная ссылка</h3>
-                            <p class="text-gray-500 text-sm font-bold leading-relaxed">Отправьте другу ссылку на сайт или в Telegram. Бонусы начислятся автоматически.</p>
+                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Покажите другу QR-код или скопируйте ссылку — бонусы начислятся автоматически.</p>
                             </div>
-                            <div>
-                                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Ссылка на сайт</p>
-                                <div class="relative group referral-link-field">
-                                    <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                        <i class="fas fa-globe text-[#ffc700] text-lg"></i>
-                                    </div>
-                                    <input type="text" readonly value="{{ site_referral_link }}"
-                                        id="site-ref-link-input"
-                                        class="referral-link-input w-full py-5 pl-14 pr-40 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
-
-                                    <button onclick="copyReferralLink('site-ref-link-input')"
-                                            class="absolute right-2 top-2 bottom-2 setup-cta-btn dashboard-action-btn !w-auto !py-0 !px-8 !mb-0 !mr-0">
-                                        Копировать
-                                    </button>
-                                </div>
+                            <div class="grid grid-cols-2 gap-3">
+                                <button type="button" onclick="openRefShare('tg')"
+                                        class="flex items-center justify-between gap-2 px-4 py-3.5 rounded-full border border-white/10 bg-white/5 hover:border-[#ffc700]/30 transition-colors text-left">
+                                    <span class="flex items-center gap-2 min-w-0">
+                                        <i class="fab fa-telegram-plane text-[#ffc700]"></i>
+                                        <span class="text-white font-semibold text-sm truncate">Telegram</span>
+                                    </span>
+                                    <i class="fas fa-qrcode text-gray-500"></i>
+                                </button>
+                                <button type="button" onclick="openRefShare('site')"
+                                        class="flex items-center justify-between gap-2 px-4 py-3.5 rounded-full border border-white/10 bg-white/5 hover:border-[#ffc700]/30 transition-colors text-left">
+                                    <span class="flex items-center gap-2 min-w-0">
+                                        <i class="fas fa-globe text-[#ffc700]"></i>
+                                        <span class="text-white font-semibold text-sm truncate">Вебсайт</span>
+                                    </span>
+                                    <i class="fas fa-qrcode text-gray-500"></i>
+                                </button>
                             </div>
-                            <div>
-                                <p class="text-gray-500 text-[10px] font-black uppercase tracking-widest mb-2 ml-1">Ссылка в Telegram</p>
-                                <div class="relative group referral-link-field">
-                                    <div class="absolute inset-y-0 left-0 pl-5 flex items-center pointer-events-none">
-                                        <i class="fab fa-telegram-plane text-[#ffc700] text-lg"></i>
-                                    </div>
-                                    <input type="text" readonly value="{{ referral_link }}"
-                                        id="ref-link-input"
-                                        class="referral-link-input w-full py-5 pl-14 pr-40 text-[12px] font-mono text-white focus:outline-none focus:border-[#ffc700]/30 transition-all shadow-inner">
+                        </div>
+                    </section>
 
-                                    <button onclick="copyReferralLink('ref-link-input')"
-                                            class="absolute right-2 top-2 bottom-2 setup-cta-btn dashboard-action-btn !w-auto !py-0 !px-8 !mb-0 !mr-0">
-                                        Копировать
-                                    </button>
-                                </div>
+                    <section class="setup-shell !p-0 overflow-hidden">
+                        <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
+                            <h3 class="text-[15px] font-bold text-white">Статистика</h3>
+                            <button type="button" onclick="openReferralTerms()"
+                                    class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-gray-400 hover:text-[#ffc700] hover:border-[#ffc700]/30 font-semibold text-xs transition-colors">
+                                <i class="fas fa-info-circle"></i> Условия
+                            </button>
+                        </div>
+                        <div class="divide-y divide-white/5">
+                            <div class="flex items-center justify-between px-5 py-3.5">
+                                <span class="text-gray-400 text-sm font-medium">Приглашено</span>
+                                <span class="text-white font-bold">{{ ref_invited_count|default:"0" }}</span>
+                            </div>
+                            <div class="flex items-center justify-between px-5 py-3.5">
+                                <span class="text-gray-400 text-sm font-medium">Активных</span>
+                                <span class="text-[#00ff88] font-bold">{{ ref_connected_count|default:"0" }}</span>
+                            </div>
+                            <div class="flex items-center justify-between px-5 py-3.5">
+                                <span class="text-gray-400 text-sm font-medium">Покупок</span>
+                                <span class="text-white font-bold">{{ ref_purchased_count|default:"0" }}</span>
+                            </div>
+                            <div class="flex items-center justify-between px-5 py-3.5">
+                                <span class="text-gray-400 text-sm font-medium">Бонусных дней</span>
+                                <span class="text-[#ffc700] font-bold">+{{ bonus_days|default:"0" }}</span>
                             </div>
                         </div>
                     </section>
@@ -2685,25 +2861,25 @@
             </div>
 
             <div id="tab-settings" class="tab-content">
-                <header class="mb-8 mobile-compact-header">
+                <header id="settings-header" class="mb-8 mobile-compact-header">
                     <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-3">Настройки</h1>
                     <p class="text-gray-500 text-sm md:text-base font-bold max-w-2xl">
                         Аккаунт, ответы на частые вопросы и управление автопродлением.
                     </p>
                 </header>
 
-                <section class="setup-shell max-w-2xl !p-0 overflow-hidden mb-7">
+                <section id="settings-account-section" class="max-w-2xl mb-7 space-y-3">
                     {# Telegram #}
-                    <div class="flex items-center gap-4 px-5 md:px-6 py-5 border-b border-white/5">
+                    <div class="settings-item flex items-center gap-4 px-4 py-4">
                         <div class="w-11 h-11 rounded-2xl bg-[#229ED9]/15 border border-[#229ED9]/25 flex items-center justify-center text-[#3aa9e0] flex-shrink-0">
                             <i class="fab fa-telegram-plane text-lg"></i>
                         </div>
                         <div class="min-w-0 flex-1">
-                            <div class="text-[10px] font-black uppercase text-gray-500 tracking-widest mb-0.5">Telegram</div>
+                            <div class="text-white font-bold truncate">Telegram</div>
                             {% if user.telegram_id %}
-                                <div class="text-white font-bold truncate">Подключён</div>
+                                <div class="text-gray-500 text-xs font-medium mt-0.5 truncate">Подключён</div>
                             {% else %}
-                                <div class="text-gray-500 font-bold truncate">Не подключён</div>
+                                <div class="text-gray-500 text-xs font-medium mt-0.5 truncate">Не подключён</div>
                             {% endif %}
                         </div>
                         {% if not user.telegram_id and tg_bind_link %}
@@ -2712,16 +2888,16 @@
                     </div>
 
                     {# Почта #}
-                    <div class="flex items-center gap-4 px-5 md:px-6 py-5 border-b border-white/5">
+                    <div class="settings-item flex items-center gap-4 px-4 py-4">
                         <div class="w-11 h-11 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                             <i class="fas fa-envelope text-lg"></i>
                         </div>
                         <div class="min-w-0 flex-1">
-                            <div class="text-[10px] font-black uppercase text-gray-500 tracking-widest mb-0.5">Почта</div>
+                            <div class="text-white font-bold truncate">Почта</div>
                             {% if user.email %}
-                                <div class="text-white font-bold truncate">{{ user.email }}</div>
+                                <div class="text-gray-500 text-xs font-medium mt-0.5 truncate">{{ user.email }}</div>
                             {% else %}
-                                <div class="text-gray-500 font-bold truncate">Не указана</div>
+                                <div class="text-gray-500 text-xs font-medium mt-0.5 truncate">Не указана</div>
                             {% endif %}
                         </div>
                         <button type="button" onclick="openEmailBindSheet()" class="text-[#ffc700] font-black text-sm hover:text-[#ffd740] transition-colors whitespace-nowrap">
@@ -2729,75 +2905,91 @@
                         </button>
                     </div>
 
-                    {# Поддержка #}
-                    <a href="{{ support_telegram_url }}" target="_blank" rel="noopener" class="flex items-center gap-4 px-5 md:px-6 py-5 group">
+                    {# FAQ — суб-экран как у Akenai; пункта «Поддержка» тут нет намеренно — поддержка живёт вкладкой в нижней навигации #}
+                    <button type="button" onclick="openSettingsFaq()" class="settings-item w-full flex items-center gap-4 px-4 py-4 text-left group">
                         <div class="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0">
-                            <i class="fas fa-headset text-lg"></i>
+                            <i class="fas fa-circle-question text-lg"></i>
                         </div>
                         <div class="min-w-0 flex-1">
-                            <div class="text-white font-bold truncate group-hover:text-[#ffc700] transition-colors">Поддержка</div>
+                            <div class="text-white font-bold truncate group-hover:text-[#ffc700] transition-colors">Часто задаваемые вопросы</div>
+                            <div class="text-gray-500 text-xs font-medium mt-0.5">Подключение, оплата, безопасность</div>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-600 group-hover:text-[#ffc700] transition-colors"></i>
+                    </button>
+
+                    {# Добавить на рабочий стол (PWA) #}
+                    <button type="button" onclick="onAddToHomeClick()" class="settings-item w-full flex items-center gap-4 px-4 py-4 text-left group">
+                        <div class="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0">
+                            <i class="fas fa-mobile-screen-button text-lg"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-white font-bold truncate group-hover:text-[#ffc700] transition-colors">Добавить на рабочий стол</div>
+                            <div class="text-gray-500 text-xs font-medium mt-0.5 tg-webapp-show-note hidden">Откроется в браузере</div>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-600 group-hover:text-[#ffc700] transition-colors"></i>
+                    </button>
+
+                    {# Документы #}
+                    <a href="{% url 'offer' %}" target="_blank" rel="noopener" class="settings-item flex items-center gap-4 px-4 py-4 group">
+                        <div class="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0">
+                            <i class="fas fa-file-contract text-lg"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-white font-bold truncate group-hover:text-[#ffc700] transition-colors">Пользовательское соглашение</div>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-600 group-hover:text-[#ffc700] transition-colors"></i>
+                    </a>
+                    <a href="{% url 'privacy' %}" target="_blank" rel="noopener" class="settings-item flex items-center gap-4 px-4 py-4 group">
+                        <div class="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0">
+                            <i class="fas fa-shield-alt text-lg"></i>
+                        </div>
+                        <div class="min-w-0 flex-1">
+                            <div class="text-white font-bold truncate group-hover:text-[#ffc700] transition-colors">Политика конфиденциальности</div>
                         </div>
                         <i class="fas fa-chevron-right text-gray-600 group-hover:text-[#ffc700] transition-colors"></i>
                     </a>
                 </section>
 
-                {# FAQ #}
-                <section class="max-w-2xl mb-7 space-y-3">
-                    <div class="faq-item setup-shell !p-0 overflow-hidden">
-                        <button type="button" class="faq-q w-full flex items-center justify-between gap-4 px-5 md:px-6 py-5 text-left" onclick="toggleFaq(this)">
-                            <span class="text-white font-black">Как подключить ваш VPN?</span>
-                            <i class="fas fa-chevron-down text-gray-500 transition-transform flex-shrink-0"></i>
+                {# FAQ по схеме Akenai: разделы -> вопросы -> статья в bottom-sheet; данные и рендер — FAQ_DATA в JS, тексты согласованы с handlers/faq.py бота #}
+                <section id="settings-faq-view" class="max-w-2xl mb-7 hidden">
+                    <div id="faq-sections-view">
+                        <button type="button" onclick="closeSettingsFaq()" class="flex items-center gap-3 mb-4 text-left group">
+                            <div class="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0 group-hover:border-white/25 transition-colors">
+                                <i class="fas fa-arrow-left text-sm"></i>
+                            </div>
+                            <span class="text-white font-bold text-lg">Часто задаваемые вопросы</span>
                         </button>
-                        <div class="faq-a px-5 md:px-6 text-gray-500 text-sm font-bold leading-relaxed">
-                            <p class="pb-5">Откройте вкладку «Установка», выберите своё устройство и следуйте инструкции. На большинстве устройств можно подключиться в один клик через приложение Happ.</p>
-                        </div>
+                        <p class="text-gray-500 text-sm font-medium mb-3 px-1">Выберите раздел</p>
+                        <div id="faq-sections-list" class="space-y-3"></div>
                     </div>
-                    <div class="faq-item setup-shell !p-0 overflow-hidden">
-                        <button type="button" class="faq-q w-full flex items-center justify-between gap-4 px-5 md:px-6 py-5 text-left" onclick="toggleFaq(this)">
-                            <span class="text-white font-black">Что происходит после оплаты?</span>
-                            <i class="fas fa-chevron-down text-gray-500 transition-transform flex-shrink-0"></i>
+
+                    <div id="faq-questions-view" class="hidden">
+                        <button type="button" onclick="showFaqSections()" class="flex items-center gap-3 mb-4 text-left group">
+                            <div class="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0 group-hover:border-white/25 transition-colors">
+                                <i class="fas fa-arrow-left text-sm"></i>
+                            </div>
+                            <span id="faq-section-title" class="text-white font-bold text-lg"></span>
                         </button>
-                        <div class="faq-a px-5 md:px-6 text-gray-500 text-sm font-bold leading-relaxed">
-                            <p class="pb-5">Подписка активируется автоматически, оплаченные дни добавляются к текущему сроку. Ключи доступа сразу появляются в этом кабинете на вкладке «Главная».</p>
+                        <div class="settings-item !p-0 overflow-hidden mb-3">
+                            <div id="faq-questions-list" class="divide-y divide-white/5"></div>
                         </div>
-                    </div>
-                    <div class="faq-item setup-shell !p-0 overflow-hidden">
-                        <button type="button" class="faq-q w-full flex items-center justify-between gap-4 px-5 md:px-6 py-5 text-left" onclick="toggleFaq(this)">
-                            <span class="text-white font-black">Какие возможности даёт подписка?</span>
-                            <i class="fas fa-chevron-down text-gray-500 transition-transform flex-shrink-0"></i>
+                        <button type="button" onclick="showTab('support')" class="settings-item w-full flex items-center gap-3 px-4 py-4 text-left">
+                            <div class="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                                <i class="fas fa-comment"></i>
+                            </div>
+                            <span class="text-gray-400 text-sm font-medium">Не нашли ответ? <span class="text-[#ffc700] font-semibold">Напишите нам</span></span>
                         </button>
-                        <div class="faq-a px-5 md:px-6 text-gray-500 text-sm font-bold leading-relaxed">
-                            <p class="pb-5">Безлимитный трафик без ограничения скорости, до 15 устройств на одной подписке, обход блокировок, YouTube и соцсети без рекламы.</p>
-                        </div>
-                    </div>
-                    <div class="faq-item setup-shell !p-0 overflow-hidden">
-                        <button type="button" class="faq-q w-full flex items-center justify-between gap-4 px-5 md:px-6 py-5 text-left" onclick="toggleFaq(this)">
-                            <span class="text-white font-black">А если что-то сломается?</span>
-                            <i class="fas fa-chevron-down text-gray-500 transition-transform flex-shrink-0"></i>
-                        </button>
-                        <div class="faq-a px-5 md:px-6 text-gray-500 text-sm font-bold leading-relaxed">
-                            <p class="pb-5">Напишите в поддержку — поможем с подключением, оплатой и настройкой устройств. Быстрее всего отвечаем в Telegram.</p>
-                        </div>
-                    </div>
-                    <div class="faq-item setup-shell !p-0 overflow-hidden">
-                        <button type="button" class="faq-q w-full flex items-center justify-between gap-4 px-5 md:px-6 py-5 text-left" onclick="toggleFaq(this)">
-                            <span class="text-white font-black">Безопасно ли это?</span>
-                            <i class="fas fa-chevron-down text-gray-500 transition-transform flex-shrink-0"></i>
-                        </button>
-                        <div class="faq-a px-5 md:px-6 text-gray-500 text-sm font-bold leading-relaxed">
-                            <p class="pb-5">Мы используем современные протоколы VLESS Reality, XHTTP Reality и Hysteria2. Трафик надёжно шифруется, а историю ваших действий мы не храним.</p>
-                        </div>
                     </div>
                 </section>
 
                 {# Управление автопродлением и выход #}
-                <section class="max-w-2xl space-y-3">
+                <section id="settings-autopay-section" class="max-w-2xl space-y-3">
                     {% comment %}
                     Автопродление — кнопка видна всегда. Источник истины — YkRecurrentPayment
                     (Wata рекурренты не поддерживает). Если активного рекуррента нет, по клику
                     показываем окно «отменять нечего», как команда бота /cancelautopay.
                     {% endcomment %}
-                    <button type="button" onclick="onAutopayButtonClick()" class="w-full flex items-center gap-4 px-5 md:px-6 py-5 setup-shell !mb-0 text-left hover:border-[#ff5c67]/30 transition-colors">
+                    <button type="button" onclick="onAutopayButtonClick()" class="w-full flex items-center gap-4 px-4 py-4 setup-shell !mb-0 text-left hover:border-[#ff5c67]/30 transition-colors">
                         <div class="w-11 h-11 rounded-2xl bg-[#ff5c67]/10 border border-[#ff5c67]/20 flex items-center justify-center text-[#ff5c67] flex-shrink-0">
                             <i class="fas fa-rotate-left text-lg"></i>
                         </div>
@@ -2808,7 +3000,7 @@
                         <i class="fas fa-chevron-right text-gray-600 flex-shrink-0"></i>
                     </button>
 
-                    <button type="button" onclick="window.location.href='{% url 'logout' %}'" class="w-full flex items-center gap-4 px-5 md:px-6 py-5 setup-shell !mb-0 text-left hover:border-white/20 transition-colors">
+                    <button type="button" onclick="window.location.href='{% url 'logout' %}'" class="tg-webapp-hide w-full flex items-center gap-4 px-4 py-4 setup-shell !mb-0 text-left hover:border-white/20 transition-colors">
                         <div class="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0">
                             <i class="fas fa-sign-out-alt text-lg"></i>
                         </div>
@@ -2820,6 +3012,58 @@
             </div>
 
         </main>
+    </div>
+
+    {# Лист статьи FAQ: вопрос, ответ и переход к следующей статье #}
+    <div id="faq-article-sheet" class="fixed inset-0 z-[9999] hidden flex items-end justify-center">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm z-[9998]" onclick="closeFaqArticle()"></div>
+        <div class="bottom-sheet-content fixed inset-x-0 bottom-0 bg-[#111113] rounded-t-[2rem] border-t border-white/10 p-5 md:p-8 pb-8 transform translate-y-full transition-transform duration-300 ease-out z-[9999]
+                    lg:left-1/2 lg:-translate-x-1/2 lg:max-w-xl" id="faq-article-content">
+            <div class="w-10 h-1 rounded-full bg-white/20 mx-auto mb-4"></div>
+            <div id="faq-article-kicker" class="text-gray-500 text-xs font-medium mb-2"></div>
+            <h4 id="faq-article-title" class="text-white text-xl font-bold mb-3 leading-snug"></h4>
+            <p id="faq-article-text" class="text-gray-400 text-sm font-medium leading-relaxed mb-5"></p>
+            <button type="button" id="faq-article-next" onclick="nextFaqArticle()"
+                    class="w-full flex items-center justify-between gap-4 px-4 py-4 rounded-2xl border border-white/10 bg-white/5 text-left hover:border-[#ffc700]/30 transition-colors">
+                <span class="text-gray-500 text-[10px] font-bold uppercase tracking-widest flex-shrink-0">Следующая статья</span>
+                <span class="flex items-center gap-2 min-w-0 justify-end">
+                    <span id="faq-article-next-title" class="text-[#ffc700] text-sm font-semibold text-right leading-snug"></span>
+                    <i class="fas fa-chevron-right text-[#ffc700] text-xs flex-shrink-0"></i>
+                </span>
+            </button>
+        </div>
+    </div>
+
+    {# Лист с QR-кодом пригласительной ссылки (Telegram / Вебсайт) #}
+    <div id="ref-share-sheet" class="fixed inset-0 z-[9999] hidden flex items-end justify-center">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm z-[9998]" onclick="closeRefShare()"></div>
+        <div class="bottom-sheet-content fixed inset-x-0 bottom-0 bg-[#111113] rounded-t-[2rem] border-t border-white/10 p-5 md:p-8 pb-8 transform translate-y-full transition-transform duration-300 ease-out z-[9999]
+                    lg:left-1/2 lg:-translate-x-1/2 lg:max-w-xl" id="ref-share-content">
+            <div class="flex items-center justify-between mb-5">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-[#ffc700]">
+                        <i id="ref-share-icon" class="fab fa-telegram-plane"></i>
+                    </div>
+                    <span id="ref-share-title" class="text-white font-bold text-lg">Telegram</span>
+                </div>
+                <button type="button" onclick="closeRefShare()" aria-label="Закрыть"
+                        class="w-9 h-9 rounded-full bg-white/5 border border-white/10 text-gray-400 hover:text-white flex items-center justify-center transition-colors">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            {# Белая подложка — стандартный тёмный-на-светлом QR читается любым сканером #}
+            <div class="flex justify-center mb-5">
+                <div class="bg-white rounded-3xl p-4">
+                    <div id="ref-qr-box" class="w-[220px] h-[220px] flex items-center justify-center"></div>
+                </div>
+            </div>
+
+            <button type="button" id="ref-copy-btn" onclick="copyRefShareLink()"
+                    class="w-full flex items-center justify-center gap-2 py-4 rounded-full border border-white/15 bg-white/5 text-white font-semibold text-sm hover:border-[#ffc700]/30 transition-all active:scale-95">
+                <i class="fas fa-copy"></i> Скопировать ссылку
+            </button>
+        </div>
     </div>
 
     {# Лист подтверждения отмены автопродления (зеркалит objection-диалог бота) #}
@@ -2919,24 +3163,16 @@
                                     {{ tariff.description }}
                                 {% endif %}
                             </span>
-                            <span class="plan-note">
-                                {% if tariff.db_tariff_id == "month" %}
-                                    Здесь и сейчас
-                                {% elif tariff.db_tariff_id == "threemonths" %}
-                                    Разумная экономия
-                                {% elif tariff.db_tariff_id == "year" %}
-                                    Максимальная выгода
-                                {% else %}
-                                    Быстрый доступ
-                                {% endif %}
-                            </span>
+                            {% if tariff.db_tariff_id == "year" %}
+                                <span class="plan-note">Максимальная выгода</span>
+                            {% endif %}
                         </span>
                         <span class="plan-price">
                             <strong>
                                 {% if tariff.db_tariff_id == "threemonths" %}
-                                    {% widthratio tariff.price 3 1 %} ₽ / месяц
+                                    {{ tariff.price|floor_div:3 }} ₽ / месяц
                                 {% elif tariff.db_tariff_id == "year" %}
-                                    {% widthratio tariff.price 12 1 %} ₽ / месяц
+                                    {{ tariff.price|floor_div:12 }} ₽ / месяц
                                 {% else %}
                                     {{ tariff.price }} ₽ / месяц
                                 {% endif %}
@@ -3006,7 +3242,7 @@
                                 <span class="text-2xl font-black text-[#ffc700]">₽</span>
                             </div>
                             <div class="text-gray-500 text-xs font-bold mt-1">
-                                {% if tariff.db_tariff_id == "threemonths" %}≈ {% widthratio tariff.price 3 1 %} ₽ в месяц{% elif tariff.db_tariff_id == "year" %}≈ {% widthratio tariff.price 12 1 %} ₽ в месяц{% else %}за месяц доступа{% endif %}
+                                {% if tariff.db_tariff_id == "threemonths" %}≈ {{ tariff.price|floor_div:3 }} ₽ в месяц{% elif tariff.db_tariff_id == "year" %}≈ {{ tariff.price|floor_div:12 }} ₽ в месяц{% else %}за месяц доступа{% endif %}
                             </div>
                         </div>
 
@@ -3230,6 +3466,11 @@
         function showTab(tabId) {
             // Если мы были на экране тарифов, возвращаемся в интерфейс
             hideTariffs();
+
+            // Суб-экран FAQ в «Настройках» сбрасываем при любом переключении вкладок
+            if (document.getElementById('settings-faq-view')) {
+                closeSettingsFaq();
+            }
 
             // Убираем активные классы со всех вкладок и кнопок
             document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
@@ -4290,7 +4531,7 @@
                     <input type="text" readonly value="${copyValue}" id="new-setup-copy-input" class="sr-only">
                     <div class="setup-wizard-actions">
                         ${newSetupLink(app.addText, app.subscriptionUrl, "", "fas fa-plus-circle")}
-                        ${newSetupButton(`Скопировать ссылку подписки`, "copyInputValue('new-setup-copy-input', 'Ссылка подписки скопирована')", "setup-secondary-btn", "fas fa-copy")}
+                        ${newSetupButton(`Скопировать ссылку подписки`, "copyInputValueBtn(event, 'new-setup-copy-input')", "setup-secondary-btn", "fas fa-copy")}
                         ${newSetupButton(`Далее: подписка добавлена`, "finishNewSetup()", "setup-secondary-btn", "fas fa-arrow-right")}
                         <button type="button" onclick="backNewSetupInstall()" class="mt-4 text-gray-500 text-sm font-black hover:text-[#ffc700] transition-colors">← Предыдущий шаг</button>
                     </div>
@@ -4468,7 +4709,7 @@
                         <p class="setup-compact-keylabel">Не сработало? Скопируйте ключ и вставьте в приложение вручную:</p>
                         <div class="setup-compact-keyrow">
                             <input type="text" readonly value="${subKey}" id="setup-copy-key" class="setup-compact-keyinput">
-                            <button type="button" onclick="copyInputValue('setup-copy-key', 'Ключ скопирован')" class="setup-compact-copybtn"><i class="fas fa-copy"></i> Копировать</button>
+                            <button type="button" onclick="copyInputValueBtn(event, 'setup-copy-key')" class="setup-compact-copybtn"><i class="fas fa-copy"></i> Копировать</button>
                         </div>
                     </div>`;
             }
@@ -4720,7 +4961,11 @@
                     }
 
                     event.preventDefault();
-                    const paymentWindow = window.open('', '_blank');
+                    // Внутри Telegram Mini App window.open недоступен: платёжную
+                    // страницу открываем системным браузером через openLink.
+                    const tgWebApp = (window.Telegram && window.Telegram.WebApp
+                        && window.Telegram.WebApp.initData) ? window.Telegram.WebApp : null;
+                    const paymentWindow = tgWebApp ? null : window.open('', '_blank');
                     if (paymentWindow) {
                         paymentWindow.opener = null;
                         paymentWindow.document.write('<!doctype html><title>Оплата</title><body style="margin:0;background:#111;color:#fff;font-family:system-ui;display:grid;place-items:center;min-height:100vh">Открываем форму оплаты...</body>');
@@ -4744,8 +4989,12 @@
                         if (!response.ok || payload.status !== 'ok') {
                             throw new Error(payload.message || 'payment launch failed');
                         }
-                        if (paymentWindow && payload.payment_url) {
-                            paymentWindow.location.href = payload.payment_url;
+                        if (payload.payment_url) {
+                            if (tgWebApp) {
+                                tgWebApp.openLink(payload.payment_url);
+                            } else if (paymentWindow) {
+                                paymentWindow.location.href = payload.payment_url;
+                            }
                         }
                         window.location.href = payload.payment_status_url;
                     } catch (error) {
@@ -4865,10 +5114,249 @@
             document.addEventListener('DOMContentLoaded', openEmailBindSheet);
         {% endif %}
 
-        function toggleFaq(button) {
-            const item = button.closest('.faq-item');
-            if (!item) return;
-            item.classList.toggle('open');
+        // FAQ по схеме Akenai: разделы -> вопросы -> статья в bottom-sheet
+        // с кнопкой «Следующая статья». Единственный источник текстов на
+        // странице — FAQ_DATA (согласован с разделом «Вопросы» бота).
+        const FAQ_DATA = [
+            { emoji: '📱', title: 'Подключение', icon: 'fa-desktop', items: [
+                { q: 'Как подключить VPN?', a: 'Откройте вкладку «Установка», выберите своё устройство и следуйте шагам. На большинстве устройств подключение занимает один клик через приложение Happ.' },
+                { q: 'Где взять ключ?', a: 'На вкладке «Установка» после выбора устройства появится ваш ключ с кнопкой копирования. Ключ работает внутри приложения Happ.' },
+                { q: 'Как проверить, что VPN работает?', a: 'Откройте сайт 2ip.io и посмотрите свой IP-адрес. Если он отличается от обычного — подключение работает.' },
+                { q: 'Показывает «подключено», но сайты не открываются — что делать?', a: 'Проверьте на «Главной», не истекла ли подписка, затем переподключитесь или смените локацию в приложении — чаще всего помогает смена сервера.' },
+                { q: 'Как сменить сервер?', a: 'В приложении Happ откройте список локаций, выберите другую и подключитесь заново — это занимает пару секунд.' },
+                { q: 'Сколько устройств можно подключить с одной подпиской?', a: 'До 15 устройств на одной подписке — телефон, планшет, компьютер и не только. Достаточно добавить один и тот же ключ на каждое устройство.' },
+            ]},
+            { emoji: '🛡', title: 'Блокировки и «белые списки»', icon: 'fa-wifi', items: [
+                { q: 'Как получить доступ при «белых списках»?', a: 'Наши ключи работают и в сетях с «белыми списками». Установите приложение по инструкции со вкладки «Установка» — когда увидите надпись «ВСЕ ЛОКАЦИИ В БЕЛОМ СПИСКЕ ❤️», всё настроено верно.' },
+                { q: 'Сколько трафика включено?', a: 'Трафик безлимитный на всех тарифах — смотрите видео, играйте и скачивайте без ограничений скорости.' },
+            ]},
+            { emoji: '💳', title: 'Подписка и оплата', icon: 'fa-credit-card', items: [
+                { q: 'Есть ли пробный период?', a: 'Да! Новым пользователям — бесплатный пробный период, он активируется сразу при регистрации. Карту привязывать не нужно.' },
+                { q: 'Какими способами можно оплатить?', a: 'Российскими банковскими картами и через СБП. Оплата проходит через защищённый платёжный шлюз — данные карты мы не видим и не храним.' },
+                { q: 'Как продлевается подписка?', a: 'Автоматически — со способа оплаты, привязанного при покупке. Отключить автопродление можно в любой момент в настройках, доступ сохранится до конца оплаченного периода.' },
+                { q: 'Что будет, если не продлить подписку?', a: 'Доступ приостановится. После оплаты он вернётся автоматически — ничего заново настраивать не придётся.' },
+                { q: 'Как отменить подписку?', a: 'В настройках нажмите «Отключить автопродление» — или отправьте команду /cancelautopay в нашем Telegram-боте.' },
+            ]},
+            { emoji: '🔒', title: 'Безопасность и приватность', icon: 'fa-shield-alt', items: [
+                { q: 'Храните ли вы логи и историю?', a: 'Нет. Мы не логируем подключения, не отслеживаем посещённые сайты и не храним историю вашей активности.' },
+                { q: 'Какое шифрование используется?', a: 'Мы используем современные протоколы VLESS Reality, XHTTP Reality и Hysteria2 — одни из самых устойчивых к блокировкам. Трафик полностью шифруется и маскируется под обычный HTTPS.' },
+                { q: 'Может ли кто-то узнать, что я пользуюсь VPN?', a: 'Ваш провайдер видит только зашифрованное соединение с сервером. Что именно происходит внутри туннеля — определить нельзя.' },
+            ]},
+            { emoji: '🚀', title: 'Скорость и стабильность', icon: 'fa-tachometer-alt', items: [
+                { q: 'Медленно работает — что делать?', a: 'Скорее всего, перегружена конкретная локация. Смените сервер в приложении Happ — обычно это помогает.' },
+                { q: 'Сколько серверов доступно?', a: 'Несколько локаций в разных странах, и список постоянно пополняется. Все локации видны в приложении — выбирайте ближайшую для максимальной скорости.' },
+                { q: 'Сервер не работает — что делать?', a: 'Смените локацию вручную в приложении. Если проблема остаётся — напишите в поддержку, поможем.' },
+            ]},
+        ];
+        let faqSectionIdx = 0;
+        let faqItemIdx = 0;
+
+        function faqScrollTop() {
+            const container = document.getElementById('app-container');
+            if (container) container.scrollTo({ top: 0 });
+        }
+
+        function pluralFaqArticles(n) {
+            const mod100 = n % 100;
+            if (mod100 >= 11 && mod100 <= 14) return 'статей';
+            const mod10 = n % 10;
+            if (mod10 === 1) return 'статья';
+            if (mod10 >= 2 && mod10 <= 4) return 'статьи';
+            return 'статей';
+        }
+
+        function openSettingsFaq() {
+            document.getElementById('settings-header').classList.add('hidden');
+            document.getElementById('settings-account-section').classList.add('hidden');
+            document.getElementById('settings-autopay-section').classList.add('hidden');
+            document.getElementById('settings-faq-view').classList.remove('hidden');
+            renderFaqSections();
+            showFaqSections();
+        }
+
+        function closeSettingsFaq() {
+            document.getElementById('settings-faq-view').classList.add('hidden');
+            document.getElementById('settings-header').classList.remove('hidden');
+            document.getElementById('settings-account-section').classList.remove('hidden');
+            document.getElementById('settings-autopay-section').classList.remove('hidden');
+        }
+
+        function renderFaqSections() {
+            const list = document.getElementById('faq-sections-list');
+            list.innerHTML = FAQ_DATA.map((section, i) => `
+                <button type="button" onclick="openFaqSection(${i})"
+                        class="settings-item w-full flex items-center justify-between gap-4 px-4 py-5 text-left group">
+                    <span class="min-w-0">
+                        <span class="block text-white font-semibold text-[16px] leading-snug">${section.emoji} ${section.title}</span>
+                        <span class="block text-gray-500 text-xs font-medium mt-1.5">${section.items.length} ${pluralFaqArticles(section.items.length)}</span>
+                    </span>
+                    <i class="fas ${section.icon} text-2xl text-[#ffc700]/50 flex-shrink-0 group-hover:text-[#ffc700]/80 transition-colors"></i>
+                </button>`).join('');
+        }
+
+        function showFaqSections() {
+            document.getElementById('faq-questions-view').classList.add('hidden');
+            document.getElementById('faq-sections-view').classList.remove('hidden');
+            faqScrollTop();
+        }
+
+        function openFaqSection(i) {
+            faqSectionIdx = i;
+            const section = FAQ_DATA[i];
+            document.getElementById('faq-section-title').textContent = section.emoji + ' ' + section.title;
+            document.getElementById('faq-questions-list').innerHTML = section.items.map((item, j) => `
+                <button type="button" onclick="openFaqArticle(${i}, ${j})"
+                        class="w-full flex items-center justify-between gap-3 px-4 py-4 text-left hover:bg-white/5 transition-colors">
+                    <span class="text-white text-sm font-medium leading-snug">${item.q}</span>
+                    <i class="fas fa-chevron-right text-gray-600 text-xs flex-shrink-0"></i>
+                </button>`).join('');
+            document.getElementById('faq-sections-view').classList.add('hidden');
+            document.getElementById('faq-questions-view').classList.remove('hidden');
+            faqScrollTop();
+        }
+
+        function renderFaqArticle() {
+            const section = FAQ_DATA[faqSectionIdx];
+            const item = section.items[faqItemIdx];
+            document.getElementById('faq-article-kicker').textContent =
+                `${section.emoji} ${section.title} · статья ${faqItemIdx + 1} из ${section.items.length}`;
+            document.getElementById('faq-article-title').textContent = item.q;
+            document.getElementById('faq-article-text').textContent = item.a;
+
+            const nextBtn = document.getElementById('faq-article-next');
+            const next = section.items[faqItemIdx + 1];
+            if (next) {
+                document.getElementById('faq-article-next-title').textContent = next.q;
+                nextBtn.classList.remove('hidden');
+            } else {
+                nextBtn.classList.add('hidden');
+            }
+        }
+
+        function openFaqArticle(i, j) {
+            faqSectionIdx = i;
+            faqItemIdx = j;
+            renderFaqArticle();
+            const sheet = document.getElementById('faq-article-sheet');
+            const content = document.getElementById('faq-article-content');
+            sheet.classList.remove('hidden');
+            setTimeout(() => content.classList.replace('translate-y-full', 'translate-y-0'), 10);
+        }
+
+        function nextFaqArticle() {
+            const section = FAQ_DATA[faqSectionIdx];
+            if (faqItemIdx + 1 < section.items.length) {
+                faqItemIdx += 1;
+                renderFaqArticle();
+            }
+        }
+
+        function closeFaqArticle() {
+            const sheet = document.getElementById('faq-article-sheet');
+            const content = document.getElementById('faq-article-content');
+            content.classList.replace('translate-y-0', 'translate-y-full');
+            setTimeout(() => sheet.classList.add('hidden'), 300);
+        }
+
+        // Пригласительные ссылки: лист с QR-кодом и копированием (как у Akenai).
+        const REF_SHARE_LINKS = {
+            tg: { url: "{{ referral_link|escapejs }}", title: "Telegram", icon: "fab fa-telegram-plane" },
+            site: { url: "{{ site_referral_link|escapejs }}", title: "Вебсайт", icon: "fas fa-globe" },
+        };
+        let refShareKind = 'tg';
+        let refCopyResetTimer = null;
+
+        function openRefShare(kind) {
+            const link = REF_SHARE_LINKS[kind];
+            if (!link) return;
+            refShareKind = kind;
+
+            document.getElementById('ref-share-title').textContent = link.title;
+            document.getElementById('ref-share-icon').className = link.icon;
+            resetRefCopyButton();
+
+            const box = document.getElementById('ref-qr-box');
+            box.innerHTML = '';
+            if (window.QRCode) {
+                new QRCode(box, {
+                    text: link.url,
+                    width: 220,
+                    height: 220,
+                    colorDark: '#111113',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M,
+                });
+            } else {
+                // CDN с QR-библиотекой недоступен — показываем ссылку текстом
+                box.innerHTML = '<span class="text-black text-xs font-mono break-all p-2">'
+                    + link.url.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span>';
+            }
+
+            const sheet = document.getElementById('ref-share-sheet');
+            const content = document.getElementById('ref-share-content');
+            sheet.classList.remove('hidden');
+            setTimeout(() => content.classList.replace('translate-y-full', 'translate-y-0'), 10);
+        }
+
+        function closeRefShare() {
+            const sheet = document.getElementById('ref-share-sheet');
+            const content = document.getElementById('ref-share-content');
+            content.classList.replace('translate-y-0', 'translate-y-full');
+            setTimeout(() => sheet.classList.add('hidden'), 300);
+        }
+
+        function resetRefCopyButton() {
+            if (refCopyResetTimer) clearTimeout(refCopyResetTimer);
+            const btn = document.getElementById('ref-copy-btn');
+            btn.classList.remove('!border-[#38d996]/40', '!bg-[#38d996]/10', '!text-[#38d996]');
+            btn.innerHTML = '<i class="fas fa-copy"></i> Скопировать ссылку';
+        }
+
+        async function copyRefShareLink() {
+            const link = REF_SHARE_LINKS[refShareKind];
+            if (!link) return;
+
+            let copied = false;
+            try {
+                await navigator.clipboard.writeText(link.url);
+                copied = true;
+            } catch (err) {
+                // Fallback для webview без clipboard API
+                const area = document.createElement('textarea');
+                area.value = link.url;
+                document.body.appendChild(area);
+                area.select();
+                try { copied = document.execCommand('copy'); } catch (e) {}
+                document.body.removeChild(area);
+            }
+
+            if (copied) {
+                const btn = document.getElementById('ref-copy-btn');
+                btn.classList.add('!border-[#38d996]/40', '!bg-[#38d996]/10', '!text-[#38d996]');
+                btn.innerHTML = '<i class="fas fa-check"></i> Скопировано!';
+                refCopyResetTimer = setTimeout(resetRefCopyButton, 2200);
+            }
+        }
+
+        // Условия реферальной программы — модалкой по «?» (как у Akenai),
+        // контент с runtime-значениями бонусов лежит в #referral-terms-content.
+        function openReferralTerms() {
+            openQuickAccessModal(
+                'Условия реферальной программы',
+                document.getElementById('referral-terms-content').innerHTML
+            );
+        }
+
+        // «Добавить на рабочий стол»: внутри Telegram Mini App установка PWA
+        // невозможна — открываем кабинет в системном браузере, дальше работает
+        // обычный PWA-флоу. На сайте показываем существующую инструкцию.
+        function onAddToHomeClick() {
+            const tg = window.Telegram && window.Telegram.WebApp;
+            if (tg && tg.initData) {
+                tg.openLink(window.location.origin + '/login/');
+                return;
+            }
+            quickAccessInstall();
         }
 
         const HAS_RECURRENT = {% if has_recurrent %}true{% else %}false{% endif %};
@@ -5075,6 +5563,22 @@
 
         function copyInputValue(inputId, message) {
             copyInputText(document.getElementById(inputId), message);
+        }
+
+        // Копирование с обратной связью прямо на кнопке: вместо тоста кнопка
+        // на пару секунд становится зелёной «Скопировано» (как в шите рефералки).
+        function copyInputValueBtn(event, inputId) {
+            const btn = event && event.target ? event.target.closest('button') : null;
+            const original = btn ? btn.innerHTML : '';
+            copyInputText(document.getElementById(inputId)).then((ok) => {
+                if (!ok || !btn) return;
+                btn.innerHTML = '<i class="fas fa-check"></i> Скопировано';
+                btn.classList.add('copied-green');
+                setTimeout(() => {
+                    btn.innerHTML = original;
+                    btn.classList.remove('copied-green');
+                }, 2200);
+            });
         }
 
         // 4. Инициализация при загрузке (чтобы была открыта первая вкладка)

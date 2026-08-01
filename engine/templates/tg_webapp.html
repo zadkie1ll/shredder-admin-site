@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Личный кабинет</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: var(--tg-theme-bg-color, #10151c);
+            color: var(--tg-theme-text-color, #f4f6f8);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+        .center {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            text-align: center;
+            padding: 0 24px;
+            box-sizing: border-box;
+        }
+        .spinner {
+            width: 36px;
+            height: 36px;
+            border: 3px solid rgba(128, 128, 128, .3);
+            border-top-color: var(--tg-theme-button-color, #5288c1);
+            border-radius: 50%;
+            animation: spin .8s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .hidden { display: none; }
+        a { color: var(--tg-theme-link-color, #6ab2f2); }
+    </style>
+</head>
+<body>
+    <div class="center">
+        <div class="spinner" id="spinner"></div>
+        <div id="status">Входим в личный кабинет…</div>
+        <div id="fallback" class="hidden">
+            Страница работает только внутри Telegram.<br>
+            <a href="{% url 'login' %}">Войти через сайт</a>
+        </div>
+    </div>
+
+    <form id="auth-form" method="post" action="{% url 'telegram_webapp_auth' %}" class="hidden">
+        {% csrf_token %}
+        <input type="hidden" name="init_data" id="init-data">
+    </form>
+
+    <script>
+        (function () {
+            var tg = window.Telegram && window.Telegram.WebApp;
+            var initData = tg && tg.initData;
+
+            if (!initData) {
+                document.getElementById("spinner").classList.add("hidden");
+                document.getElementById("status").classList.add("hidden");
+                document.getElementById("fallback").classList.remove("hidden");
+                return;
+            }
+
+            tg.ready();
+            tg.expand();
+
+            document.getElementById("init-data").value = initData;
+            document.getElementById("auth-form").submit();
+        })();
+    </script>
+</body>
+</html>

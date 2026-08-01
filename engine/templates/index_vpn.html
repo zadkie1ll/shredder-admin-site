@@ -1,4 +1,4 @@
-{% load static %}
+{% load static pricing %}
 <!DOCTYPE html>
 <html lang="ru">
 <head>
@@ -654,7 +654,7 @@
                         <div class="mb-8">
                             <div class="text-5xl font-black">{{ tariff.price }} ₽</div>
                             <div class="text-white/45 text-sm font-bold mt-1">
-                                {% if tariff.db_tariff_id == "threemonths" %}≈ {% widthratio tariff.price 3 1 %} ₽ в месяц{% elif tariff.db_tariff_id == "year" %}≈ {% widthratio tariff.price 12 1 %} ₽ в месяц{% else %}за месяц доступа{% endif %}
+                                {% if tariff.db_tariff_id == "threemonths" %}≈ {{ tariff.price|floor_div:3 }} ₽ в месяц{% elif tariff.db_tariff_id == "year" %}≈ {{ tariff.price|floor_div:12 }} ₽ в месяц{% else %}за месяц доступа{% endif %}
                             </div>
                         </div>
 

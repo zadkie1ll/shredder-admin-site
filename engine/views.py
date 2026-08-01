@@ -16,6 +16,7 @@ from datetime import date
 from datetime import time
 from datetime import timedelta
 from datetime import timezone
+from urllib.parse import parse_qsl
 from urllib.parse import urlencode
 from urllib.parse import urlsplit
 from django.http import HttpResponse
@@ -1273,7 +1274,9 @@ def verify_telegram_widget_auth(auth_data, bot_token):
     except (TypeError, ValueError):
         return False
 
-    if datetime.utcnow().timestamp() - auth_date_int > 86400:
+    # datetime.utcnow().timestamp() трактует naive-время как локальное и
+    # сдвигает окно свежести на смещение таймзоны — нужен aware-вариант.
+    if datetime.now(timezone.utc).timestamp() - auth_date_int > 86400:
         return False
 
     check_data = {
@@ -1309,6 +1312,55 @@ def decode_telegram_auth_result(raw_result):
         logging.warning("failed to decode telegram auth result: %s", e)
 
     return None
+
+
+def verify_telegram_webapp_init_data(init_data, bot_token):
+    """Проверить initData Telegram Mini App (WebView-кабинет из бота).
+
+    Алгоритм отличается от Login Widget: секретный ключ считается как
+    HMAC-SHA256(key="WebAppData", msg=bot_token). Возвращает словарь полей
+    initData без "hash" при успешной проверке, иначе None.
+    """
+    if not init_data or not bot_token:
+        return None
+
+    data = dict(parse_qsl(init_data, keep_blank_values=True))
+    received_hash = data.pop("hash", None)
+    if not received_hash:
+        return None
+
+    try:
+        auth_date_int = int(data.get("auth_date", ""))
+    except (TypeError, ValueError):
+        return None
+
+    # datetime.utcnow().timestamp() трактует naive-время как локальное и
+    # сдвигает окно свежести на смещение таймзоны — нужен aware-вариант.
+    if datetime.now(timezone.utc).timestamp() - auth_date_int > 86400:
+        return None
+
+    data_check_string = "\n".join(f"{key}={data[key]}" for key in sorted(data))
+    secret_key = hmac.new(
+        b"WebAppData", bot_token.encode(), hashlib.sha256
+    ).digest()
+    calculated_hash = hmac.new(
+        secret_key,
+        data_check_string.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+    if not hmac.compare_digest(calculated_hash, received_hash):
+        return None
+
+    return data
+
+
+def get_telegram_webapp_user_id(init_data_fields):
+    try:
+        user_payload = json.loads(init_data_fields.get("user", ""))
+        return int(user_payload["id"])
+    except (TypeError, ValueError, KeyError, json.JSONDecodeError):
+        return None
 
 
 def send_magic_link_email(email, link, *, subject=None, template_context=None):
@@ -2211,6 +2263,91 @@ def auth_by_telegram_widget(request):
         db_session.close()
 
 
+def telegram_webapp_entry(request):
+    """Страница Telegram Mini App: подхватывает initData и логинит в кабинет.
+
+    Открывается из кнопки меню бота. initData доступен только на клиенте
+    (через telegram-web-app.js), поэтому страница отправляет его POST-ом
+    на telegram_webapp_auth.
+    """
+    if not get_telegram_auth_bot(request.get_host()):
+        logging.warning("telegram webapp entry requested but bot token is missing")
+        return redirect("login")
+
+    return render(request, "tg_webapp.html")
+
+
+def auth_by_telegram_webapp(request):
+    if request.method != "POST":
+        return redirect("telegram_webapp_entry")
+
+    telegram_bot = get_telegram_auth_bot(request.get_host())
+    if not telegram_bot:
+        logging.warning("telegram webapp auth requested but bot token is missing")
+        return render_login(
+            request,
+            {"error": "Вход через Telegram временно недоступен"},
+            status=503,
+        )
+
+    init_data_fields = verify_telegram_webapp_init_data(
+        request.POST.get("init_data", ""), telegram_bot["token"]
+    )
+    if init_data_fields is None:
+        logging.warning("telegram webapp auth failed init data signature check")
+        return render_login(
+            request, {"error": "Не удалось подтвердить вход через Telegram."}
+        )
+
+    telegram_id = get_telegram_webapp_user_id(init_data_fields)
+    if telegram_id is None:
+        logging.warning("telegram webapp auth returned invalid telegram id")
+        return render_login(request, {"error": "Telegram не вернул ID аккаунта."})
+
+    db_session = session_factory()
+    try:
+        with db_session.begin():
+            user = (
+                db_session.query(User).filter(User.telegram_id == telegram_id).first()
+            )
+
+            if not user:
+                # Пользователь из бота всегда уже есть в users; создание —
+                # запасной путь на случай открытия Mini App до /start.
+                logging.info(
+                    "creating site subscription from telegram webapp auth "
+                    "for telegram id %s",
+                    telegram_id,
+                )
+                user = create_site_user(
+                    db_session,
+                    None,
+                    request,
+                    telegram_id=telegram_id,
+                    creation_channel="bot_webapp",
+                )
+
+            add_event_log_once(
+                db_session,
+                user,
+                analytics_event.FirstSuccessfulLogin(login_method="telegram_webapp"),
+            )
+
+        authorize_user_session(request, user)
+        # Кабинет открыт внутри Telegram: дальше dashboard рендерится в режиме
+        # Mini App (телеграм-SDK, без кнопки выхода и PWA-подсказок).
+        request.session["tg_webapp_mode"] = True
+        return redirect("dashboard")
+    except Exception as e:
+        logging.exception(f"telegram webapp auth failed for {telegram_id}: {e}")
+        return render_login(
+            request,
+            {"error": "Не удалось войти через Telegram. Напишите в поддержку."},
+        )
+    finally:
+        db_session.close()
+
+
 def index(request):
     captured_tracking_params = capture_tracking_params(request)
     site_role = get_site_role(request)
@@ -2510,6 +2647,7 @@ def dashboard(request):
             "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
             "referral_link": f"https://t.me/{tg_bot}?start=a{user.username}",
             "site_referral_link": f"{get_current_base_url(request)}/?a={user.username}",
+            "tg_webapp_mode": bool(request.session.get("tg_webapp_mode")),
         },
     )
 
@@ -6936,7 +7074,7 @@ def support_admin_api_censor_checks(request):
     расписание работало даже без крона (пока админку кто-то открывает);
     основной путь для расписания — management-команда censor_checks по крону.
 
-    POST action=save|delete|toggle|run.
+    POST action=save|bulk_update|delete|toggle|run.
     """
     auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
     if auth_response:
@@ -6948,6 +7086,132 @@ def support_admin_api_censor_checks(request):
     try:
         if request.method == "POST":
             action = request.POST.get("action", "save")
+
+            if action == "bulk_update":
+                updates = {}
+                updated_fields = []
+
+                if request.POST.get("apply_mode") == "1":
+                    mode = request.POST.get("mode", "")
+                    if mode not in {"op-full", "op-light", "geo-full", "geo-light"}:
+                        return JsonResponse(
+                            {"status": "error", "message": "Неверный режим замера"},
+                            status=400,
+                        )
+                    updates[CensorCheck.geo_mode] = mode.startswith("geo")
+                    updates[CensorCheck.light_mode] = mode.endswith("light")
+                    updated_fields.append("mode")
+
+                if request.POST.get("apply_api_key") == "1":
+                    api_key_raw = request.POST.get("api_key_id", "").strip()
+                    if api_key_raw:
+                        try:
+                            api_key_id = int(api_key_raw)
+                        except ValueError:
+                            return JsonResponse(
+                                {"status": "error", "message": "Неверный ключ"},
+                                status=400,
+                            )
+                        if not db_session.get(RipeApiKey, api_key_id):
+                            return JsonResponse(
+                                {"status": "error", "message": "Ключ не найден"},
+                                status=400,
+                            )
+                    else:
+                        default_key = (
+                            db_session.query(RipeApiKey)
+                            .filter(RipeApiKey.is_default.is_(True))
+                            .first()
+                        )
+                        if not default_key and not fallback_key:
+                            return JsonResponse(
+                                {
+                                    "status": "error",
+                                    "message": "Ключ по умолчанию не настроен",
+                                },
+                                status=400,
+                            )
+                        api_key_id = None
+                    updates[CensorCheck.api_key_id] = api_key_id
+                    updated_fields.append("api_key_id")
+
+                if request.POST.get("apply_interval") == "1":
+                    interval_raw = request.POST.get("interval_minutes", "").strip()
+                    if interval_raw:
+                        try:
+                            interval_minutes = int(interval_raw)
+                        except ValueError:
+                            return JsonResponse(
+                                {"status": "error", "message": "Неверный интервал"},
+                                status=400,
+                            )
+                        if interval_minutes < 60:
+                            return JsonResponse(
+                                {
+                                    "status": "error",
+                                    "message": "Минимальный интервал — 60 минут",
+                                },
+                                status=400,
+                            )
+                    else:
+                        interval_minutes = None
+                    updates[CensorCheck.interval_minutes] = interval_minutes
+                    updated_fields.append("interval_minutes")
+
+                for flag_name, value_name, model_field, field_label in (
+                    (
+                        "apply_alerts",
+                        "alerts_enabled",
+                        CensorCheck.alerts_enabled,
+                        "alerts_enabled",
+                    ),
+                    (
+                        "apply_enabled",
+                        "is_enabled",
+                        CensorCheck.is_enabled,
+                        "is_enabled",
+                    ),
+                ):
+                    if request.POST.get(flag_name) != "1":
+                        continue
+                    raw_value = request.POST.get(value_name, "")
+                    if raw_value not in {"0", "1"}:
+                        return JsonResponse(
+                            {
+                                "status": "error",
+                                "message": "Неверное логическое значение",
+                            },
+                            status=400,
+                        )
+                    updates[model_field] = raw_value == "1"
+                    updated_fields.append(field_label)
+
+                if not updated_fields:
+                    return JsonResponse(
+                        {
+                            "status": "error",
+                            "message": "Выберите хотя бы один параметр",
+                        },
+                        status=400,
+                    )
+
+                updates[CensorCheck.updated_at] = datetime.utcnow()
+                updated_count = db_session.query(CensorCheck).update(
+                    updates, synchronize_session=False
+                )
+                db_session.commit()
+                logging.info(
+                    "Admin bulk-updated %s censor checks fields=%s",
+                    updated_count,
+                    ",".join(updated_fields),
+                )
+                return JsonResponse(
+                    {
+                        "status": "ok",
+                        "updated": updated_count,
+                        "fields": updated_fields,
+                    }
+                )
 
             if action == "save":
                 check_id = request.POST.get("check_id")
