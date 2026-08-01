@@ -44,60 +44,9 @@
         });
     </script>
     <style>
-        /* Режим Mini App: вкладки Главная / Поддержка / Рефералы / Настройки.
-           «Установка» доступна кнопками с Главной. */
-        .tg-webapp .nav-btn[data-tab="setup"] {
-            display: none !important;
-        }
-
         /* Подсказки, видимые только внутри Mini App */
         .tg-webapp .tg-webapp-show-note {
             display: block !important;
-        }
-
-        /* Нижняя навигация — плавающая «пилюля» по центру, как у Akenai.
-           Переопределяем мобильные правила: кнопки не растягиваются на равные
-           колонки (иначе подписи режутся многоточием), контент центрирован
-           по вертикали, без принудительной высоты 56px. */
-        .tg-webapp .nav-mobile {
-            left: 50%;
-            right: auto;
-            transform: translateX(-50%);
-            bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px));
-            width: auto;
-            max-width: calc(100% - 1rem);
-            height: auto;
-            min-height: 0;
-            align-items: center;
-            justify-content: center;
-            padding: 0.35rem 0.6rem;
-            gap: 0.35rem;
-            border-radius: 9999px;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
-            background: rgba(18, 18, 22, 0.92);
-            backdrop-filter: blur(18px);
-            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
-        }
-
-        .tg-webapp .nav-mobile .nav-btn {
-            flex: 0 0 auto;
-            width: auto;
-            min-width: 0;
-            min-height: 0;
-            padding: 7px 11px;
-            overflow: visible;
-        }
-
-        .tg-webapp .nav-mobile .nav-btn i {
-            font-size: 18px;
-        }
-
-        .tg-webapp .nav-mobile .nav-btn span {
-            max-width: none;
-            overflow: visible;
-            text-overflow: clip;
-            font-size: 10px;
         }
 
         /* В fullscreen-режиме контент не должен заезжать под статусбар —
@@ -108,71 +57,6 @@
                 var(--tg-safe-area-inset-top, 0px) +
                 var(--tg-content-safe-area-inset-top, 0px)
             );
-        }
-
-        /* Типографика как у Akenai: спокойные веса вместо 900, обычный
-           регистр вместо капса, компактный rem-базис. */
-        html {
-            font-size: 15px;
-        }
-
-        .tg-webapp .font-black {
-            font-weight: 700;
-        }
-
-        .tg-webapp h1.font-black,
-        .tg-webapp h1 {
-            text-transform: none;
-            letter-spacing: -0.01em;
-            font-weight: 800;
-        }
-
-        .tg-webapp #days-left-count {
-            font-size: 3rem;
-            font-weight: 800;
-        }
-
-        /* Секционные лейблы (FAQ и другие) — маленькие, с акцентной чертой
-           слева, как у Akenai, без крика капсом на всю ширину. */
-        .tg-webapp .tracking-widest {
-            letter-spacing: 0.08em;
-        }
-
-        /* Нижняя навигация: обычный регистр, средний вес, мягче активный цвет */
-        .tg-webapp .nav-mobile span {
-            font-size: 11px;
-            letter-spacing: 0;
-            text-transform: none;
-            font-weight: 600;
-        }
-
-        /* Иконки в списке настроек — монохромные, как у Akenai */
-        .tg-webapp #tab-settings .w-11.h-11 {
-            background: rgba(255, 255, 255, 0.05) !important;
-            border-color: rgba(255, 255, 255, 0.1) !important;
-            color: #fff !important;
-        }
-
-        /* Плавающий реферальный бейдж «+40» в Mini App не показываем —
-           рефералка доступна отдельной вкладкой, бейдж поверх контента выглядит чужеродно */
-        .tg-webapp #ref-pill {
-            display: none !important;
-        }
-
-        /* Кнопка «Оплатить» всегда в пределах экрана: фиксируем к низу,
-           контенту добавляем запас, чтобы ничего не пряталось под кнопкой */
-        .tg-webapp .plans-form .plans-submit {
-            position: fixed;
-            left: 1rem;
-            right: 1rem;
-            bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
-            width: auto;
-            z-index: 60;
-            box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.55);
-        }
-
-        .tg-webapp .plans-form {
-            padding-bottom: 6rem;
         }
     </style>
     {% endif %}
@@ -241,6 +125,93 @@
             text-transform: none;
             letter-spacing: 0;
             font-weight: 600;
+        }
+
+        /* Мобильная версия кабинета выглядит так же, как Mini App в Telegram:
+           плавающая пилюля-навигация, без вкладки «Установка» (доступна
+           кнопками с Главной), без дублирующих карточек и бейджей, компактная
+           типографика и прилипшая кнопка «Оплатить». Десктоп не затронут. */
+        @media (max-width: 1024px) {
+            html {
+                font-size: 15px;
+            }
+
+            body.dashboard-v2 .nav-btn[data-tab="setup"],
+            body.dashboard-v2 .home-quick-actions,
+            body.dashboard-v2 .quick-access-btn,
+            body.dashboard-v2 #ref-pill {
+                display: none !important;
+            }
+
+            body.dashboard-v2 .nav-mobile {
+                left: 50%;
+                right: auto;
+                transform: translateX(-50%);
+                bottom: calc(0.8rem + env(safe-area-inset-bottom, 0px));
+                width: auto;
+                max-width: calc(100% - 1rem);
+                height: auto;
+                min-height: 0;
+                align-items: center;
+                justify-content: center;
+                padding: 0.35rem 0.6rem;
+                gap: 0.35rem;
+                border-radius: 9999px;
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-top: 1px solid rgba(255, 255, 255, 0.08);
+                background: rgba(18, 18, 22, 0.92);
+                backdrop-filter: blur(18px);
+                box-shadow: 0 12px 32px rgba(0, 0, 0, 0.55);
+            }
+
+            body.dashboard-v2 .nav-mobile .nav-btn {
+                flex: 0 0 auto;
+                width: auto;
+                min-width: 0;
+                min-height: 0;
+                padding: 7px 11px;
+                overflow: visible;
+            }
+
+            body.dashboard-v2 .nav-mobile .nav-btn i {
+                font-size: 18px;
+            }
+
+            body.dashboard-v2 .nav-mobile .nav-btn span {
+                max-width: none;
+                overflow: visible;
+                text-overflow: clip;
+                font-size: 10px;
+            }
+
+            body.dashboard-v2 #days-left-count {
+                font-size: 3rem;
+                font-weight: 800;
+            }
+
+            body.dashboard-v2 .tracking-widest {
+                letter-spacing: 0.08em;
+            }
+
+            body.dashboard-v2 #tab-settings .w-11.h-11 {
+                background: rgba(255, 255, 255, 0.05) !important;
+                border-color: rgba(255, 255, 255, 0.1) !important;
+                color: #fff !important;
+            }
+
+            body.dashboard-v2 .plans-form .plans-submit {
+                position: fixed;
+                left: 1rem;
+                right: 1rem;
+                bottom: calc(0.75rem + env(safe-area-inset-bottom, 0px));
+                width: auto;
+                z-index: 60;
+                box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.55);
+            }
+
+            body.dashboard-v2 .plans-form {
+                padding-bottom: 6rem;
+            }
         }
         
         :root {
@@ -2640,7 +2611,7 @@
                             </section>
                         {% endif %}
 
-                        <section class="tg-webapp-hide grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
+                        <section class="home-quick-actions grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
                             {% if has_subscription_access %}
                             <button type="button" onclick="showTab('setup')" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
                                 <div class="w-11 h-11 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
