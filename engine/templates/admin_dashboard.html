@@ -1836,10 +1836,24 @@
                     нужно прогнать alembic-миграцию в common (autogenerate по модели AdSpend).
                 </div>
                 <div class="card" style="padding:18px;margin-bottom:14px;">
+                    <strong>Рекламный аккаунт</strong>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        Если трафик льётся с нескольких кабинетов (например, два аккаунта Директа) —
+                        выберите, чей файл загружаете. Данные разных аккаунтов за один день <b>суммируются</b>
+                        в аналитике; выгрузка одного аккаунта не перезаписывает данные другого.
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
+                        <select id="acq-account-select" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;min-width:170px;">
+                            <option value="default">default</option>
+                        </select>
+                        <button type="button" id="acq-account-add" class="subtab" style="border:1px solid rgba(255,255,255,.2);border-radius:8px;">+ Добавить аккаунт</button>
+                    </div>
+                </div>
+                <div class="card" style="padding:18px;margin-bottom:14px;">
                     <strong>Импорт CSV из Яндекс Директа</strong>
                     <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
                         Выгрузка «по дням» (День, Показы, Клики, Расход). Строка «Итого» игнорируется.
-                        Повторная загрузка того же файла перезаписывает те же дни теми же данными — дублей не будет.
+                        Повторная загрузка того же файла перезаписывает те же дни теми же данными <b>в рамках выбранного аккаунта</b> — дублей не будет.
                     </div>
                     <form id="acq-csv-form" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
                         <input type="file" name="file" accept=".csv,text/csv" required style="color:#fff;font-size:12px;max-width:260px;">
@@ -6650,9 +6664,10 @@
         async function loadAds() {
             const res = await acqFetch('ads', {weeks: 12});
             document.getElementById('acq-ads-migration').style.display = res.needs_migration ? 'block' : 'none';
+            renderAdAccounts(res.accounts || []);
             document.getElementById('acq-spends-table').innerHTML = acqTable(
-                ['Дата', 'Канал', 'Сумма, ₽', 'Показы', 'Клики', 'Комментарий', ''],
-                res.spends.map((r) => [r.day, r.channel, fmtRub(r.amount_rub),
+                ['Дата', 'Канал', 'Аккаунт', 'Сумма, ₽', 'Показы', 'Клики', 'Комментарий', ''],
+                res.spends.map((r) => [r.day, r.channel, r.account || 'default', fmtRub(r.amount_rub),
                     fmtInt(r.impressions), fmtInt(r.clicks), r.comment,
                     `<button data-spend-del="${r.id}" style="background:none;border:0;color:rgba(255,120,80,.8);cursor:pointer;">удалить</button>`]));
             document.getElementById('acq-ads-table').innerHTML = acqTable(
@@ -6865,10 +6880,41 @@
         document.getElementById('acq-patterns-days')?.addEventListener('change', () => loadPatterns().catch(console.error));
         document.getElementById('acq-timing-days')?.addEventListener('change', () => loadJourney().catch(console.error));
         document.getElementById('acq-paths-months')?.addEventListener('change', () => loadTariffPaths().catch(console.error));
+        // ===== Рекламные аккаунты: селектор общий для CSV-импорта и ручного ввода =====
+        // Список собирается из данных (DISTINCT account) + добавленные вручную в
+        // этой сессии; после первой загрузки с новым аккаунтом он попадает в БД
+        // и дальше приходит из данных.
+        const adAccountsAdded = new Set();
+        let adAccountsFromData = [];
+        function currentAdAccount() {
+            return document.getElementById('acq-account-select')?.value || 'default';
+        }
+        function renderAdAccounts(fromData) {
+            if (fromData) adAccountsFromData = fromData;
+            const sel = document.getElementById('acq-account-select');
+            if (!sel) return;
+            const selected = sel.value || 'default';
+            const all = Array.from(new Set(
+                ['default', ...adAccountsFromData, ...adAccountsAdded]));
+            sel.innerHTML = all.map((a) =>
+                `<option value="${a.replace(/"/g, '&quot;')}">${a}</option>`).join('');
+            sel.value = all.includes(selected) ? selected : 'default';
+        }
+        document.getElementById('acq-account-add')?.addEventListener('click', () => {
+            const name = (prompt('Название аккаунта (например, direct-2):') || '')
+                .trim().slice(0, 64);
+            if (!name) return;
+            adAccountsAdded.add(name);
+            renderAdAccounts(null);
+            const sel = document.getElementById('acq-account-select');
+            if (sel) sel.value = name;
+        });
+
         document.getElementById('acq-spend-form')?.addEventListener('submit', async (ev) => {
             ev.preventDefault();
             const body = new FormData(ev.target);
             body.append('action', 'upsert');
+            body.append('account', currentAdAccount());
             const resp = await fetch(SPENDS_API, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
             const payload = await resp.json();
             if (payload.status === 'ok') { ev.target.reset(); loadAcqSection('acq-ads', true); }
@@ -6882,6 +6928,7 @@
             statusEl.textContent = 'загрузка…';
             const body = new FormData(ev.target);
             body.append('action', 'import_csv');
+            body.append('account', currentAdAccount());
             try {
                 const resp = await fetch(SPENDS_API, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
                 const payload = await resp.json();

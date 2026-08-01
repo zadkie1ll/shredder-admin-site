@@ -617,8 +617,10 @@ class AcquisitionAdsDailyTests(SimpleTestCase):
         week = date(2026, 7, 6)
         rows_mock.side_effect = [
             [{"id": 1, "day": date(2026, 7, 7), "channel": "yandex-direct",
+              "account": "default",
               "amount_rub": Decimal("1000"), "impressions": 5000, "clicks": 200,
               "comment": "csv-import"}],
+            [{"account": "default"}],
             [{"week": week, "new_payers": 4, "new_rub": Decimal("2000")}],
             [{"week": week, "subs": 50}],
             [{"week": week, "conns": 20}],
@@ -3613,3 +3615,35 @@ class ReferralAntifraudPanelTests(SimpleTestCase):
         # Слот статуса остаётся только под загрузку/ошибку и скрыт, когда пуст.
         self.assertIn(".referral-antifraud-status:empty", self.css)
         self.assertIn("target.innerHTML = '';", self.template)
+
+
+class AdSpendMultiAccountTests(SimpleTestCase):
+    def test_model_has_account_with_composite_unique(self):
+        from common.models.db import AdSpend
+
+        assert "account" in AdSpend.__table__.columns
+        column = AdSpend.__table__.columns["account"]
+        self.assertFalse(column.nullable)
+        self.assertEqual(column.server_default.arg, "default")
+
+        unique = [
+            c for c in AdSpend.__table__.constraints
+            if c.name == "uq_ad_spends_day_channel_account"
+        ]
+        self.assertEqual(len(unique), 1)
+        self.assertEqual(
+            sorted(col.name for col in unique[0].columns),
+            ["account", "channel", "day"],
+        )
+
+    def test_ad_spends_api_and_ui_are_account_aware(self):
+        views_src = Path("engine/views.py").read_text()
+        # Оба upsert-а конфликтуют по (day, channel, account) — данные разных
+        # аккаунтов за один день сосуществуют и суммируются в аналитике.
+        self.assertEqual(views_src.count("ON CONFLICT (day, channel, account)"), 2)
+        self.assertNotIn("uq_ad_spends_day_channel\n", views_src)
+
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.assertIn('id="acq-account-select"', template)
+        self.assertIn('id="acq-account-add"', template)
+        self.assertIn("currentAdAccount()", template)

@@ -7697,16 +7697,23 @@ def _acq_ads(db_session, weeks):
         spends = _acq_rows(
             db_session,
             """
-            SELECT id, day, channel, amount_rub, impressions, clicks, comment
+            SELECT id, day, channel, account, amount_rub, impressions, clicks, comment
             FROM ad_spends
             WHERE day >= (now() AT TIME ZONE 'Europe/Moscow')::date - make_interval(weeks => :weeks)
-            ORDER BY day DESC, channel
+            ORDER BY day DESC, channel, account
             """,
             weeks=weeks,
         )
+        accounts = [
+            r["account"]
+            for r in _acq_rows(
+                db_session,
+                "SELECT DISTINCT account FROM ad_spends ORDER BY account",
+            )
+        ]
     except Exception:
         db_session.rollback()
-        return {"needs_migration": True, "weeks": [], "spends": []}
+        return {"needs_migration": True, "weeks": [], "spends": [], "accounts": []}
 
     weekly_spend = {}
     for r in spends:
@@ -7780,8 +7787,10 @@ def _acq_ads(db_session, weeks):
     return {
         "needs_migration": False,
         "weeks": out,
+        "accounts": accounts,
         "spends": [
             {"id": r["id"], "day": r["day"].isoformat(), "channel": r["channel"],
+             "account": r["account"],
              "amount_rub": float(r["amount_rub"]),
              "impressions": r["impressions"], "clicks": r["clicks"],
              "comment": r["comment"] or ""}
@@ -8519,20 +8528,24 @@ def support_admin_api_ad_spends(request):
         if action == "upsert":
             day = date.fromisoformat(request.POST.get("day", ""))
             channel = (request.POST.get("channel") or "default").strip()[:128]
+            account = (
+                request.POST.get("account") or "default"
+            ).strip()[:64] or "default"
             amount = float(request.POST.get("amount_rub", ""))
             comment = (request.POST.get("comment") or "").strip()[:512] or None
             db_session.execute(
                 sa_text(
                     """
-                    INSERT INTO ad_spends (day, channel, amount_rub, comment)
-                    VALUES (:day, :channel, :amount, :comment)
-                    ON CONFLICT ON CONSTRAINT uq_ad_spends_day_channel
+                    INSERT INTO ad_spends (day, channel, account, amount_rub, comment)
+                    VALUES (:day, :channel, :account, :amount, :comment)
+                    ON CONFLICT (day, channel, account)
                     DO UPDATE SET amount_rub = EXCLUDED.amount_rub,
                                   comment = EXCLUDED.comment,
                                   updated_at = now()
                     """
                 ),
-                {"day": day, "channel": channel, "amount": amount, "comment": comment},
+                {"day": day, "channel": channel, "account": account,
+                 "amount": amount, "comment": comment},
             )
             db_session.commit()
             return JsonResponse({"status": "ok"})
@@ -8547,6 +8560,9 @@ def support_admin_api_ad_spends(request):
             channel = (
                 request.POST.get("channel") or "yandex-direct"
             ).strip()[:128] or "yandex-direct"
+            account = (
+                request.POST.get("account") or "default"
+            ).strip()[:64] or "default"
             upload = request.FILES.get("file")
             if upload is None:
                 return JsonResponse(
@@ -8564,16 +8580,18 @@ def support_admin_api_ad_spends(request):
                      "message": "в файле не найдено дневных строк Директа"},
                     status=400,
                 )
-            # Идемпотентный импорт: повторная загрузка того же файла
-            # перезаписывает те же дни теми же значениями.
+            # Идемпотентный импорт в разрезе аккаунта: повторная загрузка того
+            # же файла перезаписывает те же дни того же аккаунта, а данные
+            # других аккаунтов за эти дни не трогаются — в аналитике суммы
+            # по дню аккумулируются по всем аккаунтам.
             for item in parsed:
                 db_session.execute(
                     sa_text(
                         """
                         INSERT INTO ad_spends
-                            (day, channel, amount_rub, impressions, clicks, comment)
-                        VALUES (:day, :channel, :amount, :impressions, :clicks, :comment)
-                        ON CONFLICT ON CONSTRAINT uq_ad_spends_day_channel
+                            (day, channel, account, amount_rub, impressions, clicks, comment)
+                        VALUES (:day, :channel, :account, :amount, :impressions, :clicks, :comment)
+                        ON CONFLICT (day, channel, account)
                         DO UPDATE SET amount_rub = EXCLUDED.amount_rub,
                                       impressions = EXCLUDED.impressions,
                                       clicks = EXCLUDED.clicks,
@@ -8582,7 +8600,7 @@ def support_admin_api_ad_spends(request):
                         """
                     ),
                     {
-                        "day": item["day"], "channel": channel,
+                        "day": item["day"], "channel": channel, "account": account,
                         "amount": item["amount_rub"],
                         "impressions": item["impressions"],
                         "clicks": item["clicks"],
@@ -8592,8 +8610,8 @@ def support_admin_api_ad_spends(request):
             db_session.commit()
             days_sorted = sorted(item["day"] for item in parsed)
             logging.info(
-                "ad_spends csv import: %s rows, %s..%s, channel=%s",
-                len(parsed), days_sorted[0], days_sorted[-1], channel,
+                "ad_spends csv import: %s rows, %s..%s, channel=%s, account=%s",
+                len(parsed), days_sorted[0], days_sorted[-1], channel, account,
             )
             return JsonResponse({
                 "status": "ok",
