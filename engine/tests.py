@@ -1696,6 +1696,12 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         # Runtime-настройки раскладываются по контейнерам групп.
         for group in ("tariffs", "winback", "payment", "referral", "alerts", "general", "other"):
             self.assertIn(f'data-settings-group="{group}"', template)
+        # Тумблер win-back живёт в группе «winback»: без него ключ уехал бы в
+        # «Прочие», а выключить цепочку из админки было бы неочевидно.
+        self.assertIn(
+            "{slug: 'winback', keys: ['winback_enabled', 'winback_price_month'",
+            template,
+        )
         self.assertIn(
             'data-subtab="sys-payment" role="tab"><i class="fas fa-credit-card"></i>Платёжные шлюзы',
             template,
