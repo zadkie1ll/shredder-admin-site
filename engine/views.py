@@ -8564,6 +8564,57 @@ def support_admin_api_ad_spends(request):
             )
             db_session.commit()
             return JsonResponse({"status": "ok"})
+        if action == "rename_account":
+            # Переименование аккаунта задним числом: типовой случай — данные,
+            # залитые до появления мульти-аккаунтов, лежат под "default" и их
+            # нужно объявить конкретным кабинетом перед дозаливкой второго.
+            src = (request.POST.get("from") or "").strip()[:64]
+            dst = (request.POST.get("to") or "").strip()[:64]
+            if not src or not dst or src == dst:
+                return JsonResponse(
+                    {"status": "error", "message": "нужны разные имена from/to"},
+                    status=400,
+                )
+            overlap = db_session.execute(
+                sa_text(
+                    """
+                    SELECT count(*) FROM ad_spends a
+                    WHERE a.account = :src
+                      AND EXISTS (
+                        SELECT 1 FROM ad_spends b
+                        WHERE b.account = :dst
+                          AND b.day = a.day AND b.channel = a.channel
+                      )
+                    """
+                ),
+                {"src": src, "dst": dst},
+            ).scalar()
+            if overlap:
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": (
+                            f"у аккаунта «{dst}» уже есть данные за {overlap} "
+                            "пересекающихся дней — переименование прервано, "
+                            "чтобы ничего не затереть"
+                        ),
+                    },
+                    status=409,
+                )
+            renamed = db_session.execute(
+                sa_text(
+                    """
+                    UPDATE ad_spends SET account = :dst, updated_at = now()
+                    WHERE account = :src
+                    """
+                ),
+                {"src": src, "dst": dst},
+            ).rowcount
+            db_session.commit()
+            logging.info(
+                "ad_spends account renamed: %s -> %s (%s rows)", src, dst, renamed
+            )
+            return JsonResponse({"status": "ok", "renamed": renamed})
         if action == "import_csv":
             channel = (
                 request.POST.get("channel") or "yandex-direct"

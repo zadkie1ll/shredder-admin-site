@@ -1847,6 +1847,8 @@
                             <option value="default">default</option>
                         </select>
                         <button type="button" id="acq-account-add" class="subtab" style="border:1px solid rgba(255,255,255,.2);border-radius:8px;">+ Добавить аккаунт</button>
+                        <button type="button" id="acq-account-rename" class="subtab" style="border:1px solid rgba(255,255,255,.2);border-radius:8px;">Переименовать</button>
+                        <span id="acq-account-status" style="font-size:11px;color:var(--muted);"></span>
                     </div>
                 </div>
                 <div class="card" style="padding:18px;margin-bottom:14px;">
@@ -6908,6 +6910,34 @@
             renderAdAccounts(null);
             const sel = document.getElementById('acq-account-select');
             if (sel) sel.value = name;
+        });
+        // Переименование задним числом: данные, залитые до мульти-аккаунтов,
+        // лежат под «default» — их можно объявить конкретным кабинетом.
+        document.getElementById('acq-account-rename')?.addEventListener('click', async () => {
+            const src = currentAdAccount();
+            const dst = (prompt(`Новое имя для аккаунта «${src}»:`) || '')
+                .trim().slice(0, 64);
+            if (!dst || dst === src) return;
+            const statusEl = document.getElementById('acq-account-status');
+            statusEl.textContent = 'переименование…';
+            const body = new FormData();
+            body.append('action', 'rename_account');
+            body.append('from', src);
+            body.append('to', dst);
+            try {
+                const resp = await fetch(SPENDS_API, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await resp.json();
+                if (payload.status === 'ok') {
+                    statusEl.textContent = `переименовано строк: ${payload.renamed}`;
+                    adAccountsAdded.delete(src);
+                    adAccountsAdded.add(dst);
+                    loadAcqSection('acq-ads', true);
+                } else {
+                    statusEl.textContent = payload.message || 'ошибка переименования';
+                }
+            } catch (e) {
+                statusEl.textContent = 'ошибка переименования';
+            }
         });
 
         document.getElementById('acq-spend-form')?.addEventListener('submit', async (ev) => {

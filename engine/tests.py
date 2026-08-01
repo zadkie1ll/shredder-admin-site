@@ -3663,4 +3663,14 @@ class AdSpendMultiAccountTests(SimpleTestCase):
         template = Path("engine/templates/admin_dashboard.html").read_text()
         self.assertIn('id="acq-account-select"', template)
         self.assertIn('id="acq-account-add"', template)
+        self.assertIn('id="acq-account-rename"', template)
         self.assertIn("currentAdAccount()", template)
+
+    def test_rename_account_action_guards_against_overlap(self):
+        views_src = Path("engine/views.py").read_text()
+        # Переименование аккаунта прерывается, если у целевого имени уже есть
+        # данные за пересекающиеся (day, channel) — ничего не затирается.
+        self.assertIn('action == "rename_account"', views_src)
+        self.assertIn("UPDATE ad_spends SET account", views_src)
+        rename_block = views_src.split('action == "rename_account"', 1)[1]
+        self.assertIn("EXISTS", rename_block.split("UPDATE", 1)[0])
