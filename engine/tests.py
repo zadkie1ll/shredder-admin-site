@@ -118,6 +118,89 @@ class DashboardSetupTemplateTests(SimpleTestCase):
         self.assertNotIn('id="tab-subscription"', template)
         self.assertNotIn("showTab('subscription')", template)
 
+    def test_setup_wizard_orb_returns_on_phones_and_miniapp(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Мастер с орбом-«крутилкой» включается клиентски на телефонах и в Mini App.
+        self.assertIn("function shouldUseSetupWizard()", template)
+        self.assertIn("function applySetupFlowMode()", template)
+        self.assertIn("applySetupFlowMode();", template)
+        self.assertIn("document.body.classList.contains('tg-webapp')", template)
+        self.assertIn("return platform === 'ios' || platform === 'android';", template)
+        # USE_NEW_SETUP_FLOW остаётся серверным override для всех устройств.
+        self.assertIn(
+            "const forceSetupWizard = {% if use_new_setup_flow %}true{% else %}false{% endif %};",
+            template,
+        )
+        # Плоский флоу и его шапка скрываются, когда активен мастер.
+        self.assertIn('id="setup-flat-header"', template)
+        self.assertIn('id="setup-logic-placeholder"', template)
+        # Кольца крутилки с плавными переходами и учётом prefers-reduced-motion.
+        self.assertIn('class="setup-hero-ring setup-hero-ring-1"', template)
+        self.assertIn("transition: transform 0.7s ease, opacity 0.7s ease;", template)
+        self.assertIn("prefers-reduced-motion", template)
+
+    def test_setup_wizard_follows_competitor_layout(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Старт: крутилка с иконкой платформы сверху, заголовок и две кнопки.
+        self.assertIn("updateNewSetupHero('setup-hero-step-start', meta.icon, 0);", template)
+        self.assertIn("Настройка на ${app.platformLabel}", template)
+        self.assertIn("3 шага для завершения настройки", template)
+        # Индикатор шага «N из 3» над заголовком каждого шага.
+        self.assertIn('<div class="setup-step-kicker">1 из 3</div>', template)
+        self.assertIn('<div class="setup-step-kicker">2 из 3</div>', template)
+        self.assertIn('<div class="setup-step-kicker">3 из 3</div>', template)
+        # На каждом шаге две кнопки: цветная CTA + приглушённая «Далее».
+        self.assertIn(".setup-wizard-stage .setup-secondary-btn", template)
+        self.assertIn(".setup-wizard-stage .setup-share-btn", template)
+        # Финал — одна кнопка действия на главный экран.
+        self.assertIn("Подключение и использование</h2>", template)
+        self.assertIn('newSetupButton(`Завершить`, "showTab(\'home\')"', template)
+        # Экран «Другое устройство»: чипы по центру, копирование/шаринг и QR.
+        self.assertIn("Выберите вашу платформу", template)
+        self.assertIn("shareNewSetupLink", template)
+        self.assertIn('id="new-setup-qr"', template)
+        self.assertIn("Отсканируйте на другом устройстве", template)
+        # Старый блок «Ваше устройство» удалён вместе со стилями.
+        self.assertNotIn("setup-detected", template)
+        # Крутилка — постоянный DOM-блок с кольцами, сужающимися к финалу,
+        # и плавной прогресс-дугой (@property), как у Akenai.
+        self.assertIn('id="new-setup-hero"', template)
+        self.assertIn("setup-hero-ring-4", template)
+        self.assertIn(".setup-hero-step-done .setup-hero-ring", template)
+        self.assertIn("@property --setup-progress", template)
+        self.assertIn("function hideNewSetupHero()", template)
+        # «Назад» сверху на старте и на выборе платформы, а не под таб-баром.
+        self.assertIn("setup-devices-topbar", template)
+        # Нижний таб-бар скрыт на экране мастера.
+        self.assertIn("body.dashboard-v2.setup-wizard-active.is-setup-tab .nav-mobile", template)
+        self.assertIn("document.body.classList.toggle('is-setup-tab', tabId === 'setup');", template)
+        # В Mini App «Назад» — нативная кнопка Telegram; свои ссылки «Назад»
+        # и «Предыдущий шаг» там скрыты.
+        self.assertIn("function handleTgBackButton()", template)
+        self.assertIn("updateTgBackButton", template)
+        self.assertIn(".tg-webapp .setup-devices-topbar", template)
+        # На сайте чип «Назад» (в стиле кнопки со страницы тарифов) есть на
+        # всех экранах мастера; нижних «Предыдущий шаг» больше нет.
+        self.assertIn("function newSetupBackChip(", template)
+        self.assertEqual(template.count("newSetupBackChip("), 6)
+        self.assertNotIn("Предыдущий шаг", template)
+        # Шрифт кнопок мастера — спокойный medium, как у Akenai.
+        self.assertIn("font-weight: 500 !important;", template)
+        # «Скопировать ссылку подписки» убран с шага подписки.
+        self.assertNotIn("Не сработало? Скопировать ссылку подписки", template)
+
+    def test_happ_app_store_recommendation_uses_single_ru_link(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Актуальная рекомендация на скачивание Happ (iOS/macOS) — только RU App Store.
+        self.assertIn("https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6788279553", template)
+        self.assertNotIn("id6746188973", template)
+        # Кнопка/ссылка «для других регионов» (US App Store) убрана.
+        self.assertNotIn("id6504287215", template)
+        self.assertNotIn("других регионов", template)
+
     def test_dashboard_customer_copy_uses_respectful_tone(self):
         template = Path("engine/templates/dashboard.html").read_text()
 

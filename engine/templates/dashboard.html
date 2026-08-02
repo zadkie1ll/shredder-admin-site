@@ -104,6 +104,13 @@
             display: none !important;
         }
 
+        /* В Mini App «Назад» в мастере — нативная кнопка Telegram в шапке
+           (Telegram.WebApp.BackButton), свои ссылки «Назад» и «Предыдущий
+           шаг» в контенте не нужны */
+        .tg-webapp .setup-devices-topbar {
+            display: none !important;
+        }
+
         /* Единая типографика по образцу экрана тарифов (.plans-title):
            заголовки weight 700, обычный регистр, без сжатого трекинга.
            Мелкие капс-лейблы и бейджи (скидки, kickers) не трогаем. */
@@ -433,6 +440,123 @@
             background: rgba(17, 17, 19, 0.96);
         }
 
+        /* Как у Akenai: крутилка — постоянный (не перерисовываемый) блок
+           фиксированной высоты в верхней части, поэтому между шагами ничего
+           не прыгает, а кольца и прогресс анимируются плавно. */
+        .setup-hero {
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: clamp(260px, 42vh, 420px);
+            margin-bottom: 18px;
+        }
+
+        .setup-hero .setup-wizard-orb {
+            margin: 0;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* Концентрические кольца сужаются к центру с каждым шагом.
+           Масштаб задаётся прямыми правилами по классу шага (не через
+           CSS-переменные): transition на изменение унаследованной переменной
+           срабатывает не во всех браузерах. */
+        .setup-wizard-orb-glow,
+        .setup-hero-ring {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            border-radius: 999px;
+            pointer-events: none;
+            transform: translate(-50%, -50%) scale(1);
+            opacity: 1;
+            transition: transform 0.7s ease, opacity 0.7s ease;
+        }
+
+        .setup-wizard-orb-glow {
+            width: 430px;
+            height: 430px;
+            background: radial-gradient(
+                circle,
+                rgba(0, 255, 136, 0.14) 0%,
+                rgba(0, 255, 136, 0.05) 45%,
+                transparent 70%
+            );
+        }
+
+        .setup-hero-ring {
+            border: 1px solid rgba(0, 255, 136, 0.10);
+        }
+
+        .setup-hero-ring-1 { width: 230px; height: 230px; }
+        .setup-hero-ring-2 { width: 310px; height: 310px; }
+        .setup-hero-ring-3 { width: 390px; height: 390px; }
+        .setup-hero-ring-4 { width: 470px; height: 470px; }
+
+        .setup-hero-step-install .setup-wizard-orb-glow,
+        .setup-hero-step-install .setup-hero-ring {
+            transform: translate(-50%, -50%) scale(0.8);
+            opacity: 0.75;
+        }
+
+        .setup-hero-step-subscription .setup-wizard-orb-glow,
+        .setup-hero-step-subscription .setup-hero-ring {
+            transform: translate(-50%, -50%) scale(0.6);
+            opacity: 0.5;
+        }
+
+        .setup-hero-step-done .setup-wizard-orb-glow,
+        .setup-hero-step-done .setup-hero-ring {
+            transform: translate(-50%, -50%) scale(0.4);
+            opacity: 0;
+        }
+
+        /* Плавная анимация прогресс-дуги орба между шагами */
+        @property --setup-progress {
+            syntax: '<percentage>';
+            inherits: false;
+            initial-value: 0%;
+        }
+
+        .setup-wizard-orb {
+            transition: --setup-progress 0.7s ease;
+        }
+
+        /* Контент шага мягко проявляется при переключении */
+        @keyframes setup-content-in {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        #new-setup-content > * {
+            animation: setup-content-in 0.35s ease;
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .setup-wizard-orb-glow,
+            .setup-hero-ring,
+            .setup-wizard-orb {
+                transition: none;
+            }
+
+            #new-setup-content > * {
+                animation: none;
+            }
+        }
+
+        @media (max-width: 1024px) {
+            .setup-hero {
+                height: clamp(260px, 44vh, 420px);
+            }
+
+            /* Подзаголовок резервирует две строки — кнопки на одном уровне
+               на всех шагах */
+            .setup-step-sub {
+                min-height: 48px;
+            }
+        }
+
         .setup-wizard-icon {
             width: 62px;
             height: 62px;
@@ -451,6 +575,123 @@
             display: grid;
             grid-template-columns: minmax(0, 1fr) auto;
             gap: 12px;
+        }
+
+        /* Иерархия действий мастера: жёлтая — только главная CTA шага,
+           вторичные кнопки приглушённые (tonal), чтобы было очевидно,
+           куда нажимать. Кнопки компактные, с небольшим шрифтом, как в
+           мастерах у конкурентов. */
+        /* Префикс .dashboard-v2 нужен, чтобы перебить более позднее правило
+           .dashboard-v2 .dashboard-action-btn той же специфичности. */
+        .dashboard-v2 .setup-wizard-stage .setup-cta-btn,
+        .dashboard-v2 .setup-wizard-stage .setup-link-btn {
+            min-height: 46px;
+            padding: 12px 18px !important;
+            border-radius: 999px !important;
+            font-size: 15px !important;
+            font-weight: 500 !important;
+            letter-spacing: 0 !important;
+            line-height: 1.2 !important;
+            box-shadow: 0 6px 18px rgba(255, 199, 0, 0.18) !important;
+        }
+
+        .dashboard-v2 .setup-wizard-stage .setup-secondary-btn {
+            background: rgba(255, 255, 255, 0.06) !important;
+            color: rgba(255, 255, 255, 0.75) !important;
+            border: 1px solid rgba(255, 255, 255, 0.14) !important;
+            box-shadow: none !important;
+        }
+
+        .dashboard-v2 .setup-wizard-stage .setup-secondary-btn:hover {
+            background: rgba(255, 255, 255, 0.1) !important;
+            color: #fff !important;
+        }
+
+        /* «Поделиться» — второй акцентный цвет, чтобы кнопки различались */
+        .dashboard-v2 .setup-wizard-stage .setup-share-btn {
+            background: rgba(255, 199, 0, 0.1) !important;
+            color: #ffc700 !important;
+            border: 1px solid rgba(255, 199, 0, 0.28) !important;
+            box-shadow: none !important;
+        }
+
+        .dashboard-v2 .setup-wizard-stage .setup-share-btn:hover {
+            background: rgba(255, 199, 0, 0.16) !important;
+        }
+
+        /* На экране мастера нижний таб-бар не нужен (как у конкурентов):
+           навигация — «← Назад» сверху и кнопки шагов */
+        body.dashboard-v2.setup-wizard-active.is-setup-tab .nav-mobile {
+            display: none !important;
+        }
+
+        /* «Назад» сверху слева на экранах мастера — абсолютом, чтобы не
+           влиять на вертикальную раскладку (иначе экраны с ним и без него
+           прыгают по высоте) */
+        .setup-wizard-stage {
+            position: relative;
+        }
+
+        .setup-devices-topbar {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 5;
+            text-align: left;
+        }
+
+        /* Заголовок экрана «Другое устройство» не должен попадать под «Назад» */
+        .setup-devices-title {
+            padding-top: 52px;
+        }
+
+        .setup-devices-title {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.55);
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 14px;
+        }
+
+        .setup-qr-card {
+            margin: 22px auto 0;
+            max-width: 300px;
+            padding: 16px 16px 12px;
+            border-radius: 22px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .setup-qr-box {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff;
+            border-radius: 16px;
+            padding: 12px;
+        }
+
+        .setup-qr-box img,
+        .setup-qr-box canvas {
+            border-radius: 6px;
+            max-width: 100%;
+        }
+
+        .setup-qr-caption {
+            margin-top: 10px;
+            font-size: 12px;
+            font-weight: 700;
+            color: rgba(255, 255, 255, 0.45);
+            text-align: center;
+        }
+
+        /* Индикатор прогресса «N из 3» над заголовком шага */
+        .setup-step-kicker {
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+            color: rgba(255, 255, 255, 0.38);
+            margin-bottom: 10px;
         }
 
         /* Мастер настройки: компактные действия и понятный выбор устройства */
@@ -478,55 +719,6 @@
             color: #fff;
         }
 
-        .setup-detected {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            max-width: 360px;
-            margin: 0 auto 22px;
-            padding: 13px 18px;
-            border-radius: 16px;
-            background: rgba(0, 255, 136, 0.08);
-            border: 1px solid rgba(0, 255, 136, 0.25);
-            text-align: left;
-        }
-
-        .setup-detected > i:first-child {
-            font-size: 24px;
-            color: #fff;
-            width: 28px;
-            text-align: center;
-            flex-shrink: 0;
-        }
-
-        .setup-detected-text {
-            display: flex;
-            flex-direction: column;
-            line-height: 1.2;
-            flex: 1;
-            min-width: 0;
-        }
-
-        .setup-detected-label {
-            font-size: 11px;
-            font-weight: 700;
-            color: rgba(255, 255, 255, 0.5);
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-
-        .setup-detected-name {
-            font-size: 18px;
-            font-weight: 800;
-            color: #fff;
-        }
-
-        .setup-detected-ok {
-            color: #00ff88;
-            font-size: 20px;
-            flex-shrink: 0;
-        }
-
         .setup-device-grid {
             display: grid;
             grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -539,7 +731,7 @@
             display: flex;
             align-items: center;
             gap: 10px;
-            padding: 14px 16px;
+            padding: 12px 14px;
             border-radius: 14px;
             border: 1px solid rgba(255, 255, 255, 0.1);
             background: rgba(255, 255, 255, 0.04);
@@ -1627,14 +1819,15 @@
                 gap: 12px !important;
             }
 
-            .setup-wizard-stage .setup-link-btn,
-            .setup-wizard-stage .setup-cta-btn {
-                min-height: 54px;
-                padding: 13px 16px !important;
-                border-radius: 16px !important;
-                font-size: 10px !important;
+            .dashboard-v2 .setup-wizard-stage .setup-link-btn,
+            .dashboard-v2 .setup-wizard-stage .setup-cta-btn {
+                min-height: 46px;
+                padding: 12px 16px !important;
+                border-radius: 999px !important;
+                font-size: 15px !important;
+                font-weight: 500 !important;
+                letter-spacing: 0 !important;
                 line-height: 1.2 !important;
-                letter-spacing: 0.02em !important;
             }
 
             .setup-wizard-stage h2 {
@@ -2662,7 +2855,7 @@
             </div>
 
             <div id="tab-setup" class="tab-content">
-                <header class="mb-10 {% if use_new_setup_flow %}hidden{% endif %}">
+                <header id="setup-flat-header" class="mb-10 {% if use_new_setup_flow %}hidden{% endif %}">
                     <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Установка</h1>
                     <p class="text-gray-500 text-sm md:text-base font-bold">Установите приложение и подключитесь в один клик</p>
                 </header>
@@ -2688,7 +2881,17 @@
                                     <div id="new-setup-platforms" class="setup-chip-group flex flex-wrap gap-3"></div>
                                 </div>
 
-                                <section class="setup-shell p-6 md:p-10 text-center">
+                                <section class="p-2 md:p-4 text-center">
+                                    <div id="new-setup-hero" class="setup-hero setup-hero-step-start">
+                                        <span class="setup-wizard-orb-glow"></span>
+                                        <span class="setup-hero-ring setup-hero-ring-1"></span>
+                                        <span class="setup-hero-ring setup-hero-ring-2"></span>
+                                        <span class="setup-hero-ring setup-hero-ring-3"></span>
+                                        <span class="setup-hero-ring setup-hero-ring-4"></span>
+                                        <div class="setup-wizard-orb" id="new-setup-orb" style="--setup-progress: 0%; --setup-progress-color: #00ff88;">
+                                            <div class="setup-wizard-icon"><i id="new-setup-orb-icon" class="fab fa-apple"></i></div>
+                                        </div>
+                                    </div>
                                     <div id="new-setup-content"></div>
                                 </section>
                             </div>
@@ -3458,6 +3661,11 @@
                 btn.classList.add('active');
             });
 
+            // На экране мастера настройки нижний таб-бар скрыт (см. CSS
+            // .setup-wizard-active.is-setup-tab) — выход через «← Назад»
+            document.body.classList.toggle('is-setup-tab', tabId === 'setup');
+            updateTgBackButton();
+
             document.getElementById('app-container').scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -3604,7 +3812,7 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Скачайте <a href="https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973" target="_blank" rel="noopener" class="setup-compact-textlink">Happ</a> для России или <a href="https://apps.apple.com/us/app/happ-proxy-utility/id6504287215" target="_blank" rel="noopener" class="setup-compact-textlink">Happ</a> для других регионов.'
+                            content: 'Скачайте <a href="https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6788279553" target="_blank" rel="noopener" class="setup-compact-textlink">Happ</a> из App Store.'
                         },
                         {
                             type: 'button',
@@ -3803,15 +4011,11 @@
                     steps: [
                         {
                             title: 'Установка приложения',
-                            content: 'Скачайте нужную версию ниже и установите приложение.',
+                            content: 'Скачайте приложение из App Store и установите.',
                             links: [
                                 {
-                                    text: 'App Store (RU)',
-                                    url: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973'
-                                },
-                                {
-                                    text: 'App Store (Для других регионов)',
-                                    url: 'https://apps.apple.com/us/app/happ-proxy-utility/id6504287215'
+                                    text: 'App Store',
+                                    url: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6788279553'
                                 }
                             ]
                         },
@@ -4281,9 +4485,7 @@
                 platformLabel: 'iOS',
                 appName: 'Happ',
                 installText: 'Скачать Happ из App Store',
-                installUrl: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973',
-                fallbackText: 'App Store для других регионов',
-                fallbackUrl: 'https://apps.apple.com/us/app/happ-proxy-utility/id6504287215',
+                installUrl: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6788279553',
                 addText: 'Добавить подписку в Happ',
                 keyInputId: 'new-setup-happ-key',
                 subscriptionUrl: '{{ happ_subscription_url }}',
@@ -4301,9 +4503,7 @@
                 platformLabel: 'macOS',
                 appName: 'Happ',
                 installText: 'Скачать Happ из App Store',
-                installUrl: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6746188973',
-                fallbackText: 'App Store для других регионов',
-                fallbackUrl: 'https://apps.apple.com/us/app/happ-proxy-utility/id6504287215',
+                installUrl: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6788279553',
                 addText: 'Добавить подписку в Happ',
                 keyInputId: 'new-setup-happ-key',
                 subscriptionUrl: '{{ happ_subscription_url }}',
@@ -4425,12 +4625,70 @@
             `;
         }
 
-        function newSetupOrb(iconClass, progress) {
+        // Крутилка — постоянный DOM-блок (#new-setup-hero): между шагами
+        // меняются только класс шага, иконка и прогресс, поэтому кольца
+        // сужаются и дуга дорисовывается плавными CSS-переходами.
+        const NEW_SETUP_HERO_STEPS = [
+            'setup-hero-step-start',
+            'setup-hero-step-install',
+            'setup-hero-step-subscription',
+            'setup-hero-step-done',
+        ];
+
+        function updateNewSetupHero(stepClass, iconClass, progress) {
+            const hero = document.getElementById('new-setup-hero');
+            if (!hero) return;
+            hero.classList.remove('hidden');
+            NEW_SETUP_HERO_STEPS.forEach(cls => hero.classList.remove(cls));
+            hero.classList.add(stepClass);
+            const orb = document.getElementById('new-setup-orb');
+            if (orb) orb.style.setProperty('--setup-progress', progress + '%');
+            const icon = document.getElementById('new-setup-orb-icon');
+            if (icon) icon.className = iconClass;
+        }
+
+        function hideNewSetupHero() {
+            const hero = document.getElementById('new-setup-hero');
+            if (hero) hero.classList.add('hidden');
+        }
+
+        // Чип «Назад» сверху слева на всех экранах мастера — в стиле кнопки
+        // «Назад в кабинет» со страницы тарифов. В Mini App скрыт (там
+        // нативная кнопка Telegram).
+        function newSetupBackChip(onclick) {
             return `
-                <div class="setup-wizard-orb" style="--setup-progress: ${progress}%; --setup-progress-color: #00ff88;">
-                    <div class="setup-wizard-icon"><i class="${iconClass}"></i></div>
+                <div class="setup-devices-topbar">
+                    <button type="button" onclick="${onclick}" class="group flex items-center gap-3 px-4 py-2 rounded-full border border-white/10 hover:border-[#ffc700]/30 hover:bg-[#ffc700]/5 transition-all">
+                        <i class="fas fa-chevron-left text-gray-500 group-hover:text-[#ffc700]"></i>
+                        <span class="text-sm font-bold text-gray-500 group-hover:text-white">Назад</span>
+                    </button>
                 </div>
             `;
+        }
+
+        // Мастер с орбом-«крутилкой» показываем на телефонах и в Telegram Mini App;
+        // на десктопе остаётся плоский компактный флоу. USE_NEW_SETUP_FLOW=true
+        // по-прежнему форсит мастер для всех (серверный override).
+        const forceSetupWizard = {% if use_new_setup_flow %}true{% else %}false{% endif %};
+
+        function shouldUseSetupWizard() {
+            if (forceSetupWizard) return true;
+            if (document.body.classList.contains('tg-webapp')) return true;
+            const platform = detectNewSetupPlatform();
+            return platform === 'ios' || platform === 'android';
+        }
+
+        function applySetupFlowMode() {
+            const wizard = document.getElementById('new-setup-flow');
+            const flat = document.getElementById('setup-logic-placeholder');
+            // Блоков нет, пока нет доступа к подписке — тогда переключать нечего.
+            if (!wizard || !flat) return;
+            const useWizard = shouldUseSetupWizard();
+            wizard.classList.toggle('hidden', !useWizard);
+            flat.classList.toggle('hidden', useWizard);
+            document.body.classList.toggle('setup-wizard-active', useWizard);
+            const flatHeader = document.getElementById('setup-flat-header');
+            if (flatHeader) flatHeader.classList.toggle('hidden', useWizard);
         }
 
         function renderNewSetupWizard() {
@@ -4447,79 +4705,114 @@
             );
 
             if (newSetupStep === 'devices') {
+                hideNewSetupHero();
                 root.innerHTML = `
-                    <h2 class="text-2xl md:text-3xl font-black mb-2">Выберите устройство</h2>
-                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-7">На какой платформе подключаем VPN?</p>
+                    ${newSetupBackChip('backNewSetupStart()')}
+                    <p class="setup-devices-title">Выберите вашу платформу</p>
                     <div class="setup-device-grid">${renderNewSetupDeviceChips()}</div>
-                    <div class="mt-6">
-                        <button type="button" onclick="backNewSetupStart()" class="setup-text-link">← Назад</button>
+                    <input type="text" readonly value="{{ plain_subscription_url }}" id="new-setup-copy-input" class="sr-only">
+                    <div class="setup-wizard-actions" style="margin-top:18px;">
+                        ${newSetupButton(`Скопировать ссылку`, "copyInputValueBtn(event, 'new-setup-copy-input')", "setup-secondary-btn", "far fa-copy")}
+                        ${newSetupButton(`Поделиться`, "shareNewSetupLink(event)", "setup-share-btn", "fas fa-share-nodes")}
+                    </div>
+                    <div class="setup-qr-card">
+                        <div class="setup-qr-box" id="new-setup-qr"></div>
+                        <p class="setup-qr-caption">Отсканируйте на другом устройстве</p>
                     </div>
                 `;
+                renderNewSetupQr();
                 return;
             }
 
             if (newSetupStep === 'start') {
+                updateNewSetupHero('setup-hero-step-start', meta.icon, 0);
                 root.innerHTML = `
-                    <div class="setup-detected">
-                        <i class="${meta.icon}"></i>
-                        <div class="setup-detected-text">
-                            <span class="setup-detected-label">Ваше устройство</span>
-                            <span class="setup-detected-name">${app.platformLabel}</span>
-                        </div>
-                        <i class="fas fa-check-circle setup-detected-ok"></i>
-                    </div>
-                    <h2 class="text-2xl md:text-3xl font-black mb-2">Подключим за пару минут</h2>
-                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-8">Платформу определили автоматически. Нажмите кнопку ниже — проведём по 3 коротким шагам.</p>
-                    ${newSetupOrb('fas fa-link', 25)}
+                    ${newSetupBackChip("showTab('home')")}
+                    <div class="setup-step-kicker">&nbsp;</div>
+                    <h2 class="text-2xl md:text-3xl font-black mb-2">Настройка на ${app.platformLabel}</h2>
+                    <p class="text-gray-500 text-sm font-bold leading-relaxed mb-8 setup-step-sub">3 шага для завершения настройки</p>
                     <div class="setup-wizard-actions">
-                        ${newSetupButton(`Начать настройку`, "startNewSetupInstall()", "", "fas fa-play")}
-                        <button type="button" onclick="showNewSetupDevices()" class="setup-text-link" style="margin-top:2px;">У меня другое устройство</button>
+                        ${newSetupButton(`Начать настройку`, "startNewSetupInstall()", "", "fas fa-arrow-right")}
+                        ${newSetupButton(`Другое устройство`, "showNewSetupDevices()", "setup-secondary-btn", "fas fa-desktop")}
                     </div>
                 `;
                 return;
             }
 
             if (newSetupStep === 'install') {
+                updateNewSetupHero('setup-hero-step-install', 'fas fa-download', 50);
                 root.innerHTML = `
-                    <h2 class="text-3xl md:text-4xl font-black mb-3">Приложение</h2>
-                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Установите ${app.appName} и вернитесь к этому экрану</p>
-                    ${newSetupOrb('fas fa-download', 50)}
+                    ${newSetupBackChip('backNewSetupStart()')}
+                    <div class="setup-step-kicker">1 из 3</div>
+                    <h2 class="text-2xl md:text-3xl font-black mb-2">Установка приложения</h2>
+                    <p class="text-gray-500 text-sm font-bold leading-relaxed mb-8 setup-step-sub">Установите ${app.appName} и вернитесь к этому экрану</p>
                     <div class="setup-wizard-actions">
                         ${newSetupLink(app.installText, app.installUrl, "", "fas fa-download")}
-                        ${app.fallbackUrl ? newSetupLink(app.fallbackText, app.fallbackUrl, "setup-secondary-btn", "fas fa-external-link-alt") : ''}
-                        ${newSetupButton(`Далее: приложение установлено`, "startNewSetupSubscription()", "setup-secondary-btn", "fas fa-arrow-right")}
-                        <button type="button" onclick="backNewSetupStart()" class="mt-4 text-gray-500 text-sm font-black hover:text-[#ffc700] transition-colors">← Предыдущий шаг</button>
+                        ${newSetupButton(`Далее`, "startNewSetupSubscription()", "setup-secondary-btn", "fas fa-arrow-right")}
+                        ${app.fallbackUrl ? `<a href="${app.fallbackUrl}" target="_blank" rel="noopener" class="setup-text-link" style="margin-top:2px;">${app.fallbackText}</a>` : ''}
                     </div>
                 `;
                 return;
             }
 
             if (newSetupStep === 'subscription') {
+                updateNewSetupHero('setup-hero-step-subscription', 'fas fa-plus-circle', 75);
                 root.innerHTML = `
-                    <h2 class="text-3xl md:text-4xl font-black mb-3">Подписка</h2>
-                    <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Добавьте подписку в ${app.appName} кнопкой ниже</p>
-                    ${newSetupOrb('fas fa-plus-circle', 75)}
-                    <input type="text" readonly value="${copyValue}" id="new-setup-copy-input" class="sr-only">
+                    ${newSetupBackChip('backNewSetupInstall()')}
+                    <div class="setup-step-kicker">2 из 3</div>
+                    <h2 class="text-2xl md:text-3xl font-black mb-2">Добавление подписки</h2>
+                    <p class="text-gray-500 text-sm font-bold leading-relaxed mb-8 setup-step-sub">Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически</p>
                     <div class="setup-wizard-actions">
                         ${newSetupLink(app.addText, app.subscriptionUrl, "", "fas fa-plus-circle")}
-                        ${newSetupButton(`Скопировать ссылку подписки`, "copyInputValueBtn(event, 'new-setup-copy-input')", "setup-secondary-btn", "fas fa-copy")}
-                        ${newSetupButton(`Далее: подписка добавлена`, "finishNewSetup()", "setup-secondary-btn", "fas fa-arrow-right")}
-                        <button type="button" onclick="backNewSetupInstall()" class="mt-4 text-gray-500 text-sm font-black hover:text-[#ffc700] transition-colors">← Предыдущий шаг</button>
+                        ${newSetupButton(`Далее`, "finishNewSetup()", "setup-secondary-btn", "fas fa-arrow-right")}
                     </div>
                 `;
                 return;
             }
 
+            updateNewSetupHero('setup-hero-step-done', 'fas fa-check', 100);
             root.innerHTML = `
-                <h2 class="text-3xl md:text-4xl font-black mb-3">Готово!</h2>
-                <p class="text-gray-500 text-sm md:text-base font-bold leading-relaxed mb-9">Теперь включите VPN в приложении ${app.appName}</p>
-                ${newSetupOrb('fas fa-check', 100)}
+                ${newSetupBackChip('backNewSetupSubscription()')}
+                <div class="setup-step-kicker">3 из 3</div>
+                <h2 class="text-2xl md:text-3xl font-black mb-2">Подключение и использование</h2>
+                <p class="text-gray-500 text-sm font-bold leading-relaxed mb-8 setup-step-sub">Для подключения нажмите большую кнопку в приложении ${app.appName}</p>
                 <div class="setup-wizard-actions">
-                    ${newSetupButton(`Перейти в личный кабинет`, "showTab('home')", "", "fas fa-th-large")}
-                    ${newSetupButton(`Настроить другое устройство`, "showNewSetupDevices()", "setup-secondary-btn", "fas fa-mobile-alt")}
-                    <button type="button" onclick="backNewSetupSubscription()" class="mt-4 text-gray-500 text-sm font-black hover:text-[#ffc700] transition-colors">← Предыдущий шаг</button>
+                    ${newSetupButton(`Завершить`, "showTab('home')", "", "fas fa-arrow-right")}
                 </div>
             `;
+        }
+
+        function shareNewSetupLink(event) {
+            const input = document.getElementById('new-setup-copy-input');
+            const url = input ? input.value : '';
+            if (!url) return;
+            if (navigator.share) {
+                navigator.share({ title: 'Ссылка подписки', url }).catch(() => {});
+            } else {
+                // Web Share API нет (десктоп-браузеры) — копируем как fallback
+                copyInputValueBtn(event, 'new-setup-copy-input');
+            }
+        }
+
+        function renderNewSetupQr() {
+            const box = document.getElementById('new-setup-qr');
+            const input = document.getElementById('new-setup-copy-input');
+            if (!box || !input || !input.value) return;
+            box.innerHTML = '';
+            if (window.QRCode) {
+                new QRCode(box, {
+                    text: input.value,
+                    width: 190,
+                    height: 190,
+                    colorDark: '#111113',
+                    colorLight: '#ffffff',
+                    correctLevel: QRCode.CorrectLevel.M,
+                });
+            } else {
+                // CDN с QR-библиотекой недоступен — показываем ссылку текстом
+                box.innerHTML = '<span class="text-black text-xs font-mono break-all p-2">'
+                    + input.value.replace(/&/g, '&amp;').replace(/</g, '&lt;') + '</span>';
+            }
         }
 
         function startNewSetupInstall() {
@@ -4555,6 +4848,33 @@
         function backNewSetupSubscription() {
             newSetupStep = 'subscription';
             renderNewSetupWizard();
+        }
+
+        // В Mini App «Назад» — нативная кнопка Telegram в шапке (как у
+        // конкурентов); своя ссылка в контенте там скрыта через CSS.
+        function tgBackButton() {
+            const tg = window.Telegram && window.Telegram.WebApp;
+            return tg && tg.BackButton ? tg.BackButton : null;
+        }
+
+        function updateTgBackButton() {
+            const back = tgBackButton();
+            if (!back) return;
+            const setupActive = document.body.classList.contains('is-setup-tab')
+                && document.body.classList.contains('setup-wizard-active');
+            if (setupActive) back.show(); else back.hide();
+        }
+
+        function handleTgBackButton() {
+            if (newSetupStep === 'devices' || newSetupStep === 'install') {
+                backNewSetupStart();
+            } else if (newSetupStep === 'subscription') {
+                backNewSetupInstall();
+            } else if (newSetupStep === 'done') {
+                backNewSetupSubscription();
+            } else {
+                showTab('home');
+            }
         }
 
         function setPlatform(platform) {
@@ -4647,10 +4967,10 @@
             if (installStep?.content && !installStep.links?.length) {
                 installInstruction = installStep.content.replaceAll('setup-compact-textlink', 'setup-connect-link');
             } else if (installStep?.links?.length) {
-                const happRussiaLink = installStep.links.find(link => /apk|ru/i.test(`${link.text} ${link.url}`));
-                const happOtherLink = installStep.links.find(link => link !== happRussiaLink);
-                if (app.name === 'Happ' && happRussiaLink && happOtherLink) {
-                    installInstruction = `Скачайте <a href="${happRussiaLink.url}" target="_blank" rel="noopener" class="setup-connect-link">Happ</a> для России или <a href="${happOtherLink.url}" target="_blank" rel="noopener" class="setup-connect-link">Happ</a> для других регионов.`;
+                const happPlayLink = installStep.links.find(link => /play\.google/i.test(link.url));
+                const happApkLink = installStep.links.find(link => /apk/i.test(`${link.text} ${link.url}`));
+                if (app.name === 'Happ' && happPlayLink && happApkLink) {
+                    installInstruction = `Скачайте <a href="${happPlayLink.url}" target="_blank" rel="noopener" class="setup-connect-link">Happ из Google Play</a> или <a href="${happApkLink.url}" target="_blank" rel="noopener" class="setup-connect-link">APK-файлом</a>.`;
                 } else {
                     const installLinks = installStep.links.map(link => `<a href="${link.url}" target="_blank" rel="noopener" class="setup-connect-link">${formatInstallLinkLabel(app.name, link.text)}</a>`).join(' или ');
                     installInstruction = `Скачайте ${installLinks}.`;
@@ -4976,7 +5296,11 @@
             });
 
             selectedNewSetupPlatform = detectNewSetupPlatform();
+            applySetupFlowMode();
             renderNewSetupWizard();
+            const tgBack = tgBackButton();
+            if (tgBack) tgBack.onClick(handleTgBackButton);
+            updateTgBackButton();
 
             // Компактный флоу: определяем устройство пользователя и сразу показываем
             // рекомендованное приложение (первое в installData), а не хардкод Android.
