@@ -1823,8 +1823,17 @@
                     <span class="chart-title-wrap"><strong>Подписки по дням и конверсия в первую оплату</strong><button type="button" class="chart-info" data-help="trials" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
                     <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
                         Синие столбики — сколько подписок создано за день (левая ось).
-                        Зелёная линия — какой % из созданных в этот день подписок оплатил впервые в течение 10 дней (правая ось, в процентах).
+                        Зелёная линия — какой % из созданных в этот день подписок оплатил впервые в течение выбранного окна (правая ось, в процентах).
                         Падение столбиков = реклама приводит меньше людей; падение линии = люди приходят, но не покупают.
+                        Последние дни в размере окна — «недозрелые»: их процент ещё дорастёт.
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;font-size:12px;">
+                        <span style="color:var(--muted);">Окно конверсии:</span>
+                        <select id="acq-trials-window" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                            <option value="10" selected>10 дней</option>
+                            <option value="30">30 дней</option>
+                            <option value="60">60 дней</option>
+                        </select>
                     </div>
                     <canvas id="acq-trials-chart" style="width:100%;height:240px;display:block;margin-top:10px;"></canvas>
                 </div>
@@ -6618,11 +6627,17 @@
                 wk.map((r) => [r.week, r.trials, r.invoice_clicks, r.payments, r.new_payers,
                     r.trials ? (100 * r.new_payers / r.trials).toFixed(1) + '%' : '—',
                     fmtRub(r.new_rub) + ' ₽']));
-            const tr = await acqFetch('trials', {days: 60});
+            await loadTrials();
+        }
+
+        async function loadTrials() {
+            const windowDays = document.getElementById('acq-trials-window')?.value || '10';
+            const tr = await acqFetch('trials', {days: 60, window: windowDays});
+            const win = tr.window_days || windowDays;
             acqDraw(document.getElementById('acq-trials-chart'),
                 tr.days.map((r) => dayLabel(r.day)),
                 [{label: 'Подписок создано', tone: 'indigoSoft', data: tr.days.map((r) => r.trials), fmt: 'raw'}],
-                [{label: 'Оплатили в течение 10 дней, %', tone: 'green', data: tr.days.map((r) => r.conv_pct), fmt: 'pct'}],
+                [{label: `Оплатили в течение ${win} дней, %`, tone: 'green', data: tr.days.map((r) => r.conv_pct), fmt: 'pct'}],
                 {fullLabels: tr.days.map((r) => r.day)});
         }
 
@@ -6952,6 +6967,7 @@
         });
         document.getElementById('acq-ads-group')?.addEventListener('change', () => loadAdsDaily().catch(console.error));
         document.getElementById('acq-ads-days')?.addEventListener('change', () => loadAdsDaily().catch(console.error));
+        document.getElementById('acq-trials-window')?.addEventListener('change', () => loadTrials().catch(console.error));
         document.getElementById('acq-csv-form')?.addEventListener('submit', async (ev) => {
             ev.preventDefault();
             const statusEl = document.getElementById('acq-csv-status');
@@ -7054,11 +7070,12 @@
                 t: 'Подписки по дням и конверсия в первую оплату',
                 calc: [
                     'Столбики — число подписок (<code>subscription_created</code>) за день, МСК (левая ось).',
-                    'Линия — доля этих подписок, чей владелец <b>впервые заплатил в течение 10 дней</b> после создания подписки (правая ось, %).',
+                    'Линия — доля этих подписок, чей владелец <b>впервые заплатил в течение выбранного окна</b> (10/30/60 дней, по умолчанию 10) после создания подписки (правая ось, %).',
                 ],
                 read: [
                     'Ранний детектор проблем: <b>столбики</b> падают — приток людей просел (закупка); <b>линия</b> падает — люди приходят, но не покупают (качество трафика/оффер).',
-                    'Последние ~10 дней по линии «недозрелые»: окно оплаты ещё не вышло, конверсия дорастёт — не паникуйте по хвосту.',
+                    'Последние дни по линии в размере окна «недозрелые»: окно оплаты ещё не вышло, конверсия дорастёт — не паникуйте по хвосту. Чем шире окно, тем длиннее недозрелый хвост.',
+                    'Окно 10 дней показывает мгновенную конверсию после триала; 30/60 — добавляют тех, кого вернули винбеки и повторная потребность.',
                 ],
             },
             ads_daily: {

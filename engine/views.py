@@ -8062,7 +8062,15 @@ def _acq_cohorts(db_session, months):
     return {"ltv": cohorts, "retention": retention_out}
 
 
-def _acq_trials(db_session, days):
+# Допустимые окна конверсии для графика «подписки → первая оплата».
+# Окно шире 10 дней делает правый край графика «недозрелым» на всю свою
+# длину, поэтому набор фиксированный, а не произвольное число из запроса.
+ACQ_TRIALS_WINDOWS = (10, 30, 60)
+
+
+def _acq_trials(db_session, days, window_days=10):
+    if window_days not in ACQ_TRIALS_WINDOWS:
+        window_days = 10
     rows = _acq_rows(
         db_session,
         f"""
@@ -8076,14 +8084,17 @@ def _acq_trials(db_session, days):
         )
         SELECT ev.day, count(*) AS trials,
                count(*) FILTER (
-                   WHERE f.first_at >= ev.ts AND f.first_at <= ev.ts + interval '10 days'
+                   WHERE f.first_at >= ev.ts
+                     AND f.first_at <= ev.ts + make_interval(days => :window_days)
                ) AS converted
         FROM ev LEFT JOIN first_pay f USING (user_id)
         GROUP BY 1 ORDER BY 1
         """,
         days=days,
+        window_days=window_days,
     )
     return {
+        "window_days": window_days,
         "days": [
             {"day": r["day"].isoformat(), "trials": r["trials"],
              "converted": r["converted"],
@@ -8493,7 +8504,9 @@ ACQ_SECTIONS = {
         "month" if req.GET.get("group") == "month" else "day",
     ),
     "cohorts": lambda s, req: _acq_cohorts(s, int(req.GET.get("months", 14))),
-    "trials": lambda s, req: _acq_trials(s, int(req.GET.get("days", 60))),
+    "trials": lambda s, req: _acq_trials(
+        s, int(req.GET.get("days", 60)), int(req.GET.get("window", 10))
+    ),
     "pushes": lambda s, req: _acq_pushes(s, int(req.GET.get("days", 30))),
     "patterns": lambda s, req: _acq_patterns(s, int(req.GET.get("days", 30))),
     "trial_timing": lambda s, req: _acq_trial_timing(s, int(req.GET.get("days", 365))),

@@ -59,6 +59,7 @@ from engine.views import _parse_direct_number
 from engine.views import _parse_yandex_direct_csv
 from engine.views import _acq_tariff_paths
 from engine.views import _acq_trial_timing
+from engine.views import _acq_trials
 from engine.views import payment_retry
 from engine.views import render_login
 from engine.views import should_create_trial_for_channel
@@ -564,6 +565,57 @@ class YandexDirectCsvParserTests(SimpleTestCase):
         self.assertIsNone(_parse_direct_number("-"))
         self.assertIsNone(_parse_direct_number(""))
         self.assertIsNone(_parse_direct_number(None))
+
+
+class AcquisitionTrialsTests(SimpleTestCase):
+    @mock.patch("engine.views._acq_rows")
+    def test_window_passed_to_sql_and_echoed(self, rows_mock):
+        rows_mock.return_value = [
+            {"day": date(2026, 7, 10), "trials": 655, "converted": 14},
+        ]
+
+        result = _acq_trials(object(), 60, 30)
+
+        self.assertEqual(result["window_days"], 30)
+        _, kwargs = rows_mock.call_args
+        self.assertEqual(kwargs["window_days"], 30)
+        sql = rows_mock.call_args[0][1]
+        self.assertIn("make_interval(days => :window_days)", sql)
+        self.assertEqual(result["days"][0]["conv_pct"], 2.1)
+
+    @mock.patch("engine.views._acq_rows")
+    def test_unknown_window_falls_back_to_10(self, rows_mock):
+        rows_mock.return_value = []
+
+        result = _acq_trials(object(), 60, 45)
+
+        self.assertEqual(result["window_days"], 10)
+        _, kwargs = rows_mock.call_args
+        self.assertEqual(kwargs["window_days"], 10)
+
+    @mock.patch("engine.views._acq_rows")
+    def test_default_window_is_10(self, rows_mock):
+        rows_mock.return_value = []
+
+        result = _acq_trials(object(), 60)
+
+        self.assertEqual(result["window_days"], 10)
+
+    @mock.patch("engine.views._acq_rows")
+    def test_zero_trials_does_not_divide_by_zero(self, rows_mock):
+        rows_mock.return_value = [
+            {"day": date(2026, 7, 10), "trials": 0, "converted": 0},
+        ]
+
+        result = _acq_trials(object(), 60, 10)
+
+        self.assertEqual(result["days"][0]["conv_pct"], 0)
+
+    def test_trials_window_selector_in_template(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('id="acq-trials-window"', template)
+        self.assertIn('<option value="10" selected>', template)
 
 
 class AcquisitionRenew45Tests(SimpleTestCase):
