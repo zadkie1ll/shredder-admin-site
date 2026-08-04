@@ -3487,6 +3487,25 @@ class AcquisitionJourneyTests(SimpleTestCase):
         self.assertIn("acqFetch('tariff_paths'", template)
 
 
+class AcquisitionFunnelTemplateTests(SimpleTestCase):
+    def test_funnel_table_has_invoice_to_payment_percent(self):
+        # В таблице воронки рядом с «Подписка→покупатель» есть колонка
+        # «Инвойс→Оплата»: все оплаты недели ÷ инвойсы той же недели.
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("'Инвойс→Оплата'", template)
+        self.assertIn(
+            "r.invoice_clicks ? (100 * r.payments / r.invoice_clicks).toFixed(1) + '%' : '—'",
+            template,
+        )
+        # Метрика описана в легенде метрик и в help-модалке воронки.
+        self.assertIn("Инвойс→Оплата в воронке", template)
+        self.assertIn(
+            "<b>Инвойс→Оплата</b> = все оплаты недели ÷ инвойсы той же недели.",
+            template,
+        )
+
+
 class AdminCensorBulkUpdateTests(SimpleTestCase):
     def test_bulk_update_changes_only_selected_fields_for_all_checks(self):
         request = RequestFactory().post(
