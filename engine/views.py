@@ -2429,6 +2429,10 @@ def privacy(request):
     return render(request, "privacy.html", {"site_role": get_site_role(request)})
 
 
+def terms(request):
+    return render(request, "terms.html", {"site_role": get_site_role(request)})
+
+
 @login_required(login_url="/login/")
 def dashboard(request):
     user = request.user

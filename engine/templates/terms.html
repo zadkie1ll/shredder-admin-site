@@ -1,0 +1,179 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Пользовательское соглашение — Monkey Island</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
+    <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+
+        body {
+            font-family: 'Montserrat', sans-serif;
+            background-color: #0a0a0a;
+            color: #ffffff;
+        }
+
+        .offer-card {
+            background: rgba(255, 255, 255, 0.035);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+        }
+
+        .offer-section h2 {
+            color: #ffc700;
+            font-size: 0.78rem;
+            font-weight: 900;
+            letter-spacing: 0.14em;
+            text-transform: uppercase;
+            margin-bottom: 1rem;
+        }
+
+        .offer-section p,
+        .offer-section li {
+            color: rgba(255, 255, 255, 0.82);
+            font-size: 0.95rem;
+            line-height: 1.8;
+        }
+
+        .offer-section ul {
+            list-style: disc;
+            padding-left: 1.25rem;
+        }
+
+        .offer-section a {
+            color: #ffc700;
+            font-weight: 700;
+        }
+    </style>
+    {% include "includes/yandex_metrika.html" %}
+</head>
+<body class="antialiased">
+    <header class="border-b border-white/5 bg-[#111111]">
+        <nav class="container mx-auto px-6 py-6 flex items-center justify-between gap-6">
+            <a href="/" class="text-xl md:text-2xl font-black uppercase tracking-tighter">
+                MONKEY ISLAND{% if site_role != 'vps' and site_role != 'vps_direct_sale' %}<span class="text-[#ffc700]"> VPN</span>{% endif %}
+            </a>
+            <a href="/" class="inline-flex items-center gap-2 rounded-full border border-[#ffc700] px-5 py-2 text-[#ffc700] text-xs font-black uppercase tracking-widest hover:bg-[#ffc700] hover:text-black transition">
+                <i class="fas fa-arrow-left"></i>
+                На главную
+            </a>
+        </nav>
+    </header>
+
+    <main class="container mx-auto px-6 py-14 md:py-20">
+        <div class="max-w-4xl mx-auto">
+            <div class="mb-10">
+                <p class="text-[#ffc700] text-xs font-black uppercase tracking-[0.24em] mb-4">Правовой документ</p>
+                <h1 class="text-3xl md:text-5xl font-black uppercase leading-tight mb-5">
+                    Пользовательское соглашение
+                </h1>
+                <p class="text-gray-400 text-sm md:text-base leading-relaxed">
+                    Настоящее Пользовательское соглашение (далее — «Соглашение») является публичной офертой и определяет условия использования Telegram-бота Monkey Island (далее — «Бот»), размещённого в мессенджере Telegram, между Администрацией Бота (далее — «Администрация») и Пользователем (далее — «Пользователь»).
+                </p>
+            </div>
+
+            <article class="offer-card p-6 md:p-10 space-y-10">
+
+                <section class="offer-section">
+                    <h2>1. Предмет соглашения</h2>
+                    <div class="space-y-3">
+                        <p>1.1. Администрация предоставляет Пользователю доступ к Боту и его функционалу на условиях, изложенных в настоящем Соглашении.</p>
+                        <p>1.2. Пользователь, используя Бот, подтверждает своё полное и безоговорочное согласие с условиями настоящего Соглашения.</p>
+                        <p>1.3. Настоящее Соглашение является юридически обязательным документом.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>2. Описание Бота и его функциональности</h2>
+                    <div class="space-y-3">
+                        <p>2.1. Бот Monkey Island предназначен для {% if site_role == 'vps' or site_role == 'vps_direct_sale' %}аренды пользователями VPS серверов{% else %}предоставления пользователям доступа к VPN-сервису{% endif %} для использования в личных целях.</p>
+                        <p>2.2. Перечень функций и возможностей Бота может быть изменён Администрацией без предварительного уведомления Пользователя.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>3. Правила использования Бота</h2>
+                    <div class="space-y-3">
+                        <p>3.1. Пользователь обязуется использовать Бот исключительно в соответствии с его целевым назначением и в рамках действующего законодательства.</p>
+                        <p>3.2. Пользователь не имеет права:</p>
+                        <ul class="space-y-1">
+                            <li>Пытаться получить несанкционированный доступ к информации, содержащейся в Боте.</li>
+                            <li>Использовать Бот для распространения вредоносного программного обеспечения, спама или другой незаконной информации.</li>
+                            <li>Вмешиваться в работу Бота, изменять его код или функциональность.</li>
+                            <li>Нарушать права третьих лиц при использовании Бота.</li>
+                        </ul>
+                        <p>3.3. Администрация оставляет за собой право ограничить или прекратить доступ Пользователя к Боту в случае нарушения им условий настоящего Соглашения.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>4. Ответственность сторон</h2>
+                    <div class="space-y-3">
+                        <p>4.1. Администрация не несёт ответственности за убытки, причинённые Пользователю в результате использования Бота, в том числе за возможные ошибки в работе Бота, перерывы в работе, потерю данных и т.д.</p>
+                        <p>4.2. Пользователь несёт полную ответственность за свои действия при использовании Бота, а также за последствия таких действий.</p>
+                        <p>4.3. Администрация не несёт ответственности за содержание информации, размещённой Пользователем в Боте.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>5. Обработка персональных данных</h2>
+                    <div class="space-y-3">
+                        <p>5.1. Администрация обязуется соблюдать конфиденциальность персональных данных Пользователя, полученных в процессе использования Бота.</p>
+                        <p>5.2. Подробная информация об обработке персональных данных содержится в <a href="/privacy/">Политике конфиденциальности</a>, являющейся неотъемлемой частью настоящего Соглашения.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>6. Срок действия и порядок изменения Соглашения</h2>
+                    <div class="space-y-3">
+                        <p>6.1. Настоящее Соглашение вступает в силу с момента его принятия Пользователем и действует бессрочно.</p>
+                        <p>6.2. Администрация оставляет за собой право вносить изменения в настоящее Соглашение. Информация об изменениях будет размещена в Боте. Пользователь считается принявшим изменения, если он продолжает использовать Бот после внесения изменений.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>7. Разрешение споров</h2>
+                    <div class="space-y-3">
+                        <p>7.1. Все споры, возникающие между Администрацией и Пользователем в связи с настоящим Соглашением, подлежат разрешению в порядке, предусмотренном действующим законодательством.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>8. Прочие условия</h2>
+                    <div class="space-y-3">
+                        <p>8.1. Во всём остальном, что не предусмотрено настоящим Соглашением, стороны руководствуются действующим законодательством.</p>
+                        <p>8.2. Если какое-либо положение настоящего Соглашения будет признано недействительным, это не повлияет на действительность остальных положений.</p>
+                    </div>
+                </section>
+
+                <section class="offer-section">
+                    <h2>9. Контактная информация Администрации</h2>
+                    <div class="space-y-3">
+                        <ul class="space-y-1">
+                            <li>Telegram: <a href="https://t.me/monkeyislandsupportbot" target="_blank" rel="noopener">@monkeyislandsupportbot</a></li>
+                        </ul>
+                    </div>
+                </section>
+
+            </article>
+
+            <div class="mt-10 flex flex-wrap gap-4">
+                <a href="/offer/" class="inline-flex items-center gap-2 text-[#ffc700] text-xs font-black uppercase tracking-widest hover:underline">
+                    <i class="fas fa-file-contract"></i> Договор-оферта
+                </a>
+                <a href="/privacy/" class="inline-flex items-center gap-2 text-[#ffc700] text-xs font-black uppercase tracking-widest hover:underline">
+                    <i class="fas fa-user-shield"></i> Политика конфиденциальности
+                </a>
+                <a href="/" class="inline-flex items-center gap-2 text-gray-500 text-xs font-black uppercase tracking-widest hover:text-white transition">
+                    <i class="fas fa-arrow-left"></i> На главную
+                </a>
+            </div>
+        </div>
+    </main>
+</body>
+</html>

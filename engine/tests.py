@@ -929,6 +929,36 @@ class OfferTemplateTests(SimpleTestCase):
         )
         self.assertNotIn('<span class="text-[#ffc700]"> VPS</span>', template)
 
+    def test_terms_page_wired_and_follows_site_role(self):
+        # Пользовательское соглашение доступно по /terms/, а формулировка
+        # назначения бота подстраивается под тип домена: VPS-лендинги говорят
+        # про аренду VPS, VPN/кабинетные — про VPN-сервис.
+        from django.urls import reverse
+
+        self.assertEqual(reverse("terms"), "/terms/")
+
+        template = Path("engine/templates/terms.html").read_text()
+        self.assertIn("Пользовательское соглашение", template)
+        self.assertIn(
+            "{% if site_role == 'vps' or site_role == 'vps_direct_sale' %}"
+            "аренды пользователями VPS серверов"
+            "{% else %}предоставления пользователям доступа к VPN-сервису{% endif %}",
+            template,
+        )
+        # Контакт поддержки и ссылка на политику конфиденциальности.
+        self.assertIn("https://t.me/monkeyislandsupportbot", template)
+        self.assertIn('<a href="/privacy/">Политике конфиденциальности</a>', template)
+
+    def test_terms_linked_from_landing_footers(self):
+        for name in ("index_vpn.html", "index_vps.html", "index_vps_direct_sale.html"):
+            template = Path(f"engine/templates/{name}").read_text()
+            self.assertIn('href="/terms/"', template, name)
+
+    def test_privacy_effective_date_is_current(self):
+        template = Path("engine/templates/privacy.html").read_text()
+        self.assertIn("Дата вступления в силу: 04.08.2026", template)
+        self.assertNotIn("03.05.2026", template)
+
     def test_runtime_offer_tariffs_use_database_prices(self):
         class FakeSession:
             def get(self, model, key):

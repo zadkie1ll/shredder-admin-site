@@ -7,6 +7,7 @@ urlpatterns = [
     path("vps-direct-sale/", views.vps_direct_sale, name="vps_direct_sale"),
     path("offer/", views.offer, name="offer"),
     path("privacy/", views.privacy, name="privacy"),
+    path("terms/", views.terms, name="terms"),
     path("dashboard/", views.dashboard, name="dashboard"),
     path("update-email/", views.update_email, name="update_email"),
     path("cancel-autopay/", views.cancel_autopay, name="cancel_autopay"),
