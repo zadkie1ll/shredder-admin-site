@@ -230,10 +230,13 @@ class DashboardReferralTemplateTests(SimpleTestCase):
     def test_referral_page_shows_registration_bonus(self):
         template = Path("engine/templates/dashboard.html").read_text()
 
-        registration_bonus = '+{{ join_referrer_bonus_days|default:"3" }} дня за регистрацию'
+        # Бонус типа REGISTRATION теперь начисляется за подключение
+        # (первый трафик), а не за создание аккаунта.
+        registration_bonus = '+{{ join_referrer_bonus_days|default:"3" }} дня за подключение'
         self.assertIn("Приглашения и бонусы", template)
         self.assertIn(registration_bonus, template)
-        self.assertIn("когда друг создаст аккаунт", template)
+        self.assertIn("когда друг начнет пользоваться сервисом", template)
+        self.assertNotIn("за регистрацию", template)
         self.assertIn("md:grid-cols-3", template)
         self.assertIn("padding: 22px 24px !important;", template)
         self.assertIn("padding: 18px 22px !important;", template)

@@ -2934,7 +2934,7 @@
                     {# Условия программы показываются модалкой по «?» — контент здесь #}
                     <div id="referral-terms-content" class="hidden">
                         <p class="pb-3">Приглашайте друзей и получайте бонусные дни:</p>
-                        <p class="pb-2">✅ <b>+{{ join_referrer_bonus_days|default:"3" }} дн. за регистрацию</b> — когда друг создаст аккаунт по вашей ссылке.</p>
+                        <p class="pb-2">✅ <b>+{{ join_referrer_bonus_days|default:"3" }} дн. за подключение</b> — когда друг зарегистрируется по вашей ссылке и начнет пользоваться сервисом.</p>
                         <p class="pb-2">📶 <b>+{{ traffic_referrer_bonus_days|default:"7" }} дн. за трафик</b> — когда друг израсходует больше 100 МБ.</p>
                         <p>💎 <b>+{{ purchase_referrer_bonus_days|default:"30" }} дн. за покупку</b> — если друг оплатит подписку от 1 месяца.</p>
                     </div>
@@ -3511,8 +3511,8 @@
                         <i class="fas fa-user-check text-sm"></i>
                     </div>
                     <div>
-                        <h5 class="text-sm font-black mb-1">+{{ join_referrer_bonus_days|default:"3" }} дня за регистрацию</h5>
-                        <p class="text-gray-500 text-xs font-bold leading-relaxed">когда друг создаст аккаунт</p>
+                        <h5 class="text-sm font-black mb-1">+{{ join_referrer_bonus_days|default:"3" }} дня за подключение</h5>
+                        <p class="text-gray-500 text-xs font-bold leading-relaxed">когда друг начнет пользоваться сервисом</p>
                     </div>
                 </div>
                 <div class="setup-step-card !p-4 !mb-0 flex items-start gap-3">
