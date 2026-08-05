@@ -4138,3 +4138,31 @@ class AdminStage6RolesTests(SimpleTestCase):
             "engine/templates/support_admin_login.html"
         ).read_text()
         self.assertIn('name="login"', login_template)
+
+
+class AdminScriptScopeTests(SimpleTestCase):
+    """Регресс прода: вкладки «Промокоды»/«Сотрудники» падали с «Не удалось
+    загрузить», потому что рендер в основном script-блоке звал acqTable из
+    другого script-scope (блок аналитики). Основной блок обязан использовать
+    только собственный adminTable."""
+
+    def _main_script_block(self):
+        import re
+
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        blocks = re.findall(r"<script>(.*?)</script>", template, re.S)
+        return max(blocks, key=len)
+
+    def test_main_admin_block_does_not_use_foreign_acq_table(self):
+        block = self._main_script_block()
+
+        self.assertNotIn("acqTable(", block)
+        self.assertIn("function adminTable(", block)
+
+    def test_admin_loaders_render_via_local_helper(self):
+        block = self._main_script_block()
+
+        for loader in ("loadPromocodes", "loadStaffAccounts", "loadSysAuditLog",
+                       "loadSysSyncMismatches"):
+            self.assertIn(loader, block)
+        self.assertGreaterEqual(block.count("adminTable("), 6)

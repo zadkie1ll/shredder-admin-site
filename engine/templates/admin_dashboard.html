@@ -5430,7 +5430,7 @@
                 if (payload.status !== 'ok') throw new Error();
                 const rows = payload.result || [];
                 const kindLabel = {missing_in_panel: 'Нет в панели', expire_diff: 'Разные даты', status_diff: 'DISABLED в панели'};
-                target.innerHTML = rows.length ? acqTable(
+                target.innerHTML = rows.length ? adminTable(
                     ['Обнаружено', 'Пользователь', 'Тип', 'Детали'],
                     rows.map((row) => [row.detected_at, escapeHtml(row.username),
                         kindLabel[row.kind] || row.kind, escapeHtml(row.details || '')]))
@@ -5452,7 +5452,7 @@
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error();
                 const rows = payload.result || [];
-                target.innerHTML = rows.length ? acqTable(
+                target.innerHTML = rows.length ? adminTable(
                     ['Когда', 'Кто', 'Действие', 'Цель', 'Детали', 'IP'],
                     rows.map((row) => [row.created_at, escapeHtml(row.actor), escapeHtml(row.action),
                         escapeHtml(row.target || '—'),
@@ -5570,7 +5570,7 @@
                 : `<div class="info-card" style="margin-bottom:8px;">Готово: применено ${result.applied}/${result.total}.</div>`;
             const missing = result.missing.length
                 ? `<div class="info-card red" style="margin-bottom:8px;">Не найдены: ${result.missing.map(escapeHtml).join(', ')}</div>` : '';
-            target.innerHTML = head + missing + acqTable(
+            target.innerHTML = head + missing + adminTable(
                 ['Кто', 'Username', 'Результат'],
                 result.rows.map((row) => [escapeHtml(row.token), escapeHtml(row.username),
                     `${row.ok ? '✅' : '❌'} ${escapeHtml(row.message)}`]));
@@ -5624,7 +5624,7 @@
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error();
                 const {codes, batches: batchRows} = payload.result;
-                table.innerHTML = codes.length ? acqTable(
+                table.innerHTML = codes.length ? adminTable(
                     ['Код', 'Тип', 'Значение', 'Активаций', 'Действует до', 'Статус', 'Комментарий', 'Deep-link', ''],
                     codes.map((row) => [
                         `<code>${escapeHtml(row.code)}</code>`,
@@ -5637,7 +5637,7 @@
                         `<a href="${row.deep_link}" target="_blank" style="color:var(--brand-gold);">ссылка</a>`,
                         `<button data-promo-toggle="${row.id}" style="background:none;border:0;color:rgba(255,199,0,.8);cursor:pointer;">${row.is_active ? 'выключить' : 'включить'}</button>`,
                     ])) : '<div class="info-card muted">Промокодов ещё нет.</div>';
-                batches.innerHTML = batchRows.length ? acqTable(
+                batches.innerHTML = batchRows.length ? adminTable(
                     ['Партия', 'Кодов', 'Активировано', 'Создана', 'Выгрузка'],
                     batchRows.map((batch) => [escapeHtml(batch.name), batch.codes, batch.used, batch.created_at,
                         `<a href="${main.dataset.promocodesUrl}?action=batch_links&batch_id=${batch.id}" style="color:var(--brand-gold);">txt</a>`]))
@@ -5698,7 +5698,7 @@
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error();
                 const rows = payload.result || [];
-                target.innerHTML = rows.length ? acqTable(
+                target.innerHTML = rows.length ? adminTable(
                     ['Логин', 'Имя', 'Роль', 'Статус', 'Последний вход', '', ''],
                     rows.map((row) => [
                         `<code>${escapeHtml(row.login)}</code>`,
@@ -5750,6 +5750,15 @@
                 showAdminToast(payload.message || 'Ошибка', 'error');
             }
         });
+
+
+        // Локальный рендер таблиц для вкладок админ-операций: не зависит от
+        // acqTable из блока аналитики (тот живёт в другом script-scope).
+        function adminTable(headers, rows) {
+            const th = headers.map((x) => `<th style="text-align:left;padding:6px 10px;color:rgba(255,255,255,.5);font-size:11px;white-space:nowrap;">${x}</th>`).join('');
+            const trs = rows.map((r) => '<tr>' + r.map((c) => `<td style="padding:6px 10px;font-size:12px;border-top:1px solid rgba(255,255,255,.06);white-space:nowrap;">${c}</td>`).join('') + '</tr>').join('');
+            return `<table style="border-collapse:collapse;min-width:100%;">${'<thead><tr>' + th + '</tr></thead>'}<tbody>${trs}</tbody></table>`;
+        }
 
         const CLIENT_SUB_CONFIRMS = {
             set_trial_hour: 'Сбросить подписку до 1 часа? Используется при возврате средств.',
