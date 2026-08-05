@@ -93,7 +93,7 @@
 
             <form method="post" class="space-y-4">
                 {% csrf_token %}
-                <input class="input" type="text" name="login" placeholder="Логин (пусто — общий пароль)" autocomplete="username" style="margin-bottom:10px;">
+                <input type="text" name="login" placeholder="Логин (для общего пароля — оставьте пустым)" autocomplete="username" class="admin-login-input w-full rounded-2xl border px-5 py-4 text-white font-bold outline-none focus:border-[#ffc700]/40">
             <input type="password" name="password" placeholder="Пароль" required class="admin-login-input w-full rounded-2xl border px-5 py-4 text-white font-bold outline-none focus:border-[#ffc700]/40">
                 <button type="submit" class="admin-login-button w-full rounded-2xl px-5 py-4 text-black text-sm font-black uppercase">
                     Войти
