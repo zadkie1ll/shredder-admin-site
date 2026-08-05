@@ -155,6 +155,42 @@
         .client-ref-blocked { border-color: rgba(255,107,107,.35); color: #ff8f8f; font-weight: 700; }
         .client-ref-blocked i { margin-right: 6px; }
         .client-empty { text-align: center; padding: 26px; }
+        /* Вкладка «Таймлайн»: колонки время/категория/событие выровнены по сетке */
+        .client-timeline { padding: 8px 18px; }
+        .client-timeline-row { display: grid; grid-template-columns: 122px 130px minmax(0, 1fr); gap: 14px; align-items: baseline; padding: 10px 0; border-bottom: 1px solid var(--panel-border); font-size: 12px; font-weight: 600; }
+        .client-timeline-row:last-child { border-bottom: 0; }
+        .client-timeline-ts { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .client-timeline-cat { display: inline-flex; align-items: center; gap: 7px; color: var(--brand-gold); white-space: nowrap; }
+        .client-timeline-cat i { width: 14px; font-size: 11px; text-align: center; }
+        .client-timeline-text { min-width: 0; color: var(--text-main); line-height: 1.5; overflow-wrap: anywhere; }
+        .client-timeline-detail { display: inline-block; margin-left: 6px; padding: 1px 7px; border: 1px solid var(--panel-border); border-radius: 6px; color: var(--muted); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10.5px; font-weight: 500; white-space: nowrap; }
+        @media (max-width: 900px) { .client-timeline-row { grid-template-columns: 1fr; gap: 3px; } }
+        /* Вкладка «Синхронизация»: метрики, статус расхождений и действия — единая сетка */
+        .client-sync { display: grid; gap: 14px; padding: 18px; }
+        .client-sync-diff { display: flex; align-items: flex-start; gap: 10px; padding: 12px 14px; border: 1px solid rgba(255,92,103,.28); border-radius: 10px; background: rgba(255,92,103,.07); }
+        .client-sync-diff > i { margin-top: 3px; color: var(--red); font-size: 13px; }
+        .client-sync-diff b { display: block; color: var(--red); font-size: 13px; }
+        .client-sync-diff span { color: var(--muted); font-size: 12px; font-weight: 600; }
+        .client-sync-ok { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: 1px solid rgba(56,217,150,.25); border-radius: 10px; background: rgba(56,217,150,.07); font-size: 13px; font-weight: 700; }
+        .client-sync-ok i { color: var(--green); }
+        .client-sync-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding-top: 14px; border-top: 1px solid var(--panel-border); }
+        .client-sync-hint { flex: 1 1 240px; margin-left: auto; color: var(--muted); font-size: 11px; font-weight: 600; line-height: 1.45; text-align: right; }
+        @media (max-width: 900px) { .client-sync-hint { flex-basis: 100%; text-align: left; } }
+        /* Вкладка «Сообщение»: композер сверху, история диалога под разделителем */
+        .client-dm { padding: 18px; }
+        .client-dm-compose { display: grid; gap: 10px; }
+        .client-dm-compose .input { min-height: 84px; padding: 10px 13px; line-height: 1.5; resize: vertical; }
+        .client-dm-compose-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+        .client-dm-compose-hint { color: var(--muted); font-size: 11px; font-weight: 600; }
+        .client-dm-compose-hint i { margin-right: 5px; color: var(--brand-gold); }
+        .client-dm-history { margin-top: 16px; border-top: 1px solid var(--panel-border); }
+        .client-dm-item { padding: 12px 0; border-bottom: 1px solid var(--panel-border); }
+        .client-dm-item:last-child { border-bottom: 0; padding-bottom: 2px; }
+        .client-dm-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; color: var(--muted); font-size: 11px; font-weight: 700; }
+        .client-dm-author { color: var(--brand-gold); }
+        .client-dm-delivery { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border: 1px solid var(--panel-border); border-radius: 999px; font-size: 10px; }
+        .client-dm-text { margin-top: 6px; color: var(--text-main); font-size: 13px; font-weight: 600; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .client-dm-empty { padding: 14px 0 4px; color: var(--muted); font-size: 13px; font-weight: 600; }
         .censor-probe-row { grid-template-columns: 90px minmax(130px, 1fr) 100px 110px minmax(0, 2fr); min-width: 620px; }
         .censor-probe-row.table-head { background: rgba(255,255,255,.04); }
         /* Вес и размер держим как в остальных таблицах админки (16px/500-600):
@@ -5272,12 +5308,15 @@
                         <section class="card"><div id="client-rwms-body" class="info-card muted">Откройте вкладку, чтобы сравнить БД и панель.</div></section>
                     </div>
                     <div class="client-section ${section === 'message' ? 'active' : ''}" data-client-section="message">
-                        <section class="card">
-                            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
-                                <textarea id="client-dm-text" class="input" rows="3" style="flex:1;min-width:260px;" placeholder="Сообщение пользователю (отправят оба бота)"></textarea>
-                                <button class="btn" type="button" id="client-dm-send"><i class="fas fa-paper-plane"></i>Отправить</button>
+                        <section class="card client-dm">
+                            <div class="client-dm-compose">
+                                <textarea id="client-dm-text" class="input" rows="3" placeholder="Сообщение пользователю"></textarea>
+                                <div class="client-dm-compose-foot">
+                                    <span class="client-dm-compose-hint"><i class="fas fa-circle-info"></i>Отправят оба бота от имени поддержки</span>
+                                    <button class="btn" type="button" id="client-dm-send"><i class="fas fa-paper-plane"></i>Отправить</button>
+                                </div>
                             </div>
-                            <div id="client-dm-history" style="margin-top:12px;"></div>
+                            <div id="client-dm-history" class="client-dm-history"></div>
                         </section>
                     </div>
                 </div>
@@ -5320,15 +5359,28 @@
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error();
                 const items = payload.result.items || [];
-                target.className = '';
-                target.innerHTML = items.length ? items.map((item) => `
-                    <div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px;align-items:baseline;">
-                        <span style="color:var(--muted);white-space:nowrap;min-width:130px;">${escapeHtml(item.ts)}</span>
-                        <span style="min-width:110px;color:rgba(255,199,0,.85);white-space:nowrap;"><i class="fas ${TIMELINE_CATEGORY_ICONS[item.category] || 'fa-circle-dot'}"></i> ${escapeHtml(item.category)}</span>
-                        <span>${escapeHtml(item.title)}${Object.keys(item.details || {}).length ? ` <span style="color:var(--muted);">${escapeHtml(JSON.stringify(item.details))}</span>` : ''}</span>
-                    </div>`).join('') : '<div class="info-card muted">Событий нет.</div>';
+                if (!items.length) {
+                    target.className = 'info-card muted';
+                    target.textContent = 'Событий нет.';
+                    return;
+                }
+                target.className = 'client-timeline';
+                target.innerHTML = items.map((item) => {
+                    // event_type почти всегда дублирует заголовок — не показываем этот шум.
+                    const detailChips = Object.entries(item.details || {})
+                        .filter(([key, value]) => !(key === 'event_type' && String(value) === item.title))
+                        .map(([key, value]) => `<span class="client-timeline-detail">${escapeHtml(key)}: ${escapeHtml(value === null ? '—' : (typeof value === 'object' ? JSON.stringify(value) : value))}</span>`)
+                        .join('');
+                    return `
+                    <div class="client-timeline-row">
+                        <span class="client-timeline-ts">${escapeHtml(item.ts)}</span>
+                        <span class="client-timeline-cat"><i class="fas ${TIMELINE_CATEGORY_ICONS[item.category] || 'fa-circle-dot'}"></i>${escapeHtml(item.category)}</span>
+                        <span class="client-timeline-text">${escapeHtml(item.title)}${detailChips}</span>
+                    </div>`;
+                }).join('');
             } catch (error) {
                 delete target.dataset.loaded;
+                target.className = '';
                 target.innerHTML = '<div class="info-card red">Не удалось загрузить таймлайн</div>';
             }
         }
@@ -5345,23 +5397,26 @@
                 if (payload.status !== 'ok') throw new Error();
                 const {user, panel, diffs} = payload.result;
                 const diffRows = (diffs || []).map((diff) => `
-                    <div class="info-card red" style="margin-top:8px;">
-                        <b>${escapeHtml(diff.label)}</b><br>
-                        БД: ${escapeHtml(diff.db)} · Панель: ${escapeHtml(diff.panel)}
+                    <div class="client-sync-diff">
+                        <i class="fas fa-triangle-exclamation"></i>
+                        <div>
+                            <b>${escapeHtml(diff.label)}</b>
+                            <span>БД: ${escapeHtml(diff.db)} · Панель: ${escapeHtml(diff.panel)}</span>
+                        </div>
                     </div>`).join('');
-                target.className = '';
+                target.className = 'client-sync';
                 target.innerHTML = `
                     <div class="metrics-grid two">
                         ${metric('БД: окончание', escapeHtml(user.expire_at || '—'), 'fa-database')}
                         ${metric('Панель', panel ? `${escapeHtml(panel.expire_at || '—')} · ${escapeHtml(panel.status)}` : 'нет подписки', 'fa-server')}
                     </div>
-                    ${diffRows || '<div class="info-card" style="margin-top:8px;">✅ Расхождений нет.</div>'}
-                    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+                    ${diffRows || '<div class="client-sync-ok"><i class="fas fa-circle-check"></i>Расхождений нет</div>'}
+                    <div class="client-sync-actions">
                         <button class="btn" type="button" data-rwms-sync-action="push_to_panel" ${panel ? '' : 'disabled'}><i class="fas fa-upload"></i>БД → панель</button>
                         <button class="btn" type="button" data-rwms-sync-action="pull_from_panel" ${panel ? '' : 'disabled'}><i class="fas fa-download"></i>Панель → БД</button>
-                        <button class="btn" type="button" data-rwms-sync-action="refresh"><i class="fas fa-rotate"></i>Обновить</button>
-                    </div>
-                    <div style="font-size:11px;color:var(--muted);margin-top:6px;">Синхронизируется только дата окончания и статус; подписки не пересоздаются и не удаляются.</div>`;
+                        <button class="btn btn-secondary" type="button" data-rwms-sync-action="refresh"><i class="fas fa-rotate"></i>Обновить</button>
+                        <span class="client-sync-hint">Синхронизируется только дата окончания и статус; подписки не пересоздаются и не удаляются.</span>
+                    </div>`;
                 target.querySelectorAll('[data-rwms-sync-action]').forEach((button) => button.addEventListener('click', async () => {
                     const action = button.dataset.rwmsSyncAction;
                     if (action === 'refresh') return loadClientRwmsSync(true);
@@ -5377,6 +5432,7 @@
                 }));
             } catch (error) {
                 delete target.dataset.loaded;
+                target.className = '';
                 target.innerHTML = '<div class="info-card red">Не удалось сравнить с панелью</div>';
             }
         }
@@ -5391,11 +5447,20 @@
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error();
                 const rows = payload.result || [];
-                target.innerHTML = rows.length ? rows.map((row) => `
-                    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px;">
-                        <div style="color:var(--muted);">${escapeHtml(row.created_at)} · ${escapeHtml(row.created_by)} · ${(row.deliveries || []).map((delivery) => `${delivery.status === 'sent' ? '✅' : delivery.status === 'failed' ? '❌' : '⏳'} бот ${escapeHtml(delivery.bot)}`).join(' · ') || '⏳ ждёт доставки'}</div>
-                        <div style="margin-top:3px;white-space:pre-wrap;">${escapeHtml(row.text)}</div>
-                    </div>`).join('') : '<div class="info-card muted">Сообщений ещё не было.</div>';
+                target.innerHTML = rows.length ? rows.map((row) => {
+                    const deliveries = (row.deliveries || [])
+                        .map((delivery) => `<span class="client-dm-delivery">${delivery.status === 'sent' ? '✅' : delivery.status === 'failed' ? '❌' : '⏳'} бот ${escapeHtml(delivery.bot)}</span>`)
+                        .join('') || '<span class="client-dm-delivery">⏳ ждёт доставки</span>';
+                    return `
+                    <div class="client-dm-item">
+                        <div class="client-dm-meta">
+                            <span>${escapeHtml(row.created_at)}</span>
+                            <span class="client-dm-author">${escapeHtml(row.created_by)}</span>
+                            ${deliveries}
+                        </div>
+                        <div class="client-dm-text">${escapeHtml(row.text)}</div>
+                    </div>`;
+                }).join('') : '<div class="client-dm-empty">Сообщений ещё не было.</div>';
             } catch (error) {
                 target.innerHTML = '<div class="info-card red">Не удалось загрузить сообщения</div>';
             }
