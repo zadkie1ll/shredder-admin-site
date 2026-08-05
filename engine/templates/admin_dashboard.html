@@ -1444,14 +1444,19 @@
         </div>
         <nav class="sidebar-nav" aria-label="Разделы админки">
             <span class="nav-section-label">Обзор</span>
-            {% if support_admin_is_full_admin %}
+            {% if support_admin_is_full_admin or support_admin_is_marketer %}
                 <button class="tab-btn active" data-tab="stats"><i class="fas fa-chart-line"></i><span>Аналитика</span></button>
                 <button class="tab-btn" data-tab="acquisition"><i class="fas fa-magnet"></i><span>Привлечение</span></button>
             {% endif %}
             <span class="nav-section-label">Управление</span>
-            <button class="tab-btn {% if not support_admin_is_full_admin %}active{% endif %}" data-tab="user-payments"><i class="fas fa-user"></i><span>Клиент</span></button>
+            <button class="tab-btn {% if not support_admin_is_full_admin and not support_admin_is_marketer %}active{% endif %}" data-tab="user-payments"><i class="fas fa-user"></i><span>Клиент</span></button>
             <button class="tab-btn" data-tab="payment-info"><i class="fas fa-credit-card"></i><span>Найти платёж</span></button>
+            {% if support_admin_is_full_admin or support_admin_is_marketer %}
+                <button class="tab-btn" data-tab="broadcasts"><i class="fas fa-bullhorn"></i><span>Рассылки</span></button>
+                <button class="tab-btn" data-tab="promocodes"><i class="fas fa-ticket"></i><span>Промокоды</span></button>
+            {% endif %}
             {% if support_admin_is_full_admin %}
+                <button class="tab-btn" data-tab="bulk-actions"><i class="fas fa-layer-group"></i><span>Массовые операции</span></button>
                 <button class="tab-btn" data-tab="system"><i class="fas fa-sliders"></i><span>Система</span></button>
                 <button class="tab-btn" data-tab="config-templates"><i class="fas fa-file-code"></i><span>Конфиги</span></button>
                 <button class="tab-btn" data-tab="node-traffic"><i class="fas fa-tower-broadcast"></i><span>Трафик нод</span></button>
@@ -1484,6 +1489,16 @@
         data-ua-rules-url="{% url 'support_admin_api_ua_rules' %}"
         data-traffic-nodes-url="{% url 'support_admin_api_traffic_nodes' %}"
         data-node-traffic-url="{% url 'support_admin_api_node_traffic' %}"
+        data-top-payments-url="{% url 'support_admin_api_top_payments' %}"
+        data-audit-log-url="{% url 'support_admin_api_audit_log' %}"
+        data-segments-url="{% url 'support_admin_api_segments' %}"
+        data-broadcasts-url="{% url 'support_admin_api_broadcasts' %}"
+        data-bulk-url="{% url 'support_admin_api_bulk' %}"
+        data-promocodes-url="{% url 'support_admin_api_promocodes' %}"
+        data-accounts-url="{% url 'support_admin_api_accounts' %}"
+        data-user-timeline-url="{% url 'support_admin_api_user_timeline' %}"
+        data-rwms-sync-url="{% url 'support_admin_api_rwms_sync' %}"
+        data-direct-message-url="{% url 'support_admin_api_direct_message' %}"
         data-censor-checks-url="{% url 'support_admin_api_censor_checks' %}"
         data-censor-check-runs-url="{% url 'support_admin_api_censor_check_runs' %}"
         data-ripe-keys-url="{% url 'support_admin_api_ripe_keys' %}"
@@ -1510,7 +1525,7 @@
             </div>
         </header>
 
-        {% if support_admin_is_full_admin %}
+        {% if support_admin_is_full_admin or support_admin_is_marketer %}
         <section id="panel-stats" class="tab-panel active">
             <header class="panel-header">
                 <h1 class="admin-title">Аналитика</h1>
@@ -1746,6 +1761,8 @@
                 <button type="button" class="subtab" data-subtab="acq-pushes" role="tab"><i class="fas fa-bell"></i>Пуши</button>
                 <button type="button" class="subtab" data-subtab="acq-patterns" role="tab"><i class="fas fa-clock"></i>Паттерны</button>
                 <button type="button" class="subtab" data-subtab="acq-journey" role="tab"><i class="fas fa-route"></i>Путь клиента</button>
+                <button type="button" class="subtab" data-subtab="acq-mrr" role="tab"><i class="fas fa-arrows-rotate"></i>MRR и рекурренты</button>
+                <button type="button" class="subtab" data-subtab="acq-payhealth" role="tab"><i class="fas fa-heart-pulse"></i>Здоровье платежей</button>
             </div>
 
             <details id="acq-new-revenue-help" class="metrics-legend">
@@ -2033,9 +2050,66 @@
                     <div id="acq-tariff-paths-table" style="margin-top:12px;overflow-x:auto;"></div>
                 </div>
             </div>
+
+            <div id="subpanel-acq-mrr" class="subtab-panel">
+                <div class="card" style="padding:18px;margin-bottom:14px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <span class="chart-title-wrap"><strong>MRR по покрытию (recognized), помесячно</strong></span>
+                        <select id="acq-mrr-months" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                            <option value="12">12 месяцев</option>
+                            <option value="24" selected>24 месяца</option>
+                            <option value="36">36 месяцев</option>
+                        </select>
+                    </div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        Каждая подписочная оплата (месяц/3/6/год) равномерно распределена на оплаченные месяцы:
+                        год за 1799 ₽ в январе даёт ~150 ₽/мес до декабря. Короткие тарифы (день/3 дня) не участвуют.
+                        Хвост справа — уже оплаченное будущее покрытие текущих клиентов.
+                    </div>
+                    <div id="acq-mrr-cards" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;"></div>
+                    <canvas id="acq-mrr-chart" style="width:100%;height:260px;display:block;margin-top:10px;"></canvas>
+                </div>
+                <div class="card" style="padding:18px;">
+                    <span class="chart-title-wrap"><strong>Рекуррентная база и churn</strong></span>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        История восстановлена из событий: <b>активная база</b> — рекурренты с автосписанием
+                        за последние 12 месяцев без более поздней отмены; <b>churn</b> — отмены месяца ÷ активная база
+                        на конец прошлого месяца. Отмена и успех в одном месяце консервативно считаются отменой.
+                    </div>
+                    <canvas id="acq-mrr-churn-chart" style="width:100%;height:240px;display:block;margin-top:10px;"></canvas>
+                    <div id="acq-mrr-table" style="margin-top:12px;overflow-x:auto;"></div>
+                </div>
+            </div>
+
+            <div id="subpanel-acq-payhealth" class="subtab-panel">
+                <div class="card" style="padding:18px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <span class="chart-title-wrap"><strong>Здоровье платежей: создано → оплачено</strong></span>
+                        <div style="display:flex;gap:6px;align-items:center;">
+                            <select id="acq-payhealth-days" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                                <option value="30">30 дней</option>
+                                <option value="90" selected>90 дней</option>
+                                <option value="180">180 дней</option>
+                            </select>
+                            <select id="acq-payhealth-group" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                                <option value="day">по дням</option>
+                                <option value="week" selected>по неделям</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        ЮКасса — записи yk_payments (успех/отмена приходят вебхуком); WATA — созданные инвойсы
+                        против оплаченных транзакций; автосписания — события autopay_success/failure.
+                        Падение success rate шлюза — прямая потеря денег: сверяйте с датами релизов и сбоев шлюза.
+                    </div>
+                    <div id="acq-payhealth-cards" style="display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;"></div>
+                    <canvas id="acq-payhealth-chart" style="width:100%;height:260px;display:block;margin-top:10px;"></canvas>
+                    <div id="acq-payhealth-table" style="margin-top:12px;overflow-x:auto;"></div>
+                </div>
+            </div>
         </section>
         {% endif %}
-        <section id="panel-user-payments" class="tab-panel {% if not support_admin_is_full_admin %}active{% endif %}">
+        <section id="panel-user-payments" class="tab-panel {% if not support_admin_is_full_admin and not support_admin_is_marketer %}active{% endif %}">
             <header class="panel-header">
                 <h1 class="admin-title">Клиент</h1>
                 <p class="admin-subtitle">Профиль, подписка, платежи и рефералы — всё по одному пользователю</p>
@@ -2072,9 +2146,138 @@
                 </footer>
             </section>
             <div id="payment-info-result"></div>
+            {% if support_admin_is_full_admin %}
+            <section class="card payments-board" style="margin-top:14px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <h2 class="payments-board-title" style="margin:0;">Топ клиентов по платежам</h2>
+                    <select id="top-payments-limit" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                        <option value="10" selected>топ-10</option>
+                        <option value="25">топ-25</option>
+                        <option value="50">топ-50</option>
+                    </select>
+                </div>
+                <div id="top-payments-table" style="margin-top:10px;overflow-x:auto;"></div>
+            </section>
+            {% endif %}
         </section>
 
+        {% if support_admin_is_full_admin or support_admin_is_marketer %}
+        <section id="panel-broadcasts" class="tab-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Рассылки</h1>
+                <p class="admin-subtitle">Сегментные рассылки пользователям через ботов</p>
+            </header>
+            <section class="card" style="padding:18px;margin-bottom:14px;">
+                <h2 class="system-card-title">Новая рассылка</h2>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px;">
+                    <input class="input" id="broadcast-title" placeholder="Название (видно только админам)">
+                    <select id="broadcast-segment" class="input"><option value="">Сегмент…</option></select>
+                </div>
+                <div id="broadcast-segment-hint" style="font-size:11px;color:var(--muted);margin-top:6px;"></div>
+                <textarea class="input" id="broadcast-text" rows="5" style="margin-top:10px;width:100%;" placeholder="Текст сообщения (HTML: <b>, <i>, ссылки)"></textarea>
+                <div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:10px;">
+                    <input class="input" id="broadcast-btn-text" placeholder="Текст кнопки (необязательно)">
+                    <input class="input" id="broadcast-btn-url" placeholder="https://ссылка кнопки">
+                </div>
+                <div style="display:flex;gap:10px;margin-top:12px;align-items:center;flex-wrap:wrap;">
+                    <button class="btn" type="button" id="broadcast-create"><i class="fas fa-paper-plane"></i>Запустить рассылку</button>
+                    <span style="font-size:11px;color:var(--muted);">Отправка начнётся сразу; шлют оба бота батчами с паузами, ~5 сообщений в секунду.</span>
+                </div>
+            </section>
+            <section class="card" style="padding:18px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <h2 class="system-card-title" style="margin:0;">История рассылок</h2>
+                    <button type="button" class="subtab" id="broadcasts-refresh" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Обновить</button>
+                </div>
+                <div id="broadcasts-list" style="margin-top:12px;"></div>
+            </section>
+        </section>
+
+        <section id="panel-promocodes" class="tab-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Промокоды</h1>
+                <p class="admin-subtitle">Дни подписки или скидка % на первую покупку; купоны партиями</p>
+            </header>
+            <section class="card" style="padding:18px;margin-bottom:14px;">
+                <h2 class="system-card-title">Новый промокод</h2>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:10px;">
+                    <input class="input" id="promo-code" placeholder="Код (пусто — сгенерировать)">
+                    <select id="promo-type" class="input">
+                        <option value="days">Дни подписки</option>
+                        <option value="discount">Скидка % на первую покупку</option>
+                    </select>
+                    <input class="input" id="promo-value" type="number" min="1" placeholder="Дней / %">
+                    <input class="input" id="promo-max-uses" type="number" min="0" placeholder="Лимит активаций (0=∞)">
+                    <input class="input" id="promo-valid-until" type="date" title="Действует до">
+                </div>
+                <div style="display:flex;gap:14px;margin-top:10px;align-items:center;flex-wrap:wrap;">
+                    <label style="font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;"><input type="checkbox" id="promo-first-only">Только не платившим</label>
+                    <input class="input" id="promo-comment" placeholder="Комментарий (кому выдан)" style="flex:1;min-width:200px;">
+                    <button class="btn" type="button" id="promo-create"><i class="fas fa-plus"></i>Создать</button>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;">
+                    Скидка действует только на первую покупку; автопродление заводится по обычной цене тарифа.
+                    Активация: команда <code>/promo КОД</code> в боте или deep-link из таблицы ниже —
+                    его удобно вешать кнопкой на рассылку.
+                </div>
+            </section>
+            <section class="card" style="padding:18px;margin-bottom:14px;">
+                <h2 class="system-card-title">Партия купонов</h2>
+                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px;">
+                    <input class="input" id="batch-name" placeholder="Название партии">
+                    <select id="batch-type" class="input">
+                        <option value="days">Дни подписки</option>
+                        <option value="discount">Скидка %</option>
+                    </select>
+                    <input class="input" id="batch-value" type="number" min="1" placeholder="Дней / %">
+                    <input class="input" id="batch-count" type="number" min="1" max="500" placeholder="Сколько кодов">
+                    <button class="btn" type="button" id="batch-create"><i class="fas fa-layer-group"></i>Сгенерировать</button>
+                </div>
+                <div style="font-size:11px;color:var(--muted);margin-top:6px;">Каждый купон одноразовый; список кодов со ссылками выгружается файлом.</div>
+                <div id="promo-batches" style="margin-top:12px;overflow-x:auto;"></div>
+            </section>
+            <section class="card" style="padding:18px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                    <h2 class="system-card-title" style="margin:0;">Промокоды</h2>
+                    <button type="button" class="subtab" id="promo-refresh" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Обновить</button>
+                </div>
+                <div id="promo-table" style="margin-top:12px;overflow-x:auto;"></div>
+            </section>
+        </section>
+
+        {% endif %}
         {% if support_admin_is_full_admin %}
+        <section id="panel-bulk-actions" class="tab-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Массовые операции</h1>
+                <p class="admin-subtitle">До 500 пользователей за раз, с обязательным dry-run</p>
+            </header>
+            <section class="card" style="padding:18px;">
+                <div style="font-size:12px;color:var(--muted);line-height:1.5;">
+                    Вставьте список пользователей — telegram_id, username или email, по одному в строке
+                    (или через запятую). Сначала выполните <b>предпросмотр</b>: он покажет, кто найден и что
+                    именно произойдёт, ничего не меняя.
+                </div>
+                <textarea class="input" id="bulk-ids" rows="6" style="margin-top:10px;width:100%;" placeholder="123456789&#10;subscription-username&#10;user@example.com"></textarea>
+                <div style="display:flex;gap:10px;margin-top:10px;align-items:center;flex-wrap:wrap;">
+                    <select id="bulk-action" class="input" style="max-width:280px;">
+                        <option value="extend_days">Продлить подписку на N дней</option>
+                        <option value="block">Заблокировать (DISABLED + без автоплатежа)</option>
+                        <option value="unblock">Разблокировать</option>
+                        <option value="referral_block">Заблокировать рефералку</option>
+                        <option value="referral_unblock">Разблокировать рефералку</option>
+                    </select>
+                    <input class="input" id="bulk-days" type="number" min="1" max="365" placeholder="Дней" style="max-width:110px;">
+                    <input class="input" id="bulk-reason" placeholder="Причина (для блокировок)" style="max-width:260px;">
+                </div>
+                <div style="display:flex;gap:10px;margin-top:12px;flex-wrap:wrap;">
+                    <button class="btn" type="button" id="bulk-preview"><i class="fas fa-eye"></i>Предпросмотр (dry-run)</button>
+                    <button class="btn btn-danger" type="button" id="bulk-apply" disabled><i class="fas fa-bolt"></i>Применить</button>
+                </div>
+                <div id="bulk-result" style="margin-top:14px;overflow-x:auto;"></div>
+            </section>
+        </section>
+
         <section id="panel-system" class="tab-panel">
             <header class="panel-header">
                 <h1 class="admin-title">Система</h1>
@@ -2086,6 +2289,9 @@
                 <button type="button" class="subtab" data-subtab="sys-payment" role="tab"><i class="fas fa-credit-card"></i>Платёжные шлюзы</button>
                 <button type="button" class="subtab" data-subtab="sys-referral" role="tab"><i class="fas fa-network-wired"></i>Рефералка</button>
                 <button type="button" class="subtab" data-subtab="sys-alerts" role="tab"><i class="fas fa-triangle-exclamation"></i>Алерты</button>
+                <button type="button" class="subtab" data-subtab="sys-sync" role="tab"><i class="fas fa-arrows-rotate"></i>Синхронизация</button>
+                <button type="button" class="subtab" data-subtab="sys-audit" role="tab"><i class="fas fa-clipboard-list"></i>Аудит</button>
+                <button type="button" class="subtab" data-subtab="sys-staff" role="tab"><i class="fas fa-users-gear"></i>Сотрудники</button>
                 <button type="button" class="subtab" data-subtab="sys-general" role="tab"><i class="fas fa-sliders"></i>Общие</button>
             </div>
 
@@ -2201,6 +2407,62 @@
                 <section class="card system-card system-settings-card">
                     <h2 class="system-card-title">Пороги трафика</h2>
                     <div class="settings-list" data-settings-group="alerts"></div>
+                </section>
+            </div>
+
+            <div id="subpanel-sys-sync" class="subtab-panel">
+                <section class="card system-card">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <h2 class="system-card-title" style="margin:0;">Расхождения БД ↔ Remnawave</h2>
+                        <button type="button" class="subtab" id="sys-sync-refresh" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Обновить</button>
+                    </div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        Фоновая сверка user-notify: активные в БД пользователи, которых нет в панели,
+                        с другой датой окончания или со статусом DISABLED. Ничего не чинится автоматически —
+                        открой карточку клиента → «Синхронизация» и выбери направление.
+                    </div>
+                    <div id="sys-sync-table" style="margin-top:12px;overflow-x:auto;"></div>
+                </section>
+            </div>
+
+            <div id="subpanel-sys-staff" class="subtab-panel">
+                <section class="card system-card">
+                    <h2 class="system-card-title">Аккаунты сотрудников</h2>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        Роли: <b>full</b> — всё; <b>marketer</b> — аналитика, привлечение, рассылки, промокоды;
+                        <b>support</b> — тикеты и карточка клиента. Вход — логин+пароль на странице входа админки.
+                        Общие пароли из env продолжают работать как запасной вход.
+                    </div>
+                    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin-top:12px;">
+                        <input class="input" id="staff-login" placeholder="Логин">
+                        <input class="input" id="staff-name" placeholder="Имя (необязательно)">
+                        <select id="staff-role" class="input">
+                            <option value="support">support</option>
+                            <option value="marketer">marketer</option>
+                            <option value="full">full</option>
+                        </select>
+                        <input class="input" id="staff-password" type="password" placeholder="Пароль (мин. 8)">
+                        <button class="btn" type="button" id="staff-create"><i class="fas fa-user-plus"></i>Создать</button>
+                    </div>
+                    <div id="staff-table" style="margin-top:14px;overflow-x:auto;"></div>
+                </section>
+            </div>
+
+            <div id="subpanel-sys-audit" class="subtab-panel">
+                <section class="card system-card">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <h2 class="system-card-title" style="margin:0;">Журнал действий админов</h2>
+                        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                            <select id="sys-audit-days" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                                <option value="7">7 дней</option>
+                                <option value="30" selected>30 дней</option>
+                                <option value="90">90 дней</option>
+                            </select>
+                            <button type="button" class="subtab" id="sys-audit-refresh" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Обновить</button>
+                            <a id="sys-audit-csv" class="subtab" style="border:1px solid rgba(255,255,255,.2);border-radius:8px;text-decoration:none;" href="#">CSV</a>
+                        </div>
+                    </div>
+                    <div id="sys-audit-table" style="margin-top:12px;overflow-x:auto;"></div>
                 </section>
             </div>
 
@@ -3051,7 +3313,9 @@
             const panel = document.getElementById(`panel-${tabId}`);
             if (panel) panel.classList.add('active');
             if (tabId === 'reply-templates') loadReplyTemplates();
-            if (tabId === 'payment-info') loadPaymentsList();
+            if (tabId === 'payment-info') { loadPaymentsList(); loadTopPayments(); }
+            if (tabId === 'broadcasts') { loadBroadcastSegments(); loadBroadcastsList(); }
+            if (tabId === 'promocodes') loadPromocodes();
             if (tabId === 'config-templates') {
                 loadConfigTemplates();
                 loadUaRules();
@@ -4991,6 +5255,9 @@
                     <div class="subtabs client-subtabs" role="tablist" aria-label="Разделы клиента">
                         <button type="button" class="subtab ${section === 'payments' ? 'active' : ''}" data-client-subtab="payments" role="tab"><i class="fas fa-receipt"></i>Платежи (${(result.history || []).length})</button>
                         <button type="button" class="subtab ${section === 'referrals' ? 'active' : ''}" data-client-subtab="referrals" role="tab"><i class="fas fa-network-wired"></i>Рефералы${typeof refCount === 'number' ? ` (${refCount})` : ''}</button>
+                        <button type="button" class="subtab ${section === 'timeline' ? 'active' : ''}" data-client-subtab="timeline" role="tab"><i class="fas fa-timeline"></i>Таймлайн</button>
+                        <button type="button" class="subtab ${section === 'rwmssync' ? 'active' : ''}" data-client-subtab="rwmssync" role="tab"><i class="fas fa-arrows-rotate"></i>Синхронизация</button>
+                        <button type="button" class="subtab ${section === 'message' ? 'active' : ''}" data-client-subtab="message" role="tab"><i class="fas fa-paper-plane"></i>Сообщение</button>
                     </div>
                     <div class="client-section ${section === 'payments' ? 'active' : ''}" data-client-section="payments">
                         ${clientPaymentsSectionHtml(result)}
@@ -4998,8 +5265,27 @@
                     <div class="client-section ${section === 'referrals' ? 'active' : ''}" data-client-section="referrals">
                         <div class="result-stack">${clientReferralsSectionHtml(refPayload?.result)}</div>
                     </div>
+                    <div class="client-section ${section === 'timeline' ? 'active' : ''}" data-client-section="timeline">
+                        <section class="card"><div id="client-timeline-body" class="info-card muted">Откройте вкладку, чтобы загрузить таймлайн.</div></section>
+                    </div>
+                    <div class="client-section ${section === 'rwmssync' ? 'active' : ''}" data-client-section="rwmssync">
+                        <section class="card"><div id="client-rwms-body" class="info-card muted">Откройте вкладку, чтобы сравнить БД и панель.</div></section>
+                    </div>
+                    <div class="client-section ${section === 'message' ? 'active' : ''}" data-client-section="message">
+                        <section class="card">
+                            <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-start;">
+                                <textarea id="client-dm-text" class="input" rows="3" style="flex:1;min-width:260px;" placeholder="Сообщение пользователю (отправят оба бота)"></textarea>
+                                <button class="btn" type="button" id="client-dm-send"><i class="fas fa-paper-plane"></i>Отправить</button>
+                            </div>
+                            <div id="client-dm-history" style="margin-top:12px;"></div>
+                        </section>
+                    </div>
                 </div>
             `;
+            document.getElementById('client-dm-send')?.addEventListener('click', sendClientDirectMessage);
+            if (section === 'timeline') loadClientTimeline();
+            if (section === 'rwmssync') loadClientRwmsSync();
+            if (section === 'message') loadClientDirectMessages();
             if (refPayload?.result?.graph) {
                 drawReferralGraph(document.getElementById('referral-graph'), refPayload.result.graph);
             }
@@ -5012,7 +5298,458 @@
             document.querySelectorAll('#user-payments-result [data-client-section]').forEach((block) => {
                 block.classList.toggle('active', block.dataset.clientSection === sectionName);
             });
+            if (sectionName === 'timeline') loadClientTimeline();
+            if (sectionName === 'rwmssync') loadClientRwmsSync();
+            if (sectionName === 'message') loadClientDirectMessages();
         }
+
+        const TIMELINE_CATEGORY_ICONS = {
+            'Платежи': 'fa-credit-card', 'Подписка': 'fa-id-card', 'Пуши': 'fa-bell',
+            'Рефералка': 'fa-network-wired', 'Трафик': 'fa-signal', 'Установка': 'fa-download',
+            'Блокировки': 'fa-ban', 'Поддержка': 'fa-headset', 'Кабинет': 'fa-house-user',
+        };
+
+        async function loadClientTimeline() {
+            const target = document.getElementById('client-timeline-body');
+            if (!target || target.dataset.loaded) return;
+            target.dataset.loaded = '1';
+            target.innerHTML = inlineLoading('Собираем таймлайн...');
+            try {
+                const params = new URLSearchParams({q: clientCardState.q});
+                const response = await fetch(`${main.dataset.userTimelineUrl}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error();
+                const items = payload.result.items || [];
+                target.className = '';
+                target.innerHTML = items.length ? items.map((item) => `
+                    <div style="display:flex;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px;align-items:baseline;">
+                        <span style="color:var(--muted);white-space:nowrap;min-width:130px;">${escapeHtml(item.ts)}</span>
+                        <span style="min-width:110px;color:rgba(255,199,0,.85);white-space:nowrap;"><i class="fas ${TIMELINE_CATEGORY_ICONS[item.category] || 'fa-circle-dot'}"></i> ${escapeHtml(item.category)}</span>
+                        <span>${escapeHtml(item.title)}${Object.keys(item.details || {}).length ? ` <span style="color:var(--muted);">${escapeHtml(JSON.stringify(item.details))}</span>` : ''}</span>
+                    </div>`).join('') : '<div class="info-card muted">Событий нет.</div>';
+            } catch (error) {
+                delete target.dataset.loaded;
+                target.innerHTML = '<div class="info-card red">Не удалось загрузить таймлайн</div>';
+            }
+        }
+
+        async function loadClientRwmsSync(force = false) {
+            const target = document.getElementById('client-rwms-body');
+            if (!target || (target.dataset.loaded && !force)) return;
+            target.dataset.loaded = '1';
+            target.innerHTML = inlineLoading('Сравниваем БД и панель...');
+            try {
+                const params = new URLSearchParams({q: clientCardState.q});
+                const response = await fetch(`${main.dataset.rwmsSyncUrl}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error();
+                const {user, panel, diffs} = payload.result;
+                const diffRows = (diffs || []).map((diff) => `
+                    <div class="info-card red" style="margin-top:8px;">
+                        <b>${escapeHtml(diff.label)}</b><br>
+                        БД: ${escapeHtml(diff.db)} · Панель: ${escapeHtml(diff.panel)}
+                    </div>`).join('');
+                target.className = '';
+                target.innerHTML = `
+                    <div class="metrics-grid two">
+                        ${metric('БД: окончание', escapeHtml(user.expire_at || '—'), 'fa-database')}
+                        ${metric('Панель', panel ? `${escapeHtml(panel.expire_at || '—')} · ${escapeHtml(panel.status)}` : 'нет подписки', 'fa-server')}
+                    </div>
+                    ${diffRows || '<div class="info-card" style="margin-top:8px;">✅ Расхождений нет.</div>'}
+                    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;">
+                        <button class="btn" type="button" data-rwms-sync-action="push_to_panel" ${panel ? '' : 'disabled'}><i class="fas fa-upload"></i>БД → панель</button>
+                        <button class="btn" type="button" data-rwms-sync-action="pull_from_panel" ${panel ? '' : 'disabled'}><i class="fas fa-download"></i>Панель → БД</button>
+                        <button class="btn" type="button" data-rwms-sync-action="refresh"><i class="fas fa-rotate"></i>Обновить</button>
+                    </div>
+                    <div style="font-size:11px;color:var(--muted);margin-top:6px;">Синхронизируется только дата окончания и статус; подписки не пересоздаются и не удаляются.</div>`;
+                target.querySelectorAll('[data-rwms-sync-action]').forEach((button) => button.addEventListener('click', async () => {
+                    const action = button.dataset.rwmsSyncAction;
+                    if (action === 'refresh') return loadClientRwmsSync(true);
+                    if (!confirm(action === 'push_to_panel' ? 'Записать дату из БД в панель?' : 'Записать дату из панели в БД?')) return;
+                    const body = new FormData();
+                    body.append('csrfmiddlewaretoken', csrfToken);
+                    body.append('q', clientCardState.q);
+                    body.append('action', action);
+                    const postResponse = await fetch(main.dataset.rwmsSyncUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                    const postPayload = await postResponse.json();
+                    showAdminToast(postPayload.status === 'ok' ? 'Синхронизировано' : (postPayload.message || 'Ошибка'), postPayload.status === 'ok' ? 'success' : 'error');
+                    loadClientRwmsSync(true);
+                }));
+            } catch (error) {
+                delete target.dataset.loaded;
+                target.innerHTML = '<div class="info-card red">Не удалось сравнить с панелью</div>';
+            }
+        }
+
+        async function loadClientDirectMessages() {
+            const target = document.getElementById('client-dm-history');
+            if (!target) return;
+            target.innerHTML = inlineLoading('Загружаем историю...');
+            try {
+                const params = new URLSearchParams({q: clientCardState.q});
+                const response = await fetch(`${main.dataset.directMessageUrl}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error();
+                const rows = payload.result || [];
+                target.innerHTML = rows.length ? rows.map((row) => `
+                    <div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05);font-size:12px;">
+                        <div style="color:var(--muted);">${escapeHtml(row.created_at)} · ${escapeHtml(row.created_by)} · ${(row.deliveries || []).map((delivery) => `${delivery.status === 'sent' ? '✅' : delivery.status === 'failed' ? '❌' : '⏳'} бот ${escapeHtml(delivery.bot)}`).join(' · ') || '⏳ ждёт доставки'}</div>
+                        <div style="margin-top:3px;white-space:pre-wrap;">${escapeHtml(row.text)}</div>
+                    </div>`).join('') : '<div class="info-card muted">Сообщений ещё не было.</div>';
+            } catch (error) {
+                target.innerHTML = '<div class="info-card red">Не удалось загрузить сообщения</div>';
+            }
+        }
+
+        async function sendClientDirectMessage() {
+            const textInput = document.getElementById('client-dm-text');
+            const text = (textInput?.value || '').trim();
+            if (!text) return showAdminToast('Введите текст сообщения', 'error');
+            const body = new FormData();
+            body.append('csrfmiddlewaretoken', csrfToken);
+            body.append('q', clientCardState.q);
+            body.append('text', text);
+            const response = await fetch(main.dataset.directMessageUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+            const payload = await response.json();
+            if (payload.status === 'ok') {
+                textInput.value = '';
+                showAdminToast('Сообщение поставлено в очередь ботам', 'success');
+                loadClientDirectMessages();
+            } else {
+                showAdminToast(payload.message || 'Не удалось отправить', 'error');
+            }
+        }
+
+        async function loadSysSyncMismatches() {
+            const target = document.getElementById('sys-sync-table');
+            if (!target) return;
+            target.innerHTML = inlineLoading('Загружаем расхождения...');
+            try {
+                const response = await fetch(`${main.dataset.rwmsSyncUrl}?action=mismatches`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error();
+                const rows = payload.result || [];
+                const kindLabel = {missing_in_panel: 'Нет в панели', expire_diff: 'Разные даты', status_diff: 'DISABLED в панели'};
+                target.innerHTML = rows.length ? acqTable(
+                    ['Обнаружено', 'Пользователь', 'Тип', 'Детали'],
+                    rows.map((row) => [row.detected_at, escapeHtml(row.username),
+                        kindLabel[row.kind] || row.kind, escapeHtml(row.details || '')]))
+                    : '<div class="info-card">✅ Открытых расхождений нет.</div>';
+            } catch (error) {
+                target.innerHTML = '<div class="info-card red">Не удалось загрузить расхождения</div>';
+            }
+        }
+
+        async function loadSysAuditLog() {
+            const target = document.getElementById('sys-audit-table');
+            if (!target) return;
+            const days = document.getElementById('sys-audit-days')?.value || '30';
+            const csvLink = document.getElementById('sys-audit-csv');
+            if (csvLink) csvLink.href = `${main.dataset.auditLogUrl}?days=${days}&format=csv`;
+            target.innerHTML = inlineLoading('Загружаем журнал...');
+            try {
+                const response = await fetch(`${main.dataset.auditLogUrl}?days=${days}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error();
+                const rows = payload.result || [];
+                target.innerHTML = rows.length ? acqTable(
+                    ['Когда', 'Кто', 'Действие', 'Цель', 'Детали', 'IP'],
+                    rows.map((row) => [row.created_at, escapeHtml(row.actor), escapeHtml(row.action),
+                        escapeHtml(row.target || '—'),
+                        escapeHtml(JSON.stringify(row.details || {})),
+                        escapeHtml(row.ip || '—')]))
+                    : '<div class="info-card muted">Записей нет.</div>';
+            } catch (error) {
+                target.innerHTML = '<div class="info-card red">Не удалось загрузить журнал</div>';
+            }
+        }
+
+        document.querySelector('#panel-system .subtab[data-subtab="sys-sync"]')?.addEventListener('click', loadSysSyncMismatches);
+        document.querySelector('#panel-system .subtab[data-subtab="sys-audit"]')?.addEventListener('click', loadSysAuditLog);
+        document.getElementById('sys-sync-refresh')?.addEventListener('click', loadSysSyncMismatches);
+        document.getElementById('sys-audit-refresh')?.addEventListener('click', loadSysAuditLog);
+        document.getElementById('sys-audit-days')?.addEventListener('change', loadSysAuditLog);
+
+        // --- Рассылки ---------------------------------------------------------
+        let broadcastSegmentsLoaded = false;
+        async function loadBroadcastSegments() {
+            if (broadcastSegmentsLoaded) return;
+            const select = document.getElementById('broadcast-segment');
+            if (!select || !main.dataset.segmentsUrl) return;
+            try {
+                const response = await fetch(main.dataset.segmentsUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error();
+                broadcastSegmentsLoaded = true;
+                select.innerHTML = '<option value="">Сегмент…</option>' + payload.result.map((segment) =>
+                    `<option value="${segment.key}">${escapeHtml(segment.label)} — ${segment.count}</option>`).join('');
+                select.addEventListener('change', () => {
+                    const selected = payload.result.find((segment) => segment.key === select.value);
+                    document.getElementById('broadcast-segment-hint').textContent = selected
+                        ? `Получателей сейчас: ${selected.count} (с Telegram, без заблокированных)` : '';
+                });
+            } catch (error) {
+                select.innerHTML = '<option value="">Не удалось загрузить сегменты</option>';
+            }
+        }
+
+        async function loadBroadcastsList() {
+            const target = document.getElementById('broadcasts-list');
+            if (!target) return;
+            target.innerHTML = inlineLoading('Загружаем рассылки...');
+            try {
+                const response = await fetch(main.dataset.broadcastsUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error();
+                const rows = payload.result || [];
+                const statusLabel = {running: '▶️ идёт', stopped: '⏹ остановлена', done: '✅ завершена'};
+                target.innerHTML = rows.length ? rows.map((row) => `
+                    <div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;">
+                        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
+                            <div><b>${escapeHtml(row.title)}</b> · ${escapeHtml(row.segment_label)} · ${statusLabel[row.status] || row.status}</div>
+                            <div style="display:flex;gap:8px;align-items:center;">
+                                <span style="color:var(--muted);">${row.sent}/${row.total} доставлено (${row.progress_pct}%)</span>
+                                ${row.status === 'running' ? `<button class="btn btn-danger" style="padding:4px 10px;font-size:11px;" data-broadcast-stop="${row.id}">Стоп</button>` : ''}
+                            </div>
+                        </div>
+                        <div style="color:var(--muted);margin-top:4px;">${escapeHtml(row.created_at)} · ${escapeHtml(row.created_by)} · ${escapeHtml(row.text.slice(0, 160))}${row.text.length > 160 ? '…' : ''}</div>
+                    </div>`).join('') : '<div class="info-card muted">Рассылок ещё не было.</div>';
+                target.querySelectorAll('[data-broadcast-stop]').forEach((button) => button.addEventListener('click', async () => {
+                    if (!confirm('Остановить рассылку? Неотправленные сообщения не уйдут.')) return;
+                    const body = new FormData();
+                    body.append('csrfmiddlewaretoken', csrfToken);
+                    body.append('action', 'stop');
+                    body.append('id', button.dataset.broadcastStop);
+                    await fetch(main.dataset.broadcastsUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                    loadBroadcastsList();
+                }));
+                if (rows.some((row) => row.status === 'running')) {
+                    clearTimeout(loadBroadcastsList._timer);
+                    loadBroadcastsList._timer = setTimeout(loadBroadcastsList, 5000);
+                }
+            } catch (error) {
+                target.innerHTML = '<div class="info-card red">Не удалось загрузить рассылки</div>';
+            }
+        }
+
+        document.getElementById('broadcasts-refresh')?.addEventListener('click', loadBroadcastsList);
+        document.getElementById('broadcast-create')?.addEventListener('click', async () => {
+            const title = document.getElementById('broadcast-title').value.trim();
+            const segment = document.getElementById('broadcast-segment').value;
+            const text = document.getElementById('broadcast-text').value.trim();
+            const buttonText = document.getElementById('broadcast-btn-text').value.trim();
+            const buttonUrl = document.getElementById('broadcast-btn-url').value.trim();
+            if (!title || !segment || !text) return showAdminToast('Название, сегмент и текст обязательны', 'error');
+            const hint = document.getElementById('broadcast-segment-hint').textContent;
+            if (!confirm(`Запустить рассылку «${title}»?\n${hint}\nОтправка начнётся немедленно.`)) return;
+            const body = new FormData();
+            body.append('csrfmiddlewaretoken', csrfToken);
+            body.append('action', 'create');
+            body.append('title', title);
+            body.append('segment', segment);
+            body.append('text', text);
+            body.append('buttons', JSON.stringify(buttonText && buttonUrl ? [{text: buttonText, url: buttonUrl}] : []));
+            const response = await fetch(main.dataset.broadcastsUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+            const payload = await response.json();
+            if (payload.status === 'ok') {
+                showAdminToast('Рассылка запущена', 'success');
+                document.getElementById('broadcast-title').value = '';
+                document.getElementById('broadcast-text').value = '';
+                loadBroadcastsList();
+            } else {
+                showAdminToast(payload.message || 'Не удалось создать рассылку', 'error');
+            }
+        });
+
+        // --- Массовые операции ------------------------------------------------
+        let bulkPreviewDone = false;
+        function renderBulkResult(result) {
+            const target = document.getElementById('bulk-result');
+            const head = result.dry_run
+                ? `<div class="info-card" style="margin-bottom:8px;">Предпросмотр: найдено ${result.total}, не найдено ${result.missing.length}. Проверьте список и нажмите «Применить».</div>`
+                : `<div class="info-card" style="margin-bottom:8px;">Готово: применено ${result.applied}/${result.total}.</div>`;
+            const missing = result.missing.length
+                ? `<div class="info-card red" style="margin-bottom:8px;">Не найдены: ${result.missing.map(escapeHtml).join(', ')}</div>` : '';
+            target.innerHTML = head + missing + acqTable(
+                ['Кто', 'Username', 'Результат'],
+                result.rows.map((row) => [escapeHtml(row.token), escapeHtml(row.username),
+                    `${row.ok ? '✅' : '❌'} ${escapeHtml(row.message)}`]));
+        }
+
+        async function runBulk(dryRun) {
+            const ids = document.getElementById('bulk-ids').value.trim();
+            const action = document.getElementById('bulk-action').value;
+            if (!ids) return showAdminToast('Вставьте список пользователей', 'error');
+            if (action === 'extend_days' && !(Number(document.getElementById('bulk-days').value) >= 1)) {
+                return showAdminToast('Укажите число дней', 'error');
+            }
+            if (!dryRun && !confirm('Применить операцию ко всем найденным пользователям?')) return;
+            const body = new FormData();
+            body.append('csrfmiddlewaretoken', csrfToken);
+            body.append('ids', ids);
+            body.append('action', action);
+            body.append('days', document.getElementById('bulk-days').value || '');
+            body.append('reason', document.getElementById('bulk-reason').value || '');
+            body.append('dry_run', dryRun ? '1' : '0');
+            const target = document.getElementById('bulk-result');
+            target.innerHTML = inlineLoading(dryRun ? 'Считаем предпросмотр...' : 'Применяем...');
+            const response = await fetch(main.dataset.bulkUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+            const payload = await response.json();
+            if (payload.status !== 'ok') {
+                target.innerHTML = '';
+                return showAdminToast(payload.message || 'Ошибка', 'error');
+            }
+            renderBulkResult(payload.result);
+            bulkPreviewDone = dryRun;
+            document.getElementById('bulk-apply').disabled = !dryRun;
+        }
+
+        document.getElementById('bulk-preview')?.addEventListener('click', () => runBulk(true));
+        document.getElementById('bulk-apply')?.addEventListener('click', () => runBulk(false));
+        ['bulk-ids', 'bulk-action', 'bulk-days'].forEach((id) => {
+            document.getElementById(id)?.addEventListener('input', () => {
+                document.getElementById('bulk-apply').disabled = true;
+            });
+        });
+
+
+        // --- Промокоды --------------------------------------------------------
+        async function loadPromocodes() {
+            const table = document.getElementById('promo-table');
+            const batches = document.getElementById('promo-batches');
+            if (!table) return;
+            table.innerHTML = inlineLoading('Загружаем промокоды...');
+            try {
+                const response = await fetch(main.dataset.promocodesUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error();
+                const {codes, batches: batchRows} = payload.result;
+                table.innerHTML = codes.length ? acqTable(
+                    ['Код', 'Тип', 'Значение', 'Активаций', 'Действует до', 'Статус', 'Комментарий', 'Deep-link', ''],
+                    codes.map((row) => [
+                        `<code>${escapeHtml(row.code)}</code>`,
+                        row.promo_type === 'days' ? 'Дни' : 'Скидка',
+                        row.promo_type === 'days' ? `${row.value} дн.` : `${row.value}%`,
+                        `${row.used_count}${row.max_uses ? '/' + row.max_uses : ''}`,
+                        row.valid_until || '∞',
+                        row.is_active ? '🟢 активен' : '⚪ выключен',
+                        escapeHtml(row.comment || ''),
+                        `<a href="${row.deep_link}" target="_blank" style="color:var(--brand-gold);">ссылка</a>`,
+                        `<button data-promo-toggle="${row.id}" style="background:none;border:0;color:rgba(255,199,0,.8);cursor:pointer;">${row.is_active ? 'выключить' : 'включить'}</button>`,
+                    ])) : '<div class="info-card muted">Промокодов ещё нет.</div>';
+                batches.innerHTML = batchRows.length ? acqTable(
+                    ['Партия', 'Кодов', 'Активировано', 'Создана', 'Выгрузка'],
+                    batchRows.map((batch) => [escapeHtml(batch.name), batch.codes, batch.used, batch.created_at,
+                        `<a href="${main.dataset.promocodesUrl}?action=batch_links&batch_id=${batch.id}" style="color:var(--brand-gold);">txt</a>`]))
+                    : '';
+                table.querySelectorAll('[data-promo-toggle]').forEach((button) => button.addEventListener('click', async () => {
+                    const body = new FormData();
+                    body.append('csrfmiddlewaretoken', csrfToken);
+                    body.append('action', 'toggle');
+                    body.append('id', button.dataset.promoToggle);
+                    await fetch(main.dataset.promocodesUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                    loadPromocodes();
+                }));
+            } catch (error) {
+                table.innerHTML = '<div class="info-card red">Не удалось загрузить промокоды</div>';
+            }
+        }
+
+        async function submitPromoForm(action, fields) {
+            const body = new FormData();
+            body.append('csrfmiddlewaretoken', csrfToken);
+            body.append('action', action);
+            Object.entries(fields).forEach(([key, value]) => body.append(key, value));
+            const response = await fetch(main.dataset.promocodesUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+            const payload = await response.json();
+            if (payload.status === 'ok') {
+                showAdminToast('Готово', 'success');
+                loadPromocodes();
+            } else {
+                showAdminToast(payload.message || 'Ошибка', 'error');
+            }
+        }
+
+        document.getElementById('promo-refresh')?.addEventListener('click', loadPromocodes);
+        document.getElementById('promo-create')?.addEventListener('click', () => submitPromoForm('create', {
+            code: document.getElementById('promo-code').value,
+            promo_type: document.getElementById('promo-type').value,
+            value: document.getElementById('promo-value').value,
+            max_uses: document.getElementById('promo-max-uses').value || '0',
+            valid_until: document.getElementById('promo-valid-until').value,
+            first_purchase_only: document.getElementById('promo-first-only').checked ? '1' : '0',
+            comment: document.getElementById('promo-comment').value,
+        }));
+        document.getElementById('batch-create')?.addEventListener('click', () => submitPromoForm('create_batch', {
+            name: document.getElementById('batch-name').value,
+            promo_type: document.getElementById('batch-type').value,
+            value: document.getElementById('batch-value').value,
+            count: document.getElementById('batch-count').value,
+        }));
+
+
+        // --- Сотрудники -------------------------------------------------------
+        async function loadStaffAccounts() {
+            const target = document.getElementById('staff-table');
+            if (!target) return;
+            target.innerHTML = inlineLoading('Загружаем сотрудников...');
+            try {
+                const response = await fetch(main.dataset.accountsUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error();
+                const rows = payload.result || [];
+                target.innerHTML = rows.length ? acqTable(
+                    ['Логин', 'Имя', 'Роль', 'Статус', 'Последний вход', '', ''],
+                    rows.map((row) => [
+                        `<code>${escapeHtml(row.login)}</code>`,
+                        escapeHtml(row.display_name || '—'),
+                        `<select data-staff-role="${row.id}" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:6px;padding:3px 6px;font-size:11px;">
+                            ${['support', 'marketer', 'full'].map((role) => `<option value="${role}" ${role === row.role ? 'selected' : ''}>${role}</option>`).join('')}
+                        </select>`,
+                        row.is_active ? '🟢 активен' : '⚪ отключен',
+                        row.last_login_at || '—',
+                        `<button data-staff-toggle="${row.id}" style="background:none;border:0;color:rgba(255,199,0,.8);cursor:pointer;">${row.is_active ? 'отключить' : 'включить'}</button>`,
+                        `<button data-staff-password="${row.id}" style="background:none;border:0;color:rgba(255,255,255,.6);cursor:pointer;">сменить пароль</button>`,
+                    ])) : '<div class="info-card muted">Аккаунтов ещё нет — вход по общим паролям.</div>';
+                const staffPost = async (fields) => {
+                    const body = new FormData();
+                    body.append('csrfmiddlewaretoken', csrfToken);
+                    Object.entries(fields).forEach(([key, value]) => body.append(key, value));
+                    const postResponse = await fetch(main.dataset.accountsUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                    const postPayload = await postResponse.json();
+                    if (postPayload.status !== 'ok') showAdminToast(postPayload.message || 'Ошибка', 'error');
+                    loadStaffAccounts();
+                };
+                target.querySelectorAll('[data-staff-toggle]').forEach((button) => button.addEventListener('click', () => staffPost({action: 'toggle', id: button.dataset.staffToggle})));
+                target.querySelectorAll('[data-staff-role]').forEach((select) => select.addEventListener('change', () => staffPost({action: 'set_role', id: select.dataset.staffRole, role: select.value})));
+                target.querySelectorAll('[data-staff-password]').forEach((button) => button.addEventListener('click', () => {
+                    const password = prompt('Новый пароль (мин. 8 символов):');
+                    if (password) staffPost({action: 'set_password', id: button.dataset.staffPassword, password});
+                }));
+            } catch (error) {
+                target.innerHTML = '<div class="info-card red">Не удалось загрузить сотрудников</div>';
+            }
+        }
+        document.querySelector('#panel-system .subtab[data-subtab="sys-staff"]')?.addEventListener('click', loadStaffAccounts);
+        document.getElementById('staff-create')?.addEventListener('click', async () => {
+            const body = new FormData();
+            body.append('csrfmiddlewaretoken', csrfToken);
+            body.append('action', 'create');
+            body.append('login', document.getElementById('staff-login').value);
+            body.append('display_name', document.getElementById('staff-name').value);
+            body.append('role', document.getElementById('staff-role').value);
+            body.append('password', document.getElementById('staff-password').value);
+            const response = await fetch(main.dataset.accountsUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+            const payload = await response.json();
+            if (payload.status === 'ok') {
+                showAdminToast('Сотрудник создан', 'success');
+                document.getElementById('staff-login').value = '';
+                document.getElementById('staff-password').value = '';
+                loadStaffAccounts();
+            } else {
+                showAdminToast(payload.message || 'Ошибка', 'error');
+            }
+        });
 
         const CLIENT_SUB_CONFIRMS = {
             set_trial_hour: 'Сбросить подписку до 1 часа? Используется при возврате средств.',
@@ -5151,6 +5888,49 @@
             `;
             if (count) count.textContent = payments.length ? `Платежи: 1 - ${payments.length}` : 'Платежи: 0';
         }
+
+        let topPaymentsLoaded = false;
+        async function loadTopPayments(force = false) {
+            const target = document.getElementById('top-payments-table');
+            if (!target || !main.dataset.topPaymentsUrl) return;
+            if (topPaymentsLoaded && !force) return;
+            topPaymentsLoaded = true;
+            const limit = document.getElementById('top-payments-limit')?.value || '10';
+            target.innerHTML = inlineLoading('Считаем топ клиентов...');
+            try {
+                const response = await fetch(`${main.dataset.topPaymentsUrl}?limit=${limit}`, {
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    cache: 'no-store',
+                });
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error('bad status');
+                const rows = payload.top || [];
+                target.innerHTML = `
+                    <div class="admin-table-row table-head payments-list-row">
+                        <div>#</div>
+                        <div>Пользователь</div>
+                        <div>Telegram / Email</div>
+                        <div>Сумма</div>
+                        <div>Чеков</div>
+                        <div>Подписка</div>
+                    </div>
+                    ${rows.map((row, i) => `
+                        <div class="admin-table-row payments-list-row">
+                            <div>${i + 1}</div>
+                            <div class="cell-value" title="${escapeHtml(row.user.username)}">${escapeHtml(row.user.username)}</div>
+                            <div class="cell-value">${escapeHtml(row.user.telegram_id || row.user.email || '—')}</div>
+                            <div><b>${row.amount.toLocaleString('ru-RU')} ₽</b></div>
+                            <div>${row.payments_count}</div>
+                            <div><span class="payment-status-pill ${row.user.is_active ? 'ok' : ''}">${row.user.is_active ? 'до ' + escapeHtml(row.user.expire_at) : 'истекла'}</span></div>
+                        </div>
+                    `).join('') || '<div class="info-card muted">Пока нет платежей.</div>'}
+                `;
+            } catch (error) {
+                topPaymentsLoaded = false;
+                target.innerHTML = '<div class="info-card red">Не удалось загрузить топ клиентов</div>';
+            }
+        }
+        document.getElementById('top-payments-limit')?.addEventListener('change', () => loadTopPayments(true));
 
         function drawReferralGraph(container, graph) {
             if (!container) return;
@@ -6623,15 +7403,21 @@
                 [],
                 [
                     {label: 'Подписки', tone: 'indigo', data: wk.map((r) => r.trials), fmt: 'raw'},
+                    {label: 'Подключения', tone: 'indigoSoft', data: wk.map((r) => r.connected), fmt: 'raw'},
+                    {label: '100 МБ', tone: 'amberSoft', data: wk.map((r) => r.mb100), fmt: 'raw'},
                     {label: 'Инвойсы', tone: 'amber', data: wk.map((r) => r.invoice_clicks), fmt: 'raw'},
                     {label: 'Новые покупатели', tone: 'green', data: wk.map((r) => r.new_payers), fmt: 'raw'},
                 ],
                 {fullLabels: wk.map((r) => 'неделя с ' + r.week)});
+            const funnelPct = (num, den) => den ? (100 * num / den).toFixed(1) + '%' : '—';
             document.getElementById('acq-funnel-table').innerHTML = acqTable(
-                ['Неделя', 'Подписки', 'Инвойсы', 'Оплат всего', 'Новых покупателей', 'Подписка→покупатель', 'Инвойс→Оплата', 'Выручка новых'],
-                wk.map((r) => [r.week, r.trials, r.invoice_clicks, r.payments, r.new_payers,
-                    r.trials ? (100 * r.new_payers / r.trials).toFixed(1) + '%' : '—',
-                    r.invoice_clicks ? (100 * r.payments / r.invoice_clicks).toFixed(1) + '%' : '—',
+                ['Неделя', 'Подписки', 'Подключения', '5 МБ', '100 МБ', 'Инвойсы', 'Оплат всего', 'Новых покупателей',
+                 'Подписка→подкл.', 'Подкл.→100 МБ', 'Подписка→покупатель', 'Инвойс→Оплата', 'Выручка новых'],
+                wk.map((r) => [r.week, r.trials, r.connected, r.mb5, r.mb100, r.invoice_clicks, r.payments, r.new_payers,
+                    funnelPct(r.connected, r.trials),
+                    funnelPct(r.mb100, r.connected),
+                    funnelPct(r.new_payers, r.trials),
+                    funnelPct(r.payments, r.invoice_clicks),
                     fmtRub(r.new_rub) + ' ₽']));
             await loadTrials();
         }
@@ -6842,10 +7628,83 @@
                     fromCell(r)]));
         }
 
+        // Карточка-плитка со значением для MRR/здоровья платежей.
+        const acqCard = (label, value, tone = '') =>
+            `<div style="background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:12px;padding:12px 16px;min-width:150px;">` +
+            `<div style="font-size:11px;color:var(--muted);margin-bottom:4px;">${label}</div>` +
+            `<div class="${tone}" style="font-size:20px;font-weight:800;">${value}</div></div>`;
+
+        async function loadMrr() {
+            const months = document.getElementById('acq-mrr-months').value;
+            const res = await acqFetch('mrr', {months});
+            const m = res.mrr;
+            const monthLabel = (iso) => iso.slice(5, 7) + '.' + iso.slice(0, 4);
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            const lastClosed = m.filter((r) => r.month.slice(0, 7) < currentMonth).slice(-1)[0];
+            document.getElementById('acq-mrr-cards').innerHTML =
+                acqCard('MRR последнего закрытого месяца', lastClosed ? fmtRub(lastClosed.mrr) + ' ₽' : '—', 'chart-tone-gold') +
+                acqCard('Прогноз MRR по живым рекуррентам', fmtRub(res.live.mrr_forecast) + ' ₽', 'chart-tone-green') +
+                acqCard('Активных рекуррентов сейчас', res.live.recurrents_total.toLocaleString('ru-RU')) +
+                res.live.by_tariff.map((t) => acqCard(t.tariff, `${t.count} шт · ${fmtRub(t.mrr)} ₽/мес`)).join('');
+            acqDraw(document.getElementById('acq-mrr-chart'),
+                m.map((r) => monthLabel(r.month)),
+                [{label: 'MRR по покрытию, ₽', tone: 'amberSoft', data: m.map((r) => r.mrr), fmt: 'rub'}],
+                [{label: 'Клиентов с покрытием', tone: 'indigo', data: m.map((r) => r.covered_users), fmt: 'raw'}],
+                {fullLabels: m.map((r) => monthLabel(r.month))});
+            const d = res.dynamics;
+            acqDraw(document.getElementById('acq-mrr-churn-chart'),
+                d.map((r) => monthLabel(r.month)),
+                [{label: 'Активная рекуррентная база', tone: 'indigoSoft', data: d.map((r) => r.active_recurrents), fmt: 'raw'}],
+                [
+                    {label: 'Отмены автоплатежа', tone: 'pink', data: d.map((r) => r.cancels), fmt: 'raw'},
+                    {label: 'Churn, % (правая ось)', tone: 'amber', data: d.map((r) => r.churn_pct), fmt: 'pct'},
+                ],
+                {fullLabels: d.map((r) => monthLabel(r.month))});
+            document.getElementById('acq-mrr-table').innerHTML = acqTable(
+                ['Месяц', 'Активная база', 'Списаний (людей)', 'Autopay-фейлов', 'Отмен', 'Churn'],
+                d.slice().reverse().map((r) => [monthLabel(r.month), r.active_recurrents,
+                    r.autopay_success_users, r.autopay_failures, r.cancels,
+                    r.churn_pct == null ? '—' : r.churn_pct + '%']));
+        }
+
+        async function loadPayHealth() {
+            const days = document.getElementById('acq-payhealth-days').value;
+            const group = document.getElementById('acq-payhealth-group').value;
+            const res = await acqFetch('payment_health', {days, group});
+            const rate = (v) => v == null ? '—' : v + '%';
+            const toneFor = (v) => v == null ? '' : (v >= 50 ? 'chart-tone-green' : 'chart-tone-pink');
+            document.getElementById('acq-payhealth-cards').innerHTML =
+                acqCard('ЮКасса: оплачено/создано', `${res.yookassa.totals.paid}/${res.yookassa.totals.created} · ${rate(res.yookassa.totals.rate)}`, toneFor(res.yookassa.totals.rate)) +
+                acqCard('WATA: оплачено/создано', `${res.wata.totals.paid}/${res.wata.totals.created} · ${rate(res.wata.totals.rate)}`, toneFor(res.wata.totals.rate)) +
+                acqCard('Автосписания: успех', `${res.autopay.totals.success}/${res.autopay.totals.success + res.autopay.totals.failure} · ${rate(res.autopay.totals.rate)}`, toneFor(res.autopay.totals.rate));
+            const periods = [...new Set([
+                ...res.yookassa.series.map((r) => r.period),
+                ...res.wata.series.map((r) => r.period),
+                ...res.autopay.series.map((r) => r.period),
+            ])].sort();
+            const byPeriod = (series) => Object.fromEntries(series.map((r) => [r.period, r]));
+            const yk = byPeriod(res.yookassa.series), wa = byPeriod(res.wata.series), ap = byPeriod(res.autopay.series);
+            acqDraw(document.getElementById('acq-payhealth-chart'),
+                periods.map((p) => dayLabel(p)),
+                [],
+                [
+                    {label: 'ЮКасса, % успеха', tone: 'indigo', data: periods.map((p) => yk[p]?.rate ?? null), fmt: 'pct'},
+                    {label: 'WATA, % успеха', tone: 'amber', data: periods.map((p) => wa[p]?.rate ?? null), fmt: 'pct'},
+                    {label: 'Автосписания, % успеха', tone: 'green', data: periods.map((p) => ap[p]?.rate ?? null), fmt: 'pct'},
+                ],
+                {fullLabels: periods});
+            document.getElementById('acq-payhealth-table').innerHTML = acqTable(
+                ['Период', 'ЮК создано', 'ЮК оплачено', 'ЮК %', 'WATA создано', 'WATA оплачено', 'WATA %', 'Autopay успех', 'Autopay фейл', 'Autopay %'],
+                periods.slice().reverse().map((p) => [p,
+                    yk[p]?.created ?? 0, yk[p]?.paid ?? 0, rate(yk[p]?.rate ?? null),
+                    wa[p]?.created ?? 0, wa[p]?.paid ?? 0, rate(wa[p]?.rate ?? null),
+                    ap[p]?.success ?? 0, ap[p]?.failure ?? 0, rate(ap[p]?.rate ?? null)]));
+        }
+
         const loaders = {
             'acq-newrep': loadNewRepeat, 'acq-funnel': loadFunnel, 'acq-ads': loadAds,
             'acq-cohorts': loadCohorts, 'acq-pushes': loadPushes, 'acq-patterns': loadPatterns,
-            'acq-journey': loadJourney,
+            'acq-journey': loadJourney, 'acq-mrr': loadMrr, 'acq-payhealth': loadPayHealth,
         };
 
         function loadAcqSection(name, force = false) {
@@ -6864,6 +7723,10 @@
             loadAcqSection(document.querySelector('#panel-acquisition .subtab.active')?.dataset.subtab || 'acq-newrep');
         });
         if (location.hash === '#acquisition') loadAcqSection('acq-newrep');
+
+        document.getElementById('acq-mrr-months')?.addEventListener('change', () => loadAcqSection('acq-mrr', true));
+        document.getElementById('acq-payhealth-days')?.addEventListener('change', () => loadAcqSection('acq-payhealth', true));
+        document.getElementById('acq-payhealth-group')?.addEventListener('change', () => loadAcqSection('acq-payhealth', true));
 
         document.getElementById('acq-newrep-days')?.addEventListener('change', () => {
             document.getElementById('acq-newrep-start').value = '';

@@ -1694,7 +1694,7 @@ class AdminCohortStatsEndpointTests(SimpleTestCase):
 
         with (
             mock.patch(
-                "engine.views.require_support_admin_role", return_value=None
+                "engine.views.require_support_admin_any", return_value=None
             ),
             mock.patch(
                 "engine.views.build_admin_cohort_retention_stats"
@@ -1721,7 +1721,7 @@ class AdminCohortStatsEndpointTests(SimpleTestCase):
 
         with (
             mock.patch(
-                "engine.views.require_support_admin_role", return_value=None
+                "engine.views.require_support_admin_any", return_value=None
             ),
             mock.patch(
                 "engine.views.session_factory",
@@ -1906,9 +1906,9 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertNotIn('data-subtab="sys-operations"', template)
         self.assertNotIn('id="subpanel-sys-operations"', template)
         self.assertNotIn('data-recurrents-url=', template)
-        self.assertNotIn('data-top-payments-url=', template)
         self.assertNotIn("function loadRecurrents", template)
-        self.assertNotIn("function loadTopPayments", template)
+        # top-payments подключён к вкладке «Платежи» (этап 1 плана админки).
+        self.assertIn('data-top-payments-url=', template)
         # Сетка рефералки не должна использовать фиксированную минимальную ширину колонок,
         # из-за которой контент вылезал за экран.
         self.assertNotIn(".system-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px", template)
@@ -3497,10 +3497,7 @@ class AcquisitionFunnelTemplateTests(SimpleTestCase):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
         self.assertIn("'Инвойс→Оплата'", template)
-        self.assertIn(
-            "r.invoice_clicks ? (100 * r.payments / r.invoice_clicks).toFixed(1) + '%' : '—'",
-            template,
-        )
+        self.assertIn("funnelPct(r.payments, r.invoice_clicks)", template)
         # Метрика описана в легенде метрик и в help-модалке воронки.
         self.assertIn("Инвойс→Оплата в воронке", template)
         self.assertIn(
@@ -3861,3 +3858,283 @@ class AdSpendMultiAccountTests(SimpleTestCase):
         self.assertIn("UPDATE ad_spends SET account", views_src)
         rename_block = views_src.split('action == "rename_account"', 1)[1]
         self.assertIn("EXISTS", rename_block.split("UPDATE", 1)[0])
+
+
+class AdminAnalyticsStage1Tests(SimpleTestCase):
+    """Этап 1 плана админки: MRR/churn, здоровье платежей, воронка 100МБ."""
+
+    def test_acquisition_sections_include_mrr_and_payment_health(self):
+        from engine.views import ACQ_SECTIONS
+
+        self.assertIn("mrr", ACQ_SECTIONS)
+        self.assertIn("payment_health", ACQ_SECTIONS)
+
+    def test_mrr_tariff_months_exclude_short_tariffs(self):
+        from engine.views import ACQ_MRR_TARIFF_MONTHS_SQL
+
+        # Короткие тарифы не должны попадать в recognized-MRR.
+        self.assertNotIn("oneday", ACQ_MRR_TARIFF_MONTHS_SQL)
+        self.assertNotIn("threedays", ACQ_MRR_TARIFF_MONTHS_SQL)
+        for tariff, months in (("month", 1), ("threemonths", 3), ("sixmonths", 6), ("year", 12)):
+            self.assertIn(f"WHEN '{tariff}' THEN {months}", ACQ_MRR_TARIFF_MONTHS_SQL)
+
+    def test_recurrent_mrr_factors_match_bot_formula(self):
+        from engine.views import ACQ_MRR_RECURRENT_FACTORS
+
+        self.assertEqual(ACQ_MRR_RECURRENT_FACTORS["month"], 1.0)
+        self.assertEqual(ACQ_MRR_RECURRENT_FACTORS["oneday"], 30.0)
+        self.assertAlmostEqual(ACQ_MRR_RECURRENT_FACTORS["year"], 1.0 / 12.0)
+
+    def test_admin_template_has_new_subtabs(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('data-subtab="acq-mrr"', template)
+        self.assertIn('data-subtab="acq-payhealth"', template)
+        self.assertIn("'acq-mrr': loadMrr", template)
+        self.assertIn("'acq-payhealth': loadPayHealth", template)
+        self.assertIn("data-top-payments-url", template)
+        self.assertIn("loadTopPayments", template)
+
+    def test_funnel_includes_traffic_thresholds(self):
+        import inspect
+
+        from engine.views import _acq_funnel
+
+        src = inspect.getsource(_acq_funnel)
+        self.assertIn("traffic_threshold_reached", src)
+        self.assertIn("mb100", src)
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.assertIn("Подкл.→100 МБ", template)
+
+
+class AdminStage3Tests(SimpleTestCase):
+    """Этап 3 плана админки: аудит, таймлайн, diff RWMS, сообщения."""
+
+    def test_new_endpoints_are_routed(self):
+        from django.urls import reverse
+
+        self.assertTrue(reverse("support_admin_api_audit_log"))
+        self.assertTrue(reverse("support_admin_api_user_timeline"))
+        self.assertTrue(reverse("support_admin_api_rwms_sync"))
+        self.assertTrue(reverse("support_admin_api_direct_message"))
+
+    def test_mutating_admin_endpoints_write_audit(self):
+        import inspect
+
+        from engine import views
+
+        for func in (
+            views.support_admin_api_subscription_manage,
+            views.support_admin_api_referral_block,
+            views.support_admin_api_runtime_settings,
+        ):
+            self.assertIn("admin_audit_write", inspect.getsource(func), func.__name__)
+
+    def test_rwms_sync_never_deletes_or_recreates(self):
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_rwms_sync)
+        # Только update: панель не пересоздаётся и не удаляется.
+        self.assertIn("update_user", src)
+        self.assertNotIn("add_user", src)
+        self.assertNotIn("create_user", src)
+        self.assertNotIn("delete", src.lower())
+
+    def test_client_card_has_new_subtabs(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        for subtab in ("timeline", "rwmssync", "message"):
+            self.assertIn(f'data-client-subtab="{subtab}"', template)
+        self.assertIn('data-subtab="sys-audit"', template)
+        self.assertIn('data-subtab="sys-sync"', template)
+        self.assertIn("data-audit-log-url", template)
+        self.assertIn("data-direct-message-url", template)
+
+    def test_audit_csv_protects_from_formula_injection(self):
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_audit_log)
+        self.assertIn('("=", "+", "-", "@")', src)
+
+
+class AdminStage4Tests(SimpleTestCase):
+    """Этап 4: сегменты, рассылки, массовые операции."""
+
+    def test_segments_registry_is_consistent(self):
+        from common.models.segments import (
+            ADMIN_SEGMENTS,
+            segment_count_sql,
+            segment_user_ids_sql,
+            segment_where_sql,
+        )
+
+        for key in ADMIN_SEGMENTS:
+            where = segment_where_sql(key)
+            # Рассылки идут ботами и не должны трогать заблокированных.
+            self.assertIn("telegram_id IS NOT NULL", where)
+            self.assertIn("user_blocks", where)
+            self.assertIn("FROM users u", segment_count_sql(key))
+            self.assertIn("u.telegram_id", segment_user_ids_sql(key))
+
+        with self.assertRaises(ValueError):
+            segment_where_sql("nope")
+
+    def test_stage4_endpoints_are_routed(self):
+        from django.urls import reverse
+
+        for name in (
+            "support_admin_api_segments",
+            "support_admin_api_broadcasts",
+            "support_admin_api_bulk",
+        ):
+            self.assertTrue(reverse(name))
+
+    def test_bulk_endpoint_audits_and_has_dry_run(self):
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_bulk)
+        self.assertIn("dry_run", src)
+        self.assertIn("admin_audit_write", src)
+        self.assertIn("BULK_MAX_IDS", src)
+
+    def test_bulk_never_deletes_users_or_subscriptions(self):
+        import inspect
+
+        from engine import views
+
+        for func in (views.admin_bulk_extend, views.admin_bulk_block, views.admin_bulk_unblock):
+            src = inspect.getsource(func)
+            self.assertNotIn("add_user", src)
+            # Единственный delete — снятие рекуррентов/блокировок, не пользователей.
+            self.assertNotIn("query(User).", src)
+
+    def test_template_has_broadcasts_and_bulk_panels(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('data-tab="broadcasts"', template)
+        self.assertIn('data-tab="bulk-actions"', template)
+        self.assertIn('id="bulk-preview"', template)
+        self.assertIn("dry-run", template)
+        self.assertIn('data-broadcast-stop=', template)
+
+
+class AdminStage5PromoTests(SimpleTestCase):
+    """Этап 5: промокоды, купоны, скидка на первую покупку."""
+
+    def test_promocodes_endpoint_routed_and_audited(self):
+        import inspect
+
+        from django.urls import reverse
+
+        from engine import views
+
+        self.assertTrue(reverse("support_admin_api_promocodes"))
+        src = inspect.getsource(views.support_admin_api_promocodes)
+        self.assertIn("admin_audit_write", src)
+        # Купоны партий всегда одноразовые.
+        self.assertIn("max_uses=1", src)
+
+    def test_site_checkout_applies_discount_only_before_first_payment(self):
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.site_apply_first_purchase_discount)
+        self.assertIn("has_paid", src)
+        self.assertIn("valid_until", src)
+        # Цена не может уйти ниже 1 ₽ и скидка fail-open при ошибках.
+        self.assertIn("max(1,", src)
+        self.assertIn("except Exception", src)
+
+    def test_yk_payment_carries_promo_metadata(self):
+        import inspect
+
+        from engine import payments
+
+        src = inspect.getsource(payments.create_yk_payment_sync)
+        self.assertIn('"promo": promo', src)
+
+    def test_template_has_promocodes_tab(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('data-tab="promocodes"', template)
+        self.assertIn('id="promo-create"', template)
+        self.assertIn('id="batch-create"', template)
+        self.assertIn("start=promo_", Path("engine/views.py").read_text())
+
+
+class AdminStage6RolesTests(SimpleTestCase):
+    """Этап 6: персональные аккаунты и роль marketer."""
+
+    def test_accounts_endpoint_routed_full_only(self):
+        import inspect
+
+        from django.urls import reverse
+
+        from engine import views
+
+        self.assertTrue(reverse("support_admin_api_accounts"))
+        src = inspect.getsource(views.support_admin_api_accounts)
+        self.assertIn("SUPPORT_ADMIN_ROLE_ADMIN", src)
+        self.assertIn("make_password", src)
+        self.assertIn("admin_audit_write", src)
+
+    def test_marketer_has_analytics_but_not_system(self):
+        import inspect
+
+        from engine import views
+
+        for func in (
+            views.support_admin_api_stats,
+            views.support_admin_api_acquisition,
+            views.support_admin_api_broadcasts,
+            views.support_admin_api_promocodes,
+        ):
+            self.assertIn(
+                "ANALYTICS_ROLES", inspect.getsource(func), func.__name__
+            )
+        # Мутации клиентов/системы остаются только для full.
+        for func in (
+            views.support_admin_api_subscription_manage,
+            views.support_admin_api_bulk,
+            views.support_admin_api_runtime_settings,
+            views.support_admin_api_audit_log,
+        ):
+            self.assertIn(
+                "require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)",
+                inspect.getsource(func),
+                func.__name__,
+            )
+
+    def test_login_supports_personal_accounts_with_fallback(self):
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_login)
+        self.assertIn("AdminAccount", src)
+        self.assertIn("check_password", src)
+        # Общие пароли остаются как запасной вход.
+        self.assertIn("SUPPORT_ADMIN_PASSWORD", src)
+        # Логин пишется в сессию для аудита.
+        self.assertIn("SUPPORT_ADMIN_ACCOUNT_SESSION_KEY", src)
+
+    def test_template_gates_marketer_sections(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn(
+            "{% if support_admin_is_full_admin or support_admin_is_marketer %}",
+            template,
+        )
+        self.assertIn('data-subtab="sys-staff"', template)
+        self.assertIn('id="staff-create"', template)
+        login_template = Path(
+            "engine/templates/support_admin_login.html"
+        ).read_text()
+        self.assertIn('name="login"', login_template)

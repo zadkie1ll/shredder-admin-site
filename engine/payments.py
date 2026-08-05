@@ -46,6 +46,7 @@ def create_yk_payment_sync(
     telegram_id: int | None,
     return_url: str,
     email: str | None = None,
+    promo: bool = False,
 ) -> CreatedPayment:
     Configuration.account_id = shop_id
     Configuration.secret_key = secret
@@ -67,6 +68,9 @@ def create_yk_payment_sync(
             "autopay": False,
             "trial_promotion": isinstance(tariff, TrialPromotionTariff),
             "from_trial": False,
+            # Персональная промо-скидка на первую покупку: payment-сервис
+            # заведёт рекуррент по регулярной runtime-цене тарифа.
+            "promo": promo,
         },
         "capture": True,
         "description": tariff.description,

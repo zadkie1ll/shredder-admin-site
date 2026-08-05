@@ -79,6 +79,21 @@ from common.models.db import SupportTicketStatus
 from common.models.db import SupportTicketAttachment
 from common.models.db import SupportReplyTemplate
 from common.models.db import SystemSetting
+from django.contrib.auth.hashers import check_password
+from django.contrib.auth.hashers import make_password
+from common.models.db import AdminAccount
+from common.models.db import AdminAuditLog
+from common.models.db import Broadcast
+from common.models.db import BroadcastDelivery
+from common.models.segments import ADMIN_SEGMENTS
+from common.models.segments import segment_count_sql
+from common.models.db import AdminDirectMessage
+from common.models.db import AdminDirectMessageDelivery
+from common.models.db import RwmsSyncMismatch
+from common.models.db import UserBlock
+from common.models.db import UserDiscount
+from common.models.db import PromoBatch
+from common.models.db import PromoCode
 from common.models.db import ReferralProgramBlock
 from common.models.db import CensorCheck
 from common.models.db import CensorCheckRun
@@ -154,6 +169,8 @@ SUPPORT_ADMIN_SESSION_KEY = "support_admin_authenticated"
 SUPPORT_ADMIN_ROLE_SESSION_KEY = "support_admin_role"
 SUPPORT_ADMIN_ROLE_ADMIN = "admin"
 SUPPORT_ADMIN_ROLE_SUPPORT = "support"
+SUPPORT_ADMIN_ROLE_MARKETER = "marketer"
+SUPPORT_ADMIN_ACCOUNT_SESSION_KEY = "support_admin_account"
 SUPPORT_ATTACHMENT_ALLOWED_PREFIXES = ("image/", "video/")
 EMAIL_CONFIRMATION_SALT = "dashboard-email-confirmation"
 EMAIL_CONFIRMATION_MAX_AGE_SECONDS = 15 * 60
@@ -741,6 +758,29 @@ def support_admin_is_full_admin(request):
     return support_admin_role(request) == SUPPORT_ADMIN_ROLE_ADMIN
 
 
+def support_admin_is_marketer(request):
+    return support_admin_role(request) == SUPPORT_ADMIN_ROLE_MARKETER
+
+
+def require_support_admin_any(request, roles):
+    """Доступ для любого из перечисленных ролей (например admin+marketer)."""
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+    if support_admin_role(request) not in roles:
+        return JsonResponse(
+            {
+                "status": "forbidden",
+                "message": "Недостаточно прав для этого раздела.",
+            },
+            status=403,
+        )
+    return None
+
+
+ANALYTICS_ROLES = {SUPPORT_ADMIN_ROLE_ADMIN, SUPPORT_ADMIN_ROLE_MARKETER}
+
+
 def require_support_admin(request):
     if not settings.SUPPORT_ADMIN_PASSWORD and not settings.SUPPORT_STAFF_PASSWORD:
         logging.warning("support admin requested but no support password is configured")
@@ -1251,6 +1291,59 @@ def build_payment_status_url(request, token):
 
 def build_payment_retry_url(request, token):
     return f"{get_current_base_url(request)}{reverse('payment_retry', args=[token])}"
+
+
+def site_apply_first_purchase_discount(db_session, user, tariff):
+    """Персональная промо-скидка на первую покупку (активируется в боте).
+
+    Возвращает (tariff, applied). Скидка действует, только пока пользователь
+    ни разу не платил; рекуррент заводится по регулярной цене (metadata.promo).
+    """
+    try:
+        discount = (
+            db_session.query(UserDiscount)
+            .filter(UserDiscount.user_id == user.id)
+            .first()
+        )
+        if discount is None:
+            return tariff, False
+        if discount.valid_until is None or discount.valid_until <= datetime.utcnow():
+            return tariff, False
+        if not 1 <= (discount.percent or 0) <= 99:
+            return tariff, False
+
+        has_paid = (
+            db_session.query(YkPayment.id)
+            .filter(YkPayment.user_id == user.id, YkPayment.status == "succeeded")
+            .first()
+            is not None
+            or db_session.query(WataTransaction.id)
+            .join(WataInvoice, WataInvoice.order_id == WataTransaction.order_id)
+            .filter(
+                WataInvoice.user_id == user.id,
+                WataTransaction.transaction_status == "Paid",
+            )
+            .first()
+            is not None
+        )
+        if has_paid:
+            return tariff, False
+
+        new_price = max(1, round(tariff.price * (100 - discount.percent) / 100))
+        if new_price >= tariff.price:
+            return tariff, False
+        logging.info(
+            "site checkout: applying %s%% first-purchase discount for user %s "
+            "(%s -> %s)",
+            discount.percent,
+            user.id,
+            tariff.price,
+            new_price,
+        )
+        return tariff.model_copy(update={"price": new_price}), True
+    except Exception:
+        logging.exception("failed to apply first purchase discount")
+        return tariff, False
 
 
 def payment_session_url_key(token):
@@ -3045,6 +3138,55 @@ def support_admin_login(request):
 
     if request.method == "POST":
         password = request.POST.get("password", "")
+        login_name = (request.POST.get("login") or "").strip().lower()
+
+        # Персональные аккаунты сотрудников (этап 6 плана админки): если
+        # указан логин — проверяем только по admin_accounts.
+        if login_name:
+            db_session = session_factory()
+            try:
+                account = (
+                    db_session.query(AdminAccount)
+                    .filter(
+                        AdminAccount.login == login_name,
+                        AdminAccount.is_active.is_(True),
+                    )
+                    .first()
+                )
+                if account and check_password(password, account.password_hash):
+                    role_map = {
+                        "full": SUPPORT_ADMIN_ROLE_ADMIN,
+                        "marketer": SUPPORT_ADMIN_ROLE_MARKETER,
+                        "support": SUPPORT_ADMIN_ROLE_SUPPORT,
+                    }
+                    request.session[SUPPORT_ADMIN_SESSION_KEY] = True
+                    request.session[SUPPORT_ADMIN_ROLE_SESSION_KEY] = role_map.get(
+                        account.role, SUPPORT_ADMIN_ROLE_SUPPORT
+                    )
+                    request.session[SUPPORT_ADMIN_ACCOUNT_SESSION_KEY] = account.login
+                    request.session.modified = True
+                    account.last_login_at = datetime.utcnow()
+                    db_session.add(
+                        AdminAuditLog(
+                            actor=account.login,
+                            source="site",
+                            action="login",
+                            details={"role": account.role},
+                            ip=admin_client_ip(request),
+                        )
+                    )
+                    db_session.commit()
+                    return redirect("support_admin_tickets")
+            finally:
+                db_session.close()
+            logging.warning("admin account login failed for %s", login_name)
+            return render(
+                request,
+                "support_admin_login.html",
+                {"error": "Неверный логин или пароль."},
+                status=403,
+            )
+
         if settings.SUPPORT_ADMIN_PASSWORD and hmac.compare_digest(
             password,
             settings.SUPPORT_ADMIN_PASSWORD,
@@ -3105,6 +3247,7 @@ def support_admin_tickets(request):
             "support_status_open": SupportTicketStatus.OPEN,
             "support_admin_role": support_admin_role(request),
             "support_admin_is_full_admin": support_admin_is_full_admin(request),
+            "support_admin_is_marketer": support_admin_is_marketer(request),
         },
     )
 
@@ -4953,7 +5096,7 @@ def build_admin_cohort_retention_stats(
 
 
 def support_admin_api_stats(request):
-    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
     if auth_response:
         return auth_response
 
@@ -4998,7 +5141,7 @@ def support_admin_api_stats(request):
 
 
 def support_admin_api_stats_source_users(request):
-    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
     if auth_response:
         return auth_response
 
@@ -5164,7 +5307,7 @@ def support_admin_api_stats_source_users(request):
 
 
 def support_admin_api_cohort_stats(request):
-    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
     if auth_response:
         return auth_response
 
@@ -5624,6 +5767,9 @@ def support_admin_api_subscription_manage(request):
                 .filter(YkRecurrentPayment.user_id == user.id)
                 .delete(synchronize_session=False)
             )
+            admin_audit_write(
+                db_session, request, "subscription_disable", target=user.username
+            )
             db_session.commit()
             rwms_updated = False
             rwms_user = rwms_client.get_user_by_username(user.username)
@@ -5692,6 +5838,9 @@ def support_admin_api_subscription_manage(request):
                 ban.banned_at = now_naive
                 ban.unban_at = unban_at
                 ban.restored_at = None
+            admin_audit_write(
+                db_session, request, "temp_ban", target=user.username, hours=hours
+            )
             db_session.commit()
             return JsonResponse({
                 "status": "ok",
@@ -5709,6 +5858,9 @@ def support_admin_api_subscription_manage(request):
                 db_session.query(YkRecurrentPayment)
                 .filter(YkRecurrentPayment.user_id == user.id)
                 .delete(synchronize_session=False)
+            )
+            admin_audit_write(
+                db_session, request, "stop_autopay", target=user.username
             )
             db_session.commit()
             return JsonResponse(
@@ -5746,6 +5898,14 @@ def support_admin_api_subscription_manage(request):
 
         old_expire = user.expire_at
         user.expire_at = target_expire.replace(tzinfo=None)
+        admin_audit_write(
+            db_session,
+            request,
+            "subscription_" + action,
+            target=user.username,
+            old=str(old_expire),
+            new=str(user.expire_at),
+        )
         db_session.commit()
 
         rwms_user = rwms_client.get_user_by_username(user.username)
@@ -5843,6 +6003,7 @@ def support_admin_api_runtime_settings(request):
                     {"status": "error", "message": "Неизвестная настройка"}, status=400
                 )
             db_session.execute(sa_delete(SystemSetting).where(SystemSetting.key == key))
+            admin_audit_write(db_session, request, "setting_delete", target=key)
             db_session.commit()
             return JsonResponse({"status": "ok"})
 
@@ -5867,6 +6028,13 @@ def support_admin_api_runtime_settings(request):
                     {"status": "error", "message": pair_error}, status=400
                 )
             setting = admin_upsert_system_setting(db_session, key, normalized_value)
+            admin_audit_write(
+                db_session,
+                request,
+                "setting_save",
+                target=key,
+                value=admin_mask_setting_value(key, normalized_value),
+            )
             db_session.commit()
             db_session.refresh(setting)
             return JsonResponse(
@@ -5964,12 +6132,19 @@ def support_admin_api_referral_block(request):
                 block.reason = reason
             else:
                 db_session.add(ReferralProgramBlock(user_id=user.id, reason=reason))
+            admin_audit_write(
+                db_session, request, "referral_block", target=user.username,
+                reason=reason,
+            )
             db_session.commit()
         elif action == "unblock":
             db_session.execute(
                 sa_delete(ReferralProgramBlock).where(
                     ReferralProgramBlock.user_id == user.id
                 )
+            )
+            admin_audit_write(
+                db_session, request, "referral_unblock", target=user.username
             )
             db_session.commit()
         elif action != "status":
@@ -6563,6 +6738,10 @@ def pay(request):
                 {"result": "failed"},
             )
 
+            tariff, promo_discount_applied = site_apply_first_purchase_discount(
+                db_session, user, tariff
+            )
+
             if settings.PAYMENT_GATEWAY.lower() == "wata":
                 logging.info(
                     "creating wata invoice: email=%s user_id=%s tariff_id=%s",
@@ -6612,6 +6791,7 @@ def pay(request):
                     telegram_id=user.telegram_id or 0,
                     return_url=payment_success_redirect_url,
                     email=email or user.email,
+                    promo=promo_discount_applied,
                 )
                 confirmation_url = created_payment.confirmation_url
                 login_token = get_purchase_login_token(
@@ -7646,10 +7826,21 @@ def _acq_funnel(db_session, weeks):
         """
         SELECT date_trunc('week', (timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS week,
                count(*) FILTER (WHERE event_type = 'subscription_created') AS trials,
-               count(*) FILTER (WHERE event_type LIKE 'create_invoice%') AS invoice_clicks
+               count(*) FILTER (WHERE event_type LIKE 'create_invoice%') AS invoice_clicks,
+               count(DISTINCT user_id) FILTER (
+                   WHERE event_type = 'traffic_threshold_reached'
+                     AND event_payload->>'threshold' = '0') AS connected,
+               count(DISTINCT user_id) FILTER (
+                   WHERE event_type = 'traffic_threshold_reached'
+                     AND event_payload->>'threshold' = '5') AS mb5,
+               count(DISTINCT user_id) FILTER (
+                   WHERE event_type = 'traffic_threshold_reached'
+                     AND event_payload->>'threshold' = '100') AS mb100
         FROM event_logs
         WHERE timestamp >= now() AT TIME ZONE 'UTC' - make_interval(weeks => :weeks)
-          AND (event_type = 'subscription_created' OR event_type LIKE 'create_invoice%')
+          AND (event_type = 'subscription_created'
+               OR event_type LIKE 'create_invoice%'
+               OR event_type = 'traffic_threshold_reached')
         GROUP BY 1 ORDER BY 1
         """,
         weeks=weeks,
@@ -7672,7 +7863,11 @@ def _acq_funnel(db_session, weeks):
     merged = {}
     for r in events:
         merged.setdefault(r["week"], {}).update(
-            trials=r["trials"], invoice_clicks=r["invoice_clicks"]
+            trials=r["trials"],
+            invoice_clicks=r["invoice_clicks"],
+            connected=r["connected"],
+            mb5=r["mb5"],
+            mb100=r["mb100"],
         )
     for r in pays:
         merged.setdefault(r["week"], {}).update(
@@ -7683,6 +7878,9 @@ def _acq_funnel(db_session, weeks):
         "weeks": [
             {"week": wk.isoformat(),
              "trials": v.get("trials", 0),
+             "connected": v.get("connected", 0),
+             "mb5": v.get("mb5", 0),
+             "mb100": v.get("mb100", 0),
              "invoice_clicks": v.get("invoice_clicks", 0),
              "payments": v.get("payments", 0),
              "payers": v.get("payers", 0),
@@ -8495,6 +8693,339 @@ def _acq_tariff_paths(db_session, months=12):
     return {"tariffs": result}
 
 
+# Месячный эквивалент тарифа для MRR: сколько месяцев покрывает оплата.
+# Короткие тарифы (день/3 дня/неделя) в recognized-MRR не участвуют — это
+# разовые покупки, а не подписочный доход.
+ACQ_MRR_TARIFF_MONTHS_SQL = """
+    CASE tariff
+        WHEN 'month' THEN 1
+        WHEN 'threemonths' THEN 3
+        WHEN 'sixmonths' THEN 6
+        WHEN 'year' THEN 12
+        ELSE NULL
+    END
+"""
+
+# Множитель приведения суммы автосписания к месяцу для прогноза MRR из живых
+# рекуррентов (та же формула, что в боте /recurrents).
+ACQ_MRR_RECURRENT_FACTORS = {
+    "oneday": 30.0,
+    "threedays": 10.0,
+    "oneweek": 30.0 / 7.0,
+    "month": 1.0,
+    "threemonths": 1.0 / 3.0,
+    "sixmonths": 1.0 / 6.0,
+    "year": 1.0 / 12.0,
+}
+
+ACQ_AUTOPAY_EVENT_TYPES = (
+    "payment_regular_autopay_success",
+    "payment_trial_to_regular_autopay_success",
+    "payment_regular_autopay_failure",
+    "payment_trial_to_regular_autopay_failure",
+    "confirm_cancel_autopay_clicked",
+)
+
+
+def _acq_mrr(db_session, months):
+    months = min(max(months, 3), 36)
+
+    # Recognized MRR: каждая подписочная оплата равномерно «размазывается»
+    # на покрытые месяцы (год за 1799 в январе даёт ~150 ₽/мес на 12 месяцев).
+    mrr_rows = _acq_rows(
+        db_session,
+        f"""
+        WITH mrr_pays AS (
+            SELECT wi.user_id,
+                   date_trunc('month', (t.payment_time AT TIME ZONE 'Europe/Moscow'))::date AS pay_month,
+                   t.amount::numeric AS amount,
+                   wi.tariff_id AS tariff
+            FROM wata_transactions t
+            JOIN wata_invoices wi ON wi.order_id = t.order_id
+            WHERE t.transaction_status = 'Paid'
+            UNION ALL
+            SELECT p.user_id,
+                   date_trunc('month', (coalesce(p.captured_at, p.created_at)
+                       AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Moscow'))::date,
+                   p.amount::numeric,
+                   p.subscription_period
+            FROM yk_payments p
+            WHERE p.status = 'succeeded'
+        ),
+        mrr_norm AS (
+            SELECT user_id, pay_month, amount,
+                   {ACQ_MRR_TARIFF_MONTHS_SQL} AS cover_months
+            FROM mrr_pays
+        ),
+        covered AS (
+            SELECT (pay_month + make_interval(months => g.i))::date AS m,
+                   amount / cover_months AS mrr_part,
+                   user_id
+            FROM mrr_norm, LATERAL generate_series(0, cover_months - 1) AS g(i)
+            WHERE cover_months IS NOT NULL
+        )
+        SELECT m,
+               round(sum(mrr_part))::bigint AS mrr,
+               count(DISTINCT user_id) AS covered_users
+        FROM covered
+        WHERE m >  date_trunc('month', now() AT TIME ZONE 'Europe/Moscow')::date
+                   - make_interval(months => :months)
+          AND m <= date_trunc('month', now() AT TIME ZONE 'Europe/Moscow')::date
+        GROUP BY m ORDER BY m
+        """,
+        months=months,
+    )
+
+    # Прогноз MRR из живых рекуррентов (yk_recurrent_payments — текущее
+    # состояние; история отмен восстанавливается ниже из event_logs).
+    live_rows = _acq_rows(
+        db_session,
+        """
+        SELECT subscription_period AS tariff,
+               count(*) AS cnt,
+               coalesce(sum(amount), 0) AS total
+        FROM yk_recurrent_payments
+        GROUP BY 1
+        """,
+    )
+    live_mrr = 0.0
+    live_by_tariff = []
+    live_total = 0
+    for row in live_rows:
+        factor = ACQ_MRR_RECURRENT_FACTORS.get(row["tariff"])
+        part = float(row["total"]) * factor if factor else 0.0
+        live_mrr += part
+        live_total += int(row["cnt"])
+        live_by_tariff.append(
+            {
+                "tariff": get_tariff_display_name(row["tariff"]),
+                "count": int(row["cnt"]),
+                "mrr": round(part),
+            }
+        )
+
+    # Динамика рекуррентной базы из event_logs: строки yk_recurrent_payments
+    # при отмене удаляются, поэтому история считается по событиям
+    # autopay_success / confirm_cancel_autopay_clicked.
+    event_rows = _acq_rows(
+        db_session,
+        """
+        SELECT user_id,
+               date_trunc('month', (timestamp AT TIME ZONE 'UTC'
+                   AT TIME ZONE 'Europe/Moscow'))::date AS m,
+               event_type,
+               count(*) AS cnt
+        FROM event_logs
+        WHERE event_type = ANY(:types)
+        GROUP BY 1, 2, 3
+        """,
+        types=list(ACQ_AUTOPAY_EVENT_TYPES),
+    )
+
+    success_months = {}  # user_id -> set of months
+    cancel_months = {}
+    per_month = {}  # month -> {"cancels": set(), "failures": int, "successes": int}
+    for row in event_rows:
+        month = row["m"]
+        bucket = per_month.setdefault(
+            month, {"cancel_users": set(), "failures": 0, "success_users": set()}
+        )
+        if row["event_type"].endswith("autopay_success"):
+            success_months.setdefault(row["user_id"], set()).add(month)
+            bucket["success_users"].add(row["user_id"])
+        elif row["event_type"].endswith("autopay_failure"):
+            bucket["failures"] += int(row["cnt"])
+        else:
+            cancel_months.setdefault(row["user_id"], set()).add(month)
+            bucket["cancel_users"].add(row["user_id"])
+
+    def month_back(d, n):
+        year = d.year
+        month = d.month - n
+        while month <= 0:
+            month += 12
+            year -= 1
+        return d.replace(year=year, month=month, day=1)
+
+    def active_base(month):
+        # Активен на конец месяца: был autopay-успех за последние 12 месяцев
+        # и последняя отмена не позже последнего успеха (отмена в том же
+        # месяце, что успех, консервативно считается отменой).
+        window_start = month_back(month, 11)
+        active = set()
+        for user_id, smonths in success_months.items():
+            past = [s for s in smonths if s <= month]
+            if not past:
+                continue
+            last_success = max(past)
+            if last_success < window_start:
+                continue
+            cpast = [c for c in cancel_months.get(user_id, ()) if c <= month]
+            if cpast and max(cpast) >= last_success:
+                continue
+            active.add(user_id)
+        return active
+
+    today_month = date(date.today().year, date.today().month, 1)
+    dynamics = []
+    month_iter = month_back(today_month, months - 1)
+    prev_active = active_base(month_back(month_iter, 1))
+    while month_iter <= today_month:
+        bucket = per_month.get(
+            month_iter, {"cancel_users": set(), "failures": 0, "success_users": set()}
+        )
+        active = active_base(month_iter)
+        churned = bucket["cancel_users"] & prev_active
+        churn_pct = (
+            round(100.0 * len(churned) / len(prev_active), 1) if prev_active else None
+        )
+        dynamics.append(
+            {
+                "month": month_iter.isoformat(),
+                "active_recurrents": len(active),
+                "autopay_success_users": len(bucket["success_users"]),
+                "autopay_failures": bucket["failures"],
+                "cancels": len(bucket["cancel_users"]),
+                "churn_pct": churn_pct,
+            }
+        )
+        prev_active = active
+        month_iter = (
+            month_iter.replace(year=month_iter.year + 1, month=1)
+            if month_iter.month == 12
+            else month_iter.replace(month=month_iter.month + 1)
+        )
+
+    return {
+        "mrr": [
+            {
+                "month": r["m"].isoformat(),
+                "mrr": int(r["mrr"]),
+                "covered_users": int(r["covered_users"]),
+            }
+            for r in mrr_rows
+        ],
+        "live": {
+            "recurrents_total": live_total,
+            "mrr_forecast": round(live_mrr),
+            "by_tariff": sorted(live_by_tariff, key=lambda x: -x["mrr"]),
+        },
+        "dynamics": dynamics,
+    }
+
+
+def _acq_payment_health(db_session, days, group):
+    days = min(max(days, 7), 365)
+    grp = "week" if group == "week" else "day"
+
+    yk_rows = _acq_rows(
+        db_session,
+        f"""
+        SELECT date_trunc('{grp}', (created_at AT TIME ZONE 'UTC'
+                   AT TIME ZONE 'Europe/Moscow'))::date AS period,
+               count(*) AS created,
+               count(*) FILTER (WHERE status = 'succeeded') AS paid
+        FROM yk_payments
+        WHERE created_at >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+        GROUP BY 1 ORDER BY 1
+        """,
+        days=days,
+    )
+    wata_rows = _acq_rows(
+        db_session,
+        f"""
+        SELECT date_trunc('{grp}', (wi.creation_time AT TIME ZONE 'Europe/Moscow'))::date AS period,
+               count(*) AS created,
+               count(*) FILTER (WHERE EXISTS (
+                   SELECT 1 FROM wata_transactions t
+                   WHERE t.order_id = wi.order_id
+                     AND t.transaction_status = 'Paid'
+               )) AS paid
+        FROM wata_invoices wi
+        WHERE wi.creation_time >= now() - make_interval(days => :days)
+        GROUP BY 1 ORDER BY 1
+        """,
+        days=days,
+    )
+    autopay_rows = _acq_rows(
+        db_session,
+        f"""
+        SELECT date_trunc('{grp}', (timestamp AT TIME ZONE 'UTC'
+                   AT TIME ZONE 'Europe/Moscow'))::date AS period,
+               count(*) FILTER (WHERE event_type LIKE '%autopay_success') AS success,
+               count(*) FILTER (WHERE event_type LIKE '%autopay_failure') AS failure
+        FROM event_logs
+        WHERE event_type = ANY(:types)
+          AND timestamp >= now() AT TIME ZONE 'UTC' - make_interval(days => :days)
+        GROUP BY 1 ORDER BY 1
+        """,
+        days=days,
+        types=[t for t in ACQ_AUTOPAY_EVENT_TYPES if "cancel" not in t],
+    )
+
+    def series(rows, created_key="created", paid_key="paid"):
+        return [
+            {
+                "period": r["period"].isoformat(),
+                "created": int(r[created_key]),
+                "paid": int(r[paid_key]),
+                "rate": (
+                    round(100.0 * r[paid_key] / r[created_key], 1)
+                    if r[created_key]
+                    else None
+                ),
+            }
+            for r in rows
+        ]
+
+    def totals(rows, created_key="created", paid_key="paid"):
+        created = sum(int(r[created_key]) for r in rows)
+        paid = sum(int(r[paid_key]) for r in rows)
+        return {
+            "created": created,
+            "paid": paid,
+            "rate": round(100.0 * paid / created, 1) if created else None,
+        }
+
+    autopay_series = [
+        {
+            "period": r["period"].isoformat(),
+            "success": int(r["success"]),
+            "failure": int(r["failure"]),
+            "rate": (
+                round(100.0 * r["success"] / (r["success"] + r["failure"]), 1)
+                if (r["success"] + r["failure"])
+                else None
+            ),
+        }
+        for r in autopay_rows
+    ]
+    autopay_success = sum(r["success"] for r in autopay_series)
+    autopay_failure = sum(r["failure"] for r in autopay_series)
+
+    return {
+        "group": grp,
+        "days": days,
+        "yookassa": {"series": series(yk_rows), "totals": totals(yk_rows)},
+        "wata": {"series": series(wata_rows), "totals": totals(wata_rows)},
+        "autopay": {
+            "series": autopay_series,
+            "totals": {
+                "success": autopay_success,
+                "failure": autopay_failure,
+                "rate": (
+                    round(
+                        100.0 * autopay_success / (autopay_success + autopay_failure),
+                        1,
+                    )
+                    if (autopay_success + autopay_failure)
+                    else None
+                ),
+            },
+        },
+    }
+
+
 ACQ_SECTIONS = {
     "new_repeat": lambda s, req: _acq_new_repeat(
         s, int(req.GET.get("days", 60)),
@@ -8520,11 +9051,16 @@ ACQ_SECTIONS = {
     "tariff_paths": lambda s, req: _acq_tariff_paths(
         s, int(req.GET.get("months", 12))
     ),
+    "mrr": lambda s, req: _acq_mrr(s, int(req.GET.get("months", 24))),
+    "payment_health": lambda s, req: _acq_payment_health(
+        s, int(req.GET.get("days", 90)),
+        "week" if req.GET.get("group") == "week" else "day",
+    ),
 }
 
 
 def support_admin_api_acquisition(request):
-    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
     if auth_response:
         return auth_response
     section = request.GET.get("section", "")
@@ -8541,7 +9077,7 @@ def support_admin_api_acquisition(request):
 
 
 def support_admin_api_ad_spends(request):
-    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
     if auth_response:
         return auth_response
     if request.method != "POST":
@@ -8705,6 +9241,1401 @@ def support_admin_api_ad_spends(request):
         return JsonResponse(
             {"status": "error", "message": "ошибка (миграция ad_spends накатана?)"},
             status=500,
+        )
+    finally:
+        db_session.close()
+
+
+# === Этап 3 плана админки: аудит-лог, таймлайн клиента, diff RWMS, сообщения ==
+
+
+def support_admin_actor(request):
+    # Этап 6 положит в сессию логин персонального admin-аккаунта; до тех пор
+    # актором считается роль сессии (admin/support).
+    return (
+        request.session.get("support_admin_account")
+        or support_admin_role(request)
+        or "unknown"
+    )
+
+
+def admin_client_ip(request):
+    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()[:64]
+    return (request.META.get("REMOTE_ADDR") or "")[:64] or None
+
+
+def admin_audit_write(db_session, request, action, target=None, **details):
+    """Запись в журнал действий админов; коммитит вызывающая сторона."""
+    try:
+        db_session.add(
+            AdminAuditLog(
+                actor=str(support_admin_actor(request))[:128],
+                source="site",
+                action=action[:64],
+                target=str(target)[:256] if target is not None else None,
+                details=details,
+                ip=admin_client_ip(request),
+            )
+        )
+    except Exception:
+        logging.exception("failed to write admin audit log for action %s", action)
+
+
+def support_admin_api_audit_log(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        try:
+            days = min(max(int(request.GET.get("days") or 30), 1), 365)
+            limit = min(max(int(request.GET.get("limit") or 200), 1), 1000)
+        except ValueError:
+            return JsonResponse({"status": "error", "message": "bad params"}, status=400)
+
+        query = (
+            db_session.query(AdminAuditLog)
+            .filter(
+                AdminAuditLog.created_at
+                >= datetime.utcnow() - timedelta(days=days)
+            )
+            .order_by(AdminAuditLog.created_at.desc())
+        )
+        action = (request.GET.get("action") or "").strip()
+        if action:
+            query = query.filter(AdminAuditLog.action == action)
+        actor = (request.GET.get("actor") or "").strip()
+        if actor:
+            query = query.filter(AdminAuditLog.actor == actor)
+        rows = query.limit(limit).all()
+
+        if request.GET.get("format") == "csv":
+            import csv
+            import io
+
+            def csv_cell(value):
+                text_value = "" if value is None else str(value)
+                # Защита от CSV-инъекций в Excel/Sheets.
+                if text_value[:1] in ("=", "+", "-", "@"):
+                    return "'" + text_value
+                return text_value
+
+            buffer = io.StringIO()
+            writer = csv.writer(buffer)
+            writer.writerow(["created_at", "actor", "source", "action", "target", "ip", "details"])
+            for row in rows:
+                writer.writerow(
+                    [
+                        row.created_at.isoformat() if row.created_at else "",
+                        csv_cell(row.actor),
+                        csv_cell(row.source),
+                        csv_cell(row.action),
+                        csv_cell(row.target),
+                        csv_cell(row.ip),
+                        csv_cell(json.dumps(row.details, ensure_ascii=False)),
+                    ]
+                )
+            response = HttpResponse(
+                "﻿" + buffer.getvalue(), content_type="text/csv; charset=utf-8"
+            )
+            response["Content-Disposition"] = "attachment; filename=admin_audit_log.csv"
+            return response
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "result": [
+                    {
+                        "created_at": admin_date_label(row.created_at),
+                        "actor": row.actor,
+                        "source": row.source,
+                        "action": row.action,
+                        "target": row.target,
+                        "details": row.details,
+                        "ip": row.ip,
+                    }
+                    for row in rows
+                ],
+            }
+        )
+    finally:
+        db_session.close()
+
+
+ADMIN_TIMELINE_LIMIT = 300
+
+# Человекочитаемые подписи событий event_logs для таймлайна клиента.
+ADMIN_TIMELINE_EVENT_LABELS = {
+    "subscription_created": ("Подписка", "Подписка создана"),
+    "subscription_merged": ("Подписка", "Аккаунты объединены"),
+    "subscription_expired": ("Подписка", "Подписка истекла"),
+    "subscription_activated": ("Подписка", "Подписка активирована"),
+    "first_successful_login": ("Кабинет", "Первый вход в кабинет"),
+    "traffic_source_changed": ("Прочее", "Смена источника трафика"),
+    "traffic_threshold_reached": ("Трафик", "Порог трафика"),
+    "notification_sent": ("Пуши", "Уведомление"),
+    "confirm_cancel_autopay_clicked": ("Платежи", "Отключил автоплатёж"),
+}
+
+
+def admin_user_timeline(db_session, user, limit=ADMIN_TIMELINE_LIMIT):
+    items = []
+
+    for event in (
+        db_session.query(EventLog)
+        .filter(EventLog.user_id == user.id)
+        .order_by(EventLog.timestamp.desc())
+        .limit(limit)
+        .all()
+    ):
+        category, title = ADMIN_TIMELINE_EVENT_LABELS.get(
+            event.event_type, ("Событие", event.event_type)
+        )
+        payload = event.event_payload or {}
+        if event.event_type == "traffic_threshold_reached":
+            title = f"Трафик: порог {payload.get('threshold', '?')} МБ"
+        elif event.event_type == "notification_sent":
+            title = (
+                f"Пуш {payload.get('notification_type', '?')}"
+                f" ({payload.get('channel', 'telegram')})"
+            )
+        elif event.event_type.startswith("payment_"):
+            category = "Платежи"
+            title = event.event_type.replace("payment_", "Платёж: ")
+        elif event.event_type.startswith("create_invoice"):
+            category = "Платежи"
+            title = "Создан инвойс " + event.event_type.replace("create_invoice_", "")
+        elif event.event_type.startswith("install_"):
+            category = "Установка"
+            title = event.event_type
+        items.append(
+            {
+                "ts": event.timestamp,
+                "category": category,
+                "title": title,
+                "details": payload,
+            }
+        )
+
+    for payment in (
+        db_session.query(YkPayment)
+        .filter(YkPayment.user_id == user.id)
+        .order_by(YkPayment.created_at.desc())
+        .limit(50)
+        .all()
+    ):
+        items.append(
+            {
+                "ts": payment.captured_at or payment.created_at,
+                "category": "Платежи",
+                "title": f"ЮКасса {payment.amount} ₽ · {payment.status}",
+                "details": {
+                    "tariff": payment.subscription_period,
+                    "payment_id": payment.payment_id,
+                },
+            }
+        )
+
+    for invoice, transaction in (
+        db_session.query(WataInvoice, WataTransaction)
+        .outerjoin(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+        .filter(WataInvoice.user_id == user.id)
+        .order_by(WataInvoice.creation_time.desc())
+        .limit(50)
+        .all()
+    ):
+        status = transaction.transaction_status if transaction else invoice.status
+        items.append(
+            {
+                "ts": invoice.creation_time.replace(tzinfo=None)
+                if invoice.creation_time
+                else None,
+                "category": "Платежи",
+                "title": f"WATA {invoice.amount} ₽ · {status}",
+                "details": {"tariff": invoice.tariff_id, "order_id": invoice.order_id},
+            }
+        )
+
+    for bonus in (
+        db_session.query(ReferralBonus)
+        .filter(
+            (ReferralBonus.referrer_id == user.id)
+            | (ReferralBonus.referral_id == user.id)
+        )
+        .order_by(ReferralBonus.created_at.desc())
+        .limit(50)
+        .all()
+    ):
+        direction = "получил бонус" if bonus.referrer_id == user.id else "принёс бонус"
+        items.append(
+            {
+                "ts": bonus.created_at,
+                "category": "Рефералка",
+                "title": f"{direction} {bonus.bonus_type.value} +{bonus.days_added} дн.",
+                "details": {},
+            }
+        )
+
+    block = db_session.get(UserBlock, user.id)
+    if block:
+        items.append(
+            {
+                "ts": block.created_at,
+                "category": "Блокировки",
+                "title": "Полная блокировка",
+                "details": {"reason": block.reason},
+            }
+        )
+    referral_block = db_session.get(ReferralProgramBlock, user.id)
+    if referral_block:
+        items.append(
+            {
+                "ts": referral_block.created_at,
+                "category": "Блокировки",
+                "title": "Блокировка рефералки",
+                "details": {"reason": referral_block.reason},
+            }
+        )
+
+    for message in (
+        db_session.query(AdminDirectMessage)
+        .filter(AdminDirectMessage.user_id == user.id)
+        .order_by(AdminDirectMessage.created_at.desc())
+        .limit(20)
+        .all()
+    ):
+        items.append(
+            {
+                "ts": message.created_at,
+                "category": "Поддержка",
+                "title": f"Сообщение от админа ({message.created_by})",
+                "details": {"text": message.text[:200]},
+            }
+        )
+
+    items = [item for item in items if item["ts"] is not None]
+    items.sort(key=lambda item: item["ts"], reverse=True)
+    return items[:limit]
+
+
+def support_admin_api_user_timeline(request):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        user = admin_find_user(db_session, request.GET.get("q"))
+        if not user:
+            return JsonResponse({"status": "not_found"}, status=404)
+
+        items = admin_user_timeline(db_session, user)
+        return JsonResponse(
+            {
+                "status": "ok",
+                "result": {
+                    "user": admin_user_payload(user),
+                    "items": [
+                        {
+                            "ts": admin_date_label(item["ts"]),
+                            "category": item["category"],
+                            "title": item["title"],
+                            "details": item["details"],
+                        }
+                        for item in items
+                    ],
+                },
+            }
+        )
+    finally:
+        db_session.close()
+
+
+RWMS_EXPIRE_DIFF_TOLERANCE = timedelta(minutes=5)
+
+
+def admin_rwms_diff(user, rwms_user):
+    """Список расхождений БД ↔ панель для карточки клиента."""
+    diffs = []
+    if rwms_user is None:
+        diffs.append(
+            {
+                "kind": "missing_in_panel",
+                "label": "Подписки нет в Remnawave",
+                "db": admin_date_label(user.expire_at),
+                "panel": "—",
+            }
+        )
+        return diffs
+
+    panel_expire = rwms_expire_at(rwms_user)
+    panel_expire_naive = (
+        panel_expire.astimezone(timezone.utc).replace(tzinfo=None)
+        if panel_expire
+        else None
+    )
+    db_expire = admin_dt(user.expire_at)
+    if panel_expire_naive and db_expire:
+        if abs(panel_expire_naive - db_expire) > RWMS_EXPIRE_DIFF_TOLERANCE:
+            diffs.append(
+                {
+                    "kind": "expire_diff",
+                    "label": "Разные даты окончания",
+                    "db": admin_date_label(db_expire),
+                    "panel": admin_date_label(panel_expire_naive),
+                }
+            )
+    status_name = proto.UserStatus.Name(rwms_user.status)
+    now = datetime.utcnow()
+    db_active = bool(db_expire and db_expire > now)
+    panel_active = status_name == "ACTIVE"
+    if db_active and not panel_active:
+        diffs.append(
+            {
+                "kind": "status_diff",
+                "label": "В БД активна, в панели " + status_name,
+                "db": "ACTIVE",
+                "panel": status_name,
+            }
+        )
+    return diffs
+
+
+def support_admin_api_rwms_sync(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "GET" and request.GET.get("action") == "mismatches":
+            rows = (
+                db_session.query(RwmsSyncMismatch)
+                .filter(RwmsSyncMismatch.resolved_at.is_(None))
+                .order_by(RwmsSyncMismatch.detected_at.desc())
+                .limit(500)
+                .all()
+            )
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "result": [
+                        {
+                            "username": row.username,
+                            "kind": row.kind,
+                            "details": row.details,
+                            "detected_at": admin_date_label(row.detected_at),
+                        }
+                        for row in rows
+                    ],
+                }
+            )
+
+        query = (
+            request.GET.get("q") if request.method == "GET" else request.POST.get("q")
+        )
+        user = admin_find_user(db_session, query)
+        if not user:
+            return JsonResponse({"status": "not_found"}, status=404)
+
+        rwms_user = rwms_client.get_user_by_username(user.username)
+
+        if request.method == "GET":
+            panel_payload = None
+            if rwms_user is not None:
+                panel_expire = rwms_expire_at(rwms_user)
+                panel_payload = {
+                    "expire_at": admin_date_label(
+                        panel_expire.astimezone(timezone.utc).replace(tzinfo=None)
+                        if panel_expire
+                        else None
+                    ),
+                    "status": proto.UserStatus.Name(rwms_user.status),
+                    "squads": [
+                        squad.uuid for squad in rwms_user.active_internal_squads
+                    ],
+                }
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "result": {
+                        "user": admin_user_payload(user),
+                        "panel": panel_payload,
+                        "diffs": admin_rwms_diff(user, rwms_user),
+                    },
+                }
+            )
+
+        # POST: направленная синхронизация. Только UPDATE полей подписки —
+        # никаких удалений/пересозданий (Remnawave Safety Rules).
+        action = request.POST.get("action")
+        if action == "push_to_panel":
+            if rwms_user is None:
+                return JsonResponse(
+                    {"status": "error", "message": "Подписки нет в панели — пуш недоступен"},
+                    status=404,
+                )
+            db_expire = admin_dt(user.expire_at)
+            if db_expire is None:
+                return JsonResponse(
+                    {"status": "error", "message": "В БД нет expire_at"}, status=400
+                )
+            response = rwms_client.update_user(
+                proto.UpdateUserRequest(
+                    uuid=rwms_user.uuid,
+                    expire_at=db_expire.replace(tzinfo=timezone.utc),
+                    status=proto.UserStatus.ACTIVE
+                    if db_expire > datetime.utcnow()
+                    else rwms_user.status,
+                    traffic_limit_strategy=proto.TrafficLimitStrategy.NO_RESET,
+                    active_internal_squads=[
+                        squad.uuid for squad in rwms_user.active_internal_squads
+                    ],
+                )
+            )
+            if response is None:
+                return JsonResponse(
+                    {"status": "error", "message": "RWMS не принял обновление"},
+                    status=502,
+                )
+            admin_audit_write(
+                db_session,
+                request,
+                "rwms_sync_push",
+                target=user.username,
+                expire_at=str(user.expire_at),
+            )
+            db_session.commit()
+            return JsonResponse({"status": "ok", "result": {"synced": "to_panel"}})
+
+        if action == "pull_from_panel":
+            if rwms_user is None:
+                return JsonResponse(
+                    {"status": "error", "message": "Подписки нет в панели"}, status=404
+                )
+            panel_expire = rwms_expire_at(rwms_user)
+            if panel_expire is None:
+                return JsonResponse(
+                    {"status": "error", "message": "В панели нет expire_at"}, status=400
+                )
+            old_expire = user.expire_at
+            user.expire_at = panel_expire.astimezone(timezone.utc).replace(tzinfo=None)
+            admin_audit_write(
+                db_session,
+                request,
+                "rwms_sync_pull",
+                target=user.username,
+                old=str(old_expire),
+                new=str(user.expire_at),
+            )
+            db_session.commit()
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "result": {
+                        "synced": "from_panel",
+                        "user": admin_user_payload(user),
+                    },
+                }
+            )
+
+        return JsonResponse(
+            {"status": "error", "message": "Неизвестное действие"}, status=400
+        )
+    finally:
+        db_session.close()
+
+
+ADMIN_DIRECT_MESSAGE_MAX_LEN = 3500
+
+
+def support_admin_api_direct_message(request):
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "POST":
+            user = admin_find_user(db_session, request.POST.get("q"))
+            if not user:
+                return JsonResponse({"status": "not_found"}, status=404)
+            text_value = (request.POST.get("text") or "").strip()
+            if not text_value:
+                return JsonResponse(
+                    {"status": "error", "message": "Пустое сообщение"}, status=400
+                )
+            if len(text_value) > ADMIN_DIRECT_MESSAGE_MAX_LEN:
+                return JsonResponse(
+                    {"status": "error", "message": "Сообщение слишком длинное"},
+                    status=400,
+                )
+            if not user.telegram_id:
+                return JsonResponse(
+                    {"status": "error", "message": "У пользователя нет Telegram ID"},
+                    status=400,
+                )
+            message = AdminDirectMessage(
+                user_id=user.id,
+                text=text_value,
+                created_by=str(support_admin_actor(request))[:128],
+            )
+            db_session.add(message)
+            admin_audit_write(
+                db_session,
+                request,
+                "direct_message",
+                target=user.username,
+                length=len(text_value),
+            )
+            db_session.commit()
+            return JsonResponse({"status": "ok", "result": {"message_id": message.id}})
+
+        user = admin_find_user(db_session, request.GET.get("q"))
+        if not user:
+            return JsonResponse({"status": "not_found"}, status=404)
+        messages = (
+            db_session.query(AdminDirectMessage)
+            .filter(AdminDirectMessage.user_id == user.id)
+            .order_by(AdminDirectMessage.created_at.desc())
+            .limit(20)
+            .all()
+        )
+        deliveries = {}
+        if messages:
+            for delivery in (
+                db_session.query(AdminDirectMessageDelivery)
+                .filter(
+                    AdminDirectMessageDelivery.message_id.in_(
+                        [message.id for message in messages]
+                    )
+                )
+                .all()
+            ):
+                deliveries.setdefault(delivery.message_id, []).append(
+                    {"bot": delivery.bot_id, "status": delivery.status}
+                )
+        return JsonResponse(
+            {
+                "status": "ok",
+                "result": [
+                    {
+                        "id": message.id,
+                        "text": message.text,
+                        "created_by": message.created_by,
+                        "created_at": admin_date_label(message.created_at),
+                        "deliveries": deliveries.get(message.id, []),
+                    }
+                    for message in messages
+                ],
+            }
+        )
+    finally:
+        db_session.close()
+
+
+# === Этап 4 плана админки: сегменты, рассылки, массовые операции =============
+
+
+def support_admin_api_segments(request):
+    auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        result = []
+        for key, (label, _condition) in ADMIN_SEGMENTS.items():
+            count = db_session.execute(sa_text(segment_count_sql(key))).scalar() or 0
+            result.append({"key": key, "label": label, "count": int(count)})
+        return JsonResponse({"status": "ok", "result": result})
+    finally:
+        db_session.close()
+
+
+BROADCAST_TEXT_MAX_LEN = 3500
+BROADCAST_MAX_BUTTONS = 3
+
+
+def admin_broadcast_progress(db_session, broadcast):
+    covered, sent = db_session.execute(
+        sa_text(
+            """
+            SELECT count(DISTINCT user_id),
+                   count(DISTINCT user_id) FILTER (WHERE status = 'sent')
+            FROM broadcast_deliveries WHERE broadcast_id = :bid
+            """
+        ),
+        {"bid": broadcast.id},
+    ).one()
+    return int(covered), int(sent)
+
+
+def admin_broadcast_payload(db_session, broadcast):
+    covered, sent = admin_broadcast_progress(db_session, broadcast)
+    total = broadcast.total or 0
+    # Рассылка исчерпана: каждый получатель сегмента имеет хотя бы одну
+    # терминальную запись доставки. Помечаем done лениво при опросе.
+    if broadcast.status == "running" and total and covered >= total:
+        broadcast.status = "done"
+        broadcast.finished_at = datetime.utcnow()
+        db_session.commit()
+    return {
+        "id": broadcast.id,
+        "title": broadcast.title,
+        "segment": broadcast.segment,
+        "segment_label": ADMIN_SEGMENTS.get(broadcast.segment, (broadcast.segment,))[0],
+        "status": broadcast.status,
+        "text": broadcast.text,
+        "buttons": broadcast.buttons or [],
+        "total": total,
+        "covered": covered,
+        "sent": sent,
+        "progress_pct": round(100.0 * covered / total, 1) if total else 0,
+        "created_by": broadcast.created_by,
+        "created_at": admin_date_label(broadcast.created_at),
+        "finished_at": admin_date_label(broadcast.finished_at),
+    }
+
+
+def support_admin_api_broadcasts(request):
+    auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "GET":
+            broadcasts = (
+                db_session.query(Broadcast)
+                .order_by(Broadcast.created_at.desc())
+                .limit(50)
+                .all()
+            )
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "result": [
+                        admin_broadcast_payload(db_session, broadcast)
+                        for broadcast in broadcasts
+                    ],
+                }
+            )
+
+        if request.method != "POST":
+            return JsonResponse({"status": "error"}, status=405)
+
+        action = request.POST.get("action")
+        if action == "stop":
+            broadcast = db_session.get(Broadcast, int(request.POST.get("id") or 0))
+            if not broadcast:
+                return JsonResponse({"status": "not_found"}, status=404)
+            if broadcast.status == "running":
+                broadcast.status = "stopped"
+                broadcast.finished_at = datetime.utcnow()
+                admin_audit_write(
+                    db_session, request, "broadcast_stop", target=str(broadcast.id)
+                )
+                db_session.commit()
+            return JsonResponse(
+                {"status": "ok", "result": admin_broadcast_payload(db_session, broadcast)}
+            )
+
+        if action == "create":
+            title = (request.POST.get("title") or "").strip()[:256]
+            text_value = (request.POST.get("text") or "").strip()
+            segment = (request.POST.get("segment") or "").strip()
+            if not title or not text_value:
+                return JsonResponse(
+                    {"status": "error", "message": "Заполните название и текст"},
+                    status=400,
+                )
+            if len(text_value) > BROADCAST_TEXT_MAX_LEN:
+                return JsonResponse(
+                    {"status": "error", "message": "Текст слишком длинный"}, status=400
+                )
+            if segment not in ADMIN_SEGMENTS:
+                return JsonResponse(
+                    {"status": "error", "message": "Неизвестный сегмент"}, status=400
+                )
+            try:
+                buttons = json.loads(request.POST.get("buttons") or "[]")
+            except ValueError:
+                return JsonResponse(
+                    {"status": "error", "message": "Кнопки: некорректный JSON"},
+                    status=400,
+                )
+            if not isinstance(buttons, list) or len(buttons) > BROADCAST_MAX_BUTTONS:
+                return JsonResponse(
+                    {"status": "error", "message": "Не больше 3 кнопок"}, status=400
+                )
+            clean_buttons = []
+            for button in buttons:
+                text_label = str(button.get("text") or "").strip()[:64]
+                url = str(button.get("url") or "").strip()[:512]
+                if not text_label or not url.startswith("https://"):
+                    return JsonResponse(
+                        {
+                            "status": "error",
+                            "message": "У кнопки нужны текст и https-ссылка",
+                        },
+                        status=400,
+                    )
+                clean_buttons.append({"text": text_label, "url": url})
+
+            total = db_session.execute(sa_text(segment_count_sql(segment))).scalar() or 0
+            if not total:
+                return JsonResponse(
+                    {"status": "error", "message": "В сегменте нет получателей"},
+                    status=400,
+                )
+
+            broadcast = Broadcast(
+                title=title,
+                text=text_value,
+                segment=segment,
+                status="running",
+                buttons=clean_buttons,
+                total=int(total),
+                created_by=str(support_admin_actor(request))[:128],
+            )
+            db_session.add(broadcast)
+            admin_audit_write(
+                db_session,
+                request,
+                "broadcast_create",
+                target=title,
+                segment=segment,
+                total=int(total),
+            )
+            db_session.commit()
+            return JsonResponse(
+                {"status": "ok", "result": admin_broadcast_payload(db_session, broadcast)}
+            )
+
+        return JsonResponse(
+            {"status": "error", "message": "Неизвестное действие"}, status=400
+        )
+    finally:
+        db_session.close()
+
+
+BULK_MAX_IDS = 500
+BULK_ACTIONS = {"extend_days", "block", "unblock", "referral_block", "referral_unblock"}
+
+
+def admin_bulk_find_users(db_session, raw_ids):
+    """Резолвит строки (telegram_id / username / email) в пользователей."""
+    tokens = []
+    for line in raw_ids.replace(",", "\n").splitlines():
+        token = line.strip()
+        if token:
+            tokens.append(token)
+    tokens = tokens[: BULK_MAX_IDS + 1]
+
+    resolved = []
+    missing = []
+    seen_ids = set()
+    for token in tokens:
+        user = admin_find_user(db_session, token)
+        if user is None:
+            missing.append(token)
+        elif user.id not in seen_ids:
+            seen_ids.add(user.id)
+            resolved.append((token, user))
+    return resolved, missing
+
+
+def admin_bulk_extend(db_session, user, days):
+    current_expire = admin_dt(user.expire_at)
+    base = max(current_expire or datetime.utcnow(), datetime.utcnow())
+    target_expire = base.replace(tzinfo=timezone.utc) + timedelta(days=days)
+    user.expire_at = target_expire.replace(tzinfo=None)
+
+    rwms_user = rwms_client.get_user_by_username(user.username)
+    if rwms_user is None:
+        return "продлено в БД; подписки нет в RWMS (панель не тронута)"
+    user_email = (
+        rwms_user.email if rwms_user.email and "@" in rwms_user.email else None
+    )
+    response = rwms_client.update_user(
+        proto.UpdateUserRequest(
+            uuid=rwms_user.uuid,
+            email=user_email,
+            telegram_id=rwms_user.telegram_id,
+            expire_at=target_expire,
+            status=proto.UserStatus.ACTIVE,
+            traffic_limit_strategy=proto.TrafficLimitStrategy.NO_RESET,
+            active_internal_squads=[
+                squad.uuid for squad in rwms_user.active_internal_squads
+            ],
+        )
+    )
+    if response is None:
+        raise RuntimeError("RWMS не принял продление")
+    return f"продлено до {target_expire:%Y-%m-%d %H:%M} UTC"
+
+
+def admin_bulk_block(db_session, user, reason):
+    if db_session.get(UserBlock, user.id) is None:
+        db_session.add(UserBlock(user_id=user.id, reason=reason[:512]))
+    user.autopay_allow = False
+    db_session.query(YkRecurrentPayment).filter(
+        YkRecurrentPayment.user_id == user.id
+    ).delete(synchronize_session=False)
+    rwms_user = rwms_client.get_user_by_username(user.username)
+    if rwms_user is not None:
+        rwms_client.update_user(
+            proto.UpdateUserRequest(
+                uuid=rwms_user.uuid, status=proto.UserStatus.DISABLED
+            )
+        )
+    return "заблокирован (DISABLED в панели, автоплатёж снят)"
+
+
+def admin_bulk_unblock(db_session, user):
+    db_session.query(UserBlock).filter(UserBlock.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db_expire = admin_dt(user.expire_at)
+    if db_expire and db_expire > datetime.utcnow():
+        rwms_user = rwms_client.get_user_by_username(user.username)
+        if rwms_user is not None:
+            rwms_client.update_user(
+                proto.UpdateUserRequest(
+                    uuid=rwms_user.uuid, status=proto.UserStatus.ACTIVE
+                )
+            )
+        return "разблокирован (ACTIVE в панели)"
+    return "разблокирован (подписка истекла, панель не активировалась)"
+
+
+def support_admin_api_bulk(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+    if request.method != "POST":
+        return JsonResponse({"status": "error"}, status=405)
+
+    action = request.POST.get("action")
+    if action not in BULK_ACTIONS:
+        return JsonResponse(
+            {"status": "error", "message": "Неизвестное действие"}, status=400
+        )
+    dry_run = (request.POST.get("dry_run") or "") == "1"
+    reason = (request.POST.get("reason") or "bulk admin action").strip()
+
+    days = 0
+    if action == "extend_days":
+        try:
+            days = int(request.POST.get("days") or "0")
+        except ValueError:
+            return JsonResponse(
+                {"status": "error", "message": "Дни должны быть числом"}, status=400
+            )
+        if not 1 <= days <= 365:
+            return JsonResponse(
+                {"status": "error", "message": "Дни: от 1 до 365"}, status=400
+            )
+
+    db_session = session_factory()
+    try:
+        resolved, missing = admin_bulk_find_users(
+            db_session, request.POST.get("ids") or ""
+        )
+        if len(resolved) > BULK_MAX_IDS:
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": f"Не больше {BULK_MAX_IDS} пользователей за раз",
+                },
+                status=400,
+            )
+        if not resolved:
+            return JsonResponse(
+                {"status": "error", "message": "Ни один пользователь не найден"},
+                status=400,
+            )
+
+        results = []
+        applied = 0
+        for token, user in resolved:
+            if dry_run:
+                current = admin_dt(user.expire_at)
+                preview = {
+                    "extend_days": (
+                        f"будет продлён на {days} дн. "
+                        f"(сейчас до {current:%Y-%m-%d %H:%M} UTC)"
+                        if current
+                        else f"будет продлён на {days} дн. (сейчас без подписки)"
+                    ),
+                    "block": "будет заблокирован (DISABLED, автоплатёж снят)",
+                    "unblock": "будет разблокирован",
+                    "referral_block": "рефералка будет заблокирована",
+                    "referral_unblock": "рефералка будет разблокирована",
+                }[action]
+                results.append(
+                    {"token": token, "username": user.username, "ok": True,
+                     "message": preview}
+                )
+                continue
+            try:
+                if action == "extend_days":
+                    message = admin_bulk_extend(db_session, user, days)
+                elif action == "block":
+                    message = admin_bulk_block(db_session, user, reason)
+                elif action == "unblock":
+                    message = admin_bulk_unblock(db_session, user)
+                elif action == "referral_block":
+                    block = db_session.get(ReferralProgramBlock, user.id)
+                    if block:
+                        block.reason = reason[:512]
+                    else:
+                        db_session.add(
+                            ReferralProgramBlock(user_id=user.id, reason=reason[:512])
+                        )
+                    message = "рефералка заблокирована"
+                else:
+                    db_session.execute(
+                        sa_delete(ReferralProgramBlock).where(
+                            ReferralProgramBlock.user_id == user.id
+                        )
+                    )
+                    message = "рефералка разблокирована"
+                db_session.commit()
+                applied += 1
+                results.append(
+                    {"token": token, "username": user.username, "ok": True,
+                     "message": message}
+                )
+            except Exception as error:
+                db_session.rollback()
+                logging.exception("bulk action %s failed for %s", action, user.username)
+                results.append(
+                    {"token": token, "username": user.username, "ok": False,
+                     "message": str(error)[:200]}
+                )
+
+        if not dry_run:
+            admin_audit_write(
+                db_session,
+                request,
+                "bulk_" + action,
+                target=f"{applied}/{len(resolved)} users",
+                days=days if action == "extend_days" else None,
+                missing=len(missing),
+            )
+            db_session.commit()
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "result": {
+                    "dry_run": dry_run,
+                    "applied": applied,
+                    "total": len(resolved),
+                    "missing": missing,
+                    "rows": results,
+                },
+            }
+        )
+    finally:
+        db_session.close()
+
+
+# === Этап 5 плана админки: промокоды и купоны ================================
+
+PROMO_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ23456789"  # без похожих символов
+PROMO_BATCH_MAX_CODES = 500
+
+
+def generate_promo_code(prefix=""):
+    import secrets
+
+    body = "".join(secrets.choice(PROMO_CODE_ALPHABET) for _ in range(8))
+    return (prefix + body)[:64].upper()
+
+
+def admin_promo_payload(promo, bot_username):
+    return {
+        "id": promo.id,
+        "code": promo.code,
+        "deep_link": f"https://t.me/{bot_username}?start=promo_{promo.code}",
+        "batch_id": promo.batch_id,
+        "promo_type": promo.promo_type,
+        "value": promo.value,
+        "max_uses": promo.max_uses,
+        "used_count": promo.used_count,
+        "first_purchase_only": bool(promo.first_purchase_only),
+        "valid_until": admin_date_label(promo.valid_until),
+        "is_active": bool(promo.is_active),
+        "comment": promo.comment,
+        "created_by": promo.created_by,
+        "created_at": admin_date_label(promo.created_at),
+    }
+
+
+def support_admin_api_promocodes(request):
+    auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
+    if auth_response:
+        return auth_response
+
+    bot_username = settings.TG_BOT_USERNAME
+    db_session = session_factory()
+    try:
+        if request.method == "GET":
+            if request.GET.get("action") == "batch_links":
+                try:
+                    batch_id = int(request.GET.get("batch_id") or 0)
+                except ValueError:
+                    return JsonResponse({"status": "error"}, status=400)
+                batch = db_session.get(PromoBatch, batch_id)
+                if not batch:
+                    return JsonResponse({"status": "not_found"}, status=404)
+                codes = (
+                    db_session.query(PromoCode)
+                    .filter(PromoCode.batch_id == batch_id)
+                    .order_by(PromoCode.id)
+                    .all()
+                )
+                lines = [
+                    f"{promo.code}\thttps://t.me/{bot_username}?start=promo_{promo.code}"
+                    for promo in codes
+                ]
+                response = HttpResponse(
+                    "\n".join(lines), content_type="text/plain; charset=utf-8"
+                )
+                response["Content-Disposition"] = (
+                    f"attachment; filename=promo_batch_{batch_id}.txt"
+                )
+                return response
+
+            promos = (
+                db_session.query(PromoCode)
+                .order_by(PromoCode.created_at.desc())
+                .limit(300)
+                .all()
+            )
+            batches = (
+                db_session.query(PromoBatch)
+                .order_by(PromoBatch.created_at.desc())
+                .limit(50)
+                .all()
+            )
+            batch_counts = dict(
+                db_session.execute(
+                    sa_text(
+                        """
+                        SELECT batch_id, count(*) FROM promo_codes
+                        WHERE batch_id IS NOT NULL GROUP BY batch_id
+                        """
+                    )
+                ).all()
+            )
+            batch_used = dict(
+                db_session.execute(
+                    sa_text(
+                        """
+                        SELECT batch_id, coalesce(sum(used_count), 0)
+                        FROM promo_codes
+                        WHERE batch_id IS NOT NULL GROUP BY batch_id
+                        """
+                    )
+                ).all()
+            )
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "result": {
+                        "codes": [
+                            admin_promo_payload(promo, bot_username)
+                            for promo in promos
+                            if promo.batch_id is None
+                        ],
+                        "batches": [
+                            {
+                                "id": batch.id,
+                                "name": batch.name,
+                                "comment": batch.comment,
+                                "codes": int(batch_counts.get(batch.id, 0)),
+                                "used": int(batch_used.get(batch.id, 0)),
+                                "created_at": admin_date_label(batch.created_at),
+                            }
+                            for batch in batches
+                        ],
+                    },
+                }
+            )
+
+        if request.method != "POST":
+            return JsonResponse({"status": "error"}, status=405)
+
+        action = request.POST.get("action")
+
+        def parse_common():
+            promo_type = request.POST.get("promo_type")
+            if promo_type not in ("days", "discount"):
+                raise ValueError("Тип: days или discount")
+            value = int(request.POST.get("value") or 0)
+            if promo_type == "days" and not 1 <= value <= 365:
+                raise ValueError("Дни: от 1 до 365")
+            if promo_type == "discount" and not 1 <= value <= 99:
+                raise ValueError("Скидка: от 1 до 99%")
+            max_uses = int(request.POST.get("max_uses") or 0)
+            if max_uses < 0:
+                raise ValueError("Лимит не может быть отрицательным")
+            valid_until = None
+            raw_until = (request.POST.get("valid_until") or "").strip()
+            if raw_until:
+                valid_until = datetime.fromisoformat(raw_until)
+            return promo_type, value, max_uses, valid_until
+
+        if action == "create":
+            try:
+                promo_type, value, max_uses, valid_until = parse_common()
+            except ValueError as error:
+                return JsonResponse(
+                    {"status": "error", "message": str(error)}, status=400
+                )
+            code = (request.POST.get("code") or "").strip().upper()[:64]
+            if not code:
+                code = generate_promo_code()
+            if db_session.query(PromoCode).filter(PromoCode.code == code).first():
+                return JsonResponse(
+                    {"status": "error", "message": "Такой код уже существует"},
+                    status=400,
+                )
+            promo = PromoCode(
+                code=code,
+                promo_type=promo_type,
+                value=value,
+                max_uses=max_uses,
+                first_purchase_only=(request.POST.get("first_purchase_only") == "1"),
+                valid_until=valid_until,
+                comment=(request.POST.get("comment") or "").strip()[:512] or None,
+                created_by=str(support_admin_actor(request))[:128],
+            )
+            db_session.add(promo)
+            admin_audit_write(
+                db_session, request, "promo_create", target=code,
+                promo_type=promo_type, value=value,
+            )
+            db_session.commit()
+            return JsonResponse(
+                {"status": "ok", "result": admin_promo_payload(promo, bot_username)}
+            )
+
+        if action == "create_batch":
+            try:
+                promo_type, value, _max_uses, valid_until = parse_common()
+                count = int(request.POST.get("count") or 0)
+            except ValueError as error:
+                return JsonResponse(
+                    {"status": "error", "message": str(error)}, status=400
+                )
+            if not 1 <= count <= PROMO_BATCH_MAX_CODES:
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": f"Число кодов: от 1 до {PROMO_BATCH_MAX_CODES}",
+                    },
+                    status=400,
+                )
+            name = (request.POST.get("name") or "").strip()[:128]
+            if not name:
+                return JsonResponse(
+                    {"status": "error", "message": "Назовите партию"}, status=400
+                )
+            batch = PromoBatch(
+                name=name,
+                comment=(request.POST.get("comment") or "").strip()[:512] or None,
+                created_by=str(support_admin_actor(request))[:128],
+            )
+            db_session.add(batch)
+            db_session.flush()
+            existing_codes = {
+                row[0] for row in db_session.query(PromoCode.code).all()
+            }
+            created = 0
+            while created < count:
+                code = generate_promo_code()
+                if code in existing_codes:
+                    continue
+                existing_codes.add(code)
+                db_session.add(
+                    PromoCode(
+                        code=code,
+                        batch_id=batch.id,
+                        promo_type=promo_type,
+                        value=value,
+                        max_uses=1,  # купоны партии всегда одноразовые
+                        first_purchase_only=(
+                            request.POST.get("first_purchase_only") == "1"
+                        ),
+                        valid_until=valid_until,
+                        created_by=str(support_admin_actor(request))[:128],
+                    )
+                )
+                created += 1
+            admin_audit_write(
+                db_session, request, "promo_batch_create", target=name,
+                count=count, promo_type=promo_type, value=value,
+            )
+            db_session.commit()
+            return JsonResponse({"status": "ok", "result": {"batch_id": batch.id}})
+
+        if action == "toggle":
+            promo = db_session.get(PromoCode, int(request.POST.get("id") or 0))
+            if not promo:
+                return JsonResponse({"status": "not_found"}, status=404)
+            promo.is_active = not promo.is_active
+            admin_audit_write(
+                db_session, request,
+                "promo_enable" if promo.is_active else "promo_disable",
+                target=promo.code,
+            )
+            db_session.commit()
+            return JsonResponse(
+                {"status": "ok", "result": admin_promo_payload(promo, bot_username)}
+            )
+
+        return JsonResponse(
+            {"status": "error", "message": "Неизвестное действие"}, status=400
+        )
+    finally:
+        db_session.close()
+
+
+# === Этап 6 плана админки: персональные аккаунты сотрудников =================
+
+ADMIN_ACCOUNT_ROLES = ("full", "marketer", "support")
+
+
+def support_admin_api_accounts(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "GET":
+            accounts = (
+                db_session.query(AdminAccount).order_by(AdminAccount.login).all()
+            )
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "result": [
+                        {
+                            "id": account.id,
+                            "login": account.login,
+                            "display_name": account.display_name,
+                            "role": account.role,
+                            "is_active": bool(account.is_active),
+                            "created_at": admin_date_label(account.created_at),
+                            "last_login_at": admin_date_label(account.last_login_at),
+                        }
+                        for account in accounts
+                    ],
+                }
+            )
+
+        if request.method != "POST":
+            return JsonResponse({"status": "error"}, status=405)
+
+        action = request.POST.get("action")
+
+        if action == "create":
+            login_name = (request.POST.get("login") or "").strip().lower()[:64]
+            password = request.POST.get("password") or ""
+            role = request.POST.get("role") or ""
+            if not login_name or not login_name.isidentifier():
+                return JsonResponse(
+                    {"status": "error", "message": "Логин: латиница/цифры/подчёркивание"},
+                    status=400,
+                )
+            if len(password) < 8:
+                return JsonResponse(
+                    {"status": "error", "message": "Пароль: минимум 8 символов"},
+                    status=400,
+                )
+            if role not in ADMIN_ACCOUNT_ROLES:
+                return JsonResponse(
+                    {"status": "error", "message": "Роль: full, marketer или support"},
+                    status=400,
+                )
+            if (
+                db_session.query(AdminAccount)
+                .filter(AdminAccount.login == login_name)
+                .first()
+            ):
+                return JsonResponse(
+                    {"status": "error", "message": "Логин уже занят"}, status=400
+                )
+            account = AdminAccount(
+                login=login_name,
+                password_hash=make_password(password),
+                display_name=(request.POST.get("display_name") or "").strip()[:128]
+                or None,
+                role=role,
+            )
+            db_session.add(account)
+            admin_audit_write(
+                db_session, request, "admin_account_create", target=login_name,
+                role=role,
+            )
+            db_session.commit()
+            return JsonResponse({"status": "ok"})
+
+        account = db_session.get(AdminAccount, int(request.POST.get("id") or 0))
+        if not account:
+            return JsonResponse({"status": "not_found"}, status=404)
+
+        if action == "toggle":
+            account.is_active = not account.is_active
+            admin_audit_write(
+                db_session, request,
+                "admin_account_enable" if account.is_active else "admin_account_disable",
+                target=account.login,
+            )
+            db_session.commit()
+            return JsonResponse({"status": "ok"})
+
+        if action == "set_role":
+            role = request.POST.get("role") or ""
+            if role not in ADMIN_ACCOUNT_ROLES:
+                return JsonResponse(
+                    {"status": "error", "message": "Роль: full, marketer или support"},
+                    status=400,
+                )
+            account.role = role
+            admin_audit_write(
+                db_session, request, "admin_account_set_role",
+                target=account.login, role=role,
+            )
+            db_session.commit()
+            return JsonResponse({"status": "ok"})
+
+        if action == "set_password":
+            password = request.POST.get("password") or ""
+            if len(password) < 8:
+                return JsonResponse(
+                    {"status": "error", "message": "Пароль: минимум 8 символов"},
+                    status=400,
+                )
+            account.password_hash = make_password(password)
+            admin_audit_write(
+                db_session, request, "admin_account_set_password",
+                target=account.login,
+            )
+            db_session.commit()
+            return JsonResponse({"status": "ok"})
+
+        return JsonResponse(
+            {"status": "error", "message": "Неизвестное действие"}, status=400
         )
     finally:
         db_session.close()

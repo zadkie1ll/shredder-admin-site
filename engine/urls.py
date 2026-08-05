@@ -123,6 +123,51 @@ urlpatterns = [
         name="support_admin_api_top_payments",
     ),
     path(
+        "support-admin/api/audit-log/",
+        views.support_admin_api_audit_log,
+        name="support_admin_api_audit_log",
+    ),
+    path(
+        "support-admin/api/user-timeline/",
+        views.support_admin_api_user_timeline,
+        name="support_admin_api_user_timeline",
+    ),
+    path(
+        "support-admin/api/rwms-sync/",
+        views.support_admin_api_rwms_sync,
+        name="support_admin_api_rwms_sync",
+    ),
+    path(
+        "support-admin/api/direct-message/",
+        views.support_admin_api_direct_message,
+        name="support_admin_api_direct_message",
+    ),
+    path(
+        "support-admin/api/segments/",
+        views.support_admin_api_segments,
+        name="support_admin_api_segments",
+    ),
+    path(
+        "support-admin/api/broadcasts/",
+        views.support_admin_api_broadcasts,
+        name="support_admin_api_broadcasts",
+    ),
+    path(
+        "support-admin/api/bulk/",
+        views.support_admin_api_bulk,
+        name="support_admin_api_bulk",
+    ),
+    path(
+        "support-admin/api/promocodes/",
+        views.support_admin_api_promocodes,
+        name="support_admin_api_promocodes",
+    ),
+    path(
+        "support-admin/api/accounts/",
+        views.support_admin_api_accounts,
+        name="support_admin_api_accounts",
+    ),
+    path(
         "support-admin/api/traffic-nodes/",
         views.support_admin_api_traffic_nodes,
         name="support_admin_api_traffic_nodes",
