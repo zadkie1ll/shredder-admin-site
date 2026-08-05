@@ -1294,10 +1294,12 @@ def build_payment_retry_url(request, token):
 
 
 def site_apply_first_purchase_discount(db_session, user, tariff):
-    """Персональная промо-скидка на первую покупку (активируется в боте).
+    """Персональная промо-скидка (активируется в боте).
 
-    Возвращает (tariff, applied). Скидка действует, только пока пользователь
-    ни разу не платил; рекуррент заводится по регулярной цене (metadata.promo).
+    Возвращает (tariff, applied). Скидка одноразовая: сгорает после первой
+    успешной оплаты с момента активации, платежи до активации не мешают —
+    код можно выдать и действующему клиенту. Рекуррент заводится по
+    регулярной цене (metadata.promo).
     """
     try:
         discount = (
@@ -1311,20 +1313,37 @@ def site_apply_first_purchase_discount(db_session, user, tariff):
             return tariff, False
         if not 1 <= (discount.percent or 0) <= 99:
             return tariff, False
+        if discount.source_promo_id is not None:
+            # Выключение промокода в админке гасит и выданные им скидки.
+            promo_is_active = (
+                db_session.query(PromoCode.is_active)
+                .filter(PromoCode.id == discount.source_promo_id)
+                .scalar()
+            )
+            if promo_is_active is False:
+                return tariff, False
 
-        has_paid = (
-            db_session.query(YkPayment.id)
-            .filter(YkPayment.user_id == user.id, YkPayment.status == "succeeded")
-            .first()
-            is not None
-            or db_session.query(WataTransaction.id)
+        activated_at = discount.created_at
+        yk_paid_query = db_session.query(YkPayment.id).filter(
+            YkPayment.user_id == user.id, YkPayment.status == "succeeded"
+        )
+        wata_paid_query = (
+            db_session.query(WataTransaction.id)
             .join(WataInvoice, WataInvoice.order_id == WataTransaction.order_id)
             .filter(
                 WataInvoice.user_id == user.id,
                 WataTransaction.transaction_status == "Paid",
             )
-            .first()
-            is not None
+        )
+        if activated_at is not None:
+            yk_paid_query = yk_paid_query.filter(YkPayment.created_at > activated_at)
+            # payment_time хранится с таймзоной — сравниваем с aware-версией.
+            wata_paid_query = wata_paid_query.filter(
+                WataTransaction.payment_time
+                > activated_at.replace(tzinfo=timezone.utc)
+            )
+        has_paid = (
+            yk_paid_query.first() is not None or wata_paid_query.first() is not None
         )
         if has_paid:
             return tariff, False
