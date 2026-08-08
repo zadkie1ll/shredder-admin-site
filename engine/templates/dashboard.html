@@ -1452,7 +1452,7 @@
             color: #0a0a0a !important;
         }
 
-        /* Пункт списка «Настройки» — отдельная карточка (как у Akenai),
+        /* Пункт списка «Профиль» — отдельная карточка (как у Akenai),
            а не строки внутри одной большой рамки: пункты читаются по одному. */
         .settings-item {
             background: var(--card-bg);
@@ -2527,6 +2527,332 @@
             }
         }
 
+        /* Главная Telegram Mini App: отдельная mobile-first композиция без
+           десктопных hero-блоков, крупного счётчика дней и дублирующих CTA. */
+        body.tg-webapp {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background: #090a0f;
+        }
+
+        body.tg-webapp .page-background {
+            display: none;
+        }
+
+        body.tg-webapp #app-container {
+            background: #090a0f;
+        }
+
+        .tg-mini-home {
+            display: none;
+            width: 100%;
+            max-width: 560px;
+            margin: 0 auto;
+        }
+
+        body.tg-webapp .tg-mini-home {
+            display: block;
+        }
+
+        .standard-dashboard-home {
+            display: block;
+        }
+
+        .tg-mini-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin: 4px 0 26px;
+            color: #ffc700;
+            font-size: 20px;
+            line-height: 1.2;
+            font-weight: 600;
+        }
+
+        .tg-mini-brand-mark {
+            width: 46px;
+            height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex: 0 0 auto;
+            overflow: hidden;
+            border: 1px solid rgba(255, 199, 0, 0.72);
+            border-radius: 50%;
+            background: #090a0f;
+        }
+
+        .tg-mini-brand-mark img {
+            width: 36px;
+            height: 36px;
+            object-fit: cover;
+            filter: sepia(1) saturate(7) hue-rotate(2deg) brightness(1.08);
+        }
+
+        .tg-mini-status-card,
+        .tg-mini-action-list {
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 18px;
+            background: #14151a;
+            box-shadow: none;
+        }
+
+        .tg-mini-status-card {
+            padding: 24px 22px;
+        }
+
+        .tg-mini-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 0 0 22px;
+            color: #54df8f;
+            font-size: 16px;
+            line-height: 1.3;
+            font-weight: 600;
+        }
+
+        .tg-mini-status::before {
+            content: "";
+            width: 10px;
+            height: 10px;
+            flex: 0 0 auto;
+            border-radius: 50%;
+            background: currentColor;
+        }
+
+        .tg-mini-status-card.is-warning .tg-mini-status {
+            color: #ffc700;
+        }
+
+        .tg-mini-status-card.is-inactive .tg-mini-status {
+            color: #ff6670;
+        }
+
+        .tg-mini-expiry {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin-bottom: 14px;
+        }
+
+        .tg-mini-expiry i {
+            width: 28px;
+            flex: 0 0 auto;
+            color: rgba(255, 255, 255, 0.62);
+            font-size: 23px;
+            text-align: center;
+        }
+
+        .tg-mini-expiry h1 {
+            margin: 0;
+            color: #fff;
+            font-size: 27px !important;
+            line-height: 1.18 !important;
+            font-weight: 600 !important;
+            letter-spacing: -0.015em !important;
+        }
+
+        .tg-mini-status-note {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 14px;
+            line-height: 1.5;
+            font-weight: 400;
+        }
+
+        .tg-mini-primary {
+            width: 100%;
+            min-height: 52px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            margin: 18px 0;
+            padding: 13px 18px;
+            border: 0;
+            border-radius: 14px;
+            background: #ffc700;
+            color: #090a0f;
+            box-shadow: none;
+            font: inherit;
+            font-size: 16px;
+            line-height: 1.2;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.16s ease, transform 0.16s ease;
+        }
+
+        .tg-mini-primary:active {
+            transform: scale(0.985);
+            background: #f1bc00;
+        }
+
+        .tg-mini-primary i {
+            font-size: 16px;
+        }
+
+        .tg-mini-action-row {
+            width: 100%;
+            min-height: 66px;
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 15px 18px;
+            border: 0;
+            background: transparent;
+            color: #fff;
+            font: inherit;
+            text-align: left;
+            cursor: pointer;
+        }
+
+        .tg-mini-action-row + .tg-mini-action-row {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .tg-mini-action-row > i:first-child {
+            width: 24px;
+            flex: 0 0 auto;
+            color: rgba(255, 255, 255, 0.62);
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .tg-mini-action-label {
+            min-width: 0;
+            flex: 1 1 auto;
+            font-size: 15px;
+            line-height: 1.3;
+            font-weight: 500;
+        }
+
+        .tg-mini-action-value {
+            color: rgba(255, 255, 255, 0.46);
+            font-size: 14px;
+            line-height: 1.3;
+            font-weight: 400;
+            white-space: nowrap;
+        }
+
+        .tg-mini-action-chevron {
+            flex: 0 0 auto;
+            color: rgba(255, 255, 255, 0.52);
+            font-size: 13px;
+        }
+
+        @media (max-width: 1024px) {
+            body.dashboard-v2 {
+                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            }
+
+            body.dashboard-v2 .page-background {
+                display: none;
+            }
+
+            body.dashboard-v2 #app-container {
+                background: #090a0f;
+            }
+
+            body.dashboard-v2 .main-content {
+                padding: 20px 18px calc(
+                    98px +
+                    var(--tg-content-safe-area-inset-bottom, 0px) +
+                    env(safe-area-inset-bottom, 0px)
+                ) !important;
+            }
+
+            html.standalone-pwa.ios-device body.dashboard-v2 .main-content {
+                padding-top: calc(20px + env(safe-area-inset-top, 0px)) !important;
+            }
+
+            .tg-mini-home {
+                display: block;
+            }
+
+            .standard-dashboard-home {
+                display: none;
+            }
+
+            body.dashboard-v2 .nav-mobile {
+                left: 0;
+                right: 0;
+                bottom: 0;
+                width: 100%;
+                max-width: none;
+                height: auto;
+                min-height: 72px;
+                transform: none;
+                justify-content: space-around;
+                gap: 0;
+                padding: 7px 8px calc(
+                    7px +
+                    var(--tg-content-safe-area-inset-bottom, 0px) +
+                    env(safe-area-inset-bottom, 0px)
+                );
+                border: 0;
+                border-top: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 0;
+                background: rgba(9, 10, 15, 0.97);
+                box-shadow: none;
+                backdrop-filter: blur(18px);
+            }
+
+            body.dashboard-v2 .nav-mobile .nav-btn {
+                min-width: 0;
+                min-height: 54px;
+                flex: 1 1 0;
+                gap: 5px;
+                padding: 6px 3px;
+                border: 0;
+                border-radius: 10px;
+                background: transparent;
+            }
+
+            body.dashboard-v2 .nav-mobile .nav-btn.active {
+                border: 0;
+                background: transparent;
+                color: #ffc700;
+            }
+
+            body.dashboard-v2 .nav-mobile .nav-btn i {
+                font-size: 20px;
+            }
+
+            body.dashboard-v2 .nav-mobile .nav-btn span {
+                font-size: 10px;
+                font-weight: 500;
+            }
+        }
+
+        @media (max-width: 380px) {
+            body.dashboard-v2 .main-content {
+                padding-right: 14px !important;
+                padding-left: 14px !important;
+            }
+
+            .tg-mini-brand {
+                margin-bottom: 20px;
+            }
+
+            .tg-mini-status-card {
+                padding: 21px 18px;
+            }
+
+            .tg-mini-expiry h1 {
+                font-size: 24px !important;
+            }
+
+            .tg-mini-action-row {
+                padding-right: 15px;
+                padding-left: 15px;
+            }
+
+            .tg-mini-action-value {
+                font-size: 13px;
+            }
+        }
+
     </style>
     {% include "includes/yandex_metrika.html" %}
 </head>
@@ -2622,7 +2948,7 @@
                 <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i> Установка</button>
                 <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-friends"></i> Рефералы</button>
                 <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-headset"></i> Поддержка</button>
-                <button type="button" onclick="showTab('settings')" class="nav-btn" data-tab="settings"><i class="fas fa-cog"></i> Настройки</button>
+                <button type="button" onclick="showTab('settings')" class="nav-btn" data-tab="settings"><i class="far fa-user"></i> Профиль</button>
             </nav>
             <div class="sidebar-footer">
                 <button type="button" onclick="window.location.href='{% url 'logout' %}'" class="nav-btn sidebar-logout-btn tg-webapp-hide">
@@ -2636,13 +2962,108 @@
             <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i><span>Установка</span></button>
             <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-friends"></i><span>Рефералы</span></button>
             <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-headset"></i><span>Поддержка</span></button>
-            <button type="button" onclick="showTab('settings')" class="nav-btn" data-tab="settings"><i class="fas fa-cog"></i><span>Настройки</span></button>
+            <button type="button" onclick="showTab('settings')" class="nav-btn" data-tab="settings"><i class="far fa-user"></i><span>Профиль</span></button>
         </nav>
 
         <main class="main-content">
                 
             <div id="tab-home" class="tab-content active">
                 <div id="main-dashboard-view">
+                    <div class="tg-mini-home">
+                        <div class="tg-mini-brand">
+                            <span class="tg-mini-brand-mark" aria-hidden="true">
+                                <img src="{% static 'icons/icon-192x192.png' %}" alt="">
+                            </span>
+                            <span>Monkey Island</span>
+                        </div>
+
+                        <section class="tg-mini-status-card{% if show_expiring_banner %} is-warning{% elif not has_subscription_access %} is-inactive{% endif %}">
+                            <p class="tg-mini-status">
+                                {% if not has_subscription_access %}
+                                    Подписка не активна
+                                {% elif show_expiring_banner %}
+                                    Подписка скоро закончится
+                                {% else %}
+                                    Подписка активна
+                                {% endif %}
+                            </p>
+                            <div class="tg-mini-expiry">
+                                <i class="far fa-calendar" aria-hidden="true"></i>
+                                <h1>
+                                    {% if has_subscription_access %}
+                                        До {{ user.expire_at|date:"j E Y" }}
+                                    {% else %}
+                                        Доступ не активен
+                                    {% endif %}
+                                </h1>
+                            </div>
+                            <p class="tg-mini-status-note">
+                                {% if not has_subscription_access %}
+                                    Выберите тариф, чтобы получить доступ к подключению.
+                                {% elif show_not_connected_banner %}
+                                    Осталось установить приложение и добавить подписку.
+                                {% elif show_expiring_banner %}
+                                    Продлите подписку заранее, чтобы доступ не прерывался.
+                                {% else %}
+                                    Доступ работает на подключённых устройствах.
+                                {% endif %}
+                            </p>
+                        </section>
+
+                        {% if not has_subscription_access %}
+                            <button type="button" onclick="showTariffs()" class="tg-mini-primary">
+                                <i class="fas fa-credit-card" aria-hidden="true"></i>
+                                Купить подписку
+                            </button>
+                        {% elif show_expiring_banner %}
+                            <button type="button" onclick="showTariffs()" class="tg-mini-primary">
+                                <i class="fas fa-rotate" aria-hidden="true"></i>
+                                Продлить подписку
+                            </button>
+                        {% else %}
+                            <button type="button" onclick="showTab('setup')" class="tg-mini-primary">
+                                <i class="fas fa-plug" aria-hidden="true"></i>
+                                Подключить VPN
+                            </button>
+                        {% endif %}
+
+                        <section class="tg-mini-action-list" aria-label="Действия с подпиской">
+                            {% if has_subscription_access %}
+                            <button type="button" onclick="onAutopayButtonClick()" class="tg-mini-action-row">
+                                <i class="fas fa-rotate" aria-hidden="true"></i>
+                                <span class="tg-mini-action-label">Автопродление</span>
+                                <span class="tg-mini-action-value">{% if has_recurrent %}Подключено{% else %}Не подключено{% endif %}</span>
+                                <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
+                            </button>
+                            {% if show_expiring_banner %}
+                            <button type="button" onclick="showTab('setup')" class="tg-mini-action-row">
+                                <i class="fas fa-plug" aria-hidden="true"></i>
+                                <span class="tg-mini-action-label">Подключить VPN</span>
+                                <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
+                            </button>
+                            {% else %}
+                            <button type="button" onclick="showTariffs()" class="tg-mini-action-row">
+                                <i class="fas fa-tag" aria-hidden="true"></i>
+                                <span class="tg-mini-action-label">Продлить подписку</span>
+                                <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
+                            </button>
+                            {% endif %}
+                            {% else %}
+                            <button type="button" onclick="showTariffs()" class="tg-mini-action-row">
+                                <i class="fas fa-tag" aria-hidden="true"></i>
+                                <span class="tg-mini-action-label">Посмотреть тарифы</span>
+                                <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
+                            </button>
+                            <button type="button" onclick="showTab('support')" class="tg-mini-action-row">
+                                <i class="far fa-comment" aria-hidden="true"></i>
+                                <span class="tg-mini-action-label">Задать вопрос</span>
+                                <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
+                            </button>
+                            {% endif %}
+                        </section>
+                    </div>
+                    {% if not tg_webapp_mode %}
+                    <div class="standard-dashboard-home">
                     <header class="mb-10">
                         {% if not has_subscription_access %}
                             <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Нет активной подписки</h1>
@@ -2851,6 +3272,8 @@
                         </section>
 
                     </div>
+                    </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -3036,9 +3459,9 @@
 
             <div id="tab-settings" class="tab-content">
                 <header id="settings-header" class="mb-8 mobile-compact-header">
-                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-3">Настройки</h1>
+                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-3">Профиль</h1>
                     <p class="text-gray-500 text-sm md:text-base font-bold max-w-2xl">
-                        Аккаунт, ответы на частые вопросы и управление автопродлением.
+                        Аккаунт, ответы на частые вопросы, документы и управление подпиской.
                     </p>
                 </header>
 
@@ -3641,7 +4064,7 @@
             // Если мы были на экране тарифов, возвращаемся в интерфейс
             hideTariffs();
 
-            // Суб-экран FAQ в «Настройках» сбрасываем при любом переключении вкладок
+            // Суб-экран FAQ в «Профиле» сбрасываем при любом переключении вкладок
             if (document.getElementById('settings-faq-view')) {
                 closeSettingsFaq();
             }
@@ -3660,6 +4083,14 @@
             document.querySelectorAll(`[data-tab="${tabId}"]`).forEach(btn => {
                 btn.classList.add('active');
             });
+
+            // Повторный вход в мастер после «Завершить» начинается с первого
+            // шага: без сброса клиент видел бы последний экран с кнопкой
+            // «Завершить». Выбранная платформа сохраняется намеренно.
+            if (tabId === 'setup' && typeof newSetupStep !== 'undefined' && newSetupStep === 'done') {
+                newSetupStep = 'start';
+                renderNewSetupWizard();
+            }
 
             // На экране мастера настройки нижний таб-бар скрыт (см. CSS
             // .setup-wizard-active.is-setup-tab) — выход через «← Назад»
@@ -4459,6 +4890,60 @@
             ]
         };
 
+        // Рекомендуемое приложение из админки (apple_recommended_app=incy):
+        // Incy становится первым (рекомендованным) в плоском флоу iOS/macOS.
+        // Константы appleRecommendedApp/appleSubscriptionUrl объявлены ниже,
+        // но инициализируются до первого рендера — патчим installData сразу
+        // после DOMContentLoaded-независимого объявления через функцию.
+        function applyAppleRecommendedAppToInstallData() {
+            if (appleRecommendedApp !== 'incy' || !appleSubscriptionUrl) return;
+            const incyConnectStep = {
+                title: 'Подключение и использование',
+                content: 'Откройте Incy и нажмите большую кнопку подключения. При необходимости выберите другой сервер из списка.'
+            };
+            installData.ios.unshift({
+                name: 'Incy',
+                steps: [
+                    {
+                        title: 'Установка приложения',
+                        content: 'Откройте страницу в App Store и установите приложение.',
+                        links: [
+                            { text: 'App Store', url: INCY_IOS_APPSTORE_URL }
+                        ]
+                    },
+                    {
+                        type: 'button',
+                        url: appleSubscriptionUrl,
+                        oneClickText: 'Добавить подписку',
+                        title: 'Добавление подписки',
+                        content: 'Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически.'
+                    },
+                    incyConnectStep
+                ]
+            });
+            installData.macos.unshift({
+                name: 'Incy',
+                steps: [
+                    {
+                        title: 'Установка приложения',
+                        content: 'Скачайте нужную версию ниже и установите приложение.',
+                        links: [
+                            { text: 'macOS (Apple Silicon)', url: INCY_MACOS_ARM_URL },
+                            { text: 'macOS (Intel)', url: INCY_MACOS_INTEL_URL }
+                        ]
+                    },
+                    {
+                        type: 'button',
+                        url: appleSubscriptionUrl,
+                        oneClickText: 'Добавить подписку',
+                        title: 'Добавление подписки',
+                        content: 'Нажмите кнопку ниже — приложение откроется, и подписка добавится автоматически.'
+                    },
+                    incyConnectStep
+                ]
+            });
+        }
+
         const newSetupPlatforms = [
             { id: 'android', label: 'Android', icon: 'fab fa-android' },
             { id: 'ios', label: 'iOS', icon: 'fab fa-apple' },
@@ -4468,6 +4953,15 @@
             { id: 'androidtv', label: 'Android TV', icon: 'fas fa-tv' },
             { id: 'appletv', label: 'Apple TV', icon: 'fab fa-apple' },
         ];
+
+        // Рекомендуемое приложение для iOS/macOS задаётся в админке
+        // (apple_recommended_app: happ|incy) — как в телеграм-боте.
+        // Для INCY сервер отдаёт шифрованную incy://crypt1/-ссылку.
+        const appleRecommendedApp = '{{ apple_recommended_app }}';
+        const appleSubscriptionUrl = '{{ apple_subscription_url }}';
+        const INCY_IOS_APPSTORE_URL = 'https://apps.apple.com/us/app/incy/id6756943388';
+        const INCY_MACOS_ARM_URL = 'https://github.com/INCY-DEV/incy-platforms/releases/latest/download/incy-macos-arm64.dmg';
+        const INCY_MACOS_INTEL_URL = 'https://github.com/INCY-DEV/incy-platforms/releases/latest/download/incy-macos-intel.dmg';
 
         const newSetupApps = {
             android: {
@@ -4539,6 +5033,31 @@
                 subscriptionUrl: '{{ happ_subscription_url }}',
             },
         };
+
+        if (appleRecommendedApp === 'incy' && appleSubscriptionUrl) {
+            // Мастер: iOS/macOS ведут в Incy вместо Happ.
+            newSetupApps.ios = {
+                platformLabel: 'iOS',
+                appName: 'Incy',
+                installText: 'Скачать Incy из App Store',
+                installUrl: INCY_IOS_APPSTORE_URL,
+                addText: 'Добавить подписку в Incy',
+                keyInputId: 'new-setup-happ-key',
+                subscriptionUrl: appleSubscriptionUrl,
+            };
+            newSetupApps.macos = {
+                platformLabel: 'macOS',
+                appName: 'Incy',
+                installText: 'Скачать Incy (Apple Silicon)',
+                installUrl: INCY_MACOS_ARM_URL,
+                fallbackText: 'Версия для Intel-Mac',
+                fallbackUrl: INCY_MACOS_INTEL_URL,
+                addText: 'Добавить подписку в Incy',
+                keyInputId: 'new-setup-happ-key',
+                subscriptionUrl: appleSubscriptionUrl,
+            };
+        }
+        applyAppleRecommendedAppToInstallData();
 
         let selectedNewSetupPlatform = null;
         let newSetupStep = 'start';
@@ -5428,9 +5947,9 @@
             { emoji: '💳', title: 'Подписка и оплата', icon: 'fa-credit-card', items: [
                 { q: 'Есть ли пробный период?', a: 'Да! Новым пользователям — бесплатный пробный период, он активируется сразу при регистрации. Карту привязывать не нужно.' },
                 { q: 'Какими способами можно оплатить?', a: 'Российскими банковскими картами и через СБП. Оплата проходит через защищённый платёжный шлюз — данные карты мы не видим и не храним.' },
-                { q: 'Как продлевается подписка?', a: 'Автоматически — со способа оплаты, привязанного при покупке. Отключить автопродление можно в любой момент в настройках, доступ сохранится до конца оплаченного периода.' },
+                { q: 'Как продлевается подписка?', a: 'Автоматически — со способа оплаты, привязанного при покупке. Отключить автопродление можно в любой момент в профиле, доступ сохранится до конца оплаченного периода.' },
                 { q: 'Что будет, если не продлить подписку?', a: 'Доступ приостановится. После оплаты он вернётся автоматически — ничего заново настраивать не придётся.' },
-                { q: 'Как отменить подписку?', a: 'В настройках нажмите «Отключить автопродление» — или отправьте команду /cancelautopay в нашем Telegram-боте.' },
+                { q: 'Как отменить подписку?', a: 'В профиле нажмите «Отключить автопродление» — или отправьте команду /cancelautopay в нашем Telegram-боте.' },
             ]},
             { emoji: '🔒', title: 'Безопасность и приватность', icon: 'fa-shield-alt', items: [
                 { q: 'Храните ли вы логи и историю?', a: 'Нет. Мы не логируем подключения, не отслеживаем посещённые сайты и не храним историю вашей активности.' },

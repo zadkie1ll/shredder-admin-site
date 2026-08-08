@@ -101,6 +101,7 @@ from common.models.db import RipeApiKey
 from engine.user_block import ACCOUNT_BLOCKED_MESSAGE
 from engine.user_block import is_user_blocked
 from common.models.settings import BOOL_RUNTIME_SETTINGS
+from common.models.settings import BOT_APPLE_RECOMMENDED_APP_SETTING
 from common.models.settings import BOT_JOIN_REFERRER_BONUS_DAYS_SETTING
 from common.models.settings import BOT_PURCHASE_REFERRER_BONUS_DAYS_SETTING
 from common.models.settings import BOT_REFERRAL_REGISTRATION_AUTOBLOCK_ENABLED_SETTING
@@ -137,6 +138,8 @@ from . import ripe_atlas
 from .rwms_helpers import create_user
 from .rwms_helpers import create_user_until
 from .encrypt_happ_url import encrypt_happ_url1
+from .incy import IncyEncoderError
+from .incy import encrypt_incy_url
 from .sql_helpers import save_wata_invoice
 
 from database import session_factory
@@ -868,6 +871,50 @@ def runtime_bool_from_db(db_session, key, default_value):
 
     logging.error("invalid boolean system setting %s=%r", key, value.value)
     return default_value
+
+
+APPLE_RECOMMENDED_APP_HAPP = "happ"
+APPLE_RECOMMENDED_APP_INCY = "incy"
+
+
+def apple_recommended_app_from_db(db_session):
+    """Рекомендуемое приложение для Apple-устройств из админки (happ|incy).
+
+    Та же настройка system_settings, что читает бот
+    (get_runtime_apple_recommended_app); неизвестные значения — happ.
+    """
+    setting = db_session.get(SystemSetting, BOT_APPLE_RECOMMENDED_APP_SETTING)
+    if setting is None:
+        return APPLE_RECOMMENDED_APP_HAPP
+
+    normalized = str(setting.value or "").strip().lower()
+    if normalized in {APPLE_RECOMMENDED_APP_HAPP, APPLE_RECOMMENDED_APP_INCY}:
+        return normalized
+
+    logging.error("invalid Apple recommended app system setting %r", setting.value)
+    return APPLE_RECOMMENDED_APP_HAPP
+
+
+def build_apple_subscription_link(db_session, subscription_url):
+    """(приложение, ссылка добавления подписки) для iOS/macOS в кабинете.
+
+    Как в боте: INCY получает шифрованную incy://crypt1/-ссылку на
+    subscription_url + /custom-json. Если энкодер недоступен (нет node в
+    образе и т.п.) — молча откатываемся на Happ, кабинет ломать нельзя.
+    """
+    recommended = apple_recommended_app_from_db(db_session)
+    happ_link = encrypt_happ_url1(subscription_url + "/custom-json")
+    if recommended != APPLE_RECOMMENDED_APP_INCY:
+        return APPLE_RECOMMENDED_APP_HAPP, happ_link
+
+    try:
+        return (
+            APPLE_RECOMMENDED_APP_INCY,
+            encrypt_incy_url(subscription_url + "/custom-json"),
+        )
+    except IncyEncoderError:
+        logging.exception("incy link encoding failed, falling back to Happ")
+        return APPLE_RECOMMENDED_APP_HAPP, happ_link
 
 
 def site_trial_registration_enabled(db_session):
@@ -2725,6 +2772,17 @@ def dashboard(request):
         if has_subscription_access
         else ""
     )
+    # Рекомендуемое приложение для iOS/macOS из админки: happ (по умолчанию)
+    # или incy — для INCY ссылка добавления подписки шифруется отдельно.
+    if has_subscription_access:
+        apple_recommended_app, apple_subscription_url = build_apple_subscription_link(
+            session, subscription.subscription_url
+        )
+    else:
+        apple_recommended_app, apple_subscription_url = (
+            APPLE_RECOMMENDED_APP_HAPP,
+            "",
+        )
 
     return render(
         request,
@@ -2734,6 +2792,8 @@ def dashboard(request):
             "tg_bind_link": tg_bind_link,
             "plain_subscription_url": plain_subscription_url,
             "happ_subscription_url": happ_subscription_url,
+            "apple_recommended_app": apple_recommended_app,
+            "apple_subscription_url": apple_subscription_url,
             "ref_invited_count": ref_invited_count,
             "ref_connected_count": ref_connected_count,
             "ref_purchased_count": ref_purchased_count,
@@ -9557,12 +9617,11 @@ def admin_rwms_diff(user, rwms_user):
         )
         return diffs
 
-    panel_expire = rwms_expire_at(rwms_user)
-    panel_expire_naive = (
-        panel_expire.astimezone(timezone.utc).replace(tzinfo=None)
-        if panel_expire
-        else None
-    )
+    # rwms_expire_at уже возвращает naive UTC (protobuf ToDatetime).
+    # astimezone() здесь недопустим: на naive-значении Python трактует его как
+    # локальное время сервера (МСК) и «конвертирует» в UTC, сдвигая на -3 часа —
+    # из-за этого у всех клиентов показывался ложный рассинхрон ровно на 3 часа.
+    panel_expire_naive = rwms_expire_at(rwms_user)
     db_expire = admin_dt(user.expire_at)
     if panel_expire_naive and db_expire:
         if abs(panel_expire_naive - db_expire) > RWMS_EXPIRE_DIFF_TOLERANCE:
@@ -9632,13 +9691,11 @@ def support_admin_api_rwms_sync(request):
         if request.method == "GET":
             panel_payload = None
             if rwms_user is not None:
+                # rwms_expire_at возвращает naive UTC — показываем как есть,
+                # без astimezone (см. комментарий в admin_rwms_diff).
                 panel_expire = rwms_expire_at(rwms_user)
                 panel_payload = {
-                    "expire_at": admin_date_label(
-                        panel_expire.astimezone(timezone.utc).replace(tzinfo=None)
-                        if panel_expire
-                        else None
-                    ),
+                    "expire_at": admin_date_label(panel_expire),
                     "status": proto.UserStatus.Name(rwms_user.status),
                     "squads": [
                         squad.uuid for squad in rwms_user.active_internal_squads
@@ -9708,7 +9765,9 @@ def support_admin_api_rwms_sync(request):
                     {"status": "error", "message": "В панели нет expire_at"}, status=400
                 )
             old_expire = user.expire_at
-            user.expire_at = panel_expire.astimezone(timezone.utc).replace(tzinfo=None)
+            # panel_expire — уже naive UTC; astimezone() тут сдвигал бы время
+            # на -3 часа (трактуя naive как МСК) и портил users.expire_at.
+            user.expire_at = panel_expire
             admin_audit_write(
                 db_session,
                 request,

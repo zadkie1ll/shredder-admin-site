@@ -1050,10 +1050,34 @@ class WataPaymentFlowTests(SimpleTestCase):
     def test_payment_status_has_open_payment_button_for_pending_tab(self):
         template = Path("engine/templates/payment_status.html").read_text()
 
-        self.assertIn("Открыть форму оплаты", template)
+        self.assertIn("Продолжить оплату", template)
         self.assertNotIn("Проверить статус вручную", template)
         self.assertNotIn("manual-status-action", template)
         self.assertIn('target="_blank" rel="noopener"', template)
+
+    def test_payment_status_can_return_to_cabinet_without_canceling_payment(self):
+        template = Path("engine/templates/payment_status.html").read_text()
+
+        self.assertIn('id="cabinet-action" href="{% url \'dashboard\' %}"', template)
+        self.assertIn("Вернуться в кабинет", template)
+        self.assertIn("window.location.replace(cabinetUrl)", template)
+        self.assertIn("tg.BackButton.onClick(returnToCabinet)", template)
+        self.assertIn("tg.BackButton.show()", template)
+        self.assertIn("tg.BackButton.hide()", template)
+        # Возврат не вызывает API отмены и не останавливает polling платежа.
+        self.assertNotIn("cancelPayment", template)
+        self.assertIn("window.setTimeout(pollStatus, 2500)", template)
+
+    def test_payment_status_matches_mobile_dashboard_typography_and_buttons(self):
+        template = Path("engine/templates/payment_status.html").read_text()
+
+        self.assertIn('font-family: -apple-system, BlinkMacSystemFont, "Segoe UI"', template)
+        self.assertNotIn("fonts.googleapis.com", template)
+        self.assertIn("font-size: 27px;", template)
+        self.assertIn("font-weight: 600;", template)
+        self.assertIn("text-transform: none;", template)
+        self.assertIn(".btn-cabinet", template)
+        self.assertIn(".btn-support", template)
 
     @override_settings(PAYMENT_GATEWAY="wata", WATA_HOST="https://wata.example", WATA_TOKEN="token")
     def test_pay_rejects_blocked_user(self):
@@ -2803,6 +2827,11 @@ class SettingsTabTemplateTests(SimpleTestCase):
 
         self.assertIn('data-tab="settings"', template)
         self.assertIn('id="tab-settings"', template)
+        # Пользовательское название и иконка соответствуют содержимому раздела;
+        # внутренний settings-id сохраняется для обратной совместимости ссылок.
+        self.assertIn('<i class="far fa-user"></i><span>Профиль</span>', template)
+        self.assertIn('tracking-tighter mb-3">Профиль</h1>', template)
+        self.assertNotIn('<i class="fas fa-cog"></i><span>Настройки</span>', template)
         self.assertIn("Отключить автопродление", template)
         self.assertIn("openAutopaySheet()", template)
         self.assertIn("confirmCancelAutopay", template)
@@ -2845,6 +2874,47 @@ class SettingsTabTemplateTests(SimpleTestCase):
         self.assertIn("отменять нечего", template)
         # Заглушки старого варианта быть не должно.
         self.assertNotIn("Не подключено · оформляется при оплате", template)
+
+
+class MobileDashboardHomeTemplateTests(SimpleTestCase):
+    def test_mobile_home_uses_compact_state_driven_layout(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Компактная главная всегда есть в DOM: на сайте её включает mobile
+        # breakpoint, а Mini App использует её независимо от ширины.
+        self.assertIn('<div class="tg-mini-home">', template)
+        self.assertIn("body.tg-webapp .tg-mini-home", template)
+        self.assertIn("{% if not tg_webapp_mode %}", template)
+        self.assertIn('<div class="standard-dashboard-home">', template)
+        self.assertIn('class="tg-mini-status-card', template)
+        self.assertIn('До {{ user.expire_at|date:"j E Y" }}', template)
+        self.assertIn('class="tg-mini-primary"', template)
+        self.assertIn("Подключить VPN", template)
+        self.assertIn("Продлить подписку", template)
+        self.assertIn("Купить подписку", template)
+        self.assertIn('class="tg-mini-action-list"', template)
+        self.assertIn('onclick="onAutopayButtonClick()" class="tg-mini-action-row"', template)
+
+    def test_mobile_home_has_restrained_visual_hierarchy(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn("body.tg-webapp {", template)
+        self.assertIn('font-family: -apple-system, BlinkMacSystemFont, "Segoe UI"', template)
+        self.assertIn(".tg-mini-expiry h1", template)
+        self.assertIn("font-size: 27px !important;", template)
+        self.assertIn(".tg-mini-primary", template)
+        self.assertIn("min-height: 52px;", template)
+        self.assertIn("body.dashboard-v2 .nav-mobile .nav-btn.active", template)
+        self.assertIn("background: transparent;", template)
+
+    def test_mobile_breakpoint_replaces_standard_home_for_regular_website(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn("@media (max-width: 1024px)", template)
+        self.assertIn(".tg-mini-home {\n                display: block;", template)
+        self.assertIn(".standard-dashboard-home {\n                display: none;", template)
+        self.assertIn("body.dashboard-v2 .main-content", template)
+        self.assertIn("body.dashboard-v2 .nav-mobile", template)
 
 
 class ConfigPinsAdminApiTests(SimpleTestCase):
@@ -3923,6 +3993,133 @@ class AdminAnalyticsStage1Tests(SimpleTestCase):
         self.assertIn("Подкл.→100 МБ", template)
 
 
+class SetupWizardTests(SimpleTestCase):
+    """Мастер подключения в кабинете и Mini App."""
+
+    def test_wizard_resets_to_start_after_finish(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Повторный вход в мастер после «Завершить» (шаг done) начинается с
+        # первого шага — без сброса клиент видел бы последний экран.
+        self.assertIn("newSetupStep === 'done'", template)
+        showtab_src = template.split("function showTab(tabId)", 1)[1].split(
+            "function ", 1
+        )[0]
+        self.assertIn("newSetupStep = 'start'", showtab_src)
+        self.assertIn("renderNewSetupWizard()", showtab_src)
+
+    def test_wizard_honors_apple_recommended_app(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Настройка apple_recommended_app из админки доезжает до кабинета:
+        # мастер и плоский флоу переключаются на Incy с шифрованной ссылкой.
+        self.assertIn("const appleRecommendedApp = '{{ apple_recommended_app }}'", template)
+        self.assertIn("const appleSubscriptionUrl = '{{ apple_subscription_url }}'", template)
+        self.assertIn("appleRecommendedApp === 'incy'", template)
+        self.assertIn("applyAppleRecommendedAppToInstallData()", template)
+        self.assertIn("Скачать Incy из App Store", template)
+
+    def test_dashboard_view_passes_apple_context(self):
+        import inspect
+
+        from engine.views import build_apple_subscription_link, dashboard
+
+        src = inspect.getsource(dashboard)
+        self.assertIn("build_apple_subscription_link", src)
+        self.assertIn('"apple_recommended_app": apple_recommended_app', src)
+        # INCY недоступен (нет node и т.п.) — молча откатываемся на Happ.
+        self.assertIn(
+            "IncyEncoderError",
+            inspect.getsource(build_apple_subscription_link),
+        )
+
+    def test_apple_recommended_app_from_db_normalizes_values(self):
+        from types import SimpleNamespace
+        from unittest.mock import MagicMock
+
+        from engine.views import apple_recommended_app_from_db
+
+        def session_with(value):
+            session = MagicMock()
+            session.get.return_value = (
+                SimpleNamespace(value=value) if value is not None else None
+            )
+            return session
+
+        self.assertEqual(apple_recommended_app_from_db(session_with(None)), "happ")
+        self.assertEqual(apple_recommended_app_from_db(session_with("incy")), "incy")
+        self.assertEqual(apple_recommended_app_from_db(session_with(" INCY ")), "incy")
+        self.assertEqual(apple_recommended_app_from_db(session_with("happ")), "happ")
+        self.assertEqual(apple_recommended_app_from_db(session_with("garbage")), "happ")
+
+
+class AdminAdsCsvUxTests(SimpleTestCase):
+    """UX импорта рекламного CSV: стилизованная кнопка файла и явный выбор
+    аккаунта прямо в форме загрузки (раньше данные молча писались в аккаунт,
+    выбранный в другой карточке, — легко было залить в default)."""
+
+    def test_csv_file_input_is_styled_button(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        # Нативный инпут скрыт внутри стилизованной кнопки-label
+        self.assertIn('id="acq-csv-file-label"', template)
+        self.assertIn('id="acq-csv-filename"', template)
+        self.assertIn('id="acq-csv-file-input"', template)
+        # Имя выбранного файла показывается на кнопке
+        self.assertIn("nameEl.textContent = file ? file.name", template)
+        # Скрытый инпут больше не полагается на браузерный required
+        self.assertIn("сначала выберите CSV-файл", template)
+
+    def test_csv_form_has_explicit_account_selector(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('id="acq-csv-account"', template)
+        # Селекторы синхронизированы в обе стороны
+        self.assertIn("csvSel.value = currentAdAccount()", template)
+        # Статус импорта называет аккаунт
+        self.assertIn("импортировано в «${account}»", template)
+        self.assertIn("загрузка в аккаунт «${account}»", template)
+
+
+class AdminAcqDatePickerTests(SimpleTestCase):
+    """Календарь периода в «Привлечении»: кастомный пикер как в «Аналитике»
+    вместо нативных input[type=date], плюс запрет «конец раньше начала»."""
+
+    def test_newrep_period_uses_custom_date_picker(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        # Нативных date-инпутов у графика «новые vs повторные» больше нет —
+        # только hidden внутри date-field.
+        self.assertNotIn('type="date" id="acq-newrep-start"', template)
+        self.assertNotIn('type="date" id="acq-newrep-end"', template)
+        self.assertIn('<input type="hidden" id="acq-newrep-start">', template)
+        self.assertIn('<input type="hidden" id="acq-newrep-end">', template)
+        # Программная установка дат идёт через setDateFieldValue (лейблы)
+        self.assertIn("function setAcqDateField", template)
+        self.assertIn("setAcqDateField('acq-newrep-start'", template)
+
+    def test_date_range_cannot_invert(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        # Дни вне диапазона выключены: у конца min — это начало, у начала
+        # max — это конец. Подключено и в «Привлечении», и в «Аналитике».
+        self.assertIn("function resolveRangeBound", template)
+        self.assertIn("range-disabled", template)
+        self.assertIn('data-range-min-from="#acq-newrep-start"', template)
+        self.assertIn('data-range-max-from="#acq-newrep-end"', template)
+        self.assertIn('data-range-min-from=\'[name="start"]\'', template)
+        self.assertIn('data-range-min-from=\'[name="cohort_start"]\'', template)
+
+    def test_month_selection_survives_programmatic_date_set(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        # setDateFieldValue шлёт input-событие; подстановка границ месяца
+        # не должна сбрасывать сам селектор месяца.
+        self.assertIn("settingMonthBounds = true", template)
+        self.assertIn("if (!settingMonthBounds) monthSel.value = ''", template)
+        self.assertIn("input.dispatchEvent(new Event('input'", template)
+
+
 class AdminRecurrentDynamicsTests(SimpleTestCase):
     """Активная рекуррентная база: фейл автосписания после последнего успеха
     выбивает пользователя из базы (мёртвая карта), отзыв разрешения в банке
@@ -4075,6 +4272,30 @@ class AdminStage3Tests(SimpleTestCase):
         self.assertNotIn("add_user", src)
         self.assertNotIn("create_user", src)
         self.assertNotIn("delete", src.lower())
+
+    def test_rwms_sync_does_not_shift_panel_time_by_local_timezone(self):
+        """Регресс-гард ложного рассинхрона на 3 часа.
+
+        rwms_expire_at возвращает naive UTC; вызов astimezone() на naive
+        datetime трактует его как ЛОКАЛЬНОЕ время сервера (МСК) и сдвигает
+        на -3 часа. Из-за этого вкладка «Синхронизация» показывала всем
+        клиентам ложный рассинхрон, а «Панель → БД» портила users.expire_at.
+        """
+        import inspect
+
+        from engine import views
+
+        for func in (
+            views.support_admin_api_rwms_sync,
+            views.admin_rwms_diff,
+        ):
+            self.assertNotIn(
+                "astimezone(timezone", inspect.getsource(func), func.__name__
+            )
+        # rwms_expire_at обязан отдавать naive datetime (UTC из protobuf).
+        self.assertIn(
+            "replace(tzinfo=None)", inspect.getsource(views.rwms_expire_at)
+        )
 
     def test_client_card_has_new_subtabs(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()

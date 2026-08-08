@@ -227,6 +227,8 @@
         .date-day.selected { background: var(--brand-gold); color: #050505; border-color: transparent; }
         .date-day:hover { background: rgba(255,255,255,.08); }
         .date-day.selected:hover { background: var(--brand-gold); }
+        .date-day.range-disabled { color: rgba(80,88,100,.45); cursor: not-allowed; }
+        .date-day.range-disabled:hover { background: transparent; }
         .date-picker-foot { display: flex; justify-content: space-between; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,.07); }
         .date-quick { border: 0; background: transparent; color: var(--brand-gold); font-size: 12px; font-weight: 700; cursor: pointer; padding: 0; }
         .date-presets { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 0; }
@@ -1572,7 +1574,7 @@
             </div>
             <div id="subpanel-overview" class="subtab-panel active">
             <form id="stats-form" class="card form-card form-grid-stats">
-                <div class="date-field" data-date-picker>
+                <div class="date-field" data-date-picker data-range-max-from='[name="end"]'>
                     <input type="hidden" name="start">
                     <button type="button" class="date-trigger" data-date-trigger>
                         <span data-date-label>Дата начала</span>
@@ -1580,7 +1582,7 @@
                     </button>
                     <div class="date-popover" data-date-popover></div>
                 </div>
-                <div class="date-field" data-date-picker>
+                <div class="date-field" data-date-picker data-range-min-from='[name="start"]'>
                     <input type="hidden" name="end">
                     <button type="button" class="date-trigger" data-date-trigger>
                         <span data-date-label>Дата конца</span>
@@ -1644,7 +1646,7 @@
                     <div class="cohort-date-pair">
                         <div class="cohort-field">
                             <span class="cohort-field-label">Начало диапазона</span>
-                            <div class="date-field" data-date-picker>
+                            <div class="date-field" data-date-picker data-range-max-from='[name="end"]'>
                                 <input type="hidden" name="start">
                                 <button type="button" class="date-trigger" data-date-trigger>
                                     <span data-date-label>Дата начала</span>
@@ -1655,7 +1657,7 @@
                         </div>
                         <div class="cohort-field">
                             <span class="cohort-field-label">Конец диапазона</span>
-                            <div class="date-field" data-date-picker>
+                            <div class="date-field" data-date-picker data-range-min-from='[name="start"]'>
                                 <input type="hidden" name="end">
                                 <button type="button" class="date-trigger" data-date-trigger>
                                     <span data-date-label>Дата конца</span>
@@ -1686,7 +1688,7 @@
                     <div class="cohort-date-pair">
                         <div class="cohort-field">
                             <span class="cohort-field-label is-cohort">Начало когорты</span>
-                            <div class="date-field" data-date-picker>
+                            <div class="date-field" data-date-picker data-range-max-from='[name="cohort_end"]'>
                                 <input type="hidden" name="cohort_start">
                                 <button type="button" class="date-trigger" data-date-trigger>
                                     <span data-date-label>Дата начала</span>
@@ -1697,7 +1699,7 @@
                         </div>
                         <div class="cohort-field">
                             <span class="cohort-field-label is-cohort">Конец когорты</span>
-                            <div class="date-field" data-date-picker>
+                            <div class="date-field" data-date-picker data-range-min-from='[name="cohort_start"]'>
                                 <input type="hidden" name="cohort_end">
                                 <button type="button" class="date-trigger" data-date-trigger>
                                     <span data-date-label>Дата конца</span>
@@ -1848,8 +1850,22 @@
                                 <option value="90">90 дней</option>
                             </select>
                             <span style="font-size:11px;color:var(--muted);">или период:</span>
-                            <input type="date" id="acq-newrep-start" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
-                            <input type="date" id="acq-newrep-end" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                            <div class="date-field" data-date-picker data-range-max-from="#acq-newrep-end" style="width:160px;">
+                                <input type="hidden" id="acq-newrep-start">
+                                <button type="button" class="date-trigger" data-date-trigger>
+                                    <span data-date-label>Дата начала</span>
+                                    <i class="fas fa-calendar-days"></i>
+                                </button>
+                                <div class="date-popover" data-date-popover></div>
+                            </div>
+                            <div class="date-field" data-date-picker data-range-min-from="#acq-newrep-start" style="width:160px;">
+                                <input type="hidden" id="acq-newrep-end">
+                                <button type="button" class="date-trigger" data-date-trigger>
+                                    <span data-date-label>Дата конца</span>
+                                    <i class="fas fa-calendar-days"></i>
+                                </button>
+                                <div class="date-popover" data-date-popover></div>
+                            </div>
                             <button type="button" id="acq-newrep-apply" class="subtab active" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Показать</button>
                         </div>
                     </div>
@@ -1924,8 +1940,18 @@
                         Повторная загрузка того же файла перезаписывает те же дни теми же данными <b>в рамках выбранного аккаунта</b> — дублей не будет.
                     </div>
                     <form id="acq-csv-form" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center;">
-                        <input type="file" name="file" accept=".csv,text/csv" required style="color:#fff;font-size:12px;max-width:260px;">
+                        <label class="subtab" id="acq-csv-file-label" style="border:1px solid rgba(255,255,255,.2);border-radius:8px;cursor:pointer;display:inline-flex;align-items:center;gap:7px;position:relative;">
+                            <i class="fas fa-file-csv"></i>
+                            <span id="acq-csv-filename">Выбрать CSV-файл</span>
+                            <input type="file" name="file" accept=".csv,text/csv" id="acq-csv-file-input" style="position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;">
+                        </label>
                         <input type="text" name="channel" placeholder="канал (yandex-direct)" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;width:170px;">
+                        <label style="display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--muted);">
+                            в аккаунт:
+                            <select id="acq-csv-account" style="background:#111;border:1px solid rgba(255,199,0,.42);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;min-width:140px;">
+                                <option value="default">default</option>
+                            </select>
+                        </label>
                         <button type="submit" class="subtab active" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Загрузить</button>
                         <span id="acq-csv-status" style="font-size:11px;color:var(--muted);"></span>
                     </form>
@@ -3156,6 +3182,10 @@
             const label = field.querySelector('[data-date-label]');
             input.value = value;
             label.textContent = displayDate(value) || 'Выберите дату';
+            // Программная установка значения не триггерит события — шлём input,
+            // чтобы слушатели (сброс выбранного месяца в «Привлечении» и т.п.)
+            // реагировали на выбор даты в пикере так же, как на ручной ввод.
+            input.dispatchEvent(new Event('input', {bubbles: true}));
         }
 
         function addDays(date, days) {
@@ -3241,11 +3271,24 @@
             });
         }
 
+        // Связка «начало ≤ конец»: data-range-min-from / data-range-max-from
+        // содержат селектор парного hidden-инпута; дни вне диапазона гаснут.
+        function resolveRangeBound(field, selector) {
+            if (!selector) return null;
+            const scope = field.closest('form') || document;
+            const partner = scope.querySelector(selector) || document.querySelector(selector);
+            return partner ? localDateFromIso(partner.value) : null;
+        }
+
         function renderDatePicker(field, viewDate) {
             const popover = field.querySelector('[data-date-popover]');
             const input = field.querySelector('input[type="hidden"]');
             const selectedDate = localDateFromIso(input.value);
             const todayDate = new Date();
+            const minDate = resolveRangeBound(field, field.dataset.rangeMinFrom);
+            const maxDate = resolveRangeBound(field, field.dataset.rangeMaxFrom);
+            const isDayAllowed = (day) =>
+                (!minDate || day >= minDate) && (!maxDate || day <= maxDate);
             const firstOfMonth = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1);
             const startOffset = (firstOfMonth.getDay() + 6) % 7;
             const gridStart = new Date(viewDate.getFullYear(), viewDate.getMonth(), 1 - startOffset);
@@ -3260,13 +3303,15 @@
                 <div class="date-days">
                     ${days.map((day) => {
                         const iso = isoFromLocalDate(day);
+                        const allowed = isDayAllowed(day);
                         const classes = [
                             'date-day',
                             day.getMonth() !== viewDate.getMonth() ? 'outside' : '',
                             sameDay(day, todayDate) ? 'today' : '',
                             sameDay(day, selectedDate) ? 'selected' : '',
+                            allowed ? '' : 'range-disabled',
                         ].filter(Boolean).join(' ');
-                        return `<button type="button" class="${classes}" data-date-day="${iso}">${day.getDate()}</button>`;
+                        return `<button type="button" class="${classes}" data-date-day="${iso}" ${allowed ? '' : 'disabled'}>${day.getDate()}</button>`;
                     }).join('')}
                 </div>
                 <div class="date-picker-foot">
@@ -3277,6 +3322,7 @@
             popover.querySelector('[data-date-prev]').addEventListener('click', () => renderDatePicker(field, new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1)));
             popover.querySelector('[data-date-next]').addEventListener('click', () => renderDatePicker(field, new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1)));
             popover.querySelector('[data-date-today]').addEventListener('click', () => {
+                if (!isDayAllowed(new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate()))) return;
                 setDateFieldValue(field, isoFromLocalDate(new Date()));
                 clearCohortPresetActiveForField(field);
                 field.classList.remove('open');
@@ -7753,9 +7799,19 @@
         document.getElementById('acq-payhealth-days')?.addEventListener('change', () => loadAcqSection('acq-payhealth', true));
         document.getElementById('acq-payhealth-group')?.addEventListener('change', () => loadAcqSection('acq-payhealth', true));
 
+        // Календарные поля периода — кастомные date-field (как в «Аналитике»):
+        // программная установка значения идёт через setDateFieldValue, чтобы
+        // обновлялся и лейбл кнопки-триггера.
+        function setAcqDateField(id, iso) {
+            const input = document.getElementById(id);
+            if (!input) return;
+            const field = input.closest('[data-date-picker]');
+            if (field) setDateFieldValue(field, iso);
+            else input.value = iso;
+        }
         document.getElementById('acq-newrep-days')?.addEventListener('change', () => {
-            document.getElementById('acq-newrep-start').value = '';
-            document.getElementById('acq-newrep-end').value = '';
+            setAcqDateField('acq-newrep-start', '');
+            setAcqDateField('acq-newrep-end', '');
             const monthSel = document.getElementById('acq-newrep-month');
             if (monthSel) monthSel.value = '';
             loadNewRepeat().catch(console.error);
@@ -7775,17 +7831,24 @@
                 opt.textContent = `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
                 monthSel.appendChild(opt);
             }
+            // setDateFieldValue шлёт input-событие; во время программной
+            // подстановки границ месяца сброс селектора надо подавлять.
+            let settingMonthBounds = false;
             monthSel.addEventListener('change', () => {
                 if (!monthSel.value) return;
                 const [y, m] = monthSel.value.split('-').map(Number);
                 const lastDay = new Date(y, m, 0).getDate();
-                document.getElementById('acq-newrep-start').value = `${monthSel.value}-01`;
-                document.getElementById('acq-newrep-end').value = `${monthSel.value}-${String(lastDay).padStart(2, '0')}`;
+                settingMonthBounds = true;
+                setAcqDateField('acq-newrep-start', `${monthSel.value}-01`);
+                setAcqDateField('acq-newrep-end', `${monthSel.value}-${String(lastDay).padStart(2, '0')}`);
+                settingMonthBounds = false;
                 loadNewRepeat().catch(console.error);
             });
             // Ручная правка календарных дат снимает выбор месяца
             ['acq-newrep-start', 'acq-newrep-end'].forEach((id) => {
-                document.getElementById(id)?.addEventListener('input', () => { monthSel.value = ''; });
+                document.getElementById(id)?.addEventListener('input', () => {
+                    if (!settingMonthBounds) monthSel.value = '';
+                });
             });
         })();
         document.getElementById('acq-patterns-days')?.addEventListener('change', () => loadPatterns().catch(console.error));
@@ -7807,10 +7870,35 @@
             const selected = sel.value || 'default';
             const all = Array.from(new Set(
                 ['default', ...adAccountsFromData, ...adAccountsAdded]));
-            sel.innerHTML = all.map((a) =>
+            const options = all.map((a) =>
                 `<option value="${a.replace(/"/g, '&quot;')}">${a}</option>`).join('');
+            sel.innerHTML = options;
             sel.value = all.includes(selected) ? selected : 'default';
+            // Дублирующий селектор в форме импорта CSV: человек явно видит,
+            // в какой аккаунт лягут данные. Синхронизирован с верхним.
+            const csvSel = document.getElementById('acq-csv-account');
+            if (csvSel) {
+                csvSel.innerHTML = options;
+                csvSel.value = sel.value;
+            }
         }
+        // Двусторонняя синхронизация селекторов аккаунта (верхний ↔ CSV-форма)
+        document.getElementById('acq-account-select')?.addEventListener('change', () => {
+            const csvSel = document.getElementById('acq-csv-account');
+            if (csvSel) csvSel.value = currentAdAccount();
+        });
+        document.getElementById('acq-csv-account')?.addEventListener('change', (ev) => {
+            const sel = document.getElementById('acq-account-select');
+            if (sel) sel.value = ev.target.value;
+        });
+        // Кнопка выбора файла: показываем имя выбранного файла на самой кнопке
+        document.getElementById('acq-csv-file-input')?.addEventListener('change', (ev) => {
+            const nameEl = document.getElementById('acq-csv-filename');
+            const label = document.getElementById('acq-csv-file-label');
+            const file = ev.target.files && ev.target.files[0];
+            if (nameEl) nameEl.textContent = file ? file.name : 'Выбрать CSV-файл';
+            if (label) label.classList.toggle('active', Boolean(file));
+        });
         document.getElementById('acq-account-add')?.addEventListener('click', () => {
             const name = (prompt('Название аккаунта (например, direct-2):') || '')
                 .trim().slice(0, 64);
@@ -7865,16 +7953,31 @@
         document.getElementById('acq-csv-form')?.addEventListener('submit', async (ev) => {
             ev.preventDefault();
             const statusEl = document.getElementById('acq-csv-status');
-            statusEl.textContent = 'загрузка…';
+            const fileInput = document.getElementById('acq-csv-file-input');
+            // Инпут скрыт (стилизованная кнопка), браузерная валидация required
+            // на нём не работает — проверяем вручную.
+            if (!fileInput || !fileInput.files || !fileInput.files.length) {
+                statusEl.textContent = 'сначала выберите CSV-файл';
+                return;
+            }
+            const account = currentAdAccount();
+            statusEl.textContent = `загрузка в аккаунт «${account}»…`;
             const body = new FormData(ev.target);
             body.append('action', 'import_csv');
-            body.append('account', currentAdAccount());
+            body.append('account', account);
             try {
                 const resp = await fetch(SPENDS_API, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
                 const payload = await resp.json();
                 if (payload.status === 'ok') {
-                    statusEl.textContent = `импортировано дней: ${payload.imported} (${payload.from} — ${payload.to})`;
+                    statusEl.textContent = `импортировано в «${account}» дней: ${payload.imported} (${payload.from} — ${payload.to})`;
                     ev.target.reset();
+                    const nameEl = document.getElementById('acq-csv-filename');
+                    if (nameEl) nameEl.textContent = 'Выбрать CSV-файл';
+                    document.getElementById('acq-csv-file-label')?.classList.remove('active');
+                    // form.reset() сбросил селектор аккаунта в форме на первый
+                    // option — возвращаем синхронизацию с верхним селектором.
+                    const csvSel = document.getElementById('acq-csv-account');
+                    if (csvSel) csvSel.value = account;
                     loadAcqSection('acq-ads', true);
                 } else {
                     statusEl.textContent = payload.message || 'ошибка импорта';

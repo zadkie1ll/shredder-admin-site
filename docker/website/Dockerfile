@@ -9,13 +9,17 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PATH="/opt/venv/bin:$PATH"
 
-# Компилятор и dev-зависимости нужны только на этапе сборки
-RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev \
+# Компилятор и dev-зависимости нужны только на этапе сборки; nodejs+npm —
+# для установки @incy/link-encoder (шифрование incy://-ссылок подписки)
+RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev nodejs npm \
     && python -m venv /opt/venv \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
 RUN pip install -r requirements.txt
+
+COPY package.json package-lock.json* ./
+RUN npm install --omit=dev && npm cache clean --force
 
 FROM python:3.12-slim
 
@@ -27,11 +31,13 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PATH="/opt/venv/bin:$PATH"
 
-# В рантайме оставляем только библиотеку клиента Postgres
-RUN apt-get update && apt-get install -y --no-install-recommends libpq5 \
+# В рантайме: клиент Postgres и nodejs (запуск incy_link_encoder.mjs —
+# шифрование ссылок подписки для приложения Incy)
+RUN apt-get update && apt-get install -y --no-install-recommends libpq5 nodejs \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /opt/venv /opt/venv
+COPY --from=builder /app/node_modules ./node_modules
 
 # Копируем только то, что действительно нужно приложению в рантайме
 COPY manage.py database.py ./

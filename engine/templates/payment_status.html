@@ -11,8 +11,6 @@
     <title>Статус платежа — Monkey Island</title>
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap');
-
         :root {
             --bg: #0a0a0a;
             --panel: #1a1a1a;
@@ -434,7 +432,202 @@
             .orb-center { width: 58px; height: 58px; font-size: 26px; }
             h1 { font-size: 34px; }
         }
+
+        /* Единый mobile-first стиль с главной кабинета: системный шрифт,
+           спокойная иерархия и только одна акцентная кнопка. */
+        body {
+            padding: 24px 18px;
+            background:
+                radial-gradient(circle at 50% 0%, rgba(255,199,0,0.045), transparent 30rem),
+                #090a0f;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        .status-shell {
+            width: min(560px, 100%);
+            padding: 28px;
+            border-color: rgba(255,255,255,0.1);
+            border-radius: 18px;
+            background: #14151a;
+            box-shadow: none;
+        }
+
+        .brand {
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+
+        .brand img {
+            width: 46px;
+            height: 46px;
+            border-radius: 50%;
+            border-color: rgba(255,199,0,0.72);
+            filter: sepia(1) saturate(7) hue-rotate(2deg) brightness(1.08);
+        }
+
+        .brand-title {
+            font-size: 20px;
+            line-height: 1.2;
+            font-weight: 600;
+            text-transform: none;
+        }
+
+        .orb-wrap {
+            margin-bottom: 22px;
+        }
+
+        .orb {
+            width: 86px;
+            height: 86px;
+        }
+
+        .orb-ring-inner {
+            inset: 12px;
+        }
+
+        .orb-center {
+            width: 54px;
+            height: 54px;
+            font-size: 24px;
+        }
+
+        .status-tag {
+            margin-bottom: 12px;
+            padding: 5px 11px;
+            font-size: 12px;
+            line-height: 1.2;
+            font-weight: 600;
+            text-transform: none;
+            letter-spacing: 0;
+        }
+
+        h1 {
+            margin-bottom: 10px;
+            font-size: 28px;
+            line-height: 1.18;
+            font-weight: 600;
+            letter-spacing: -0.015em;
+        }
+
+        .status-text {
+            margin-bottom: 16px;
+            font-size: 14px;
+            line-height: 1.55;
+            font-weight: 400;
+        }
+
+        .status-text + .status-text {
+            margin-top: -4px;
+            margin-bottom: 24px;
+        }
+
+        .process-steps {
+            gap: 12px;
+            margin: 22px 0 26px;
+        }
+
+        .pstep {
+            font-size: 14px;
+            line-height: 1.35;
+            font-weight: 500;
+        }
+
+        .progress-dots {
+            display: none !important;
+        }
+
+        .actions {
+            gap: 10px;
+        }
+
+        .btn {
+            min-height: 52px;
+            padding: 13px 18px;
+            border-color: rgba(255,255,255,0.1);
+            border-radius: 14px;
+            background: rgba(255,255,255,0.045);
+            font-size: 15px;
+            line-height: 1.2;
+            font-weight: 600;
+            text-transform: none;
+            letter-spacing: 0;
+            box-shadow: none;
+        }
+
+        .btn-primary,
+        .btn-primary:hover {
+            border-color: transparent;
+            background: var(--gold);
+            color: #090a0f;
+            box-shadow: none;
+        }
+
+        .btn:hover {
+            transform: none;
+            border-color: rgba(255,255,255,0.18);
+            background: rgba(255,255,255,0.07);
+        }
+
+        .btn-primary:hover {
+            background: #f1bc00;
+        }
+
+        .btn:active {
+            transform: scale(0.985);
+        }
+
+        .btn-cabinet {
+            background: rgba(255,255,255,0.065);
+            color: var(--ink);
+        }
+
+        .btn-support {
+            min-height: 48px;
+            border-color: transparent;
+            background: transparent;
+            color: rgba(255,255,255,0.62);
+            font-weight: 500;
+        }
+
+        .status-shell[data-status="succeeded"] .cabinet-action {
+            display: none;
+        }
+
+        @media (max-width: 520px) {
+            body {
+                display: block;
+                padding: 20px 18px calc(24px + env(safe-area-inset-bottom, 0px));
+                background: #090a0f;
+            }
+
+            .status-shell {
+                width: 100%;
+                padding: 0;
+                border: 0;
+                background: transparent;
+            }
+
+            .brand {
+                margin-bottom: 22px;
+            }
+
+            h1 {
+                font-size: 27px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .orb-pulse,
+            .orb-ring-outer,
+            .orb-ring-inner,
+            .orb-center,
+            .tag-dot,
+            .pstep-spinner {
+                animation: none !important;
+            }
+        }
     </style>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
 </head>
 <body>
     <main class="status-shell" id="status-shell" data-status="{{ initial_status }}">
@@ -465,10 +658,10 @@
 
         <!-- Тексты -->
         <p class="status-text pending-only">
-            Проверяем статус платежа. Не закрывайте эту страницу — как только платеж пройдет, вы попадете в личный кабинет.
+            Ожидаем подтверждение от платежного сервиса. Обычно это занимает несколько минут.
         </p>
         <p class="status-text pending-only">
-            Если вы еще не оплатили, откройте вкладку с формой оплаты и завершите платеж.
+            Если вы передумали платить, можно вернуться в кабинет. Созданная форма оплаты ни к чему не обязывает.
         </p>
         <p class="status-text success-only">
             Платеж прошел успешно. Переходим в личный кабинет…
@@ -493,23 +686,18 @@
             </div>
         </div>
 
-        <!-- Прогресс-точки (только при pending) -->
-        <div class="progress-dots pending-only">
-            <div class="pdot"></div>
-            <div class="pdot"></div>
-            <div class="pdot"></div>
-            <div class="pdot"></div>
-        </div>
-
         <!-- Кнопки -->
         <div class="actions">
             <a class="btn btn-primary login-action" id="login-action" href="{{ login_url }}">
                 Перейти в личный кабинет
             </a>
             <a class="btn btn-primary payment-action" id="payment-action" href="{{ payment_url }}" target="_blank" rel="noopener">
-                Открыть форму оплаты
+                Продолжить оплату
             </a>
-            <a class="btn btn-secondary" href="{{ support_telegram_url }}" target="_blank" rel="noopener">
+            <a class="btn btn-cabinet cabinet-action" id="cabinet-action" href="{% url 'dashboard' %}">
+                Вернуться в кабинет
+            </a>
+            <a class="btn btn-support" href="{{ support_telegram_url }}" target="_blank" rel="noopener">
                 <svg class="support-icon" viewBox="0 0 24 24" fill="none" aria-hidden="true">
                     <path d="M4 13a8 8 0 0 1 16 0" stroke-width="2" stroke-linecap="round"/>
                     <path d="M4 13v3a2 2 0 0 0 2 2h1v-7H6a2 2 0 0 0-2 2Z" stroke-width="2" stroke-linejoin="round"/>
@@ -527,9 +715,30 @@
         const orbEmoji    = document.getElementById('orb-emoji');
         const loginAction = document.getElementById('login-action');
         const paymentAction = document.getElementById('payment-action');
+        const cabinetAction = document.getElementById('cabinet-action');
         const failedCopy  = document.getElementById('failed-copy');
         const statusApiUrl = '{{ status_api_url|default:""|escapejs }}';
+        const cabinetUrl = '{% url "dashboard" %}';
+        const tg = window.Telegram && window.Telegram.WebApp;
         let statusGoalSent = false;
+
+        function returnToCabinet(event) {
+            if (event && typeof event.preventDefault === 'function') {
+                event.preventDefault();
+            }
+            window.location.replace(cabinetUrl);
+        }
+
+        cabinetAction.addEventListener('click', returnToCabinet);
+
+        if (tg && tg.initData) {
+            tg.ready();
+            tg.expand();
+            if (tg.BackButton) {
+                tg.BackButton.onClick(returnToCabinet);
+                tg.BackButton.show();
+            }
+        }
 
         function sendStatusGoal(goal) {
             if (statusGoalSent) return;
@@ -549,6 +758,9 @@
                 sendStatusGoal('payment_success');
                 title.textContent = 'Платеж прошел';
                 orbEmoji.textContent = '✓';
+                if (tg && tg.initData && tg.BackButton) {
+                    tg.BackButton.hide();
+                }
                 if (payload.login_url) {
                     loginAction.href = payload.login_url;
                     window.setTimeout(() => {
