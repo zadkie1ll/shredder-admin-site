@@ -5566,7 +5566,9 @@ def admin_payment_info_payload(db_session, payment, user, system, invoice=None):
             "currency": payment.currency,
             "tariff": get_tariff_display_name(payment.subscription_period),
             "type": (
-                "Пробный период" if payment.is_trial_promotion else "Обычный платеж"
+                "Пробный период"
+                if payment.is_trial_promotion
+                else ("Автосписание" if payment.is_autopay else "Обычный платеж")
             ),
             "status": {
                 "succeeded": "Успешен",
@@ -5575,6 +5577,9 @@ def admin_payment_info_payload(db_session, payment, user, system, invoice=None):
                 "waiting_for_capture": "Ожидает подтверждения",
             }.get(status, status),
             "success": is_success,
+            # Сырая причина отмены из вебхука ЮКассы (insufficient_funds,
+            # recurring_permission_revoked, ...); у старых платежей пусто.
+            "cancellation_reason": payment.cancellation_reason or "",
         }
     else:
         status = payment.transaction_status
@@ -6216,84 +6221,6 @@ def support_admin_api_recurrents(request):
                         "trial": bool(recurrent.is_trial_promotion),
                     }
                     for recurrent, user in rows
-                ],
-            }
-        )
-    finally:
-        db_session.close()
-
-
-def support_admin_api_top_payments(request):
-    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
-    if auth_response:
-        return auth_response
-    if request.method != "GET":
-        return JsonResponse({"status": "error"}, status=405)
-
-    db_session = session_factory()
-    try:
-        limit = min(max(int(request.GET.get("limit") or 20), 1), 100)
-    except ValueError:
-        limit = 20
-    try:
-        totals = {}
-        user_ids = set()
-        yk_rows = (
-            db_session.query(
-                YkPayment.user_id,
-                func.coalesce(func.sum(YkPayment.amount), 0).label("total_amount"),
-                func.count(YkPayment.id).label("payments_count"),
-            )
-            .filter(YkPayment.status == "succeeded")
-            .group_by(YkPayment.user_id)
-            .all()
-        )
-        wata_rows = (
-            db_session.query(
-                WataInvoice.user_id,
-                func.coalesce(func.sum(WataTransaction.amount), 0).label(
-                    "total_amount"
-                ),
-                func.count(WataTransaction.id).label("payments_count"),
-            )
-            .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
-            .filter(WataTransaction.transaction_status == "Paid")
-            .group_by(WataInvoice.user_id)
-            .all()
-        )
-        for user_id, amount, payments_count in yk_rows + wata_rows:
-            if not user_id:
-                continue
-            user_ids.add(user_id)
-            current = totals.setdefault(user_id, {"amount": 0, "payments_count": 0})
-            current["amount"] += int(amount or 0)
-            current["payments_count"] += int(payments_count or 0)
-
-        users_by_id = {}
-        if user_ids:
-            users_by_id = {
-                user.id: user
-                for user in db_session.query(User).filter(User.id.in_(user_ids)).all()
-            }
-        rows = sorted(
-            (
-                (users_by_id.get(user_id), data["amount"], data["payments_count"])
-                for user_id, data in totals.items()
-                if users_by_id.get(user_id)
-            ),
-            key=lambda row: row[1],
-            reverse=True,
-        )[:limit]
-        return JsonResponse(
-            {
-                "status": "ok",
-                "top": [
-                    {
-                        "user": admin_user_payload(user),
-                        "amount": int(total_amount or 0),
-                        "payments_count": int(payments_count or 0),
-                    }
-                    for user, total_amount, payments_count in rows
                 ],
             }
         )
@@ -8745,6 +8672,115 @@ ACQ_AUTOPAY_EVENT_TYPES = (
     "confirm_cancel_autopay_clicked",
 )
 
+# Причины фейла автосписания, означающие отзыв разрешения на стороне банка:
+# в churn считаются отменой (как кнопка «отменить автоплатёж»), а не фейлом.
+# permission_revoked — код из документации ЮКассы; recurring_permission_revoked
+# приходит в проде для СБП-рекуррентов.
+ACQ_AUTOPAY_REVOKED_REASONS = {
+    "permission_revoked",
+    "recurring_permission_revoked",
+}
+
+
+def _acq_recurrent_dynamics(event_rows, months, today=None):
+    """Восстанавливает помесячную динамику рекуррентной базы из событий.
+
+    Чистая функция (rows -> список месяцев) — покрыта тестами отдельно от БД.
+    event_rows: [{user_id, m (date месяца), event_type, reason, cnt}].
+    """
+    success_months = {}  # user_id -> set of months
+    cancel_months = {}
+    failure_months = {}  # user_id -> set of months (фейлы автосписаний)
+    per_month = {}  # month -> {"cancel_users": set(), "failures": int, ...}
+    for row in event_rows:
+        month = row["m"]
+        bucket = per_month.setdefault(
+            month, {"cancel_users": set(), "failures": 0, "success_users": set()}
+        )
+        if row["event_type"].endswith("autopay_success"):
+            success_months.setdefault(row["user_id"], set()).add(month)
+            bucket["success_users"].add(row["user_id"])
+        elif row["event_type"].endswith("autopay_failure"):
+            if row["reason"] in ACQ_AUTOPAY_REVOKED_REASONS:
+                # Отзыв разрешения на автосписания в банке — это отмена
+                # автоплатежа, просто другой кнопкой; в churn считаем отменой.
+                cancel_months.setdefault(row["user_id"], set()).add(month)
+                bucket["cancel_users"].add(row["user_id"])
+            else:
+                failure_months.setdefault(row["user_id"], set()).add(month)
+                bucket["failures"] += int(row["cnt"])
+        else:
+            cancel_months.setdefault(row["user_id"], set()).add(month)
+            bucket["cancel_users"].add(row["user_id"])
+
+    def month_back(d, n):
+        year = d.year
+        month = d.month - n
+        while month <= 0:
+            month += 12
+            year -= 1
+        return d.replace(year=year, month=month, day=1)
+
+    def active_base(month):
+        # Активен на конец месяца: был autopay-успех за последние 12 месяцев,
+        # после которого не было ни отмены, ни фейла автосписания.
+        # - отмена в том же месяце, что успех, консервативно считается отменой;
+        # - фейл в том же месяце, что успех, считается ЖИВЫМ (типичный сценарий
+        #   «фейл → пополнил карту → успешный ретрай» внутри одного месяца);
+        # - фейл строго после последнего успеха — карта умерла (при фейле
+        #   payment либо удаляет рекуррент, либо ретраит максимум ~4 суток,
+        #   и без нового успеха списаний больше не будет).
+        window_start = month_back(month, 11)
+        active = set()
+        for user_id, smonths in success_months.items():
+            past = [s for s in smonths if s <= month]
+            if not past:
+                continue
+            last_success = max(past)
+            if last_success < window_start:
+                continue
+            cpast = [c for c in cancel_months.get(user_id, ()) if c <= month]
+            if cpast and max(cpast) >= last_success:
+                continue
+            fpast = [f for f in failure_months.get(user_id, ()) if f <= month]
+            if fpast and max(fpast) > last_success:
+                continue
+            active.add(user_id)
+        return active
+
+    today = today or date.today()
+    today_month = date(today.year, today.month, 1)
+    dynamics = []
+    month_iter = month_back(today_month, months - 1)
+    prev_active = active_base(month_back(month_iter, 1))
+    while month_iter <= today_month:
+        bucket = per_month.get(
+            month_iter, {"cancel_users": set(), "failures": 0, "success_users": set()}
+        )
+        active = active_base(month_iter)
+        churned = bucket["cancel_users"] & prev_active
+        churn_pct = (
+            round(100.0 * len(churned) / len(prev_active), 1) if prev_active else None
+        )
+        dynamics.append(
+            {
+                "month": month_iter.isoformat(),
+                "active_recurrents": len(active),
+                "autopay_success_users": len(bucket["success_users"]),
+                "autopay_failures": bucket["failures"],
+                "cancels": len(bucket["cancel_users"]),
+                "churn_pct": churn_pct,
+            }
+        )
+        prev_active = active
+        month_iter = (
+            month_iter.replace(year=month_iter.year + 1, month=1)
+            if month_iter.month == 12
+            else month_iter.replace(month=month_iter.month + 1)
+        )
+
+    return dynamics
+
 
 def _acq_mrr(db_session, months):
     months = min(max(months, 3), 36)
@@ -8825,7 +8861,9 @@ def _acq_mrr(db_session, months):
 
     # Динамика рекуррентной базы из event_logs: строки yk_recurrent_payments
     # при отмене удаляются, поэтому история считается по событиям
-    # autopay_success / confirm_cancel_autopay_clicked.
+    # autopay_success / autopay_failure / confirm_cancel_autopay_clicked.
+    # reason в payload фейла появился в августе 2026 (payment пишет причину
+    # отмены из вебхука); у старых событий его нет.
     event_rows = _acq_rows(
         db_session,
         """
@@ -8833,87 +8871,16 @@ def _acq_mrr(db_session, months):
                date_trunc('month', (timestamp AT TIME ZONE 'UTC'
                    AT TIME ZONE 'Europe/Moscow'))::date AS m,
                event_type,
+               event_payload->>'reason' AS reason,
                count(*) AS cnt
         FROM event_logs
         WHERE event_type = ANY(:types)
-        GROUP BY 1, 2, 3
+        GROUP BY 1, 2, 3, 4
         """,
         types=list(ACQ_AUTOPAY_EVENT_TYPES),
     )
 
-    success_months = {}  # user_id -> set of months
-    cancel_months = {}
-    per_month = {}  # month -> {"cancels": set(), "failures": int, "successes": int}
-    for row in event_rows:
-        month = row["m"]
-        bucket = per_month.setdefault(
-            month, {"cancel_users": set(), "failures": 0, "success_users": set()}
-        )
-        if row["event_type"].endswith("autopay_success"):
-            success_months.setdefault(row["user_id"], set()).add(month)
-            bucket["success_users"].add(row["user_id"])
-        elif row["event_type"].endswith("autopay_failure"):
-            bucket["failures"] += int(row["cnt"])
-        else:
-            cancel_months.setdefault(row["user_id"], set()).add(month)
-            bucket["cancel_users"].add(row["user_id"])
-
-    def month_back(d, n):
-        year = d.year
-        month = d.month - n
-        while month <= 0:
-            month += 12
-            year -= 1
-        return d.replace(year=year, month=month, day=1)
-
-    def active_base(month):
-        # Активен на конец месяца: был autopay-успех за последние 12 месяцев
-        # и последняя отмена не позже последнего успеха (отмена в том же
-        # месяце, что успех, консервативно считается отменой).
-        window_start = month_back(month, 11)
-        active = set()
-        for user_id, smonths in success_months.items():
-            past = [s for s in smonths if s <= month]
-            if not past:
-                continue
-            last_success = max(past)
-            if last_success < window_start:
-                continue
-            cpast = [c for c in cancel_months.get(user_id, ()) if c <= month]
-            if cpast and max(cpast) >= last_success:
-                continue
-            active.add(user_id)
-        return active
-
-    today_month = date(date.today().year, date.today().month, 1)
-    dynamics = []
-    month_iter = month_back(today_month, months - 1)
-    prev_active = active_base(month_back(month_iter, 1))
-    while month_iter <= today_month:
-        bucket = per_month.get(
-            month_iter, {"cancel_users": set(), "failures": 0, "success_users": set()}
-        )
-        active = active_base(month_iter)
-        churned = bucket["cancel_users"] & prev_active
-        churn_pct = (
-            round(100.0 * len(churned) / len(prev_active), 1) if prev_active else None
-        )
-        dynamics.append(
-            {
-                "month": month_iter.isoformat(),
-                "active_recurrents": len(active),
-                "autopay_success_users": len(bucket["success_users"]),
-                "autopay_failures": bucket["failures"],
-                "cancels": len(bucket["cancel_users"]),
-                "churn_pct": churn_pct,
-            }
-        )
-        prev_active = active
-        month_iter = (
-            month_iter.replace(year=month_iter.year + 1, month=1)
-            if month_iter.month == 12
-            else month_iter.replace(month=month_iter.month + 1)
-        )
+    dynamics = _acq_recurrent_dynamics(event_rows, months)
 
     return {
         "mrr": [

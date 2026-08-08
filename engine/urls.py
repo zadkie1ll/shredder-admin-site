@@ -118,11 +118,6 @@ urlpatterns = [
         name="support_admin_api_recurrents",
     ),
     path(
-        "support-admin/api/top-payments/",
-        views.support_admin_api_top_payments,
-        name="support_admin_api_top_payments",
-    ),
-    path(
         "support-admin/api/audit-log/",
         views.support_admin_api_audit_log,
         name="support_admin_api_audit_log",

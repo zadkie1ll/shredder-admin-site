@@ -431,16 +431,19 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn(".setting-value-editor {\n    padding-right: 18px;", stylesheet)
         self.assertIn(".setting-value-editor {\n        padding-right: 0;", stylesheet)
 
-    def test_payment_search_is_rendered_before_payment_history(self):
+    def test_payment_search_result_is_rendered_before_payment_history(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
+        # Порядок вкладки «Платежи»: форма поиска → результат поиска →
+        # сворачиваемая история платежей (детали найденного платежа важнее
+        # общей ленты).
         payment_panel = template[template.index('<section id="panel-payment-info"'):]
         search_position = payment_panel.index('<form id="payment-info-form"')
-        history_position = payment_panel.index('<section class="card payments-board">')
-        result_position = payment_panel.index('<div id="payment-info-result">')
+        result_position = payment_panel.index('<div id="payment-info-result"')
+        history_position = payment_panel.index('<details id="payments-history-details"')
 
-        self.assertLess(search_position, history_position)
-        self.assertLess(history_position, result_position)
+        self.assertLess(search_position, result_position)
+        self.assertLess(result_position, history_position)
 
     def test_expandable_controls_have_consistent_chevron_affordances(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
@@ -1907,8 +1910,9 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertNotIn('id="subpanel-sys-operations"', template)
         self.assertNotIn('data-recurrents-url=', template)
         self.assertNotIn("function loadRecurrents", template)
-        # top-payments подключён к вкладке «Платежи» (этап 1 плана админки).
-        self.assertIn('data-top-payments-url=', template)
+        # Таблица «Топ клиентов по платежам» убрана из вкладки «Платежи».
+        self.assertNotIn('data-top-payments-url=', template)
+        self.assertNotIn("loadTopPayments", template)
         # Сетка рефералки не должна использовать фиксированную минимальную ширину колонок,
         # из-за которой контент вылезал за экран.
         self.assertNotIn(".system-grid { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(360px", template)
@@ -3892,8 +3896,20 @@ class AdminAnalyticsStage1Tests(SimpleTestCase):
         self.assertIn('data-subtab="acq-payhealth"', template)
         self.assertIn("'acq-mrr': loadMrr", template)
         self.assertIn("'acq-payhealth': loadPayHealth", template)
-        self.assertIn("data-top-payments-url", template)
-        self.assertIn("loadTopPayments", template)
+        # Топ клиентов по платежам удалён из вкладки «Платежи»: результат
+        # поиска платежа показывается над сворачиваемой историей платежей.
+        self.assertNotIn("data-top-payments-url", template)
+        self.assertNotIn("loadTopPayments", template)
+        self.assertNotIn("Топ клиентов по платежам", template)
+        history_details = 'id="payments-history-details"'
+        self.assertIn(history_details, template)
+        # Результат поиска платежа стоит в разметке выше истории платежей.
+        self.assertLess(
+            template.index('id="payment-info-result"'),
+            template.index(history_details),
+        )
+        # После успешного поиска история сворачивается, чтобы карточка была на виду.
+        self.assertIn("historyDetails.open = false", template)
 
     def test_funnel_includes_traffic_thresholds(self):
         import inspect
@@ -3905,6 +3921,124 @@ class AdminAnalyticsStage1Tests(SimpleTestCase):
         self.assertIn("mb100", src)
         template = Path("engine/templates/admin_dashboard.html").read_text()
         self.assertIn("Подкл.→100 МБ", template)
+
+
+class AdminRecurrentDynamicsTests(SimpleTestCase):
+    """Активная рекуррентная база: фейл автосписания после последнего успеха
+    выбивает пользователя из базы (мёртвая карта), отзыв разрешения в банке
+    считается отменой. Раньше база завышалась: человек с умершей картой висел
+    «активным» до 12 месяцев после последнего успешного списания."""
+
+    @staticmethod
+    def _dynamics(rows, months=3, today=date(2026, 8, 8)):
+        from engine.views import _acq_recurrent_dynamics
+
+        return _acq_recurrent_dynamics(rows, months, today=today)
+
+    @staticmethod
+    def _row(user_id, month, event_type, reason=None, cnt=1):
+        return {
+            "user_id": user_id,
+            "m": month,
+            "event_type": event_type,
+            "reason": reason,
+            "cnt": cnt,
+        }
+
+    def test_failure_after_last_success_removes_user_from_base(self):
+        rows = [
+            self._row(1, date(2026, 6, 1), "payment_regular_autopay_success"),
+            self._row(1, date(2026, 7, 1), "payment_regular_autopay_failure"),
+        ]
+
+        dynamics = {d["month"]: d for d in self._dynamics(rows)}
+
+        # В июне жив, с июля (фейл без последующего успеха) — выбыл.
+        self.assertEqual(dynamics["2026-06-01"]["active_recurrents"], 1)
+        self.assertEqual(dynamics["2026-07-01"]["active_recurrents"], 0)
+        self.assertEqual(dynamics["2026-08-01"]["active_recurrents"], 0)
+        self.assertEqual(dynamics["2026-07-01"]["autopay_failures"], 1)
+
+    def test_failure_with_successful_retry_same_month_keeps_user_alive(self):
+        # «Не хватило денег → пополнил → успешный ретрай» внутри месяца.
+        rows = [
+            self._row(1, date(2026, 7, 1), "payment_regular_autopay_failure"),
+            self._row(1, date(2026, 7, 1), "payment_regular_autopay_success"),
+        ]
+
+        dynamics = {d["month"]: d for d in self._dynamics(rows)}
+
+        self.assertEqual(dynamics["2026-07-01"]["active_recurrents"], 1)
+        self.assertEqual(dynamics["2026-08-01"]["active_recurrents"], 1)
+
+    def test_success_after_failure_revives_user(self):
+        rows = [
+            self._row(1, date(2026, 6, 1), "payment_regular_autopay_success"),
+            self._row(1, date(2026, 7, 1), "payment_regular_autopay_failure"),
+            self._row(1, date(2026, 8, 1), "payment_regular_autopay_success"),
+        ]
+
+        dynamics = {d["month"]: d for d in self._dynamics(rows)}
+
+        self.assertEqual(dynamics["2026-07-01"]["active_recurrents"], 0)
+        self.assertEqual(dynamics["2026-08-01"]["active_recurrents"], 1)
+
+    def test_permission_revoked_counts_as_cancel_not_failure(self):
+        from engine.views import ACQ_AUTOPAY_REVOKED_REASONS
+
+        # Оба кода: из документации ЮКассы и реальный СБП-код из прода.
+        self.assertIn("permission_revoked", ACQ_AUTOPAY_REVOKED_REASONS)
+        self.assertIn("recurring_permission_revoked", ACQ_AUTOPAY_REVOKED_REASONS)
+
+        rows = [
+            self._row(1, date(2026, 6, 1), "payment_regular_autopay_success"),
+            self._row(
+                1,
+                date(2026, 7, 1),
+                "payment_regular_autopay_failure",
+                reason="recurring_permission_revoked",
+            ),
+        ]
+
+        dynamics = {d["month"]: d for d in self._dynamics(rows)}
+
+        july = dynamics["2026-07-01"]
+        self.assertEqual(july["active_recurrents"], 0)
+        self.assertEqual(july["cancels"], 1)  # отмена, а не фейл
+        self.assertEqual(july["autopay_failures"], 0)
+        # Отзыв входит в churn: 1 отменившийся ÷ 1 активный на конец июня.
+        self.assertEqual(july["churn_pct"], 100.0)
+
+    def test_cancel_click_still_counts_as_cancel(self):
+        # Старое поведение кнопки «отменить автоплатёж» сохранено.
+        rows = [
+            self._row(1, date(2026, 6, 1), "payment_regular_autopay_success"),
+            self._row(1, date(2026, 7, 1), "confirm_cancel_autopay_clicked"),
+        ]
+
+        dynamics = {d["month"]: d for d in self._dynamics(rows)}
+
+        self.assertEqual(dynamics["2026-07-01"]["active_recurrents"], 0)
+        self.assertEqual(dynamics["2026-07-01"]["cancels"], 1)
+
+    def test_events_query_reads_reason_from_payload(self):
+        import inspect
+
+        from engine.views import _acq_mrr
+
+        src = inspect.getsource(_acq_mrr)
+        self.assertIn("event_payload->>'reason'", src)
+
+    def test_payment_card_exposes_autopay_type_and_cancellation_reason(self):
+        import inspect
+
+        from engine.views import admin_payment_info_payload
+
+        src = inspect.getsource(admin_payment_info_payload)
+        self.assertIn("Автосписание", src)
+        self.assertIn("cancellation_reason", src)
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.assertIn("Причина отмены", template)
 
 
 class AdminStage3Tests(SimpleTestCase):
