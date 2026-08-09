@@ -144,7 +144,6 @@
             }
 
             body.dashboard-v2 .nav-btn[data-tab="setup"],
-            body.dashboard-v2 .home-quick-actions,
             body.dashboard-v2 .quick-access-btn,
             body.dashboard-v2 #ref-pill {
                 display: none !important;
@@ -1618,16 +1617,46 @@
             transition: width 0.4s ease;
         }
 
-        .quick-action-card {
-            min-height: 160px;
-            cursor: pointer;
-            transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+        .home-subscription-actions {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 10px;
+            flex-wrap: wrap;
         }
 
-        .quick-action-card:hover {
-            transform: translateY(-3px);
-            border-color: rgba(255, 199, 0, 0.35) !important;
-            background: rgba(255, 199, 0, 0.06) !important;
+        .home-payments-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 9px;
+            min-height: 49px;
+            padding: 0 18px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 14px;
+            background: rgba(255, 255, 255, 0.035);
+            color: rgba(255, 255, 255, 0.88);
+            font-size: 15px;
+            line-height: 1.15;
+            font-weight: 700;
+            white-space: nowrap;
+            transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease, color 0.2s ease;
+        }
+
+        .home-payments-btn i {
+            color: var(--brand-gold);
+        }
+
+        .home-payments-btn:hover {
+            transform: translateY(-1px);
+            border-color: rgba(255, 199, 0, 0.38);
+            background: rgba(255, 199, 0, 0.06);
+            color: #fff;
+        }
+
+        .home-payments-btn:focus-visible {
+            outline: 2px solid rgba(255, 199, 0, 0.85);
+            outline-offset: 3px;
         }
 
         .overview-hero-card {
@@ -2302,15 +2331,6 @@
         .dashboard-v2 .status-progress-bar {
             background: linear-gradient(90deg, var(--brand-gold), #f9d85e);
             box-shadow: 0 0 20px rgba(255, 199, 0, 0.35);
-        }
-
-        .dashboard-v2 .quick-action-card {
-            min-height: 0;
-        }
-
-        .dashboard-v2 .quick-action-card:hover {
-            transform: translateY(-1px);
-            background: rgba(255, 199, 0, 0.06) !important;
         }
 
         .dashboard-v2 .w-12.h-12,
@@ -3161,9 +3181,15 @@
                                         <p class="text-gray-500 text-sm font-bold leading-relaxed">Осталось {{ time_left_value }} {{ time_left_label }}. Продлите доступ заранее, чтобы VPN не отключился в неподходящий момент.</p>
                                     </div>
                                 </div>
-                                <button type="button" onclick="showTariffs()" class="setup-cta-btn dashboard-action-btn !w-full md:!w-auto !mb-0 !mr-0">
-                                    Продлить
-                                </button>
+                                <div class="home-subscription-actions w-full md:w-auto">
+                                    <button type="button" onclick="openPaymentsHistorySheet()" class="home-payments-btn w-full sm:w-auto">
+                                        <i class="fas fa-receipt" aria-hidden="true"></i>
+                                        История платежей
+                                    </button>
+                                    <button type="button" onclick="showTariffs()" class="setup-cta-btn dashboard-action-btn !w-full sm:!w-auto !mb-0 !mr-0">
+                                        Продлить
+                                    </button>
+                                </div>
                             </section>
                         {% endif %}
 
@@ -3220,57 +3246,17 @@
                                     <h3 class="text-lg font-black mb-2">Продлить подписку</h3>
                                     <p class="text-gray-500 text-sm font-bold">Выберите новый тариф или добавьте дней к текущей подписке.</p>
                                 </div>
-                                <button type="button" onclick="showTariffs()" class="setup-cta-btn dashboard-action-btn !w-full md:!w-auto !mb-0 !mr-0">
-                                    Продлить
-                                </button>
+                                <div class="home-subscription-actions w-full md:w-auto">
+                                    <button type="button" onclick="openPaymentsHistorySheet()" class="home-payments-btn w-full sm:w-auto">
+                                        <i class="fas fa-receipt" aria-hidden="true"></i>
+                                        История платежей
+                                    </button>
+                                    <button type="button" onclick="showTariffs()" class="setup-cta-btn dashboard-action-btn !w-full sm:!w-auto !mb-0 !mr-0">
+                                        Продлить
+                                    </button>
+                                </div>
                             </section>
                         {% endif %}
-
-                        <section class="home-quick-actions grid grid-cols-1 md:grid-cols-3 gap-3 md:gap-4">
-                            {% if has_subscription_access %}
-                            <button type="button" onclick="showTab('setup')" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
-                                <div class="w-11 h-11 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
-                                    <i class="fas fa-bolt"></i>
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <h3 class="text-base font-black leading-tight">Установка</h3>
-                                    <p class="text-gray-500 text-xs font-bold leading-snug">Установка на ваши устройства</p>
-                                </div>
-                                <i class="fas fa-chevron-right text-gray-600 text-sm flex-shrink-0"></i>
-                            </button>
-                            {% else %}
-                            <button type="button" onclick="showTariffs()" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
-                                <div class="w-11 h-11 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
-                                    <i class="fas fa-credit-card"></i>
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <h3 class="text-base font-black leading-tight">Купить подписку</h3>
-                                    <p class="text-gray-500 text-xs font-bold leading-snug">Тарифы и оплата</p>
-                                </div>
-                                <i class="fas fa-chevron-right text-gray-600 text-sm flex-shrink-0"></i>
-                            </button>
-                            {% endif %}
-                            <button type="button" onclick="showTab('support')" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
-                                <div class="w-11 h-11 rounded-xl bg-[#2ec4b6]/10 border border-[#2ec4b6]/20 flex items-center justify-center text-[#2ec4b6] flex-shrink-0">
-                                    <i class="fas fa-headset"></i>
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <h3 class="text-base font-black leading-tight">Поддержка</h3>
-                                    <p class="text-gray-500 text-xs font-bold leading-snug">Помощь в Telegram</p>
-                                </div>
-                                <i class="fas fa-chevron-right text-gray-600 text-sm flex-shrink-0"></i>
-                            </button>
-                            <button type="button" onclick="showTab('profile')" class="setup-step-card quick-action-card flex items-center gap-4 text-left !mb-0 !py-4 !px-5">
-                                <div class="w-11 h-11 rounded-xl bg-[#9b5cff]/10 border border-[#9b5cff]/20 flex items-center justify-center text-[#9b5cff] flex-shrink-0">
-                                    <i class="fas fa-user-friends"></i>
-                                </div>
-                                <div class="min-w-0 flex-1">
-                                    <h3 class="text-base font-black leading-tight">Рефералы</h3>
-                                    <p class="text-gray-500 text-xs font-bold leading-snug">+40 дней за друга</p>
-                                </div>
-                                <i class="fas fa-chevron-right text-gray-600 text-sm flex-shrink-0"></i>
-                            </button>
-                        </section>
 
                     </div>
                     </div>

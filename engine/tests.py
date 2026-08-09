@@ -253,7 +253,15 @@ class DashboardReferralTemplateTests(SimpleTestCase):
         self.assertIn(registration_bonus, template)
         self.assertIn("когда друг начнет пользоваться сервисом", template)
         self.assertNotIn("за регистрацию", template)
-        self.assertIn("md:grid-cols-3", template)
+        # Проверяем саму компактную статистику рефералов, а не случайный
+        # grid-класс из другого раздела главной страницы.
+        for label, value in (
+            ("Приглашено", '{{ ref_invited_count|default:"0" }}'),
+            ("Активных", '{{ ref_connected_count|default:"0" }}'),
+            ("Покупок", '{{ ref_purchased_count|default:"0" }}'),
+        ):
+            self.assertIn(label, template)
+            self.assertIn(value, template)
         self.assertIn("padding: 22px 24px !important;", template)
         self.assertIn("padding: 18px 22px !important;", template)
         self.assertIn(".referral-stat-card p:last-child", template)
@@ -799,6 +807,7 @@ class AcquisitionAdsDailyTests(SimpleTestCase):
 class AcquisitionAdsTemplateTests(SimpleTestCase):
     def test_ads_tab_has_csv_import_and_daily_analytics(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
+        stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn('id="acq-csv-form"', template)
         self.assertIn("action', 'import_csv'", template.replace('"', "'"))
@@ -807,6 +816,11 @@ class AcquisitionAdsTemplateTests(SimpleTestCase):
         self.assertIn('id="acq-ads-group"', template)
         self.assertIn('data-help="ads_daily"', template)
         self.assertIn("'Подключения', 'Цена подключения', 'Продажи', 'Цена продажи'", template)
+        self.assertIn('class="acq-chart-data-section"', template)
+        self.assertIn('id="acq-ads-scroll-hint"', template)
+        self.assertIn('updateAdsDailyTableFrame(group, rows.length);', template)
+        self.assertIn('scrollbar-gutter: stable both-edges;', stylesheet)
+        self.assertIn('.acq-chart-data-scroll thead th {', stylesheet)
         self.assertNotIn("'CPA, ₽'", template)
 
 
@@ -3017,6 +3031,24 @@ class SettingsTabTemplateTests(SimpleTestCase):
 
 
 class MobileDashboardHomeTemplateTests(SimpleTestCase):
+    def test_desktop_home_replaces_duplicate_cards_with_payment_history_action(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+        desktop_home = template[
+            template.index('<div class="standard-dashboard-home">'):
+            template.index("{% endif %}\n                </div>\n            </div>", template.index('<div class="standard-dashboard-home">'))
+        ]
+
+        self.assertNotIn("home-quick-actions", desktop_home)
+        self.assertNotIn("quick-action-card", desktop_home)
+        self.assertNotIn("Установка на ваши устройства", desktop_home)
+        self.assertNotIn("Помощь в Telegram", desktop_home)
+        self.assertNotIn("+40 дней за друга", desktop_home)
+        self.assertIn("home-subscription-actions", desktop_home)
+        self.assertIn("home-payments-btn", desktop_home)
+        self.assertIn('onclick="openPaymentsHistorySheet()"', desktop_home)
+        self.assertIn("История платежей", desktop_home)
+        self.assertIn("fas fa-receipt", desktop_home)
+
     def test_mobile_home_uses_compact_state_driven_layout(self):
         template = Path("engine/templates/dashboard.html").read_text()
 
@@ -4579,6 +4611,50 @@ class AdminClientWorkspaceTests(SimpleTestCase):
         self.assertNotIn("function clientSubscriptionManageHtml", template)
         self.assertIn(".client-actions-grid", css)
         self.assertIn(".client-danger-panel", css)
+
+
+class AdminPaymentJournalTests(SimpleTestCase):
+    """Единый современный журнал операций для двух списков платежей."""
+
+    def test_client_and_global_payment_lists_use_expandable_journal(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("function paymentJournalRowsHtml", template)
+        self.assertIn("function paymentStatusDescriptor", template)
+        self.assertIn("function paymentAmountLabel", template)
+        self.assertIn("data-payment-journal-toggle", template)
+        self.assertIn("payment-journal-details", template)
+        self.assertIn("paymentJournalRowsHtml(history, {context: 'client'})", template)
+        self.assertIn(
+            "paymentJournalRowsHtml(payments, {showUser: true, context: 'all'})",
+            template,
+        )
+        self.assertIn("details.hidden = !shouldOpen", template)
+        self.assertNotIn('<span class="payments-pages"', template)
+
+    def test_payment_journal_has_desktop_mobile_and_light_styles(self):
+        css = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        for selector in (
+            ".payment-journal-columns.has-user",
+            ".payment-journal-status.is-success",
+            ".payment-journal-status.is-pending",
+            ".payment-journal-status.is-error",
+            ".payment-journal-details:not([hidden])",
+            'html[data-admin-theme="light"] .payment-journal',
+        ):
+            self.assertIn(selector, css)
+        self.assertIn("grid-template-columns: minmax(0, 1fr) auto 18px;", css)
+
+    def test_global_payment_payload_exposes_provider_and_time(self):
+        import inspect
+
+        from engine import views
+
+        source = inspect.getsource(views.support_admin_api_payments)
+        self.assertIn('"system": "YooKassa"', source)
+        self.assertIn('"system": "Wata"', source)
+        self.assertNotIn("with_time=False", source)
 
 
 class AdminStage3Tests(SimpleTestCase):

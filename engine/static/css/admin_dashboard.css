@@ -3393,6 +3393,268 @@ html[data-admin-theme="light"] #panel-acquisition table td {
     border-color: rgba(29, 34, 42, .10) !important;
 }
 
+/* Advertising charts: visually separate the exact data table from canvases. */
+.acq-chart-data-section {
+    margin-top: 26px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, .11);
+    border-radius: 14px;
+    background: rgba(8, 9, 13, .58);
+    box-shadow: 0 14px 32px rgba(0, 0, 0, .16);
+}
+
+.acq-chart-data-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    padding: 15px 17px;
+    border-bottom: 1px solid rgba(255, 255, 255, .08);
+    background: rgba(255, 255, 255, .025);
+}
+
+.acq-chart-data-heading {
+    min-width: 0;
+}
+
+.acq-chart-data-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--admin-accent);
+    font-size: 10px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.acq-chart-data-heading h3 {
+    margin: 4px 0 2px;
+    color: var(--admin-text);
+    font-size: 15px;
+    line-height: 1.3;
+}
+
+.acq-chart-data-heading p {
+    margin: 0;
+    color: var(--admin-text-muted);
+    font-size: 11px;
+    line-height: 1.45;
+}
+
+.acq-chart-scroll-hint {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    min-width: 190px;
+    padding: 8px 11px;
+    color: var(--admin-text-muted);
+    border: 1px solid rgba(255, 255, 255, .10);
+    border-radius: 10px;
+    background: rgba(255, 255, 255, .035);
+    font-size: 10px;
+    line-height: 1.25;
+}
+
+.acq-chart-scroll-hint > i {
+    color: rgba(255, 255, 255, .48);
+    font-size: 15px;
+}
+
+.acq-chart-scroll-hint strong {
+    display: block;
+    margin-top: 1px;
+    color: var(--admin-text);
+    font-size: 11px;
+}
+
+.acq-chart-scroll-hint.is-active {
+    color: rgba(255, 226, 122, .74);
+    border-color: rgba(255, 199, 0, .26);
+    background: rgba(255, 199, 0, .07);
+}
+
+.acq-chart-scroll-hint.is-active > i,
+.acq-chart-scroll-hint.is-active strong {
+    color: var(--admin-accent);
+}
+
+.acq-chart-data-shell {
+    position: relative;
+    isolation: isolate;
+}
+
+.acq-chart-data-scroll {
+    max-height: min(420px, 52vh);
+    overflow: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable both-edges;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 199, 0, .72) rgba(255, 255, 255, .05);
+    outline: none;
+}
+
+.acq-chart-data-scroll:focus-visible {
+    box-shadow: inset 0 0 0 2px rgba(255, 199, 0, .62);
+}
+
+.acq-chart-data-scroll::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.acq-chart-data-scroll::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, .045);
+}
+
+.acq-chart-data-scroll::-webkit-scrollbar-thumb {
+    min-height: 44px;
+    border: 2px solid #101116;
+    border-radius: 999px;
+    background: rgba(255, 199, 0, .72);
+}
+
+.acq-chart-data-scroll table {
+    min-width: 100%;
+}
+
+.acq-chart-data-scroll thead th {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: #17181e;
+    box-shadow: 0 1px 0 rgba(255, 255, 255, .10);
+}
+
+.acq-chart-data-scroll :is(th, td):first-child {
+    position: sticky;
+    left: 0;
+    z-index: 2;
+    background: #111217;
+    box-shadow: 1px 0 0 rgba(255, 255, 255, .08);
+}
+
+.acq-chart-data-scroll thead th:first-child {
+    z-index: 4;
+    background: #17181e;
+}
+
+.acq-chart-data-shell.has-overflow-y:not(.is-at-bottom)::after,
+.acq-chart-data-shell.has-overflow-x:not(.is-at-right)::before {
+    content: "";
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+}
+
+.acq-chart-data-shell.has-overflow-y:not(.is-at-bottom)::after {
+    right: 10px;
+    bottom: 0;
+    left: 0;
+    height: 34px;
+    background: linear-gradient(to bottom, transparent, rgba(10, 11, 16, .94));
+}
+
+.acq-chart-data-shell.has-overflow-x:not(.is-at-right)::before {
+    top: 0;
+    right: 0;
+    bottom: 10px;
+    width: 34px;
+    background: linear-gradient(to right, transparent, rgba(10, 11, 16, .94));
+}
+
+.acq-chart-data-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 9px 17px;
+    color: var(--admin-text-subtle);
+    border-top: 1px solid rgba(255, 255, 255, .07);
+    background: rgba(255, 255, 255, .02);
+    font-size: 10px;
+}
+
+.acq-chart-data-footer span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+html[data-admin-theme="light"] .acq-chart-data-section {
+    border-color: var(--admin-border);
+    background: #fff;
+    box-shadow: 0 12px 30px rgba(37, 42, 50, .08);
+}
+
+html[data-admin-theme="light"] .acq-chart-data-header,
+html[data-admin-theme="light"] .acq-chart-data-footer {
+    border-color: var(--admin-border);
+    background: #f5f6f8;
+}
+
+html[data-admin-theme="light"] .acq-chart-scroll-hint {
+    border-color: var(--admin-border-strong);
+    background: #fff;
+}
+
+html[data-admin-theme="light"] .acq-chart-scroll-hint.is-active {
+    border-color: rgba(174, 130, 0, .34);
+    background: rgba(255, 199, 0, .10);
+}
+
+html[data-admin-theme="light"] .acq-chart-data-scroll thead th,
+html[data-admin-theme="light"] .acq-chart-data-scroll thead th:first-child {
+    background: #eef0f3;
+}
+
+html[data-admin-theme="light"] .acq-chart-data-scroll :is(th, td):first-child {
+    background: #fff;
+    box-shadow: 1px 0 0 var(--admin-border);
+}
+
+html[data-admin-theme="light"] .acq-chart-data-scroll thead th:first-child {
+    background: #eef0f3;
+}
+
+html[data-admin-theme="light"] .acq-chart-data-shell.has-overflow-y:not(.is-at-bottom)::after {
+    background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, .96));
+}
+
+html[data-admin-theme="light"] .acq-chart-data-shell.has-overflow-x:not(.is-at-right)::before {
+    background: linear-gradient(to right, transparent, rgba(255, 255, 255, .96));
+}
+
+@media (max-width: 640px) {
+    .acq-chart-data-section {
+        margin-top: 20px;
+    }
+
+    .acq-chart-data-header {
+        align-items: stretch;
+        flex-direction: column;
+        gap: 11px;
+        padding: 14px;
+    }
+
+    .acq-chart-scroll-hint {
+        width: 100%;
+        min-width: 0;
+    }
+
+    .acq-chart-data-scroll {
+        max-height: min(360px, 48vh);
+    }
+
+    .acq-chart-data-footer {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 5px;
+        padding: 9px 14px;
+    }
+}
+
 @media (max-width: 1024px) {
     html[data-admin-theme="light"] .sidebar {
         background: rgba(255, 255, 255, .985);
@@ -3406,6 +3668,592 @@ html[data-admin-theme="light"] #panel-acquisition table td {
         border-color: var(--admin-border);
         background: #fff;
         box-shadow: 0 10px 24px rgba(37, 42, 50, .07);
+    }
+}
+
+/* Payment journal: compact operation hierarchy with expandable technical data. */
+.payment-journal,
+.payment-history-panel {
+    overflow: hidden;
+    border-color: var(--admin-border);
+    border-radius: 14px;
+    background: #101116;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, .16);
+}
+
+.payment-journal-header,
+.payment-history-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 15px 18px;
+    background: #131419;
+}
+
+.payment-history-summary {
+    position: relative;
+}
+
+.payment-journal-header {
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.payment-history-panel[open] > .payment-history-summary {
+    border-bottom: 1px solid var(--admin-border);
+}
+
+.payment-journal-eyebrow,
+.payment-history-summary-copy > span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--admin-accent);
+    font-size: 9px;
+    font-weight: 800;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+}
+
+.payment-journal-header h3,
+.payment-history-summary-copy strong {
+    display: block;
+    margin: 3px 0 0;
+    color: rgba(255, 255, 255, .92);
+    font-size: 14px;
+    font-weight: 780;
+}
+
+.payment-journal-header p,
+.payment-history-summary-copy small {
+    display: block;
+    margin: 2px 0 0;
+    color: var(--admin-text-muted);
+    font-size: 9.5px;
+    line-height: 1.4;
+}
+
+.payment-history-summary-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border: 1px solid rgba(var(--accent-rgb), .25);
+    border-radius: 10px;
+    background: rgba(var(--accent-rgb), .07);
+    color: var(--admin-accent);
+    font-size: 12px;
+}
+
+.payment-history-summary-copy {
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.payment-journal-summary,
+.payment-history-summary-state {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: var(--admin-text-muted);
+    font-size: 9.5px;
+    white-space: nowrap;
+}
+
+.payment-history-summary-state {
+    margin-left: auto;
+    margin-right: 4px;
+}
+
+.payment-journal-summary-success {
+    color: #68d6a6;
+}
+
+.payment-journal-summary-error {
+    color: #ff8f9d;
+}
+
+.payment-journal-summary-dot {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, .24);
+}
+
+.payment-journal-columns,
+.payment-journal-row {
+    display: grid;
+    grid-template-columns: minmax(230px, 2fr) minmax(125px, 1fr) 92px 108px 20px;
+    align-items: center;
+    column-gap: 15px;
+}
+
+.payment-journal-columns.has-user,
+.payment-journal-row.has-user {
+    grid-template-columns: minmax(205px, 1.7fr) minmax(145px, 1.15fr) minmax(120px, .9fr) 88px 104px 20px;
+}
+
+.payment-journal-columns {
+    min-height: 36px;
+    padding: 0 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, .07);
+    background: #0d0e12;
+    color: rgba(255, 255, 255, .38);
+    font-size: 8.5px;
+    font-weight: 800;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+}
+
+.payment-journal-list {
+    display: grid;
+}
+
+.payment-journal-item {
+    position: relative;
+    min-width: 0;
+    border-bottom: 1px solid rgba(255, 255, 255, .07);
+    background: #121318;
+}
+
+.payment-journal-item:last-child {
+    border-bottom: 0;
+}
+
+.payment-journal-item::before {
+    position: absolute;
+    top: 13px;
+    bottom: 13px;
+    left: 0;
+    width: 2px;
+    border-radius: 0 2px 2px 0;
+    background: rgba(255, 255, 255, .24);
+    content: "";
+}
+
+.payment-journal-item.is-success::before { background: #43be87; }
+.payment-journal-item.is-pending::before { background: var(--admin-accent); }
+.payment-journal-item.is-error::before { background: #ef6671; }
+
+.payment-journal-item.is-open {
+    background: #15161c;
+}
+
+.payment-journal-row {
+    width: 100%;
+    min-height: 66px;
+    padding: 9px 18px;
+    border: 0;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+
+.payment-journal-row:hover {
+    background: rgba(255, 255, 255, .025);
+}
+
+.payment-journal-row:focus-visible {
+    position: relative;
+    z-index: 2;
+    outline: 2px solid rgba(var(--accent-rgb), .70);
+    outline-offset: -2px;
+}
+
+.payment-journal-operation {
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 34px minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+}
+
+.payment-journal-provider {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid rgba(var(--accent-rgb), .28);
+    border-radius: 10px;
+    background: rgba(var(--accent-rgb), .08);
+    color: var(--admin-accent);
+    font-size: 10px;
+    font-weight: 800;
+}
+
+.payment-journal-operation-copy {
+    min-width: 0;
+    display: grid;
+    gap: 2px;
+}
+
+.payment-journal-operation-copy > strong {
+    overflow: hidden;
+    color: rgba(255, 255, 255, .88);
+    font-size: 10.5px;
+    font-weight: 750;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.payment-journal-id,
+.payment-journal-full-id {
+    min-width: 0;
+    overflow: hidden;
+    color: rgba(255, 255, 255, .42);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 8.5px;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.payment-journal-operation-copy > small {
+    display: none;
+}
+
+.payment-journal-user {
+    min-width: 0;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    color: rgba(255, 255, 255, .64);
+    font-size: 9.5px;
+}
+
+.payment-journal-user > i {
+    color: rgba(255, 255, 255, .30);
+    font-size: 9px;
+}
+
+.payment-journal-user > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.payment-journal-date {
+    color: rgba(255, 255, 255, .72);
+    font-size: 9.5px;
+    font-variant-numeric: tabular-nums;
+}
+
+.payment-journal-date > small {
+    display: block;
+    margin-top: 2px;
+    color: rgba(255, 255, 255, .38);
+    font-size: 8.5px;
+}
+
+.payment-journal-amount {
+    color: rgba(255, 255, 255, .94);
+    font-size: 11.5px;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.payment-journal-status {
+    justify-self: start;
+    min-height: 24px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 8px;
+    border: 1px solid rgba(255, 255, 255, .14);
+    border-radius: 999px;
+    font-size: 8.5px;
+    font-weight: 750;
+    white-space: nowrap;
+}
+
+.payment-journal-status > i {
+    font-size: 4px;
+}
+
+.payment-journal-status.is-success,
+.payment-journal-details .is-success {
+    color: #68d6a6;
+}
+
+.payment-journal-status.is-success {
+    border-color: rgba(var(--green-rgb), .30);
+    background: rgba(var(--green-rgb), .08);
+}
+
+.payment-journal-status.is-pending,
+.payment-journal-details .is-pending {
+    color: #ffe27a;
+}
+
+.payment-journal-status.is-pending {
+    border-color: rgba(var(--accent-rgb), .28);
+    background: rgba(var(--accent-rgb), .07);
+}
+
+.payment-journal-status.is-error,
+.payment-journal-details .is-error {
+    color: #ff8f9d;
+}
+
+.payment-journal-status.is-error {
+    border-color: rgba(255, 107, 125, .30);
+    background: rgba(255, 107, 125, .08);
+}
+
+.payment-journal-chevron {
+    justify-self: end;
+    color: rgba(255, 255, 255, .32);
+    font-size: 9px;
+    transition: color .16s ease, transform .18s ease;
+}
+
+.payment-journal-item.is-open .payment-journal-chevron {
+    color: var(--admin-accent);
+    transform: rotate(90deg);
+}
+
+.payment-journal-details {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 16px;
+    margin: 0 18px 13px 62px;
+    padding: 11px 13px;
+    border: 1px solid rgba(255, 255, 255, .10);
+    border-radius: 9px;
+    background: #0d0e12;
+}
+
+.payment-journal-item.has-user .payment-journal-details {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.payment-journal-details:not([hidden]) {
+    display: grid;
+}
+
+.payment-journal-details[hidden] {
+    display: none;
+}
+
+.payment-journal-details > div {
+    min-width: 0;
+    display: grid;
+    gap: 3px;
+}
+
+.payment-journal-details span {
+    color: rgba(255, 255, 255, .34);
+    font-size: 8px;
+    font-weight: 750;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+}
+
+.payment-journal-details strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    color: rgba(255, 255, 255, .70);
+    font-size: 9px;
+    font-weight: 650;
+}
+
+.payment-journal-footer,
+.payment-history-panel > .payments-board-footer {
+    min-height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 8px 18px;
+    border-top: 1px solid rgba(255, 255, 255, .07);
+    background: #0d0e12;
+    color: rgba(255, 255, 255, .38);
+    font-size: 8.5px;
+}
+
+.payment-journal-footer span,
+.payment-history-panel > .payments-board-footer span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.payment-journal-footer strong,
+.payment-history-panel > .payments-board-footer strong {
+    color: rgba(255, 255, 255, .68);
+}
+
+.payment-journal-empty {
+    min-height: 120px;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 9px;
+    color: var(--admin-text-muted);
+    font-size: 10px;
+}
+
+.payment-journal-empty > i {
+    color: rgba(var(--accent-rgb), .56);
+    font-size: 20px;
+}
+
+html[data-admin-theme="light"] .payment-journal,
+html[data-admin-theme="light"] .payment-history-panel {
+    border-color: var(--admin-border);
+    background: #fff;
+    box-shadow: 0 12px 30px rgba(37, 42, 50, .07);
+}
+
+html[data-admin-theme="light"] .payment-journal-header,
+html[data-admin-theme="light"] .payment-history-summary {
+    background: #f5f6f8;
+}
+
+html[data-admin-theme="light"] .payment-journal-header h3,
+html[data-admin-theme="light"] .payment-history-summary-copy strong,
+html[data-admin-theme="light"] .payment-journal-operation-copy > strong,
+html[data-admin-theme="light"] .payment-journal-amount {
+    color: #252a32;
+}
+
+html[data-admin-theme="light"] .payment-journal-columns,
+html[data-admin-theme="light"] .payment-journal-footer,
+html[data-admin-theme="light"] .payment-history-panel > .payments-board-footer,
+html[data-admin-theme="light"] .payment-journal-details {
+    border-color: var(--admin-border);
+    background: #f0f2f5;
+}
+
+html[data-admin-theme="light"] .payment-journal-item {
+    border-color: var(--admin-border);
+    background: #fff;
+}
+
+html[data-admin-theme="light"] .payment-journal-item.is-open,
+html[data-admin-theme="light"] .payment-journal-row:hover {
+    background: #f8f9fb;
+}
+
+html[data-admin-theme="light"] .payment-journal-id,
+html[data-admin-theme="light"] .payment-journal-full-id,
+html[data-admin-theme="light"] .payment-journal-date > small,
+html[data-admin-theme="light"] .payment-journal-details span {
+    color: #737b87;
+}
+
+html[data-admin-theme="light"] .payment-journal-user,
+html[data-admin-theme="light"] .payment-journal-date,
+html[data-admin-theme="light"] .payment-journal-details strong {
+    color: #4e5662;
+}
+
+html[data-admin-theme="light"] .payment-journal-summary-dot {
+    background: rgba(34, 39, 47, .24);
+}
+
+@media (max-width: 900px) {
+    .payment-journal-columns {
+        display: none;
+    }
+
+    .payment-journal-row,
+    .payment-journal-row.has-user {
+        grid-template-columns: minmax(0, 1fr) auto 18px;
+        gap: 9px;
+        padding: 11px 14px;
+    }
+
+    .payment-journal-operation {
+        grid-column: 1;
+        grid-row: 1 / span 2;
+    }
+
+    .payment-journal-operation-copy > small {
+        display: block;
+        overflow: hidden;
+        color: var(--admin-text-muted);
+        font-size: 8px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+    }
+
+    .payment-journal-user,
+    .payment-journal-date {
+        display: none;
+    }
+
+    .payment-journal-amount {
+        grid-column: 2;
+        grid-row: 1;
+        justify-self: end;
+    }
+
+    .payment-journal-status {
+        grid-column: 2;
+        grid-row: 2;
+        justify-self: end;
+    }
+
+    .payment-journal-chevron {
+        grid-column: 3;
+        grid-row: 1 / span 2;
+        align-self: center;
+    }
+
+    .payment-journal-details,
+    .payment-journal-item.has-user .payment-journal-details {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        margin-left: 14px;
+        margin-right: 14px;
+    }
+}
+
+@media (max-width: 640px) {
+    .payment-journal-header,
+    .payment-history-summary {
+        align-items: flex-start;
+        flex-wrap: wrap;
+        padding: 13px 14px;
+    }
+
+    .payment-history-summary-state,
+    .payment-journal-summary {
+        width: 100%;
+        margin: 2px 0 0;
+        padding-left: 44px;
+    }
+
+    .payment-history-summary::after {
+        position: absolute;
+        top: 25px;
+        right: 14px;
+    }
+
+    .payment-journal-provider {
+        width: 32px;
+        height: 32px;
+    }
+
+    .payment-journal-operation {
+        grid-template-columns: 32px minmax(0, 1fr);
+    }
+
+    .payment-journal-details,
+    .payment-journal-item.has-user .payment-journal-details {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .payment-journal-footer,
+    .payment-history-panel > .payments-board-footer {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 4px;
+        padding: 9px 14px;
     }
 }
 

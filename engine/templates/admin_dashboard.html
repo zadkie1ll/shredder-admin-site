@@ -1974,7 +1974,26 @@
                     <canvas id="acq-ads-daily-chart" style="width:100%;height:250px;display:block;margin-top:10px;"></canvas>
                     <div style="font-size:11px;color:var(--muted);margin-top:12px;">Стоимость привлечения, ₽: CPC (клик), подписка, подключение, продажа</div>
                     <canvas id="acq-ads-cost-chart" style="width:100%;height:220px;display:block;margin-top:6px;"></canvas>
-                    <div id="acq-ads-daily-table" style="margin-top:12px;overflow-x:auto;max-height:420px;overflow-y:auto;"></div>
+                    <section class="acq-chart-data-section" aria-labelledby="acq-ads-data-title">
+                        <header class="acq-chart-data-header">
+                            <div class="acq-chart-data-heading">
+                                <span class="acq-chart-data-kicker"><i class="fas fa-table"></i>Табличная детализация графиков</span>
+                                <h3 id="acq-ads-data-title">Данные графиков по периодам</h3>
+                                <p>Те же показатели двух графиков выше, но в точных числах для каждого периода.</p>
+                            </div>
+                            <div class="acq-chart-scroll-hint" id="acq-ads-scroll-hint" role="status">
+                                <i class="fas fa-computer-mouse"></i>
+                                <span>Прокрутка таблицы<strong id="acq-ads-scroll-directions">проверяем размер…</strong></span>
+                            </div>
+                        </header>
+                        <div class="acq-chart-data-shell" id="acq-ads-data-shell">
+                            <div id="acq-ads-daily-table" class="acq-chart-data-scroll" tabindex="0" aria-label="Табличная детализация графиков рекламы"></div>
+                        </div>
+                        <footer class="acq-chart-data-footer">
+                            <span id="acq-ads-data-count">Загружаем строки…</span>
+                            <span><i class="fas fa-thumbtack"></i>Шапка и период закреплены при прокрутке</span>
+                        </footer>
+                    </section>
                 </div>
                 <div class="card" style="padding:18px;margin-bottom:14px;">
                     <strong>Добавить/обновить траты на рекламу вручную</strong>
@@ -2201,19 +2220,20 @@
                 <button class="btn" type="submit"><i class="fas fa-search"></i>Найти</button>
             </form>
             <div id="payment-info-result" style="margin-bottom:14px;"></div>
-            <details id="payments-history-details" class="card payments-board admin-collapse" open>
-                <summary><i class="fas fa-clock-rotate-left"></i>История платежей</summary>
-                <div id="payments-list" class="payments-board-scroll"></div>
-                <footer class="payments-board-footer">
-                    <span id="payments-list-count">Платежи: 0</span>
-                    <span class="payments-pages" aria-label="Страницы платежей">
-                        <span class="payments-page muted"><i class="fas fa-angle-left"></i></span>
-                        <span class="payments-page active">1</span>
-                        <span class="payments-page">2</span>
-                        <span class="payments-page">3</span>
-                        <span class="payments-page muted"><i class="fas fa-angle-right"></i></span>
-                        <span class="payments-page muted"><i class="fas fa-angles-right"></i></span>
+            <details id="payments-history-details" class="card payments-board payment-history-panel admin-collapse" open>
+                <summary class="payment-history-summary">
+                    <span class="payment-history-summary-icon"><i class="fas fa-receipt"></i></span>
+                    <span class="payment-history-summary-copy">
+                        <span>Журнал операций</span>
+                        <strong>История платежей</strong>
+                        <small>Последние операции всех клиентов</small>
                     </span>
+                    <span class="payment-history-summary-state" id="payments-history-summary-state">Загрузка…</span>
+                </summary>
+                <div id="payments-list" class="payment-journal-host"></div>
+                <footer class="payments-board-footer">
+                    <span id="payments-list-count">Показано операций: 0</span>
+                    <span><i class="fas fa-arrow-pointer"></i>Нажмите на строку, чтобы увидеть полный ID и результат</span>
                 </footer>
             </details>
         </section>
@@ -5147,34 +5167,119 @@
             await renderClientCard();
         }
 
+        function paymentStatusDescriptor(payment) {
+            const rawStatus = String(payment?.status || '').trim();
+            const normalized = rawStatus.toLowerCase();
+            if (payment?.success) return {key: 'success', label: 'Успешен'};
+            if (['pending', 'waiting', 'processing', 'created', 'new', 'ожида', 'обработ'].some((token) => normalized.includes(token))) {
+                return {
+                    key: 'pending',
+                    label: normalized.includes('waiting') || normalized.includes('ожида') ? 'Ожидает' : 'В обработке',
+                };
+            }
+            if (normalized.includes('cancel') || normalized.includes('отмен')) {
+                return {key: 'error', label: 'Отменён'};
+            }
+            return {key: 'error', label: 'Ошибка'};
+        }
+
+        function paymentAmountLabel(payment) {
+            const currency = String(payment?.currency || '').toUpperCase();
+            const symbol = {RUB: '₽', RUR: '₽', USD: '$', EUR: '€'}[currency] || currency;
+            return `${payment?.amount ?? '—'}${symbol ? ` ${symbol}` : ''}`;
+        }
+
+        function paymentDateParts(value) {
+            const parts = String(value || '—').trim().split(/\s+/);
+            return {date: parts.shift() || '—', time: parts.join(' ')};
+        }
+
+        function paymentProviderInitial(system) {
+            const normalized = String(system || '').toLowerCase();
+            if (normalized.includes('wata')) return 'W';
+            if (normalized.includes('yoo') || normalized.includes('юкас')) return 'Ю';
+            return '₽';
+        }
+
+        function paymentJournalSummaryHtml(payments) {
+            const successCount = payments.filter((payment) => payment.success).length;
+            const problemCount = payments.length - successCount;
+            return `
+                <span class="payment-journal-summary-success">${successCount} успешн.</span>
+                <span class="payment-journal-summary-dot" aria-hidden="true"></span>
+                <span class="${problemCount ? 'payment-journal-summary-error' : ''}">${problemCount} остальных</span>
+            `;
+        }
+
+        function paymentJournalRowsHtml(payments, {showUser = false, context = 'payments'} = {}) {
+            if (!payments.length) {
+                return '<div class="payment-journal-empty"><i class="fas fa-receipt"></i><span>Платежей пока нет.</span></div>';
+            }
+            const columnClass = showUser ? ' has-user' : '';
+            return `
+                <div class="payment-journal-columns${columnClass}" aria-hidden="true">
+                    <span>Операция</span>
+                    ${showUser ? '<span>Пользователь</span>' : ''}
+                    <span>Дата и система</span>
+                    <span>Сумма</span>
+                    <span>Статус</span>
+                    <span></span>
+                </div>
+                <div class="payment-journal-list">
+                    ${payments.map((payment, index) => {
+                        const status = paymentStatusDescriptor(payment);
+                        const date = paymentDateParts(payment.date);
+                        const system = String(payment.system || 'Платёжная система');
+                        const tariff = String(payment.tariff || 'Тариф не указан');
+                        const user = String(payment.user || '');
+                        const detailId = `payment-journal-detail-${context}-${index}`;
+                        const mobileMeta = [showUser ? user : '', date.date, system].filter(Boolean).join(' · ');
+                        return `
+                            <article class="payment-journal-item is-${status.key}${columnClass}" data-payment-journal-item>
+                                <button class="payment-journal-row${columnClass}" type="button" data-payment-journal-toggle aria-expanded="false" aria-controls="${detailId}">
+                                    <span class="payment-journal-operation">
+                                        <span class="payment-journal-provider" aria-hidden="true">${escapeHtml(paymentProviderInitial(system))}</span>
+                                        <span class="payment-journal-operation-copy">
+                                            <strong>${payment.trial ? 'Пробный период' : 'Подписка'} · ${escapeHtml(tariff)}</strong>
+                                            <span class="payment-journal-id" title="${escapeHtml(payment.id)}">${escapeHtml(payment.id)}</span>
+                                            <small>${escapeHtml(mobileMeta)}</small>
+                                        </span>
+                                    </span>
+                                    ${showUser ? `<span class="payment-journal-user" title="${escapeHtml(user)}"><i class="fas fa-user"></i><span>${escapeHtml(user || '—')}</span></span>` : ''}
+                                    <span class="payment-journal-date">${escapeHtml(date.date)}<small>${date.time ? `${escapeHtml(date.time)} · ` : ''}${escapeHtml(system)}</small></span>
+                                    <span class="payment-journal-amount">${escapeHtml(paymentAmountLabel(payment))}</span>
+                                    <span class="payment-journal-status is-${status.key}"><i class="fas fa-circle"></i>${escapeHtml(status.label)}</span>
+                                    <i class="fas fa-chevron-right payment-journal-chevron" aria-hidden="true"></i>
+                                </button>
+                                <div class="payment-journal-details" id="${detailId}" hidden>
+                                    <div><span>ID платежа</span><strong class="payment-journal-full-id">${escapeHtml(payment.id || '—')}</strong></div>
+                                    <div><span>Провайдер</span><strong>${escapeHtml(system)}</strong></div>
+                                    ${showUser ? `<div><span>Пользователь</span><strong>${escapeHtml(user || '—')}</strong></div>` : ''}
+                                    <div><span>Результат</span><strong class="is-${status.key}">${escapeHtml(payment.status || status.label)}</strong></div>
+                                </div>
+                            </article>
+                        `;
+                    }).join('')}
+                </div>
+            `;
+        }
+
         function clientPaymentsSectionHtml(result) {
             const history = result.history || [];
             return `
-                <section class="card payments-board">
-                    <div class="payments-board-scroll">
-                        ${history.length ? `
-                            <div class="admin-table-row table-head user-payments-row">
-                                <div>ID Платежа</div>
-                                <div>Дата</div>
-                                <div>Система</div>
-                                <div>Тариф</div>
-                                <div>Сумма</div>
-                                <div>Статус</div>
-                            </div>
-                            ${history.map((item) => `
-                                <div class="admin-table-row user-payments-row">
-                                    <div class="payment-id-cell" title="${escapeHtml(item.id)}">${escapeHtml(item.id)}</div>
-                                    <div>${escapeHtml(item.date)}</div>
-                                    <div>${escapeHtml(item.system)}</div>
-                                    <div class="cell-value" title="${escapeHtml(item.tariff)}">${escapeHtml(item.tariff)}${item.trial ? ' · Trial' : ''}</div>
-                                    <div>${escapeHtml(item.amount)} ${escapeHtml(item.currency)}</div>
-                                    <div><span class="payment-status-pill ${item.success ? 'ok' : ''}">${item.success ? 'Успешен' : 'Ошибка'}</span></div>
-                                </div>
-                            `).join('')}
-                        ` : '<div class="info-card muted">Платежей не найдено.</div>'}
-                    </div>
-                    <footer class="payments-board-footer">
-                        <span>Платежи: ${history.length ? `1 - ${history.length}` : '0'}</span>
+                <section class="card payment-journal">
+                    <header class="payment-journal-header">
+                        <div>
+                            <span class="payment-journal-eyebrow"><i class="fas fa-receipt"></i>Журнал операций</span>
+                            <h3>История платежей</h3>
+                            <p>Последние операции клиента — сначала новые</p>
+                        </div>
+                        <div class="payment-journal-summary" aria-label="Сводка статусов">${paymentJournalSummaryHtml(history)}</div>
+                    </header>
+                    ${paymentJournalRowsHtml(history, {context: 'client'})}
+                    <footer class="payment-journal-footer">
+                        <span>Показано операций: <strong>${history.length}</strong></span>
+                        <span><i class="fas fa-arrow-pointer"></i>Нажмите строку, чтобы раскрыть технические детали</span>
                     </footer>
                 </section>`;
         }
@@ -6119,6 +6224,7 @@
         async function loadPaymentsList() {
             const target = document.getElementById('payments-list');
             const count = document.getElementById('payments-list-count');
+            const summaryState = document.getElementById('payments-history-summary-state');
             if (!target || !main.dataset.paymentsUrl) return;
             target.innerHTML = inlineLoading('Загружаем платежи...');
             let response;
@@ -6129,35 +6235,19 @@
                 });
             } catch (error) {
                 target.innerHTML = '<div class="info-card red">Не удалось загрузить платежи</div>';
+                if (summaryState) summaryState.textContent = 'Ошибка загрузки';
                 return;
             }
             if (!response.ok) {
                 target.innerHTML = '<div class="info-card red">Не удалось загрузить платежи</div>';
+                if (summaryState) summaryState.textContent = 'Ошибка загрузки';
                 return;
             }
             const payload = await response.json();
             const payments = payload.payments || [];
-            target.innerHTML = `
-                <div class="admin-table-row table-head payments-list-row">
-                    <div>ID Платежа</div>
-                    <div>Дата</div>
-                    <div>Пользователь</div>
-                    <div>Тариф</div>
-                    <div>Сумма</div>
-                    <div>Статус</div>
-                </div>
-                ${payments.map((payment) => `
-                    <div class="admin-table-row payments-list-row">
-                        <div class="payment-id-cell" title="${escapeHtml(payment.id)}">${escapeHtml(payment.id)}</div>
-                        <div>${escapeHtml(payment.date)}</div>
-                        <div class="cell-value" title="${escapeHtml(payment.user)}">${escapeHtml(payment.user)}</div>
-                        <div class="cell-value" title="${escapeHtml(payment.tariff)}">${escapeHtml(payment.tariff)}</div>
-                        <div>${escapeHtml(payment.amount)} ${escapeHtml(payment.currency)}</div>
-                        <div><span class="payment-status-pill ${payment.success ? 'ok' : ''}">${escapeHtml(payment.status)}</span></div>
-                    </div>
-                `).join('') || '<div class="info-card muted">Платежей пока нет.</div>'}
-            `;
-            if (count) count.textContent = payments.length ? `Платежи: 1 - ${payments.length}` : 'Платежи: 0';
+            target.innerHTML = paymentJournalRowsHtml(payments, {showUser: true, context: 'all'});
+            if (summaryState) summaryState.innerHTML = paymentJournalSummaryHtml(payments);
+            if (count) count.innerHTML = `Показано операций: <strong>${payments.length}</strong>`;
         }
 
         function drawReferralGraph(container, graph) {
@@ -7231,6 +7321,16 @@
         }
 
         document.addEventListener('click', (event) => {
+            const paymentToggle = event.target.closest('[data-payment-journal-toggle]');
+            if (paymentToggle) {
+                const item = paymentToggle.closest('[data-payment-journal-item]');
+                const details = item?.querySelector('.payment-journal-details');
+                const shouldOpen = paymentToggle.getAttribute('aria-expanded') !== 'true';
+                paymentToggle.setAttribute('aria-expanded', String(shouldOpen));
+                item?.classList.toggle('is-open', shouldOpen);
+                if (details) details.hidden = !shouldOpen;
+            }
+
             const recentClientButton = event.target.closest('[data-client-recent-query]');
             if (recentClientButton) {
                 const form = document.getElementById('user-payments-form');
@@ -7673,6 +7773,51 @@
         const fmtCost = (v) => v == null ? '—' : v.toFixed(2) + ' ₽';
         const fmtInt = (v) => v == null ? '—' : v.toLocaleString('ru-RU');
 
+        function updateAdsDailyTableFrame(group, rowCount) {
+            const scroller = document.getElementById('acq-ads-daily-table');
+            const shell = document.getElementById('acq-ads-data-shell');
+            const title = document.getElementById('acq-ads-data-title');
+            const count = document.getElementById('acq-ads-data-count');
+            const hint = document.getElementById('acq-ads-scroll-hint');
+            const directions = document.getElementById('acq-ads-scroll-directions');
+            if (!scroller || !shell || !hint || !directions) return;
+
+            const groupedByMonth = group === 'month';
+            const periodLabel = groupedByMonth ? 'месяцам' : 'дням';
+            if (title) title.textContent = `Данные графиков по ${periodLabel}`;
+            if (count) count.textContent = `Показано периодов: ${rowCount}`;
+            scroller.setAttribute(
+                'aria-label',
+                `Данные двух графиков рекламы по ${periodLabel}. Прокручиваемая таблица.`,
+            );
+
+            const refreshScrollCues = () => {
+                const canScrollY = scroller.scrollHeight > scroller.clientHeight + 2;
+                const canScrollX = scroller.scrollWidth > scroller.clientWidth + 2;
+                const atBottom = !canScrollY || scroller.scrollTop + scroller.clientHeight >= scroller.scrollHeight - 2;
+                const atRight = !canScrollX || scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 2;
+                shell.classList.toggle('has-overflow-y', canScrollY);
+                shell.classList.toggle('has-overflow-x', canScrollX);
+                shell.classList.toggle('is-at-bottom', atBottom);
+                shell.classList.toggle('is-at-right', atRight);
+                hint.classList.toggle('is-active', canScrollY || canScrollX);
+                const availableDirections = [
+                    canScrollY ? 'вниз ↕' : '',
+                    canScrollX ? 'в сторону ↔' : '',
+                ].filter(Boolean);
+                directions.textContent = availableDirections.length
+                    ? availableDirections.join(' · ')
+                    : 'все строки и столбцы видны';
+            };
+
+            scroller.__refreshScrollCues = refreshScrollCues;
+            if (!scroller.dataset.scrollCueBound) {
+                scroller.dataset.scrollCueBound = '1';
+                scroller.addEventListener('scroll', refreshScrollCues, {passive: true});
+            }
+            requestAnimationFrame(refreshScrollCues);
+        }
+
         async function loadAdsDaily() {
             const group = document.getElementById('acq-ads-group').value;
             const days = document.getElementById('acq-ads-days').value;
@@ -7705,6 +7850,7 @@
                 rows.slice().reverse().map((r) => [r.period, fmtRub(r.spend), fmtInt(r.impressions), fmtInt(r.clicks),
                     fmtCost(r.cpc), r.subs, fmtCost(r.cost_per_sub),
                     r.conns, fmtCost(r.cost_per_conn), r.sales, fmtCost(r.cost_per_sale)]));
+            updateAdsDailyTableFrame(group, rows.length);
         }
 
         async function loadAds() {
@@ -8115,6 +8261,7 @@
         });
         document.getElementById('acq-ads-group')?.addEventListener('change', () => loadAdsDaily().catch(console.error));
         document.getElementById('acq-ads-days')?.addEventListener('change', () => loadAdsDaily().catch(console.error));
+        window.addEventListener('resize', () => document.getElementById('acq-ads-daily-table')?.__refreshScrollCues?.());
         document.getElementById('acq-trials-window')?.addEventListener('change', () => loadTrials().catch(console.error));
         document.getElementById('acq-csv-form')?.addEventListener('submit', async (ev) => {
             ev.preventDefault();

@@ -5722,8 +5722,9 @@ def support_admin_api_payments(request):
         for payment, user in yk_payments:
             payments.append(
                 {
+                    "system": "YooKassa",
                     "id": payment.payment_id,
-                    "date": admin_date_label(payment.created_at, with_time=False),
+                    "date": admin_date_label(payment.created_at),
                     "date_sort": admin_dt(payment.created_at) or datetime.min,
                     "user": user.username or user.email or str(user.id),
                     "tariff": get_tariff_display_name(payment.subscription_period),
@@ -5742,8 +5743,9 @@ def support_admin_api_payments(request):
         for payment, invoice, user in wata_payments:
             payments.append(
                 {
+                    "system": "Wata",
                     "id": payment.transaction_id,
-                    "date": admin_date_label(payment.payment_time, with_time=False),
+                    "date": admin_date_label(payment.payment_time),
                     "date_sort": admin_dt(payment.payment_time) or datetime.min,
                     "user": user.username or user.email or str(user.id),
                     "tariff": invoice.tariff_id
