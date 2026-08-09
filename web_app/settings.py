@@ -362,8 +362,30 @@ TIME_ZONE = "Europe/Moscow"
 
 STATIC_URL = "/static/"
 
-if HAS_WHITENOISE:
-    STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+# Django 6 читает backend статики только из STORAGES. Manifest backend добавляет
+# content hash в URL, поэтому nginx может безопасно кешировать CSS неделю: новая
+# версия админки всегда получает новый адрес, а не старый admin_dashboard.css.
+PRODUCTION_STATICFILES_BACKEND = (
+    "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    if HAS_WHITENOISE
+    else "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
+)
+# Django test runner рендерит шаблоны без предварительного collectstatic. Для
+# тестов нужен обычный finder-backed storage; production-конфигурацию отдельно
+# проверяет StaticAssetVersioningTests.
+STATICFILES_BACKEND = (
+    "django.contrib.staticfiles.storage.StaticFilesStorage"
+    if "test" in sys.argv
+    else PRODUCTION_STATICFILES_BACKEND
+)
+STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
+    "staticfiles": {
+        "BACKEND": STATICFILES_BACKEND,
+    },
+}
 
 AUTHENTICATION_BACKENDS = [
     "django.contrib.auth.backends.ModelBackend",  # Оставляем для админки (sqlite)

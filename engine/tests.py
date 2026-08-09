@@ -9,6 +9,7 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
+from django.conf import settings
 from django.test import RequestFactory
 from django.test import SimpleTestCase
 from django.test import override_settings
@@ -78,6 +79,21 @@ from engine.views import verify_telegram_widget_auth
 from engine.views import verify_telegram_webapp_init_data
 from engine.views import get_telegram_webapp_user_id
 from web_app.settings import telegram_web_login_start_codes
+
+
+class StaticAssetVersioningTests(SimpleTestCase):
+    def test_staticfiles_use_django_6_manifest_storage(self):
+        settings_source = Path("web_app/settings.py").read_text()
+
+        self.assertIn(
+            "ManifestStaticFilesStorage",
+            settings.PRODUCTION_STATICFILES_BACKEND,
+        )
+        self.assertEqual(
+            settings.STORAGES["staticfiles"]["BACKEND"],
+            "django.contrib.staticfiles.storage.StaticFilesStorage",
+        )
+        self.assertNotIn("STATICFILES_STORAGE =", settings_source)
 
 
 class DashboardSetupTemplateTests(SimpleTestCase):
