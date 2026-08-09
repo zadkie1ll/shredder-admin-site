@@ -3068,9 +3068,29 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertNotIn("+40 дней за друга", desktop_home)
         self.assertIn("home-subscription-actions", desktop_home)
         self.assertIn("home-payments-btn", desktop_home)
+        self.assertIn("desktop-renewal-card", desktop_home)
         self.assertIn('onclick="openPaymentsHistorySheet()"', desktop_home)
         self.assertIn("История платежей", desktop_home)
         self.assertIn("fas fa-receipt", desktop_home)
+
+    def test_desktop_home_uses_semantic_tonal_surface_palette(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn(".standard-dashboard-home .status-overview-card", template)
+        self.assertIn("rgba(255, 178, 0, 0.065)", template)
+        self.assertNotIn("rgba(255, 178, 0, 0.16)", template)
+        self.assertIn(".standard-dashboard-home .status-overview-card::after", template)
+        self.assertIn("feTurbulence", template)
+        self.assertIn("baseFrequency='.78'", template)
+        self.assertIn("mix-blend-mode: screen;", template)
+        self.assertIn("mask-image: radial-gradient(ellipse 58% 118% at 82% 0%", template)
+        self.assertIn("linear-gradient(90deg, #35c966, #62df85);", template)
+        self.assertIn(".standard-dashboard-home .desktop-renewal-card", template)
+        self.assertIn("rgba(113, 130, 160, 0.07)", template)
+        self.assertIn("rgba(255, 190, 67, 0.18)", template)
+        self.assertIn("linear-gradient(105deg, rgba(31, 26, 17, 0.90), rgba(18, 18, 20, 0.92));", template)
+        self.assertIn("body.dashboard-v2 .home-payments-btn i", template)
+        self.assertIn("color: rgba(218, 224, 235, 0.78);", template)
 
     def test_mobile_home_uses_compact_state_driven_layout(self):
         template = Path("engine/templates/dashboard.html").read_text()
