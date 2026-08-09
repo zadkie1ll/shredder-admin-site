@@ -75,7 +75,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800;900&display=swap');
 
         html, body {
             width: 100%;
@@ -144,8 +144,7 @@
             }
 
             body.dashboard-v2 .nav-btn[data-tab="setup"],
-            body.dashboard-v2 .quick-access-btn,
-            body.dashboard-v2 #ref-pill {
+            body.dashboard-v2 .quick-access-btn {
                 display: none !important;
             }
 
@@ -1696,6 +1695,261 @@
             border-radius: 16px;
         }
 
+        .referral-terms-modal {
+            position: fixed;
+            inset: 0;
+            z-index: 10020;
+            display: flex;
+            align-items: flex-end;
+            justify-content: center;
+        }
+
+        .referral-terms-modal.hidden {
+            display: none;
+        }
+
+        .referral-terms-backdrop {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            padding: 0;
+            border: 0;
+            background: rgba(2, 4, 9, 0.78);
+            opacity: 0;
+            backdrop-filter: blur(7px);
+            -webkit-backdrop-filter: blur(7px);
+            transition: opacity 0.2s ease;
+        }
+
+        .referral-terms-modal.is-open .referral-terms-backdrop {
+            opacity: 1;
+        }
+
+        .referral-terms-panel {
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-height: calc(100dvh - max(48px, env(safe-area-inset-top)));
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-bottom: 0;
+            border-radius: 24px 24px 0 0;
+            background:
+                radial-gradient(circle at 22% 0%, rgba(255, 199, 0, 0.06), transparent 28%),
+                rgba(17, 18, 23, 0.995);
+            box-shadow: 0 -24px 72px rgba(0, 0, 0, 0.58);
+            transform: translateY(100%);
+            transition: transform 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+            will-change: transform;
+        }
+
+        .referral-terms-modal.is-open .referral-terms-panel {
+            transform: translateY(0);
+        }
+
+        .referral-terms-drag-zone {
+            flex: 0 0 auto;
+            touch-action: none;
+        }
+
+        .referral-terms-drag-handle {
+            display: block;
+            width: 42px;
+            height: 4px;
+            margin: 10px auto 8px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.38);
+        }
+
+        .referral-terms-header {
+            display: grid;
+            grid-template-columns: 46px minmax(0, 1fr) 36px;
+            align-items: center;
+            gap: 13px;
+            padding: 5px 20px 18px;
+        }
+
+        .referral-terms-icon {
+            width: 46px;
+            height: 46px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 199, 0, 0.28);
+            border-radius: 12px;
+            background: rgba(255, 199, 0, 0.10);
+            color: #ffc700;
+            font-size: 19px;
+        }
+
+        .referral-terms-heading {
+            min-width: 0;
+        }
+
+        .referral-terms-heading h2 {
+            margin: 0 0 4px;
+            color: #fff;
+            font-size: 19px;
+            font-weight: 750;
+            line-height: 1.15;
+            letter-spacing: -0.025em;
+        }
+
+        .referral-terms-heading p {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.52);
+            font-size: 12.5px;
+            font-weight: 500;
+        }
+
+        .referral-terms-close {
+            width: 36px;
+            height: 36px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.045);
+            color: rgba(255, 255, 255, 0.72);
+            font-size: 15px;
+            transition: color 0.16s ease, background 0.16s ease, border-color 0.16s ease;
+        }
+
+        .referral-terms-close:hover {
+            border-color: rgba(255, 255, 255, 0.18);
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+        }
+
+        .referral-terms-list {
+            min-height: 0;
+            display: grid;
+            gap: 0;
+            margin: 0;
+            padding: 2px 20px 18px;
+            overflow-y: auto;
+            overscroll-behavior: contain;
+            list-style: none;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        .referral-terms-step {
+            position: relative;
+            display: grid;
+            grid-template-columns: 44px minmax(0, 1fr);
+            grid-template-rows: auto auto;
+            column-gap: 13px;
+            padding: 10px 0 16px;
+        }
+
+        .referral-terms-marker {
+            position: relative;
+            z-index: 1;
+            grid-row: 1 / span 2;
+            width: 40px;
+            height: 40px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 199, 0, 0.48);
+            border-radius: 50%;
+            background: linear-gradient(145deg, rgba(255, 199, 0, 0.28), rgba(116, 88, 0, 0.34));
+            color: #ffc700;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 7px 20px rgba(255, 199, 0, 0.12);
+        }
+
+        .referral-terms-step:not(:last-child) .referral-terms-marker::after {
+            content: "";
+            position: absolute;
+            top: 40px;
+            bottom: -34px;
+            left: 50%;
+            width: 1px;
+            background: linear-gradient(rgba(255, 199, 0, 0.50), rgba(255, 199, 0, 0.12));
+            transform: translateX(-50%);
+        }
+
+        .referral-terms-reward {
+            grid-column: 2;
+            margin: 0 0 3px;
+            color: #ffc700;
+            font-size: 16px;
+            font-weight: 750;
+            line-height: 1.2;
+        }
+
+        .referral-terms-detail {
+            grid-column: 2;
+            min-width: 0;
+        }
+
+        .referral-terms-detail strong {
+            display: block;
+            margin-bottom: 4px;
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+        }
+
+        .referral-terms-detail p {
+            margin: 0;
+            color: rgba(255, 255, 255, 0.52);
+            font-size: 12px;
+            font-weight: 500;
+            line-height: 1.45;
+        }
+
+        .referral-terms-footer {
+            flex: 0 0 auto;
+            padding: 12px 20px calc(12px + env(safe-area-inset-bottom));
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            background: rgba(17, 18, 23, 0.98);
+        }
+
+        .referral-terms-note {
+            display: none;
+        }
+
+        .referral-terms-confirm {
+            width: 100%;
+            min-height: 50px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid #ffc700;
+            border-radius: 10px;
+            background: #ffc700;
+            color: #0b0c0f;
+            font-size: 14px;
+            font-weight: 700;
+            box-shadow: 0 10px 28px rgba(255, 199, 0, 0.22);
+            transition: transform 0.16s ease, filter 0.16s ease;
+        }
+
+        .referral-terms-confirm:active {
+            transform: scale(0.985);
+        }
+
+        .referral-terms-close:focus-visible,
+        .referral-terms-confirm:focus-visible {
+            outline: 2px solid rgba(255, 199, 0, 0.88);
+            outline-offset: 3px;
+        }
+
+        .ref-desktop-dialog {
+            display: none;
+        }
+
+        body.referral-dialog-open {
+            overflow: hidden;
+        }
+
         .bottom-sheet-content {
             max-height: min(88vh, 760px);
             overflow-y: auto;
@@ -2873,6 +3127,714 @@
             }
         }
 
+        /* Desktop-only visual layer. Mobile website and Telegram Mini App keep
+           their existing system typography, pill navigation and controls. */
+        @media (min-width: 1025px) {
+            body.dashboard-v2,
+            body.dashboard-v2 .main-content,
+            body.dashboard-v2 .sidebar-desktop {
+                font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            }
+
+            body.dashboard-v2 .main-content h1,
+            body.dashboard-v2 .main-content h2,
+            body.dashboard-v2 .main-content h3,
+            body.dashboard-v2 .main-content h4 {
+                font-weight: 700 !important;
+                letter-spacing: -0.025em !important;
+            }
+
+            body.dashboard-v2 .main-content .text-gray-500.font-bold {
+                font-weight: 500 !important;
+            }
+
+            body.dashboard-v2 .sidebar-desktop nav {
+                margin: 0 -16px;
+            }
+
+            body.dashboard-v2 .sidebar-desktop .nav-btn {
+                position: relative;
+                gap: 14px;
+                min-height: 48px;
+                margin: 0;
+                padding: 0 28px 0 30px;
+                border: 0;
+                border-radius: 4px;
+                background: transparent;
+                color: rgba(255, 255, 255, 0.55);
+                font-size: 14px;
+                font-weight: 500;
+                text-transform: none;
+                box-shadow: none;
+                transition: color 0.18s ease, background 0.18s ease;
+            }
+
+            body.dashboard-v2 .sidebar-desktop .nav-btn:hover {
+                background: rgba(255, 255, 255, 0.035);
+                color: rgba(255, 255, 255, 0.86);
+            }
+
+            body.dashboard-v2 .sidebar-desktop .nav-btn.active {
+                border: 0;
+                background: rgba(255, 255, 255, 0.065);
+                color: #fff;
+                box-shadow: none;
+            }
+
+            body.dashboard-v2 .sidebar-desktop .nav-btn.active::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                bottom: 0;
+                left: 0;
+                width: 3px;
+                border-radius: 0 3px 3px 0;
+                background: #ffc700;
+                box-shadow: 0 0 14px rgba(255, 199, 0, 0.28);
+            }
+
+            body.dashboard-v2 .sidebar-desktop .nav-btn i {
+                color: rgba(255, 255, 255, 0.62);
+            }
+
+            body.dashboard-v2 .sidebar-desktop .nav-btn.active i {
+                color: #fff;
+            }
+
+            body.dashboard-v2 #interface-wrapper .setup-cta-btn,
+            body.dashboard-v2 #interface-wrapper .setup-link-btn,
+            body.dashboard-v2 #interface-wrapper .dashboard-action-btn,
+            body.dashboard-v2 .quick-access-btn {
+                min-height: 46px !important;
+                padding: 13px 19px !important;
+                border-radius: 8px !important;
+                font-size: 14px !important;
+                font-weight: 700 !important;
+                line-height: 1.15 !important;
+                box-shadow: 0 8px 22px rgba(255, 199, 0, 0.20) !important;
+            }
+
+            body.dashboard-v2 .home-payments-btn {
+                min-height: 46px;
+                padding: 0 17px;
+                border-radius: 8px;
+                background: rgba(255, 255, 255, 0.025);
+                font-size: 14px;
+                font-weight: 600;
+            }
+
+            body.dashboard-v2 .desktop-referral-strip {
+                display: flex;
+                align-items: center;
+                gap: 16px;
+                width: 100%;
+                padding: 16px 18px;
+                border: 1px solid rgba(255, 255, 255, 0.09);
+                border-radius: 12px;
+                background: rgba(17, 18, 23, 0.82);
+                box-shadow: 0 16px 34px rgba(0, 0, 0, 0.14);
+            }
+
+            body.dashboard-v2 .desktop-referral-icon {
+                width: 44px;
+                height: 44px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                flex: 0 0 auto;
+                border: 1px solid rgba(255, 199, 0, 0.24);
+                border-radius: 10px;
+                background: rgba(255, 199, 0, 0.10);
+                color: #ffc700;
+                font-size: 17px;
+            }
+
+            body.dashboard-v2 .desktop-referral-copy {
+                min-width: 0;
+                flex: 1 1 auto;
+            }
+
+            body.dashboard-v2 .desktop-referral-copy h3 {
+                margin: 0 0 4px;
+                color: #fff;
+                font-size: 15px;
+            }
+
+            body.dashboard-v2 .desktop-referral-copy p {
+                margin: 0;
+                color: rgba(255, 255, 255, 0.48);
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .desktop-referral-btn {
+                min-height: 42px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 8px;
+                flex: 0 0 auto;
+                padding: 0 17px;
+                border: 1px solid rgba(255, 199, 0, 0.62);
+                border-radius: 8px;
+                background: rgba(255, 199, 0, 0.055);
+                color: #ffc700;
+                font-size: 13px;
+                font-weight: 600;
+                transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+            }
+
+            body.dashboard-v2 .desktop-referral-btn:hover {
+                transform: translateY(-1px);
+                background: rgba(255, 199, 0, 0.12);
+                color: #ffd740;
+            }
+
+            body.dashboard-v2 .desktop-referral-btn:focus-visible {
+                outline: 2px solid rgba(255, 199, 0, 0.8);
+                outline-offset: 3px;
+            }
+
+            body.dashboard-v2 .referral-terms-modal {
+                align-items: center;
+                padding: 24px;
+            }
+
+            body.dashboard-v2 .referral-terms-panel {
+                width: min(820px, calc(100vw - 48px));
+                max-height: calc(100dvh - 48px);
+                border: 1px solid rgba(255, 255, 255, 0.18);
+                border-radius: 14px;
+                box-shadow: 0 34px 96px rgba(0, 0, 0, 0.64);
+                opacity: 0;
+                transform: translateY(10px) scale(0.992);
+                transition: opacity 0.18s ease, transform 0.18s ease;
+            }
+
+            body.dashboard-v2 .referral-terms-modal.is-open .referral-terms-panel {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+
+            body.dashboard-v2 .referral-terms-drag-zone {
+                touch-action: auto;
+            }
+
+            body.dashboard-v2 .referral-terms-drag-handle {
+                display: none;
+            }
+
+            body.dashboard-v2 .referral-terms-header {
+                grid-template-columns: 58px minmax(0, 1fr) 38px;
+                gap: 18px;
+                padding: 26px 34px 22px;
+            }
+
+            body.dashboard-v2 .referral-terms-icon {
+                width: 58px;
+                height: 58px;
+                border-radius: 14px;
+                font-size: 24px;
+            }
+
+            body.dashboard-v2 .referral-terms-heading h2 {
+                margin-bottom: 5px;
+                font-size: 24px;
+            }
+
+            body.dashboard-v2 .referral-terms-heading p {
+                font-size: 13px;
+            }
+
+            body.dashboard-v2 .referral-terms-list {
+                gap: 12px;
+                padding: 8px 34px 28px;
+            }
+
+            body.dashboard-v2 .referral-terms-step {
+                grid-template-columns: 46px 104px minmax(0, 1fr);
+                grid-template-rows: auto;
+                align-items: center;
+                column-gap: 18px;
+                min-height: 94px;
+                padding: 14px 18px;
+                border: 1px solid rgba(255, 255, 255, 0.10);
+                border-radius: 11px;
+                background: rgba(255, 255, 255, 0.018);
+            }
+
+            body.dashboard-v2 .referral-terms-marker {
+                grid-row: auto;
+                width: 44px;
+                height: 44px;
+                font-size: 15px;
+            }
+
+            body.dashboard-v2 .referral-terms-step:not(:last-child) .referral-terms-marker::after {
+                top: 44px;
+                bottom: -44px;
+            }
+
+            body.dashboard-v2 .referral-terms-reward {
+                grid-column: auto;
+                margin: 0;
+                font-size: 19px;
+            }
+
+            body.dashboard-v2 .referral-terms-detail {
+                grid-column: auto;
+            }
+
+            body.dashboard-v2 .referral-terms-detail strong {
+                margin-bottom: 5px;
+                font-size: 15px;
+            }
+
+            body.dashboard-v2 .referral-terms-detail p {
+                font-size: 12.5px;
+            }
+
+            body.dashboard-v2 .referral-terms-footer {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 22px;
+                padding: 15px 34px;
+                background: transparent;
+            }
+
+            body.dashboard-v2 .referral-terms-note {
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                min-width: 0;
+                margin: 0;
+                color: rgba(255, 255, 255, 0.48);
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .referral-terms-note i {
+                color: #ffc700;
+                font-size: 18px;
+            }
+
+            body.dashboard-v2 .referral-terms-confirm {
+                width: auto;
+                min-width: 116px;
+                min-height: 42px;
+                flex: 0 0 auto;
+                padding: 0 20px;
+                border-color: rgba(255, 255, 255, 0.30);
+                background: rgba(255, 255, 255, 0.02);
+                color: rgba(255, 255, 255, 0.88);
+                box-shadow: none;
+                font-size: 13px;
+            }
+
+            body.dashboard-v2 .referral-terms-confirm:hover {
+                border-color: rgba(255, 199, 0, 0.72);
+                background: rgba(255, 199, 0, 0.08);
+                color: #ffc700;
+            }
+
+            body.dashboard-v2 #ref-sheet {
+                align-items: center;
+                padding: 24px;
+            }
+
+            body.dashboard-v2 #ref-sheet #ref-content {
+                display: none;
+            }
+
+            body.dashboard-v2 #ref-sheet .ref-sheet-backdrop {
+                background: rgba(2, 4, 9, 0.80);
+                backdrop-filter: blur(8px);
+                -webkit-backdrop-filter: blur(8px);
+            }
+
+            body.dashboard-v2 .ref-desktop-dialog {
+                position: relative;
+                z-index: 9999;
+                display: flex;
+                width: min(1040px, calc(100vw - 48px));
+                max-height: calc(100dvh - 48px);
+                overflow: auto;
+                flex-direction: column;
+                border: 1px solid rgba(255, 255, 255, 0.19);
+                border-radius: 14px;
+                background:
+                    radial-gradient(circle at 72% 8%, rgba(255, 199, 0, 0.05), transparent 30%),
+                    rgba(17, 18, 23, 0.985);
+                box-shadow: 0 32px 90px rgba(0, 0, 0, 0.64);
+                opacity: 0;
+                pointer-events: none;
+                transform: translateY(10px) scale(0.992);
+                transition: opacity 0.16s ease, transform 0.16s ease;
+                scrollbar-width: thin;
+                scrollbar-color: rgba(255, 255, 255, 0.16) transparent;
+            }
+
+            body.dashboard-v2 .ref-desktop-dialog.is-open {
+                opacity: 1;
+                pointer-events: auto;
+                transform: translateY(0) scale(1);
+            }
+
+            body.dashboard-v2 .ref-desktop-header {
+                position: relative;
+                display: grid;
+                grid-template-columns: 50px minmax(0, 1fr);
+                align-items: start;
+                gap: 16px;
+                min-height: 96px;
+                padding: 24px 28px 20px;
+            }
+
+            body.dashboard-v2 .ref-desktop-header-icon,
+            body.dashboard-v2 .ref-desktop-step-icon,
+            body.dashboard-v2 .ref-desktop-channel-icon {
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                flex: 0 0 auto;
+                border: 1px solid rgba(255, 199, 0, 0.25);
+                background: rgba(255, 199, 0, 0.10);
+                color: #ffc700;
+            }
+
+            body.dashboard-v2 .ref-desktop-header-icon {
+                width: 50px;
+                height: 50px;
+                border-radius: 11px;
+                font-size: 20px;
+            }
+
+            body.dashboard-v2 .ref-desktop-title-copy {
+                min-width: 0;
+            }
+
+            body.dashboard-v2 .ref-desktop-title-copy h2 {
+                margin: 0 0 5px;
+                color: #fff;
+                font-size: 23px;
+                line-height: 1.15;
+            }
+
+            body.dashboard-v2 .ref-desktop-title-copy p {
+                margin: 0;
+                color: rgba(255, 255, 255, 0.54);
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .ref-desktop-earned {
+                position: absolute;
+                top: 60px;
+                right: 28px;
+                min-width: 150px;
+                padding: 11px 15px;
+                border: 1px solid rgba(255, 255, 255, 0.09);
+                border-radius: 10px;
+                background: rgba(255, 255, 255, 0.025);
+                text-align: center;
+            }
+
+            body.dashboard-v2 .ref-desktop-earned span,
+            body.dashboard-v2 .ref-desktop-earned strong {
+                display: block;
+            }
+
+            body.dashboard-v2 .ref-desktop-earned span {
+                margin-bottom: 3px;
+                color: rgba(255, 255, 255, 0.48);
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .ref-desktop-earned strong {
+                color: #ffc700;
+                font-size: 21px;
+                line-height: 1.05;
+            }
+
+            body.dashboard-v2 .ref-desktop-close-icon {
+                position: absolute;
+                top: 24px;
+                right: 28px;
+                width: 38px;
+                height: 38px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border: 0;
+                border-radius: 8px;
+                background: transparent;
+                color: rgba(255, 255, 255, 0.63);
+                font-size: 18px;
+                transition: color 0.16s ease, background 0.16s ease;
+            }
+
+            body.dashboard-v2 .ref-desktop-close-icon:hover {
+                background: rgba(255, 255, 255, 0.06);
+                color: #fff;
+            }
+
+            body.dashboard-v2 .ref-desktop-close-icon:focus-visible,
+            body.dashboard-v2 .ref-desktop-dialog button:focus-visible {
+                outline: 2px solid rgba(255, 199, 0, 0.82);
+                outline-offset: 2px;
+            }
+
+            body.dashboard-v2 .ref-desktop-rewards {
+                padding: 0 28px 20px;
+            }
+
+            body.dashboard-v2 .ref-desktop-rewards h3,
+            body.dashboard-v2 .ref-desktop-share h3 {
+                margin: 0 0 17px;
+                color: #fff;
+                font-size: 16px;
+            }
+
+            body.dashboard-v2 .ref-desktop-timeline {
+                display: grid;
+                grid-template-columns: minmax(178px, auto) minmax(44px, 1fr) minmax(178px, auto) minmax(44px, 1fr) minmax(178px, auto);
+                align-items: center;
+                gap: 14px;
+            }
+
+            body.dashboard-v2 .ref-desktop-step {
+                display: grid;
+                grid-template-columns: 46px minmax(0, 1fr);
+                align-items: center;
+                gap: 12px;
+                min-width: 0;
+            }
+
+            body.dashboard-v2 .ref-desktop-step-icon {
+                width: 46px;
+                height: 46px;
+                border-radius: 50%;
+                font-size: 17px;
+            }
+
+            body.dashboard-v2 .ref-desktop-step > div > strong,
+            body.dashboard-v2 .ref-desktop-step > div > span {
+                display: block;
+            }
+
+            body.dashboard-v2 .ref-desktop-step > div > strong {
+                margin-bottom: 4px;
+                color: #ffc700;
+                font-size: 15px;
+            }
+
+            body.dashboard-v2 .ref-desktop-step > div > span {
+                color: rgba(255, 255, 255, 0.53);
+                font-size: 12px;
+                font-weight: 500;
+                white-space: nowrap;
+            }
+
+            body.dashboard-v2 .ref-desktop-connector {
+                height: 1px;
+                background: linear-gradient(90deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.28), rgba(255, 255, 255, 0.08));
+            }
+
+            body.dashboard-v2 .ref-desktop-stats {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                margin: 0 28px 22px;
+                border: 1px solid rgba(255, 255, 255, 0.09);
+                border-radius: 10px;
+                background: rgba(255, 255, 255, 0.018);
+            }
+
+            body.dashboard-v2 .ref-desktop-stat {
+                min-width: 0;
+                padding: 16px 20px;
+            }
+
+            body.dashboard-v2 .ref-desktop-stat + .ref-desktop-stat {
+                border-left: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            body.dashboard-v2 .ref-desktop-stat dt {
+                margin-bottom: 5px;
+                color: rgba(255, 255, 255, 0.48);
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .ref-desktop-stat dd {
+                margin: 0;
+                color: #fff;
+                font-size: 21px;
+                font-weight: 700;
+                line-height: 1;
+            }
+
+            body.dashboard-v2 .ref-desktop-stat.is-active dd {
+                color: #45dd79;
+            }
+
+            body.dashboard-v2 .ref-desktop-share {
+                padding: 0 28px 24px;
+            }
+
+            body.dashboard-v2 .ref-desktop-share-row {
+                display: grid;
+                grid-template-columns: 46px minmax(0, 1fr) auto;
+                align-items: center;
+                gap: 14px;
+                min-height: 76px;
+                padding: 12px 16px;
+                border: 1px solid rgba(255, 255, 255, 0.11);
+                border-radius: 10px;
+                background: rgba(255, 255, 255, 0.018);
+            }
+
+            body.dashboard-v2 .ref-desktop-share-row + .ref-desktop-share-row {
+                margin-top: 10px;
+            }
+
+            body.dashboard-v2 .ref-desktop-share-row.is-recommended {
+                border-color: rgba(255, 199, 0, 0.54);
+                background: rgba(255, 199, 0, 0.04);
+            }
+
+            body.dashboard-v2 .ref-desktop-channel-icon {
+                width: 46px;
+                height: 46px;
+                border-radius: 50%;
+                font-size: 18px;
+            }
+
+            body.dashboard-v2 .ref-desktop-share-row.is-recommended .ref-desktop-channel-icon {
+                border-color: transparent;
+                background: #ffc700;
+                color: #0b0c0f;
+                box-shadow: 0 8px 24px rgba(255, 199, 0, 0.22);
+            }
+
+            body.dashboard-v2 .ref-desktop-channel-copy {
+                min-width: 0;
+            }
+
+            body.dashboard-v2 .ref-desktop-channel-title {
+                display: flex;
+                align-items: center;
+                gap: 9px;
+                margin-bottom: 3px;
+                color: #fff;
+                font-size: 13px;
+                font-weight: 700;
+            }
+
+            body.dashboard-v2 .ref-desktop-recommended {
+                padding: 3px 7px;
+                border-radius: 4px;
+                background: rgba(255, 199, 0, 0.12);
+                color: #ffc700;
+                font-size: 10px;
+                font-weight: 600;
+            }
+
+            body.dashboard-v2 .ref-desktop-link-input {
+                width: 100%;
+                min-width: 0;
+                padding: 0;
+                overflow: hidden;
+                border: 0 !important;
+                border-radius: 0 !important;
+                outline: 0;
+                background: transparent !important;
+                box-shadow: none !important;
+                color: rgba(255, 255, 255, 0.58) !important;
+                font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
+                font-size: 12px;
+                font-weight: 500 !important;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            body.dashboard-v2 .ref-desktop-share-actions {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            body.dashboard-v2 .ref-desktop-copy-btn,
+            body.dashboard-v2 .ref-desktop-send-btn,
+            body.dashboard-v2 .ref-desktop-footer-close {
+                min-height: 40px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 8px;
+                font-size: 12px;
+                font-weight: 700;
+                transition: border-color 0.16s ease, background 0.16s ease, color 0.16s ease, transform 0.16s ease;
+            }
+
+            body.dashboard-v2 .ref-desktop-copy-btn,
+            body.dashboard-v2 .ref-desktop-footer-close {
+                padding: 0 17px;
+                border: 1px solid rgba(255, 255, 255, 0.22);
+                background: rgba(255, 255, 255, 0.015);
+                color: rgba(255, 255, 255, 0.86);
+            }
+
+            body.dashboard-v2 .ref-desktop-copy-btn:hover,
+            body.dashboard-v2 .ref-desktop-footer-close:hover {
+                border-color: rgba(255, 255, 255, 0.38);
+                background: rgba(255, 255, 255, 0.055);
+            }
+
+            body.dashboard-v2 .ref-desktop-send-btn {
+                padding: 0 20px;
+                border: 1px solid #ffc700;
+                background: #ffc700;
+                color: #0b0c0f;
+                box-shadow: 0 8px 22px rgba(255, 199, 0, 0.22);
+            }
+
+            body.dashboard-v2 .ref-desktop-send-btn:hover {
+                transform: translateY(-1px);
+                background: #ffd740;
+            }
+
+            body.dashboard-v2 .ref-desktop-footer {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 20px;
+                padding: 14px 28px;
+                border-top: 1px solid rgba(255, 255, 255, 0.08);
+            }
+
+            body.dashboard-v2 .ref-desktop-footer-note {
+                display: flex;
+                align-items: center;
+                gap: 11px;
+                min-width: 0;
+                color: rgba(255, 255, 255, 0.48);
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .ref-desktop-footer-note i {
+                color: #ffc700;
+                font-size: 17px;
+            }
+
+            body.dashboard-v2 .ref-desktop-footer-close {
+                min-width: 104px;
+                flex: 0 0 auto;
+            }
+        }
+
     </style>
     {% include "includes/yandex_metrika.html" %}
 </head>
@@ -3258,6 +4220,20 @@
                             </section>
                         {% endif %}
 
+                        <section class="desktop-referral-strip" aria-label="Реферальная программа">
+                            <span class="desktop-referral-icon" aria-hidden="true">
+                                <i class="fas fa-user-friends"></i>
+                            </span>
+                            <div class="desktop-referral-copy">
+                                <h3>Пригласите друга — получите до {{ max_referral_bonus_days }} дней</h3>
+                                <p>Друг получит бонус к подписке, а вам начислим дни за подключение, трафик и покупку.</p>
+                            </div>
+                            <button type="button" class="desktop-referral-btn" onclick="toggleRefSheet()">
+                                <i class="fas fa-user-plus" aria-hidden="true"></i>
+                                Пригласить
+                            </button>
+                        </section>
+
                     </div>
                     </div>
                     {% endif %}
@@ -3341,14 +4317,6 @@
                     <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Приглашения и бонусы</h1>
                 </header>
                 <div class="overview-grid space-y-5">
-                    {# Условия программы показываются модалкой по «?» — контент здесь #}
-                    <div id="referral-terms-content" class="hidden">
-                        <p class="pb-3">Приглашайте друзей и получайте бонусные дни:</p>
-                        <p class="pb-2">✅ <b>+{{ join_referrer_bonus_days|default:"3" }} дн. за подключение</b> — когда друг зарегистрируется по вашей ссылке и начнет пользоваться сервисом.</p>
-                        <p class="pb-2">📶 <b>+{{ traffic_referrer_bonus_days|default:"7" }} дн. за трафик</b> — когда друг израсходует больше 100 МБ.</p>
-                        <p>💎 <b>+{{ purchase_referrer_bonus_days|default:"30" }} дн. за покупку</b> — если друг оплатит подписку от 1 месяца.</p>
-                    </div>
-
                     <section class="setup-shell p-5 md:p-6 referral-link-card">
                         <div class="flex flex-col gap-5">
                             <div>
@@ -3908,15 +4876,159 @@
         </div>
     </div>
 
-    <div id="ref-pill" class="fixed right-0 top-[78%] z-50 {% if not has_subscription_access %}hidden{% endif %}" onclick="toggleRefSheet()" title="+40 дней за друга">
-        <div class="bg-[#ffc700] text-black pl-2.5 pr-2 py-2 rounded-l-lg shadow-[0_0_12px_rgba(255,199,0,0.25)] flex items-center gap-1.5 cursor-pointer border-y border-l border-white/20 transition-all hover:pr-3">
-            <i class="fas fa-gift text-xs"></i>
-            <span class="text-[10px] font-black">+40</span>
-        </div>
+    <div id="referral-terms-modal" class="referral-terms-modal hidden" aria-hidden="true">
+        <button type="button" class="referral-terms-backdrop" onclick="closeReferralTerms()" tabindex="-1" aria-label="Закрыть условия реферальной программы"></button>
+
+        <section id="referral-terms-panel" class="referral-terms-panel" role="dialog" aria-modal="true" aria-labelledby="referral-terms-title" aria-describedby="referral-terms-description">
+            <div id="referral-terms-drag-zone" class="referral-terms-drag-zone">
+                <span class="referral-terms-drag-handle" aria-hidden="true"></span>
+                <header class="referral-terms-header">
+                    <span class="referral-terms-icon" aria-hidden="true"><i class="fas fa-gift"></i></span>
+                    <div class="referral-terms-heading">
+                        <h2 id="referral-terms-title">Условия программы</h2>
+                        <p id="referral-terms-description">До {{ max_referral_bonus_days|default:"40" }} дней за одного друга</p>
+                    </div>
+                    <button type="button" id="referral-terms-close" class="referral-terms-close" onclick="closeReferralTerms()" aria-label="Закрыть условия">
+                        <i class="fas fa-times" aria-hidden="true"></i>
+                    </button>
+                </header>
+            </div>
+
+            <ol class="referral-terms-list">
+                <li class="referral-terms-step">
+                    <span class="referral-terms-marker" aria-hidden="true">1</span>
+                    <p class="referral-terms-reward">+{{ join_referrer_bonus_days|default:"3" }} дня</p>
+                    <div class="referral-terms-detail">
+                        <strong>Подключение</strong>
+                        <p>Друг зарегистрировался и начал пользоваться сервисом</p>
+                    </div>
+                </li>
+                <li class="referral-terms-step">
+                    <span class="referral-terms-marker" aria-hidden="true">2</span>
+                    <p class="referral-terms-reward">+{{ traffic_referrer_bonus_days|default:"7" }} дней</p>
+                    <div class="referral-terms-detail">
+                        <strong>Активность</strong>
+                        <p>Друг использовал 100 МБ трафика</p>
+                    </div>
+                </li>
+                <li class="referral-terms-step">
+                    <span class="referral-terms-marker" aria-hidden="true">3</span>
+                    <p class="referral-terms-reward">+{{ purchase_referrer_bonus_days|default:"30" }} дней</p>
+                    <div class="referral-terms-detail">
+                        <strong>Покупка</strong>
+                        <p>Друг оплатил подписку от 1 месяца</p>
+                    </div>
+                </li>
+            </ol>
+
+            <footer class="referral-terms-footer">
+                <p class="referral-terms-note"><i class="fas fa-shield-alt" aria-hidden="true"></i><span>Бонусы начисляются автоматически</span></p>
+                <button type="button" class="referral-terms-confirm" onclick="closeReferralTerms()">Понятно</button>
+            </footer>
+        </section>
     </div>
 
-    <div id="ref-sheet" class="fixed inset-0 z-[9999] hidden flex items-end justify-center">
-        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm z-[9998]" onclick="toggleRefSheet()"></div>
+    <div id="ref-sheet" class="fixed inset-0 z-[9999] hidden flex items-end justify-center" aria-hidden="true">
+        <div class="ref-sheet-backdrop absolute inset-0 bg-black/70 backdrop-blur-sm z-[9998]" onclick="toggleRefSheet()"></div>
+
+        <div id="ref-desktop-content" class="ref-desktop-dialog" role="dialog" aria-modal="true" aria-labelledby="ref-desktop-title" aria-describedby="ref-desktop-description">
+            <header class="ref-desktop-header">
+                <span class="ref-desktop-header-icon" aria-hidden="true">
+                    <i class="fas fa-user-friends"></i>
+                </span>
+                <div class="ref-desktop-title-copy">
+                    <h2 id="ref-desktop-title">Приглашения и бонусы</h2>
+                    <p id="ref-desktop-description">Отправьте ссылку другу — бонусы начислятся автоматически</p>
+                </div>
+                <div class="ref-desktop-earned" aria-label="Заработано бонусных дней">
+                    <span>Заработано</span>
+                    <strong>+{{ bonus_days|default:"0" }} дней</strong>
+                </div>
+                <button type="button" id="ref-desktop-close" class="ref-desktop-close-icon" onclick="toggleRefSheet()" aria-label="Закрыть окно приглашений">
+                    <i class="fas fa-times" aria-hidden="true"></i>
+                </button>
+            </header>
+
+            <section class="ref-desktop-rewards" aria-labelledby="ref-desktop-rewards-title">
+                <h3 id="ref-desktop-rewards-title">Как получить до {{ max_referral_bonus_days|default:"40" }} дней</h3>
+                <div class="ref-desktop-timeline">
+                    <div class="ref-desktop-step">
+                        <span class="ref-desktop-step-icon" aria-hidden="true"><i class="fas fa-user-plus"></i></span>
+                        <div>
+                            <strong>+{{ join_referrer_bonus_days|default:"3" }} дня</strong>
+                            <span>Друг подключился</span>
+                        </div>
+                    </div>
+                    <span class="ref-desktop-connector" aria-hidden="true"></span>
+                    <div class="ref-desktop-step">
+                        <span class="ref-desktop-step-icon" aria-hidden="true"><i class="fas fa-chart-line"></i></span>
+                        <div>
+                            <strong>+{{ traffic_referrer_bonus_days|default:"7" }} дней</strong>
+                            <span>Использовал 100 МБ</span>
+                        </div>
+                    </div>
+                    <span class="ref-desktop-connector" aria-hidden="true"></span>
+                    <div class="ref-desktop-step">
+                        <span class="ref-desktop-step-icon" aria-hidden="true"><i class="fas fa-gem"></i></span>
+                        <div>
+                            <strong>+{{ purchase_referrer_bonus_days|default:"30" }} дней</strong>
+                            <span>Оплатил подписку</span>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <dl class="ref-desktop-stats" aria-label="Статистика приглашений">
+                <div class="ref-desktop-stat">
+                    <dt>Приглашено</dt>
+                    <dd>{{ ref_invited_count|default:"0" }}</dd>
+                </div>
+                <div class="ref-desktop-stat is-active">
+                    <dt>Активны</dt>
+                    <dd>{{ ref_connected_count|default:"0" }}</dd>
+                </div>
+                <div class="ref-desktop-stat">
+                    <dt>Покупок</dt>
+                    <dd>{{ ref_purchased_count|default:"0" }}</dd>
+                </div>
+            </dl>
+
+            <section class="ref-desktop-share" aria-labelledby="ref-desktop-share-title">
+                <h3 id="ref-desktop-share-title">Поделиться приглашением</h3>
+                <div class="ref-desktop-share-row is-recommended">
+                    <span class="ref-desktop-channel-icon" aria-hidden="true"><i class="fab fa-telegram-plane"></i></span>
+                    <div class="ref-desktop-channel-copy">
+                        <div class="ref-desktop-channel-title">
+                            <span>Telegram</span>
+                            <span class="ref-desktop-recommended">Рекомендуем</span>
+                        </div>
+                        <input type="text" readonly value="{{ referral_link }}" id="ref-desktop-telegram-link" class="ref-desktop-link-input" aria-label="Пригласительная ссылка для Telegram">
+                    </div>
+                    <div class="ref-desktop-share-actions">
+                        <button type="button" class="ref-desktop-copy-btn" onclick="copyRefLink(event, 'ref-desktop-telegram-link')">Скопировать</button>
+                        <button type="button" class="ref-desktop-send-btn" onclick="shareTelegramReferral()">Отправить</button>
+                    </div>
+                </div>
+                <div class="ref-desktop-share-row">
+                    <span class="ref-desktop-channel-icon" aria-hidden="true"><i class="fas fa-globe"></i></span>
+                    <div class="ref-desktop-channel-copy">
+                        <div class="ref-desktop-channel-title"><span>Сайт</span></div>
+                        <input type="text" readonly value="{{ site_referral_link }}" id="ref-desktop-site-link" class="ref-desktop-link-input" aria-label="Пригласительная ссылка на сайт">
+                    </div>
+                    <div class="ref-desktop-share-actions">
+                        <button type="button" class="ref-desktop-copy-btn" onclick="copyRefLink(event, 'ref-desktop-site-link')">Скопировать</button>
+                    </div>
+                </div>
+            </section>
+
+            <footer class="ref-desktop-footer">
+                <p class="ref-desktop-footer-note">
+                    <i class="fas fa-shield-alt" aria-hidden="true"></i>
+                    <span>Бонусы начисляются автоматически после выполнения условий</span>
+                </p>
+                <button type="button" class="ref-desktop-footer-close" onclick="toggleRefSheet()">Закрыть</button>
+            </footer>
+        </div>
         
         <div class="bottom-sheet-content fixed inset-x-0 bottom-0 bg-[#111113] rounded-t-[2rem] border-t border-white/10 p-5 md:p-8 transform translate-y-full transition-transform duration-300 ease-out z-[9999]
                     lg:left-1/2 lg:-translate-x-1/2 lg:max-w-3xl" id="ref-content">
@@ -5390,13 +6502,18 @@
         function updateTgBackButton() {
             const back = tgBackButton();
             if (!back) return;
+            const referralTermsOpen = document.getElementById('referral-terms-modal')
+                ?.classList.contains('is-open');
             const setupActive = document.body.classList.contains('is-setup-tab')
                 && document.body.classList.contains('setup-wizard-active');
-            if (setupActive) back.show(); else back.hide();
+            if (referralTermsOpen || setupActive) back.show(); else back.hide();
         }
 
         function handleTgBackButton() {
-            if (newSetupStep === 'devices' || newSetupStep === 'install') {
+            const referralTermsModal = document.getElementById('referral-terms-modal');
+            if (referralTermsModal?.classList.contains('is-open')) {
+                closeReferralTerms();
+            } else if (newSetupStep === 'devices' || newSetupStep === 'install') {
                 backNewSetupStart();
             } else if (newSetupStep === 'subscription') {
                 backNewSetupInstall();
@@ -5896,22 +7013,57 @@
             });
         }
 
+        let refSheetTrigger = null;
+
         function toggleRefSheet() {
             const sheet = document.getElementById('ref-sheet');
             const content = document.getElementById('ref-content');
+            const desktopContent = document.getElementById('ref-desktop-content');
+            const appContainer = document.getElementById('app-container');
+            const isDesktop = window.matchMedia('(min-width: 1025px)').matches;
+            if (!sheet || !content) return;
             
             if (sheet.classList.contains('hidden')) {
-                // Сначала показываем контейнер
+                refSheetTrigger = document.activeElement;
                 sheet.classList.remove('hidden');
-                // Через микрозадержку добавляем класс, который убирает translate-y-full
-                setTimeout(() => content.classList.replace('translate-y-full', 'translate-y-0'), 10);
+                sheet.setAttribute('aria-hidden', 'false');
+                document.body.classList.add('referral-dialog-open');
+                appContainer?.setAttribute('inert', '');
+
+                if (isDesktop && desktopContent) {
+                    requestAnimationFrame(() => {
+                        desktopContent.classList.add('is-open');
+                        document.getElementById('ref-desktop-close')?.focus();
+                    });
+                } else {
+                    desktopContent?.classList.remove('is-open');
+                    setTimeout(() => content.classList.replace('translate-y-full', 'translate-y-0'), 10);
+                }
             } else {
-                // Убираем translate-y-0
-                content.classList.replace('translate-y-0', 'translate-y-full');
-                // После завершения анимации (300ms) прячем контейнер
-                setTimeout(() => sheet.classList.add('hidden'), 300);
+                sheet.setAttribute('aria-hidden', 'true');
+                document.body.classList.remove('referral-dialog-open');
+                appContainer?.removeAttribute('inert');
+                desktopContent?.classList.remove('is-open');
+
+                if (isDesktop && desktopContent) {
+                    setTimeout(() => sheet.classList.add('hidden'), 170);
+                } else {
+                    content.classList.replace('translate-y-0', 'translate-y-full');
+                    setTimeout(() => sheet.classList.add('hidden'), 300);
+                }
+
+                if (refSheetTrigger && typeof refSheetTrigger.focus === 'function') {
+                    setTimeout(() => refSheetTrigger.focus(), isDesktop ? 180 : 310);
+                }
             }
         }
+
+        document.addEventListener('keydown', (event) => {
+            const sheet = document.getElementById('ref-sheet');
+            if (event.key === 'Escape' && sheet && !sheet.classList.contains('hidden')) {
+                toggleRefSheet();
+            }
+        });
 
         function openEmailBindSheet() {
             const sheet = document.getElementById('email-bind-sheet');
@@ -6163,13 +7315,99 @@
             }
         }
 
-        // Условия реферальной программы — модалкой по «?» (как у Akenai),
-        // контент с runtime-значениями бонусов лежит в #referral-terms-content.
+        let referralTermsTrigger = null;
+        let referralTermsCloseTimer = null;
+
+        function referralTermsIsOpen() {
+            const modal = document.getElementById('referral-terms-modal');
+            return Boolean(modal?.classList.contains('is-open'));
+        }
+
+        // На desktop это центрированный dialog, на телефоне — bottom sheet.
+        // Значения бонусов отрисованы сервером из действующих настроек.
         function openReferralTerms() {
-            openQuickAccessModal(
-                'Условия реферальной программы',
-                document.getElementById('referral-terms-content').innerHTML
-            );
+            const modal = document.getElementById('referral-terms-modal');
+            const panel = document.getElementById('referral-terms-panel');
+            const appContainer = document.getElementById('app-container');
+            if (!modal || !panel) return;
+
+            if (referralTermsCloseTimer) clearTimeout(referralTermsCloseTimer);
+            referralTermsTrigger = document.activeElement;
+            panel.style.removeProperty('transition');
+            panel.style.removeProperty('transform');
+            modal.classList.remove('hidden');
+            modal.setAttribute('aria-hidden', 'false');
+            appContainer?.setAttribute('inert', '');
+            document.body.classList.add('referral-dialog-open');
+
+            requestAnimationFrame(() => {
+                modal.classList.add('is-open');
+                document.getElementById('referral-terms-close')?.focus();
+                updateTgBackButton();
+            });
+        }
+
+        function closeReferralTerms() {
+            const modal = document.getElementById('referral-terms-modal');
+            const panel = document.getElementById('referral-terms-panel');
+            const appContainer = document.getElementById('app-container');
+            if (!modal || modal.classList.contains('hidden')) return;
+
+            panel?.style.removeProperty('transition');
+            panel?.style.removeProperty('transform');
+            modal.classList.remove('is-open');
+            modal.setAttribute('aria-hidden', 'true');
+            appContainer?.removeAttribute('inert');
+            document.body.classList.remove('referral-dialog-open');
+            updateTgBackButton();
+
+            referralTermsCloseTimer = setTimeout(() => {
+                modal.classList.add('hidden');
+                if (referralTermsTrigger && typeof referralTermsTrigger.focus === 'function') {
+                    referralTermsTrigger.focus();
+                }
+            }, 250);
+        }
+
+        document.addEventListener('keydown', (event) => {
+            if (event.key === 'Escape' && referralTermsIsOpen()) closeReferralTerms();
+        });
+
+        function initReferralTermsSwipe() {
+            const panel = document.getElementById('referral-terms-panel');
+            const dragZone = document.getElementById('referral-terms-drag-zone');
+            if (!panel || !dragZone) return;
+
+            let startY = 0;
+            let dragY = 0;
+            let dragging = false;
+
+            dragZone.addEventListener('pointerdown', (event) => {
+                if (!window.matchMedia('(max-width: 1024px)').matches || event.pointerType === 'mouse') return;
+                dragging = true;
+                startY = event.clientY;
+                dragY = 0;
+                panel.style.transition = 'none';
+                dragZone.setPointerCapture?.(event.pointerId);
+            });
+
+            dragZone.addEventListener('pointermove', (event) => {
+                if (!dragging) return;
+                dragY = Math.max(0, event.clientY - startY);
+                panel.style.transform = `translateY(${dragY}px)`;
+            });
+
+            const finishDrag = () => {
+                if (!dragging) return;
+                dragging = false;
+                panel.style.removeProperty('transition');
+                panel.style.removeProperty('transform');
+                if (dragY >= 76) closeReferralTerms();
+                dragY = 0;
+            };
+
+            dragZone.addEventListener('pointerup', finishDrag);
+            dragZone.addEventListener('pointercancel', finishDrag);
         }
 
         // «Добавить на рабочий стол»: внутри Telegram Mini App установка PWA
@@ -6438,6 +7676,23 @@
             });
         }
 
+        function shareTelegramReferral() {
+            const input = document.getElementById('ref-desktop-telegram-link');
+            if (!input || !input.value) return;
+
+            const message = 'Подключайтесь к Monkey Island по моей ссылке — получите бонус к подписке.';
+            const shareUrl = `https://t.me/share/url?url=${encodeURIComponent(input.value)}&text=${encodeURIComponent(message)}`;
+            const telegramWebApp = window.Telegram && window.Telegram.WebApp;
+
+            if (telegramWebApp && typeof telegramWebApp.openTelegramLink === 'function') {
+                telegramWebApp.openTelegramLink(shareUrl);
+                return;
+            }
+
+            const popup = window.open(shareUrl, '_blank', 'noopener,noreferrer');
+            if (popup) popup.opener = null;
+        }
+
         function copyReferralLink(inputId) {
             copyInputText(document.getElementById(inputId), 'Ссылка скопирована!');
         }
@@ -6467,6 +7722,7 @@
             try {
                 localStorage.setItem('monkeyIslandHasDashboard', '1');
             } catch (err) {}
+            initReferralTermsSwipe();
         });
     </script>
 </body>

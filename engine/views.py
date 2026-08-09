@@ -2849,6 +2849,11 @@ def dashboard(request):
             "join_referrer_bonus_days": join_referrer_bonus_days,
             "traffic_referrer_bonus_days": traffic_referrer_bonus_days,
             "purchase_referrer_bonus_days": purchase_referrer_bonus_days,
+            "max_referral_bonus_days": (
+                join_referrer_bonus_days
+                + traffic_referrer_bonus_days
+                + purchase_referrer_bonus_days
+            ),
             "tariffs": get_runtime_actual_tariffs(),
             "has_recurrent": has_recurrent,
             "has_subscription_access": has_subscription_access,

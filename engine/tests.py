@@ -3031,6 +3031,29 @@ class SettingsTabTemplateTests(SimpleTestCase):
 
 
 class MobileDashboardHomeTemplateTests(SimpleTestCase):
+    def test_desktop_visual_language_uses_concept_sidebar_buttons_and_referral_strip(self):
+        import inspect
+
+        from engine import views
+
+        template = Path("engine/templates/dashboard.html").read_text()
+        dashboard_source = inspect.getsource(views.dashboard)
+
+        self.assertIn("@media (min-width: 1025px)", template)
+        self.assertIn("font-family: 'Inter'", template)
+        self.assertIn(".sidebar-desktop .nav-btn.active::before", template)
+        self.assertIn("background: rgba(255, 255, 255, 0.065);", template)
+        self.assertIn("background: #ffc700;", template)
+        self.assertIn("border-radius: 8px !important;", template)
+        self.assertIn('class="desktop-referral-strip"', template)
+        self.assertIn("Пригласите друга — получите до {{ max_referral_bonus_days }} дней", template)
+        self.assertIn('class="desktop-referral-btn" onclick="toggleRefSheet()"', template)
+        self.assertNotIn('id="ref-pill"', template)
+        self.assertIn('"max_referral_bonus_days": (', dashboard_source)
+        self.assertIn("join_referrer_bonus_days", dashboard_source)
+        self.assertIn("traffic_referrer_bonus_days", dashboard_source)
+        self.assertIn("purchase_referrer_bonus_days", dashboard_source)
+
     def test_desktop_home_replaces_duplicate_cards_with_payment_history_action(self):
         template = Path("engine/templates/dashboard.html").read_text()
         desktop_home = template[
@@ -3088,6 +3111,144 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn(".standard-dashboard-home {\n                display: none;", template)
         self.assertIn("body.dashboard-v2 .main-content", template)
         self.assertIn("body.dashboard-v2 .nav-mobile", template)
+
+    def test_desktop_referral_dialog_matches_approved_concept(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn('id="ref-desktop-content" class="ref-desktop-dialog"', template)
+        self.assertIn('role="dialog" aria-modal="true"', template)
+        self.assertIn('aria-labelledby="ref-desktop-title"', template)
+        self.assertIn("Отправьте ссылку другу — бонусы начислятся автоматически", template)
+        self.assertIn("Как получить до {{ max_referral_bonus_days|default:\"40\" }} дней", template)
+        self.assertIn("Друг подключился", template)
+        self.assertIn("Использовал 100 МБ", template)
+        self.assertIn("Оплатил подписку", template)
+        self.assertIn('aria-label="Статистика приглашений"', template)
+        self.assertIn('id="ref-desktop-telegram-link"', template)
+        self.assertIn('id="ref-desktop-site-link"', template)
+        self.assertIn("Рекомендуем", template)
+        self.assertIn('onclick="shareTelegramReferral()">Отправить</button>', template)
+        self.assertIn("Бонусы начисляются автоматически после выполнения условий", template)
+        self.assertIn("body.dashboard-v2 #ref-sheet #ref-content", template)
+        self.assertIn("body.dashboard-v2 .ref-desktop-dialog.is-open", template)
+
+    def test_mobile_referral_bottom_sheet_is_preserved(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn('class="bottom-sheet-content fixed inset-x-0 bottom-0', template)
+        self.assertIn('id="ref-content"', template)
+        self.assertIn('id="site-ref-link-input-sheet"', template)
+        self.assertIn('id="ref-link-input-sheet"', template)
+        self.assertIn(".ref-desktop-dialog {\n            display: none;", template)
+        self.assertIn("const isDesktop = window.matchMedia('(min-width: 1025px)').matches;", template)
+        self.assertIn("content.classList.replace('translate-y-full', 'translate-y-0')", template)
+
+    def test_referral_dialog_supports_escape_focus_and_safe_telegram_share(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn('aria-hidden="true"', template)
+        self.assertIn("let refSheetTrigger = null;", template)
+        self.assertIn("appContainer?.setAttribute('inert', '');", template)
+        self.assertIn("appContainer?.removeAttribute('inert');", template)
+        self.assertIn("document.getElementById('ref-desktop-close')?.focus();", template)
+        self.assertIn("event.key === 'Escape'", template)
+        self.assertIn("function shareTelegramReferral()", template)
+        self.assertIn("https://t.me/share/url?url=${encodeURIComponent(input.value)}", template)
+        self.assertIn("telegramWebApp.openTelegramLink(shareUrl)", template)
+        self.assertIn("window.open(shareUrl, '_blank', 'noopener,noreferrer')", template)
+
+    def test_desktop_referral_icons_stay_centered_and_links_have_no_input_bars(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Text rules must not override the inline-flex icon container.
+        self.assertIn(".ref-desktop-step > div > strong", template)
+        self.assertIn(".ref-desktop-step > div > span", template)
+        self.assertNotIn(".ref-desktop-step strong,\n            body.dashboard-v2 .ref-desktop-step span", template)
+        # The general dashboard input style uses !important; the readonly link
+        # fields explicitly reset it so no black rounded bars remain.
+        self.assertIn("body.dashboard-v2 .ref-desktop-link-input", template)
+        self.assertIn("background: transparent !important;", template)
+        self.assertIn("border: 0 !important;", template)
+        self.assertIn("border-radius: 0 !important;", template)
+        self.assertIn("box-shadow: none !important;", template)
+
+    def test_desktop_referral_earned_card_sits_below_close_button(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn("grid-template-columns: 50px minmax(0, 1fr);", template)
+        self.assertIn("min-height: 96px;", template)
+        self.assertNotIn("min-height: 136px;", template)
+        self.assertIn("position: absolute;\n                top: 60px;\n                right: 28px;", template)
+        self.assertIn("right: 28px;\n                min-width: 150px;", template)
+        self.assertNotIn("margin-top: 48px;", template)
+        self.assertIn("text-align: center;", template)
+        self.assertIn("position: absolute;\n                top: 24px;\n                right: 28px;", template)
+
+    def test_referral_terms_use_dedicated_responsive_dialog(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+        open_terms_source = template[
+            template.index("function openReferralTerms()"):
+            template.index("function closeReferralTerms()")
+        ]
+
+        self.assertIn('id="referral-terms-modal" class="referral-terms-modal hidden"', template)
+        self.assertIn('id="referral-terms-panel" class="referral-terms-panel"', template)
+        self.assertIn('role="dialog" aria-modal="true"', template)
+        self.assertIn('id="referral-terms-title">Условия программы</h2>', template)
+        self.assertIn("До {{ max_referral_bonus_days|default:\"40\" }} дней за одного друга", template)
+        self.assertIn("Друг зарегистрировался и начал пользоваться сервисом", template)
+        self.assertIn("Друг использовал 100 МБ трафика", template)
+        self.assertIn("Друг оплатил подписку от 1 месяца", template)
+        self.assertNotIn('id="referral-terms-content"', template)
+        self.assertNotIn("openQuickAccessModal", open_terms_source)
+        self.assertIn("modal.classList.remove('hidden')", open_terms_source)
+
+    def test_referral_terms_match_desktop_and_mobile_concept(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Mobile-first bottom sheet with drag handle, timeline and brand CTA.
+        self.assertIn("align-items: flex-end;", template)
+        self.assertIn("border-radius: 24px 24px 0 0;", template)
+        self.assertIn('id="referral-terms-drag-zone"', template)
+        self.assertIn("grid-template-columns: 44px minmax(0, 1fr);", template)
+        self.assertIn("background: #ffc700;", template)
+        self.assertIn("color: #0b0c0f;", template)
+        # Desktop becomes a centered compact modal with rows and neutral CTA.
+        self.assertIn("body.dashboard-v2 .referral-terms-modal", template)
+        self.assertIn("width: min(820px, calc(100vw - 48px));", template)
+        self.assertIn("grid-template-columns: 46px 104px minmax(0, 1fr);", template)
+        self.assertIn("body.dashboard-v2 .referral-terms-confirm", template)
+        self.assertIn("background: rgba(255, 255, 255, 0.02);", template)
+        self.assertIn("color: rgba(255, 255, 255, 0.88);", template)
+
+    def test_referral_surfaces_use_black_and_yellow_brand_palette(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn("body.dashboard-v2 .desktop-referral-icon", template)
+        self.assertIn("body.dashboard-v2 .ref-desktop-share-row.is-recommended", template)
+        self.assertIn("body.dashboard-v2 .ref-desktop-send-btn", template)
+        self.assertIn("border: 1px solid #ffc700;", template)
+        self.assertIn("background: rgba(255, 199, 0, 0.10);", template)
+        self.assertNotIn("#a96dff", template)
+        self.assertNotIn("#ad72ff", template)
+        self.assertNotIn("rgba(155, 92, 255", template)
+        self.assertNotIn("rgba(169, 109, 255", template)
+
+    def test_referral_terms_support_accessible_close_telegram_back_and_mobile_swipe(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn("function referralTermsIsOpen()", template)
+        self.assertIn("modal?.classList.contains('is-open')", template)
+        self.assertIn("event.key === 'Escape' && referralTermsIsOpen()", template)
+        self.assertIn("document.getElementById('referral-terms-close')?.focus();", template)
+        self.assertIn("appContainer?.setAttribute('inert', '');", template)
+        self.assertIn("appContainer?.removeAttribute('inert');", template)
+        self.assertIn("if (referralTermsOpen || setupActive) back.show();", template)
+        self.assertIn("closeReferralTerms();\n            } else if (newSetupStep", template)
+        self.assertIn("function initReferralTermsSwipe()", template)
+        self.assertIn("window.matchMedia('(max-width: 1024px)').matches", template)
+        self.assertIn("if (dragY >= 76) closeReferralTerms();", template)
+        self.assertIn("initReferralTermsSwipe();", template)
 
 
 class ConfigPinsAdminApiTests(SimpleTestCase):
