@@ -11,6 +11,11 @@ urlpatterns = [
     path("dashboard/", views.dashboard, name="dashboard"),
     path("update-email/", views.update_email, name="update_email"),
     path("cancel-autopay/", views.cancel_autopay, name="cancel_autopay"),
+    path(
+        "cabinet/api/payments/",
+        views.cabinet_payments_history,
+        name="cabinet_payments_history",
+    ),
     path("confirm-email/<path:token>/", views.confirm_email, name="confirm_email"),
     path(
         "support/tickets/create/",
@@ -76,6 +81,11 @@ urlpatterns = [
         "support-admin/api/user-payments/",
         views.support_admin_api_user_payments,
         name="support_admin_api_user_payments",
+    ),
+    path(
+        "support-admin/api/user-traffic/",
+        views.support_admin_api_user_traffic,
+        name="support_admin_api_user_traffic",
     ),
     path(
         "support-admin/api/referrals/",

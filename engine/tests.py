@@ -1947,20 +1947,20 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         css = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn("function clientReferralControlHtml", template)
-        self.assertIn("function clientSubscriptionManageHtml(refResult)", template)
-        self.assertIn("${clientReferralControlHtml(refResult)}", template)
-        self.assertIn("${clientSubscriptionManageHtml(refPayload?.result)}", template)
-        self.assertIn("Управление клиентом", template)
+        self.assertIn("function clientOverviewSectionHtml(result, refResult)", template)
+        self.assertIn("const controlHtml = clientReferralControlHtml(refResult);", template)
+        self.assertIn('data-client-section-link="referrals"', template)
+        self.assertIn("Действия с клиентом", template)
         self.assertIn('data-client-referral-block-action="block"', template)
         self.assertIn('data-client-referral-block-action="unblock"', template)
         self.assertIn("function clientReferralBlockAction", template)
         self.assertIn("formData.set('q', clientCardState.q)", template)
         self.assertIn("await renderClientCard();", template)
         self.assertNotIn("await renderClientCard('referrals')", template)
-        self.assertNotIn("const controlHtml = clientReferralControlHtml(refResult);", template)
-        self.assertIn("Заблокировать рефералку", template)
-        self.assertIn("Разблокировать рефералку", template)
-        self.assertIn(".client-ref-control", css)
+        self.assertNotIn("function clientSubscriptionManageHtml", template)
+        self.assertIn("Заблокировать", template)
+        self.assertIn("Разблокировать", template)
+        self.assertIn(".client-referral-manage-card", css)
         self.assertIn(".client-ref-control-actions", css)
 
     def test_referral_settings_match_standard_system_width_without_duplicate_antifraud_rows(self):
@@ -2276,6 +2276,122 @@ class TelegramWebappAuthTests(SimpleTestCase):
         self.assertIsNone(get_telegram_webapp_user_id({}))
         self.assertIsNone(get_telegram_webapp_user_id({"user": "not-json"}))
         self.assertIsNone(get_telegram_webapp_user_id({"user": "{}"}))
+
+    @override_settings(
+        TELEGRAM_AUTH_BOTS={
+            "monkey-island-vpn.com": {
+                "username": "vpn_auth_bot",
+                "token": "222:second-token",
+            },
+            "monkey-island-vps.com": {
+                "username": "vps_auth_bot",
+                "token": "111:first-token",
+            },
+        },
+        TG_BOT_USERNAME="legacy_bot",
+        TELEGRAM_AUTH_BOT_TOKEN="333:legacy-token",
+    )
+    def test_all_auth_bots_are_tried_domain_bot_first(self):
+        """Mini App обоих ботов открывает один кабинетный домен, но initData
+        подписан токеном того бота, из которого открыли. Регресс-гард: вход
+        из vps-бота на vpn-домене падал с «Не удалось подтвердить вход»."""
+        from engine.views import get_all_telegram_auth_bots
+
+        bots = get_all_telegram_auth_bots("monkey-island-vpn.com")
+
+        tokens = [bot["token"] for bot in bots]
+        # Доменный бот первым, все остальные (включая legacy) — тоже в списке
+        self.assertEqual(tokens[0], "222:second-token")
+        self.assertIn("111:first-token", tokens)
+        self.assertIn("333:legacy-token", tokens)
+        self.assertEqual(len(tokens), len(set(tokens)))  # без дублей
+
+        # initData, подписанный «чужим» для домена (vps) ботом, проходит
+        # проверку одним из доверенных токенов.
+        init_data = self.build_init_data(bot_token="111:first-token")
+        verified_by = [
+            bot["username"]
+            for bot in bots
+            if verify_telegram_webapp_init_data(init_data, bot["token"]) is not None
+        ]
+        self.assertEqual(verified_by, ["vps_auth_bot"])
+
+    def test_webapp_auth_view_iterates_over_all_bots(self):
+        import inspect
+
+        from engine.views import auth_by_telegram_webapp
+
+        src = inspect.getsource(auth_by_telegram_webapp)
+        self.assertIn("get_all_telegram_auth_bots", src)
+        self.assertIn("for telegram_bot in telegram_bots", src)
+
+    @override_settings(
+        ALLOWED_HOSTS=["mnk-island.org"],
+        TELEGRAM_AUTH_BOTS={
+            "mnk-island.org": {
+                "username": "monkeyislandvpnbot",
+                "token": "222:second-token",
+            },
+            "monkey-island-vps.com": {
+                "username": "monkeyislandvpsbot",
+                "token": "111:first-token",
+            },
+        },
+    )
+    def test_webapp_login_succeeds_with_init_data_from_vps_bot_on_vpn_domain(self):
+        """Сквозной регресс-гард продовой раскладки: webapp_url обоих ботов
+        указывает на mnk-island.org (домен vpn-бота), а initData подписан
+        vps-ботом. Старый код отвечал логин-страницей с «Не удалось
+        подтвердить вход»; новый должен дологинить и средиректить в кабинет."""
+        from engine.views import auth_by_telegram_webapp
+
+        init_data = self.build_init_data(bot_token="111:first-token", user_id=777)
+        request = RequestFactory().post(
+            "/tg-webapp/auth/",
+            {"init_data": init_data},
+            HTTP_HOST="mnk-island.org",
+            secure=True,
+        )
+        request.session = {}
+
+        fake_user = SimpleNamespace(id=1, telegram_id=777)
+
+        class FakeBegin:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return fake_user
+
+        class FakeSession:
+            def begin(self):
+                return FakeBegin()
+
+            def query(self, model):
+                return FakeQuery()
+
+            def close(self):
+                pass
+
+        with mock.patch(
+            "engine.views.session_factory", return_value=FakeSession()
+        ), mock.patch("engine.views.add_event_log_once"), mock.patch(
+            "engine.views.authorize_user_session"
+        ) as authorize_mock:
+            response = auth_by_telegram_webapp(request)
+
+        # Подпись принята чужим для домена (vps) токеном: логин состоялся
+        authorize_mock.assert_called_once()
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, "/dashboard/")
+        self.assertTrue(request.session.get("tg_webapp_mode"))
 
 
 class PaymentRedirectTests(SimpleTestCase):
@@ -2740,6 +2856,9 @@ class CancelAutopayViewTests(SimpleTestCase):
                     return FakeQuery("user")
                 return FakeQuery("recurrent")
 
+            def add(self, obj):
+                recorded.setdefault("added", []).append(obj)
+
             def commit(self):
                 recorded["committed"] = True
 
@@ -2769,6 +2888,10 @@ class CancelAutopayViewTests(SimpleTestCase):
         self.assertTrue(recorded["deleted"])
         self.assertTrue(recorded["committed"])
         self.assertTrue(recorded["closed"])
+        # Отмена из кабинета пишет то же событие, что и бот, — иначе она
+        # невидима для churn-аналитики и ежедневного отчёта.
+        added_types = [event.event_type for event in recorded.get("added", [])]
+        self.assertIn("confirm_cancel_autopay_clicked", added_types)
 
     def test_cancel_autopay_rejects_get_requests(self):
         request = RequestFactory().get("/cancel-autopay/")
@@ -2860,8 +2983,9 @@ class SettingsTabTemplateTests(SimpleTestCase):
     def test_autopay_button_always_clickable_with_nothing_to_cancel_sheet(self):
         template = Path("engine/templates/dashboard.html").read_text()
 
-        # Кнопка отключения видна всегда и кликабельна, без обёртки {% if has_recurrent %}.
-        self.assertIn('onclick="onAutopayButtonClick()"', template)
+        # Отключение автопродления убрано с видных мест и живёт ссылкой
+        # внутри листа «История платежей» (открывает прежний confirm-флоу).
+        self.assertIn("setTimeout(onAutopayButtonClick, 320)", template)
         # Клиент решает по has_recurrent, какой лист открыть.
         self.assertIn(
             "const HAS_RECURRENT = {% if has_recurrent %}true{% else %}false{% endif %};",
@@ -2893,7 +3017,8 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("Продлить подписку", template)
         self.assertIn("Купить подписку", template)
         self.assertIn('class="tg-mini-action-list"', template)
-        self.assertIn('onclick="onAutopayButtonClick()" class="tg-mini-action-row"', template)
+        # На главном экране вместо «Автопродление» — «История платежей»
+        self.assertIn('onclick="openPaymentsHistorySheet()" class="tg-mini-action-row"', template)
 
     def test_mobile_home_has_restrained_visual_hierarchy(self):
         template = Path("engine/templates/dashboard.html").read_text()
@@ -4120,6 +4245,137 @@ class AdminAcqDatePickerTests(SimpleTestCase):
         self.assertIn("input.dispatchEvent(new Event('input'", template)
 
 
+class CabinetPaymentsHistoryTests(SimpleTestCase):
+    """История платежей в кабинете: отмена автопродления убрана с видных мест
+    и живёт маленькой ссылкой внутри листа истории."""
+
+    def _build_session(self):
+        from engine.views import YkPayment as YkModel
+
+        yk_rows = [
+            SimpleNamespace(
+                created_at=datetime(2026, 8, 7, 12, 0),
+                amount=299,
+                currency="RUB",
+                subscription_period="month",
+                is_trial_promotion=False,
+                status="succeeded",
+            )
+        ]
+        wata_rows = [
+            (
+                SimpleNamespace(
+                    payment_time=datetime(2026, 8, 8, 10, 0),
+                    amount=1799,
+                    currency="RUB",
+                    transaction_status="Paid",
+                    order_description="год",
+                ),
+                SimpleNamespace(tariff_id="year"),
+            )
+        ]
+
+        class FakeQuery:
+            def __init__(self, rows):
+                self.rows = rows
+
+            def filter(self, *args, **kwargs):
+                return self
+
+            def join(self, *args, **kwargs):
+                return self
+
+            def order_by(self, *args, **kwargs):
+                return self
+
+            def limit(self, *args, **kwargs):
+                return self
+
+            def all(self):
+                return self.rows
+
+        class FakeSession:
+            def query(self, *models):
+                return FakeQuery(yk_rows if models[0] is YkModel else wata_rows)
+
+            def close(self):
+                pass
+
+        return FakeSession()
+
+    def test_returns_merged_history_newest_first(self):
+        from engine.views import cabinet_payments_history
+
+        request = RequestFactory().get("/cabinet/api/payments/")
+        request.user = SimpleNamespace(is_authenticated=True, id=42)
+
+        with mock.patch(
+            "engine.views.session_factory", return_value=self._build_session()
+        ):
+            response = cabinet_payments_history(request)
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["status"], "ok")
+        # WATA-год (08.08) свежее ЮКассы-месяца (07.08)
+        self.assertEqual(
+            [(p["tariff"], p["amount"]) for p in payload["payments"]],
+            [("1 год", 1799), ("1 месяц", 299)],
+        )
+        self.assertNotIn("date_sort", payload["payments"][0])
+
+    def test_requires_authentication_and_get(self):
+        from engine.views import cabinet_payments_history
+
+        anonymous = RequestFactory().get("/cabinet/api/payments/")
+        anonymous.user = SimpleNamespace(is_authenticated=False, id=None)
+        self.assertEqual(cabinet_payments_history(anonymous).status_code, 403)
+
+        post = RequestFactory().post("/cabinet/api/payments/")
+        post.user = SimpleNamespace(is_authenticated=True, id=42)
+        self.assertEqual(cabinet_payments_history(post).status_code, 403)
+
+    def test_cancel_autopay_is_buried_in_payments_sheet(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Главный экран mini app: вместо «Автопродление» — «История платежей»
+        self.assertNotIn('tg-mini-action-label">Автопродление', template)
+        self.assertIn('tg-mini-action-label">История платежей', template)
+        # Профиль: заметной карточки отмены больше нет
+        self.assertNotIn(
+            '<div class="text-white font-black">Отключить автопродление</div>',
+            template,
+        )
+        self.assertIn("Все ваши оплаты подписки", template)
+        # Отмена доступна маленькой ссылкой внутри листа истории платежей
+        self.assertIn('id="payments-history-sheet"', template)
+        self.assertIn(
+            "closePaymentsHistorySheet(); setTimeout(onAutopayButtonClick, 320);",
+            template,
+        )
+        # FAQ указывает новый путь к отмене
+        self.assertIn("Историю платежей", template)
+
+
+class CabinetCancelAutopayEventTests(SimpleTestCase):
+    """Отмена автоплатежа из кабинета обязана писать то же аналитическое
+    событие, что и бот (confirm_cancel_autopay_clicked) — иначе отмены через
+    сайт невидимы для графика churn, ежедневного отчёта и таймлайна."""
+
+    def test_cabinet_cancel_writes_cancel_event(self):
+        import inspect
+
+        from engine.views import cancel_autopay
+
+        src = inspect.getsource(cancel_autopay)
+        self.assertIn("ConfirmCancelAutopayClicked", src)
+        self.assertIn("add_event_log", src)
+        # Событие пишется в той же транзакции, что удаление рекуррента
+        self.assertLess(
+            src.index("add_event_log"), src.index("session.commit()")
+        )
+
+
 class AdminRecurrentDynamicsTests(SimpleTestCase):
     """Активная рекуррентная база: фейл автосписания после последнего успеха
     выбивает пользователя из базы (мёртвая карта), отзыв разрешения в банке
@@ -4236,6 +4492,77 @@ class AdminRecurrentDynamicsTests(SimpleTestCase):
         self.assertIn("cancellation_reason", src)
         template = Path("engine/templates/admin_dashboard.html").read_text()
         self.assertIn("Причина отмены", template)
+
+
+class AdminClientWorkspaceTests(SimpleTestCase):
+    """Компактная карточка клиента и фактический трафик из RWMS."""
+
+    def test_rwms_traffic_payload_uses_real_panel_counters(self):
+        from engine import views
+
+        rwms = mock.Mock()
+        rwms.get_user_by_username.return_value = SimpleNamespace(
+            used_traffic_bytes=12_345_678,
+            lifetime_used_traffic_bytes=98_765_432,
+        )
+
+        payload = views.admin_rwms_traffic_payload("594514115", client=rwms)
+
+        self.assertTrue(payload["available"])
+        self.assertEqual(payload["used_traffic_bytes"], 12_345_678)
+        self.assertEqual(payload["lifetime_used_traffic_bytes"], 98_765_432)
+        rwms.get_user_by_username.assert_called_once_with("594514115")
+
+    def test_rwms_traffic_payload_degrades_without_breaking_client_card(self):
+        from engine import views
+
+        rwms = mock.Mock()
+        rwms.get_user_by_username.side_effect = RuntimeError("rwms unavailable")
+
+        with self.assertLogs(level="ERROR"):
+            payload = views.admin_rwms_traffic_payload("594514115", client=rwms)
+
+        self.assertEqual(
+            payload,
+            {
+                "available": False,
+                "used_traffic_bytes": None,
+                "lifetime_used_traffic_bytes": None,
+            },
+        )
+
+    def test_rwms_traffic_api_is_read_only_and_routed(self):
+        import inspect
+        from django.urls import reverse
+        from engine import views
+
+        self.assertEqual(
+            reverse("support_admin_api_user_traffic"),
+            "/support-admin/api/user-traffic/",
+        )
+        src = inspect.getsource(views.support_admin_api_user_traffic)
+        helper_src = inspect.getsource(views.admin_rwms_traffic_payload)
+        self.assertIn("get_user_by_username", helper_src)
+        self.assertNotIn("update_user", helper_src)
+        self.assertNotIn("delete", helper_src.lower())
+        self.assertIn("require_support_admin", src)
+
+    def test_client_template_matches_compact_overview_concept(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        css = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        self.assertIn("data-user-traffic-url", template)
+        self.assertIn('data-client-subtab="overview"', template)
+        self.assertIn("client-summary-card", template)
+        self.assertIn("data-client-traffic-value", template)
+        self.assertIn("loadClientTraffic(clientCardState.q)", template)
+        self.assertIn("Действия с клиентом", template)
+        self.assertIn("Подписка и оплата", template)
+        self.assertIn("Ограничения доступа", template)
+        self.assertIn("автоплатёж не изменится", template)
+        self.assertNotIn("function clientSubscriptionManageHtml", template)
+        self.assertIn(".client-actions-grid", css)
+        self.assertIn(".client-danger-panel", css)
 
 
 class AdminStage3Tests(SimpleTestCase):

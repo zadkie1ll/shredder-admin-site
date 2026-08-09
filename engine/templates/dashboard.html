@@ -3029,10 +3029,11 @@
 
                         <section class="tg-mini-action-list" aria-label="Действия с подпиской">
                             {% if has_subscription_access %}
-                            <button type="button" onclick="onAutopayButtonClick()" class="tg-mini-action-row">
-                                <i class="fas fa-rotate" aria-hidden="true"></i>
-                                <span class="tg-mini-action-label">Автопродление</span>
-                                <span class="tg-mini-action-value">{% if has_recurrent %}Подключено{% else %}Не подключено{% endif %}</span>
+                            {# Не рекламируем отмену автопродления на главном экране: #}
+                            {# отключение живёт маленькой ссылкой внутри истории платежей #}
+                            <button type="button" onclick="openPaymentsHistorySheet()" class="tg-mini-action-row">
+                                <i class="fas fa-receipt" aria-hidden="true"></i>
+                                <span class="tg-mini-action-label">История платежей</span>
                                 <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
                             </button>
                             {% if show_expiring_banner %}
@@ -3579,20 +3580,22 @@
                     </div>
                 </section>
 
-                {# Управление автопродлением и выход #}
+                {# История платежей и выход #}
                 <section id="settings-autopay-section" class="max-w-2xl space-y-3">
                     {% comment %}
-                    Автопродление — кнопка видна всегда. Источник истины — YkRecurrentPayment
-                    (Wata рекурренты не поддерживает). Если активного рекуррента нет, по клику
-                    показываем окно «отменять нечего», как команда бота /cancelautopay.
+                    Отключение автопродления сознательно убрано с видных мест
+                    (главный экран, профиль): оно живёт маленькой ссылкой внутри
+                    листа «История платежей». Источник истины — YkRecurrentPayment;
+                    если активного рекуррента нет, по клику на ссылку показывается
+                    окно «отменять нечего», как команда бота /cancelautopay.
                     {% endcomment %}
-                    <button type="button" onclick="onAutopayButtonClick()" class="w-full flex items-center gap-4 px-4 py-4 setup-shell !mb-0 text-left hover:border-[#ff5c67]/30 transition-colors">
-                        <div class="w-11 h-11 rounded-2xl bg-[#ff5c67]/10 border border-[#ff5c67]/20 flex items-center justify-center text-[#ff5c67] flex-shrink-0">
-                            <i class="fas fa-rotate-left text-lg"></i>
+                    <button type="button" onclick="openPaymentsHistorySheet()" class="w-full flex items-center gap-4 px-4 py-4 setup-shell !mb-0 text-left hover:border-[#ffc700]/30 transition-colors">
+                        <div class="w-11 h-11 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
+                            <i class="fas fa-receipt text-lg"></i>
                         </div>
                         <div class="min-w-0 flex-1">
-                            <div class="text-white font-black">Отключить автопродление</div>
-                            <div class="text-gray-500 text-xs font-bold mt-0.5">Доступ сохранится до конца оплаченного периода</div>
+                            <div class="text-white font-black">История платежей</div>
+                            <div class="text-gray-500 text-xs font-bold mt-0.5">Все ваши оплаты подписки</div>
                         </div>
                         <i class="fas fa-chevron-right text-gray-600 flex-shrink-0"></i>
                     </button>
@@ -3659,6 +3662,28 @@
             <button type="button" id="ref-copy-btn" onclick="copyRefShareLink()"
                     class="w-full flex items-center justify-center gap-2 py-4 rounded-full border border-white/15 bg-white/5 text-white font-semibold text-sm hover:border-[#ffc700]/30 transition-all active:scale-95">
                 <i class="fas fa-copy"></i> Скопировать ссылку
+            </button>
+        </div>
+    </div>
+
+    {# Лист истории платежей; отключение автопродления — маленькой ссылкой внизу #}
+    <div id="payments-history-sheet" class="fixed inset-0 z-[9999] hidden flex items-end justify-center">
+        <div class="absolute inset-0 bg-black/70 backdrop-blur-sm z-[9998]" onclick="closePaymentsHistorySheet()"></div>
+        <div class="bottom-sheet-content fixed inset-x-0 bottom-0 bg-[#111113] rounded-t-[2rem] border-t border-white/10 p-5 md:p-8 pb-6 transform translate-y-full transition-transform duration-300 ease-out z-[9999]
+                    lg:left-1/2 lg:-translate-x-1/2 lg:max-w-xl" id="payments-history-content">
+            <div class="w-10 h-1 rounded-full bg-white/20 mx-auto mb-4"></div>
+            <h4 class="text-xl font-black mb-4">История платежей</h4>
+            <div id="payments-history-list" class="space-y-2 max-h-[50vh] overflow-y-auto pr-1">
+                <div class="text-gray-500 text-sm font-bold py-6 text-center">Загружаем платежи…</div>
+            </div>
+            <button type="button" onclick="closePaymentsHistorySheet()" class="w-full bg-[#ffc700] hover:bg-[#ffd740] text-black py-4 mt-4 rounded-2xl font-black uppercase text-xs tracking-widest transition-all active:scale-95">
+                Закрыть
+            </button>
+            {# Ссылка видна всегда: есть ли что отменять — решает onAutopayButtonClick #}
+            {# (при отсутствии рекуррента покажет лист «отменять нечего», как бот) #}
+            <button type="button" onclick="closePaymentsHistorySheet(); setTimeout(onAutopayButtonClick, 320);"
+                    class="w-full py-3 mt-1 text-gray-600 text-xs font-bold hover:text-gray-400 transition-colors">
+                Отключить автопродление
             </button>
         </div>
     </div>
@@ -5947,9 +5972,9 @@
             { emoji: '💳', title: 'Подписка и оплата', icon: 'fa-credit-card', items: [
                 { q: 'Есть ли пробный период?', a: 'Да! Новым пользователям — бесплатный пробный период, он активируется сразу при регистрации. Карту привязывать не нужно.' },
                 { q: 'Какими способами можно оплатить?', a: 'Российскими банковскими картами и через СБП. Оплата проходит через защищённый платёжный шлюз — данные карты мы не видим и не храним.' },
-                { q: 'Как продлевается подписка?', a: 'Автоматически — со способа оплаты, привязанного при покупке. Отключить автопродление можно в любой момент в профиле, доступ сохранится до конца оплаченного периода.' },
+                { q: 'Как продлевается подписка?', a: 'Автоматически — со способа оплаты, привязанного при покупке. Отключить автопродление можно в любой момент: откройте «Историю платежей» в профиле, ссылка внизу листа. Доступ сохранится до конца оплаченного периода.' },
                 { q: 'Что будет, если не продлить подписку?', a: 'Доступ приостановится. После оплаты он вернётся автоматически — ничего заново настраивать не придётся.' },
-                { q: 'Как отменить подписку?', a: 'В профиле нажмите «Отключить автопродление» — или отправьте команду /cancelautopay в нашем Telegram-боте.' },
+                { q: 'Как отменить подписку?', a: 'Откройте в профиле «Историю платежей» и нажмите «Отключить автопродление» внизу листа — или отправьте команду /cancelautopay в нашем Telegram-боте.' },
             ]},
             { emoji: '🔒', title: 'Безопасность и приватность', icon: 'fa-shield-alt', items: [
                 { q: 'Храните ли вы логи и историю?', a: 'Нет. Мы не логируем подключения, не отслеживаем посещённые сайты и не храним историю вашей активности.' },
@@ -6191,6 +6216,62 @@
             if (!sheet || !content) return;
             sheet.classList.remove('hidden');
             setTimeout(() => content.classList.replace('translate-y-full', 'translate-y-0'), 10);
+        }
+
+        let paymentsHistoryLoaded = false;
+        function openPaymentsHistorySheet() {
+            const sheet = document.getElementById('payments-history-sheet');
+            const content = document.getElementById('payments-history-content');
+            if (!sheet || !content) return;
+            sheet.classList.remove('hidden');
+            setTimeout(() => content.classList.replace('translate-y-full', 'translate-y-0'), 10);
+            if (!paymentsHistoryLoaded) loadPaymentsHistory();
+        }
+
+        function closePaymentsHistorySheet() {
+            const sheet = document.getElementById('payments-history-sheet');
+            const content = document.getElementById('payments-history-content');
+            if (!sheet || !content) return;
+            content.classList.replace('translate-y-0', 'translate-y-full');
+            setTimeout(() => sheet.classList.add('hidden'), 300);
+        }
+
+        async function loadPaymentsHistory() {
+            const list = document.getElementById('payments-history-list');
+            if (!list) return;
+            try {
+                const response = await fetch('{% url 'cabinet_payments_history' %}', {
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                });
+                if (!response.ok) throw new Error('bad status');
+                const payload = await response.json();
+                const payments = payload.payments || [];
+                paymentsHistoryLoaded = true;
+                if (!payments.length) {
+                    list.innerHTML = '<div class="text-gray-500 text-sm font-bold py-6 text-center">Платежей пока нет</div>';
+                    return;
+                }
+                list.innerHTML = payments.map((p) => `
+                    <div class="flex items-center justify-between gap-3 px-4 py-3 rounded-2xl border border-white/10 bg-white/5">
+                        <div class="min-w-0">
+                            <div class="text-white text-sm font-black truncate">${escapeHtmlText(p.tariff)}${p.trial ? ' · пробный' : ''}</div>
+                            <div class="text-gray-500 text-xs font-bold mt-0.5">${escapeHtmlText(p.date)}</div>
+                        </div>
+                        <div class="text-white text-sm font-black whitespace-nowrap">${p.amount.toLocaleString('ru-RU')} ${escapeHtmlText(p.currency)}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.warn('Не удалось загрузить историю платежей', error);
+                list.innerHTML = '<div class="text-gray-500 text-sm font-bold py-6 text-center">Не удалось загрузить платежи. Попробуйте позже.</div>';
+            }
+        }
+
+        function escapeHtmlText(value) {
+            return String(value ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;');
         }
 
         function openNoAutopaySheet() {

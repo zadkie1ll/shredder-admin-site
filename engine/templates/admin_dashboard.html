@@ -1514,6 +1514,7 @@
         data-stats-source-users-url="{% url 'support_admin_api_stats_source_users' %}"
         data-cohort-stats-url="{% url 'support_admin_api_cohort_stats' %}"
         data-user-payments-url="{% url 'support_admin_api_user_payments' %}"
+        data-user-traffic-url="{% url 'support_admin_api_user_traffic' %}"
         data-referrals-url="{% url 'support_admin_api_referrals' %}"
         data-payment-info-url="{% url 'support_admin_api_payment_info' %}"
         data-payments-url="{% url 'support_admin_api_payments' %}"
@@ -2174,11 +2175,16 @@
         </section>
         {% endif %}
         <section id="panel-user-payments" class="tab-panel {% if not support_admin_is_full_admin and not support_admin_is_marketer %}active{% endif %}">
-            <header class="panel-header">
-                <h1 class="admin-title">Клиент</h1>
-                <p class="admin-subtitle">Профиль, подписка, платежи и рефералы — всё по одному пользователю</p>
+            <header class="panel-header client-panel-header">
+                <div>
+                    <h1 class="admin-title">Клиент</h1>
+                    <p class="admin-subtitle">Профиль, подписка, платежи и рефералы — всё по одному пользователю</p>
+                </div>
+                <button class="btn btn-secondary client-new-search-button" type="button" id="client-new-search" hidden>
+                    <i class="fas fa-search"></i>Найти другого клиента
+                </button>
             </header>
-            <form id="user-payments-form" class="card form-card form-grid-two">
+            <form id="user-payments-form" class="card form-card form-grid-two client-search-form">
                 <input class="input" name="q" placeholder="username, email или telegram_id">
                 <button class="btn" type="submit"><i class="fas fa-search"></i>Найти</button>
             </form>
@@ -5075,9 +5081,17 @@
             writeRecentClients([recent, ...clients]);
         }
 
+        function setClientSearchMode(hasClient) {
+            const form = document.getElementById('user-payments-form');
+            const reopenButton = document.getElementById('client-new-search');
+            if (form) form.hidden = Boolean(hasClient);
+            if (reopenButton) reopenButton.hidden = !hasClient;
+        }
+
         function renderClientStartState() {
             const target = document.getElementById('user-payments-result');
             if (!target) return;
+            setClientSearchMode(false);
             const recentClients = readRecentClients();
             const recentHtml = recentClients.length
                 ? recentClients.map((client) => `
@@ -5173,29 +5187,32 @@
             const updatedAt = block.updated_at || block.created_at || '';
             const actionsHtml = canManage
                 ? (isBlocked
-                    ? `<button class="btn btn-secondary" type="button" data-client-referral-block-action="unblock"><i class="fas fa-unlock"></i>Разблокировать рефералку</button>`
+                    ? `<button class="btn btn-secondary client-action-button" type="button" data-client-referral-block-action="unblock"><i class="fas fa-unlock"></i>Разблокировать</button>`
                     : `
                         <input class="input" type="text" maxlength="255" data-client-referral-block-reason placeholder="Причина блокировки">
-                        <button class="btn btn-danger" type="button" data-client-referral-block-action="block"><i class="fas fa-ban"></i>Заблокировать рефералку</button>
+                        <button class="btn btn-danger client-action-button" type="button" data-client-referral-block-action="block"><i class="fas fa-ban"></i>Заблокировать</button>
                     `)
                 : '';
             return `
-                <div class="client-sub-action client-ref-control ${isBlocked ? 'is-blocked' : ''}">
-                    <div class="client-ref-control-title-row">
-                        <div class="client-sub-action-title">Реферальная программа</div>
-                        <span class="client-ref-status ${isBlocked ? 'is-blocked' : 'is-active'}">${isBlocked ? 'Заблокирована' : 'Доступна'}</span>
+                <section class="card client-referral-manage-card ${isBlocked ? 'is-blocked' : ''}">
+                    <div class="client-referral-manage-copy">
+                        <div class="client-ref-control-title-row">
+                            <div class="client-referral-manage-title"><i class="fas fa-gift"></i>Реферальные бонусы</div>
+                            <span class="client-ref-status ${isBlocked ? 'is-blocked' : 'is-active'}">${isBlocked ? 'Заблокированы' : 'Доступны'}</span>
+                        </div>
+                        <div class="client-referral-manage-desc">${isBlocked ? 'Новые бонусы за приглашённых пользователей не начисляются.' : 'Клиент может получать новые бонусы за приглашённых пользователей.'}</div>
+                        ${block.reason ? `<div class="client-ref-control-meta"><strong>Причина:</strong> ${escapeHtml(block.reason)}</div>` : ''}
+                        ${updatedAt ? `<div class="client-ref-control-meta"><strong>Обновлено:</strong> ${escapeHtml(updatedAt)}</div>` : ''}
                     </div>
-                    <div class="client-sub-action-desc">${isBlocked ? 'Новые реферальные бонусы для этого клиента не начисляются.' : 'Запрещает клиенту получать новые бонусы за приглашённых пользователей.'}</div>
-                    ${block.reason ? `<div class="client-ref-control-meta"><strong>Причина:</strong> ${escapeHtml(block.reason)}</div>` : ''}
-                    ${updatedAt ? `<div class="client-ref-control-meta"><strong>Обновлено:</strong> ${escapeHtml(updatedAt)}</div>` : ''}
-                    ${actionsHtml ? `<div class="client-sub-action-controls client-ref-control-actions">${actionsHtml}</div>` : ''}
-                </div>
+                    ${actionsHtml ? `<div class="client-ref-control-actions">${actionsHtml}</div>` : ''}
+                </section>
             `;
         }
 
         function clientReferralsSectionHtml(refResult) {
             if (!refResult) return '<div class="card info-card muted">Данные по рефералам недоступны.</div>';
             const referrals = refResult.referrals || [];
+            const controlHtml = clientReferralControlHtml(refResult);
             const metricsHtml = `
                 <div class="metrics-grid three">
                     ${metric('Рефералов', refResult.summary.referrals, 'fa-user-plus')}
@@ -5203,9 +5220,10 @@
                     ${metric('Бонусных дней', refResult.summary.bonus_days, 'fa-gift')}
                 </div>`;
             if (!referrals.length) {
-                return `${metricsHtml}<div class="card info-card muted client-empty">У клиента пока нет приглашённых рефералов.</div>`;
+                return `${controlHtml}${metricsHtml}<div class="card info-card muted client-empty">У клиента пока нет приглашённых рефералов.</div>`;
             }
             return `
+                ${controlHtml}
                 ${metricsHtml}
                 <section class="card info-card"><h3 class="info-title">Граф приглашений</h3><div id="referral-graph"></div></section>
                 <section class="referral-cards">
@@ -5240,60 +5258,196 @@
                 </section>`;
         }
 
-        function clientSubscriptionManageHtml(refResult) {
-            if (main.dataset.fullAdmin !== '1') return '';
+        function clientSummaryHtml(result) {
+            const user = result.user || {};
+            const autopayActive = Boolean(result.autopay?.yk || result.autopay?.wata);
+            const username = user.username ? `@${user.username}` : (user.email || `ID ${user.id || '—'}`);
+            const avatarSource = String(user.username || user.email || user.telegram_id || '?').replace(/^@/, '');
+            const avatar = user.username
+                ? `@${avatarSource.slice(0, 1).toUpperCase()}`
+                : avatarSource.slice(0, 1).toUpperCase();
             return `
-                <section class="card client-sub-card">
-                    <h3 class="info-title"><i class="fas fa-user-gear"></i> Управление клиентом</h3>
-                    ${clientCardState.lastAction ? `<div class="client-sub-last-action">${clientCardState.lastAction}</div>` : ''}
-                    <div class="client-sub-actions">
-                        <div class="client-sub-action">
-                            <div class="client-sub-action-title">Продлить подписку</div>
-                            <div class="client-sub-action-desc">Добавит дней к текущему сроку — бонусы, компенсации.</div>
-                            <div class="client-sub-action-controls">
-                                <input class="input" id="client-extend-days" type="number" min="1" placeholder="Дней">
-                                <button class="btn" type="button" data-client-sub-action="extend"><i class="fas fa-plus"></i>Продлить</button>
-                            </div>
+                <section class="card client-summary-card">
+                    <div class="client-summary-identity">
+                        <div class="client-summary-avatar" aria-hidden="true">${escapeHtml(avatar)}</div>
+                        <div class="client-summary-identity-copy">
+                            <strong>${escapeHtml(username)}</strong>
+                            <span>${escapeHtml(user.email || 'Email не указан')}</span>
+                            <span><i class="fab fa-telegram-plane"></i>Telegram ID: ${escapeHtml(user.telegram_id || '—')}</span>
                         </div>
-                        <div class="client-sub-action">
-                            <div class="client-sub-action-title">Сброс для возврата</div>
-                            <div class="client-sub-action-desc">Срок станет 1 час: подписка гасится, но клиент дорабатывает, пока идёт возврат денег.</div>
-                            <div class="client-sub-action-controls">
-                                <button class="btn btn-secondary" type="button" data-client-sub-action="set_trial_hour"><i class="fas fa-clock"></i>Установить 1 час</button>
-                            </div>
-                        </div>
-                        <div class="client-sub-action">
-                            <div class="client-sub-action-title">Автоплатёж</div>
-                            <div class="client-sub-action-desc">Отключает автосписание — по просьбе клиента или при возврате.</div>
-                            <div class="client-sub-action-controls">
-                                <button class="btn btn-danger" type="button" data-client-sub-action="stop_autopay"><i class="fas fa-ban"></i>Отключить</button>
-                            </div>
-                        </div>
-                        <div class="client-sub-action">
-                            <div class="client-sub-action-title">Отключить подписку</div>
-                            <div class="client-sub-action-desc">Статус RWMS → DISABLED, автоплатёж выключается. Реактивируется ручной оплатой. Как в трафик-алертах бота.</div>
-                            <div class="client-sub-action-controls">
-                                <button class="btn btn-danger" type="button" data-client-sub-action="disable_subscription"><i class="fas fa-power-off"></i>Отключить подписку</button>
-                            </div>
-                        </div>
-                        <div class="client-sub-action">
-                            <div class="client-sub-action-title">Временный бан</div>
-                            <div class="client-sub-action-desc">Подписка уходит в ban-сквад на заданный срок; снимет бот автоматически. Против шеринга/абуза.</div>
-                            <div class="client-sub-action-controls">
-                                <input class="input" id="client-ban-hours" type="number" min="1" step="1" placeholder="Часов">
-                                <button class="btn btn-danger" type="button" data-client-sub-action="temp_ban"><i class="fas fa-user-lock"></i>Забанить</button>
-                            </div>
-                        </div>
-                        ${clientReferralControlHtml(refResult)}
+                    </div>
+                    <div class="client-summary-stat client-summary-subscription">
+                        <span class="client-status-pill ${user.is_active ? 'is-active' : 'is-expired'}">${user.is_active ? 'Активна' : 'Истекла'}</span>
+                        <span class="client-summary-label">Подписка до</span>
+                        <strong class="client-summary-value">${escapeHtml(user.expire_at || '—')}</strong>
+                    </div>
+                    <div class="client-summary-stat">
+                        <span class="client-summary-label"><i class="fas fa-wallet"></i>LTV</span>
+                        <strong class="client-summary-value">${escapeHtml(money(result.ltv))}</strong>
+                    </div>
+                    <div class="client-summary-stat" data-client-traffic-stat>
+                        <span class="client-summary-label"><i class="fas fa-signal"></i>Трафик <small>RWMS</small></span>
+                        <strong class="client-summary-value" data-client-traffic-value aria-live="polite">Загрузка…</strong>
+                        <span class="client-summary-meta" data-client-traffic-meta>Фактическое потребление</span>
+                    </div>
+                    <div class="client-summary-stat">
+                        <span class="client-summary-label"><i class="fas fa-calendar"></i>Регистрация</span>
+                        <strong class="client-summary-value">${escapeHtml(result.first_seen)}</strong>
+                    </div>
+                    <div class="client-summary-stat">
+                        <span class="client-summary-label"><i class="fas fa-arrows-rotate"></i>Автоплатёж</span>
+                        <strong class="client-summary-value ${autopayActive ? 'green' : ''}">${autopayActive ? 'Подключён' : 'Отключён'}</strong>
                     </div>
                 </section>`;
         }
 
+        function clientOverviewSectionHtml(result, refResult) {
+            if (main.dataset.fullAdmin !== '1') return '';
+            const autopayActive = Boolean(result.autopay?.yk || result.autopay?.wata);
+            const referralBlocked = Boolean(refResult?.referral_block?.blocked);
+            return `
+                <section class="client-overview-workspace">
+                    <div class="client-overview-heading">
+                        <div class="client-overview-heading-icon"><i class="fas fa-user-gear"></i></div>
+                        <div>
+                            <h2>Действия с клиентом</h2>
+                            <p>Все изменения записываются в журнал администратора</p>
+                        </div>
+                    </div>
+                    <div class="client-actions-grid">
+                        <article class="card client-action-panel">
+                            <h3 class="client-action-panel-title">Подписка и оплата</h3>
+                            <div class="client-action-list">
+                                <div class="client-action-row">
+                                    <span class="client-action-icon"><i class="fas fa-calendar-plus"></i></span>
+                                    <div class="client-action-copy">
+                                        <strong>Продлить подписку</strong>
+                                        <span>Добавить бонусные или компенсационные дни</span>
+                                    </div>
+                                    <div class="client-action-controls">
+                                        <label class="client-number-field"><input class="input" id="client-extend-days" type="number" min="1" value="30" aria-label="Количество дней продления"><span>дней</span></label>
+                                        <button class="btn client-action-button" type="button" data-client-sub-action="extend">Продлить</button>
+                                    </div>
+                                </div>
+                                <div class="client-action-row">
+                                    <span class="client-action-icon"><i class="fas fa-rotate-left"></i></span>
+                                    <div class="client-action-copy">
+                                        <strong>Подготовить возврат</strong>
+                                        <span>Срок станет 1 час · автоплатёж не изменится</span>
+                                    </div>
+                                    <div class="client-action-controls">
+                                        <button class="btn btn-secondary client-action-button" type="button" data-client-sub-action="set_trial_hour">Подготовить</button>
+                                    </div>
+                                </div>
+                                <div class="client-action-row">
+                                    <span class="client-action-icon"><i class="fas fa-arrows-rotate"></i></span>
+                                    <div class="client-action-copy">
+                                        <div class="client-action-title-line"><strong>Автоплатёж</strong><span class="client-inline-status ${autopayActive ? 'is-active' : 'is-off'}">${autopayActive ? 'Подключён' : 'Отключён'}</span></div>
+                                        <span>${autopayActive ? 'Регулярные списания разрешены' : 'Активных регулярных списаний нет'}</span>
+                                    </div>
+                                    <div class="client-action-controls">
+                                        <button class="btn btn-secondary client-action-button" type="button" data-client-sub-action="stop_autopay" ${autopayActive ? '' : 'disabled'}>Отключить</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                        <article class="card client-action-panel client-danger-panel">
+                            <div class="client-danger-heading">
+                                <i class="fas fa-triangle-exclamation"></i>
+                                <div><h3>Ограничения доступа</h3><p>Редкие действия с ограничением подписки</p></div>
+                            </div>
+                            <div class="client-action-list">
+                                <div class="client-action-row">
+                                    <span class="client-action-icon"><i class="fas fa-user-lock"></i></span>
+                                    <div class="client-action-copy">
+                                        <strong>Временная блокировка</strong>
+                                        <span>Ban-сквад; бот снимет блокировку автоматически</span>
+                                    </div>
+                                    <div class="client-action-controls">
+                                        <label class="client-number-field"><input class="input" id="client-ban-hours" type="number" min="1" step="1" value="24" aria-label="Длительность блокировки"><span>часа</span></label>
+                                        <button class="btn btn-danger client-action-button" type="button" data-client-sub-action="temp_ban">Заблокировать</button>
+                                    </div>
+                                </div>
+                                <div class="client-action-row">
+                                    <span class="client-action-icon"><i class="fas fa-power-off"></i></span>
+                                    <div class="client-action-copy">
+                                        <strong>Отключить доступ</strong>
+                                        <span>RWMS → DISABLED; автоплатёж отключится</span>
+                                    </div>
+                                    <div class="client-action-controls">
+                                        <button class="btn btn-danger client-action-button" type="button" data-client-sub-action="disable_subscription">Отключить</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </article>
+                    </div>
+                    <div class="card client-referral-summary-row ${referralBlocked ? 'is-blocked' : ''}">
+                        <span class="client-referral-summary-icon"><i class="fas fa-gift"></i></span>
+                        <div class="client-referral-summary-copy">
+                            <div><strong>Реферальные бонусы</strong><span class="client-inline-status ${referralBlocked ? 'is-blocked' : 'is-active'}">${referralBlocked ? 'Заблокированы' : 'Доступны'}</span></div>
+                            <span>Управление доступом находится рядом с историей приглашений</span>
+                        </div>
+                        <button class="client-text-button" type="button" data-client-section-link="referrals">Управлять <i class="fas fa-chevron-right"></i></button>
+                    </div>
+                    <div class="card client-last-action ${clientCardState.lastAction ? '' : 'is-empty'}">
+                        <span class="client-last-action-icon"><i class="fas fa-clock-rotate-left"></i></span>
+                        <strong>Последнее действие:</strong>
+                        <span>${clientCardState.lastAction || 'В этой сессии действий ещё не было'}</span>
+                    </div>
+                </section>`;
+        }
+
+        function formatClientTrafficBytes(value) {
+            let number = Number(value);
+            if (!Number.isFinite(number) || number < 0) return '—';
+            const units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
+            let unit = 0;
+            while (number >= 1024 && unit < units.length - 1) {
+                number /= 1024;
+                unit += 1;
+            }
+            const digits = number >= 100 ? 0 : (number >= 10 ? 1 : 2);
+            return `${new Intl.NumberFormat('ru-RU', {maximumFractionDigits: digits}).format(number)} ${units[unit]}`;
+        }
+
+        async function loadClientTraffic(query) {
+            const valueTarget = document.querySelector('[data-client-traffic-value]');
+            const metaTarget = document.querySelector('[data-client-traffic-meta]');
+            const statTarget = document.querySelector('[data-client-traffic-stat]');
+            if (!valueTarget || !metaTarget || !main.dataset.userTrafficUrl) return;
+            try {
+                const params = new URLSearchParams({q: query});
+                const response = await fetch(`${main.dataset.userTrafficUrl}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (clientCardState.q !== query || !valueTarget.isConnected) return;
+                const traffic = payload?.result || {};
+                if (!response.ok || payload.status !== 'ok' || !traffic.available) {
+                    valueTarget.textContent = '—';
+                    metaTarget.textContent = 'Нет данных RWMS';
+                    statTarget?.classList.add('is-unavailable');
+                    return;
+                }
+                const used = formatClientTrafficBytes(traffic.used_traffic_bytes);
+                const lifetime = formatClientTrafficBytes(traffic.lifetime_used_traffic_bytes);
+                valueTarget.textContent = used;
+                metaTarget.textContent = `За всё время: ${lifetime}`;
+                statTarget?.setAttribute('title', `RWMS: текущий период ${used}; за всё время ${lifetime}`);
+                statTarget?.classList.remove('is-unavailable');
+            } catch (error) {
+                if (clientCardState.q !== query || !valueTarget.isConnected) return;
+                valueTarget.textContent = '—';
+                metaTarget.textContent = 'RWMS временно недоступен';
+                statTarget?.classList.add('is-unavailable');
+            }
+        }
+
         async function renderClientCard(activeSection = null) {
             const target = document.getElementById('user-payments-result');
-            const section = activeSection
+            const canManage = main.dataset.fullAdmin === '1';
+            let section = activeSection
                 || document.querySelector('#user-payments-result [data-client-subtab].active')?.dataset.clientSubtab
-                || 'payments';
+                || (canManage ? 'overview' : 'payments');
+            if (!canManage && section === 'overview') section = 'payments';
             setLoading(target, 'Собираем карточку клиента...');
             const params = new URLSearchParams({q: clientCardState.q});
             const fetchOptions = {headers: {'X-Requested-With': 'XMLHttpRequest'}};
@@ -5304,11 +5458,16 @@
                     fetch(`${main.dataset.referralsUrl}?${params}`, fetchOptions),
                 ]);
             } catch (error) {
+                setClientSearchMode(false);
                 return setError(target, 'Ошибка запроса');
             }
-            if (!paymentsResponse.ok) return setError(target, 'Пользователь не найден');
+            if (!paymentsResponse.ok) {
+                setClientSearchMode(false);
+                return setError(target, 'Пользователь не найден');
+            }
             const {result} = await paymentsResponse.json();
             rememberRecentClient(result.user);
+            setClientSearchMode(true);
             let refPayload = null;
             if (referralsResponse.ok) {
                 try { refPayload = await referralsResponse.json(); } catch (error) { refPayload = null; }
@@ -5316,20 +5475,16 @@
             const refCount = refPayload?.result?.summary?.referrals;
             target.innerHTML = `
                 <div class="result-stack">
-                    ${userCard(result.user)}
-                    <div class="metrics-grid three">
-                        ${metric('LTV', money(result.ltv), 'fa-wallet')}
-                        ${metric('Использование', escapeHtml(result.traffic), 'fa-signal')}
-                        ${metric('Регистрация', escapeHtml(result.first_seen), 'fa-calendar')}
-                    </div>
-                    ${clientSubscriptionManageHtml(refPayload?.result)}
+                    ${clientSummaryHtml(result)}
                     <div class="subtabs client-subtabs" role="tablist" aria-label="Разделы клиента">
+                        ${canManage ? `<button type="button" class="subtab ${section === 'overview' ? 'active' : ''}" data-client-subtab="overview" role="tab"><i class="fas fa-house"></i>Обзор</button>` : ''}
                         <button type="button" class="subtab ${section === 'payments' ? 'active' : ''}" data-client-subtab="payments" role="tab"><i class="fas fa-receipt"></i>Платежи (${(result.history || []).length})</button>
                         <button type="button" class="subtab ${section === 'referrals' ? 'active' : ''}" data-client-subtab="referrals" role="tab"><i class="fas fa-network-wired"></i>Рефералы${typeof refCount === 'number' ? ` (${refCount})` : ''}</button>
                         <button type="button" class="subtab ${section === 'timeline' ? 'active' : ''}" data-client-subtab="timeline" role="tab"><i class="fas fa-timeline"></i>Таймлайн</button>
                         <button type="button" class="subtab ${section === 'rwmssync' ? 'active' : ''}" data-client-subtab="rwmssync" role="tab"><i class="fas fa-arrows-rotate"></i>Синхронизация</button>
                         <button type="button" class="subtab ${section === 'message' ? 'active' : ''}" data-client-subtab="message" role="tab"><i class="fas fa-paper-plane"></i>Сообщение</button>
                     </div>
+                    ${canManage ? `<div class="client-section ${section === 'overview' ? 'active' : ''}" data-client-section="overview">${clientOverviewSectionHtml(result, refPayload?.result)}</div>` : ''}
                     <div class="client-section ${section === 'payments' ? 'active' : ''}" data-client-section="payments">
                         ${clientPaymentsSectionHtml(result)}
                     </div>
@@ -5356,6 +5511,7 @@
                     </div>
                 </div>
             `;
+            loadClientTraffic(clientCardState.q);
             document.getElementById('client-dm-send')?.addEventListener('click', sendClientDirectMessage);
             if (section === 'timeline') loadClientTimeline();
             if (section === 'rwmssync') loadClientRwmsSync();
@@ -5879,6 +6035,7 @@
                     return;
                 }
                 formData.append('days', days);
+                if (!confirm(`Продлить подписку клиента на ${days} дн.?`)) return;
             }
             if (action === 'temp_ban') {
                 const hours = document.getElementById('client-ban-hours')?.value;
@@ -7117,6 +7274,8 @@
 
             const clientSubtabButton = event.target.closest('[data-client-subtab]');
             if (clientSubtabButton) showClientSection(clientSubtabButton.dataset.clientSubtab);
+            const clientSectionLink = event.target.closest('[data-client-section-link]');
+            if (clientSectionLink) showClientSection(clientSectionLink.dataset.clientSectionLink);
             const clientSubActionButton = event.target.closest('[data-client-sub-action]');
             if (clientSubActionButton) clientSubscriptionAction(clientSubActionButton.dataset.clientSubAction);
             const clientReferralBlockButton = event.target.closest('[data-client-referral-block-action]');
@@ -7125,6 +7284,7 @@
 
         const statsForm = document.getElementById('stats-form');
         const userPaymentsForm = document.getElementById('user-payments-form');
+        const clientNewSearchButton = document.getElementById('client-new-search');
         const paymentInfoForm = document.getElementById('payment-info-form');
         const referralAntifraudForm = document.getElementById('referral-antifraud-form');
         const replyTemplateForm = document.getElementById('reply-template-form');
@@ -7144,6 +7304,12 @@
             userPaymentsForm.addEventListener('submit', loadClientCard);
             renderClientStartState();
         }
+        clientNewSearchButton?.addEventListener('click', () => {
+            setClientSearchMode(false);
+            const input = userPaymentsForm?.elements.q;
+            input?.focus();
+            input?.select();
+        });
         if (paymentInfoForm) paymentInfoForm.addEventListener('submit', loadPaymentInfo);
         if (referralAntifraudForm) referralAntifraudForm.addEventListener('submit', submitReferralAntifraud);
         if (replyTemplateForm) replyTemplateForm.addEventListener('submit', submitReplyTemplate);

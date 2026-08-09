@@ -3,6 +3,7 @@ import uuid
 import hmac
 import hashlib
 import logging
+import math
 import base64
 import json
 import resend
@@ -230,6 +231,41 @@ def get_telegram_auth_bot(host):
         }
 
     return None
+
+
+def get_all_telegram_auth_bots(host=None):
+    """Все доверенные Telegram-боты для проверки подписи Mini App initData.
+
+    Кнопка Mini App у vpn- и vps-бота ведёт на один и тот же кабинетный
+    домен (runtime-настройка webapp_url общая), а initData подписан токеном
+    того бота, из которого открыли приложение. Проверять подпись только
+    ботом, привязанным к домену, нельзя — вход из «не доменного» бота падал
+    бы с ложным «Не удалось подтвердить вход». Возвращает ботов без дублей,
+    первым — привязанного к домену (частый случай, меньше лишних HMAC).
+    """
+    bots = []
+    seen_tokens = set()
+
+    candidates = []
+    domain_bot = get_telegram_auth_bot(host) if host else None
+    if domain_bot:
+        candidates.append(domain_bot)
+    candidates.extend(settings.TELEGRAM_AUTH_BOTS.values())
+    if settings.TG_BOT_USERNAME and settings.TELEGRAM_AUTH_BOT_TOKEN:
+        candidates.append(
+            {
+                "username": settings.TG_BOT_USERNAME.lstrip("@"),
+                "token": settings.TELEGRAM_AUTH_BOT_TOKEN,
+            }
+        )
+
+    for bot in candidates:
+        if bot["token"] in seen_tokens:
+            continue
+        seen_tokens.add(bot["token"])
+        bots.append(bot)
+
+    return bots
 
 
 def get_telegram_web_login_start_code(host):
@@ -2440,8 +2476,8 @@ def auth_by_telegram_webapp(request):
     if request.method != "POST":
         return redirect("telegram_webapp_entry")
 
-    telegram_bot = get_telegram_auth_bot(request.get_host())
-    if not telegram_bot:
+    telegram_bots = get_all_telegram_auth_bots(request.get_host())
+    if not telegram_bots:
         logging.warning("telegram webapp auth requested but bot token is missing")
         return render_login(
             request,
@@ -2449,9 +2485,21 @@ def auth_by_telegram_webapp(request):
             status=503,
         )
 
-    init_data_fields = verify_telegram_webapp_init_data(
-        request.POST.get("init_data", ""), telegram_bot["token"]
-    )
+    # Mini App могут открыть из любого из наших ботов (vpn/vps), а домен
+    # кабинета у них общий — подпись initData проверяем всеми доверенными
+    # токенами, а не только ботом, привязанным к домену.
+    init_data = request.POST.get("init_data", "")
+    init_data_fields = None
+    for telegram_bot in telegram_bots:
+        init_data_fields = verify_telegram_webapp_init_data(
+            init_data, telegram_bot["token"]
+        )
+        if init_data_fields is not None:
+            logging.info(
+                "telegram webapp auth verified by bot %s",
+                telegram_bot["username"],
+            )
+            break
     if init_data_fields is None:
         logging.warning("telegram webapp auth failed init data signature check")
         return render_login(
@@ -2896,6 +2944,75 @@ def update_email(request):
         session.close()
 
 
+def cabinet_payments_history(request):
+    """История платежей текущего пользователя для личного кабинета.
+
+    Показываем только успешные оплаты (YooKassa succeeded + WATA Paid) —
+    отменённые/протухшие инвойсы для пользователя шум. Свежие первыми.
+    """
+    if request.method != "GET" or not request.user.is_authenticated:
+        return JsonResponse({"status": "error"}, status=403)
+
+    db_session = session_factory()
+    try:
+        yk_payments = (
+            db_session.query(YkPayment)
+            .filter(
+                YkPayment.user_id == request.user.id,
+                YkPayment.status == "succeeded",
+            )
+            .order_by(YkPayment.created_at.desc())
+            .limit(100)
+            .all()
+        )
+        wata_payments = (
+            db_session.query(WataTransaction, WataInvoice)
+            .join(WataInvoice, WataInvoice.order_id == WataTransaction.order_id)
+            .filter(
+                WataInvoice.user_id == request.user.id,
+                WataTransaction.transaction_status == "Paid",
+            )
+            .order_by(WataTransaction.payment_time.desc())
+            .limit(100)
+            .all()
+        )
+
+        history = []
+        for payment in yk_payments:
+            history.append(
+                {
+                    "date": admin_date_label(payment.created_at, with_time=False),
+                    "date_sort": admin_dt(payment.created_at) or datetime.min,
+                    "amount": admin_money(payment.amount),
+                    "currency": payment.currency,
+                    "tariff": get_tariff_display_name(payment.subscription_period),
+                    "trial": bool(payment.is_trial_promotion),
+                }
+            )
+        for payment, invoice in wata_payments:
+            history.append(
+                {
+                    "date": admin_date_label(payment.payment_time, with_time=False),
+                    "date_sort": admin_dt(payment.payment_time) or datetime.min,
+                    "amount": admin_money(payment.amount),
+                    "currency": payment.currency,
+                    "tariff": invoice.tariff_id
+                    and get_tariff_display_name(invoice.tariff_id)
+                    or payment.order_description,
+                    "trial": False,
+                }
+            )
+
+        history.sort(key=lambda item: item["date_sort"], reverse=True)
+        history = history[:100]
+        for item in history:
+            item.pop("date_sort", None)
+
+        return JsonResponse({"status": "ok", "payments": history})
+    finally:
+        db_session.close()
+
+
 def cancel_autopay(request):
     """Отключение автопродления из личного кабинета.
 
@@ -2924,6 +3041,10 @@ def cancel_autopay(request):
         )
         old_autopay_allow = bool(db_user.autopay_allow)
         db_user.autopay_allow = False
+        # То же событие, что пишет бот при подтверждении отмены: без него
+        # отмены из кабинета были невидимы для аналитики (график churn,
+        # ежедневный отчёт, таймлайн клиента) и занижали отток рекуррентов.
+        add_event_log(session, db_user, analytics_event.ConfirmCancelAutopayClicked())
         session.commit()
 
         logging.info(
@@ -4542,6 +4663,49 @@ def admin_traffic_status_payload(traffic):
     return "Не подключался"
 
 
+def admin_rwms_traffic_payload(username, client=None):
+    """Фактическое потребление подписки из RWMS без локальных эвристик.
+
+    Карточка клиента загружает этот payload отдельным запросом, поэтому
+    недоступность панели не должна скрывать профиль, платежи и действия.
+    RPC только читает UserResponse и никогда не изменяет подписку.
+    """
+
+    empty = {
+        "available": False,
+        "used_traffic_bytes": None,
+        "lifetime_used_traffic_bytes": None,
+    }
+    if not username:
+        return empty
+
+    rwms = client or rwms_client
+    try:
+        rwms_user = rwms.get_user_by_username(username)
+    except Exception:
+        logging.exception("support admin: failed to load RWMS traffic for %s", username)
+        return empty
+    if rwms_user is None:
+        return empty
+
+    def safe_bytes(value):
+        try:
+            number = float(value or 0)
+        except (TypeError, ValueError):
+            return 0
+        if not math.isfinite(number):
+            return 0
+        return max(0, int(number))
+
+    return {
+        "available": True,
+        "used_traffic_bytes": safe_bytes(rwms_user.used_traffic_bytes),
+        "lifetime_used_traffic_bytes": safe_bytes(
+            rwms_user.lifetime_used_traffic_bytes
+        ),
+    }
+
+
 def admin_payment_history(db_session, user):
     yk_payments = (
         db_session.query(YkPayment)
@@ -4658,6 +4822,30 @@ def support_admin_api_user_payments(request):
         )
     finally:
         db_session.close()
+
+
+def support_admin_api_user_traffic(request):
+    """Read-only фактический трафик одного клиента из RWMS."""
+
+    auth_response = require_support_admin(request)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        user = admin_find_user(db_session, request.GET.get("q"))
+        if not user:
+            return JsonResponse({"status": "not_found"}, status=404)
+        username = user.username
+    finally:
+        db_session.close()
+
+    return JsonResponse(
+        {
+            "status": "ok",
+            "result": admin_rwms_traffic_payload(username),
+        }
+    )
 
 
 def build_admin_interval_stats(
