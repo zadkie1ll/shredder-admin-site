@@ -10097,7 +10097,175 @@ def support_admin_api_segments(request):
 
 
 BROADCAST_TEXT_MAX_LEN = 3500
+# Telegram: подпись к фото ограничена 1024 символами (у текста — 4096).
+BROADCAST_CAPTION_MAX_LEN = 1024
 BROADCAST_MAX_BUTTONS = 3
+BROADCAST_MEDIA_MAX_BYTES = 3 * 1024 * 1024
+BROADCAST_MEDIA_TYPES = {"image/jpeg": "photo", "image/png": "photo"}
+BROADCAST_TARIFF_IDS = {"oneday", "threedays", "month", "threemonths", "sixmonths", "year"}
+
+
+def admin_broadcast_parse_buttons(db_session, raw_buttons):
+    """Валидация типизированных кнопок рассылки. Бросает ValueError с текстом
+    для админа. Типы: url / claim_promo (распродажа) / tariffs (как в /sendmsg)."""
+    try:
+        buttons = json.loads(raw_buttons or "[]")
+    except json.JSONDecodeError:
+        raise ValueError("Кнопки: некорректный JSON")
+    if not isinstance(buttons, list):
+        raise ValueError("Кнопки: некорректный JSON")
+    clean = []
+    plain_count = 0
+    for button in buttons:
+        if not isinstance(button, dict):
+            raise ValueError("Кнопки: некорректный JSON")
+        button_type = str(button.get("type") or "url")
+        if button_type == "url":
+            text_label = str(button.get("text") or "").strip()[:64]
+            url = str(button.get("url") or "").strip()[:512]
+            if not text_label or not url.startswith("https://"):
+                raise ValueError("У кнопки-ссылки нужны текст и https-ссылка")
+            clean.append({"type": "url", "text": text_label, "url": url})
+            plain_count += 1
+        elif button_type == "claim_promo":
+            text_label = str(button.get("text") or "").strip()[:64]
+            try:
+                promo_id = int(button.get("promo_id") or 0)
+            except (TypeError, ValueError):
+                promo_id = 0
+            promo = db_session.get(PromoCode, promo_id) if promo_id else None
+            if not text_label or promo is None:
+                raise ValueError("У кнопки скидки нужны текст и существующий промокод")
+            if promo.promo_type != "discount":
+                raise ValueError("Для кнопки скидки подходит только промокод-скидка")
+            if not promo.is_active:
+                raise ValueError(f"Промокод {promo.code} выключен")
+            if promo.valid_until and promo.valid_until <= datetime.utcnow():
+                raise ValueError(f"Срок промокода {promo.code} истёк")
+            if any(entry.get("type") == "claim_promo" for entry in clean):
+                raise ValueError("Кнопка скидки может быть только одна")
+            clean.append(
+                {
+                    "type": "claim_promo",
+                    "text": text_label,
+                    "promo_id": promo.id,
+                    "code": promo.code,
+                }
+            )
+            plain_count += 1
+        elif button_type == "tariffs":
+            tariff_ids = [
+                str(item).strip().lower()
+                for item in (button.get("tariff_ids") or [])
+                if str(item).strip()
+            ]
+            unknown = [item for item in tariff_ids if item not in BROADCAST_TARIFF_IDS]
+            if unknown:
+                raise ValueError(f"Неизвестный тариф: {', '.join(unknown)}")
+            overrides = {}
+            for key, value in (button.get("price_overrides") or {}).items():
+                key = str(key).strip().lower()
+                if key not in BROADCAST_TARIFF_IDS:
+                    raise ValueError(f"Неизвестный тариф: {key}")
+                try:
+                    price = int(value)
+                except (TypeError, ValueError):
+                    raise ValueError(f"Некорректная цена тарифа {key}")
+                if not 1 <= price <= 100000:
+                    raise ValueError(f"Некорректная цена тарифа {key}")
+                overrides[key] = price
+                if key not in tariff_ids:
+                    tariff_ids.append(key)
+            if any(entry.get("type") == "tariffs" for entry in clean):
+                raise ValueError("Кнопки тарифов можно добавить один раз")
+            clean.append(
+                {
+                    "type": "tariffs",
+                    "tariff_ids": tariff_ids or None,
+                    "price_overrides": overrides,
+                }
+            )
+        else:
+            raise ValueError("Неизвестный тип кнопки")
+    if plain_count > BROADCAST_MAX_BUTTONS:
+        raise ValueError("Не больше 3 кнопок (не считая тарифов)")
+    return clean
+
+
+def admin_broadcast_parse_media(request, text_value):
+    """Фото рассылки из multipart-формы; None — без медиа. Бросает ValueError."""
+    upload = request.FILES.get("media")
+    if upload is None:
+        return None, None
+    media_type = BROADCAST_MEDIA_TYPES.get((upload.content_type or "").lower())
+    if media_type is None:
+        raise ValueError("Фото: только JPEG или PNG")
+    if upload.size > BROADCAST_MEDIA_MAX_BYTES:
+        raise ValueError("Фото: не больше 3 МБ")
+    if len(text_value) > BROADCAST_CAPTION_MAX_LEN:
+        raise ValueError(
+            f"С фото текст ограничен {BROADCAST_CAPTION_MAX_LEN} символами (лимит Telegram)"
+        )
+    return upload.read(), media_type
+
+
+def admin_broadcast_funnel(db_session, broadcast):
+    """Воронка распродажи для рассылок с кнопкой «Забрать скидку»:
+    активации промокода и покупки активировавших после активации."""
+    claim = next(
+        (
+            button
+            for button in (broadcast.buttons or [])
+            if button.get("type") == "claim_promo"
+        ),
+        None,
+    )
+    if claim is None:
+        return None
+    params = {"promo_id": claim.get("promo_id"), "start": broadcast.created_at}
+    claims = (
+        db_session.execute(
+            sa_text(
+                """
+                SELECT count(*) FROM promo_code_uses
+                WHERE promo_id = :promo_id AND created_at >= :start
+                """
+            ),
+            params,
+        ).scalar()
+        or 0
+    )
+    yk_buyers, yk_revenue = db_session.execute(
+        sa_text(
+            """
+            SELECT count(DISTINCT uses.user_id), COALESCE(sum(p.amount), 0)
+            FROM promo_code_uses uses
+            JOIN yk_payments p ON p.user_id = uses.user_id
+             AND p.status = 'succeeded' AND p.created_at > uses.created_at
+            WHERE uses.promo_id = :promo_id AND uses.created_at >= :start
+            """
+        ),
+        params,
+    ).one()
+    wata_buyers, wata_revenue = db_session.execute(
+        sa_text(
+            """
+            SELECT count(DISTINCT uses.user_id), COALESCE(sum(t.amount), 0)
+            FROM promo_code_uses uses
+            JOIN wata_invoices i ON i.user_id = uses.user_id
+            JOIN wata_transactions t ON t.order_id = i.order_id
+             AND t.transaction_status = 'Paid' AND t.payment_time > uses.created_at
+            WHERE uses.promo_id = :promo_id AND uses.created_at >= :start
+            """
+        ),
+        params,
+    ).one()
+    return {
+        "code": claim.get("code"),
+        "claims": int(claims),
+        "buyers": int(yk_buyers or 0) + int(wata_buyers or 0),
+        "revenue": int(yk_revenue or 0) + int(wata_revenue or 0),
+    }
 
 
 def admin_broadcast_progress(db_session, broadcast):
@@ -10131,10 +10299,13 @@ def admin_broadcast_payload(db_session, broadcast):
         "status": broadcast.status,
         "text": broadcast.text,
         "buttons": broadcast.buttons or [],
+        "has_media": bool(broadcast.media_type),
+        "is_test": bool(broadcast.test_telegram_id),
         "total": total,
         "covered": covered,
         "sent": sent,
         "progress_pct": round(100.0 * covered / total, 1) if total else 0,
+        "funnel": admin_broadcast_funnel(db_session, broadcast),
         "created_by": broadcast.created_by,
         "created_at": admin_date_label(broadcast.created_at),
         "finished_at": admin_date_label(broadcast.finished_at),
@@ -10184,10 +10355,15 @@ def support_admin_api_broadcasts(request):
                 {"status": "ok", "result": admin_broadcast_payload(db_session, broadcast)}
             )
 
-        if action == "create":
+        if action in ("create", "test"):
+            is_test = action == "test"
             title = (request.POST.get("title") or "").strip()[:256]
             text_value = (request.POST.get("text") or "").strip()
             segment = (request.POST.get("segment") or "").strip()
+            if is_test and not title:
+                title = "Тест рассылки"
+            if is_test and not segment:
+                segment = "all"
             if not title or not text_value:
                 return JsonResponse(
                     {"status": "error", "message": "Заполните название и текст"},
@@ -10202,43 +10378,61 @@ def support_admin_api_broadcasts(request):
                     {"status": "error", "message": "Неизвестный сегмент"}, status=400
                 )
             try:
-                buttons = json.loads(request.POST.get("buttons") or "[]")
-            except ValueError:
-                return JsonResponse(
-                    {"status": "error", "message": "Кнопки: некорректный JSON"},
-                    status=400,
+                clean_buttons = admin_broadcast_parse_buttons(
+                    db_session, request.POST.get("buttons")
                 )
-            if not isinstance(buttons, list) or len(buttons) > BROADCAST_MAX_BUTTONS:
-                return JsonResponse(
-                    {"status": "error", "message": "Не больше 3 кнопок"}, status=400
+                media_bytes, media_type = admin_broadcast_parse_media(
+                    request, text_value
                 )
-            clean_buttons = []
-            for button in buttons:
-                text_label = str(button.get("text") or "").strip()[:64]
-                url = str(button.get("url") or "").strip()[:512]
-                if not text_label or not url.startswith("https://"):
+            except ValueError as error:
+                return JsonResponse(
+                    {"status": "error", "message": str(error)}, status=400
+                )
+
+            test_telegram_id = None
+            if is_test:
+                try:
+                    test_telegram_id = int(request.POST.get("telegram_id") or 0)
+                except ValueError:
+                    test_telegram_id = 0
+                if test_telegram_id <= 0:
+                    return JsonResponse(
+                        {"status": "error", "message": "Укажите Telegram ID для теста"},
+                        status=400,
+                    )
+                known = (
+                    db_session.query(User.id)
+                    .filter(User.telegram_id == test_telegram_id)
+                    .first()
+                )
+                if known is None:
                     return JsonResponse(
                         {
                             "status": "error",
-                            "message": "У кнопки нужны текст и https-ссылка",
+                            "message": "Этого Telegram ID нет среди пользователей ботов",
                         },
                         status=400,
                     )
-                clean_buttons.append({"text": text_label, "url": url})
-
-            total = db_session.execute(sa_text(segment_count_sql(segment))).scalar() or 0
-            if not total:
-                return JsonResponse(
-                    {"status": "error", "message": "В сегменте нет получателей"},
-                    status=400,
+                total = 1
+            else:
+                total = (
+                    db_session.execute(sa_text(segment_count_sql(segment))).scalar() or 0
                 )
+                if not total:
+                    return JsonResponse(
+                        {"status": "error", "message": "В сегменте нет получателей"},
+                        status=400,
+                    )
 
             broadcast = Broadcast(
-                title=title,
+                title=title if not is_test else f"[тест] {title}"[:256],
                 text=text_value,
                 segment=segment,
                 status="running",
                 buttons=clean_buttons,
+                media=media_bytes,
+                media_type=media_type,
+                test_telegram_id=test_telegram_id,
                 total=int(total),
                 created_by=str(support_admin_actor(request))[:128],
             )
@@ -10246,7 +10440,7 @@ def support_admin_api_broadcasts(request):
             admin_audit_write(
                 db_session,
                 request,
-                "broadcast_create",
+                "broadcast_test" if is_test else "broadcast_create",
                 target=title,
                 segment=segment,
                 total=int(total),
