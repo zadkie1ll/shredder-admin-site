@@ -5935,9 +5935,9 @@
                 const response = await fetch(main.dataset.promocodesUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error();
-                const discounts = (payload.result.codes || []).filter((promo) => promo.promo_type === 'discount' && promo.is_active);
-                broadcastPromoOptions = '<option value="">Промокод…</option>' + discounts.map((promo) =>
-                    `<option value="${promo.id}" data-percent="${promo.value}" data-code="${escapeHtml(promo.code)}">${escapeHtml(promo.code)} — скидка ${promo.value}%</option>`).join('');
+                const promos = (payload.result.codes || []).filter((promo) => promo.is_active);
+                broadcastPromoOptions = '<option value="">Промокод…</option>' + promos.map((promo) =>
+                    `<option value="${promo.id}" data-ptype="${promo.promo_type}" data-value="${promo.value}" data-code="${escapeHtml(promo.code)}">${escapeHtml(promo.code)} — ${promo.promo_type === 'days' ? `${promo.value} дн.` : `скидка ${promo.value}%`}</option>`).join('');
                 document.querySelectorAll('.broadcast-btn-promo').forEach((select) => {
                     const current = select.value;
                     select.innerHTML = broadcastPromoOptions;
@@ -5960,7 +5960,7 @@
             row.innerHTML = `
                 <select class="input broadcast-btn-type">
                     <option value="url">Ссылка</option>
-                    <option value="claim_promo">🔥 Забрать скидку</option>
+                    <option value="claim_promo">Промокод</option>
                     <option value="tariffs">Тарифы</option>
                 </select>
                 <select class="input broadcast-btn-style">${BROADCAST_STYLE_OPTIONS}</select>
@@ -6022,9 +6022,12 @@
                 } else if (type === 'claim_promo') {
                     const promoSelect = row.querySelector('.broadcast-btn-promo');
                     const promoId = parseInt(promoSelect.value, 10);
-                    if (!promoId) throw new Error('Выберите промокод для кнопки скидки');
-                    const percent = promoSelect.selectedOptions[0]?.dataset.percent;
-                    buttons.push({type: 'claim_promo', text: text || `🔥 Забрать скидку ${percent}%`, promo_id: promoId, style});
+                    if (!promoId) throw new Error('Выберите промокод для кнопки');
+                    const option = promoSelect.selectedOptions[0];
+                    const fallback = option?.dataset.ptype === 'days'
+                        ? `Получить ${option.dataset.value} дн. подписки`
+                        : `Забрать скидку ${option?.dataset.value}%`;
+                    buttons.push({type: 'claim_promo', text: text || fallback, promo_id: promoId, style});
                 } else if (type === 'tariffs') {
                     const spec = parseBroadcastTariffSpec(row.querySelector('.broadcast-btn-tariffs').value);
                     buttons.push({type: 'tariffs', ...spec});
@@ -6062,7 +6065,11 @@
                     rendered.push({label: text_label || 'Кнопка-ссылка', style});
                 } else if (type === 'claim_promo') {
                     const option = row.querySelector('.broadcast-btn-promo').selectedOptions[0];
-                    rendered.push({label: text_label || (option?.dataset.percent ? `🔥 Забрать скидку ${option.dataset.percent}%` : '🔥 Забрать скидку'), style});
+                    const fallback = !option || !option.dataset.value ? 'Промокод'
+                        : option.dataset.ptype === 'days'
+                            ? `Получить ${option.dataset.value} дн. подписки`
+                            : `Забрать скидку ${option.dataset.value}%`;
+                    rendered.push({label: text_label || fallback, style});
                 } else if (type === 'tariffs') {
                     try {
                         const spec = parseBroadcastTariffSpec(row.querySelector('.broadcast-btn-tariffs').value);

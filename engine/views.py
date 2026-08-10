@@ -10140,15 +10140,13 @@ def admin_broadcast_parse_buttons(db_session, raw_buttons):
                 promo_id = 0
             promo = db_session.get(PromoCode, promo_id) if promo_id else None
             if not text_label or promo is None:
-                raise ValueError("У кнопки скидки нужны текст и существующий промокод")
-            if promo.promo_type != "discount":
-                raise ValueError("Для кнопки скидки подходит только промокод-скидка")
+                raise ValueError("У кнопки промокода нужны текст и существующий промокод")
             if not promo.is_active:
                 raise ValueError(f"Промокод {promo.code} выключен")
             if promo.valid_until and promo.valid_until <= datetime.utcnow():
                 raise ValueError(f"Срок промокода {promo.code} истёк")
             if any(entry.get("type") == "claim_promo" for entry in clean):
-                raise ValueError("Кнопка скидки может быть только одна")
+                raise ValueError("Кнопка промокода может быть только одна")
             clean.append(
                 {
                     "type": "claim_promo",
