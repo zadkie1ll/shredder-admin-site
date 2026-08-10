@@ -92,6 +92,7 @@ from common.models.db import AdminDirectMessage
 from common.models.db import AdminDirectMessageDelivery
 from common.models.db import RwmsSyncMismatch
 from common.models.db import UserBlock
+from common.models.db import PromoCodeUse
 from common.models.db import UserDiscount
 from common.models.db import PromoBatch
 from common.models.db import PromoCode
@@ -10934,6 +10935,34 @@ def support_admin_api_promocodes(request):
             db_session.commit()
             return JsonResponse(
                 {"status": "ok", "result": admin_promo_payload(promo, bot_username)}
+            )
+
+        if action == "delete":
+            # Удаление кода вместе с историей его активаций и выданными скидками
+            # (для тестовых/ошибочных кодов). У активированных кодов UI требует
+            # подтверждение с количеством активаций: воронка распродажи по ним
+            # после удаления перестанет считаться.
+            promo = db_session.get(PromoCode, int(request.POST.get("id") or 0))
+            if not promo:
+                return JsonResponse({"status": "not_found"}, status=404)
+            uses = (
+                db_session.query(PromoCodeUse)
+                .filter(PromoCodeUse.promo_id == promo.id)
+                .delete()
+            )
+            discounts = (
+                db_session.query(UserDiscount)
+                .filter(UserDiscount.source_promo_id == promo.id)
+                .delete()
+            )
+            admin_audit_write(
+                db_session, request, "promo_delete", target=promo.code,
+                uses=int(uses), discounts=int(discounts),
+            )
+            db_session.delete(promo)
+            db_session.commit()
+            return JsonResponse(
+                {"status": "ok", "result": {"uses": int(uses), "discounts": int(discounts)}}
             )
 
         return JsonResponse(

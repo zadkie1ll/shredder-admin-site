@@ -6276,7 +6276,10 @@
                         row.is_active ? '🟢 активен' : '⚪ выключен',
                         escapeHtml(row.comment || ''),
                         `<a href="${row.deep_link}" target="_blank" style="color:var(--brand-gold);">ссылка</a>`,
-                        `<button data-promo-toggle="${row.id}" style="background:none;border:0;color:rgba(255,199,0,.8);cursor:pointer;">${row.is_active ? 'выключить' : 'включить'}</button>`,
+                        `<span style="display:inline-flex;gap:10px;">
+                            <button data-promo-toggle="${row.id}" style="background:none;border:0;color:rgba(255,199,0,.8);cursor:pointer;">${row.is_active ? 'выключить' : 'включить'}</button>
+                            <button data-promo-delete="${row.id}" data-promo-code="${escapeHtml(row.code)}" data-promo-uses="${row.used_count}" style="background:none;border:0;color:var(--red);cursor:pointer;">удалить</button>
+                        </span>`,
                     ])) : '<div class="info-card muted">Промокодов ещё нет.</div>';
                 batches.innerHTML = batchRows.length ? adminTable(
                     ['Партия', 'Кодов', 'Активировано', 'Создана', 'Выгрузка'],
@@ -6289,6 +6292,21 @@
                     body.append('action', 'toggle');
                     body.append('id', button.dataset.promoToggle);
                     await fetch(main.dataset.promocodesUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                    loadPromocodes();
+                }));
+                table.querySelectorAll('[data-promo-delete]').forEach((button) => button.addEventListener('click', async () => {
+                    const uses = parseInt(button.dataset.promoUses, 10) || 0;
+                    const warning = uses
+                        ? `Код ${button.dataset.promoCode} активировали ${uses} раз(а).\nУдалить вместе с историей активаций и выданными скидками?\nВоронка распродажи по нему перестанет считаться.`
+                        : `Удалить код ${button.dataset.promoCode}?`;
+                    if (!confirm(warning)) return;
+                    const body = new FormData();
+                    body.append('csrfmiddlewaretoken', csrfToken);
+                    body.append('action', 'delete');
+                    body.append('id', button.dataset.promoDelete);
+                    const response = await fetch(main.dataset.promocodesUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                    const payload = await response.json();
+                    showAdminToast(payload.status === 'ok' ? 'Промокод удалён' : (payload.message || 'Не удалось удалить'), payload.status === 'ok' ? 'success' : 'error');
                     loadPromocodes();
                 }));
             } catch (error) {
