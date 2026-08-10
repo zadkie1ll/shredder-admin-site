@@ -199,8 +199,16 @@
         .broadcast-media-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; }
         .broadcast-media-pick { cursor: pointer; }
         .broadcast-buttons { display: grid; gap: 8px; }
-        .broadcast-button-row { display: grid; grid-template-columns: 170px minmax(0, 1fr) minmax(0, 1.4fr); gap: 8px; }
-        @media (max-width: 900px) { .broadcast-button-row { grid-template-columns: 1fr; } }
+        .broadcast-buttons:empty { display: none; }
+        .broadcast-button-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+        .broadcast-button-row .broadcast-btn-type { flex: 0 0 150px; }
+        .broadcast-button-row .broadcast-btn-style { flex: 0 0 130px; }
+        .broadcast-button-row .broadcast-btn-text { flex: 1 1 130px; min-width: 0; }
+        .broadcast-button-row .broadcast-btn-url,
+        .broadcast-button-row .broadcast-btn-promo,
+        .broadcast-button-row .broadcast-btn-tariffs { flex: 1.4 1 170px; min-width: 0; }
+        .broadcast-btn-remove { flex: 0 0 auto; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--panel-border); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; transition: all .13s; }
+        .broadcast-btn-remove:hover { border-color: rgba(255,92,103,.4); color: var(--red); }
         .broadcast-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
         .broadcast-test { display: flex; gap: 8px; margin-left: auto; }
         .broadcast-test .input { width: 150px; }
@@ -213,7 +221,10 @@
         .broadcast-preview-text a { color: #6ab3f3; }
         .broadcast-preview-text.muted { color: rgba(241,244,248,.45); }
         .broadcast-preview-buttons { display: grid; gap: 4px; margin-top: 6px; }
-        .broadcast-preview-btn { padding: 8px 10px; border-radius: 8px; background: rgba(101,163,236,.22); color: #8fc1f5; font-size: 12.5px; font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .broadcast-preview-btn { padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.10); color: #dfe6ee; font-size: 12.5px; font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .broadcast-preview-btn.primary { background: rgba(101,163,236,.24); color: #8fc1f5; }
+        .broadcast-preview-btn.success { background: rgba(56,217,150,.22); color: #7ee2b8; }
+        .broadcast-preview-btn.danger { background: rgba(255,92,103,.22); color: #ff9aa2; }
         .broadcast-funnel { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; padding: 8px 10px; border: 1px solid rgba(255,199,0,.22); border-radius: 9px; background: rgba(255,199,0,.05); font-size: 12px; font-weight: 700; }
         .broadcast-funnel b { color: var(--brand-gold); }
         .broadcast-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--panel-border); font-size: 10px; font-weight: 800; color: var(--muted); }
@@ -2292,43 +2303,9 @@
                             <span id="broadcast-media-name" class="muted"></span>
                             <button type="button" class="btn btn-secondary" id="broadcast-media-clear" hidden><i class="fas fa-xmark"></i>Убрать</button>
                         </div>
-                        <div class="broadcast-buttons" id="broadcast-buttons">
-                            <div class="broadcast-button-row" data-row="0">
-                                <select class="input broadcast-btn-type">
-                                    <option value="">Без кнопки</option>
-                                    <option value="url">Ссылка</option>
-                                    <option value="claim_promo">🔥 Забрать скидку</option>
-                                    <option value="tariffs">Тарифы</option>
-                                </select>
-                                <input class="input broadcast-btn-text" placeholder="Текст кнопки">
-                                <input class="input broadcast-btn-url" placeholder="https://ссылка">
-                                <select class="input broadcast-btn-promo" hidden><option value="">Промокод…</option></select>
-                                <input class="input broadcast-btn-tariffs" hidden placeholder="month=199, year=999 (пусто — все тарифы по обычным ценам)">
-                            </div>
-                            <div class="broadcast-button-row" data-row="1">
-                                <select class="input broadcast-btn-type">
-                                    <option value="">Без кнопки</option>
-                                    <option value="url">Ссылка</option>
-                                    <option value="claim_promo">🔥 Забрать скидку</option>
-                                    <option value="tariffs">Тарифы</option>
-                                </select>
-                                <input class="input broadcast-btn-text" placeholder="Текст кнопки">
-                                <input class="input broadcast-btn-url" placeholder="https://ссылка">
-                                <select class="input broadcast-btn-promo" hidden><option value="">Промокод…</option></select>
-                                <input class="input broadcast-btn-tariffs" hidden placeholder="month=199, year=999 (пусто — все тарифы по обычным ценам)">
-                            </div>
-                            <div class="broadcast-button-row" data-row="2">
-                                <select class="input broadcast-btn-type">
-                                    <option value="">Без кнопки</option>
-                                    <option value="url">Ссылка</option>
-                                    <option value="claim_promo">🔥 Забрать скидку</option>
-                                    <option value="tariffs">Тарифы</option>
-                                </select>
-                                <input class="input broadcast-btn-text" placeholder="Текст кнопки">
-                                <input class="input broadcast-btn-url" placeholder="https://ссылка">
-                                <select class="input broadcast-btn-promo" hidden><option value="">Промокод…</option></select>
-                                <input class="input broadcast-btn-tariffs" hidden placeholder="month=199, year=999 (пусто — все тарифы по обычным ценам)">
-                            </div>
+                        <div class="broadcast-buttons" id="broadcast-buttons"></div>
+                        <div>
+                            <button type="button" class="btn btn-secondary" id="broadcast-add-button"><i class="fas fa-plus"></i>Добавить кнопку</button>
                         </div>
                         <div class="broadcast-actions">
                             <button class="btn" type="button" id="broadcast-create"><i class="fas fa-paper-plane"></i>Запустить рассылку</button>
@@ -5949,19 +5926,67 @@
             oneday: '1 день', threedays: '3 дня', month: '1 мес.',
             threemonths: '3 мес.', sixmonths: '6 мес.', year: '12 мес.',
         };
-        let broadcastPromosLoaded = false;
+        let broadcastPromoOptions = '<option value="">Промокод…</option>';
         async function loadBroadcastPromos() {
-            if (broadcastPromosLoaded || !main.dataset.promocodesUrl) return;
+            // Обновляем при каждом открытии вкладки: код часто создают в
+            // «Промокодах» и сразу идут собирать распродажу — кэш здесь вреден.
+            if (!main.dataset.promocodesUrl) return;
             try {
                 const response = await fetch(main.dataset.promocodesUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error();
                 const discounts = (payload.result.codes || []).filter((promo) => promo.promo_type === 'discount' && promo.is_active);
-                const options = '<option value="">Промокод…</option>' + discounts.map((promo) =>
+                broadcastPromoOptions = '<option value="">Промокод…</option>' + discounts.map((promo) =>
                     `<option value="${promo.id}" data-percent="${promo.value}" data-code="${escapeHtml(promo.code)}">${escapeHtml(promo.code)} — скидка ${promo.value}%</option>`).join('');
-                document.querySelectorAll('.broadcast-btn-promo').forEach((select) => { select.innerHTML = options; });
-                broadcastPromosLoaded = true;
+                document.querySelectorAll('.broadcast-btn-promo').forEach((select) => {
+                    const current = select.value;
+                    select.innerHTML = broadcastPromoOptions;
+                    if (current) select.value = current;
+                });
             } catch (error) { /* остаётся плейсхолдер */ }
+        }
+
+        // Стили кнопок Telegram: success/danger/primary или бесцветная.
+        const BROADCAST_STYLE_OPTIONS = `
+            <option value="">Без цвета</option>
+            <option value="success">🟢 Зелёная</option>
+            <option value="danger">🔴 Красная</option>
+            <option value="primary">🔵 Синяя</option>`;
+
+        function addBroadcastButtonRow() {
+            const container = document.getElementById('broadcast-buttons');
+            const row = document.createElement('div');
+            row.className = 'broadcast-button-row';
+            row.innerHTML = `
+                <select class="input broadcast-btn-type">
+                    <option value="url">Ссылка</option>
+                    <option value="claim_promo">🔥 Забрать скидку</option>
+                    <option value="tariffs">Тарифы</option>
+                </select>
+                <select class="input broadcast-btn-style">${BROADCAST_STYLE_OPTIONS}</select>
+                <input class="input broadcast-btn-text" placeholder="Текст кнопки">
+                <input class="input broadcast-btn-url" placeholder="https://ссылка">
+                <select class="input broadcast-btn-promo" hidden>${broadcastPromoOptions}</select>
+                <input class="input broadcast-btn-tariffs" hidden placeholder="month=199, year=999 (пусто — все тарифы по обычным ценам)">
+                <button type="button" class="broadcast-btn-remove" title="Убрать кнопку"><i class="fas fa-xmark"></i></button>`;
+            const typeSelect = row.querySelector('.broadcast-btn-type');
+            const sync = () => {
+                const type = typeSelect.value;
+                row.querySelector('.broadcast-btn-style').hidden = type === 'tariffs';
+                row.querySelector('.broadcast-btn-text').hidden = type === 'tariffs';
+                row.querySelector('.broadcast-btn-url').hidden = type !== 'url';
+                row.querySelector('.broadcast-btn-promo').hidden = type !== 'claim_promo';
+                row.querySelector('.broadcast-btn-tariffs').hidden = type !== 'tariffs';
+                renderBroadcastPreview();
+            };
+            typeSelect.addEventListener('change', sync);
+            row.querySelectorAll('input, select').forEach((field) => field.addEventListener('input', renderBroadcastPreview));
+            row.querySelector('.broadcast-btn-remove').addEventListener('click', () => {
+                row.remove();
+                renderBroadcastPreview();
+            });
+            container.appendChild(row);
+            sync();
         }
 
         function parseBroadcastTariffSpec(raw) {
@@ -5988,18 +6013,18 @@
             const buttons = [];
             document.querySelectorAll('#broadcast-buttons .broadcast-button-row').forEach((row) => {
                 const type = row.querySelector('.broadcast-btn-type').value;
-                if (!type) return;
                 const text = row.querySelector('.broadcast-btn-text').value.trim();
+                const style = row.querySelector('.broadcast-btn-style').value || undefined;
                 if (type === 'url') {
                     const url = row.querySelector('.broadcast-btn-url').value.trim();
                     if (!text || !url.startsWith('https://')) throw new Error('У кнопки-ссылки нужны текст и https-ссылка');
-                    buttons.push({type: 'url', text, url});
+                    buttons.push({type: 'url', text, url, style});
                 } else if (type === 'claim_promo') {
                     const promoSelect = row.querySelector('.broadcast-btn-promo');
                     const promoId = parseInt(promoSelect.value, 10);
                     if (!promoId) throw new Error('Выберите промокод для кнопки скидки');
                     const percent = promoSelect.selectedOptions[0]?.dataset.percent;
-                    buttons.push({type: 'claim_promo', text: text || `🔥 Забрать скидку ${percent}%`, promo_id: promoId});
+                    buttons.push({type: 'claim_promo', text: text || `🔥 Забрать скидку ${percent}%`, promo_id: promoId, style});
                 } else if (type === 'tariffs') {
                     const spec = parseBroadcastTariffSpec(row.querySelector('.broadcast-btn-tariffs').value);
                     buttons.push({type: 'tariffs', ...spec});
@@ -6031,45 +6056,33 @@
             let rendered = [];
             document.querySelectorAll('#broadcast-buttons .broadcast-button-row').forEach((row) => {
                 const type = row.querySelector('.broadcast-btn-type').value;
-                if (!type) return;
                 const text_label = row.querySelector('.broadcast-btn-text').value.trim();
+                const style = row.querySelector('.broadcast-btn-style').value;
                 if (type === 'url') {
-                    rendered.push(text_label || 'Кнопка-ссылка');
+                    rendered.push({label: text_label || 'Кнопка-ссылка', style});
                 } else if (type === 'claim_promo') {
                     const option = row.querySelector('.broadcast-btn-promo').selectedOptions[0];
-                    rendered.push(text_label || (option?.dataset.percent ? `🔥 Забрать скидку ${option.dataset.percent}%` : '🔥 Забрать скидку'));
+                    rendered.push({label: text_label || (option?.dataset.percent ? `🔥 Забрать скидку ${option.dataset.percent}%` : '🔥 Забрать скидку'), style});
                 } else if (type === 'tariffs') {
                     try {
                         const spec = parseBroadcastTariffSpec(row.querySelector('.broadcast-btn-tariffs').value);
                         const ids = spec.tariff_ids || Object.keys(BROADCAST_TARIFF_LABELS).filter((id) => id !== 'threedays' && id !== 'oneday');
-                        ids.forEach((id) => rendered.push(spec.price_overrides[id]
+                        ids.forEach((id) => rendered.push({label: spec.price_overrides[id]
                             ? `${spec.price_overrides[id]}₽ за ${BROADCAST_TARIFF_LABELS[id]}`
-                            : `Тариф ${BROADCAST_TARIFF_LABELS[id]}`));
+                            : `Тариф ${BROADCAST_TARIFF_LABELS[id]}`, style: id === 'month' ? 'success' : ''}));
                     } catch (error) {
-                        rendered.push('⚠️ ' + error.message);
+                        rendered.push({label: '⚠️ ' + error.message, style: 'danger'});
                     }
                 }
             });
-            buttonsTarget.innerHTML = rendered.map((label) => `<div class="broadcast-preview-btn">${escapeHtml(label)}</div>`).join('');
+            buttonsTarget.innerHTML = rendered.map((button) =>
+                `<div class="broadcast-preview-btn${button.style ? ' ' + button.style : ''}">${escapeHtml(button.label)}</div>`).join('');
         }
 
         function wireBroadcastComposer() {
             if (wireBroadcastComposer._done) return;
             wireBroadcastComposer._done = true;
-            document.querySelectorAll('#broadcast-buttons .broadcast-button-row').forEach((row) => {
-                const typeSelect = row.querySelector('.broadcast-btn-type');
-                const sync = () => {
-                    const type = typeSelect.value;
-                    row.querySelector('.broadcast-btn-text').hidden = !type || type === 'tariffs';
-                    row.querySelector('.broadcast-btn-url').hidden = type !== 'url';
-                    row.querySelector('.broadcast-btn-promo').hidden = type !== 'claim_promo';
-                    row.querySelector('.broadcast-btn-tariffs').hidden = type !== 'tariffs';
-                    renderBroadcastPreview();
-                };
-                typeSelect.addEventListener('change', sync);
-                row.querySelectorAll('input, select').forEach((field) => field.addEventListener('input', renderBroadcastPreview));
-                sync();
-            });
+            document.getElementById('broadcast-add-button').addEventListener('click', addBroadcastButtonRow);
             document.getElementById('broadcast-text').addEventListener('input', renderBroadcastPreview);
             const mediaInput = document.getElementById('broadcast-media');
             const mediaName = document.getElementById('broadcast-media-name');

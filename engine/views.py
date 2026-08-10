@@ -10100,7 +10100,9 @@ def support_admin_api_segments(request):
 BROADCAST_TEXT_MAX_LEN = 3500
 # Telegram: подпись к фото ограничена 1024 символами (у текста — 4096).
 BROADCAST_CAPTION_MAX_LEN = 1024
-BROADCAST_MAX_BUTTONS = 3
+# Telegram позволяет до ~100 кнопок на клавиатуру; 50 — запас с учётом тарифов.
+BROADCAST_MAX_BUTTONS = 50
+BROADCAST_BUTTON_STYLES = {"success", "danger", "primary"}
 BROADCAST_MEDIA_MAX_BYTES = 3 * 1024 * 1024
 BROADCAST_MEDIA_TYPES = {"image/jpeg": "photo", "image/png": "photo"}
 BROADCAST_TARIFF_IDS = {"oneday", "threedays", "month", "threemonths", "sixmonths", "year"}
@@ -10121,12 +10123,14 @@ def admin_broadcast_parse_buttons(db_session, raw_buttons):
         if not isinstance(button, dict):
             raise ValueError("Кнопки: некорректный JSON")
         button_type = str(button.get("type") or "url")
+        style = button.get("style")
+        style = style if style in BROADCAST_BUTTON_STYLES else None
         if button_type == "url":
             text_label = str(button.get("text") or "").strip()[:64]
             url = str(button.get("url") or "").strip()[:512]
             if not text_label or not url.startswith("https://"):
                 raise ValueError("У кнопки-ссылки нужны текст и https-ссылка")
-            clean.append({"type": "url", "text": text_label, "url": url})
+            clean.append({"type": "url", "text": text_label, "url": url, "style": style})
             plain_count += 1
         elif button_type == "claim_promo":
             text_label = str(button.get("text") or "").strip()[:64]
@@ -10151,6 +10155,7 @@ def admin_broadcast_parse_buttons(db_session, raw_buttons):
                     "text": text_label,
                     "promo_id": promo.id,
                     "code": promo.code,
+                    "style": style,
                 }
             )
             plain_count += 1
@@ -10189,7 +10194,7 @@ def admin_broadcast_parse_buttons(db_session, raw_buttons):
         else:
             raise ValueError("Неизвестный тип кнопки")
     if plain_count > BROADCAST_MAX_BUTTONS:
-        raise ValueError("Не больше 3 кнопок (не считая тарифов)")
+        raise ValueError(f"Не больше {BROADCAST_MAX_BUTTONS} кнопок (не считая тарифов)")
     return clean
 
 
