@@ -5121,6 +5121,48 @@ class AdminStage5PromoTests(SimpleTestCase):
         self.assertIn('id="batch-create"', template)
         self.assertIn("start=promo_", Path("engine/views.py").read_text())
 
+    def test_promocode_editor_explains_effects_and_audiences(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("Один код — одна активация на человека", template)
+        self.assertIn("Скидка на следующую оплату", template)
+        self.assertIn("Без даты она доступна 72 часа", template)
+        self.assertIn('data-promo-type-picker="promo"', template)
+        self.assertIn('data-promo-type-picker="batch"', template)
+        self.assertIn('id="promo-first-only"', template)
+        self.assertIn('id="batch-first-only"', template)
+        self.assertIn('id="batch-valid-until"', template)
+        self.assertIn("renderPromoCodes", template)
+        self.assertIn("renderPromoBatches", template)
+        self.assertNotIn('<select id="promo-type"', template)
+
+    def test_batch_payload_exposes_effect_and_audience(self):
+        from types import SimpleNamespace
+
+        from engine.views import admin_promo_batch_payload
+
+        batch = SimpleNamespace(
+            id=7,
+            name="Blogger August",
+            comment="Партнёру",
+            created_at=datetime(2026, 8, 11, 12, 30),
+        )
+        sample = SimpleNamespace(
+            promo_type="discount",
+            value=25,
+            first_purchase_only=True,
+            valid_until=datetime(2026, 8, 20),
+        )
+
+        payload = admin_promo_batch_payload(batch, sample, 50, 12)
+
+        self.assertEqual(payload["promo_type"], "discount")
+        self.assertEqual(payload["value"], 25)
+        self.assertTrue(payload["first_purchase_only"])
+        self.assertEqual(payload["codes"], 50)
+        self.assertEqual(payload["used"], 12)
+        self.assertTrue(payload["valid_until"])
+
 
 class AdminStage6RolesTests(SimpleTestCase):
     """Этап 6: персональные аккаунты и роль marketer."""
@@ -5197,7 +5239,7 @@ class AdminScriptScopeTests(SimpleTestCase):
     """Регресс прода: вкладки «Промокоды»/«Сотрудники» падали с «Не удалось
     загрузить», потому что рендер в основном script-блоке звал acqTable из
     другого script-scope (блок аналитики). Основной блок обязан использовать
-    только собственный adminTable."""
+    только собственные render-хелперы."""
 
     def _main_script_block(self):
         import re
@@ -5218,4 +5260,6 @@ class AdminScriptScopeTests(SimpleTestCase):
         for loader in ("loadPromocodes", "loadStaffAccounts", "loadSysAuditLog",
                        "loadSysSyncMismatches"):
             self.assertIn(loader, block)
-        self.assertGreaterEqual(block.count("adminTable("), 6)
+        self.assertGreaterEqual(block.count("adminTable("), 5)
+        self.assertIn("function renderPromoCodes(", block)
+        self.assertIn("function renderPromoBatches(", block)

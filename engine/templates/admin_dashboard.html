@@ -393,6 +393,178 @@
             .broadcast-record-footer { align-items: flex-start; flex-direction: column; }
             .broadcast-stop { width: 100%; }
         }
+        /* Промокоды: редактор правил, подсказки по аудитории и компактный реестр. */
+        #panel-promocodes {
+            --promo-line: rgba(255,255,255,.085);
+            --promo-soft: rgba(255,255,255,.035);
+            --promo-surface: rgba(12,13,18,.78);
+            --promo-surface-strong: rgba(8,9,13,.9);
+        }
+        html[data-admin-theme="light"] #panel-promocodes {
+            --promo-line: rgba(26,31,42,.11);
+            --promo-soft: rgba(26,31,42,.035);
+            --promo-surface: rgba(255,255,255,.86);
+            --promo-surface-strong: rgba(247,248,250,.98);
+        }
+        .promo-page-header { margin-bottom: 15px; }
+        .promo-guide-hero { display: grid; grid-template-columns: minmax(260px, .75fr) repeat(2, minmax(250px, 1fr)); gap: 10px; margin-bottom: 14px; }
+        .promo-guide-intro, .promo-guide-card { min-width: 0; padding: 14px; border: 1px solid var(--promo-line); border-radius: 13px; background: var(--promo-surface); }
+        .promo-guide-intro { display: flex; align-items: center; gap: 12px; border-color: rgba(255,199,0,.2); background: linear-gradient(135deg, rgba(255,199,0,.09), rgba(255,199,0,.025)); }
+        .promo-guide-intro-icon { width: 38px; height: 38px; flex: 0 0 38px; display: grid; place-items: center; border: 1px solid rgba(255,199,0,.26); border-radius: 11px; background: rgba(255,199,0,.09); color: var(--brand-gold); font-size: 13px; }
+        .promo-guide-intro b, .promo-guide-intro span { display: block; }
+        .promo-guide-intro b { margin-bottom: 4px; color: var(--text-main); font-size: 12px; font-weight: 850; }
+        .promo-guide-intro span { color: var(--muted); font-size: 9.5px; line-height: 1.45; font-weight: 600; }
+        .promo-guide-card { position: relative; overflow: hidden; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 10px; }
+        .promo-guide-card::after { content: ""; position: absolute; inset: auto 0 0; height: 2px; background: var(--green); opacity: .7; }
+        .promo-guide-card.is-discount::after { background: #9b7bff; }
+        .promo-guide-card-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 10px; background: rgba(56,217,150,.08); color: var(--green); font-size: 11px; }
+        .promo-guide-card.is-discount .promo-guide-card-icon { background: rgba(155,123,255,.09); color: #b29aff; }
+        .promo-guide-card b { display: block; margin-bottom: 4px; color: var(--text-main); font-size: 11px; font-weight: 850; }
+        .promo-guide-card p { margin: 0 0 8px; color: var(--muted); font-size: 9px; line-height: 1.45; font-weight: 600; }
+        .promo-guide-tags { display: flex; flex-wrap: wrap; gap: 5px; }
+        .promo-guide-tags span { padding: 3px 6px; border: 1px solid var(--promo-line); border-radius: 999px; color: var(--muted); font-size: 8px; font-weight: 750; }
+        .promo-compose-grid { display: grid; grid-template-columns: minmax(0, 1.48fr) minmax(300px, .52fr); gap: 14px; margin-bottom: 14px; align-items: stretch; }
+        .promo-builder-card, .promo-live-card, .promo-batch-card, .promo-registry-card { padding: 0; overflow: hidden; }
+        .promo-card-head { min-height: 61px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 13px 15px; border-bottom: 1px solid var(--promo-line); }
+        .promo-card-heading { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .promo-card-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border: 1px solid rgba(255,199,0,.23); border-radius: 10px; background: rgba(255,199,0,.07); color: var(--brand-gold); font-size: 11px; }
+        .promo-card-heading h2 { margin: 0 0 3px; color: var(--text-main); font-size: 14px; line-height: 1.2; font-weight: 850; }
+        .promo-card-heading p { margin: 0; color: var(--muted); font-size: 9.5px; line-height: 1.35; font-weight: 600; }
+        .promo-step-chip { padding: 4px 8px; border: 1px solid rgba(255,199,0,.2); border-radius: 999px; background: rgba(255,199,0,.055); color: #e3c14a; font-size: 8px; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; white-space: nowrap; }
+        .promo-form { display: grid; gap: 14px; padding: 15px; }
+        .promo-field { display: grid; gap: 6px; min-width: 0; }
+        .promo-field-label { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9px; font-weight: 850; letter-spacing: .05em; text-transform: uppercase; }
+        .promo-field-label span { color: rgba(255,255,255,.34); font-size: 8px; font-weight: 650; letter-spacing: 0; text-transform: none; }
+        html[data-admin-theme="light"] .promo-field-label span { color: rgba(26,31,42,.42); }
+        .promo-form .input { min-height: 43px; border-radius: 10px; background: var(--promo-surface-strong); }
+        .promo-type-picker { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+        .promo-type-option { min-width: 0; min-height: 58px; display: grid; grid-template-columns: 31px minmax(0, 1fr) 16px; gap: 9px; align-items: center; padding: 8px 10px; border: 1px solid var(--promo-line); border-radius: 11px; background: var(--promo-soft); color: var(--text-main); font: inherit; text-align: left; cursor: pointer; transition: all .14s; }
+        .promo-type-option:hover { border-color: rgba(255,199,0,.25); background: rgba(255,199,0,.035); }
+        .promo-type-option[aria-pressed="true"] { border-color: rgba(255,199,0,.43); background: rgba(255,199,0,.075); box-shadow: 0 0 0 3px rgba(255,199,0,.045); }
+        .promo-type-option-icon { width: 31px; height: 31px; display: grid; place-items: center; border-radius: 9px; background: rgba(56,217,150,.08); color: var(--green); font-size: 10px; }
+        .promo-type-option[data-value="discount"] .promo-type-option-icon { background: rgba(155,123,255,.09); color: #b29aff; }
+        .promo-type-option b, .promo-type-option small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .promo-type-option b { margin-bottom: 2px; font-size: 10.5px; font-weight: 800; }
+        .promo-type-option small { color: var(--muted); font-size: 8px; font-weight: 600; }
+        .promo-type-option > i { color: transparent; font-size: 9px; }
+        .promo-type-option[aria-pressed="true"] > i { color: var(--brand-gold); }
+        .promo-fields-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+        .promo-fields-row.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        .promo-audience { display: grid; grid-template-columns: minmax(0, .78fr) minmax(240px, 1.22fr); gap: 10px; align-items: stretch; }
+        .promo-switch { position: relative; min-height: 58px; display: flex; align-items: center; gap: 10px; padding: 9px 11px; border: 1px solid var(--promo-line); border-radius: 11px; background: var(--promo-soft); cursor: pointer; }
+        .promo-switch input { position: absolute; opacity: 0; pointer-events: none; }
+        .promo-switch-track { position: relative; width: 34px; height: 19px; flex: 0 0 34px; border-radius: 999px; background: rgba(255,255,255,.11); transition: background .14s; }
+        .promo-switch-track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 13px; height: 13px; border-radius: 50%; background: #9da4af; transition: transform .14s, background .14s; }
+        .promo-switch input:checked + .promo-switch-track { background: rgba(255,199,0,.25); }
+        .promo-switch input:checked + .promo-switch-track::after { background: var(--brand-gold); transform: translateX(15px); }
+        .promo-switch-copy b, .promo-switch-copy small { display: block; }
+        .promo-switch-copy b { margin-bottom: 3px; color: var(--text-main); font-size: 10px; font-weight: 800; }
+        .promo-switch-copy small { color: var(--muted); font-size: 8px; line-height: 1.35; font-weight: 600; }
+        .promo-form-footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 13px; border-top: 1px solid var(--promo-line); }
+        .promo-form-note { display: flex; align-items: flex-start; gap: 7px; max-width: 570px; color: var(--muted); font-size: 8.5px; line-height: 1.45; font-weight: 600; }
+        .promo-form-note i { margin-top: 2px; color: var(--brand-gold); }
+        .promo-submit { min-height: 42px; border-radius: 10px; }
+        .promo-live-card { display: flex; flex-direction: column; background: linear-gradient(160deg, rgba(255,199,0,.055), transparent 46%), var(--promo-surface); }
+        .promo-live-body { display: grid; gap: 12px; padding: 15px; }
+        .promo-live-effect { padding: 13px; border: 1px solid rgba(56,217,150,.18); border-radius: 12px; background: rgba(56,217,150,.045); }
+        .promo-live-effect[data-type="discount"] { border-color: rgba(155,123,255,.2); background: rgba(155,123,255,.045); }
+        .promo-live-kicker { display: flex; align-items: center; gap: 6px; margin-bottom: 6px; color: var(--green); font-size: 8px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+        .promo-live-effect[data-type="discount"] .promo-live-kicker { color: #b29aff; }
+        .promo-live-effect h3 { margin: 0 0 6px; color: var(--text-main); font-size: 13px; font-weight: 850; }
+        .promo-live-effect p { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.55; font-weight: 600; }
+        .promo-rule-list { display: grid; gap: 7px; }
+        .promo-rule { display: grid; grid-template-columns: 25px minmax(0, 1fr); gap: 8px; align-items: start; padding: 8px 9px; border: 1px solid var(--promo-line); border-radius: 10px; background: var(--promo-soft); }
+        .promo-rule-icon { width: 25px; height: 25px; display: grid; place-items: center; border-radius: 7px; background: rgba(255,199,0,.07); color: var(--brand-gold); font-size: 8px; }
+        .promo-rule b, .promo-rule span { display: block; }
+        .promo-rule b { margin-bottom: 2px; color: var(--text-main); font-size: 9px; font-weight: 800; }
+        .promo-rule span { color: var(--muted); font-size: 8px; line-height: 1.4; font-weight: 600; }
+        .promo-batch-card { margin-bottom: 14px; }
+        .promo-batch-layout { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(260px, .55fr); }
+        .promo-batch-form { border-right: 1px solid var(--promo-line); }
+        .promo-batch-note { display: grid; align-content: center; gap: 10px; padding: 15px; background: rgba(0,0,0,.065); }
+        .promo-batch-note-item { display: flex; align-items: flex-start; gap: 8px; color: var(--muted); font-size: 8.5px; line-height: 1.45; font-weight: 600; }
+        .promo-batch-note-item i { width: 18px; margin-top: 2px; color: var(--brand-gold); text-align: center; }
+        #promo-batches:empty { display: none; }
+        .promo-batches-list { display: grid; gap: 8px; padding: 0 15px 15px; }
+        .promo-batch-row { display: grid; grid-template-columns: minmax(180px, 1.15fr) minmax(210px, 1fr) minmax(170px, .8fr) auto; gap: 12px; align-items: center; padding: 11px 12px; border: 1px solid var(--promo-line); border-radius: 11px; background: var(--promo-soft); }
+        .promo-batch-title b, .promo-batch-title small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .promo-batch-title b { margin-bottom: 3px; color: var(--text-main); font-size: 10.5px; font-weight: 800; }
+        .promo-batch-title small { color: var(--muted); font-size: 8px; font-weight: 600; }
+        .promo-effect-line { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--text-main); font-size: 9px; font-weight: 750; }
+        .promo-effect-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 7px rgba(56,217,150,.3); }
+        .promo-effect-line.is-discount .promo-effect-dot { background: #9b7bff; box-shadow: 0 0 7px rgba(155,123,255,.35); }
+        .promo-usage { display: grid; gap: 5px; }
+        .promo-usage-head { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 8px; font-weight: 700; }
+        .promo-usage-head b { color: var(--text-main); font-weight: 800; }
+        .promo-usage-track { height: 4px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.07); }
+        .promo-usage-track i { display: block; height: 100%; min-width: 2px; border-radius: inherit; background: linear-gradient(90deg, #d8a700, #ffd53d); }
+        .promo-download, .promo-refresh, .promo-action { min-height: 34px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border: 1px solid rgba(255,199,0,.25); border-radius: 8px; background: rgba(255,199,0,.045); color: #dfbe48; font: inherit; font-size: 8.5px; font-weight: 800; text-decoration: none; cursor: pointer; transition: all .14s; }
+        .promo-download:hover, .promo-refresh:hover, .promo-action:hover { border-color: rgba(255,199,0,.46); background: rgba(255,199,0,.09); color: var(--brand-gold); }
+        .promo-refresh[data-loading="true"] i { animation: broadcastSpin .7s linear infinite; }
+        .promo-registry-card { overflow: hidden; }
+        .promo-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 15px; border-bottom: 1px solid var(--promo-line); background: rgba(0,0,0,.055); }
+        .promo-summary-item { padding: 8px 10px; border: 1px solid var(--promo-line); border-radius: 9px; background: var(--promo-soft); }
+        .promo-summary-item span, .promo-summary-item b { display: block; }
+        .promo-summary-item span { margin-bottom: 4px; color: var(--muted); font-size: 7.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+        .promo-summary-item b { color: var(--text-main); font-size: 14px; font-weight: 850; font-variant-numeric: tabular-nums; }
+        .promo-summary-item.is-active b { color: var(--green); }
+        .promo-code-list { display: grid; gap: 8px; padding: 12px; }
+        .promo-code-row { display: grid; grid-template-columns: minmax(230px, 1.22fr) minmax(210px, 1fr) minmax(150px, .68fr) minmax(145px, .66fr) auto; gap: 12px; align-items: center; padding: 11px 12px; border: 1px solid var(--promo-line); border-radius: 11px; background: var(--promo-surface); transition: border-color .14s, background .14s; }
+        .promo-code-row:hover { border-color: rgba(255,199,0,.2); background: rgba(255,199,0,.025); }
+        .promo-code-main { min-width: 0; }
+        .promo-code-top { display: flex; align-items: center; gap: 7px; min-width: 0; }
+        .promo-code-top code { overflow: hidden; color: var(--text-main); font-size: 11px; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
+        .promo-status { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%; background: var(--muted); }
+        .promo-status.active { background: var(--green); box-shadow: 0 0 7px rgba(56,217,150,.38); }
+        .promo-code-meta { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+        .promo-chip { padding: 3px 6px; border: 1px solid var(--promo-line); border-radius: 999px; background: var(--promo-soft); color: var(--muted); font-size: 7.5px; font-weight: 750; white-space: nowrap; }
+        .promo-chip.is-days { border-color: rgba(56,217,150,.18); color: var(--green); }
+        .promo-chip.is-discount { border-color: rgba(155,123,255,.21); color: #b29aff; }
+        .promo-code-rule b, .promo-code-rule span { display: block; }
+        .promo-code-rule b { margin-bottom: 4px; color: var(--text-main); font-size: 9px; font-weight: 800; }
+        .promo-code-rule span { overflow: hidden; color: var(--muted); font-size: 8px; line-height: 1.35; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+        .promo-code-date { color: var(--muted); font-size: 8.5px; line-height: 1.4; font-weight: 650; }
+        .promo-code-date b { display: block; margin-bottom: 3px; color: var(--text-main); font-size: 9px; font-weight: 800; }
+        .promo-row-actions { display: flex; align-items: center; justify-content: flex-end; gap: 5px; }
+        .promo-icon-action { width: 32px; height: 32px; display: grid; place-items: center; border: 1px solid var(--promo-line); border-radius: 8px; background: var(--promo-soft); color: var(--muted); cursor: pointer; transition: all .13s; }
+        .promo-icon-action:hover { border-color: rgba(255,199,0,.35); color: var(--brand-gold); }
+        .promo-icon-action.is-danger:hover { border-color: rgba(255,92,103,.32); background: rgba(255,92,103,.06); color: var(--red); }
+        .promo-empty { display: grid; place-items: center; min-height: 150px; padding: 24px; color: var(--muted); text-align: center; }
+        .promo-empty i { margin-bottom: 10px; color: rgba(255,199,0,.45); font-size: 22px; }
+        .promo-empty b, .promo-empty span { display: block; }
+        .promo-empty b { margin-bottom: 5px; color: var(--text-main); font-size: 11px; font-weight: 800; }
+        .promo-empty span { font-size: 9px; line-height: 1.45; font-weight: 600; }
+        html[data-admin-theme="light"] .promo-batch-note, html[data-admin-theme="light"] .promo-summary { background: rgba(26,31,42,.025); }
+        html[data-admin-theme="light"] .promo-usage-track { background: rgba(26,31,42,.08); }
+        @media (max-width: 1180px) {
+            .promo-guide-hero { grid-template-columns: 1fr 1fr; }
+            .promo-guide-intro { grid-column: 1 / -1; }
+            .promo-compose-grid { grid-template-columns: 1fr; }
+            .promo-live-card { display: grid; grid-template-columns: minmax(260px, .65fr) minmax(0, 1fr); }
+            .promo-live-card .promo-card-head { border-right: 1px solid var(--promo-line); border-bottom: 0; }
+            .promo-code-row { grid-template-columns: minmax(210px, 1.1fr) minmax(190px, 1fr) minmax(145px, .7fr) auto; }
+            .promo-code-date { display: none; }
+        }
+        @media (max-width: 860px) {
+            .promo-batch-layout { grid-template-columns: 1fr; }
+            .promo-batch-form { border-right: 0; border-bottom: 1px solid var(--promo-line); }
+            .promo-batch-row { grid-template-columns: 1fr 1fr; }
+            .promo-download { width: 100%; }
+            .promo-code-row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+            .promo-code-rule, .promo-code-row > .promo-usage { grid-column: 1 / -1; }
+            .promo-row-actions { grid-column: 2; grid-row: 1; }
+        }
+        @media (max-width: 620px) {
+            .promo-guide-hero, .promo-type-picker, .promo-fields-row, .promo-fields-row.is-two, .promo-audience, .promo-summary { grid-template-columns: 1fr; }
+            .promo-live-card { display: flex; }
+            .promo-live-card .promo-card-head { border-right: 0; border-bottom: 1px solid var(--promo-line); }
+            .promo-form-footer { align-items: stretch; flex-direction: column; }
+            .promo-submit { width: 100%; }
+            .promo-batch-row { grid-template-columns: 1fr; }
+            .promo-batch-row .promo-usage { grid-column: auto; }
+            .promo-code-row { grid-template-columns: 1fr; }
+            .promo-row-actions { grid-column: 1; grid-row: auto; justify-content: flex-start; }
+        }
         .censor-probe-row { grid-template-columns: 90px minmax(130px, 1fr) 100px 110px minmax(0, 2fr); min-width: 620px; }
         .censor-probe-row.table-head { background: rgba(255,255,255,.04); }
         /* Вес и размер держим как в остальных таблицах админки (16px/500-600):
@@ -2743,54 +2915,183 @@
         </section>
 
         <section id="panel-promocodes" class="tab-panel">
-            <header class="panel-header">
+            <header class="panel-header promo-page-header">
                 <h1 class="admin-title">Промокоды</h1>
-                <p class="admin-subtitle">Дни подписки или скидка % на первую покупку; купоны партиями</p>
+                <p class="admin-subtitle">Управляйте подарочными днями, скидками на следующую оплату и одноразовыми купонами</p>
             </header>
-            <section class="card" style="padding:18px;margin-bottom:14px;">
-                <h2 class="system-card-title">Новый промокод</h2>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-top:10px;">
-                    <input class="input" id="promo-code" placeholder="Код (пусто — сгенерировать)">
-                    <select id="promo-type" class="input">
-                        <option value="days">Дни подписки</option>
-                        <option value="discount">Скидка % на первую покупку</option>
-                    </select>
-                    <input class="input" id="promo-value" type="number" min="1" placeholder="Дней / %">
-                    <input class="input" id="promo-max-uses" type="number" min="0" placeholder="Лимит активаций (0=∞)">
-                    <input class="input" id="promo-valid-until" type="date" title="Действует до">
+            <section class="promo-guide-hero" aria-label="Как работают промокоды">
+                <div class="promo-guide-intro">
+                    <span class="promo-guide-intro-icon"><i class="fas fa-route"></i></span>
+                    <div>
+                        <b>Один код — одна активация на человека</b>
+                        <span>Код вводят через <code>/promo КОД</code>, открывают по deep-link или забирают кнопкой из рассылки.</span>
+                    </div>
                 </div>
-                <div style="display:flex;gap:14px;margin-top:10px;align-items:center;flex-wrap:wrap;">
-                    <label style="font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;"><input type="checkbox" id="promo-first-only">Только не платившим</label>
-                    <input class="input" id="promo-comment" placeholder="Комментарий (кому выдан)" style="flex:1;min-width:200px;">
-                    <button class="btn" type="button" id="promo-create"><i class="fas fa-plus"></i>Создать</button>
-                </div>
-                <div style="font-size:11px;color:var(--muted);margin-top:8px;line-height:1.5;">
-                    Скидка действует только на первую покупку; автопродление заводится по обычной цене тарифа.
-                    Активация: команда <code>/promo КОД</code> в боте или deep-link из таблицы ниже —
-                    его удобно вешать кнопкой на рассылку.
-                </div>
+                <article class="promo-guide-card is-days">
+                    <span class="promo-guide-card-icon"><i class="fas fa-calendar-plus"></i></span>
+                    <div>
+                        <b>Дни подписки</b>
+                        <p>Сразу добавляются к подписке после активации. Подходит и новым, и действующим клиентам.</p>
+                        <div class="promo-guide-tags"><span>Моментальный эффект</span><span>1–365 дней</span></div>
+                    </div>
+                </article>
+                <article class="promo-guide-card is-discount">
+                    <span class="promo-guide-card-icon"><i class="fas fa-percent"></i></span>
+                    <div>
+                        <b>Скидка на оплату</b>
+                        <p>Уменьшает ближайший платёж после активации. Следующее автопродление идёт по обычной цене.</p>
+                        <div class="promo-guide-tags"><span>Однократная скидка</span><span>1–99%</span></div>
+                    </div>
+                </article>
             </section>
-            <section class="card" style="padding:18px;margin-bottom:14px;">
-                <h2 class="system-card-title">Партия купонов</h2>
-                <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-top:10px;">
-                    <input class="input" id="batch-name" placeholder="Название партии">
-                    <select id="batch-type" class="input">
-                        <option value="days">Дни подписки</option>
-                        <option value="discount">Скидка %</option>
-                    </select>
-                    <input class="input" id="batch-value" type="number" min="1" placeholder="Дней / %">
-                    <input class="input" id="batch-count" type="number" min="1" max="500" placeholder="Сколько кодов">
-                    <button class="btn" type="button" id="batch-create"><i class="fas fa-layer-group"></i>Сгенерировать</button>
+
+            <div class="promo-compose-grid">
+                <section class="card promo-builder-card">
+                    <div class="promo-card-head">
+                        <div class="promo-card-heading">
+                            <span class="promo-card-icon"><i class="fas fa-ticket"></i></span>
+                            <div><h2>Новый промокод</h2><p>Настройте эффект, аудиторию и ограничения</p></div>
+                        </div>
+                        <span class="promo-step-chip">Один код</span>
+                    </div>
+                    <div class="promo-form">
+                        <div class="promo-field">
+                            <div class="promo-field-label">Что получит пользователь <span>выберите один эффект</span></div>
+                            <input type="hidden" id="promo-type" value="days">
+                            <div class="promo-type-picker" data-promo-type-picker="promo">
+                                <button type="button" class="promo-type-option" data-value="days" aria-pressed="true">
+                                    <span class="promo-type-option-icon"><i class="fas fa-calendar-plus"></i></span>
+                                    <span><b>Дни подписки</b><small>Добавятся сразу</small></span><i class="fas fa-check"></i>
+                                </button>
+                                <button type="button" class="promo-type-option" data-value="discount" aria-pressed="false">
+                                    <span class="promo-type-option-icon"><i class="fas fa-percent"></i></span>
+                                    <span><b>Скидка на оплату</b><small>На ближайший платёж</small></span><i class="fas fa-check"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="promo-fields-row">
+                            <label class="promo-field">
+                                <span class="promo-field-label">Код <span>пусто — сгенерируем</span></span>
+                                <input class="input" id="promo-code" maxlength="64" spellcheck="false" placeholder="Например, WELCOME20">
+                            </label>
+                            <label class="promo-field">
+                                <span class="promo-field-label" data-promo-value-label="promo">Сколько дней <span>от 1 до 365</span></span>
+                                <input class="input" id="promo-value" type="number" min="1" max="365" placeholder="Например, 7">
+                            </label>
+                            <label class="promo-field">
+                                <span class="promo-field-label">Общий лимит <span>0 — без лимита</span></span>
+                                <input class="input" id="promo-max-uses" type="number" min="0" placeholder="Например, 100">
+                            </label>
+                        </div>
+                        <div class="promo-fields-row is-two">
+                            <label class="promo-field">
+                                <span class="promo-field-label">Активировать до <span>пусто — без срока</span></span>
+                                <input class="input" id="promo-valid-until" type="date" title="Код перестанет активироваться с начала выбранной даты">
+                            </label>
+                            <label class="promo-field">
+                                <span class="promo-field-label">Комментарий <span>виден только команде</span></span>
+                                <input class="input" id="promo-comment" maxlength="512" placeholder="Кампания, блогер или получатель">
+                            </label>
+                        </div>
+                        <div class="promo-audience">
+                            <label class="promo-switch">
+                                <input type="checkbox" id="promo-first-only">
+                                <span class="promo-switch-track" aria-hidden="true"></span>
+                                <span class="promo-switch-copy"><b>Только пользователям без оплат</b><small>Платившие не смогут активировать код</small></span>
+                            </label>
+                            <div class="promo-rule">
+                                <span class="promo-rule-icon"><i class="fas fa-users"></i></span>
+                                <div><b>Кому доступен сейчас</b><span id="promo-audience-summary">Всем пользователям: новым, на триале и уже платившим</span></div>
+                            </div>
+                        </div>
+                        <div class="promo-form-footer">
+                            <div class="promo-form-note"><i class="fas fa-circle-info"></i><span>Выключение скидочного кода отключит и уже выданную по нему, но ещё не использованную скидку.</span></div>
+                            <button class="btn promo-submit" type="button" id="promo-create"><i class="fas fa-plus"></i>Создать промокод</button>
+                        </div>
+                    </div>
+                </section>
+                <aside class="card promo-live-card" aria-live="polite">
+                    <div class="promo-card-head">
+                        <div class="promo-card-heading">
+                            <span class="promo-card-icon"><i class="fas fa-lightbulb"></i></span>
+                            <div><h2>Как сработает</h2><p>Подсказка меняется вместе с настройками</p></div>
+                        </div>
+                    </div>
+                    <div class="promo-live-body">
+                        <div class="promo-live-effect" id="promo-live-effect" data-type="days">
+                            <div class="promo-live-kicker"><i class="fas fa-bolt"></i><span id="promo-live-kicker">Сразу после активации</span></div>
+                            <h3 id="promo-live-title">Подарок к подписке</h3>
+                            <p id="promo-live-copy">Выбранное число дней сразу добавится к текущему сроку подписки пользователя.</p>
+                        </div>
+                        <div class="promo-rule-list">
+                            <div class="promo-rule"><span class="promo-rule-icon"><i class="fas fa-user-check"></i></span><div><b>Аудитория</b><span id="promo-live-audience">Любой пользователь, который ещё не применял этот код</span></div></div>
+                            <div class="promo-rule"><span class="promo-rule-icon"><i class="fas fa-fingerprint"></i></span><div><b>Повторная активация</b><span>Один и тот же пользователь может применить код только один раз</span></div></div>
+                            <div class="promo-rule"><span class="promo-rule-icon"><i class="fas fa-paper-plane"></i></span><div><b>Как отправить</b><span>Скопируйте deep-link из реестра или добавьте код кнопкой в рассылку</span></div></div>
+                        </div>
+                    </div>
+                </aside>
+            </div>
+
+            <section class="card promo-batch-card">
+                <div class="promo-card-head">
+                    <div class="promo-card-heading">
+                        <span class="promo-card-icon"><i class="fas fa-layer-group"></i></span>
+                        <div><h2>Партия одноразовых купонов</h2><p>Для блогеров, розыгрышей и офлайн-раздач</p></div>
+                    </div>
+                    <span class="promo-step-chip">До 500 кодов</span>
                 </div>
-                <div style="font-size:11px;color:var(--muted);margin-top:6px;">Каждый купон одноразовый; список кодов со ссылками выгружается файлом.</div>
-                <div id="promo-batches" style="margin-top:12px;overflow-x:auto;"></div>
+                <div class="promo-batch-layout">
+                    <div class="promo-form promo-batch-form">
+                        <div class="promo-field">
+                            <div class="promo-field-label">Эффект каждого купона <span>все коды партии одинаковые</span></div>
+                            <input type="hidden" id="batch-type" value="days">
+                            <div class="promo-type-picker" data-promo-type-picker="batch">
+                                <button type="button" class="promo-type-option" data-value="days" aria-pressed="true">
+                                    <span class="promo-type-option-icon"><i class="fas fa-calendar-plus"></i></span>
+                                    <span><b>Дни подписки</b><small>Добавятся сразу</small></span><i class="fas fa-check"></i>
+                                </button>
+                                <button type="button" class="promo-type-option" data-value="discount" aria-pressed="false">
+                                    <span class="promo-type-option-icon"><i class="fas fa-percent"></i></span>
+                                    <span><b>Скидка на оплату</b><small>На ближайший платёж</small></span><i class="fas fa-check"></i>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="promo-fields-row">
+                            <label class="promo-field"><span class="promo-field-label">Название партии <span>для команды</span></span><input class="input" id="batch-name" maxlength="128" placeholder="Например, Blogger August"></label>
+                            <label class="promo-field"><span class="promo-field-label" data-promo-value-label="batch">Сколько дней <span>от 1 до 365</span></span><input class="input" id="batch-value" type="number" min="1" max="365" placeholder="Например, 7"></label>
+                            <label class="promo-field"><span class="promo-field-label">Количество <span>от 1 до 500</span></span><input class="input" id="batch-count" type="number" min="1" max="500" placeholder="Например, 50"></label>
+                        </div>
+                        <div class="promo-fields-row is-two">
+                            <label class="promo-field"><span class="promo-field-label">Активировать до <span>пусто — без срока</span></span><input class="input" id="batch-valid-until" type="date" title="Купоны перестанут активироваться с начала выбранной даты"></label>
+                            <label class="promo-field"><span class="promo-field-label">Комментарий <span>виден только команде</span></span><input class="input" id="batch-comment" maxlength="512" placeholder="Кому и зачем передана партия"></label>
+                        </div>
+                        <div class="promo-audience">
+                            <label class="promo-switch"><input type="checkbox" id="batch-first-only"><span class="promo-switch-track" aria-hidden="true"></span><span class="promo-switch-copy"><b>Только пользователям без оплат</b><small>Платившие не смогут активировать купон</small></span></label>
+                            <div class="promo-rule"><span class="promo-rule-icon"><i class="fas fa-users"></i></span><div><b>Кому доступна партия</b><span id="batch-audience-summary">Всем пользователям: новым, на триале и уже платившим</span></div></div>
+                        </div>
+                        <div class="promo-form-footer">
+                            <div class="promo-form-note"><i class="fas fa-shield-halved"></i><span>Каждый код партии имеет общий лимит ровно в одну активацию.</span></div>
+                            <button class="btn promo-submit" type="button" id="batch-create"><i class="fas fa-layer-group"></i>Сгенерировать купоны</button>
+                        </div>
+                    </div>
+                    <aside class="promo-batch-note">
+                        <div class="promo-batch-note-item"><i class="fas fa-file-arrow-down"></i><span>После создания скачайте TXT: в каждой строке будет код и готовая Telegram-ссылка.</span></div>
+                        <div class="promo-batch-note-item"><i class="fas fa-user-lock"></i><span>Один купон сможет забрать только один человек; повторно раздать этот же код нельзя.</span></div>
+                        <div class="promo-batch-note-item"><i class="fas fa-clock"></i><span id="batch-effect-summary">Дни добавятся к подписке сразу после активации купона.</span></div>
+                    </aside>
+                </div>
+                <div id="promo-batches"></div>
             </section>
-            <section class="card" style="padding:18px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                    <h2 class="system-card-title" style="margin:0;">Промокоды</h2>
-                    <button type="button" class="subtab" id="promo-refresh" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Обновить</button>
+
+            <section class="card promo-registry-card">
+                <div class="promo-card-head">
+                    <div class="promo-card-heading">
+                        <span class="promo-card-icon"><i class="fas fa-list-check"></i></span>
+                        <div><h2>Реестр промокодов</h2><p>Правила, аудитория, срок и расход каждого кода</p></div>
+                    </div>
+                    <button type="button" class="promo-refresh" id="promo-refresh"><i class="fas fa-rotate"></i><span>Обновить</span></button>
                 </div>
-                <div id="promo-table" style="margin-top:12px;overflow-x:auto;"></div>
+                <div id="promo-table"></div>
             </section>
         </section>
 
@@ -6965,43 +7266,178 @@
 
 
         // --- Промокоды --------------------------------------------------------
+        function promoTypeInfo(type, value = 0) {
+            const numericValue = parseInt(value, 10) || 0;
+            if (type === 'discount') {
+                return {
+                    label: 'Скидка на оплату',
+                    value: numericValue ? `${numericValue}%` : 'Скидка',
+                    effect: numericValue ? `${numericValue}% на ближайший платёж` : 'Скидка на ближайший платёж',
+                    className: 'is-discount',
+                };
+            }
+            return {
+                label: 'Дни подписки',
+                value: numericValue ? `${numericValue} дн.` : 'Дни',
+                effect: numericValue ? `+${numericValue} дн. сразу к подписке` : 'Дни сразу к подписке',
+                className: 'is-days',
+            };
+        }
+
+        function promoAudienceText(firstPurchaseOnly, compact = false) {
+            if (firstPurchaseOnly) return compact ? 'Только без оплат' : 'Только пользователи без успешных оплат';
+            return compact ? 'Все пользователи' : 'Новые, на триале, действующие и уже платившие';
+        }
+
+        function setPromoType(scope, type) {
+            const safeType = type === 'discount' ? 'discount' : 'days';
+            const hidden = document.getElementById(`${scope}-type`);
+            const picker = document.querySelector(`[data-promo-type-picker="${scope}"]`);
+            const valueInput = document.getElementById(`${scope}-value`);
+            const valueLabel = document.querySelector(`[data-promo-value-label="${scope}"]`);
+            if (hidden) hidden.value = safeType;
+            picker?.querySelectorAll('.promo-type-option').forEach((button) => {
+                button.setAttribute('aria-pressed', button.dataset.value === safeType ? 'true' : 'false');
+            });
+            if (valueInput) {
+                valueInput.max = safeType === 'discount' ? '99' : '365';
+                valueInput.placeholder = safeType === 'discount' ? 'Например, 20' : 'Например, 7';
+            }
+            if (valueLabel) {
+                valueLabel.innerHTML = safeType === 'discount'
+                    ? 'Размер скидки <span>от 1 до 99%</span>'
+                    : 'Сколько дней <span>от 1 до 365</span>';
+            }
+
+            if (scope === 'promo') {
+                const effect = document.getElementById('promo-live-effect');
+                if (effect) effect.dataset.type = safeType;
+                const kicker = document.getElementById('promo-live-kicker');
+                const title = document.getElementById('promo-live-title');
+                const copy = document.getElementById('promo-live-copy');
+                if (kicker) kicker.textContent = safeType === 'discount' ? 'При создании ближайшего платежа' : 'Сразу после активации';
+                if (title) title.textContent = safeType === 'discount' ? 'Скидка на следующую оплату' : 'Подарок к подписке';
+                if (copy) copy.textContent = safeType === 'discount'
+                    ? 'Скидка уменьшит первый успешный платёж после активации. Без даты она доступна 72 часа; автопродление останется по обычной цене.'
+                    : 'Выбранное число дней сразу добавится к текущему сроку подписки пользователя.';
+            } else {
+                const summary = document.getElementById('batch-effect-summary');
+                if (summary) summary.textContent = safeType === 'discount'
+                    ? 'Каждый купон даст скидку на ближайший платёж; автопродление останется по обычной цене.'
+                    : 'Дни добавятся к подписке сразу после активации купона.';
+            }
+        }
+
+        function syncPromoAudience(scope) {
+            const firstOnly = document.getElementById(`${scope}-first-only`)?.checked || false;
+            const summary = document.getElementById(`${scope}-audience-summary`);
+            if (summary) summary.textContent = firstOnly
+                ? 'Только пользователям, у которых ещё не было успешных оплат'
+                : 'Всем пользователям: новым, на триале и уже платившим';
+            if (scope === 'promo') {
+                const live = document.getElementById('promo-live-audience');
+                if (live) live.textContent = firstOnly
+                    ? 'Только пользователь без успешных оплат, если он ещё не применял этот код'
+                    : 'Любой пользователь, который ещё не применял этот код';
+            }
+        }
+
+        function promoUsageMarkup(used, maxUses, label = 'Активации') {
+            const safeUsed = parseInt(used, 10) || 0;
+            const safeMax = parseInt(maxUses, 10) || 0;
+            const percent = safeMax ? Math.min(100, Math.round(safeUsed / safeMax * 100)) : 0;
+            return `<div class="promo-usage">
+                <div class="promo-usage-head"><span>${label}</span><b>${num(safeUsed)} / ${safeMax ? num(safeMax) : '∞'}</b></div>
+                <div class="promo-usage-track"><i style="width:${safeMax ? percent : (safeUsed ? 100 : 0)}%"></i></div>
+            </div>`;
+        }
+
+        function renderPromoCodes(codes) {
+            if (!codes.length) {
+                return `<div class="promo-empty"><div><i class="fas fa-ticket"></i><b>Промокодов пока нет</b><span>Создайте первый код выше — его правила и ссылка появятся здесь.</span></div></div>`;
+            }
+            const active = codes.filter((row) => row.is_active).length;
+            const uses = codes.reduce((sum, row) => sum + (parseInt(row.used_count, 10) || 0), 0);
+            const summary = `<div class="promo-summary">
+                <div class="promo-summary-item"><span>Всего кодов</span><b>${num(codes.length)}</b></div>
+                <div class="promo-summary-item is-active"><span>Активных</span><b>${num(active)}</b></div>
+                <div class="promo-summary-item"><span>Активаций</span><b>${num(uses)}</b></div>
+            </div>`;
+            const rows = codes.map((row) => {
+                const type = promoTypeInfo(row.promo_type, row.value);
+                const status = row.is_active ? 'Активен' : 'Выключен';
+                const comment = escapeHtml(row.comment || 'Без внутреннего комментария');
+                const code = escapeHtml(row.code);
+                const deepLink = escapeHtml(row.deep_link || '');
+                return `<article class="promo-code-row">
+                    <div class="promo-code-main">
+                        <div class="promo-code-top"><span class="promo-status ${row.is_active ? 'active' : ''}"></span><code>${code}</code></div>
+                        <div class="promo-code-meta"><span class="promo-chip ${type.className}">${type.value}</span><span class="promo-chip">${promoAudienceText(row.first_purchase_only, true)}</span><span class="promo-chip">${status}</span></div>
+                    </div>
+                    <div class="promo-code-rule"><b>${escapeHtml(type.effect)}</b><span title="${comment}">${comment}</span></div>
+                    ${promoUsageMarkup(row.used_count, row.max_uses)}
+                    <div class="promo-code-date"><b>${row.valid_until ? escapeHtml(row.valid_until) : 'Без срока'}</b>${row.valid_until ? 'активировать до даты' : 'активация не ограничена'}</div>
+                    <div class="promo-row-actions">
+                        <button type="button" class="promo-icon-action" data-promo-copy="${code}" title="Скопировать код" aria-label="Скопировать код ${code}"><i class="fas fa-copy"></i></button>
+                        <a class="promo-icon-action" href="${deepLink}" target="_blank" rel="noopener" title="Открыть deep-link" aria-label="Открыть ссылку промокода"><i class="fab fa-telegram"></i></a>
+                        <button type="button" class="promo-icon-action" data-promo-toggle="${row.id}" title="${row.is_active ? 'Выключить' : 'Включить'}" aria-label="${row.is_active ? 'Выключить' : 'Включить'} промокод ${code}"><i class="fas fa-power-off"></i></button>
+                        <button type="button" class="promo-icon-action is-danger" data-promo-delete="${row.id}" data-promo-code="${code}" data-promo-uses="${row.used_count}" title="Удалить" aria-label="Удалить промокод ${code}"><i class="fas fa-trash"></i></button>
+                    </div>
+                </article>`;
+            }).join('');
+            return `${summary}<div class="promo-code-list">${rows}</div>`;
+        }
+
+        function renderPromoBatches(batchRows) {
+            if (!batchRows.length) return '';
+            return `<div class="promo-batches-list">${batchRows.map((batch) => {
+                const type = promoTypeInfo(batch.promo_type, batch.value);
+                const codes = parseInt(batch.codes, 10) || 0;
+                const used = parseInt(batch.used, 10) || 0;
+                const comment = escapeHtml(batch.comment || 'Без комментария');
+                const deadline = batch.valid_until ? `до ${escapeHtml(batch.valid_until)}` : 'без срока';
+                return `<article class="promo-batch-row">
+                    <div class="promo-batch-title"><b>${escapeHtml(batch.name)}</b><small title="${comment}">${comment} · ${escapeHtml(batch.created_at || '—')}</small></div>
+                    <div class="promo-code-rule"><div class="promo-effect-line ${type.className}"><span class="promo-effect-dot"></span><b>${escapeHtml(type.effect)}</b></div><span>${promoAudienceText(batch.first_purchase_only)} · ${deadline}</span></div>
+                    ${promoUsageMarkup(used, codes, 'Купоны')}
+                    <a class="promo-download" href="${main.dataset.promocodesUrl}?action=batch_links&amp;batch_id=${batch.id}"><i class="fas fa-file-arrow-down"></i>Скачать TXT</a>
+                </article>`;
+            }).join('')}</div>`;
+        }
+
+        async function copyPromoText(value) {
+            try {
+                await navigator.clipboard.writeText(value);
+                showAdminToast('Код скопирован', 'success');
+            } catch (error) {
+                window.prompt('Скопируйте код', value);
+            }
+        }
+
         async function loadPromocodes() {
             const table = document.getElementById('promo-table');
             const batches = document.getElementById('promo-batches');
+            const refresh = document.getElementById('promo-refresh');
             if (!table) return;
+            if (refresh) refresh.dataset.loading = 'true';
             table.innerHTML = inlineLoading('Загружаем промокоды...');
             try {
                 const response = await fetch(main.dataset.promocodesUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error();
                 const {codes, batches: batchRows} = payload.result;
-                table.innerHTML = codes.length ? adminTable(
-                    ['Код', 'Тип', 'Значение', 'Активаций', 'Действует до', 'Статус', 'Комментарий', 'Deep-link', ''],
-                    codes.map((row) => [
-                        `<code>${escapeHtml(row.code)}</code>`,
-                        row.promo_type === 'days' ? 'Дни' : 'Скидка',
-                        row.promo_type === 'days' ? `${row.value} дн.` : `${row.value}%`,
-                        `${row.used_count}${row.max_uses ? '/' + row.max_uses : ''}`,
-                        row.valid_until || '∞',
-                        row.is_active ? '🟢 активен' : '⚪ выключен',
-                        escapeHtml(row.comment || ''),
-                        `<a href="${row.deep_link}" target="_blank" style="color:var(--brand-gold);">ссылка</a>`,
-                        `<span style="display:inline-flex;gap:10px;">
-                            <button data-promo-toggle="${row.id}" style="background:none;border:0;color:rgba(255,199,0,.8);cursor:pointer;">${row.is_active ? 'выключить' : 'включить'}</button>
-                            <button data-promo-delete="${row.id}" data-promo-code="${escapeHtml(row.code)}" data-promo-uses="${row.used_count}" style="background:none;border:0;color:var(--red);cursor:pointer;">удалить</button>
-                        </span>`,
-                    ])) : '<div class="info-card muted">Промокодов ещё нет.</div>';
-                batches.innerHTML = batchRows.length ? adminTable(
-                    ['Партия', 'Кодов', 'Активировано', 'Создана', 'Выгрузка'],
-                    batchRows.map((batch) => [escapeHtml(batch.name), batch.codes, batch.used, batch.created_at,
-                        `<a href="${main.dataset.promocodesUrl}?action=batch_links&batch_id=${batch.id}" style="color:var(--brand-gold);">txt</a>`]))
-                    : '';
+                table.innerHTML = renderPromoCodes(codes || []);
+                if (batches) batches.innerHTML = renderPromoBatches(batchRows || []);
+                table.querySelectorAll('[data-promo-copy]').forEach((button) => button.addEventListener('click', () => copyPromoText(button.dataset.promoCopy)));
                 table.querySelectorAll('[data-promo-toggle]').forEach((button) => button.addEventListener('click', async () => {
+                    button.disabled = true;
                     const body = new FormData();
                     body.append('csrfmiddlewaretoken', csrfToken);
                     body.append('action', 'toggle');
                     body.append('id', button.dataset.promoToggle);
-                    await fetch(main.dataset.promocodesUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                    const response = await fetch(main.dataset.promocodesUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                    const result = await response.json();
+                    showAdminToast(result.status === 'ok' ? 'Статус промокода изменён' : (result.message || 'Не удалось изменить статус'), result.status === 'ok' ? 'success' : 'error');
                     loadPromocodes();
                 }));
                 table.querySelectorAll('[data-promo-delete]').forEach((button) => button.addEventListener('click', async () => {
@@ -7020,27 +7456,54 @@
                     loadPromocodes();
                 }));
             } catch (error) {
-                table.innerHTML = '<div class="info-card red">Не удалось загрузить промокоды</div>';
+                table.innerHTML = '<div class="promo-empty"><div><i class="fas fa-triangle-exclamation"></i><b>Не удалось загрузить промокоды</b><span>Проверьте соединение и попробуйте обновить раздел.</span></div></div>';
+            } finally {
+                if (refresh) refresh.dataset.loading = 'false';
             }
         }
 
-        async function submitPromoForm(action, fields) {
+        async function submitPromoForm(action, fields, button) {
             const body = new FormData();
             body.append('csrfmiddlewaretoken', csrfToken);
             body.append('action', action);
             Object.entries(fields).forEach(([key, value]) => body.append(key, value));
-            const response = await fetch(main.dataset.promocodesUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
-            const payload = await response.json();
-            if (payload.status === 'ok') {
-                showAdminToast('Готово', 'success');
-                loadPromocodes();
-            } else {
-                showAdminToast(payload.message || 'Ошибка', 'error');
+            if (button) button.disabled = true;
+            try {
+                const response = await fetch(main.dataset.promocodesUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status === 'ok') {
+                    showAdminToast(action === 'create_batch' ? 'Партия купонов создана' : 'Промокод создан', 'success');
+                    if (action === 'create') {
+                        document.getElementById('promo-code').value = '';
+                        document.getElementById('promo-comment').value = '';
+                    } else {
+                        document.getElementById('batch-name').value = '';
+                        document.getElementById('batch-count').value = '';
+                        document.getElementById('batch-comment').value = '';
+                    }
+                    loadPromocodes();
+                } else {
+                    showAdminToast(payload.message || 'Ошибка', 'error');
+                }
+            } catch (error) {
+                showAdminToast('Не удалось сохранить промокод', 'error');
+            } finally {
+                if (button) button.disabled = false;
             }
         }
 
+        document.querySelectorAll('[data-promo-type-picker]').forEach((picker) => {
+            picker.querySelectorAll('.promo-type-option').forEach((button) => button.addEventListener('click', () => {
+                setPromoType(picker.dataset.promoTypePicker, button.dataset.value);
+            }));
+        });
+        ['promo', 'batch'].forEach((scope) => {
+            document.getElementById(`${scope}-first-only`)?.addEventListener('change', () => syncPromoAudience(scope));
+            setPromoType(scope, document.getElementById(`${scope}-type`)?.value || 'days');
+            syncPromoAudience(scope);
+        });
         document.getElementById('promo-refresh')?.addEventListener('click', loadPromocodes);
-        document.getElementById('promo-create')?.addEventListener('click', () => submitPromoForm('create', {
+        document.getElementById('promo-create')?.addEventListener('click', (event) => submitPromoForm('create', {
             code: document.getElementById('promo-code').value,
             promo_type: document.getElementById('promo-type').value,
             value: document.getElementById('promo-value').value,
@@ -7048,13 +7511,16 @@
             valid_until: document.getElementById('promo-valid-until').value,
             first_purchase_only: document.getElementById('promo-first-only').checked ? '1' : '0',
             comment: document.getElementById('promo-comment').value,
-        }));
-        document.getElementById('batch-create')?.addEventListener('click', () => submitPromoForm('create_batch', {
+        }, event.currentTarget));
+        document.getElementById('batch-create')?.addEventListener('click', (event) => submitPromoForm('create_batch', {
             name: document.getElementById('batch-name').value,
             promo_type: document.getElementById('batch-type').value,
             value: document.getElementById('batch-value').value,
             count: document.getElementById('batch-count').value,
-        }));
+            valid_until: document.getElementById('batch-valid-until').value,
+            first_purchase_only: document.getElementById('batch-first-only').checked ? '1' : '0',
+            comment: document.getElementById('batch-comment').value,
+        }, event.currentTarget));
 
 
         // --- Сотрудники -------------------------------------------------------

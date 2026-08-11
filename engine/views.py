@@ -10763,6 +10763,22 @@ def admin_promo_payload(promo, bot_username):
     }
 
 
+def admin_promo_batch_payload(batch, sample, codes, used):
+    """Сводка партии с правилами первого купона (в партии они одинаковые)."""
+    return {
+        "id": batch.id,
+        "name": batch.name,
+        "comment": batch.comment,
+        "codes": int(codes or 0),
+        "used": int(used or 0),
+        "created_at": admin_date_label(batch.created_at),
+        "promo_type": sample.promo_type if sample else None,
+        "value": int(sample.value or 0) if sample else 0,
+        "first_purchase_only": bool(sample.first_purchase_only) if sample else False,
+        "valid_until": admin_date_label(sample.valid_until) if sample else None,
+    }
+
+
 def support_admin_api_promocodes(request):
     auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
     if auth_response:
@@ -10831,6 +10847,26 @@ def support_admin_api_promocodes(request):
                     )
                 ).all()
             )
+            batch_ids = [batch.id for batch in batches]
+            batch_samples = {}
+            if batch_ids:
+                sample_ids = [
+                    row[0]
+                    for row in (
+                        db_session.query(func.min(PromoCode.id))
+                        .filter(PromoCode.batch_id.in_(batch_ids))
+                        .group_by(PromoCode.batch_id)
+                        .all()
+                    )
+                ]
+                batch_samples = {
+                    promo.batch_id: promo
+                    for promo in (
+                        db_session.query(PromoCode)
+                        .filter(PromoCode.id.in_(sample_ids))
+                        .all()
+                    )
+                }
             return JsonResponse(
                 {
                     "status": "ok",
@@ -10841,14 +10877,12 @@ def support_admin_api_promocodes(request):
                             if promo.batch_id is None
                         ],
                         "batches": [
-                            {
-                                "id": batch.id,
-                                "name": batch.name,
-                                "comment": batch.comment,
-                                "codes": int(batch_counts.get(batch.id, 0)),
-                                "used": int(batch_used.get(batch.id, 0)),
-                                "created_at": admin_date_label(batch.created_at),
-                            }
+                            admin_promo_batch_payload(
+                                batch,
+                                batch_samples.get(batch.id),
+                                batch_counts.get(batch.id, 0),
+                                batch_used.get(batch.id, 0),
+                            )
                             for batch in batches
                         ],
                     },
