@@ -5209,6 +5209,28 @@ class AdminStage5PromoTests(SimpleTestCase):
         self.assertIn("renderPromoBatches", template)
         self.assertNotIn('<select id="promo-type"', template)
 
+    def test_promocode_icons_and_supporting_copy_are_readable(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        def css_rule(selector):
+            start = template.index(f"{selector} {{")
+            return template[start:template.index("}", start) + 1]
+
+        self.assertIn("display: grid", css_rule(".promo-guide-intro-icon"))
+        self.assertIn("font-size: 15px", css_rule(".promo-guide-intro-icon"))
+        self.assertIn("display: grid", css_rule(".promo-rule-icon"))
+        self.assertIn("font-size: 12px", css_rule(".promo-rule-icon"))
+        self.assertIn("font-size: 10.5px", css_rule(".promo-field-label"))
+        self.assertIn("font-size: 10px", css_rule(".promo-guide-tags span"))
+        self.assertIn(
+            ".promo-rule > div > span { color: var(--muted); font-size: 10.5px;",
+            template,
+        )
+        self.assertIn("font-size: inherit", css_rule(".promo-guide-intro-icon i, .promo-guide-card-icon i, .promo-card-icon i, .promo-type-option-icon i, .promo-rule-icon i"))
+        self.assertIn('<i class="fas fa-key"></i>', template)
+        self.assertNotIn(".promo-guide-intro b, .promo-guide-intro span", template)
+        self.assertNotIn(".promo-rule b, .promo-rule span", template)
+
     def test_batch_payload_exposes_effect_and_audience(self):
         from types import SimpleNamespace
 
