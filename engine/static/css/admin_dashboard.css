@@ -1377,11 +1377,21 @@ html[data-admin-theme="light"] .chart-tone-pink { color: #b82a70; }
 }
 
 .source-details-btn {
-    color: #ffd740;
+    color: #171300;
 }
 
 .source-details-btn:hover {
-    color: #fff2b3;
+    color: #050505;
+}
+
+.source-details-btn:focus-visible {
+    color: #050505;
+    outline: 2px solid rgba(255, 215, 64, .72);
+    outline-offset: 2px;
+}
+
+.source-details-btn i {
+    color: currentColor;
 }
 
 /* Status chips preserve semantic colors. */
@@ -3218,7 +3228,6 @@ html[data-admin-theme="light"] .gold,
 html[data-admin-theme="light"] .sources-cell.gold,
 html[data-admin-theme="light"] .ticket-link,
 html[data-admin-theme="light"] .censor-last-run-link,
-html[data-admin-theme="light"] .source-details-btn,
 html[data-admin-theme="light"] .sources-th.is-active {
     color: #946b00;
 }

@@ -1867,6 +1867,54 @@ class AdminStatsSalesModeTests(SimpleTestCase):
 
 
 class AdminCohortDashboardTemplateTests(SimpleTestCase):
+    def test_analytics_dense_views_use_readable_typography(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        def css_rule(selector):
+            start = template.index(f"{selector} {{")
+            return template[start:template.index("}", start) + 1]
+
+        expected_sizes = {
+            "#panel-stats .sources-th": "font-size: 10px",
+            "#panel-stats .sources-cell": "font-size: 12.5px",
+            "#panel-stats .sources-cell-name-copy b": "font-size: 13px",
+            "#panel-stats .analytics-insight-heading h3": "font-size: 16px",
+            "#panel-stats .analytics-tariff-name": "font-size: 12px",
+            "#source-users-modal .source-user-head": "font-size: 10px",
+            "#source-users-modal .source-user-identity-copy b": "font-size: 12.5px",
+            "#source-users-modal .source-user-status": "font-size: 11px",
+            "#source-users-modal .modal-page-info": "font-size: 11px",
+        }
+        for selector, font_size in expected_sizes.items():
+            with self.subTest(selector=selector):
+                self.assertIn(font_size, css_rule(selector))
+
+        self.assertIn("min-width: 1260px", css_rule("#panel-stats .sources-table-row"))
+        self.assertIn("min-height: 60px", css_rule("#panel-stats .sources-table-row"))
+        self.assertIn("min-width: 980px", css_rule("#source-users-modal .source-users-table"))
+        self.assertIn("min-height: 64px", css_rule("#source-users-modal .source-user-row"))
+
+    def test_source_details_button_keeps_dark_text_on_gold_background(self):
+        css = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        self.assertIn(
+            ".source-details-btn {\n    color: #171300;\n}",
+            css,
+        )
+        self.assertIn(
+            ".source-details-btn:hover {\n    color: #050505;\n}",
+            css,
+        )
+        self.assertIn(".source-details-btn:focus-visible {", css)
+        self.assertIn(
+            ".source-details-btn i {\n    color: currentColor;\n}",
+            css,
+        )
+        self.assertNotIn(
+            'html[data-admin-theme="light"] .source-details-btn,',
+            css,
+        )
+
     def test_sources_panel_has_totals_summary_above_rows(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
@@ -3830,6 +3878,31 @@ class NodeTrafficAdminApiTests(SimpleTestCase):
 
 
 class NodeTrafficTemplateTests(SimpleTestCase):
+    def test_node_traffic_report_uses_current_admin_design_system(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        for marker in (
+            'class="node-traffic-report"',
+            'class="card node-traffic-summary-card"',
+            'class="node-traffic-summary-grid"',
+            'class="node-traffic-context-note"',
+            'class="card node-traffic-table-card"',
+            'class="node-traffic-table-scroll"',
+            'class="node-traffic-share-track"',
+            'class="node-traffic-status${statusKind}"',
+            'class="node-traffic-top-node-copy"',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, template)
+
+        row_rule_start = template.index("#panel-node-traffic .node-traffic-row {")
+        row_rule = template[row_rule_start:template.index("}", row_rule_start) + 1]
+        self.assertIn("min-width: 1240px", row_rule)
+        self.assertIn("font-size: 12.5px", row_rule)
+        self.assertIn("const shareTone = share >= 10 ? ' is-hot'", template)
+        self.assertIn("['ACTIVE', 'ENABLED'].includes(normalizedStatus)", template)
+        self.assertNotIn('class="card info-card" style="margin-bottom:10px;"', template)
+
     def test_admin_dashboard_has_node_traffic_tab(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
