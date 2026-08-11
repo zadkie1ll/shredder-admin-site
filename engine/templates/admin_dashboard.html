@@ -191,43 +191,208 @@
         .client-dm-delivery { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border: 1px solid var(--panel-border); border-radius: 999px; font-size: 10px; }
         .client-dm-text { margin-top: 6px; color: var(--text-main); font-size: 13px; font-weight: 600; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
         .client-dm-empty { padding: 14px 0 4px; color: var(--muted); font-size: 13px; font-weight: 600; }
-        /* Рассылки: форма слева, телеграм-предпросмотр справа */
-        .broadcast-composer { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr); gap: 18px; margin-top: 10px; align-items: start; }
-        @media (max-width: 1100px) { .broadcast-composer { grid-template-columns: 1fr; } }
-        .broadcast-form { display: grid; gap: 10px; min-width: 0; }
-        .broadcast-text-meta { display: flex; justify-content: space-between; gap: 10px; font-size: 11px; font-weight: 600; }
-        .broadcast-media-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; font-size: 12px; }
-        .broadcast-media-pick { cursor: pointer; }
+        /* Рассылки: отдельный рабочий интерфейс в визуальном языке админки. */
+        #panel-broadcasts {
+            --broadcast-surface: rgba(13,14,19,.74);
+            --broadcast-surface-strong: rgba(9,10,14,.92);
+            --broadcast-line: rgba(255,255,255,.085);
+            --broadcast-soft: rgba(255,255,255,.035);
+        }
+        html[data-admin-theme="light"] #panel-broadcasts {
+            --broadcast-surface: rgba(255,255,255,.82);
+            --broadcast-surface-strong: rgba(247,248,250,.96);
+            --broadcast-line: rgba(26,31,42,.12);
+            --broadcast-soft: rgba(26,31,42,.035);
+        }
+        .broadcast-compose-card { padding: 0; margin-bottom: 16px; overflow: visible; }
+        .broadcast-card-head { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 17px 18px; border-bottom: 1px solid var(--broadcast-line); }
+        .broadcast-card-heading { display: flex; align-items: center; gap: 11px; min-width: 0; }
+        .broadcast-card-icon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border: 1px solid rgba(255,199,0,.28); border-radius: 11px; background: rgba(255,199,0,.08); color: var(--brand-gold); box-shadow: inset 0 1px 0 rgba(255,255,255,.04); }
+        .broadcast-card-heading h2 { margin: 0 0 3px; color: var(--text-main); font-size: 15px; line-height: 1.2; font-weight: 850; }
+        .broadcast-card-heading p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.35; font-weight: 600; }
+        .broadcast-steps { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 10px; font-weight: 750; white-space: nowrap; }
+        .broadcast-step { display: inline-flex; align-items: center; gap: 6px; padding: 6px 8px; border: 1px solid transparent; border-radius: 8px; }
+        .broadcast-step b { width: 17px; height: 17px; display: grid; place-items: center; border-radius: 50%; background: rgba(255,255,255,.07); color: var(--muted); font-size: 9px; }
+        .broadcast-step.active { border-color: rgba(255,199,0,.2); background: rgba(255,199,0,.06); color: var(--text-main); }
+        .broadcast-step.active b { background: var(--brand-gold); color: #151104; }
+        .broadcast-step-divider { width: 13px; height: 1px; background: var(--broadcast-line); }
+        .broadcast-composer { display: grid; grid-template-columns: minmax(0, 1.34fr) minmax(310px, .72fr); gap: 0; align-items: stretch; }
+        .broadcast-form { display: grid; gap: 15px; min-width: 0; padding: 18px; }
+        .broadcast-primary-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, .88fr); gap: 12px; align-items: start; }
+        .broadcast-field { display: grid; gap: 7px; min-width: 0; }
+        .broadcast-field-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 10px; line-height: 1.2; font-weight: 800; letter-spacing: .055em; text-transform: uppercase; }
+        .broadcast-field-label span { color: rgba(255,255,255,.35); font-size: 9px; letter-spacing: 0; text-transform: none; }
+        html[data-admin-theme="light"] .broadcast-field-label span { color: rgba(26,31,42,.45); }
+        .broadcast-form .input { min-height: 44px; border-radius: 10px; background: var(--broadcast-surface-strong); }
+        .broadcast-form textarea.input { min-height: 164px; padding: 13px 14px; line-height: 1.55; resize: vertical; }
+        .broadcast-text-meta { display: flex; justify-content: space-between; gap: 10px; margin-top: -2px; color: var(--muted); font-size: 10px; font-weight: 650; }
+        .broadcast-segment-picker { position: relative; min-width: 0; z-index: 30; }
+        #broadcast-segment { display: none; }
+        .broadcast-segment-trigger { width: 100%; min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 6px 11px; border: 1px solid var(--broadcast-line); border-radius: 10px; background: var(--broadcast-surface-strong); color: var(--text-main); font: inherit; text-align: left; cursor: pointer; transition: border-color .14s, background .14s, box-shadow .14s; }
+        .broadcast-segment-trigger:hover { border-color: rgba(255,199,0,.28); background: rgba(255,199,0,.035); }
+        .broadcast-segment-trigger[aria-expanded="true"] { border-color: rgba(255,199,0,.52); box-shadow: 0 0 0 3px rgba(255,199,0,.065); }
+        .broadcast-segment-symbol { width: 29px; height: 29px; flex: 0 0 29px; display: grid; place-items: center; border: 1px solid rgba(255,199,0,.18); border-radius: 8px; background: rgba(255,199,0,.07); color: var(--brand-gold); font-size: 11px; }
+        .broadcast-segment-copy { min-width: 0; flex: 1; }
+        .broadcast-segment-copy b, .broadcast-segment-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .broadcast-segment-copy b { margin-bottom: 1px; color: var(--text-main); font-size: 12px; line-height: 1.25; font-weight: 750; }
+        .broadcast-segment-copy small { color: var(--muted); font-size: 9.5px; line-height: 1.25; font-weight: 600; }
+        .broadcast-segment-trigger > i { flex: 0 0 auto; color: var(--muted); font-size: 9px; transition: transform .14s; }
+        .broadcast-segment-trigger[aria-expanded="true"] > i { transform: rotate(180deg); }
+        .broadcast-segment-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 100; width: min(440px, calc(100vw - 42px)); display: none; overflow: hidden; border: 1px solid rgba(255,199,0,.25); border-radius: 13px; background: rgba(15,17,22,.985); box-shadow: 0 24px 70px rgba(0,0,0,.62), inset 0 1px 0 rgba(255,255,255,.04); backdrop-filter: blur(18px); }
+        html[data-admin-theme="light"] .broadcast-segment-menu { background: rgba(255,255,255,.99); box-shadow: 0 24px 65px rgba(34,39,52,.18); }
+        .broadcast-segment-menu[data-open="true"] { display: block; animation: broadcastMenuIn .12s ease-out; }
+        @keyframes broadcastMenuIn { from { opacity: 0; transform: translateY(-3px); } to { opacity: 1; transform: translateY(0); } }
+        .broadcast-segment-menu-head { padding: 12px; border-bottom: 1px solid var(--broadcast-line); }
+        .broadcast-segment-menu-title { display: flex; justify-content: space-between; gap: 10px; margin-bottom: 9px; color: var(--text-main); font-size: 11px; font-weight: 800; }
+        .broadcast-segment-menu-title span { color: var(--muted); font-size: 10px; font-weight: 650; }
+        .broadcast-segment-search-wrap { position: relative; }
+        .broadcast-segment-search-wrap > i { position: absolute; left: 11px; top: 50%; z-index: 2; color: var(--muted); font-size: 10px; transform: translateY(-50%); pointer-events: none; }
+        .broadcast-segment-search { width: 100%; height: 36px; padding: 0 32px; border: 1px solid var(--broadcast-line); border-radius: 9px; outline: none; background: var(--broadcast-surface-strong); color: var(--text-main); font: inherit; font-size: 11px; font-weight: 650; }
+        .broadcast-segment-search:focus { border-color: rgba(255,199,0,.46); box-shadow: 0 0 0 3px rgba(255,199,0,.06); }
+        .broadcast-segment-search-clear { position: absolute; top: 50%; right: 7px; width: 23px; height: 23px; display: none; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; transform: translateY(-50%); }
+        .broadcast-segment-search-clear[data-visible="true"] { display: grid; }
+        .broadcast-segment-search-clear:hover { background: rgba(255,255,255,.07); color: var(--text-main); }
+        .broadcast-segment-list { max-height: 330px; overflow-y: auto; padding: 6px; scrollbar-color: rgba(255,199,0,.42) transparent; scrollbar-width: thin; }
+        .broadcast-segment-group { padding: 8px 8px 5px; color: var(--muted); font-size: 8.5px; font-weight: 850; letter-spacing: .085em; text-transform: uppercase; }
+        .broadcast-segment-option { width: 100%; display: grid; grid-template-columns: 27px minmax(0, 1fr) auto 16px; gap: 8px; align-items: center; min-height: 45px; padding: 6px 8px; border: 1px solid transparent; border-radius: 9px; background: transparent; color: var(--text-main); font: inherit; text-align: left; cursor: pointer; }
+        .broadcast-segment-option:hover, .broadcast-segment-option:focus-visible { outline: none; background: rgba(255,255,255,.045); }
+        .broadcast-segment-option[aria-selected="true"] { border-color: rgba(255,199,0,.22); background: rgba(255,199,0,.075); }
+        .broadcast-segment-option-icon { width: 27px; height: 27px; display: grid; place-items: center; border-radius: 7px; background: rgba(255,255,255,.055); color: var(--muted); font-size: 10px; }
+        .broadcast-segment-option[aria-selected="true"] .broadcast-segment-option-icon { background: rgba(255,199,0,.12); color: var(--brand-gold); }
+        .broadcast-segment-option-copy { min-width: 0; }
+        .broadcast-segment-option-copy b, .broadcast-segment-option-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .broadcast-segment-option-copy b { margin-bottom: 2px; font-size: 11px; font-weight: 750; }
+        .broadcast-segment-option-copy small { color: var(--muted); font-size: 9px; font-weight: 600; }
+        .broadcast-segment-count { padding: 3px 7px; border: 1px solid var(--broadcast-line); border-radius: 999px; color: var(--muted); font-size: 9px; font-weight: 750; font-variant-numeric: tabular-nums; }
+        .broadcast-segment-check { color: var(--brand-gold); font-size: 10px; text-align: center; }
+        .broadcast-segment-empty { padding: 28px 12px; color: var(--muted); font-size: 11px; text-align: center; }
+        #broadcast-segment-hint { min-height: 15px; color: var(--muted); font-size: 10px; font-weight: 650; }
+        #broadcast-segment-hint:empty { display: none; }
+        #broadcast-segment-hint:not(:empty)::before { content: "\f0c0"; margin-right: 6px; color: var(--green); font: var(--fa-font-solid); font-size: 9px; }
+        .broadcast-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px; border: 1px solid var(--broadcast-line); border-radius: 11px; background: var(--broadcast-soft); }
+        .broadcast-media-row { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; font-size: 11px; }
+        .broadcast-media-pick, #broadcast-add-button { min-height: 36px; padding: 0 11px; border-radius: 8px; cursor: pointer; }
+        #broadcast-media-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #broadcast-media-clear { width: 30px; min-width: 30px; min-height: 30px; padding: 0; border-radius: 8px; }
         .broadcast-buttons { display: grid; gap: 8px; }
         .broadcast-buttons:empty { display: none; }
-        .broadcast-button-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-        .broadcast-button-row .broadcast-btn-type { flex: 0 0 150px; }
-        .broadcast-button-row .broadcast-btn-style { flex: 0 0 130px; }
+        .broadcast-button-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; padding: 9px; border: 1px solid var(--broadcast-line); border-radius: 11px; background: var(--broadcast-soft); }
+        .broadcast-button-row .input { min-height: 38px; border-radius: 8px; }
+        .broadcast-button-row select.input { padding-right: 28px; color-scheme: dark; }
+        html[data-admin-theme="light"] .broadcast-button-row select.input { color-scheme: light; }
+        .broadcast-button-row .broadcast-btn-type { flex: 0 0 142px; }
+        .broadcast-button-row .broadcast-btn-style { flex: 0 0 124px; }
         .broadcast-button-row .broadcast-btn-text { flex: 1 1 130px; min-width: 0; }
         .broadcast-button-row .broadcast-btn-url,
         .broadcast-button-row .broadcast-btn-promo,
         .broadcast-button-row .broadcast-btn-tariffs { flex: 1.4 1 170px; min-width: 0; }
-        .broadcast-btn-remove { flex: 0 0 auto; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--panel-border); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; transition: all .13s; }
-        .broadcast-btn-remove:hover { border-color: rgba(255,92,103,.4); color: var(--red); }
-        .broadcast-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: 2px; }
+        .broadcast-btn-remove { flex: 0 0 auto; width: 36px; height: 36px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid var(--broadcast-line); border-radius: 8px; background: transparent; color: var(--muted); cursor: pointer; transition: all .13s; }
+        .broadcast-btn-remove:hover { border-color: rgba(255,92,103,.4); background: rgba(255,92,103,.07); color: var(--red); }
+        .broadcast-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding-top: 14px; border-top: 1px solid var(--broadcast-line); }
+        .broadcast-launch { min-height: 44px; padding: 0 17px; border-radius: 10px; box-shadow: 0 12px 30px rgba(255,199,0,.14); }
         .broadcast-test { display: flex; gap: 8px; margin-left: auto; }
-        .broadcast-test .input { width: 150px; }
-        .broadcast-preview-pane { position: sticky; top: 12px; }
-        .broadcast-preview-title { margin-bottom: 8px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-        .broadcast-preview { padding: 16px; border-radius: 12px; background: #0e1621; border: 1px solid rgba(255,255,255,.07); }
-        .broadcast-preview-bubble { max-width: 100%; overflow: hidden; border-radius: 10px; background: #182533; color: #f1f4f8; }
-        .broadcast-preview-bubble img { display: block; width: 100%; max-height: 260px; object-fit: cover; }
-        .broadcast-preview-text { padding: 10px 12px; font-size: 13px; font-weight: 500; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+        .broadcast-test .input { width: 150px; min-height: 40px; }
+        .broadcast-test .btn { min-height: 40px; border-radius: 9px; }
+        .broadcast-send-note { flex: 1 0 100%; display: flex; align-items: flex-start; gap: 7px; color: var(--muted); font-size: 10px; line-height: 1.45; font-weight: 600; }
+        .broadcast-send-note i { margin-top: 2px; color: var(--brand-gold); }
+        .broadcast-preview-pane { position: relative; min-width: 0; padding: 18px; border-left: 1px solid var(--broadcast-line); background: rgba(0,0,0,.075); }
+        .broadcast-preview-sticky { position: sticky; top: 12px; }
+        .broadcast-preview-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; color: var(--muted); font-size: 9px; font-weight: 850; letter-spacing: .08em; text-transform: uppercase; }
+        .broadcast-preview-live { display: inline-flex; align-items: center; gap: 5px; color: var(--green); font-size: 8px; letter-spacing: .04em; }
+        .broadcast-preview-live::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px rgba(56,217,150,.62); }
+        .broadcast-preview { min-height: 280px; padding: 13px; border: 1px solid rgba(76,121,154,.22); border-radius: 14px; background: radial-gradient(circle at 85% 5%, rgba(64,119,156,.16), transparent 16rem), #0e1621; box-shadow: inset 0 1px 0 rgba(255,255,255,.025); }
+        .broadcast-preview-bubble { max-width: 100%; overflow: hidden; border-radius: 11px 11px 5px 11px; background: #182533; color: #f1f4f8; box-shadow: 0 5px 16px rgba(0,0,0,.13); }
+        .broadcast-preview-bubble img { display: block; width: 100%; max-height: 270px; object-fit: cover; }
+        .broadcast-preview-text { min-height: 70px; padding: 11px 12px 13px; font-size: 12px; font-weight: 500; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
         .broadcast-preview-text a { color: #6ab3f3; }
-        .broadcast-preview-text.muted { color: rgba(241,244,248,.45); }
-        .broadcast-preview-buttons { display: grid; gap: 4px; margin-top: 6px; }
-        .broadcast-preview-btn { padding: 8px 10px; border-radius: 8px; background: rgba(255,255,255,.10); color: #dfe6ee; font-size: 12.5px; font-weight: 600; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .broadcast-preview-text.muted { color: rgba(241,244,248,.42); }
+        .broadcast-preview-buttons { display: grid; gap: 4px; margin-top: 5px; }
+        .broadcast-preview-btn { padding: 8px 10px; border-radius: 7px; background: rgba(255,255,255,.10); color: #dfe6ee; font-size: 11px; font-weight: 650; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .broadcast-preview-btn.primary { background: rgba(101,163,236,.24); color: #8fc1f5; }
         .broadcast-preview-btn.success { background: rgba(56,217,150,.22); color: #7ee2b8; }
         .broadcast-preview-btn.danger { background: rgba(255,92,103,.22); color: #ff9aa2; }
-        .broadcast-funnel { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 6px; padding: 8px 10px; border: 1px solid rgba(255,199,0,.22); border-radius: 9px; background: rgba(255,199,0,.05); font-size: 12px; font-weight: 700; }
-        .broadcast-funnel b { color: var(--brand-gold); }
-        .broadcast-badge { display: inline-flex; align-items: center; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--panel-border); font-size: 10px; font-weight: 800; color: var(--muted); }
+        .broadcast-preview-caption { display: flex; align-items: center; gap: 6px; margin-top: 9px; color: rgba(255,255,255,.34); font-size: 8.5px; font-weight: 650; }
+        .broadcast-history-card { padding: 0; overflow: hidden; }
+        .broadcast-history-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--broadcast-line); }
+        .broadcast-refresh { min-height: 36px; display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid rgba(255,199,0,.26); border-radius: 9px; background: rgba(255,199,0,.04); color: var(--muted); font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; transition: all .14s; }
+        .broadcast-refresh:hover { border-color: rgba(255,199,0,.48); background: rgba(255,199,0,.08); color: var(--brand-gold); }
+        .broadcast-refresh[data-loading="true"] i { animation: broadcastSpin .7s linear infinite; }
+        @keyframes broadcastSpin { to { transform: rotate(360deg); } }
+        #broadcasts-list { display: grid; gap: 10px; padding: 12px; }
+        .broadcast-record { position: relative; overflow: hidden; border: 1px solid var(--broadcast-line); border-radius: 13px; background: var(--broadcast-surface); }
+        .broadcast-record::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--green); }
+        .broadcast-record[data-status="running"]::before { background: var(--brand-gold); }
+        .broadcast-record[data-status="stopped"]::before { background: var(--red); }
+        .broadcast-record-main { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 18px; padding: 15px 16px 13px 18px; }
+        .broadcast-record-title-row { display: flex; align-items: flex-start; gap: 10px; min-width: 0; }
+        .broadcast-record-status { width: 30px; height: 30px; flex: 0 0 30px; display: grid; place-items: center; border: 1px solid rgba(56,217,150,.2); border-radius: 9px; background: rgba(56,217,150,.07); color: var(--green); font-size: 10px; }
+        .broadcast-record[data-status="running"] .broadcast-record-status { border-color: rgba(255,199,0,.24); background: rgba(255,199,0,.08); color: var(--brand-gold); }
+        .broadcast-record[data-status="stopped"] .broadcast-record-status { border-color: rgba(255,92,103,.23); background: rgba(255,92,103,.07); color: var(--red); }
+        .broadcast-record-title { min-width: 0; }
+        .broadcast-record-title h3 { margin: 0 0 4px; color: var(--text-main); font-size: 13px; line-height: 1.35; font-weight: 800; overflow-wrap: anywhere; }
+        .broadcast-record-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 5px 9px; color: var(--muted); font-size: 9.5px; line-height: 1.35; font-weight: 650; }
+        .broadcast-record-meta span { display: inline-flex; align-items: center; gap: 5px; }
+        .broadcast-record-meta i { color: rgba(255,199,0,.72); font-size: 8px; }
+        .broadcast-badges { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+        .broadcast-badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 7px; border: 1px solid var(--broadcast-line); border-radius: 999px; background: var(--broadcast-soft); color: var(--muted); font-size: 8.5px; font-weight: 800; }
+        .broadcast-badge.accent { border-color: rgba(255,199,0,.22); background: rgba(255,199,0,.06); color: #e7c550; }
+        .broadcast-record-message { margin: 9px 0 0 40px; color: var(--muted); font-size: 10.5px; line-height: 1.5; font-weight: 600; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+        .broadcast-delivery { display: flex; align-items: center; gap: 9px; align-self: center; }
+        .broadcast-delivery-ring { position: relative; width: 46px; height: 46px; flex: 0 0 46px; }
+        .broadcast-delivery-ring svg { width: 46px; height: 46px; transform: rotate(-90deg); }
+        .broadcast-delivery-ring circle { fill: none; stroke-width: 3; }
+        .broadcast-delivery-ring circle:first-child { stroke: rgba(255,255,255,.08); }
+        .broadcast-delivery-ring circle:last-child { stroke: var(--green); stroke-linecap: round; }
+        .broadcast-record[data-status="running"] .broadcast-delivery-ring circle:last-child { stroke: var(--brand-gold); }
+        .broadcast-record[data-status="stopped"] .broadcast-delivery-ring circle:last-child { stroke: var(--red); }
+        .broadcast-delivery-ring b { position: absolute; inset: 0; display: grid; place-items: center; color: var(--text-main); font-size: 9px; font-weight: 800; }
+        .broadcast-delivery-copy { text-align: right; }
+        .broadcast-delivery-copy b, .broadcast-delivery-copy span { display: block; white-space: nowrap; }
+        .broadcast-delivery-copy b { margin-bottom: 3px; color: var(--green); font-size: 10.5px; font-weight: 750; }
+        .broadcast-record[data-status="running"] .broadcast-delivery-copy b { color: var(--brand-gold); }
+        .broadcast-record[data-status="stopped"] .broadcast-delivery-copy b { color: var(--red); }
+        .broadcast-delivery-copy span { color: var(--muted); font-size: 9px; font-weight: 650; }
+        .broadcast-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--broadcast-line); border-bottom: 1px solid var(--broadcast-line); background: rgba(0,0,0,.09); }
+        .broadcast-metric { padding: 11px 16px; border-right: 1px solid var(--broadcast-line); }
+        .broadcast-metric:last-child { border-right: 0; }
+        .broadcast-metric span, .broadcast-metric b { display: block; }
+        .broadcast-metric span { margin-bottom: 4px; color: var(--muted); font-size: 8.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .035em; }
+        .broadcast-metric b { color: var(--text-main); font-size: 13px; font-weight: 750; font-variant-numeric: tabular-nums; }
+        .broadcast-metric b small { margin-left: 6px; color: var(--brand-gold); font-size: 8.5px; font-weight: 750; }
+        .broadcast-record-progress { height: 3px; overflow: hidden; background: rgba(255,255,255,.045); }
+        .broadcast-record-progress span { display: block; height: 100%; border-radius: 0 4px 4px 0; background: linear-gradient(90deg, #39c88d, #72e2b4); transition: width .25s ease; }
+        .broadcast-record[data-status="running"] .broadcast-record-progress span { background: linear-gradient(90deg, #dba900, #ffd235); }
+        .broadcast-record[data-status="stopped"] .broadcast-record-progress span { background: linear-gradient(90deg, #d94755, #ff7f89); }
+        .broadcast-record-footer { min-height: 42px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px 8px 18px; }
+        .broadcast-status-label { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 9.5px; font-weight: 700; }
+        .broadcast-status-label::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px rgba(56,217,150,.42); }
+        .broadcast-record[data-status="running"] .broadcast-status-label::before { background: var(--brand-gold); box-shadow: 0 0 8px rgba(255,199,0,.42); }
+        .broadcast-record[data-status="stopped"] .broadcast-status-label::before { background: var(--red); box-shadow: 0 0 8px rgba(255,92,103,.38); }
+        .broadcast-stop { min-height: 30px; padding: 0 10px; border-radius: 8px; font-size: 9px; }
+        @media (max-width: 1180px) {
+            .broadcast-steps { display: none; }
+            .broadcast-composer { grid-template-columns: 1fr; }
+            .broadcast-preview-pane { border-top: 1px solid var(--broadcast-line); border-left: 0; }
+            .broadcast-preview-sticky { position: static; }
+            .broadcast-preview { max-width: 520px; }
+        }
+        @media (max-width: 720px) {
+            .broadcast-card-head, .broadcast-history-head { padding: 14px; }
+            .broadcast-form, .broadcast-preview-pane { padding: 14px; }
+            .broadcast-primary-fields { grid-template-columns: 1fr; }
+            .broadcast-actions { align-items: stretch; }
+            .broadcast-launch { width: 100%; }
+            .broadcast-test { width: 100%; margin-left: 0; }
+            .broadcast-test .input { min-width: 0; flex: 1; }
+            .broadcast-record-main { grid-template-columns: 1fr; gap: 12px; }
+            .broadcast-delivery { margin-left: 40px; }
+            .broadcast-delivery-copy { text-align: left; }
+            .broadcast-metrics { grid-template-columns: 1fr 1fr; }
+            .broadcast-metric:nth-child(2) { border-right: 0; }
+            .broadcast-metric:nth-child(-n+2) { border-bottom: 1px solid var(--broadcast-line); }
+            .broadcast-record-footer { align-items: flex-start; flex-direction: column; }
+            .broadcast-stop { width: 100%; }
+        }
         .censor-probe-row { grid-template-columns: 90px minmax(130px, 1fr) 100px 110px minmax(0, 2fr); min-width: 620px; }
         .censor-probe-row.table-head { background: rgba(255,255,255,.04); }
         /* Вес и размер держим как в остальных таблицах админки (16px/500-600):
@@ -1489,6 +1654,194 @@
             }
             #panel-censor-checks .censor-last-run-link { display: inline; }
         }
+
+        /* Аналитика: плотная таблица источников, итоговые инсайты и компактная сводка. */
+        #panel-stats .sources-panel { margin-top: 18px; overflow: hidden; border-color: rgba(255,199,0,.14); background: rgba(17,18,23,.9); }
+        #panel-stats .sources-panel-head { min-height: 66px; display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 13px 14px 13px 16px; border-bottom: 1px solid rgba(255,255,255,.075); }
+        #panel-stats .sources-panel-heading { min-width: 0; display: flex; align-items: center; gap: 11px; }
+        #panel-stats .sources-panel-icon { width: 35px; height: 35px; flex: 0 0 35px; display: grid; place-items: center; border: 1px solid rgba(255,199,0,.25); border-radius: 10px; background: rgba(255,199,0,.075); color: var(--brand-gold); font-size: 12px; }
+        #panel-stats .sources-toolbar-title { margin: 0 0 3px; color: var(--text-main); font-size: 15px; line-height: 1.2; font-weight: 850; }
+        #panel-stats .sources-toolbar-subtitle { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-size: 9.5px; line-height: 1.35; font-weight: 650; }
+        #panel-stats .sources-total-badge { display: inline-flex; align-items: center; gap: 4px; padding: 2px 6px; border: 1px solid rgba(255,199,0,.17); border-radius: 999px; background: rgba(255,199,0,.05); color: #d8bc55; font-size: 8px; font-weight: 800; }
+        #panel-stats .sources-view-toggle { flex: 0 0 auto; padding: 3px; border-color: rgba(255,255,255,.08); border-radius: 9px; background: rgba(0,0,0,.16); }
+        #panel-stats .sources-view-btn { min-height: 32px; padding: 0 10px; border-radius: 7px; font-size: 9.5px; }
+        #panel-stats .sources-view-btn.is-active { border: 1px solid rgba(255,199,0,.24); background: rgba(255,199,0,.11); color: var(--brand-gold); box-shadow: none; }
+        #panel-stats .sources-summary-scroll { overflow-x: auto; border-bottom: 1px solid rgba(255,255,255,.075); scrollbar-width: thin; scrollbar-color: rgba(255,199,0,.3) transparent; }
+        #panel-stats .sources-summary { min-width: 980px; display: grid; grid-template-columns: minmax(150px, 1.25fr) repeat(7, minmax(92px, 1fr)); gap: 7px; padding: 10px 14px; background: linear-gradient(90deg, rgba(255,199,0,.055), rgba(255,199,0,.012) 58%, transparent); }
+        #panel-stats .sources-summary-lead, #panel-stats .sources-summary-item { min-width: 0; min-height: 49px; border: 1px solid rgba(255,255,255,.07); border-radius: 9px; background: rgba(255,255,255,.026); }
+        #panel-stats .sources-summary-lead { display: flex; align-items: center; gap: 9px; padding: 7px 10px; border-color: rgba(255,199,0,.19); background: rgba(255,199,0,.06); }
+        #panel-stats .sources-summary-icon { width: 29px; height: 29px; flex: 0 0 29px; display: grid; place-items: center; border-radius: 8px; background: rgba(255,199,0,.12); color: var(--brand-gold); font-size: 9px; }
+        #panel-stats .sources-summary-lead small, #panel-stats .sources-summary-lead b, #panel-stats .sources-summary-item span, #panel-stats .sources-summary-item strong { display: block; }
+        #panel-stats .sources-summary-lead small { margin-bottom: 2px; color: var(--muted); font-size: 7.5px; line-height: 1; font-weight: 750; letter-spacing: .045em; text-transform: uppercase; }
+        #panel-stats .sources-summary-lead b { color: var(--text-main); font-size: 12px; line-height: 1.1; font-weight: 850; }
+        #panel-stats .sources-summary-item { display: flex; flex-direction: column; justify-content: center; padding: 7px 9px; }
+        #panel-stats .sources-summary-item span { overflow: hidden; margin-bottom: 5px; color: var(--muted); font-size: 7.5px; line-height: 1; font-weight: 750; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
+        #panel-stats .sources-summary-item strong { color: rgba(255,255,255,.86); font-size: 12.5px; line-height: 1; font-weight: 850; font-variant-numeric: tabular-nums; }
+        #panel-stats .sources-summary-item.is-money strong { color: var(--green); }
+        #panel-stats .sources-summary-item.is-conversion strong { color: var(--brand-gold); }
+        #panel-stats .sources-table-scroll { overflow-x: auto; scrollbar-width: thin; scrollbar-color: rgba(255,199,0,.34) transparent; }
+        #panel-stats .sources-table-card { border: 0; border-radius: 0; background: transparent; box-shadow: none; }
+        #panel-stats .sources-table-row { grid-template-columns: minmax(180px, 1.55fr) repeat(4, minmax(74px, .67fr)) minmax(98px, .78fr) repeat(2, minmax(112px, .85fr)) 82px; min-width: 1110px; min-height: 52px; gap: 12px; padding: 0 14px; border-bottom: 1px solid rgba(255,255,255,.06); background: transparent; color: var(--text-main); font-size: 11px; }
+        #panel-stats .sources-table-row.table-head { min-height: 42px; border-bottom-color: rgba(255,255,255,.08); background: rgba(255,255,255,.025); }
+        #panel-stats .sources-table-row:not(.table-head):nth-child(odd),
+        #panel-stats .sources-table-row:not(.table-head):nth-child(even) { background: transparent; }
+        #panel-stats .sources-table-row:not(.table-head):hover { background: rgba(255,199,0,.035); color: var(--text-main); }
+        #panel-stats .sources-table-row:last-child { border-bottom: 0; }
+        #panel-stats .sources-th { color: var(--muted); font-size: 8.5px; line-height: 1.2; font-weight: 850; letter-spacing: .055em; text-transform: uppercase; }
+        #panel-stats .sources-th.is-active { color: var(--brand-gold); }
+        #panel-stats .sources-th i { color: rgba(255,255,255,.28); font-size: 8px; }
+        #panel-stats .sources-cell { color: rgba(255,255,255,.7); font-size: 10.5px; font-weight: 650; }
+        #panel-stats .sources-cell.num { color: rgba(255,255,255,.72); }
+        #panel-stats .sources-cell-name { display: flex; align-items: center; gap: 9px; min-width: 0; color: var(--text-main); }
+        #panel-stats .sources-cell-name-icon { width: 27px; height: 27px; flex: 0 0 27px; display: grid; place-items: center; border: 1px solid rgba(255,199,0,.17); border-radius: 8px; background: rgba(255,199,0,.055); color: var(--brand-gold); font-size: 9px; }
+        #panel-stats .sources-cell-name-copy { min-width: 0; }
+        #panel-stats .sources-cell-name-copy b, #panel-stats .sources-cell-name-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #panel-stats .sources-cell-name-copy b { margin-bottom: 2px; color: var(--text-main); font-size: 10.5px; font-weight: 800; }
+        #panel-stats .sources-cell-name-copy small { color: var(--muted); font-size: 8px; font-weight: 600; }
+        #panel-stats .sources-revenue { color: #e8edf4; font-weight: 800; }
+        #panel-stats .sources-conversion { display: grid; gap: 5px; min-width: 0; }
+        #panel-stats .sources-conversion-value { color: var(--brand-gold); font-size: 10px; line-height: 1; font-weight: 850; text-align: right; font-variant-numeric: tabular-nums; }
+        #panel-stats .sources-conversion-track { height: 3px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.06); }
+        #panel-stats .sources-conversion-track i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #d8a800, #ffd43b); }
+        #panel-stats .sources-row-action { width: auto; min-width: 68px; height: 30px; display: inline-flex; gap: 6px; padding: 0 9px; border: 1px solid rgba(255,199,0,.24); border-radius: 8px; background: rgba(255,199,0,.055); color: #d9ba48; font-size: 8.5px; font-weight: 800; }
+        #panel-stats .sources-row-action:hover { border-color: rgba(255,199,0,.45); background: rgba(255,199,0,.1); color: var(--brand-gold); }
+        #panel-stats .sources-cards-body { padding: 12px; }
+        #panel-stats .sources-grid { gap: 10px; }
+
+        #panel-stats .analytics-insights { display: grid; grid-template-columns: minmax(0, 1.08fr) minmax(360px, .92fr); gap: 14px; margin-top: 14px; }
+        #panel-stats .analytics-insight-card { min-width: 0; overflow: hidden; padding: 0; }
+        #panel-stats .analytics-insight-head { min-height: 57px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 11px 14px; border-bottom: 1px solid rgba(255,255,255,.07); }
+        #panel-stats .analytics-insight-heading { display: flex; align-items: center; gap: 9px; min-width: 0; }
+        #panel-stats .analytics-insight-icon { width: 31px; height: 31px; flex: 0 0 31px; display: grid; place-items: center; border: 1px solid rgba(255,199,0,.22); border-radius: 9px; background: rgba(255,199,0,.065); color: var(--brand-gold); font-size: 10px; }
+        #panel-stats .analytics-insight-heading h3 { margin: 0 0 2px; color: var(--text-main); font-size: 13px; line-height: 1.2; font-weight: 850; }
+        #panel-stats .analytics-insight-heading p { margin: 0; color: var(--muted); font-size: 8.5px; line-height: 1.3; font-weight: 600; }
+        #panel-stats .analytics-insight-total { padding: 4px 8px; border: 1px solid rgba(56,217,150,.18); border-radius: 999px; background: rgba(56,217,150,.055); color: var(--green); font-size: 8.5px; font-weight: 800; white-space: nowrap; }
+        #panel-stats .analytics-conversions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); border-bottom: 1px solid rgba(255,255,255,.07); }
+        #panel-stats .analytics-conversion-card { min-width: 0; padding: 14px; border-right: 1px solid rgba(255,255,255,.07); }
+        #panel-stats .analytics-conversion-card:last-child { border-right: 0; }
+        #panel-stats .analytics-conversion-label { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; color: var(--muted); font-size: 8.5px; line-height: 1.3; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
+        #panel-stats .analytics-conversion-label i { color: rgba(255,199,0,.72); font-size: 8px; }
+        #panel-stats .analytics-conversion-value { margin-bottom: 9px; color: var(--brand-gold); font-size: 25px; line-height: 1; font-weight: 850; font-variant-numeric: tabular-nums; }
+        #panel-stats .analytics-progress { height: 5px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.06); }
+        #panel-stats .analytics-progress i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #d5a500, #ffd43a); }
+        #panel-stats .analytics-referral-flow { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 12px; }
+        #panel-stats .analytics-referral-step { position: relative; min-width: 0; padding: 3px 13px 3px 8px; border-right: 1px solid rgba(255,255,255,.07); }
+        #panel-stats .analytics-referral-step:last-child { border-right: 0; }
+        #panel-stats .analytics-referral-step span, #panel-stats .analytics-referral-step b { display: block; }
+        #panel-stats .analytics-referral-step span { margin-bottom: 5px; color: var(--muted); font-size: 8px; line-height: 1.3; font-weight: 700; }
+        #panel-stats .analytics-referral-step b { color: var(--green); font-size: 17px; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums; }
+        #panel-stats .analytics-referral-step small { margin-left: 4px; color: rgba(255,255,255,.36); font-size: 8px; font-weight: 650; }
+        #panel-stats .analytics-tariff-list { display: grid; gap: 10px; padding: 13px 14px 14px; }
+        #panel-stats .analytics-tariff-row { display: grid; grid-template-columns: minmax(100px, 1fr) minmax(120px, 1.4fr) auto; gap: 10px; align-items: center; min-width: 0; }
+        #panel-stats .analytics-tariff-name { min-width: 0; overflow: hidden; color: rgba(255,255,255,.76); font-size: 9.5px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
+        #panel-stats .analytics-tariff-track { height: 5px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.055); }
+        #panel-stats .analytics-tariff-track i { display: block; height: 100%; min-width: 3px; border-radius: inherit; background: linear-gradient(90deg, #2ebf83, #66dcaa); }
+        #panel-stats .analytics-tariff-value { min-width: 55px; color: var(--green); font-size: 10px; font-weight: 850; text-align: right; font-variant-numeric: tabular-nums; }
+        #panel-stats .analytics-tariff-value small { margin-left: 4px; color: var(--muted); font-size: 7.5px; font-weight: 650; }
+        #panel-stats .analytics-empty { padding: 28px 14px; color: var(--muted); font-size: 10px; text-align: center; }
+
+        #source-users-modal .source-users-modal-card { width: min(1160px, 100%); max-height: min(760px, calc(100vh - 40px)); border-color: rgba(255,199,0,.16); background: #101217; }
+        #source-users-modal .modal-header { align-items: center; padding: 14px 16px; background: rgba(16,18,23,.98); }
+        #source-users-modal .source-modal-heading { display: flex; align-items: center; gap: 11px; min-width: 0; }
+        #source-users-modal .source-modal-icon { width: 37px; height: 37px; flex: 0 0 37px; display: grid; place-items: center; border: 1px solid rgba(255,199,0,.24); border-radius: 10px; background: rgba(255,199,0,.07); color: var(--brand-gold); font-size: 11px; }
+        #source-users-modal .modal-title { margin: 0 0 3px; font-size: 16px; font-weight: 850; }
+        #source-users-modal .modal-subtitle { margin: 0; font-size: 9.5px; line-height: 1.35; }
+        #source-users-modal .source-modal-stats { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+        #source-users-modal .source-modal-stat { display: inline-flex; align-items: center; gap: 5px; padding: 5px 8px; border: 1px solid rgba(255,255,255,.08); border-radius: 8px; background: rgba(255,255,255,.03); color: var(--muted); font-size: 8.5px; font-weight: 750; }
+        #source-users-modal .source-modal-stat i { color: var(--brand-gold); font-size: 8px; }
+        #source-users-modal .modal-close { width: 34px; height: 34px; margin-left: 4px; border-radius: 9px; }
+        #source-users-modal .modal-body { padding: 0; background: #0e1015; }
+        #source-users-modal .source-users-table { min-width: 830px; }
+        #source-users-modal .source-user-row { display: grid; grid-template-columns: minmax(225px, 1.45fr) minmax(135px, .78fr) minmax(140px, .82fr) minmax(115px, .65fr) minmax(135px, .72fr); gap: 14px; align-items: center; min-height: 53px; padding: 0 16px; border-bottom: 1px solid rgba(255,255,255,.06); }
+        #source-users-modal .source-user-row:last-child { border-bottom: 0; }
+        #source-users-modal .source-user-row:not(.source-user-head):hover { background: rgba(255,199,0,.028); }
+        #source-users-modal .source-user-head { position: sticky; top: 0; z-index: 2; min-height: 36px; background: rgba(21,23,29,.98); color: var(--muted); font-size: 8px; font-weight: 850; letter-spacing: .055em; text-transform: uppercase; }
+        #source-users-modal .source-user-identity { min-width: 0; display: flex; align-items: center; gap: 9px; }
+        #source-users-modal .source-user-avatar { width: 29px; height: 29px; flex: 0 0 29px; display: grid; place-items: center; border: 1px solid rgba(255,199,0,.16); border-radius: 8px; background: rgba(255,199,0,.05); color: #d7b94e; font-size: 9px; font-weight: 850; }
+        #source-users-modal .source-user-identity-copy { min-width: 0; }
+        #source-users-modal .source-user-identity-copy b, #source-users-modal .source-user-identity-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #source-users-modal .source-user-identity-copy b { margin-bottom: 2px; color: var(--text-main); font-size: 10px; font-weight: 800; }
+        #source-users-modal .source-user-identity-copy small { color: var(--muted); font-size: 8px; font-weight: 600; }
+        #source-users-modal .source-user-telegram { color: rgba(255,255,255,.68); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 9.5px; font-weight: 700; }
+        #source-users-modal .source-user-expiry { display: flex; align-items: center; gap: 6px; color: rgba(255,255,255,.7); font-size: 9.5px; font-weight: 700; }
+        #source-users-modal .source-user-expiry::before { content: ""; width: 6px; height: 6px; flex: 0 0 6px; border-radius: 50%; background: var(--red); box-shadow: 0 0 7px rgba(255,92,103,.35); }
+        #source-users-modal .source-user-expiry.active::before { background: var(--green); box-shadow: 0 0 7px rgba(56,217,150,.36); }
+        #source-users-modal .source-user-status { min-height: 25px; display: inline-flex; align-items: center; gap: 5px; width: fit-content; padding: 0 7px; border: 0; border-radius: 7px; background: rgba(255,255,255,.035); color: var(--muted); font-size: 8.5px; font-weight: 750; }
+        #source-users-modal .source-user-status.ok { background: rgba(56,217,150,.06); color: var(--green); }
+        #source-users-modal .source-user-status.no { background: rgba(255,92,103,.055); color: #ff8490; }
+        #source-users-modal .source-users-empty { display: grid; place-items: center; min-height: 180px; color: var(--muted); font-size: 10px; }
+        #source-users-modal .modal-footer { min-height: 54px; padding: 8px 12px 8px 16px; background: rgba(16,18,23,.98); }
+        #source-users-modal .modal-page-info { color: var(--muted); font-size: 9px; font-weight: 700; }
+        #source-users-modal .modal-pagination .btn { min-height: 34px; padding: 0 11px; border-radius: 8px; font-size: 9px; }
+
+        html[data-admin-theme="light"] #panel-stats .sources-panel,
+        html[data-admin-theme="light"] #panel-stats .analytics-insight-card { border-color: rgba(110,88,8,.14); background: rgba(255,255,255,.92); }
+        html[data-admin-theme="light"] #panel-stats .sources-panel-head,
+        html[data-admin-theme="light"] #panel-stats .sources-summary-scroll,
+        html[data-admin-theme="light"] #panel-stats .analytics-insight-head,
+        html[data-admin-theme="light"] #panel-stats .analytics-conversions { border-color: rgba(26,31,42,.09); }
+        html[data-admin-theme="light"] #panel-stats .sources-summary { background: linear-gradient(90deg, rgba(181,139,0,.055), rgba(181,139,0,.012) 58%, transparent); }
+        html[data-admin-theme="light"] #panel-stats .sources-summary-lead,
+        html[data-admin-theme="light"] #panel-stats .sources-summary-item { border-color: rgba(26,31,42,.09); background: rgba(26,31,42,.025); }
+        html[data-admin-theme="light"] #panel-stats .sources-summary-lead { border-color: rgba(181,139,0,.2); background: rgba(181,139,0,.065); }
+        html[data-admin-theme="light"] #panel-stats .sources-summary-item strong { color: rgba(20,25,34,.86); }
+        html[data-admin-theme="light"] #panel-stats .sources-summary-item.is-money strong { color: #11835d; }
+        html[data-admin-theme="light"] #panel-stats .sources-summary-item.is-conversion strong { color: #a87d00; }
+        html[data-admin-theme="light"] #panel-stats .sources-table-row { border-color: rgba(26,31,42,.075); }
+        html[data-admin-theme="light"] #panel-stats .sources-table-row.table-head { border-color: rgba(26,31,42,.1); background: rgba(26,31,42,.025); }
+        html[data-admin-theme="light"] #panel-stats .sources-table-row:not(.table-head):hover { background: rgba(181,139,0,.045); }
+        html[data-admin-theme="light"] #panel-stats .sources-cell,
+        html[data-admin-theme="light"] #panel-stats .sources-cell.num { color: rgba(26,31,42,.72); }
+        html[data-admin-theme="light"] #panel-stats .sources-cell-name-copy b,
+        html[data-admin-theme="light"] #panel-stats .sources-revenue,
+        html[data-admin-theme="light"] #panel-stats .analytics-tariff-name { color: rgba(20,25,34,.86); }
+        html[data-admin-theme="light"] #panel-stats .sources-th { color: rgba(44,51,63,.55); }
+        html[data-admin-theme="light"] #panel-stats .sources-th i { color: rgba(44,51,63,.28); }
+        html[data-admin-theme="light"] #panel-stats .sources-conversion-track,
+        html[data-admin-theme="light"] #panel-stats .analytics-progress,
+        html[data-admin-theme="light"] #panel-stats .analytics-tariff-track { background: rgba(26,31,42,.08); }
+        html[data-admin-theme="light"] #panel-stats .analytics-conversion-card,
+        html[data-admin-theme="light"] #panel-stats .analytics-referral-step { border-color: rgba(26,31,42,.09); }
+        html[data-admin-theme="light"] #panel-stats .analytics-referral-step small { color: rgba(26,31,42,.42); }
+
+        html[data-admin-theme="light"] #source-users-modal .source-users-modal-card,
+        html[data-admin-theme="light"] #source-users-modal .modal-header,
+        html[data-admin-theme="light"] #source-users-modal .modal-footer { background: #f8f9fb; }
+        html[data-admin-theme="light"] #source-users-modal .modal-body { background: #f3f5f8; }
+        html[data-admin-theme="light"] #source-users-modal .source-user-head { background: rgba(235,238,243,.98); }
+        html[data-admin-theme="light"] #source-users-modal .source-user-row { border-color: rgba(26,31,42,.09); }
+        html[data-admin-theme="light"] #source-users-modal .source-user-row:not(.source-user-head):hover { background: rgba(181,139,0,.035); }
+        html[data-admin-theme="light"] #source-users-modal .source-user-identity-copy b,
+        html[data-admin-theme="light"] #source-users-modal .source-user-telegram,
+        html[data-admin-theme="light"] #source-users-modal .source-user-expiry { color: rgba(20,25,34,.78); }
+        html[data-admin-theme="light"] #source-users-modal .source-user-status { background: rgba(26,31,42,.04); }
+        html[data-admin-theme="light"] #source-users-modal .source-user-status.ok { background: rgba(21,155,101,.07); color: #11835d; }
+        html[data-admin-theme="light"] #source-users-modal .source-user-status.no { background: rgba(211,65,78,.06); color: #c44351; }
+
+        @media (max-width: 1050px) {
+            #panel-stats .analytics-insights { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 720px) {
+            #panel-stats .sources-panel-head { align-items: flex-start; flex-direction: column; }
+            #panel-stats .sources-view-toggle { width: 100%; }
+            #panel-stats .sources-view-btn { flex: 1; justify-content: center; }
+            #panel-stats .analytics-conversions, #panel-stats .analytics-referral-flow { grid-template-columns: 1fr; }
+            #panel-stats .analytics-conversion-card, #panel-stats .analytics-referral-step { border-right: 0; border-bottom: 1px solid rgba(255,255,255,.07); }
+            #panel-stats .analytics-conversion-card:last-child, #panel-stats .analytics-referral-step:last-child { border-bottom: 0; }
+            #panel-stats .analytics-tariff-row { grid-template-columns: minmax(90px, 1fr) minmax(80px, 1fr) auto; }
+            #source-users-modal { padding: 10px; }
+            #source-users-modal .source-users-modal-card { max-height: calc(100dvh - 20px); }
+            #source-users-modal .source-modal-stats { display: none; }
+            #source-users-modal .modal-body { padding: 8px; }
+            #source-users-modal .source-users-table { min-width: 0; display: grid; gap: 8px; }
+            #source-users-modal .source-user-head { display: none; }
+            #source-users-modal .source-user-row { min-width: 0; grid-template-columns: 1fr 1fr; gap: 9px 12px; min-height: 0; padding: 11px; border: 1px solid rgba(255,255,255,.07); border-radius: 10px; background: rgba(255,255,255,.025); }
+            #source-users-modal .source-user-identity { grid-column: 1 / -1; padding-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,.06); }
+            #source-users-modal .source-user-telegram::before, #source-users-modal .source-user-expiry::before { flex: 0 0 auto; }
+            #source-users-modal .source-user-telegram { overflow: hidden; text-overflow: ellipsis; }
+            #source-users-modal .modal-footer { align-items: stretch; flex-direction: column; }
+            #source-users-modal .modal-pagination, #source-users-modal .modal-pagination .btn { width: 100%; }
+        }
     </style>
     <link href="{% static 'css/admin_dashboard.css' %}" rel="stylesheet">
     {% include "includes/yandex_metrika.html" %}
@@ -2281,59 +2634,111 @@
                 <h1 class="admin-title">Рассылки</h1>
                 <p class="admin-subtitle">Сегментные рассылки пользователям через ботов</p>
             </header>
-            <section class="card" style="padding:18px;margin-bottom:14px;">
-                <h2 class="system-card-title">Новая рассылка</h2>
+            <section class="card broadcast-compose-card">
+                <div class="broadcast-card-head">
+                    <div class="broadcast-card-heading">
+                        <span class="broadcast-card-icon" aria-hidden="true"><i class="fas fa-paper-plane"></i></span>
+                        <div>
+                            <h2>Новая рассылка</h2>
+                            <p>Соберите сообщение, проверьте вид и запустите отправку</p>
+                        </div>
+                    </div>
+                    <div class="broadcast-steps" aria-label="Этапы создания рассылки">
+                        <span class="broadcast-step active"><b>1</b>Сообщение</span><i class="broadcast-step-divider"></i>
+                        <span class="broadcast-step"><b>2</b>Аудитория</span><i class="broadcast-step-divider"></i>
+                        <span class="broadcast-step"><b>3</b>Запуск</span>
+                    </div>
+                </div>
                 <div class="broadcast-composer">
                     <div class="broadcast-form">
-                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-                            <input class="input" id="broadcast-title" placeholder="Название (видно только админам)">
-                            <select id="broadcast-segment" class="input"><option value="">Сегмент…</option></select>
-                        </div>
-                        <div id="broadcast-segment-hint" style="font-size:11px;color:var(--muted);"></div>
-                        <textarea class="input" id="broadcast-text" rows="6" placeholder="Текст сообщения (HTML: <b>, <i>, ссылки)"></textarea>
-                        <div class="broadcast-text-meta">
-                            <span id="broadcast-text-counter" class="muted">0 символов</span>
-                            <span id="broadcast-caption-warn" class="red" hidden>С фото лимит Telegram — 1024 символа</span>
-                        </div>
-                        <div class="broadcast-media-row">
-                            <label class="btn btn-secondary broadcast-media-pick">
-                                <i class="fas fa-image"></i>Фото
-                                <input type="file" id="broadcast-media" accept="image/jpeg,image/png" hidden>
+                        <div class="broadcast-primary-fields">
+                            <label class="broadcast-field">
+                                <span class="broadcast-field-label">Название <span>видно только администраторам</span></span>
+                                <input class="input" id="broadcast-title" placeholder="Например, сервис снова на связи">
                             </label>
-                            <span id="broadcast-media-name" class="muted"></span>
-                            <button type="button" class="btn btn-secondary" id="broadcast-media-clear" hidden><i class="fas fa-xmark"></i>Убрать</button>
+                            <div class="broadcast-field">
+                                <span class="broadcast-field-label">Получатели <span>один сегмент</span></span>
+                                <div class="broadcast-segment-picker" id="broadcast-segment-picker">
+                                    <button class="broadcast-segment-trigger" id="broadcast-segment-trigger" type="button" aria-haspopup="listbox" aria-expanded="false" aria-controls="broadcast-segment-menu">
+                                        <span class="broadcast-segment-symbol" aria-hidden="true"><i class="fas fa-users"></i></span>
+                                        <span class="broadcast-segment-copy">
+                                            <b id="broadcast-segment-name">Выберите сегмент</b>
+                                            <small id="broadcast-segment-summary">Загружаем доступные аудитории…</small>
+                                        </span>
+                                        <i class="fas fa-chevron-down" aria-hidden="true"></i>
+                                    </button>
+                                    <div class="broadcast-segment-menu" id="broadcast-segment-menu" data-open="false">
+                                        <div class="broadcast-segment-menu-head">
+                                            <div class="broadcast-segment-menu-title"><b>Выберите сегмент</b><span id="broadcast-segment-total">0 сегментов</span></div>
+                                            <div class="broadcast-segment-search-wrap">
+                                                <i class="fas fa-magnifying-glass" aria-hidden="true"></i>
+                                                <input class="broadcast-segment-search" id="broadcast-segment-search" type="search" placeholder="Найти сегмент…" autocomplete="off" aria-label="Найти сегмент">
+                                                <button class="broadcast-segment-search-clear" id="broadcast-segment-search-clear" type="button" aria-label="Очистить поиск"><i class="fas fa-xmark"></i></button>
+                                            </div>
+                                        </div>
+                                        <div class="broadcast-segment-list" id="broadcast-segment-list" role="listbox" aria-label="Сегменты получателей"></div>
+                                    </div>
+                                    <select id="broadcast-segment" tabindex="-1" aria-hidden="true"><option value="">Сегмент…</option></select>
+                                </div>
+                                <div id="broadcast-segment-hint" aria-live="polite"></div>
+                            </div>
                         </div>
-                        <div class="broadcast-buttons" id="broadcast-buttons"></div>
-                        <div>
+                        <label class="broadcast-field">
+                            <span class="broadcast-field-label">Текст сообщения <span>поддерживаются HTML-теги и ссылки</span></span>
+                            <textarea class="input" id="broadcast-text" rows="6" placeholder="Напишите сообщение для пользователей…"></textarea>
+                            <span class="broadcast-text-meta">
+                                <span id="broadcast-text-counter">0 символов</span>
+                                <span id="broadcast-caption-warn" class="red" hidden>С фото лимит Telegram — 1024 символа</span>
+                            </span>
+                        </label>
+                        <div class="broadcast-tools">
+                            <div class="broadcast-media-row">
+                                <label class="btn btn-secondary broadcast-media-pick">
+                                    <i class="fas fa-image"></i>Добавить фото
+                                    <input type="file" id="broadcast-media" accept="image/jpeg,image/png" hidden>
+                                </label>
+                                <span id="broadcast-media-name" class="muted">JPEG или PNG, до 3 МБ</span>
+                                <button type="button" class="btn btn-secondary" id="broadcast-media-clear" hidden title="Убрать фото" aria-label="Убрать фото"><i class="fas fa-xmark"></i></button>
+                            </div>
                             <button type="button" class="btn btn-secondary" id="broadcast-add-button"><i class="fas fa-plus"></i>Добавить кнопку</button>
                         </div>
+                        <div class="broadcast-buttons" id="broadcast-buttons"></div>
                         <div class="broadcast-actions">
-                            <button class="btn" type="button" id="broadcast-create"><i class="fas fa-paper-plane"></i>Запустить рассылку</button>
+                            <button class="btn broadcast-launch" type="button" id="broadcast-create"><i class="fas fa-paper-plane"></i>Запустить рассылку</button>
                             <div class="broadcast-test">
                                 <input class="input" id="broadcast-test-id" placeholder="Telegram ID">
                                 <button class="btn btn-secondary" type="button" id="broadcast-test-send"><i class="fas fa-vial"></i>Тест себе</button>
                             </div>
+                            <span class="broadcast-send-note"><i class="fas fa-circle-info"></i>Отправка начнётся сразу. Оба бота отправляют сообщения батчами с паузами, примерно по 5 сообщений в секунду. Тест уйдёт только на указанный Telegram ID.</span>
                         </div>
-                        <span style="font-size:11px;color:var(--muted);">Отправка начнётся сразу; шлют оба бота батчами с паузами, ~5 сообщений в секунду. «Тест себе» отправит сообщение только на указанный Telegram ID (оба бота).</span>
                     </div>
                     <div class="broadcast-preview-pane">
-                        <div class="broadcast-preview-title">Предпросмотр</div>
-                        <div class="broadcast-preview" id="broadcast-preview">
-                            <div class="broadcast-preview-bubble">
-                                <img id="broadcast-preview-photo" hidden alt="">
-                                <div id="broadcast-preview-text" class="broadcast-preview-text muted">Текст сообщения появится здесь…</div>
+                        <div class="broadcast-preview-sticky">
+                            <div class="broadcast-preview-title"><span>Предпросмотр в Telegram</span><span class="broadcast-preview-live">Обновляется сразу</span></div>
+                            <div class="broadcast-preview" id="broadcast-preview">
+                                <div class="broadcast-preview-bubble">
+                                    <img id="broadcast-preview-photo" hidden alt="">
+                                    <div id="broadcast-preview-text" class="broadcast-preview-text muted">Текст сообщения появится здесь…</div>
+                                </div>
+                                <div id="broadcast-preview-buttons" class="broadcast-preview-buttons"></div>
+                                <div class="broadcast-preview-caption"><i class="fab fa-telegram"></i>Так сообщение увидит пользователь</div>
                             </div>
-                            <div id="broadcast-preview-buttons" class="broadcast-preview-buttons"></div>
                         </div>
                     </div>
                 </div>
             </section>
-            <section class="card" style="padding:18px;">
-                <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                    <h2 class="system-card-title" style="margin:0;">История рассылок</h2>
-                    <button type="button" class="subtab" id="broadcasts-refresh" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Обновить</button>
+            <section class="card broadcast-history-card">
+                <div class="broadcast-history-head">
+                    <div class="broadcast-card-heading">
+                        <span class="broadcast-card-icon" aria-hidden="true"><i class="fas fa-chart-line"></i></span>
+                        <div>
+                            <h2>История рассылок</h2>
+                            <p>Результаты отправок и эффективность кампаний</p>
+                        </div>
+                    </div>
+                    <button type="button" class="broadcast-refresh" id="broadcasts-refresh"><i class="fas fa-rotate"></i><span>Обновить</span></button>
                 </div>
-                <div id="broadcasts-list" style="margin-top:12px;"></div>
+                <div id="broadcasts-list"></div>
             </section>
         </section>
 
@@ -3013,12 +3418,16 @@
     </div>
 
     <div id="source-users-modal" class="modal-overlay" aria-hidden="true">
-        <section class="modal-card" role="dialog" aria-modal="true" aria-labelledby="source-users-modal-title">
+        <section class="modal-card source-users-modal-card" role="dialog" aria-modal="true" aria-labelledby="source-users-modal-title">
             <header class="modal-header">
-                <div>
-                    <h2 id="source-users-modal-title" class="modal-title">Пользователи источника</h2>
-                    <div id="source-users-modal-subtitle" class="modal-subtitle"></div>
+                <div class="source-modal-heading">
+                    <span class="source-modal-icon" aria-hidden="true"><i class="fas fa-chart-simple"></i></span>
+                    <div>
+                        <h2 id="source-users-modal-title" class="modal-title">Пользователи источника</h2>
+                        <div id="source-users-modal-subtitle" class="modal-subtitle"></div>
+                    </div>
                 </div>
+                <div id="source-users-modal-stats" class="source-modal-stats" aria-live="polite"></div>
                 <button type="button" class="modal-close" data-source-modal-close aria-label="Закрыть">
                     <i class="fas fa-times"></i>
                 </button>
@@ -4809,14 +5218,14 @@
         }
 
         const SOURCE_COLUMNS = [
-            {key: 'label', label: 'Источник', name: true},
-            {key: 'subscriptions', label: 'Подписки', fmt: num},
-            {key: 'connections', label: 'Подключения', fmt: num},
-            {key: 'unique_paying_users', label: 'Покупатели', fmt: num},
-            {key: 'payments', label: 'Платежи', fmt: num},
-            {key: 'revenue', label: 'Выручка', fmt: money},
-            {key: 'connection_conversion', label: 'Конв. подкл.', fmt: pct, tone: 'gold'},
-            {key: 'payment_conversion', label: 'Конв. прод.', fmt: pct, tone: 'gold'},
+            {key: 'label', label: 'Источник', name: true, hint: 'Метка или прямой трафик'},
+            {key: 'subscriptions', label: 'Подписки', fmt: num, hint: 'Создали подписку'},
+            {key: 'connections', label: 'Подключения', fmt: num, hint: 'Пользовались VPN'},
+            {key: 'unique_paying_users', label: 'Покупатели', fmt: num, hint: 'Уникальные покупатели'},
+            {key: 'payments', label: 'Платежи', fmt: num, hint: 'Количество платежей'},
+            {key: 'revenue', label: 'Выручка', fmt: money, revenue: true, hint: 'Сумма платежей'},
+            {key: 'connection_conversion', label: 'В подключение', fmt: pct, conversion: true, hint: 'Подключения / подписки'},
+            {key: 'payment_conversion', label: 'В продажу', fmt: pct, conversion: true, hint: 'Покупатели / подписки'},
         ];
 
         function sourceValueOf(source) {
@@ -4843,10 +5252,49 @@
                 : '<i class="fas fa-sort-down"></i>';
         }
 
+        function sourceTotals(sources) {
+            const totals = sources.reduce((result, source) => {
+                result.subscriptions += Number(source.subscriptions || 0);
+                result.connections += Number(source.connections || 0);
+                result.unique_paying_users += Number(source.unique_paying_users || 0);
+                result.payments += Number(source.payments || 0);
+                result.revenue += Number(source.revenue || 0);
+                return result;
+            }, {subscriptions: 0, connections: 0, unique_paying_users: 0, payments: 0, revenue: 0});
+            totals.connection_conversion = totals.subscriptions
+                ? totals.connections / totals.subscriptions * 100
+                : 0;
+            totals.payment_conversion = totals.subscriptions
+                ? totals.unique_paying_users / totals.subscriptions * 100
+                : 0;
+            return totals;
+        }
+
+        function renderSourcesSummary(sources) {
+            const totals = sourceTotals(sources);
+            return `
+                <div class="sources-summary-scroll">
+                    <div class="sources-summary" role="group" aria-label="Всего по источникам трафика">
+                        <div class="sources-summary-lead">
+                            <span class="sources-summary-icon"><i class="fas fa-calculator"></i></span>
+                            <span><small>Сводка</small><b>Всего</b></span>
+                        </div>
+                        <div class="sources-summary-item"><span>Подписки</span><strong>${num(totals.subscriptions)}</strong></div>
+                        <div class="sources-summary-item"><span>Подключения</span><strong>${num(totals.connections)}</strong></div>
+                        <div class="sources-summary-item"><span>Покупатели</span><strong>${num(totals.unique_paying_users)}</strong></div>
+                        <div class="sources-summary-item"><span>Платежи</span><strong>${num(totals.payments)}</strong></div>
+                        <div class="sources-summary-item is-money"><span>Выручка</span><strong>${money(totals.revenue)}</strong></div>
+                        <div class="sources-summary-item is-conversion"><span>В подключение</span><strong>${pct(totals.connection_conversion)}</strong></div>
+                        <div class="sources-summary-item is-conversion"><span>В продажу</span><strong>${pct(totals.payment_conversion)}</strong></div>
+                    </div>
+                </div>
+            `;
+        }
+
         function renderSourcesTable(sources) {
             const head = `<div class="admin-table-row table-head sources-table-row">
                 ${SOURCE_COLUMNS.map((col) => `
-                    <button type="button" class="sources-th${col.name ? ' is-name' : ''}${sourcesSort.key === col.key ? ' is-active' : ''}" data-sort-key="${col.key}">
+                    <button type="button" class="sources-th${col.name ? ' is-name' : ''}${sourcesSort.key === col.key ? ' is-active' : ''}" data-sort-key="${col.key}" title="${escapeHtml(col.hint || col.label)}">
                         ${escapeHtml(col.label)}${sourcesSortIcon(col.key)}
                     </button>
                 `).join('')}
@@ -4856,16 +5304,24 @@
                 const sourceValue = sourceValueOf(source);
                 const cells = SOURCE_COLUMNS.map((col) => {
                     if (col.name) {
-                        return `<span class="sources-cell sources-cell-name" title="${escapeHtml(source.label)}">${escapeHtml(source.label)}</span>`;
+                        const direct = sourceValue === '__direct__';
+                        return `<span class="sources-cell sources-cell-name" title="${escapeHtml(source.label)}">
+                            <span class="sources-cell-name-icon"><i class="fas ${direct ? 'fa-arrow-pointer' : 'fa-tag'}"></i></span>
+                            <span class="sources-cell-name-copy"><b>${escapeHtml(source.label)}</b><small>${direct ? 'Прямой трафик' : 'Метка источника'}</small></span>
+                        </span>`;
                     }
-                    return `<span class="sources-cell num${col.tone ? ' ' + col.tone : ''}">${col.fmt(source[col.key])}</span>`;
+                    if (col.conversion) {
+                        const value = Math.max(0, Math.min(100, Number(source[col.key] || 0)));
+                        return `<span class="sources-cell sources-conversion"><span class="sources-conversion-value">${col.fmt(source[col.key])}</span><span class="sources-conversion-track"><i style="width:${value}%"></i></span></span>`;
+                    }
+                    return `<span class="sources-cell num${col.revenue ? ' sources-revenue' : ''}">${col.fmt(source[col.key])}</span>`;
                 }).join('');
                 return `<div class="admin-table-row sources-table-row">
                     ${cells}
-                    <button type="button" class="sources-row-action" data-source-details data-source="${escapeHtml(sourceValue)}" data-source-label="${escapeHtml(source.label)}" aria-label="Подробности: ${escapeHtml(source.label)}"><i class="fas fa-list"></i></button>
+                    <button type="button" class="sources-row-action" data-source-details data-source="${escapeHtml(sourceValue)}" data-source-label="${escapeHtml(source.label)}" aria-label="Открыть сводку: ${escapeHtml(source.label)}"><i class="fas fa-list-ul"></i><span>Сводка</span></button>
                 </div>`;
             }).join('');
-            return `<div class="card sources-table-card"><div class="data-table">${head}${rows}</div></div>`;
+            return `<div class="sources-table-scroll"><div class="data-table">${head}${rows}</div></div>`;
         }
 
         function renderSourceCards(sources) {
@@ -4932,17 +5388,27 @@
             }
             const sorted = sortedSources(sources);
             const body = sourcesViewMode === 'cards'
-                ? renderSourceCards(sorted)
+                ? `<div class="sources-cards-body">${renderSourceCards(sorted)}</div>`
                 : renderSourcesTable(sorted);
+            const subscriptionTotal = sources.reduce((sum, source) => sum + Number(source.subscriptions || 0), 0);
             return `
-                <div class="sources-toolbar">
-                    <h3 class="sources-toolbar-title">Источники трафика</h3>
+                <section class="card sources-panel sources-table-card">
+                <div class="sources-panel-head">
+                    <div class="sources-panel-heading">
+                        <span class="sources-panel-icon" aria-hidden="true"><i class="fas fa-route"></i></span>
+                        <div>
+                            <h3 class="sources-toolbar-title">Источники трафика</h3>
+                            <div class="sources-toolbar-subtitle"><span>Каналы привлечения и путь до оплаты</span><span class="sources-total-badge">${sources.length} источников · ${num(subscriptionTotal)} подписок</span></div>
+                        </div>
+                    </div>
                     <div class="sources-view-toggle" role="group" aria-label="Вид источников">
                         <button type="button" class="sources-view-btn${sourcesViewMode === 'table' ? ' is-active' : ''}" data-sources-view="table"><i class="fas fa-table-list"></i>Таблица</button>
                         <button type="button" class="sources-view-btn${sourcesViewMode === 'cards' ? ' is-active' : ''}" data-sources-view="cards"><i class="fas fa-table-cells-large"></i>Карточки</button>
                     </div>
                 </div>
+                ${renderSourcesSummary(sources)}
                 ${body}
+                </section>
             `;
         }
 
@@ -4981,6 +5447,15 @@
             const seriesMode = seriesModeLabels[series.mode] || seriesModeLabels.cohort;
             const legendItems = renderSalesChartLegend(series);
             lastStatsResult = result;
+            const tariffRows = result.tariffs || [];
+            const tariffTotal = tariffRows.reduce((sum, item) => sum + Number(item.count || 0), 0);
+            const referrals = Number(result.totals.referrals || 0);
+            const referralTraffic = Number(result.totals.referral_traffic || 0);
+            const referralPurchase = Number(result.totals.referral_purchase || 0);
+            const referralTrafficRate = referrals ? Math.round(100 * referralTraffic / referrals) : 0;
+            const referralPurchaseRate = referralTraffic ? Math.round(100 * referralPurchase / referralTraffic) : 0;
+            const connectionConversion = Math.max(0, Math.min(100, Number(result.totals.connection_conversion || 0)));
+            const paymentConversion = Math.max(0, Math.min(100, Number(result.totals.payment_conversion || 0)));
             target.innerHTML = `
                 <div class="metrics-grid five">
                     ${metric('Подписок', num(result.totals.subscriptions), 'fa-users')}
@@ -5002,23 +5477,52 @@
                         : `<div class="empty-chart">${seriesMode.empty}</div>`}
                 </section>
                 <section id="sources-section">${renderSourcesSection(result)}</section>
-                <section class="metrics-grid two">
-                    <div class="card info-card">
-                        <h3 class="info-title">Итоги</h3>
-                        <div class="stat-list">
-                            ${statRow('Конверсия в подключения', pct(result.totals.connection_conversion), 'gold')}
-                            ${statRow('Конверсия в продажи', pct(result.totals.payment_conversion), 'gold')}
-                            ${statRow('Рефералов за период', num(result.totals.referrals), 'green')}
-                            ${statRow('Рефералы начали пользоваться', num(result.totals.referral_traffic), 'green')}
-                            ${statRow('Рефералы оплатили', num(result.totals.referral_purchase), 'green')}
+                <section class="analytics-insights">
+                    <article class="card analytics-insight-card">
+                        <header class="analytics-insight-head">
+                            <div class="analytics-insight-heading">
+                                <span class="analytics-insight-icon"><i class="fas fa-chart-line"></i></span>
+                                <div><h3>Итоги периода</h3><p>Конверсия и реферальная воронка</p></div>
+                            </div>
+                            <span class="analytics-insight-total"><i class="fas fa-user-plus"></i> ${num(referrals)} рефералов</span>
+                        </header>
+                        <div class="analytics-conversions">
+                            <div class="analytics-conversion-card">
+                                <div class="analytics-conversion-label"><i class="fas fa-plug"></i>В подключение</div>
+                                <div class="analytics-conversion-value">${pct(result.totals.connection_conversion)}</div>
+                                <div class="analytics-progress"><i style="width:${connectionConversion}%"></i></div>
+                            </div>
+                            <div class="analytics-conversion-card">
+                                <div class="analytics-conversion-label"><i class="fas fa-credit-card"></i>В продажу</div>
+                                <div class="analytics-conversion-value">${pct(result.totals.payment_conversion)}</div>
+                                <div class="analytics-progress"><i style="width:${paymentConversion}%"></i></div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="card info-card">
-                        <h3 class="info-title">Тарифы</h3>
-                        ${(result.tariffs && result.tariffs.length)
-                            ? `<div class="stat-list">${result.tariffs.map((item) => statRow(item.name, num(item.count), 'green')).join('')}</div>`
-                            : '<div class="stat-list-empty">Платежей по тарифам нет</div>'}
-                    </div>
+                        <div class="analytics-referral-flow">
+                            <div class="analytics-referral-step"><span>Приглашены</span><b>${num(referrals)}</b><small>100%</small></div>
+                            <div class="analytics-referral-step"><span>Начали пользоваться</span><b>${num(referralTraffic)}</b><small>${referralTrafficRate}%</small></div>
+                            <div class="analytics-referral-step"><span>Оплатили</span><b>${num(referralPurchase)}</b><small>${referralPurchaseRate}%</small></div>
+                        </div>
+                    </article>
+                    <article class="card analytics-insight-card">
+                        <header class="analytics-insight-head">
+                            <div class="analytics-insight-heading">
+                                <span class="analytics-insight-icon"><i class="fas fa-tags"></i></span>
+                                <div><h3>Тарифы</h3><p>Распределение оплаченных планов</p></div>
+                            </div>
+                            <span class="analytics-insight-total">${num(tariffTotal)} платежей</span>
+                        </header>
+                        ${tariffRows.length
+                            ? `<div class="analytics-tariff-list">${tariffRows.map((item) => {
+                                const share = tariffTotal ? Math.round(100 * Number(item.count || 0) / tariffTotal) : 0;
+                                return `<div class="analytics-tariff-row">
+                                    <span class="analytics-tariff-name" title="${escapeHtml(item.name)}">${escapeHtml(item.name)}</span>
+                                    <span class="analytics-tariff-track"><i style="width:${share}%"></i></span>
+                                    <span class="analytics-tariff-value">${num(item.count)}<small>${share}%</small></span>
+                                </div>`;
+                            }).join('')}</div>`
+                            : '<div class="analytics-empty">Платежей по тарифам за выбранный период нет</div>'}
+                    </article>
                 </section>
             `;
             if (hasSalesSeries) {
@@ -5034,7 +5538,8 @@
             sourceUsersModalState.page = 1;
             sourceUsersModalState.totalPages = 1;
             document.getElementById('source-users-modal-title').textContent = sourceUsersModalState.label;
-            document.getElementById('source-users-modal-subtitle').textContent = 'Пользователи, создавшие подписку из этого источника за выбранный период';
+            document.getElementById('source-users-modal-subtitle').textContent = 'Подписки из этого источника за выбранный период';
+            document.getElementById('source-users-modal-stats').innerHTML = '<span class="source-modal-stat"><i class="fas fa-spinner fa-spin"></i>Загружаем</span>';
             document.getElementById('source-users-modal').classList.add('open');
             document.getElementById('source-users-modal').setAttribute('aria-hidden', 'false');
             loadSourceUsersPage(1);
@@ -5052,6 +5557,7 @@
             const pageInfo = document.getElementById('source-users-modal-page');
             const prevButton = document.querySelector('[data-source-modal-prev]');
             const nextButton = document.querySelector('[data-source-modal-next]');
+            const modalStats = document.getElementById('source-users-modal-stats');
             const form = document.getElementById('stats-form');
             if (!target || !form) return;
 
@@ -5078,42 +5584,31 @@
             sourceUsersModalState.page = pagination.page || 1;
             sourceUsersModalState.totalPages = Math.max(1, pagination.total_pages || 1);
             target.innerHTML = `
-                <div class="source-users-list">
-                    ${users.map((user) => `
-                        <div class="source-user-card">
-                            <div>
-                                <div class="cell-label">Username</div>
-                                <div class="source-user-value" title="${escapeHtml(user.username || '')}">@${escapeHtml(user.username || '—')}</div>
+                <div class="source-users-table">
+                    ${users.length ? `<div class="source-user-row source-user-head"><span>Пользователь</span><span>Telegram ID</span><span>Подписка до</span><span>Оплата</span><span>VPN</span></div>` : ''}
+                    ${users.map((user) => {
+                        const username = String(user.username || '').replace(/^@/, '');
+                        const identity = username ? `@${username}` : 'Без username';
+                        const email = user.email || 'Email не указан';
+                        const avatarLetter = (username || String(user.telegram_id || 'U')).slice(0, 1).toUpperCase();
+                        return `<div class="source-user-row">
+                            <div class="source-user-identity">
+                                <span class="source-user-avatar">${escapeHtml(avatarLetter)}</span>
+                                <span class="source-user-identity-copy"><b title="${escapeHtml(identity)}">${escapeHtml(identity)}</b><small title="${escapeHtml(email)}">${escapeHtml(email)}</small></span>
                             </div>
-                            <div>
-                                <div class="cell-label">Email</div>
-                                <div class="source-user-value" title="${escapeHtml(user.email || '')}">${escapeHtml(user.email || '—')}</div>
-                            </div>
-                            <div>
-                                <div class="cell-label">Telegram</div>
-                                <div class="source-user-value" title="${escapeHtml(user.telegram_id || '')}">${escapeHtml(user.telegram_id || '—')}</div>
-                            </div>
-                            <div>
-                                <div class="cell-label">Подписка до</div>
-                                <div class="source-user-value ${user.is_active ? 'green' : 'red'}">${escapeHtml(user.expire_at || '—')}</div>
-                            </div>
-                            <div>
-                                <div class="cell-label">Платеж</div>
-                                <div class="source-user-status ${user.has_paid ? 'ok' : 'no'}">
-                                    <i class="fas ${user.has_paid ? 'fa-check' : 'fa-times'}"></i>${user.has_paid ? 'Платил' : 'Не платил'}
-                                </div>
-                            </div>
-                            <div>
-                                <div class="cell-label">VPN</div>
-                                <div class="source-user-status ${user.has_connected ? 'ok' : 'no'}">
-                                    <i class="fas ${user.has_connected ? 'fa-plug' : 'fa-minus'}"></i>${user.has_connected ? 'Подключался' : 'Не подключался'}
-                                </div>
-                            </div>
-                        </div>
-                    `).join('') || '<div class="muted">Пользователей за период нет.</div>'}
+                            <div class="source-user-telegram" title="${escapeHtml(user.telegram_id || '')}">${escapeHtml(user.telegram_id || '—')}</div>
+                            <div class="source-user-expiry${user.is_active ? ' active' : ''}">${escapeHtml(user.expire_at || '—')}</div>
+                            <div><span class="source-user-status ${user.has_paid ? 'ok' : 'no'}"><i class="fas ${user.has_paid ? 'fa-check' : 'fa-xmark'}"></i>${user.has_paid ? 'Платил' : 'Не платил'}</span></div>
+                            <div><span class="source-user-status ${user.has_connected ? 'ok' : 'no'}"><i class="fas ${user.has_connected ? 'fa-plug' : 'fa-minus'}"></i>${user.has_connected ? 'Подключался' : 'Не подключался'}</span></div>
+                        </div>`;
+                    }).join('') || '<div class="source-users-empty"><span><i class="fas fa-users-slash"></i>&nbsp;&nbsp;Пользователей за период нет</span></div>'}
                 </div>
             `;
-            pageInfo.textContent = `Страница ${sourceUsersModalState.page} из ${sourceUsersModalState.totalPages} · всего ${pagination.total || 0}`;
+            const total = Number(pagination.total || 0);
+            const firstShown = total ? (sourceUsersModalState.page - 1) * sourceUsersModalState.perPage + 1 : 0;
+            const lastShown = users.length ? Math.min(total, firstShown + users.length - 1) : 0;
+            pageInfo.textContent = `Страница ${sourceUsersModalState.page} из ${sourceUsersModalState.totalPages} · показано ${firstShown}–${lastShown} из ${num(total)}`;
+            if (modalStats) modalStats.innerHTML = `<span class="source-modal-stat"><i class="fas fa-users"></i>${num(total)} пользователей</span><span class="source-modal-stat"><i class="fas fa-layer-group"></i>Страница ${sourceUsersModalState.page}/${sourceUsersModalState.totalPages}</span>`;
             prevButton.disabled = sourceUsersModalState.page <= 1;
             nextButton.disabled = sourceUsersModalState.page >= sourceUsersModalState.totalPages;
         }
@@ -5900,24 +6395,175 @@
 
         // --- Рассылки ---------------------------------------------------------
         let broadcastSegmentsLoaded = false;
+        let broadcastSegmentRows = [];
+
+        function broadcastSegmentGroup(segment) {
+            const haystack = `${segment.key || ''} ${segment.label || ''}`.toLowerCase();
+            if (/^all\b|все пользователи/.test(haystack)) return 'Все';
+            if (/рефера|referr|прямые|источник/.test(haystack)) return 'Привлечение';
+            if (/подпис|триал|плат|истека|истек|оплат|автоплат/.test(haystack)) return 'Подписка и оплата';
+            return 'Активность';
+        }
+
+        function broadcastSegmentDescription(segment) {
+            const label = (segment.label || '').toLowerCase();
+            if (label.includes('все пользователи')) return 'Без дополнительной фильтрации';
+            if (label.includes('активная подписка')) return 'Подписка действует прямо сейчас';
+            if (label.includes('триал')) return 'Пробный период без оплаты';
+            if (label.includes('истекают')) return 'Скоро потребуется продление';
+            if (label.includes('истекли')) return 'Подписка уже завершилась';
+            if (label.includes('не подключались')) return 'Нет зафиксированного трафика';
+            if (label.includes('никогда не платили')) return 'Без успешных покупок';
+            if (label.includes('рефераль')) return 'Пришли по приглашению';
+            return 'Актуальный сегмент получателей';
+        }
+
+        function broadcastSegmentIcon(segment) {
+            const group = broadcastSegmentGroup(segment);
+            if (group === 'Все') return 'fa-users';
+            if (group === 'Привлечение') return 'fa-user-plus';
+            if (group === 'Подписка и оплата') return 'fa-credit-card';
+            return 'fa-wave-square';
+        }
+
+        function broadcastSegmentsWord(count) {
+            const mod10 = count % 10;
+            const mod100 = count % 100;
+            if (mod10 === 1 && mod100 !== 11) return 'сегмент';
+            if (mod10 >= 2 && mod10 <= 4 && !(mod100 >= 12 && mod100 <= 14)) return 'сегмента';
+            return 'сегментов';
+        }
+
+        function setBroadcastSegmentMenu(open) {
+            const trigger = document.getElementById('broadcast-segment-trigger');
+            const menu = document.getElementById('broadcast-segment-menu');
+            if (!trigger || !menu) return;
+            trigger.setAttribute('aria-expanded', String(open));
+            menu.dataset.open = String(open);
+            if (open) {
+                window.requestAnimationFrame(() => document.getElementById('broadcast-segment-search')?.focus());
+            }
+        }
+
+        function renderBroadcastSegmentMenu(query = '') {
+            const target = document.getElementById('broadcast-segment-list');
+            const select = document.getElementById('broadcast-segment');
+            if (!target || !select) return;
+            const normalizedQuery = query.trim().toLocaleLowerCase('ru-RU');
+            const visible = broadcastSegmentRows.filter((segment) =>
+                `${segment.label || ''} ${segment.key || ''}`.toLocaleLowerCase('ru-RU').includes(normalizedQuery));
+            if (!visible.length) {
+                target.innerHTML = '<div class="broadcast-segment-empty"><i class="fas fa-magnifying-glass"></i><br><br>Подходящих сегментов не найдено</div>';
+                return;
+            }
+            const groupOrder = ['Все', 'Подписка и оплата', 'Активность', 'Привлечение'];
+            target.innerHTML = groupOrder.map((group) => {
+                const rows = visible.filter((segment) => broadcastSegmentGroup(segment) === group);
+                if (!rows.length) return '';
+                return `<div class="broadcast-segment-group">${group}</div>` + rows.map((segment) => {
+                    const index = broadcastSegmentRows.indexOf(segment);
+                    const selected = select.value === String(segment.key);
+                    return `<button class="broadcast-segment-option" type="button" role="option" aria-selected="${selected}" data-broadcast-segment-index="${index}">
+                        <span class="broadcast-segment-option-icon"><i class="fas ${broadcastSegmentIcon(segment)}"></i></span>
+                        <span class="broadcast-segment-option-copy"><b>${escapeHtml(segment.label)}</b><small>${escapeHtml(broadcastSegmentDescription(segment))}</small></span>
+                        <span class="broadcast-segment-count">${Number(segment.count || 0).toLocaleString('ru-RU')}</span>
+                        <span class="broadcast-segment-check">${selected ? '<i class="fas fa-check"></i>' : ''}</span>
+                    </button>`;
+                }).join('');
+            }).join('');
+            target.querySelectorAll('[data-broadcast-segment-index]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const segment = broadcastSegmentRows[Number(button.dataset.broadcastSegmentIndex)];
+                    if (!segment) return;
+                    select.value = String(segment.key);
+                    select.dispatchEvent(new Event('change'));
+                    setBroadcastSegmentMenu(false);
+                });
+            });
+        }
+
+        function syncBroadcastSegmentPicker() {
+            const select = document.getElementById('broadcast-segment');
+            const name = document.getElementById('broadcast-segment-name');
+            const summary = document.getElementById('broadcast-segment-summary');
+            const hint = document.getElementById('broadcast-segment-hint');
+            if (!select || !name || !summary || !hint) return;
+            const selected = broadcastSegmentRows.find((segment) => String(segment.key) === select.value);
+            if (selected) {
+                const count = Number(selected.count || 0);
+                name.textContent = selected.label;
+                summary.textContent = `${count.toLocaleString('ru-RU')} получателей`;
+                hint.textContent = `Получателей сейчас: ${count.toLocaleString('ru-RU')} — с Telegram, без заблокированных`;
+            } else {
+                name.textContent = 'Выберите сегмент';
+                summary.textContent = broadcastSegmentRows.length
+                    ? `${broadcastSegmentRows.length} ${broadcastSegmentsWord(broadcastSegmentRows.length)} доступно`
+                    : 'Получаем список аудиторий…';
+                hint.textContent = '';
+            }
+            renderBroadcastSegmentMenu(document.getElementById('broadcast-segment-search')?.value || '');
+        }
+
+        function wireBroadcastSegmentPicker() {
+            if (wireBroadcastSegmentPicker._done) return;
+            wireBroadcastSegmentPicker._done = true;
+            const picker = document.getElementById('broadcast-segment-picker');
+            const trigger = document.getElementById('broadcast-segment-trigger');
+            const menu = document.getElementById('broadcast-segment-menu');
+            const search = document.getElementById('broadcast-segment-search');
+            const clear = document.getElementById('broadcast-segment-search-clear');
+            const select = document.getElementById('broadcast-segment');
+            trigger?.addEventListener('click', () => setBroadcastSegmentMenu(menu?.dataset.open !== 'true'));
+            select?.addEventListener('change', syncBroadcastSegmentPicker);
+            search?.addEventListener('input', () => {
+                clear.dataset.visible = String(Boolean(search.value));
+                renderBroadcastSegmentMenu(search.value);
+            });
+            clear?.addEventListener('click', () => {
+                search.value = '';
+                clear.dataset.visible = 'false';
+                renderBroadcastSegmentMenu();
+                search.focus();
+            });
+            menu?.addEventListener('keydown', (event) => {
+                const options = [...menu.querySelectorAll('.broadcast-segment-option')];
+                const current = options.indexOf(document.activeElement);
+                if (event.key === 'Escape') {
+                    setBroadcastSegmentMenu(false);
+                    trigger?.focus();
+                } else if (event.key === 'ArrowDown' && options.length) {
+                    event.preventDefault();
+                    options[Math.min(current + 1, options.length - 1)].focus();
+                } else if (event.key === 'ArrowUp' && options.length) {
+                    event.preventDefault();
+                    options[Math.max(current - 1, 0)].focus();
+                }
+            });
+            document.addEventListener('pointerdown', (event) => {
+                if (menu?.dataset.open === 'true' && !picker?.contains(event.target)) setBroadcastSegmentMenu(false);
+            });
+        }
+
         async function loadBroadcastSegments() {
             if (broadcastSegmentsLoaded) return;
             const select = document.getElementById('broadcast-segment');
             if (!select || !main.dataset.segmentsUrl) return;
+            wireBroadcastSegmentPicker();
             try {
                 const response = await fetch(main.dataset.segmentsUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error();
                 broadcastSegmentsLoaded = true;
-                select.innerHTML = '<option value="">Сегмент…</option>' + payload.result.map((segment) =>
+                broadcastSegmentRows = payload.result || [];
+                select.innerHTML = '<option value="">Сегмент…</option>' + broadcastSegmentRows.map((segment) =>
                     `<option value="${segment.key}">${escapeHtml(segment.label)} — ${segment.count}</option>`).join('');
-                select.addEventListener('change', () => {
-                    const selected = payload.result.find((segment) => segment.key === select.value);
-                    document.getElementById('broadcast-segment-hint').textContent = selected
-                        ? `Получателей сейчас: ${selected.count} (с Telegram, без заблокированных)` : '';
-                });
+                document.getElementById('broadcast-segment-total').textContent = `${broadcastSegmentRows.length} ${broadcastSegmentsWord(broadcastSegmentRows.length)}`;
+                syncBroadcastSegmentPicker();
             } catch (error) {
                 select.innerHTML = '<option value="">Не удалось загрузить сегменты</option>';
+                document.getElementById('broadcast-segment-name').textContent = 'Не удалось загрузить';
+                document.getElementById('broadcast-segment-summary').textContent = 'Обновите страницу и попробуйте ещё раз';
+                document.getElementById('broadcast-segment-list').innerHTML = '<div class="broadcast-segment-empty">Сегменты временно недоступны</div>';
             }
         }
 
@@ -6102,7 +6748,7 @@
                     mediaInput.value = '';
                     return;
                 }
-                mediaName.textContent = file ? `${file.name} (${Math.round(file.size / 1024)} КБ)` : '';
+                mediaName.textContent = file ? `${file.name} (${Math.round(file.size / 1024)} КБ)` : 'JPEG или PNG, до 3 МБ';
                 mediaClear.hidden = !file;
                 if (photo.src) URL.revokeObjectURL(photo.src);
                 photo.hidden = !file;
@@ -6164,41 +6810,83 @@
 
         async function loadBroadcastsList() {
             const target = document.getElementById('broadcasts-list');
+            const refreshButton = document.getElementById('broadcasts-refresh');
             if (!target) return;
+            if (refreshButton) refreshButton.dataset.loading = 'true';
             target.innerHTML = inlineLoading('Загружаем рассылки...');
             try {
                 const response = await fetch(main.dataset.broadcastsUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error();
                 const rows = payload.result || [];
-                const statusLabel = {running: '▶️ идёт', stopped: '⏹ остановлена', done: '✅ завершена'};
+                const statusMeta = {
+                    running: {label: 'Идёт отправка', icon: 'fa-paper-plane'},
+                    stopped: {label: 'Рассылка остановлена', icon: 'fa-stop'},
+                    done: {label: 'Рассылка завершена', icon: 'fa-check'},
+                };
                 target.innerHTML = rows.length ? rows.map((row) => {
+                    const status = statusMeta[row.status] || {label: row.status || 'Без статуса', icon: 'fa-circle-info'};
+                    const progress = Math.max(0, Math.min(100, Number(row.progress_pct || 0)));
+                    const sent = Number(row.sent || 0);
+                    const total = Number(row.total || 0);
+                    const funnel = row.funnel || null;
+                    const claims = funnel ? Number(funnel.claims || 0) : null;
+                    const buyers = funnel ? Number(funnel.buyers || 0) : null;
+                    const revenue = funnel ? Number(funnel.revenue || 0) : null;
+                    const claimRate = claims !== null && sent ? Math.round(100 * claims / sent) : null;
+                    const buyerRate = buyers !== null && claims ? Math.round(100 * buyers / claims) : null;
+                    const claimRateLabel = claims > 0 && claimRate !== null
+                        ? `<small>${claimRate}% от доставленных</small>`
+                        : '';
+                    const buyerRateLabel = buyers > 0 && buyerRate !== null
+                        ? `<small>${buyerRate}% от забравших</small>`
+                        : '';
+                    const message = String(row.text || '');
                     const badges = [
-                        row.is_test ? '<span class="broadcast-badge">тест</span>' : '',
-                        row.has_media ? '<span class="broadcast-badge">📷 фото</span>' : '',
+                        `<span class="broadcast-badge accent"><i class="fas fa-users"></i>${escapeHtml(row.segment_label || 'Сегмент')}</span>`,
+                        row.is_test ? '<span class="broadcast-badge"><i class="fas fa-vial"></i>тест</span>' : '',
+                        row.has_media ? '<span class="broadcast-badge"><i class="fas fa-image"></i>фото</span>' : '',
                         ...(row.buttons || []).map((button) => button.type === 'claim_promo'
-                            ? `<span class="broadcast-badge">🎟 ${escapeHtml(button.code || 'промокод')}</span>`
-                            : button.type === 'tariffs' ? '<span class="broadcast-badge">тарифы</span>' : ''),
+                            ? `<span class="broadcast-badge"><i class="fas fa-ticket"></i>${escapeHtml(button.code || 'промокод')}</span>`
+                            : button.type === 'tariffs' ? '<span class="broadcast-badge"><i class="fas fa-layer-group"></i>тарифы</span>' : ''),
                     ].filter(Boolean).join(' ');
-                    const funnel = row.funnel ? `
-                        <div class="broadcast-funnel">
-                            <span>Доставлено <b>${row.sent}</b></span>
-                            <span>Забрали скидку <b>${row.funnel.claims}</b>${row.sent ? ` (${Math.round(100 * row.funnel.claims / row.sent)}%)` : ''}</span>
-                            <span>Купили <b>${row.funnel.buyers}</b>${row.funnel.claims ? ` (${Math.round(100 * row.funnel.buyers / row.funnel.claims)}%)` : ''}</span>
-                            <span>Выручка <b>${row.funnel.revenue}₽</b></span>
-                        </div>` : '';
                     return `
-                    <div style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:12px;">
-                        <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center;">
-                            <div><b>${escapeHtml(row.title)}</b> · ${escapeHtml(row.segment_label)} · ${statusLabel[row.status] || row.status} ${badges}</div>
-                            <div style="display:flex;gap:8px;align-items:center;">
-                                <span style="color:var(--muted);">${row.sent}/${row.total} доставлено (${row.progress_pct}%)</span>
-                                ${row.status === 'running' ? `<button class="btn btn-danger" style="padding:4px 10px;font-size:11px;" data-broadcast-stop="${row.id}">Стоп</button>` : ''}
+                    <article class="broadcast-record" data-status="${escapeHtml(row.status || '')}">
+                        <div class="broadcast-record-main">
+                            <div>
+                                <div class="broadcast-record-title-row">
+                                    <span class="broadcast-record-status" aria-hidden="true"><i class="fas ${status.icon}"></i></span>
+                                    <div class="broadcast-record-title">
+                                        <h3>${escapeHtml(row.title || 'Без названия')}</h3>
+                                        <div class="broadcast-record-meta">
+                                            <span><i class="fas fa-calendar"></i>${escapeHtml(row.created_at || '—')}</span>
+                                            <span><i class="fas fa-user"></i>${escapeHtml(row.created_by || '—')}</span>
+                                        </div>
+                                        <div class="broadcast-badges">${badges}</div>
+                                    </div>
+                                </div>
+                                <p class="broadcast-record-message">${escapeHtml(message.slice(0, 320))}${message.length > 320 ? '…' : ''}</p>
+                            </div>
+                            <div class="broadcast-delivery" aria-label="Доставлено ${progress}%">
+                                <span class="broadcast-delivery-ring">
+                                    <svg viewBox="0 0 46 46" aria-hidden="true"><circle cx="23" cy="23" r="18"></circle><circle cx="23" cy="23" r="18" pathLength="100" stroke-dasharray="${progress} 100"></circle></svg>
+                                    <b>${progress}%</b>
+                                </span>
+                                <span class="broadcast-delivery-copy"><b>${status.label}</b><span>${sent.toLocaleString('ru-RU')} из ${total.toLocaleString('ru-RU')} доставлено</span></span>
                             </div>
                         </div>
-                        <div style="color:var(--muted);margin-top:4px;">${escapeHtml(row.created_at)} · ${escapeHtml(row.created_by)} · ${escapeHtml(row.text.slice(0, 160))}${row.text.length > 160 ? '…' : ''}</div>
-                        ${funnel}
-                    </div>`;
+                        <div class="broadcast-metrics">
+                            <div class="broadcast-metric"><span>Доставлено</span><b>${sent.toLocaleString('ru-RU')}</b></div>
+                            <div class="broadcast-metric"><span>Забрали скидку</span><b>${claims === null ? '—' : claims.toLocaleString('ru-RU')}${claimRateLabel}</b></div>
+                            <div class="broadcast-metric"><span>Купили</span><b>${buyers === null ? '—' : buyers.toLocaleString('ru-RU')}${buyerRateLabel}</b></div>
+                            <div class="broadcast-metric"><span>Выручка</span><b>${revenue === null ? '—' : `${revenue.toLocaleString('ru-RU')} ₽`}</b></div>
+                        </div>
+                        <div class="broadcast-record-progress" aria-hidden="true"><span style="width:${progress}%"></span></div>
+                        <footer class="broadcast-record-footer">
+                            <span class="broadcast-status-label">${status.label}</span>
+                            ${row.status === 'running' ? `<button class="btn btn-danger broadcast-stop" data-broadcast-stop="${Number(row.id)}"><i class="fas fa-stop"></i>Остановить</button>` : ''}
+                        </footer>
+                    </article>`;
                 }).join('') : '<div class="info-card muted">Рассылок ещё не было.</div>';
                 target.querySelectorAll('[data-broadcast-stop]').forEach((button) => button.addEventListener('click', async () => {
                     if (!confirm('Остановить рассылку? Неотправленные сообщения не уйдут.')) return;
@@ -6215,6 +6903,8 @@
                 }
             } catch (error) {
                 target.innerHTML = '<div class="info-card red">Не удалось загрузить рассылки</div>';
+            } finally {
+                if (refreshButton) refreshButton.dataset.loading = 'false';
             }
         }
 

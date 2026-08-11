@@ -1805,7 +1805,86 @@ class AdminCohortStatsEndpointTests(SimpleTestCase):
         self.assertEqual(args[5], "month")
 
 
+class AdminStatsSalesModeTests(SimpleTestCase):
+    def test_absolute_mode_replaces_cash_kpis_and_tariffs(self):
+        from engine.views import admin_stats_apply_sales_mode
+
+        cohort_totals = {
+            "subscriptions": 100,
+            "connections": 50,
+            "unique_paying_users": 4,
+            "payments": 5,
+            "revenue": 1200,
+        }
+        sales_series = {
+            "mode": "absolute",
+            "totals": {
+                "unique_paying_users": 18,
+                "payments": 27,
+                "revenue": 9400,
+                "tariffs": {"1 месяц": 20, "1 год": 7},
+            },
+        }
+
+        totals, tariffs, cohort_payers = admin_stats_apply_sales_mode(
+            cohort_totals, {"1 месяц": 5}, sales_series
+        )
+
+        self.assertEqual(totals["subscriptions"], 100)
+        self.assertEqual(totals["connections"], 50)
+        self.assertEqual(totals["unique_paying_users"], 18)
+        self.assertEqual(totals["payments"], 27)
+        self.assertEqual(totals["revenue"], 9400)
+        self.assertEqual(tariffs, {"1 месяц": 20, "1 год": 7})
+        self.assertEqual(cohort_payers, 4)
+
+    def test_series_totals_match_chart_buckets(self):
+        from engine.views import admin_stats_sales_series_totals
+
+        totals = admin_stats_sales_series_totals(
+            [
+                {
+                    "payments": 2,
+                    "revenue": 600,
+                    "tariffs": [{"name": "1 месяц", "count": 2}],
+                },
+                {
+                    "payments": 3,
+                    "revenue": 1500,
+                    "tariffs": [
+                        {"name": "1 месяц", "count": 1},
+                        {"name": "1 год", "count": 2},
+                    ],
+                },
+            ],
+            unique_paying_users=4,
+        )
+
+        self.assertEqual(totals["payments"], 5)
+        self.assertEqual(totals["revenue"], 2100)
+        self.assertEqual(totals["unique_paying_users"], 4)
+        self.assertEqual(totals["tariffs"], {"1 месяц": 3, "1 год": 2})
+
+
 class AdminCohortDashboardTemplateTests(SimpleTestCase):
+    def test_sources_panel_has_totals_summary_above_rows(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("function sourceTotals(sources)", template)
+        self.assertIn("function renderSourcesSummary(sources)", template)
+        self.assertIn('class="sources-summary"', template)
+        self.assertIn("${renderSourcesSummary(sources)}\n                ${body}", template)
+        for label in (
+            "Подписки",
+            "Подключения",
+            "Покупатели",
+            "Платежи",
+            "Выручка",
+            "В подключение",
+            "В продажу",
+        ):
+            self.assertIn(f"<span>{label}</span>", template)
+
     def test_cohort_analytics_section_is_present(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
@@ -4918,6 +4997,25 @@ class AdminStage3Tests(SimpleTestCase):
 
 class AdminStage4Tests(SimpleTestCase):
     """Этап 4: сегменты, рассылки, массовые операции."""
+
+    def test_broadcast_title_and_segment_controls_align(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn(
+            ".broadcast-primary-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, .88fr); gap: 12px; align-items: start; }",
+            template,
+        )
+        self.assertIn("#broadcast-segment-hint:empty { display: none; }", template)
+
+    def test_zero_broadcast_funnel_metrics_do_not_repeat_zero_percent(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("claims > 0 && claimRate !== null", template)
+        self.assertIn("buyers > 0 && buyerRate !== null", template)
+        self.assertIn("% от доставленных</small>", template)
+        self.assertIn("% от забравших</small>", template)
+        self.assertNotIn("<em>${claimRate}%</em>", template)
+        self.assertNotIn("<em>${buyerRate}%</em>", template)
 
     def test_segments_registry_is_consistent(self):
         from common.models.segments import (

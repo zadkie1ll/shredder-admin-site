@@ -4171,6 +4171,43 @@ def admin_stats_source_key(value):
     return None if value is None else str(value)
 
 
+def admin_stats_sales_series_totals(buckets, unique_paying_users=0):
+    """Собирает кассовые итоги из тех же бакетов, которые показаны на графике."""
+    totals = {
+        "payments": 0,
+        "revenue": 0,
+        "unique_paying_users": int(unique_paying_users or 0),
+        "tariffs": {},
+    }
+    for bucket in buckets:
+        totals["payments"] += int(bucket.get("payments") or 0)
+        totals["revenue"] += admin_money(bucket.get("revenue"))
+        for tariff in bucket.get("tariffs") or []:
+            name = tariff.get("name") or "Без тарифа"
+            totals["tariffs"][name] = totals["tariffs"].get(name, 0) + int(
+                tariff.get("count") or 0
+            )
+    return totals
+
+
+def admin_stats_apply_sales_mode(totals, total_tariffs, sales_series):
+    """Подменяет только кассовые KPI, сохраняя когортные метрики воронки."""
+    selected_totals = dict(totals)
+    selected_tariffs = dict(total_tariffs)
+    cohort_unique_paying_users = int(totals.get("unique_paying_users") or 0)
+
+    if sales_series.get("mode") == "absolute":
+        sales_totals = sales_series.get("totals") or {}
+        selected_totals["payments"] = int(sales_totals.get("payments") or 0)
+        selected_totals["revenue"] = admin_money(sales_totals.get("revenue"))
+        selected_totals["unique_paying_users"] = int(
+            sales_totals.get("unique_paying_users") or 0
+        )
+        selected_tariffs = dict(sales_totals.get("tariffs") or {})
+
+    return selected_totals, selected_tariffs, cohort_unique_paying_users
+
+
 # Имя session-temp таблицы, в которую один раз материализуется когорта первых
 # подписок выбранного периода. См. build_admin_cohort_table.
 ADMIN_COHORT_TEMP_TABLE = "admin_cohort_events_tmp"
@@ -4416,6 +4453,10 @@ def build_admin_sales_series(
         .group_by(payer_events.c.bucket_start)
         .all()
     )
+    unique_paying_users = (
+        db_session.query(func.count(func.distinct(payer_events.c.user_id))).scalar()
+        or 0
+    )
     for bucket_start_value, unique_payers in payer_rows:
         key = admin_stats_row_bucket_key(bucket_start_value, granularity)
         bucket = buckets.get(key)
@@ -4461,6 +4502,9 @@ def build_admin_sales_series(
         "note": granularity_note,
         "tariff_names": sorted(tariff_names, key=get_tariff_order),
         "buckets": output_buckets,
+        "totals": admin_stats_sales_series_totals(
+            output_buckets, unique_paying_users
+        ),
     }
 
 
@@ -5074,6 +5118,9 @@ def build_admin_interval_stats(
         granularity_note,
         sales_mode,
     )
+    totals, total_tariffs, cohort_unique_paying_users = admin_stats_apply_sales_mode(
+        totals, total_tariffs, sales_series
+    )
     sources.sort(key=lambda item: item["subscriptions"], reverse=True)
     totals["referrals"] = referral_count
     totals["referral_traffic"] = referral_bonus_counts.get(ReferralBonusType.TRAFFIC, 0)
@@ -5086,7 +5133,7 @@ def build_admin_interval_stats(
         else 0
     )
     totals["payment_conversion"] = (
-        totals["unique_paying_users"] / totals["subscriptions"] * 100
+        cohort_unique_paying_users / totals["subscriptions"] * 100
         if totals["subscriptions"]
         else 0
     )
