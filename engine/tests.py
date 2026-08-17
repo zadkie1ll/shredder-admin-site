@@ -3917,6 +3917,22 @@ class NodeTrafficTemplateTests(SimpleTestCase):
             any('data-tab="node-traffic"' in part.split("{% endif %}")[0] for part in admin_only_block[1:])
         )
 
+    def test_node_traffic_icons_exist_in_bundled_font_awesome(self):
+        """Страница использует иконки FA 6.1+ (fa-magnifying-glass-chart,
+        fa-ranking-star, глиф \\e522); с FA 6.0.0 они рендерились пустыми
+        квадратами, поэтому шаблоны обязаны подключать FA >= 6.1."""
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("font-awesome/6.7.2/css/all.min.css", template)
+        self.assertIn('content: "\\e522"', template)  # fa-magnifying-glass-chart
+        self.assertNotIn('content: "\\e51d"', template)  # fa-laptop-file — чужой глиф
+        self.assertIn('<i class="fas fa-magnifying-glass-chart"></i>', template)
+        self.assertIn('<i class="fas fa-ranking-star"></i>', template)
+
+        for path in sorted(Path("engine/templates").glob("*.html")):
+            with self.subTest(template=path.name):
+                self.assertNotIn("font-awesome/6.0.0", path.read_text())
+
     def test_node_traffic_loads_today_report_on_first_tab_open(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 

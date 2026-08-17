@@ -471,7 +471,10 @@ CSS-классом `hero-art-scene`, чтобы не утяжелять перв
 Производительность: hero/onboarding-изображения переведены в WebP с ресайзом
 (≈ −84% веса; исходные PNG сохранены), к hero-картинкам добавлены `width/height` и
 `fetchpriority`; шрифты Google Fonts и Font Awesome подключаются неблокирующе
-(`preload` + `onload`), вместо рендер-блокирующего `@import`. Tailwind по-прежнему
+(`preload` + `onload`), вместо рендер-блокирующего `@import`. Font Awesome
+подключается версии 6.7.2 (не ниже 6.1): админка использует иконки, добавленные
+в FA 6.1 (`fa-magnifying-glass-chart`, `fa-ranking-star`, `fa-chart-simple`,
+`fa-envelope-circle-check` и др.) — с 6.0.0 они рендерились пустыми квадратами. Tailwind по-прежнему
 подключается через CDN — перевод на собранный CSS требует Node-сборки и вынесен в
 отдельную задачу.
 
