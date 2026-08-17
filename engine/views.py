@@ -11056,6 +11056,270 @@ def support_admin_api_promocodes(request):
         db_session.close()
 
 
+PROMO_COHORT_USERS_LIMIT = 500
+
+
+def support_admin_api_promo_cohort(request):
+    """Когорта по промокоду (или партии): судьба активировавших код.
+
+    Когорта = строки promo_code_uses; для каждого пользователя считаем
+    платежи ПОСЛЕ активации (ЮKassa + Wata), текущий статус подписки и
+    автоплатёж. Отдельно — конверсия рассылок с кнопкой claim_promo этого
+    кода: сколько получателей активировали. Только чтение, ничего не мутирует.
+    """
+    auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
+    if auth_response:
+        return auth_response
+    if request.method != "GET":
+        return JsonResponse({"status": "error"}, status=405)
+
+    def parse_id(name):
+        try:
+            return int(request.GET.get(name) or 0)
+        except ValueError:
+            return 0
+
+    promo_id, batch_id = parse_id("promo_id"), parse_id("batch_id")
+    if bool(promo_id) == bool(batch_id):
+        return JsonResponse(
+            {"status": "error", "message": "Нужен promo_id или batch_id"}, status=400
+        )
+
+    db_session = session_factory()
+    try:
+        if promo_id:
+            promo = db_session.get(PromoCode, promo_id)
+            if not promo:
+                return JsonResponse({"status": "not_found"}, status=404)
+            promo_ids = [promo.id]
+            subject = {
+                "kind": "code",
+                "label": promo.code,
+                "promo_type": promo.promo_type,
+                "value": promo.value,
+            }
+        else:
+            batch = db_session.get(PromoBatch, batch_id)
+            if not batch:
+                return JsonResponse({"status": "not_found"}, status=404)
+            codes = (
+                db_session.query(PromoCode.id, PromoCode.promo_type, PromoCode.value)
+                .filter(PromoCode.batch_id == batch_id)
+                .all()
+            )
+            promo_ids = [row[0] for row in codes]
+            subject = {
+                "kind": "batch",
+                "label": batch.name,
+                "promo_type": codes[0][1] if codes else None,
+                "value": codes[0][2] if codes else None,
+            }
+        if not promo_ids:
+            return JsonResponse(
+                {"status": "ok", "result": {"subject": subject, "cohort": None}}
+            )
+
+        params = {"promo_ids": promo_ids}
+        rows = db_session.execute(
+            sa_text(
+                """
+                SELECT
+                    uses.user_id,
+                    u.telegram_id,
+                    uses.created_at AS activated_at,
+                    u.expire_at,
+                    EXISTS (
+                        SELECT 1 FROM yk_recurrent_payments r WHERE r.user_id = u.id
+                    ) AS has_autopay,
+                    EXISTS (
+                        SELECT 1 FROM user_blocks b WHERE b.user_id = u.id
+                    ) AS is_blocked,
+                    yk.cnt AS yk_cnt, yk.total AS yk_total, yk.first_at AS yk_first,
+                    wt.cnt AS wt_cnt, wt.total AS wt_total, wt.first_at AS wt_first
+                FROM promo_code_uses uses
+                JOIN users u ON u.id = uses.user_id
+                LEFT JOIN LATERAL (
+                    SELECT count(*) AS cnt,
+                           coalesce(sum(p.amount), 0) AS total,
+                           min(p.created_at) AS first_at
+                    FROM yk_payments p
+                    WHERE p.user_id = uses.user_id AND p.status = 'succeeded'
+                      AND p.created_at > uses.created_at
+                ) yk ON TRUE
+                LEFT JOIN LATERAL (
+                    SELECT count(*) AS cnt,
+                           coalesce(sum(t.amount), 0) AS total,
+                           min(t.payment_time) AS first_at
+                    FROM wata_invoices i
+                    JOIN wata_transactions t ON t.order_id = i.order_id
+                     AND t.transaction_status = 'Paid'
+                    WHERE i.user_id = uses.user_id
+                      AND t.payment_time > uses.created_at
+                ) wt ON TRUE
+                WHERE uses.promo_id = ANY(:promo_ids)
+                ORDER BY uses.created_at DESC
+                """
+            ),
+            params,
+        ).all()
+
+        now = datetime.utcnow()
+        users, days_to_purchase = [], []
+        totals = {
+            "activations": len(rows),
+            "buyers": 0,
+            "payments": 0,
+            "revenue": 0,
+            "active_now": 0,
+            "returned_then_churned": 0,
+            "with_autopay": 0,
+            "blocked": 0,
+        }
+        activations_by_day = {}
+        for row in rows:
+            paid_count = int(row.yk_cnt or 0) + int(row.wt_cnt or 0)
+            revenue = admin_money(row.yk_total) + admin_money(row.wt_total)
+            first_paid_at = min(
+                (value for value in (row.yk_first, row.wt_first) if value),
+                default=None,
+            )
+            is_active = bool(row.expire_at and row.expire_at > now)
+            if row.is_blocked:
+                status = "blocked"
+            elif is_active:
+                status = "active"
+            else:
+                status = "expired"
+            totals["payments"] += paid_count
+            totals["revenue"] += revenue
+            if paid_count:
+                totals["buyers"] += 1
+                if not is_active and not row.is_blocked:
+                    totals["returned_then_churned"] += 1
+            if is_active:
+                totals["active_now"] += 1
+            if row.has_autopay:
+                totals["with_autopay"] += 1
+            if row.is_blocked:
+                totals["blocked"] += 1
+            if first_paid_at and row.activated_at:
+                # payment_time (Wata) приходит timezone-aware — приводим к naive
+                # UTC, как хранятся activated_at/created_at.
+                naive_paid = (
+                    first_paid_at.astimezone(timezone.utc).replace(tzinfo=None)
+                    if first_paid_at.tzinfo
+                    else first_paid_at
+                )
+                delta_days = (naive_paid - row.activated_at).total_seconds() / 86400
+                if delta_days >= 0:
+                    days_to_purchase.append(delta_days)
+            if row.activated_at:
+                day = row.activated_at.date().isoformat()
+                activations_by_day[day] = activations_by_day.get(day, 0) + 1
+            if len(users) < PROMO_COHORT_USERS_LIMIT:
+                users.append(
+                    {
+                        "user_id": row.user_id,
+                        "telegram_id": row.telegram_id,
+                        "activated_at": admin_date_label(row.activated_at),
+                        "status": status,
+                        "payments": paid_count,
+                        "revenue": revenue,
+                        "first_paid_at": admin_date_label(first_paid_at),
+                        "expire_at": admin_date_label(row.expire_at),
+                        "has_autopay": bool(row.has_autopay),
+                    }
+                )
+
+        pending_discounts = (
+            db_session.execute(
+                sa_text(
+                    """
+                    SELECT count(*) FROM user_discounts d
+                    WHERE d.source_promo_id = ANY(:promo_ids)
+                      AND d.valid_until > (now() AT TIME ZONE 'UTC')
+                    """
+                ),
+                params,
+            ).scalar()
+            or 0
+        )
+
+        broadcasts = db_session.execute(
+            sa_text(
+                """
+                SELECT b.id, b.title, b.total, b.created_at,
+                       (
+                           SELECT count(DISTINCT d.user_id)
+                           FROM broadcast_deliveries d
+                           WHERE d.broadcast_id = b.id AND d.status = 'sent'
+                       ) AS sent,
+                       (
+                           SELECT count(DISTINCT uses.user_id)
+                           FROM promo_code_uses uses
+                           JOIN broadcast_deliveries d ON d.user_id = uses.user_id
+                            AND d.broadcast_id = b.id AND d.status = 'sent'
+                           WHERE uses.promo_id = ANY(:promo_ids)
+                             AND uses.created_at >= b.created_at
+                       ) AS activated
+                FROM broadcasts b
+                WHERE b.test_telegram_id IS NULL
+                  AND EXISTS (
+                      SELECT 1 FROM jsonb_array_elements(b.buttons) btn
+                      WHERE btn->>'type' = 'claim_promo'
+                        AND (btn->>'promo_id')::bigint = ANY(:promo_ids)
+                  )
+                ORDER BY b.created_at DESC
+                """
+            ),
+            params,
+        ).all()
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "result": {
+                    "subject": subject,
+                    "cohort": {
+                        **totals,
+                        "pending_discounts": int(pending_discounts),
+                        "avg_days_to_purchase": (
+                            round(sum(days_to_purchase) / len(days_to_purchase), 1)
+                            if days_to_purchase
+                            else None
+                        ),
+                        "conversion_pct": (
+                            round(100.0 * totals["buyers"] / totals["activations"], 1)
+                            if totals["activations"]
+                            else 0
+                        ),
+                    },
+                    "activations_by_day": sorted(activations_by_day.items()),
+                    "broadcasts": [
+                        {
+                            "id": row.id,
+                            "title": row.title,
+                            "total": int(row.total or 0),
+                            "sent": int(row.sent or 0),
+                            "activated": int(row.activated or 0),
+                            "activation_pct": (
+                                round(100.0 * int(row.activated or 0) / int(row.sent), 1)
+                                if row.sent
+                                else 0
+                            ),
+                            "created_at": admin_date_label(row.created_at),
+                        }
+                        for row in broadcasts
+                    ],
+                    "users": users,
+                    "users_truncated": len(rows) > len(users),
+                },
+            }
+        )
+    finally:
+        db_session.close()
+
+
 # === Этап 6 плана админки: персональные аккаунты сотрудников =================
 
 ADMIN_ACCOUNT_ROLES = ("full", "marketer", "support")

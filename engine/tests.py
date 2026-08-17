@@ -3933,6 +3933,32 @@ class NodeTrafficTemplateTests(SimpleTestCase):
             with self.subTest(template=path.name):
                 self.assertNotIn("font-awesome/6.0.0", path.read_text())
 
+    def test_node_traffic_summary_icons_are_readable(self):
+        """Иконки сводки были 11px muted-серым на тёмном фоне — почти невидимы."""
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        def css_rule(selector):
+            start = template.index(f"{selector} {{")
+            return template[start:template.index("}", start) + 1]
+
+        section = css_rule("#panel-node-traffic .node-traffic-section-icon")
+        self.assertIn("font-size: 14px", section)
+        summary = css_rule("#panel-node-traffic .node-traffic-summary-item-icon")
+        self.assertIn("font-size: 14px", summary)
+        self.assertNotIn("color: var(--muted)", summary)
+        # Общий селектор `.node-traffic-summary-item span` специфичнее правила
+        # иконки: он превращал её плашку в block с 10px-шрифтом — глиф уезжал
+        # в верхний левый угол. Подписи стилизуются только через -copy.
+        self.assertNotIn(".node-traffic-summary-item span", template)
+        self.assertNotIn(".node-traffic-summary-item strong", template)
+        self.assertIn(".node-traffic-summary-item-copy span", template)
+        self.assertIn(".node-traffic-summary-item-copy strong", template)
+        # Светлая тема: у иконок свой контрастный цвет, а не белый из тёмной.
+        self.assertIn(
+            'html[data-admin-theme="light"] #panel-node-traffic .node-traffic-summary-item-icon',
+            template,
+        )
+
     def test_node_traffic_loads_today_report_on_first_tab_open(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
@@ -5344,6 +5370,124 @@ class AdminStage6RolesTests(SimpleTestCase):
             "engine/templates/support_admin_login.html"
         ).read_text()
         self.assertIn('name="login"', login_template)
+
+
+class DormantSegmentsTests(SimpleTestCase):
+    """Win-back-сегменты «спящих» (истекли >30 дней назад) для рассылок."""
+
+    def test_dormant_segments_registered(self):
+        from common.models.segments import ADMIN_SEGMENTS
+
+        self.assertIn("dormant_30d_paid", ADMIN_SEGMENTS)
+        self.assertIn("dormant_30d_used_free", ADMIN_SEGMENTS)
+
+        label, condition = ADMIN_SEGMENTS["dormant_30d_paid"]
+        self.assertIn("Неактивны >30 дней, платили", label)
+        self.assertIn("interval '30 days'", condition)
+        self.assertIn("u.expire_at <=", condition)
+        self.assertIn("yk_payments", condition)
+
+        label, condition = ADMIN_SEGMENTS["dormant_30d_used_free"]
+        self.assertIn("не платили", label)
+        self.assertIn("NOT (", condition)
+        self.assertIn("user_traffic_progress", condition)
+        self.assertIn("tp.passed_0", condition)
+
+    def test_dormant_segments_do_not_overlap_by_payments(self):
+        # Один и тот же пользователь не должен попадать в оба сегмента:
+        # первый требует наличие оплат, второй — их отсутствие.
+        from common.models.segments import ADMIN_SEGMENTS, PAYS_EXISTS_SQL
+
+        paid = ADMIN_SEGMENTS["dormant_30d_paid"][1]
+        free = ADMIN_SEGMENTS["dormant_30d_used_free"][1]
+        self.assertIn(f"({PAYS_EXISTS_SQL})", paid)
+        self.assertIn(f"NOT ({PAYS_EXISTS_SQL})", free)
+
+    def test_segments_synced_with_bot_repo(self):
+        # Сегменты читает и бот (выборка получателей рассылки); файлы обязаны
+        # быть идентичны, иначе рассылка по новому сегменту упадёт в боте.
+        bot_copy = Path(
+            "../monkey-island-vpn-bot/common/models/segments.py"
+        )
+        if not bot_copy.exists():
+            self.skipTest("репозиторий бота недоступен")
+        self.assertEqual(
+            Path("common/models/segments.py").read_text(), bot_copy.read_text()
+        )
+
+
+class PromoCohortTests(SimpleTestCase):
+    """Когорта по промокоду: судьба активировавших (покупки, статус, автоплатёж)."""
+
+    def test_endpoint_is_routed(self):
+        from django.urls import reverse
+
+        self.assertTrue(reverse("support_admin_api_promo_cohort"))
+
+    def test_view_is_read_only_and_counts_payments_after_activation(self):
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_promo_cohort)
+        # Только чтение: никаких мутаций и коммитов.
+        self.assertNotIn("db_session.add", src)
+        self.assertNotIn("db_session.delete", src)
+        self.assertNotIn("commit", src)
+        # Платежи считаются строго ПОСЛЕ активации промокода.
+        self.assertIn("p.created_at > uses.created_at", src)
+        self.assertIn("t.payment_time > uses.created_at", src)
+        # Оба платёжных провайдера и судьба: статус, автоплатёж, блокировка.
+        self.assertIn("yk_payments", src)
+        self.assertIn("wata_transactions", src)
+        self.assertIn("yk_recurrent_payments", src)
+        self.assertIn("user_blocks", src)
+        # Конверсия рассылок: только реальные (не тестовые) с кнопкой промо.
+        self.assertIn("claim_promo", src)
+        self.assertIn("test_telegram_id IS NULL", src)
+        self.assertIn("PROMO_COHORT_USERS_LIMIT", src)
+
+    def test_requires_promo_or_batch_id(self):
+        from engine.views import support_admin_api_promo_cohort
+
+        with mock.patch(
+            "engine.views.require_support_admin_any", return_value=None
+        ):
+            request = RequestFactory().get("/support-admin/api/promo-cohort/")
+            self.assertEqual(support_admin_api_promo_cohort(request).status_code, 400)
+            request = RequestFactory().get(
+                "/support-admin/api/promo-cohort/?promo_id=1&batch_id=2"
+            )
+            self.assertEqual(support_admin_api_promo_cohort(request).status_code, 400)
+
+    def test_template_has_cohort_ui_in_analytics(self):
+        """Когорты живут вкладкой в «Аналитике»: выбор промокода + график
+        активаций по дням; из раздела «Промокоды» кнопки убраны."""
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('data-subtab="promo-cohorts"', template)
+        self.assertIn('id="subpanel-promo-cohorts"', template)
+        self.assertIn('id="promo-cohort-form"', template)
+        self.assertIn('id="promo-cohort-select"', template)
+        self.assertIn('id="promo-cohort-chart"', template)
+        self.assertIn('id="promo-cohort-card"', template)
+        self.assertIn('id="promo-cohort-body"', template)
+        self.assertIn("data-promo-cohort-url", template)
+        self.assertIn("function renderPromoCohort", template)
+        self.assertIn("function renderPromoCohortChart", template)
+        self.assertIn("function loadPromoCohort", template)
+        self.assertIn("function loadPromoCohortOptions", template)
+        self.assertIn("function openUserCard", template)
+        # Из когорты можно провалиться в карточку клиента.
+        self.assertIn("data-open-user", template)
+        # График рисует канвас-рендер вкладки «Привлечение» через window
+        # (прямой вызов из чужого scope — регресс AdminScriptScopeTests).
+        self.assertIn("window.acqDraw = acqDraw;", template)
+        self.assertIn("window.acqDraw(", template)
+        # Кнопок когорты в реестре промокодов больше нет.
+        self.assertNotIn('data-promo-cohort="', template)
+        self.assertNotIn('data-batch-cohort="', template)
+        self.assertNotIn("promo-cohort-close", template)
 
 
 class AdminScriptScopeTests(SimpleTestCase):

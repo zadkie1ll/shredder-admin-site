@@ -168,6 +168,11 @@ urlpatterns = [
         name="support_admin_api_promocodes",
     ),
     path(
+        "support-admin/api/promo-cohort/",
+        views.support_admin_api_promo_cohort,
+        name="support_admin_api_promo_cohort",
+    ),
+    path(
         "support-admin/api/accounts/",
         views.support_admin_api_accounts,
         name="support_admin_api_accounts",

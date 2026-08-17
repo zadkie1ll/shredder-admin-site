@@ -503,6 +503,29 @@
         .promo-download:hover, .promo-refresh:hover, .promo-action:hover { border-color: rgba(255,199,0,.46); background: rgba(255,199,0,.09); color: var(--brand-gold); }
         .promo-refresh[data-loading="true"] i { animation: broadcastSpin .7s linear infinite; }
         .promo-registry-card { overflow: hidden; }
+        .promo-cohort-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
+        .promo-cohort-chart-wrap { padding: 14px 15px 6px; border-bottom: 1px solid var(--promo-line); }
+        .promo-cohort-card { overflow: hidden; border-color: rgba(255,199,0,.22); }
+        .promo-cohort-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--promo-line); }
+        .promo-cohort-broadcasts { padding: 12px 15px; border-bottom: 1px solid var(--promo-line); }
+        .promo-cohort-broadcasts h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 9px; color: var(--text-main); font-size: 12.5px; font-weight: 850; }
+        .promo-cohort-broadcasts h3 i { color: var(--brand-gold); font-size: 11px; }
+        .promo-cohort-broadcast-row { padding: 8px 10px; border: 1px solid var(--promo-line); border-radius: 9px; background: var(--promo-soft); }
+        .promo-cohort-broadcast-row + .promo-cohort-broadcast-row { margin-top: 6px; }
+        .promo-cohort-broadcast-row b { display: block; margin-bottom: 3px; color: var(--text-main); font-size: 12px; font-weight: 800; }
+        .promo-cohort-broadcast-row span { color: var(--muted); font-size: 10.5px; font-weight: 600; }
+        .promo-cohort-table-scroll { overflow-x: auto; padding: 4px 15px 12px; }
+        .promo-cohort-table { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 11.5px; }
+        .promo-cohort-table th { padding: 10px 8px; border-bottom: 1px solid var(--promo-line); color: var(--muted); font-size: 9.5px; font-weight: 850; letter-spacing: .04em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+        .promo-cohort-table td { padding: 8px; border-bottom: 1px solid var(--promo-line); color: var(--text-main); font-weight: 600; white-space: nowrap; }
+        .promo-cohort-table td.is-num { text-align: right; font-variant-numeric: tabular-nums; }
+        .promo-cohort-table a { color: var(--brand-gold); text-decoration: none; }
+        .promo-cohort-table a:hover { text-decoration: underline; }
+        .promo-cohort-status { display: inline-block; padding: 3px 8px; border: 1px solid var(--promo-line); border-radius: 999px; color: var(--muted); font-size: 9.5px; font-weight: 800; }
+        .promo-cohort-status.is-active { border-color: rgba(56,217,150,.25); color: var(--green); }
+        .promo-cohort-status.is-blocked { border-color: rgba(255,107,107,.3); color: #ff6b6b; }
+        .promo-cohort-autopay { color: var(--green); }
+        .promo-cohort-note { margin: 0; padding: 0 15px 13px; color: var(--muted); font-size: 10.5px; font-weight: 600; }
         .promo-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 15px; border-bottom: 1px solid var(--promo-line); background: rgba(0,0,0,.055); }
         .promo-summary-item { padding: 8px 10px; border: 1px solid var(--promo-line); border-radius: 9px; background: var(--promo-soft); }
         .promo-summary-item span, .promo-summary-item b { display: block; }
@@ -1836,7 +1859,7 @@
         #panel-node-traffic .node-traffic-summary-head,
         #panel-node-traffic .node-traffic-table-heading { min-height: 62px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,.07); }
         #panel-node-traffic .node-traffic-section-title { min-width: 0; display: flex; align-items: center; gap: 10px; }
-        #panel-node-traffic .node-traffic-section-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border: 1px solid rgba(255,199,0,.22); border-radius: 9px; background: rgba(255,199,0,.07); color: var(--brand-gold); font-size: 11px; }
+        #panel-node-traffic .node-traffic-section-icon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border: 1px solid rgba(255,199,0,.22); border-radius: 9px; background: rgba(255,199,0,.09); color: var(--brand-gold); font-size: 14px; }
         #panel-node-traffic .node-traffic-section-copy { min-width: 0; }
         #panel-node-traffic .node-traffic-section-copy h3 { margin: 0 0 3px; color: var(--text-main); font-size: 16px; line-height: 1.2; font-weight: 850; }
         #panel-node-traffic .node-traffic-section-copy p { margin: 0; color: var(--muted); font-size: 11px; line-height: 1.35; font-weight: 600; }
@@ -1844,13 +1867,15 @@
         #panel-node-traffic .node-traffic-summary-grid { display: grid; grid-template-columns: minmax(280px, 1.8fr) repeat(3, minmax(140px, 1fr)); gap: 9px; padding: 12px; }
         #panel-node-traffic .node-traffic-summary-item { min-width: 0; min-height: 72px; display: flex; align-items: center; gap: 11px; padding: 11px 12px; border: 1px solid rgba(255,255,255,.07); border-radius: 10px; background: rgba(255,255,255,.025); }
         #panel-node-traffic .node-traffic-summary-item.is-primary { border-color: rgba(255,199,0,.17); background: rgba(255,199,0,.045); }
-        #panel-node-traffic .node-traffic-summary-item-icon { width: 34px; height: 34px; flex: 0 0 34px; display: grid; place-items: center; border-radius: 9px; background: rgba(255,255,255,.045); color: var(--muted); font-size: 11px; }
-        #panel-node-traffic .node-traffic-summary-item.is-primary .node-traffic-summary-item-icon { background: rgba(255,199,0,.1); color: var(--brand-gold); }
+        #panel-node-traffic .node-traffic-summary-item-icon { width: 36px; height: 36px; flex: 0 0 36px; display: grid; place-items: center; border-radius: 9px; background: rgba(255,255,255,.07); color: rgba(255,255,255,.68); font-size: 14px; }
+        #panel-node-traffic .node-traffic-summary-item.is-primary .node-traffic-summary-item-icon { background: rgba(255,199,0,.12); color: var(--brand-gold); }
         #panel-node-traffic .node-traffic-summary-item-copy { min-width: 0; }
-        #panel-node-traffic .node-traffic-summary-item span,
-        #panel-node-traffic .node-traffic-summary-item strong { display: block; min-width: 0; }
-        #panel-node-traffic .node-traffic-summary-item span { margin-bottom: 5px; color: var(--muted); font-size: 10px; line-height: 1; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
-        #panel-node-traffic .node-traffic-summary-item strong { overflow: hidden; color: rgba(255,255,255,.88); font-size: 15px; line-height: 1.25; font-weight: 850; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
+        /* Подписи стилизуем строго через -copy: span-селектор на всю карточку
+           специфичнее правила иконки и ломал её плашке display и шрифт. */
+        #panel-node-traffic .node-traffic-summary-item-copy span,
+        #panel-node-traffic .node-traffic-summary-item-copy strong { display: block; min-width: 0; }
+        #panel-node-traffic .node-traffic-summary-item-copy span { margin-bottom: 5px; color: var(--muted); font-size: 10px; line-height: 1; font-weight: 750; text-transform: uppercase; letter-spacing: .04em; }
+        #panel-node-traffic .node-traffic-summary-item-copy strong { overflow: hidden; color: rgba(255,255,255,.88); font-size: 15px; line-height: 1.25; font-weight: 850; text-overflow: ellipsis; font-variant-numeric: tabular-nums; }
         #panel-node-traffic .node-traffic-summary-item.is-traffic strong { color: var(--green); }
         #panel-node-traffic .node-traffic-context-note,
         #panel-node-traffic .node-traffic-alert { display: flex; align-items: flex-start; gap: 10px; padding: 11px 13px; border: 1px solid rgba(255,255,255,.07); border-radius: 10px; background: rgba(255,255,255,.025); color: var(--muted); font-size: 11px; line-height: 1.45; }
@@ -1913,7 +1938,7 @@
         html[data-admin-theme="light"] #panel-node-traffic .node-traffic-summary-item,
         html[data-admin-theme="light"] #panel-node-traffic .node-traffic-context-note { border-color: rgba(26,31,42,.09); background: rgba(26,31,42,.025); }
         html[data-admin-theme="light"] #panel-node-traffic .node-traffic-summary-item.is-primary { border-color: rgba(181,139,0,.18); background: rgba(181,139,0,.055); }
-        html[data-admin-theme="light"] #panel-node-traffic .node-traffic-summary-item strong,
+        html[data-admin-theme="light"] #panel-node-traffic .node-traffic-summary-item-copy strong,
         html[data-admin-theme="light"] #panel-node-traffic .node-traffic-total,
         html[data-admin-theme="light"] #panel-node-traffic .node-traffic-user-copy b,
         html[data-admin-theme="light"] #panel-node-traffic .node-traffic-top-node b,
@@ -1923,6 +1948,8 @@
         html[data-admin-theme="light"] #panel-node-traffic .node-traffic-row.table-head { background: rgba(26,31,42,.025); }
         html[data-admin-theme="light"] #panel-node-traffic .node-traffic-user-icon,
         html[data-admin-theme="light"] #panel-node-traffic .node-traffic-status { background: rgba(26,31,42,.045); }
+        html[data-admin-theme="light"] #panel-node-traffic .node-traffic-summary-item-icon { background: rgba(26,31,42,.055); color: rgba(26,31,42,.62); }
+        html[data-admin-theme="light"] #panel-node-traffic .node-traffic-summary-item.is-primary .node-traffic-summary-item-icon { background: rgba(181,139,0,.12); color: #8a6d00; }
         html[data-admin-theme="light"] #panel-node-traffic .node-traffic-status.is-ok { background: rgba(21,155,101,.07); color: #11835d; }
         html[data-admin-theme="light"] #panel-node-traffic .node-traffic-status.is-bad { background: rgba(211,65,78,.06); color: #c44351; }
 
@@ -2206,6 +2233,7 @@
         data-broadcasts-url="{% url 'support_admin_api_broadcasts' %}"
         data-bulk-url="{% url 'support_admin_api_bulk' %}"
         data-promocodes-url="{% url 'support_admin_api_promocodes' %}"
+        data-promo-cohort-url="{% url 'support_admin_api_promo_cohort' %}"
         data-accounts-url="{% url 'support_admin_api_accounts' %}"
         data-user-timeline-url="{% url 'support_admin_api_user_timeline' %}"
         data-rwms-sync-url="{% url 'support_admin_api_rwms_sync' %}"
@@ -2245,6 +2273,7 @@
             <div class="subtabs" role="tablist" aria-label="Режим аналитики">
                 <button type="button" class="subtab active" data-subtab="overview" role="tab"><i class="fas fa-chart-line"></i>Сквозной анализ</button>
                 <button type="button" class="subtab" data-subtab="cohort" role="tab"><i class="fas fa-users"></i>Когортный анализ</button>
+                <button type="button" class="subtab" data-subtab="promo-cohorts" role="tab"><i class="fas fa-ticket"></i>Когорты промокодов</button>
             </div>
             <div id="subpanel-overview" class="subtab-panel active">
             <form id="stats-form" class="card form-card form-grid-stats">
@@ -2454,6 +2483,28 @@
             <div id="cohort-result" class="result-stack">
                 <div class="card cohort-hint">Выберите диапазон и когорту внутри него, затем нажмите «Построить».</div>
             </div>
+            </div>
+
+            <div id="subpanel-promo-cohorts" class="subtab-panel">
+                <p class="admin-subtitle" style="margin-bottom: 16px;">Выберите промокод или партию купонов — график покажет активации по дням, а сводка судьбу когорты: покупки после активации, статус подписки и автоплатёж</p>
+                <form id="promo-cohort-form" class="card form-card promo-cohort-form">
+                    <select class="input" id="promo-cohort-select">
+                        <option value="">Загружаем промокоды…</option>
+                    </select>
+                    <button class="btn" type="submit"><i class="fas fa-magnifying-glass-chart"></i>Показать</button>
+                </form>
+                <section class="card promo-cohort-card" id="promo-cohort-card" hidden>
+                    <div class="promo-card-head">
+                        <div class="promo-card-heading">
+                            <span class="promo-card-icon"><i class="fas fa-user-clock"></i></span>
+                            <div><h2 id="promo-cohort-title">Когорта промокода</h2><p>Активации по дням и судьба когорты после активации</p></div>
+                        </div>
+                    </div>
+                    <div class="promo-cohort-chart-wrap" id="promo-cohort-chart-wrap" hidden>
+                        <canvas id="promo-cohort-chart" style="width:100%;height:240px;display:block;"></canvas>
+                    </div>
+                    <div id="promo-cohort-body"></div>
+                </section>
             </div>
         </section>
         {% endif %}
@@ -7516,6 +7567,149 @@
             }).join('')}</div>`;
         }
 
+        function renderPromoCohort(result) {
+            const cohort = result.cohort;
+            if (!cohort || !cohort.activations) {
+                return `<div class="promo-empty"><div><i class="fas fa-user-clock"></i><b>Активаций пока нет</b><span>Как только код начнут активировать, здесь появится судьба когорты: покупки, статус, автоплатёж.</span></div></div>`;
+            }
+            const kpis = [
+                ['Активаций', num(cohort.activations)],
+                ['Купили после', `${num(cohort.buyers)} · ${cohort.conversion_pct}%`],
+                ['Платежей', num(cohort.payments)],
+                ['Выручка после активации', `${num(cohort.revenue)} ₽`],
+                ['Активна сейчас', num(cohort.active_now)],
+                ['Купили и снова ушли', num(cohort.returned_then_churned)],
+                ['С автоплатежом', num(cohort.with_autopay)],
+                ['Скидка не потрачена', num(cohort.pending_discounts)],
+            ];
+            if (cohort.avg_days_to_purchase !== null) kpis.push(['Дней до покупки, среднее', cohort.avg_days_to_purchase]);
+            if (cohort.blocked) kpis.push(['Заблокированы', num(cohort.blocked)]);
+            const summary = `<div class="promo-summary promo-cohort-summary">${kpis.map(([label, value]) => `<div class="promo-summary-item"><span>${label}</span><b>${value}</b></div>`).join('')}</div>`;
+            const broadcasts = (result.broadcasts || []).length ? `<div class="promo-cohort-broadcasts">
+                <h3><i class="fas fa-bullhorn"></i>Рассылки с этим промокодом</h3>
+                ${result.broadcasts.map((row) => `<div class="promo-cohort-broadcast-row">
+                    <b>${escapeHtml(row.title)}</b>
+                    <span>${escapeHtml(row.created_at || '')} · доставлено ${num(row.sent)} · активировали после рассылки ${num(row.activated)} (${row.activation_pct}% доставленных)</span>
+                </div>`).join('')}
+            </div>` : '';
+            const statusChip = (status) => status === 'active'
+                ? '<span class="promo-cohort-status is-active">Активна</span>'
+                : status === 'blocked'
+                    ? '<span class="promo-cohort-status is-blocked">Блок</span>'
+                    : '<span class="promo-cohort-status">Истекла</span>';
+            const users = (result.users || []).map((row) => `<tr>
+                <td><a href="#" data-open-user="${row.telegram_id || row.user_id}">${row.telegram_id || `id ${row.user_id}`}</a></td>
+                <td>${escapeHtml(row.activated_at || '—')}</td>
+                <td>${statusChip(row.status)}</td>
+                <td class="is-num">${num(row.payments)}</td>
+                <td class="is-num">${row.revenue ? `${num(row.revenue)} ₽` : '—'}</td>
+                <td>${escapeHtml(row.first_paid_at || '—')}</td>
+                <td>${escapeHtml(row.expire_at || '—')}</td>
+                <td>${row.has_autopay ? '<i class="fas fa-circle-check promo-cohort-autopay"></i>' : '—'}</td>
+            </tr>`).join('');
+            const truncated = result.users_truncated ? `<p class="promo-cohort-note">Показаны первые ${num((result.users || []).length)} активаций — агрегаты выше учитывают всю когорту.</p>` : '';
+            return `${summary}${broadcasts}
+                <div class="promo-cohort-table-scroll"><table class="promo-cohort-table">
+                    <thead><tr><th>Пользователь</th><th>Активация</th><th>Статус</th><th>Платежей</th><th>Выручка</th><th>Первая оплата</th><th>Подписка до</th><th>Автоплатёж</th></tr></thead>
+                    <tbody>${users}</tbody>
+                </table></div>${truncated}`;
+        }
+
+        function openUserCard(query) {
+            showAdminTab('user-payments');
+            const form = document.getElementById('user-payments-form');
+            if (!form) return;
+            form.hidden = false;
+            form.elements.q.value = query;
+            form.requestSubmit();
+        }
+
+        function renderPromoCohortChart(byDay) {
+            const wrap = document.getElementById('promo-cohort-chart-wrap');
+            const canvas = document.getElementById('promo-cohort-chart');
+            if (!wrap || !canvas) return;
+            // acqDraw живёт в скрипте «Привлечения» и экспортирован глобально.
+            if (!window.acqDraw || !byDay || !byDay.length) { wrap.hidden = true; return; }
+            // API отдаёт только дни с активациями — дыры заполняем нулями,
+            // иначе редкие всплески на графике слипаются в сплошной ряд.
+            const counts = new Map(byDay);
+            const first = new Date(`${byDay[0][0]}T00:00:00Z`);
+            const last = new Date(`${byDay[byDay.length - 1][0]}T00:00:00Z`);
+            const days = [];
+            for (let ts = first.getTime(); ts <= last.getTime() && days.length < 1000; ts += 86400000) {
+                days.push(new Date(ts).toISOString().slice(0, 10));
+            }
+            wrap.hidden = false;
+            window.acqDraw(
+                canvas,
+                days.map((iso) => iso.slice(8, 10) + '.' + iso.slice(5, 7)),
+                [{label: 'Активации промокода', tone: 'amber', data: days.map((iso) => counts.get(iso) || 0), fmt: 'raw'}],
+                [],
+                {fullLabels: days},
+            );
+        }
+
+        async function loadPromoCohort(params, label) {
+            const card = document.getElementById('promo-cohort-card');
+            const body = document.getElementById('promo-cohort-body');
+            const title = document.getElementById('promo-cohort-title');
+            if (!card || !body) return;
+            card.hidden = false;
+            if (title) title.textContent = `Когорта: ${label}`;
+            body.innerHTML = inlineLoading('Считаем судьбу когорты...');
+            try {
+                const query = new URLSearchParams(params);
+                const response = await fetch(`${main.dataset.promoCohortUrl}?${query.toString()}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error();
+                renderPromoCohortChart((payload.result || {}).activations_by_day || []);
+                body.innerHTML = renderPromoCohort(payload.result || {});
+                body.querySelectorAll('[data-open-user]').forEach((link) => link.addEventListener('click', (event) => {
+                    event.preventDefault();
+                    openUserCard(link.dataset.openUser);
+                }));
+            } catch (error) {
+                const wrap = document.getElementById('promo-cohort-chart-wrap');
+                if (wrap) wrap.hidden = true;
+                body.innerHTML = '<div class="promo-empty"><div><i class="fas fa-triangle-exclamation"></i><b>Не удалось построить когорту</b><span>Проверьте соединение и попробуйте ещё раз.</span></div></div>';
+            }
+        }
+
+        let promoCohortOptionsLoaded = false;
+        async function loadPromoCohortOptions() {
+            const select = document.getElementById('promo-cohort-select');
+            if (!select || promoCohortOptionsLoaded) return;
+            try {
+                const response = await fetch(main.dataset.promocodesUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error();
+                const {codes, batches} = payload.result || {};
+                const option = (value, text) => `<option value="${value}">${escapeHtml(text)}</option>`;
+                const codeOptions = (codes || []).map((row) => {
+                    const type = row.promo_type === 'days' ? `+${row.value} дн.` : `-${row.value}%`;
+                    return option(`promo:${row.id}`, `${row.code} · ${type} · активаций: ${row.used_count}`);
+                }).join('');
+                const batchOptions = (batches || []).map((row) => option(`batch:${row.id}`, `${row.name} · купонов: ${row.codes}, активаций: ${row.used}`)).join('');
+                select.innerHTML = '<option value="">— выберите промокод —</option>'
+                    + (codeOptions ? `<optgroup label="Промокоды">${codeOptions}</optgroup>` : '')
+                    + (batchOptions ? `<optgroup label="Партии купонов">${batchOptions}</optgroup>` : '');
+                promoCohortOptionsLoaded = true;
+            } catch (error) {
+                select.innerHTML = '<option value="">Не удалось загрузить промокоды</option>';
+            }
+        }
+
+        document.querySelector('#panel-stats .subtab[data-subtab="promo-cohorts"]')?.addEventListener('click', loadPromoCohortOptions);
+        document.getElementById('promo-cohort-form')?.addEventListener('submit', (event) => {
+            event.preventDefault();
+            const select = document.getElementById('promo-cohort-select');
+            const value = select?.value || '';
+            if (!value) return;
+            const [kind, id] = value.split(':');
+            const label = select.options[select.selectedIndex].textContent;
+            loadPromoCohort(kind === 'batch' ? {batch_id: id} : {promo_id: id}, label);
+        });
+
         async function copyPromoText(value) {
             try {
                 await navigator.clipboard.writeText(value);
@@ -9094,6 +9288,9 @@
     (function () {
         const mainEl = document.querySelector('main.main');
         if (!mainEl || !mainEl.dataset.acquisitionUrl) return;
+        // График «Когорты промокодов» в Аналитике переиспользует канвас-рендер
+        // этой вкладки (оси, тултипы, ретина, перерисовка при смене темы).
+        window.acqDraw = acqDraw;
         const API = mainEl.dataset.acquisitionUrl;
         const SPENDS_API = mainEl.dataset.adSpendsUrl;
         const loaded = {};
