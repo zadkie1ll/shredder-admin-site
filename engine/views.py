@@ -88,6 +88,7 @@ from common.models.db import Broadcast
 from common.models.db import BroadcastDelivery
 from common.models.segments import ADMIN_SEGMENTS
 from common.models.segments import segment_count_sql
+from common.models.segments import segments_counts_sql
 from common.models.db import AdminDirectMessage
 from common.models.db import AdminDirectMessageDelivery
 from common.models.db import RwmsSyncMismatch
@@ -10128,6 +10129,15 @@ def support_admin_api_direct_message(request):
 # === Этап 4 плана админки: сегменты, рассылки, массовые операции =============
 
 
+# Потолок одного count-запроса сегмента: медленный или сломанный сегмент не
+# должен ронять весь пикер получателей (раньше любая ошибка = 500 и «Сегменты
+# временно недоступны» на всю рассылку).
+SEGMENT_COUNT_TIMEOUT_MS = 5000
+# Потолок быстрого пути — все сегменты одним проходом по users (hash-join'ы
+# вместо 18 отдельных запросов с коррелированными EXISTS).
+SEGMENTS_FAST_COUNT_TIMEOUT_MS = 15000
+
+
 def support_admin_api_segments(request):
     auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
     if auth_response:
@@ -10135,10 +10145,42 @@ def support_admin_api_segments(request):
 
     db_session = session_factory()
     try:
+        counts = {}
+        try:
+            db_session.execute(
+                sa_text(
+                    f"SET LOCAL statement_timeout = {SEGMENTS_FAST_COUNT_TIMEOUT_MS}"
+                )
+            )
+            row = db_session.execute(sa_text(segments_counts_sql())).one()
+            counts = {
+                key: int(value)
+                for key, value in zip(ADMIN_SEGMENTS, row)
+            }
+        except Exception:
+            logging.exception("segments fast count failed, per-segment fallback")
+            db_session.rollback()
+
         result = []
         for key, (label, _condition) in ADMIN_SEGMENTS.items():
-            count = db_session.execute(sa_text(segment_count_sql(key))).scalar() or 0
-            result.append({"key": key, "label": label, "count": int(count)})
+            if key in counts:
+                count = counts[key]
+            else:
+                try:
+                    db_session.execute(
+                        sa_text(
+                            f"SET LOCAL statement_timeout = {SEGMENT_COUNT_TIMEOUT_MS}"
+                        )
+                    )
+                    count = int(
+                        db_session.execute(sa_text(segment_count_sql(key))).scalar()
+                        or 0
+                    )
+                except Exception:
+                    logging.exception("segment count failed: %s", key)
+                    db_session.rollback()
+                    count = None
+            result.append({"key": key, "label": label, "count": count})
         return JsonResponse({"status": "ok", "result": result})
     finally:
         db_session.close()
@@ -11056,6 +11098,76 @@ def support_admin_api_promocodes(request):
         db_session.close()
 
 
+def admin_promo_cohort_tariffs(db_session, promo_ids):
+    """Тарифы успешных оплат после активации выбранных промокодов.
+
+    ЮKassa и Wata хранят тариф в разных таблицах, поэтому агрегируем их
+    отдельно через ORM, а затем объединяем по внутреннему tariff_id.
+    """
+    yk_rows = (
+        db_session.query(
+            YkPayment.subscription_period,
+            func.count(YkPayment.id),
+            func.coalesce(func.sum(YkPayment.amount), 0),
+        )
+        .select_from(PromoCodeUse)
+        .join(YkPayment, YkPayment.user_id == PromoCodeUse.user_id)
+        .filter(PromoCodeUse.promo_id.in_(promo_ids))
+        .filter(YkPayment.status == "succeeded")
+        .filter(YkPayment.created_at > PromoCodeUse.created_at)
+        .group_by(YkPayment.subscription_period)
+        .all()
+    )
+    wata_rows = (
+        db_session.query(
+            WataInvoice.tariff_id,
+            func.count(WataTransaction.id),
+            func.coalesce(func.sum(WataTransaction.amount), 0),
+        )
+        .select_from(PromoCodeUse)
+        .join(WataInvoice, WataInvoice.user_id == PromoCodeUse.user_id)
+        .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+        .filter(PromoCodeUse.promo_id.in_(promo_ids))
+        .filter(WataTransaction.transaction_status == "Paid")
+        .filter(WataTransaction.payment_time > PromoCodeUse.created_at)
+        .group_by(WataInvoice.tariff_id)
+        .all()
+    )
+
+    merged = {}
+    for tariff_id, payments, revenue in [*yk_rows, *wata_rows]:
+        key = tariff_id or ""
+        tariff = merged.setdefault(
+            key,
+            {
+                "id": key,
+                "name": get_tariff_display_name(key),
+                "payments": 0,
+                "revenue": 0,
+            },
+        )
+        tariff["payments"] += int(payments or 0)
+        tariff["revenue"] += admin_money(revenue)
+
+    total_payments = sum(tariff["payments"] for tariff in merged.values())
+    tariffs = []
+    for tariff in merged.values():
+        tariffs.append(
+            {
+                **tariff,
+                "share_pct": (
+                    round(100.0 * tariff["payments"] / total_payments, 1)
+                    if total_payments
+                    else 0
+                ),
+            }
+        )
+    return sorted(
+        tariffs,
+        key=lambda tariff: (get_tariff_order(tariff["name"]), tariff["name"]),
+    )
+
+
 PROMO_COHORT_USERS_LIMIT = 500
 
 
@@ -11168,14 +11280,19 @@ def support_admin_api_promo_cohort(request):
         totals = {
             "activations": len(rows),
             "buyers": 0,
+            "repeat_buyers": 0,
             "payments": 0,
             "revenue": 0,
             "active_now": 0,
+            "active_paid": 0,
+            "active_without_purchase": 0,
+            "expired_without_purchase": 0,
             "returned_then_churned": 0,
             "with_autopay": 0,
             "blocked": 0,
         }
         activations_by_day = {}
+        first_payments_by_day = {}
         for row in rows:
             paid_count = int(row.yk_cnt or 0) + int(row.wt_cnt or 0)
             revenue = admin_money(row.yk_total) + admin_money(row.wt_total)
@@ -11194,15 +11311,25 @@ def support_admin_api_promo_cohort(request):
             totals["revenue"] += revenue
             if paid_count:
                 totals["buyers"] += 1
+                if paid_count > 1:
+                    totals["repeat_buyers"] += 1
                 if not is_active and not row.is_blocked:
                     totals["returned_then_churned"] += 1
             if is_active:
                 totals["active_now"] += 1
+            if not row.is_blocked:
+                if is_active and paid_count:
+                    totals["active_paid"] += 1
+                elif is_active:
+                    totals["active_without_purchase"] += 1
+                elif not paid_count:
+                    totals["expired_without_purchase"] += 1
             if row.has_autopay:
                 totals["with_autopay"] += 1
             if row.is_blocked:
                 totals["blocked"] += 1
-            if first_paid_at and row.activated_at:
+            naive_paid = None
+            if first_paid_at:
                 # payment_time (Wata) приходит timezone-aware — приводим к naive
                 # UTC, как хранятся activated_at/created_at.
                 naive_paid = (
@@ -11210,6 +11337,11 @@ def support_admin_api_promo_cohort(request):
                     if first_paid_at.tzinfo
                     else first_paid_at
                 )
+                paid_day = naive_paid.date().isoformat()
+                first_payments_by_day[paid_day] = (
+                    first_payments_by_day.get(paid_day, 0) + 1
+                )
+            if naive_paid and row.activated_at:
                 delta_days = (naive_paid - row.activated_at).total_seconds() / 86400
                 if delta_days >= 0:
                     days_to_purchase.append(delta_days)
@@ -11230,6 +11362,8 @@ def support_admin_api_promo_cohort(request):
                         "has_autopay": bool(row.has_autopay),
                     }
                 )
+
+        tariffs = admin_promo_cohort_tariffs(db_session, promo_ids)
 
         pending_discounts = (
             db_session.execute(
@@ -11293,8 +11427,20 @@ def support_admin_api_promo_cohort(request):
                             if totals["activations"]
                             else 0
                         ),
+                        "second_purchase_pct": (
+                            round(100.0 * totals["repeat_buyers"] / totals["buyers"], 1)
+                            if totals["buyers"]
+                            else 0
+                        ),
+                        "revenue_per_activation": (
+                            round(totals["revenue"] / totals["activations"])
+                            if totals["activations"]
+                            else 0
+                        ),
                     },
                     "activations_by_day": sorted(activations_by_day.items()),
+                    "first_payments_by_day": sorted(first_payments_by_day.items()),
+                    "tariffs": tariffs,
                     "broadcasts": [
                         {
                             "id": row.id,

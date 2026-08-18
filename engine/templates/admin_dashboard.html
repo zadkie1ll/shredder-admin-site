@@ -503,29 +503,130 @@
         .promo-download:hover, .promo-refresh:hover, .promo-action:hover { border-color: rgba(255,199,0,.46); background: rgba(255,199,0,.09); color: var(--brand-gold); }
         .promo-refresh[data-loading="true"] i { animation: broadcastSpin .7s linear infinite; }
         .promo-registry-card { overflow: hidden; }
-        .promo-cohort-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: center; }
-        .promo-cohort-chart-wrap { padding: 14px 15px 6px; border-bottom: 1px solid var(--promo-line); }
-        .promo-cohort-card { overflow: hidden; border-color: rgba(255,199,0,.22); }
-        .promo-cohort-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); border-bottom: 1px solid var(--promo-line); }
-        .promo-cohort-broadcasts { padding: 12px 15px; border-bottom: 1px solid var(--promo-line); }
-        .promo-cohort-broadcasts h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 9px; color: var(--text-main); font-size: 12.5px; font-weight: 850; }
-        .promo-cohort-broadcasts h3 i { color: var(--brand-gold); font-size: 11px; }
-        .promo-cohort-broadcast-row { padding: 8px 10px; border: 1px solid var(--promo-line); border-radius: 9px; background: var(--promo-soft); }
-        .promo-cohort-broadcast-row + .promo-cohort-broadcast-row { margin-top: 6px; }
-        .promo-cohort-broadcast-row b { display: block; margin-bottom: 3px; color: var(--text-main); font-size: 12px; font-weight: 800; }
-        .promo-cohort-broadcast-row span { color: var(--muted); font-size: 10.5px; font-weight: 600; }
-        .promo-cohort-table-scroll { overflow-x: auto; padding: 4px 15px 12px; }
+        #subpanel-promo-cohorts {
+            --promo-line: rgba(255,255,255,.085);
+            --promo-soft: rgba(255,255,255,.035);
+            --promo-surface: rgba(12,13,18,.78);
+            --promo-surface-strong: rgba(8,9,13,.9);
+            --promo-cohort-blue: #7da8ff;
+            --promo-cohort-gray: #747b88;
+            --promo-cohort-red: #ff717b;
+        }
+        html[data-admin-theme="light"] #subpanel-promo-cohorts {
+            --promo-line: rgba(26,31,42,.11);
+            --promo-soft: rgba(26,31,42,.035);
+            --promo-surface: rgba(255,255,255,.9);
+            --promo-surface-strong: rgba(247,248,250,.98);
+            --promo-cohort-blue: #426dc0;
+            --promo-cohort-gray: #77808d;
+            --promo-cohort-red: #c84a57;
+        }
+        html[data-admin-theme="light"] .promo-cohort-funnel-track,
+        html[data-admin-theme="light"] .promo-cohort-state-track,
+        html[data-admin-theme="light"] .promo-cohort-tariff-track { background: rgba(26,31,42,.075); }
+        .promo-cohort-intro { max-width: 980px; margin-bottom: 14px; }
+        .promo-cohort-form { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; align-items: end; }
+        .promo-cohort-field { display: grid; gap: 7px; min-width: 0; }
+        .promo-cohort-field label { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 10.5px; font-weight: 850; letter-spacing: .045em; text-transform: uppercase; }
+        .promo-cohort-field label span { font-size: 10px; font-weight: 650; letter-spacing: 0; text-transform: none; }
+        .promo-cohort-form .input { min-height: 44px; background: var(--promo-surface-strong); }
+        .promo-cohort-form .btn { min-height: 44px; }
+        .promo-cohort-card { overflow: hidden; padding: 0; border-color: rgba(255,199,0,.2); }
+        .promo-cohort-card .promo-card-head { align-items: center; }
+        .promo-cohort-header-meta { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+        .promo-cohort-tag { padding: 5px 8px; border: 1px solid var(--promo-line); border-radius: 999px; background: var(--promo-soft); color: var(--muted); font-size: 10px; font-weight: 750; white-space: nowrap; }
+        .promo-cohort-tag.is-effect { border-color: rgba(255,199,0,.25); background: rgba(255,199,0,.065); color: #e7c64d; }
+        html[data-admin-theme="light"] .promo-cohort-tag.is-effect { color: #8b6800; }
+        .promo-cohort-body { min-width: 0; }
+        .promo-cohort-view-tabs { display: flex; gap: 4px; padding: 8px 15px; border-bottom: 1px solid var(--promo-line); background: rgba(0,0,0,.06); }
+        .promo-cohort-view-tab { min-height: 34px; display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: 11px; font-weight: 800; cursor: pointer; }
+        .promo-cohort-view-tab:hover { color: var(--text-main); background: var(--promo-soft); }
+        .promo-cohort-view-tab[aria-selected="true"] { border-color: rgba(255,199,0,.25); background: rgba(255,199,0,.085); color: var(--brand-gold); }
+        .promo-cohort-view-panel { padding: 15px; }
+        .promo-cohort-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 9px; margin-bottom: 10px; }
+        .promo-cohort-metric { min-width: 0; padding: 13px; border: 1px solid var(--promo-line); border-radius: 11px; background: var(--promo-soft); }
+        .promo-cohort-metric span, .promo-cohort-metric b, .promo-cohort-metric small { display: block; }
+        .promo-cohort-metric span { margin-bottom: 7px; color: var(--muted); font-size: 10px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
+        .promo-cohort-metric b { overflow: hidden; color: var(--text-main); font-size: clamp(18px, 1.5vw, 23px); font-weight: 850; font-variant-numeric: tabular-nums; text-overflow: ellipsis; white-space: nowrap; }
+        .promo-cohort-metric b small { display: inline; margin-left: 3px; color: var(--muted); font-size: 11px; font-weight: 750; }
+        .promo-cohort-metric > small { margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.35; font-weight: 600; }
+        .promo-cohort-overview-grid { display: grid; grid-template-columns: minmax(0, 1.55fr) minmax(260px, .75fr); gap: 10px; }
+        .promo-cohort-panel { min-width: 0; padding: 14px; border: 1px solid var(--promo-line); border-radius: 11px; background: var(--promo-soft); }
+        .promo-cohort-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 13px; }
+        .promo-cohort-panel-head h3 { margin: 0; color: var(--text-main); font-size: 13px; font-weight: 850; }
+        .promo-cohort-panel-head p { margin: 4px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.4; font-weight: 600; }
+        .promo-cohort-panel-count { color: var(--muted); font-size: 10px; font-weight: 750; white-space: nowrap; }
+        .promo-cohort-funnel { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; align-items: end; }
+        .promo-cohort-funnel-step { display: grid; gap: 7px; min-width: 0; }
+        .promo-cohort-funnel-value { min-height: 47px; }
+        .promo-cohort-funnel-value b, .promo-cohort-funnel-value span { display: block; }
+        .promo-cohort-funnel-value b { color: var(--text-main); font-size: 20px; line-height: 1.1; font-weight: 850; font-variant-numeric: tabular-nums; }
+        .promo-cohort-funnel-value span { margin-top: 4px; color: var(--muted); font-size: 10px; font-weight: 650; }
+        .promo-cohort-funnel-track { position: relative; height: 96px; overflow: hidden; border-radius: 8px; background: rgba(255,255,255,.045); }
+        .promo-cohort-funnel-bar { position: absolute; inset: auto 0 0; min-height: 3px; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, #ffd83d, #e9b600); }
+        .promo-cohort-funnel-step:nth-child(2) .promo-cohort-funnel-bar { background: linear-gradient(180deg, #65e1aa, #27b97c); }
+        .promo-cohort-funnel-step:nth-child(3) .promo-cohort-funnel-bar { background: linear-gradient(180deg, #9bbcff, #638fe6); }
+        .promo-cohort-funnel-label { min-height: 32px; color: var(--muted); font-size: 10.5px; line-height: 1.4; font-weight: 650; }
+        .promo-cohort-state-track { display: flex; height: 10px; overflow: hidden; margin: 8px 0 15px; border-radius: 999px; background: rgba(255,255,255,.055); }
+        .promo-cohort-state-segment.is-active-paid { background: var(--green); }
+        .promo-cohort-state-segment.is-active-free { background: var(--brand-gold); }
+        .promo-cohort-state-segment.is-expired-free { background: var(--promo-cohort-gray); }
+        .promo-cohort-state-segment.is-churned { background: var(--promo-cohort-red); }
+        .promo-cohort-state-segment.is-blocked { background: var(--promo-cohort-blue); }
+        .promo-cohort-state-list { display: grid; gap: 10px; }
+        .promo-cohort-state-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 10.5px; font-weight: 650; }
+        .promo-cohort-state-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .promo-cohort-state-dot { width: 7px; height: 7px; flex: 0 0 7px; border-radius: 2px; background: currentColor; }
+        .promo-cohort-state-name.is-active-paid { color: var(--green); }
+        .promo-cohort-state-name.is-active-free { color: var(--brand-gold); }
+        .promo-cohort-state-name.is-expired-free { color: var(--promo-cohort-gray); }
+        .promo-cohort-state-name.is-churned { color: var(--promo-cohort-red); }
+        .promo-cohort-state-name.is-blocked { color: var(--promo-cohort-blue); }
+        .promo-cohort-state-name span:last-child { color: var(--muted); }
+        .promo-cohort-state-row b { color: var(--text-main); font-weight: 850; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .promo-cohort-tariffs { margin-top: 10px; }
+        .promo-cohort-tariff-list { display: grid; gap: 9px; }
+        .promo-cohort-tariff-row { display: grid; grid-template-columns: minmax(100px, .7fr) minmax(160px, 1.6fr) auto auto; gap: 12px; align-items: center; }
+        .promo-cohort-tariff-name { overflow: hidden; color: var(--text-main); font-size: 11px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
+        .promo-cohort-tariff-track { height: 8px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.055); }
+        .promo-cohort-tariff-track span { display: block; height: 100%; min-width: 2px; border-radius: inherit; background: linear-gradient(90deg, #e8b600, #ffd83d); }
+        .promo-cohort-tariff-count, .promo-cohort-tariff-revenue { color: var(--muted); font-size: 10.5px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+        .promo-cohort-tariff-revenue { color: var(--text-main); text-align: right; }
+        .promo-cohort-tariff-empty { color: var(--muted); font-size: 10.5px; font-weight: 600; }
+        .promo-cohort-insights { display: grid; grid-template-columns: minmax(0, 1.5fr) repeat(5, minmax(100px, .5fr)); gap: 9px; margin-top: 10px; }
+        .promo-cohort-insight-main, .promo-cohort-insight-stat { padding: 12px; border: 1px solid var(--promo-line); border-radius: 10px; background: var(--promo-soft); }
+        .promo-cohort-insight-main { border-left: 2px solid var(--brand-gold); }
+        .promo-cohort-insight-main b, .promo-cohort-insight-main span, .promo-cohort-insight-stat span, .promo-cohort-insight-stat b { display: block; }
+        .promo-cohort-insight-main b { margin-bottom: 5px; color: var(--text-main); font-size: 11.5px; font-weight: 850; }
+        .promo-cohort-insight-main span { color: var(--muted); font-size: 10.5px; line-height: 1.45; font-weight: 600; }
+        .promo-cohort-insight-stat span { color: var(--muted); font-size: 9.5px; font-weight: 800; letter-spacing: .035em; text-transform: uppercase; }
+        .promo-cohort-insight-stat b { margin-top: 6px; color: var(--text-main); font-size: 14px; font-weight: 850; font-variant-numeric: tabular-nums; }
+        .promo-cohort-chart-wrap { min-width: 0; padding: 14px; border: 1px solid var(--promo-line); border-radius: 11px; background: var(--promo-soft); }
+        .promo-cohort-chart-wrap canvas { width: 100%; height: 240px; display: block; }
+        .promo-cohort-chart-wrap canvas[hidden], .promo-cohort-chart-empty[hidden] { display: none; }
+        .promo-cohort-chart-empty { min-height: 170px; display: grid; place-items: center; color: var(--muted); text-align: center; }
+        .promo-cohort-chart-empty div { max-width: 440px; }
+        .promo-cohort-chart-empty i, .promo-cohort-chart-empty b, .promo-cohort-chart-empty span { display: block; }
+        .promo-cohort-chart-empty i { margin-bottom: 9px; color: rgba(255,199,0,.55); font-size: 20px; }
+        .promo-cohort-chart-empty b { margin-bottom: 5px; color: var(--text-main); font-size: 12px; font-weight: 850; }
+        .promo-cohort-chart-empty span { font-size: 10.5px; line-height: 1.45; font-weight: 600; }
+        .promo-cohort-broadcasts { display: grid; gap: 8px; margin-top: 10px; }
+        .promo-cohort-broadcast-row { padding: 11px 12px; border: 1px solid var(--promo-line); border-radius: 9px; background: var(--promo-soft); }
+        .promo-cohort-broadcast-row b { display: block; margin-bottom: 4px; color: var(--text-main); font-size: 11.5px; font-weight: 800; }
+        .promo-cohort-broadcast-row span { color: var(--muted); font-size: 10.5px; line-height: 1.45; font-weight: 600; }
+        .promo-cohort-table-scroll { overflow-x: auto; }
         .promo-cohort-table { width: 100%; min-width: 860px; border-collapse: collapse; font-size: 11.5px; }
         .promo-cohort-table th { padding: 10px 8px; border-bottom: 1px solid var(--promo-line); color: var(--muted); font-size: 9.5px; font-weight: 850; letter-spacing: .04em; text-align: left; text-transform: uppercase; white-space: nowrap; }
-        .promo-cohort-table td { padding: 8px; border-bottom: 1px solid var(--promo-line); color: var(--text-main); font-weight: 600; white-space: nowrap; }
+        .promo-cohort-table td { padding: 10px 8px; border-bottom: 1px solid var(--promo-line); color: var(--text-main); font-weight: 600; white-space: nowrap; }
+        .promo-cohort-table tbody tr:hover { background: rgba(255,199,0,.025); }
         .promo-cohort-table td.is-num { text-align: right; font-variant-numeric: tabular-nums; }
-        .promo-cohort-table a { color: var(--brand-gold); text-decoration: none; }
+        .promo-cohort-table a { color: var(--brand-gold); font-weight: 800; text-decoration: none; }
         .promo-cohort-table a:hover { text-decoration: underline; }
         .promo-cohort-status { display: inline-block; padding: 3px 8px; border: 1px solid var(--promo-line); border-radius: 999px; color: var(--muted); font-size: 9.5px; font-weight: 800; }
         .promo-cohort-status.is-active { border-color: rgba(56,217,150,.25); color: var(--green); }
         .promo-cohort-status.is-blocked { border-color: rgba(255,107,107,.3); color: #ff6b6b; }
         .promo-cohort-autopay { color: var(--green); }
-        .promo-cohort-note { margin: 0; padding: 0 15px 13px; color: var(--muted); font-size: 10.5px; font-weight: 600; }
+        .promo-cohort-note { margin: 12px 0 0; color: var(--muted); font-size: 10.5px; font-weight: 600; }
         .promo-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 12px 15px; border-bottom: 1px solid var(--promo-line); background: rgba(0,0,0,.055); }
         .promo-summary-item { padding: 8px 10px; border: 1px solid var(--promo-line); border-radius: 9px; background: var(--promo-soft); }
         .promo-summary-item span, .promo-summary-item b { display: block; }
@@ -568,6 +669,9 @@
             .promo-live-card .promo-card-head { border-right: 1px solid var(--promo-line); border-bottom: 0; }
             .promo-code-row { grid-template-columns: minmax(210px, 1.1fr) minmax(190px, 1fr) minmax(145px, .7fr) auto; }
             .promo-code-date { display: none; }
+            .promo-cohort-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .promo-cohort-insights { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .promo-cohort-insight-main { grid-column: 1 / -1; }
         }
         @media (max-width: 860px) {
             .promo-batch-layout { grid-template-columns: 1fr; }
@@ -577,6 +681,9 @@
             .promo-code-row { grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
             .promo-code-rule, .promo-code-row > .promo-usage { grid-column: 1 / -1; }
             .promo-row-actions { grid-column: 2; grid-row: 1; }
+            .promo-cohort-overview-grid { grid-template-columns: minmax(0, 1fr); }
+            .promo-cohort-card .promo-card-head { align-items: flex-start; flex-direction: column; }
+            .promo-cohort-header-meta { justify-content: flex-start; }
         }
         @media (max-width: 620px) {
             .promo-guide-hero, .promo-type-picker, .promo-fields-row, .promo-fields-row.is-two, .promo-audience, .promo-summary { grid-template-columns: 1fr; }
@@ -588,6 +695,27 @@
             .promo-batch-row .promo-usage { grid-column: auto; }
             .promo-code-row { grid-template-columns: 1fr; }
             .promo-row-actions { grid-column: 1; grid-row: auto; justify-content: flex-start; }
+            .promo-cohort-form, .promo-cohort-metrics, .promo-cohort-insights { grid-template-columns: 1fr; }
+            .promo-cohort-form .btn { width: 100%; }
+            .promo-cohort-field label { align-items: flex-start; flex-direction: column; gap: 3px; }
+            .promo-cohort-view-tabs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 8px; }
+            .promo-cohort-view-tab { justify-content: center; padding: 0 6px; }
+            .promo-cohort-view-panel { padding: 10px; }
+            .promo-cohort-funnel { gap: 5px; }
+            .promo-cohort-funnel-track { height: 72px; }
+            .promo-cohort-panel { padding: 11px; }
+            .promo-cohort-chart-wrap canvas { height: 220px; }
+            .promo-cohort-tariff-row { grid-template-columns: minmax(0, 1fr) auto; gap: 6px 10px; }
+            .promo-cohort-tariff-track { grid-column: 1 / -1; grid-row: 2; }
+            .promo-cohort-tariff-count { grid-column: 1; grid-row: 3; }
+            .promo-cohort-tariff-revenue { grid-column: 2; grid-row: 3; }
+            .promo-cohort-table { min-width: 0; display: block; }
+            .promo-cohort-table thead { display: none; }
+            .promo-cohort-table tbody { display: grid; gap: 8px; }
+            .promo-cohort-table tr { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; padding: 10px; border: 1px solid var(--promo-line); border-radius: 10px; background: var(--promo-soft); }
+            .promo-cohort-table td, .promo-cohort-table td.is-num { display: grid; gap: 3px; padding: 0; border: 0; text-align: left; white-space: normal; }
+            .promo-cohort-table td::before { content: attr(data-label); color: var(--muted); font-size: 8.5px; font-weight: 850; letter-spacing: .04em; text-transform: uppercase; }
+            .promo-cohort-table td:first-child { grid-column: 1 / -1; padding-bottom: 8px; border-bottom: 1px solid var(--promo-line); }
         }
         .censor-probe-row { grid-template-columns: 90px minmax(130px, 1fr) 100px 110px minmax(0, 2fr); min-width: 620px; }
         .censor-probe-row.table-head { background: rgba(255,255,255,.04); }
@@ -2486,24 +2614,25 @@
             </div>
 
             <div id="subpanel-promo-cohorts" class="subtab-panel">
-                <p class="admin-subtitle" style="margin-bottom: 16px;">Выберите промокод или партию купонов — график покажет активации по дням, а сводка судьбу когорты: покупки после активации, статус подписки и автоплатёж</p>
+                <p class="admin-subtitle promo-cohort-intro">Проследите путь активаций до первой и повторной оплаты, найдите главный этап оттока и проверьте текущее состояние подписок.</p>
                 <form id="promo-cohort-form" class="card form-card promo-cohort-form">
-                    <select class="input" id="promo-cohort-select">
-                        <option value="">Загружаем промокоды…</option>
-                    </select>
-                    <button class="btn" type="submit"><i class="fas fa-magnifying-glass-chart"></i>Показать</button>
+                    <div class="promo-cohort-field">
+                        <label for="promo-cohort-select">Промокод или партия <span>В скобках показано число активаций</span></label>
+                        <select class="input" id="promo-cohort-select">
+                            <option value="">Загружаем промокоды…</option>
+                        </select>
+                    </div>
+                    <button class="btn" type="submit"><i class="fas fa-chart-column"></i>Построить отчёт</button>
                 </form>
                 <section class="card promo-cohort-card" id="promo-cohort-card" hidden>
                     <div class="promo-card-head">
                         <div class="promo-card-heading">
                             <span class="promo-card-icon"><i class="fas fa-user-clock"></i></span>
-                            <div><h2 id="promo-cohort-title">Когорта промокода</h2><p>Активации по дням и судьба когорты после активации</p></div>
+                            <div><h2 id="promo-cohort-title">Когорта промокода</h2><p>Покупки считаются только после активации выбранного промокода</p></div>
                         </div>
+                        <div class="promo-cohort-header-meta" id="promo-cohort-header-meta"></div>
                     </div>
-                    <div class="promo-cohort-chart-wrap" id="promo-cohort-chart-wrap" hidden>
-                        <canvas id="promo-cohort-chart" style="width:100%;height:240px;display:block;"></canvas>
-                    </div>
-                    <div id="promo-cohort-body"></div>
+                    <div class="promo-cohort-body" id="promo-cohort-body"></div>
                 </section>
             </div>
         </section>
@@ -6908,6 +7037,14 @@
             }
         }
 
+        // Бэкенд отдаёт count: null, если подсчёт сегмента упал или не уложился
+        // в таймаут — сегмент остаётся выбираемым, просто без цифры охвата.
+        function broadcastSegmentCountLabel(segment) {
+            return segment.count === null || segment.count === undefined
+                ? '—'
+                : Number(segment.count).toLocaleString('ru-RU');
+        }
+
         function renderBroadcastSegmentMenu(query = '') {
             const target = document.getElementById('broadcast-segment-list');
             const select = document.getElementById('broadcast-segment');
@@ -6929,7 +7066,7 @@
                     return `<button class="broadcast-segment-option" type="button" role="option" aria-selected="${selected}" data-broadcast-segment-index="${index}">
                         <span class="broadcast-segment-option-icon"><i class="fas ${broadcastSegmentIcon(segment)}"></i></span>
                         <span class="broadcast-segment-option-copy"><b>${escapeHtml(segment.label)}</b><small>${escapeHtml(broadcastSegmentDescription(segment))}</small></span>
-                        <span class="broadcast-segment-count">${Number(segment.count || 0).toLocaleString('ru-RU')}</span>
+                        <span class="broadcast-segment-count">${broadcastSegmentCountLabel(segment)}</span>
                         <span class="broadcast-segment-check">${selected ? '<i class="fas fa-check"></i>' : ''}</span>
                     </button>`;
                 }).join('');
@@ -6953,10 +7090,10 @@
             if (!select || !name || !summary || !hint) return;
             const selected = broadcastSegmentRows.find((segment) => String(segment.key) === select.value);
             if (selected) {
-                const count = Number(selected.count || 0);
+                const count = broadcastSegmentCountLabel(selected);
                 name.textContent = selected.label;
-                summary.textContent = `${count.toLocaleString('ru-RU')} получателей`;
-                hint.textContent = `Получателей сейчас: ${count.toLocaleString('ru-RU')} — с Telegram, без заблокированных`;
+                summary.textContent = `${count} получателей`;
+                hint.textContent = `Получателей сейчас: ${count} — с Telegram, без заблокированных`;
             } else {
                 name.textContent = 'Выберите сегмент';
                 summary.textContent = broadcastSegmentRows.length
@@ -7019,7 +7156,7 @@
                 broadcastSegmentsLoaded = true;
                 broadcastSegmentRows = payload.result || [];
                 select.innerHTML = '<option value="">Сегмент…</option>' + broadcastSegmentRows.map((segment) =>
-                    `<option value="${segment.key}">${escapeHtml(segment.label)} — ${segment.count}</option>`).join('');
+                    `<option value="${segment.key}">${escapeHtml(segment.label)} — ${broadcastSegmentCountLabel(segment)}</option>`).join('');
                 document.getElementById('broadcast-segment-total').textContent = `${broadcastSegmentRows.length} ${broadcastSegmentsWord(broadcastSegmentRows.length)}`;
                 syncBroadcastSegmentPicker();
             } catch (error) {
@@ -7567,52 +7704,164 @@
             }).join('')}</div>`;
         }
 
+        function promoCohortCount(value) {
+            return Math.max(0, Number(value) || 0);
+        }
+
+        function promoCohortPct(value, total) {
+            const safeTotal = promoCohortCount(total);
+            return safeTotal ? Math.round(1000 * promoCohortCount(value) / safeTotal) / 10 : 0;
+        }
+
         function renderPromoCohort(result) {
             const cohort = result.cohort;
             if (!cohort || !cohort.activations) {
-                return `<div class="promo-empty"><div><i class="fas fa-user-clock"></i><b>Активаций пока нет</b><span>Как только код начнут активировать, здесь появится судьба когорты: покупки, статус, автоплатёж.</span></div></div>`;
+                return `<div class="promo-empty"><div><i class="fas fa-user-clock"></i><b>Активаций пока нет</b><span>После первой активации здесь появятся покупки, текущее состояние подписок и пользователи когорты.</span></div></div>`;
             }
-            const kpis = [
-                ['Активаций', num(cohort.activations)],
-                ['Купили после', `${num(cohort.buyers)} · ${cohort.conversion_pct}%`],
-                ['Платежей', num(cohort.payments)],
-                ['Выручка после активации', `${num(cohort.revenue)} ₽`],
-                ['Активна сейчас', num(cohort.active_now)],
-                ['Купили и снова ушли', num(cohort.returned_then_churned)],
-                ['С автоплатежом', num(cohort.with_autopay)],
-                ['Скидка не потрачена', num(cohort.pending_discounts)],
+
+            const activations = promoCohortCount(cohort.activations);
+            const buyers = promoCohortCount(cohort.buyers);
+            const repeatBuyers = promoCohortCount(cohort.repeat_buyers);
+            const conversion = promoCohortPct(buyers, activations);
+            const repeatConversion = promoCohortPct(repeatBuyers, buyers);
+            const secondPurchaseConversion = cohort.second_purchase_pct ?? repeatConversion;
+            const revenuePerActivation = promoCohortCount(cohort.revenue_per_activation);
+            const metrics = [
+                ['Активировали', num(activations), '100% выбранной когорты'],
+                ['Совершили оплату', `${num(buyers)} <small>· ${conversion}%</small>`, 'Хотя бы один платёж после активации'],
+                ['Оплатили второй раз', `${num(repeatBuyers)} <small>· ${secondPurchaseConversion}%</small>`, 'Доля среди купивших хотя бы один раз'],
+                ['Выручка когорты', `${num(cohort.revenue)} <small>₽</small>`, 'Все успешные платежи после активации'],
             ];
-            if (cohort.avg_days_to_purchase !== null) kpis.push(['Дней до покупки, среднее', cohort.avg_days_to_purchase]);
-            if (cohort.blocked) kpis.push(['Заблокированы', num(cohort.blocked)]);
-            const summary = `<div class="promo-summary promo-cohort-summary">${kpis.map(([label, value]) => `<div class="promo-summary-item"><span>${label}</span><b>${value}</b></div>`).join('')}</div>`;
-            const broadcasts = (result.broadcasts || []).length ? `<div class="promo-cohort-broadcasts">
-                <h3><i class="fas fa-bullhorn"></i>Рассылки с этим промокодом</h3>
-                ${result.broadcasts.map((row) => `<div class="promo-cohort-broadcast-row">
-                    <b>${escapeHtml(row.title)}</b>
-                    <span>${escapeHtml(row.created_at || '')} · доставлено ${num(row.sent)} · активировали после рассылки ${num(row.activated)} (${row.activation_pct}% доставленных)</span>
-                </div>`).join('')}
-            </div>` : '';
+            const metricHtml = `<div class="promo-cohort-metrics">${metrics.map(([label, value, note]) => `
+                <article class="promo-cohort-metric"><span>${label}</span><b>${value}</b><small>${note}</small></article>`).join('')}
+            </div>`;
+
+            const funnel = [
+                {label: 'Активировали промокод', value: activations, rate: '100% когорты'},
+                {label: 'Совершили первую оплату', value: buyers, rate: `${conversion}% от активаций`},
+                {label: 'Оплатили повторно', value: repeatBuyers, rate: `${repeatConversion}% от купивших`},
+            ];
+            const funnelHtml = `<article class="promo-cohort-panel">
+                <div class="promo-cohort-panel-head"><div><h3>Воронка монетизации</h3><p>Конверсия указана относительно предыдущего шага</p></div><span class="promo-cohort-panel-count">${num(activations)} активаций</span></div>
+                <div class="promo-cohort-funnel">${funnel.map((step, index) => {
+                    const height = index === 0 ? 100 : Math.max(step.value ? 6 : 0, promoCohortPct(step.value, activations));
+                    return `<div class="promo-cohort-funnel-step">
+                        <div class="promo-cohort-funnel-value"><b>${num(step.value)}</b><span>${step.rate}</span></div>
+                        <div class="promo-cohort-funnel-track"><span class="promo-cohort-funnel-bar" style="height:${height}%"></span></div>
+                        <div class="promo-cohort-funnel-label">${step.label}</div>
+                    </div>`;
+                }).join('')}</div>
+            </article>`;
+
+            const states = [
+                {className: 'is-active-paid', label: 'Активна и оплачена', value: promoCohortCount(cohort.active_paid)},
+                {className: 'is-active-free', label: 'Активна без оплаты', value: promoCohortCount(cohort.active_without_purchase)},
+                {className: 'is-expired-free', label: 'Истекла без покупки', value: promoCohortCount(cohort.expired_without_purchase)},
+                {className: 'is-churned', label: 'Ушли после покупки', value: promoCohortCount(cohort.returned_then_churned)},
+                {className: 'is-blocked', label: 'Заблокированы', value: promoCohortCount(cohort.blocked)},
+            ];
+            const stateSegments = states.filter((state) => state.value).map((state) =>
+                `<span class="promo-cohort-state-segment ${state.className}" style="width:${promoCohortPct(state.value, activations)}%"></span>`
+            ).join('');
+            const stateHtml = `<article class="promo-cohort-panel">
+                <div class="promo-cohort-panel-head"><div><h3>Состояние когорты сейчас</h3><p>Категории не пересекаются</p></div></div>
+                <div class="promo-cohort-state-track" role="img" aria-label="Распределение текущих состояний">${stateSegments}</div>
+                <div class="promo-cohort-state-list">${states.map((state) => `<div class="promo-cohort-state-row">
+                    <span class="promo-cohort-state-name ${state.className}"><span class="promo-cohort-state-dot"></span><span>${state.label}</span></span>
+                    <b>${num(state.value)} · ${promoCohortPct(state.value, activations)}%</b>
+                </div>`).join('')}</div>
+            </article>`;
+
+            const tariffRows = (result.tariffs || []).map((tariff) => {
+                const payments = promoCohortCount(tariff.payments);
+                const share = Math.max(0, Math.min(100, Number(tariff.share_pct) || 0));
+                return `<div class="promo-cohort-tariff-row">
+                    <span class="promo-cohort-tariff-name">${escapeHtml(tariff.name || tariff.id || 'Без тарифа')}</span>
+                    <span class="promo-cohort-tariff-track" role="img" aria-label="${share}% платежей"><span style="width:${share}%"></span></span>
+                    <span class="promo-cohort-tariff-count">${num(payments)} оплат · ${share}%</span>
+                    <span class="promo-cohort-tariff-revenue">${num(tariff.revenue)} ₽</span>
+                </div>`;
+            }).join('');
+            const tariffsHtml = `<article class="promo-cohort-panel promo-cohort-tariffs">
+                <div class="promo-cohort-panel-head"><div><h3>Какие тарифы оплатила когорта</h3><p>Все успешные платежи после активации, включая повторные</p></div><span class="promo-cohort-panel-count">${num(cohort.payments)} оплат</span></div>
+                ${tariffRows ? `<div class="promo-cohort-tariff-list">${tariffRows}</div>` : '<div class="promo-cohort-tariff-empty">Оплаченных тарифов пока нет.</div>'}
+            </article>`;
+
+            const lostBeforePurchase = Math.max(0, activations - buyers);
+            const lostBeforeRepeat = Math.max(0, buyers - repeatBuyers);
+            const mainLossIsFirstPurchase = lostBeforePurchase >= lostBeforeRepeat;
+            const funnelHasNoLoss = lostBeforePurchase === 0 && lostBeforeRepeat === 0;
+            const insightTitle = funnelHasNoLoss
+                ? 'Потерь между этапами пока нет'
+                : (mainLossIsFirstPurchase ? 'Основной отток — до первой оплаты' : 'Основной отток — после первой оплаты');
+            const insightCopy = funnelHasNoLoss
+                ? 'Все активировавшие уже совершили первую и повторную оплату. Следите за результатом по мере роста когорты.'
+                : (mainLossIsFirstPurchase
+                    ? `${num(lostBeforePurchase)} активаций не привели к покупке. Это главный резерв роста конверсии этой когорты.`
+                    : `${num(lostBeforeRepeat)} покупателей не совершили повторную оплату. Основной резерв находится в удержании после первой покупки.`);
+            const avgDays = cohort.avg_days_to_purchase === null ? 'Нет данных' : `${cohort.avg_days_to_purchase} дн.`;
+            const insightsHtml = `<div class="promo-cohort-insights">
+                <div class="promo-cohort-insight-main"><b>${insightTitle}</b><span>${insightCopy}</span></div>
+                <div class="promo-cohort-insight-stat"><span>Платежей всего</span><b>${num(cohort.payments)}</b></div>
+                <div class="promo-cohort-insight-stat"><span>До первой оплаты</span><b>${avgDays}</b></div>
+                <div class="promo-cohort-insight-stat"><span>Автоплатёж сейчас</span><b>${num(cohort.with_autopay)}</b></div>
+                <div class="promo-cohort-insight-stat"><span>Скидка не потрачена</span><b>${num(cohort.pending_discounts)}</b></div>
+                <div class="promo-cohort-insight-stat"><span>Выручка / активацию</span><b>${num(revenuePerActivation)} ₽</b></div>
+            </div>`;
+
+            const broadcasts = (result.broadcasts || []).map((row) => `<div class="promo-cohort-broadcast-row">
+                <b>${escapeHtml(row.title)}</b>
+                <span>${escapeHtml(row.created_at || '')} · доставлено ${num(row.sent)} · активировали после рассылки ${num(row.activated)} (${row.activation_pct}% доставленных)</span>
+            </div>`).join('');
+            const broadcastsHtml = broadcasts ? `<div class="promo-cohort-broadcasts">${broadcasts}</div>` : '';
+
             const statusChip = (status) => status === 'active'
                 ? '<span class="promo-cohort-status is-active">Активна</span>'
                 : status === 'blocked'
                     ? '<span class="promo-cohort-status is-blocked">Блок</span>'
                     : '<span class="promo-cohort-status">Истекла</span>';
-            const users = (result.users || []).map((row) => `<tr>
-                <td><a href="#" data-open-user="${row.telegram_id || row.user_id}">${row.telegram_id || `id ${row.user_id}`}</a></td>
-                <td>${escapeHtml(row.activated_at || '—')}</td>
-                <td>${statusChip(row.status)}</td>
-                <td class="is-num">${num(row.payments)}</td>
-                <td class="is-num">${row.revenue ? `${num(row.revenue)} ₽` : '—'}</td>
-                <td>${escapeHtml(row.first_paid_at || '—')}</td>
-                <td>${escapeHtml(row.expire_at || '—')}</td>
-                <td>${row.has_autopay ? '<i class="fas fa-circle-check promo-cohort-autopay"></i>' : '—'}</td>
-            </tr>`).join('');
-            const truncated = result.users_truncated ? `<p class="promo-cohort-note">Показаны первые ${num((result.users || []).length)} активаций — агрегаты выше учитывают всю когорту.</p>` : '';
-            return `${summary}${broadcasts}
-                <div class="promo-cohort-table-scroll"><table class="promo-cohort-table">
-                    <thead><tr><th>Пользователь</th><th>Активация</th><th>Статус</th><th>Платежей</th><th>Выручка</th><th>Первая оплата</th><th>Подписка до</th><th>Автоплатёж</th></tr></thead>
-                    <tbody>${users}</tbody>
-                </table></div>${truncated}`;
+            const users = (result.users || []).map((row) => {
+                const identity = row.telegram_id || `id ${row.user_id}`;
+                const query = row.telegram_id || row.user_id;
+                return `<tr>
+                    <td data-label="Пользователь"><a href="#" data-open-user="${escapeHtml(String(query))}">${escapeHtml(String(identity))}</a></td>
+                    <td data-label="Активация">${escapeHtml(row.activated_at || '—')}</td>
+                    <td data-label="Статус">${statusChip(row.status)}</td>
+                    <td data-label="Платежей" class="is-num">${num(row.payments)}</td>
+                    <td data-label="Выручка" class="is-num">${num(row.revenue)} ₽</td>
+                    <td data-label="Первая оплата">${escapeHtml(row.first_paid_at || '—')}</td>
+                    <td data-label="Подписка до">${escapeHtml(row.expire_at || '—')}</td>
+                    <td data-label="Автоплатёж">${row.has_autopay ? '<i class="fas fa-circle-check promo-cohort-autopay"></i> Включён' : '—'}</td>
+                </tr>`;
+            }).join('');
+            const truncated = result.users_truncated ? `<p class="promo-cohort-note">Показаны первые ${num((result.users || []).length)} активаций — агрегаты учитывают всю когорту.</p>` : '';
+
+            return `<div class="promo-cohort-view-tabs" role="tablist" aria-label="Представление отчёта">
+                    <button type="button" class="promo-cohort-view-tab" id="promo-cohort-tab-overview" role="tab" data-promo-cohort-view="overview" aria-selected="true" aria-controls="promo-cohort-view-overview"><i class="fas fa-chart-pie"></i>Обзор</button>
+                    <button type="button" class="promo-cohort-view-tab" id="promo-cohort-tab-dynamics" role="tab" data-promo-cohort-view="dynamics" aria-selected="false" aria-controls="promo-cohort-view-dynamics"><i class="fas fa-chart-line"></i>Динамика</button>
+                    <button type="button" class="promo-cohort-view-tab" id="promo-cohort-tab-users" role="tab" data-promo-cohort-view="users" aria-selected="false" aria-controls="promo-cohort-view-users"><i class="fas fa-users"></i>Пользователи</button>
+                </div>
+                <section class="promo-cohort-view-panel" id="promo-cohort-view-overview" role="tabpanel" aria-labelledby="promo-cohort-tab-overview" data-promo-cohort-view-panel="overview">
+                    ${metricHtml}
+                    <div class="promo-cohort-overview-grid">${funnelHtml}${stateHtml}</div>
+                    ${tariffsHtml}
+                    ${insightsHtml}
+                </section>
+                <section class="promo-cohort-view-panel" id="promo-cohort-view-dynamics" role="tabpanel" aria-labelledby="promo-cohort-tab-dynamics" data-promo-cohort-view-panel="dynamics" hidden>
+                    <div class="promo-cohort-chart-wrap" id="promo-cohort-chart-wrap">
+                        <div class="promo-cohort-panel-head"><div><h3>Активации и первые оплаты</h3><p>Первые оплаты показаны по фактической дате платежа</p></div></div>
+                        <canvas id="promo-cohort-chart" hidden></canvas>
+                        <div class="promo-cohort-chart-empty" id="promo-cohort-chart-empty" hidden><div><i class="fas fa-chart-column"></i><b>Для динамики пока мало данных</b><span>Одна дата не образует тренд. Все доступные показатели и пользователь уже показаны в соседних вкладках.</span></div></div>
+                    </div>
+                    ${broadcasts ? `<div class="promo-cohort-panel" style="margin-top:10px;"><div class="promo-cohort-panel-head"><div><h3>Рассылки с этим промокодом</h3><p>Доставки и активации после отправки</p></div></div>${broadcastsHtml}</div>` : ''}
+                </section>
+                <section class="promo-cohort-view-panel" id="promo-cohort-view-users" role="tabpanel" aria-labelledby="promo-cohort-tab-users" data-promo-cohort-view-panel="users" hidden>
+                    <div class="promo-cohort-panel-head"><div><h3>Пользователи когорты</h3><p>Клик по идентификатору открывает карточку клиента</p></div><span class="promo-cohort-panel-count">${num((result.users || []).length)} строк</span></div>
+                    <div class="promo-cohort-table-scroll"><table class="promo-cohort-table">
+                        <thead><tr><th>Пользователь</th><th>Активация</th><th>Статус</th><th>Платежей</th><th>Выручка</th><th>Первая оплата</th><th>Подписка до</th><th>Автоплатёж</th></tr></thead>
+                        <tbody>${users}</tbody>
+                    </table></div>${truncated}
+                </section>`;
         }
 
         function openUserCard(query) {
@@ -7624,53 +7873,100 @@
             form.requestSubmit();
         }
 
-        function renderPromoCohortChart(byDay) {
+        function renderPromoCohortChart(byDay, firstPaymentsByDay) {
             const wrap = document.getElementById('promo-cohort-chart-wrap');
             const canvas = document.getElementById('promo-cohort-chart');
-            if (!wrap || !canvas) return;
+            const empty = document.getElementById('promo-cohort-chart-empty');
+            if (!wrap || !canvas || !empty) return;
             // acqDraw живёт в скрипте «Привлечения» и экспортирован глобально.
-            if (!window.acqDraw || !byDay || !byDay.length) { wrap.hidden = true; return; }
-            // API отдаёт только дни с активациями — дыры заполняем нулями,
-            // иначе редкие всплески на графике слипаются в сплошной ряд.
-            const counts = new Map(byDay);
-            const first = new Date(`${byDay[0][0]}T00:00:00Z`);
-            const last = new Date(`${byDay[byDay.length - 1][0]}T00:00:00Z`);
+            if (!window.acqDraw || !byDay || !byDay.length) {
+                canvas.hidden = true;
+                empty.hidden = false;
+                return;
+            }
+            // API отдаёт только даты с событиями. Собираем общую шкалу активаций
+            // и первых оплат, а пропуски заполняем нулями.
+            const activationCounts = new Map(byDay);
+            const paymentCounts = new Map(firstPaymentsByDay || []);
+            const eventDates = [...activationCounts.keys(), ...paymentCounts.keys()].sort();
+            if (eventDates.length < 2) {
+                canvas.hidden = true;
+                empty.hidden = false;
+                return;
+            }
+            const first = new Date(`${eventDates[0]}T00:00:00Z`);
+            const last = new Date(`${eventDates[eventDates.length - 1]}T00:00:00Z`);
             const days = [];
             for (let ts = first.getTime(); ts <= last.getTime() && days.length < 1000; ts += 86400000) {
                 days.push(new Date(ts).toISOString().slice(0, 10));
             }
-            wrap.hidden = false;
+            empty.hidden = true;
+            canvas.hidden = false;
             window.acqDraw(
                 canvas,
                 days.map((iso) => iso.slice(8, 10) + '.' + iso.slice(5, 7)),
-                [{label: 'Активации промокода', tone: 'amber', data: days.map((iso) => counts.get(iso) || 0), fmt: 'raw'}],
-                [],
+                [{label: 'Активации', tone: 'amber', data: days.map((iso) => activationCounts.get(iso) || 0), fmt: 'raw'}],
+                [{label: 'Первые оплаты (правая ось)', tone: 'green', data: days.map((iso) => paymentCounts.get(iso) || 0), fmt: 'raw'}],
                 {fullLabels: days},
             );
+        }
+
+        function setupPromoCohortViews(result) {
+            const body = document.getElementById('promo-cohort-body');
+            if (!body) return;
+            let chartRendered = false;
+            const showView = (view) => {
+                body.querySelectorAll('[data-promo-cohort-view]').forEach((button) => {
+                    button.setAttribute('aria-selected', String(button.dataset.promoCohortView === view));
+                });
+                body.querySelectorAll('[data-promo-cohort-view-panel]').forEach((panel) => {
+                    panel.hidden = panel.dataset.promoCohortViewPanel !== view;
+                });
+                if (view === 'dynamics' && !chartRendered) {
+                    chartRendered = true;
+                    window.requestAnimationFrame(() => renderPromoCohortChart(
+                        result.activations_by_day || [],
+                        result.first_payments_by_day || [],
+                    ));
+                }
+            };
+            body.querySelectorAll('[data-promo-cohort-view]').forEach((button) => {
+                button.addEventListener('click', () => showView(button.dataset.promoCohortView));
+            });
+            showView('overview');
         }
 
         async function loadPromoCohort(params, label) {
             const card = document.getElementById('promo-cohort-card');
             const body = document.getElementById('promo-cohort-body');
             const title = document.getElementById('promo-cohort-title');
+            const headerMeta = document.getElementById('promo-cohort-header-meta');
             if (!card || !body) return;
             card.hidden = false;
             if (title) title.textContent = `Когорта: ${label}`;
+            if (headerMeta) headerMeta.innerHTML = '';
             body.innerHTML = inlineLoading('Считаем судьбу когорты...');
             try {
                 const query = new URLSearchParams(params);
                 const response = await fetch(`${main.dataset.promoCohortUrl}?${query.toString()}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error();
-                renderPromoCohortChart((payload.result || {}).activations_by_day || []);
-                body.innerHTML = renderPromoCohort(payload.result || {});
+                const result = payload.result || {};
+                const subject = result.subject || {};
+                if (title) title.textContent = subject.label || label;
+                if (headerMeta) {
+                    const effect = promoTypeInfo(subject.promo_type, subject.value);
+                    const kind = subject.kind === 'batch' ? 'Партия купонов' : 'Промокод';
+                    headerMeta.innerHTML = `<span class="promo-cohort-tag is-effect">${escapeHtml(effect.effect)}</span><span class="promo-cohort-tag">${kind}</span><span class="promo-cohort-tag">${num(result.cohort?.activations || 0)} активаций</span>`;
+                }
+                body.innerHTML = renderPromoCohort(result);
+                setupPromoCohortViews(result);
                 body.querySelectorAll('[data-open-user]').forEach((link) => link.addEventListener('click', (event) => {
                     event.preventDefault();
                     openUserCard(link.dataset.openUser);
                 }));
             } catch (error) {
-                const wrap = document.getElementById('promo-cohort-chart-wrap');
-                if (wrap) wrap.hidden = true;
+                if (headerMeta) headerMeta.innerHTML = '';
                 body.innerHTML = '<div class="promo-empty"><div><i class="fas fa-triangle-exclamation"></i><b>Не удалось построить когорту</b><span>Проверьте соединение и попробуйте ещё раз.</span></div></div>';
             }
         }

@@ -4,6 +4,7 @@ import json
 import time
 from datetime import date
 from datetime import datetime
+from datetime import timezone
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
@@ -5151,6 +5152,47 @@ class AdminStage4Tests(SimpleTestCase):
         with self.assertRaises(ValueError):
             segment_where_sql("nope")
 
+    def test_segments_endpoint_survives_single_segment_failure(self):
+        """Один медленный/сломанный сегмент не должен ронять весь пикер
+        получателей: у него count=null, остальные сегменты живут."""
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_segments)
+        self.assertIn("SET LOCAL statement_timeout", src)
+        self.assertIn("SEGMENT_COUNT_TIMEOUT_MS", src)
+        self.assertIn("db_session.rollback()", src)
+        self.assertIn("count = None", src)
+        self.assertIn("logging.exception", src)
+        # Быстрый путь: один проход вместо 18 запросов, с откатом на
+        # пер-сегментный подсчёт при любой ошибке.
+        self.assertIn("segments_counts_sql", src)
+        self.assertIn("SEGMENTS_FAST_COUNT_TIMEOUT_MS", src)
+
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        # Фронт показывает «—» вместо нуля, если охват сегмента не посчитался.
+        self.assertIn("function broadcastSegmentCountLabel", template)
+        self.assertIn("broadcastSegmentCountLabel(segment)", template)
+
+    def test_fast_segment_counts_cover_every_segment(self):
+        """У каждого сегмента из ADMIN_SEGMENTS должно быть условие быстрого
+        подсчёта — иначе новый сегмент молча уйдёт на медленный fallback."""
+        from common.models.segments import (
+            ADMIN_SEGMENTS,
+            SEGMENT_COUNT_CONDITIONS,
+            segments_counts_sql,
+        )
+
+        self.assertEqual(set(ADMIN_SEGMENTS), set(SEGMENT_COUNT_CONDITIONS))
+        sql = segments_counts_sql()
+        for key in ADMIN_SEGMENTS:
+            self.assertIn(f'AS "{key}"', sql)
+        # Базовая выборка повторяет segment_where_sql: без заблокированных,
+        # только с Telegram.
+        self.assertIn("user_blocks", sql)
+        self.assertIn("u.telegram_id IS NOT NULL", sql)
+
     def test_stage4_endpoints_are_routed(self):
         from django.urls import reverse
 
@@ -5460,9 +5502,160 @@ class PromoCohortTests(SimpleTestCase):
             )
             self.assertEqual(support_admin_api_promo_cohort(request).status_code, 400)
 
+    def test_endpoint_returns_funnel_states_and_first_payment_timeline(self):
+        from engine.views import support_admin_api_promo_cohort
+
+        def row(
+            user_id,
+            activated_at,
+            expire_at,
+            *,
+            yk_count=0,
+            yk_total=0,
+            yk_first=None,
+            wata_count=0,
+            wata_total=0,
+            wata_first=None,
+            has_autopay=False,
+            is_blocked=False,
+        ):
+            return SimpleNamespace(
+                user_id=user_id,
+                telegram_id=100000 + user_id,
+                activated_at=activated_at,
+                expire_at=expire_at,
+                has_autopay=has_autopay,
+                is_blocked=is_blocked,
+                yk_cnt=yk_count,
+                yk_total=yk_total,
+                yk_first=yk_first,
+                wt_cnt=wata_count,
+                wt_total=wata_total,
+                wt_first=wata_first,
+            )
+
+        future = datetime(2099, 1, 1)
+        expired = datetime(2020, 1, 1)
+        rows = [
+            row(
+                1,
+                datetime(2026, 8, 1, 10),
+                future,
+                yk_count=2,
+                yk_total=2000,
+                yk_first=datetime(2026, 8, 3, 10),
+                has_autopay=True,
+            ),
+            row(2, datetime(2026, 8, 1, 12), future),
+            row(
+                3,
+                datetime(2026, 8, 2, 8),
+                expired,
+                wata_count=1,
+                wata_total=900,
+                wata_first=datetime(2026, 8, 4, 8, tzinfo=timezone.utc),
+            ),
+            row(4, datetime(2026, 8, 2, 14), expired),
+            row(5, datetime(2026, 8, 2, 16), future, is_blocked=True),
+        ]
+
+        cohort_query = mock.Mock()
+        cohort_query.all.return_value = rows
+        discounts_query = mock.Mock()
+        discounts_query.scalar.return_value = 2
+        broadcasts_query = mock.Mock()
+        broadcasts_query.all.return_value = []
+        yk_tariff_query = mock.MagicMock()
+        wata_tariff_query = mock.MagicMock()
+        for tariff_query in (yk_tariff_query, wata_tariff_query):
+            tariff_query.select_from.return_value = tariff_query
+            tariff_query.join.return_value = tariff_query
+            tariff_query.filter.return_value = tariff_query
+            tariff_query.group_by.return_value = tariff_query
+        yk_tariff_query.all.return_value = [("month", 1, 1000)]
+        wata_tariff_query.all.return_value = [
+            ("month", 1, 1000),
+            ("year", 1, 900),
+        ]
+        db_session = mock.Mock()
+        db_session.get.return_value = SimpleNamespace(
+            id=7,
+            code="TEST30",
+            promo_type="days",
+            value=30,
+        )
+        db_session.execute.side_effect = [
+            cohort_query,
+            discounts_query,
+            broadcasts_query,
+        ]
+        db_session.query.side_effect = [yk_tariff_query, wata_tariff_query]
+
+        with (
+            mock.patch("engine.views.require_support_admin_any", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=db_session),
+        ):
+            request = RequestFactory().get(
+                "/support-admin/api/promo-cohort/?promo_id=7"
+            )
+            response = support_admin_api_promo_cohort(request)
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        result = payload["result"]
+        cohort = result["cohort"]
+        self.assertEqual(cohort["activations"], 5)
+        self.assertEqual(cohort["buyers"], 2)
+        self.assertEqual(cohort["repeat_buyers"], 1)
+        self.assertEqual(cohort["second_purchase_pct"], 50.0)
+        self.assertEqual(cohort["payments"], 3)
+        self.assertEqual(cohort["revenue"], 2900)
+        self.assertEqual(cohort["revenue_per_activation"], 580)
+        self.assertEqual(cohort["active_paid"], 1)
+        self.assertEqual(cohort["active_without_purchase"], 1)
+        self.assertEqual(cohort["expired_without_purchase"], 1)
+        self.assertEqual(cohort["returned_then_churned"], 1)
+        self.assertEqual(cohort["blocked"], 1)
+        self.assertEqual(
+            cohort["active_paid"]
+            + cohort["active_without_purchase"]
+            + cohort["expired_without_purchase"]
+            + cohort["returned_then_churned"]
+            + cohort["blocked"],
+            cohort["activations"],
+        )
+        self.assertEqual(
+            result["first_payments_by_day"],
+            [["2026-08-03", 1], ["2026-08-04", 1]],
+        )
+        self.assertEqual(
+            result["activations_by_day"],
+            [["2026-08-01", 2], ["2026-08-02", 3]],
+        )
+        self.assertEqual(
+            result["tariffs"],
+            [
+                {
+                    "id": "month",
+                    "name": "1 месяц",
+                    "payments": 2,
+                    "revenue": 2000,
+                    "share_pct": 66.7,
+                },
+                {
+                    "id": "year",
+                    "name": "1 год",
+                    "payments": 1,
+                    "revenue": 900,
+                    "share_pct": 33.3,
+                },
+            ],
+        )
+        db_session.close.assert_called_once_with()
+
     def test_template_has_cohort_ui_in_analytics(self):
-        """Когорты живут вкладкой в «Аналитике»: выбор промокода + график
-        активаций по дням; из раздела «Промокоды» кнопки убраны."""
+        """Когорты живут вкладкой в «Аналитике»: обзор, динамика и люди;
+        из раздела «Промокоды» кнопки убраны."""
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
         self.assertIn('data-subtab="promo-cohorts"', template)
@@ -5470,11 +5663,23 @@ class PromoCohortTests(SimpleTestCase):
         self.assertIn('id="promo-cohort-form"', template)
         self.assertIn('id="promo-cohort-select"', template)
         self.assertIn('id="promo-cohort-chart"', template)
+        self.assertIn('id="promo-cohort-chart-empty"', template)
         self.assertIn('id="promo-cohort-card"', template)
         self.assertIn('id="promo-cohort-body"', template)
         self.assertIn("data-promo-cohort-url", template)
+        self.assertIn('data-promo-cohort-view="overview"', template)
+        self.assertIn('data-promo-cohort-view="dynamics"', template)
+        self.assertIn('data-promo-cohort-view="users"', template)
+        self.assertIn("Воронка монетизации", template)
+        self.assertIn("Состояние когорты сейчас", template)
+        self.assertIn("Какие тарифы оплатила когорта", template)
+        self.assertIn("Оплатили второй раз", template)
+        self.assertIn("second_purchase_pct", template)
+        self.assertIn("promo-cohort-tariff-list", template)
+        self.assertIn("first_payments_by_day", template)
         self.assertIn("function renderPromoCohort", template)
         self.assertIn("function renderPromoCohortChart", template)
+        self.assertIn("function setupPromoCohortViews", template)
         self.assertIn("function loadPromoCohort", template)
         self.assertIn("function loadPromoCohortOptions", template)
         self.assertIn("function openUserCard", template)
