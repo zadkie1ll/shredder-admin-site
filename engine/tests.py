@@ -3972,6 +3972,63 @@ class NodeTrafficTemplateTests(SimpleTestCase):
         self.assertIn("function loadNodeTraffic(event)", template)
 
 
+class NodeProvisionTemplateTests(SimpleTestCase):
+    def setUp(self):
+        self.template = Path("engine/templates/admin_dashboard.html").read_text()
+
+    def test_node_provision_separates_installations_and_scripts(self):
+        for marker in (
+            'data-node-provision-view="installations"',
+            'data-node-provision-view="scripts"',
+            'data-node-provision-panel="installations"',
+            'data-node-provision-panel="scripts"',
+            'class="node-provision-flow"',
+            'id="node-provision-readiness"',
+            'class="node-provision-form-grid"',
+            'class="node-provision-request-row"',
+            'class="node-provision-scripts-layout"',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        self.assertIn("function setNodeProvisionView(view)", self.template)
+        self.assertNotIn('class="node-provision-script-block"', self.template)
+        self.assertNotIn('class="node-provision-table"', self.template)
+
+    def test_node_script_editor_has_live_bash_highlighting(self):
+        for marker in (
+            'id="node-provision-editor-highlight"',
+            'id="node-provision-editor-lines"',
+            'data-node-script-editor=',
+            'wrap="off"',
+            "function nodeProvisionHighlightBashLine",
+            "function renderNodeScriptEditor()",
+            "NODE_PROVISION_BASH_KEYWORDS",
+            "node-provision-bash-comment",
+            "node-provision-bash-variable",
+            "node-provision-bash-string",
+            "editor.setRangeText('  '",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        # Подсветка живёт в отдельном слое, а исходный текст по-прежнему
+        # читается из textarea и без преобразований отправляется в API.
+        self.assertIn("body.append('content', editor.value);", self.template)
+        self.assertIn("color: transparent", self.template)
+        self.assertIn("pointer-events: none", self.template)
+
+    def test_node_provision_layout_has_mobile_reflow(self):
+        self.assertIn("@media (max-width: 760px)", self.template)
+        self.assertIn(".node-provision-form-grid { grid-template-columns: 1fr; }", self.template)
+        self.assertIn(".node-provision-request-row { grid-template-columns: 1fr; }", self.template)
+        self.assertIn(".node-provision-script-nav { grid-template-columns: 1fr; }", self.template)
+        self.assertIn(
+            'html[data-admin-theme="light"] .node-provision-code-editor',
+            self.template,
+        )
+
+
 class NodeTrafficDayGranularityTests(SimpleTestCase):
     """Панель хранит трафик посуточно (created_at = 00:00 дня, UTC); начало
     периода внутри дня отбрасывало весь этот день (инцидент 2026-07-10)."""

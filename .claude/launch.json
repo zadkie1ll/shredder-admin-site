@@ -2,10 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "admin-preview",
-      "runtimeExecutable": "/bin/bash",
-      "runtimeArgs": ["/private/tmp/claude-501/-Users-apugachev-Work-projects-monkeyislandvpn-monkey-island-website/6fc5ab15-09c1-494e-aa96-6ed6090869c4/scratchpad/run_admin_preview.sh"],
-      "port": 7788
+      "name": "concept-preview",
+      "runtimeExecutable": "python3",
+      "runtimeArgs": ["-m", "http.server", "8899", "--directory", "/Users/apugachev/Desktop/monkey-island-vpn-assets"],
+      "port": 8899
     }
   ]
 }
