@@ -151,14 +151,12 @@ CABINET_DOMAINS = config(
 DEFAULT_CABINET_DOMAIN = config(
     "DEFAULT_CABINET_DOMAIN", default="http://localhost:8000"
 )
-# Панельные домены: только на них отвечает bootstrap-API установки нод
-# (/node-bootstrap/...). Пустой список = API выключено (безопасный дефолт).
-PANEL_DOMAINS = config("PANEL_DOMAINS", default="", cast=csv_domains)
-# Откуда bootstrap-API берёт сертификаты для новых нод (выпускает
-# manage-node-certificates.sh из devops-репозитория)
-NODE_BOOTSTRAP_CERT_ROOT = config(
-    "NODE_BOOTSTRAP_CERT_ROOT", default="/etc/monkeyisland/ssl"
-)
+# Домены, на которых сайт отвечает bootstrap-API установки нод
+# (/node-bootstrap/...). Это НЕ домен панели Remnawave: нужен любой домен,
+# который маршрутизируется на сайт с валидным TLS (например, отдельный
+# поддомен) — свежие ноды забирают с него скрипт и секреты по публичному
+# HTTPS. Пустой список = API выключено (безопасный дефолт).
+NODE_BOOTSTRAP_DOMAINS = config("NODE_BOOTSTRAP_DOMAINS", default="", cast=csv_domains)
 # TTL одноразового токена установки до момента claim
 NODE_BOOTSTRAP_TOKEN_TTL_MINUTES = config(
     "NODE_BOOTSTRAP_TOKEN_TTL_MINUTES", default=60, cast=int

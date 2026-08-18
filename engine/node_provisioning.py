@@ -5,23 +5,21 @@
 
     curl -fsSL https://<панельный-домен>/node-bootstrap/runner | bash -s -- <токен>
 
-Обёртка по токену забирает SECRET_KEY панели (через RWMS), сертификаты и
-зафиксированную в заявке версию install-скрипта (копия devops-скрипта из
-таблицы node_install_scripts), выполняет установку и шлёт прогресс обратно.
+Обёртка по токену забирает SECRET_KEY панели (через RWMS) и зафиксированную
+в заявке версию install-скрипта (копия devops-скрипта из таблицы
+node_install_scripts), выполняет установку и шлёт прогресс обратно.
 Нода создаётся в панели Remnawave уже на claim (идемпотентно, через RWMS),
 поэтому момент её первого коннекта — естественное подтверждение успеха.
+Сертификаты в поток не входят: их деплоят вручную
+(manage-node-certificates.sh из devops-репозитория).
 
 Безопасность: токен хранится только хешем, живёт NODE_BOOTSTRAP_TOKEN_TTL
-до claim, после claim привязан к IP сервера; сертификаты выдаются один раз
-на заявку; сам SECRET_KEY и содержимое сертификатов не логируются.
+до claim, после claim привязан к IP сервера; сам SECRET_KEY не логируется.
 """
 
 import hashlib
-import io
 import logging
-import os
 import secrets
-import tarfile
 from datetime import datetime
 from datetime import timedelta
 
@@ -42,7 +40,7 @@ NODE_TYPES = [
 ]
 NODE_TYPE_KEYS = {key for key, _ in NODE_TYPES}
 
-STAGES = ["claim", "certs", "script", "connect"]
+STAGES = ["claim", "script", "connect"]
 
 DEFAULT_SSH_PORT = 40022
 REMNANODE_PORT = 2222
@@ -317,50 +315,6 @@ def claim_request(db_session, provision_request, client_ip, rwms_client):
         "script_sha256": script_sha256(script.content),
         "remnawave_node_uuid": node.uuid,
     }
-
-
-def build_certs_tar(cert_root) -> bytes:
-    """tar.gz каталога сертификатов; пути в архиве — от корня ФС,
-    чтобы на ноде хватило tar -xzf certs.tar.gz -C /."""
-    if not os.path.isdir(cert_root):
-        raise ProvisionError(
-            f"Каталог сертификатов {cert_root} недоступен на сервере сайта",
-            http_status=503,
-        )
-    buffer = io.BytesIO()
-    files_added = 0
-    with tarfile.open(fileobj=buffer, mode="w:gz") as tar:
-        for dirpath, _dirnames, filenames in os.walk(cert_root):
-            for filename in sorted(filenames):
-                full_path = os.path.join(dirpath, filename)
-                if not os.path.isfile(full_path):
-                    continue
-                tar.add(full_path, arcname=os.path.relpath(full_path, "/"))
-                files_added += 1
-    if files_added == 0:
-        raise ProvisionError(
-            f"В {cert_root} нет файлов сертификатов", http_status=503
-        )
-    return buffer.getvalue()
-
-
-def issue_certs(db_session, provision_request, cert_root) -> bytes:
-    """Сертификаты выдаются один раз на заявку (сброс — кнопкой в админке)."""
-    check_stage_allowed(provision_request)
-    if provision_request.certs_issued_at is not None:
-        raise ProvisionError(
-            "Сертификаты по этой заявке уже выдавались; сбрось выдачу в админке",
-            http_status=409,
-        )
-    payload = build_certs_tar(cert_root)
-    provision_request.certs_issued_at = datetime.now()
-    set_stage(db_session, provision_request, "certs", "ok")
-    logger.info(
-        "node bootstrap: certs issued request=%s bytes=%s",
-        provision_request.id,
-        len(payload),
-    )
-    return payload
 
 
 def check_stage_allowed(provision_request):

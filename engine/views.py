@@ -11651,14 +11651,14 @@ def support_admin_api_accounts(request):
 
 
 def _node_bootstrap_reject_host(request):
-    """Bootstrap-API отвечает только на панельных доменах.
+    """Bootstrap-API отвечает только на доменах из NODE_BOOTSTRAP_DOMAINS.
 
-    Пустой PANEL_DOMAINS = API выключено. На остальных доменах отдаём 404
-    без тела, чтобы эндпоинты не светились на VPN/VPS/cabinet доменах.
+    Пустой список = API выключено. На остальных доменах отдаём 404 без
+    тела, чтобы эндпоинты не светились на VPN/VPS/cabinet доменах.
     """
-    if not settings.PANEL_DOMAINS:
+    if not settings.NODE_BOOTSTRAP_DOMAINS:
         return HttpResponse(status=404)
-    if normalize_host(request.get_host()) not in settings.PANEL_DOMAINS:
+    if normalize_host(request.get_host()) not in settings.NODE_BOOTSTRAP_DOMAINS:
         return HttpResponse(status=404)
     return None
 
@@ -11718,27 +11718,6 @@ def node_bootstrap_claim(request):
         )
         db_session.commit()
         return JsonResponse({"status": "ok", "result": payload})
-    except node_provisioning.ProvisionError as error:
-        return _node_bootstrap_error(db_session, error)
-    finally:
-        db_session.close()
-
-
-def node_bootstrap_certs(request):
-    host_response = _node_bootstrap_reject_host(request)
-    if host_response:
-        return host_response
-
-    db_session = session_factory()
-    try:
-        provision_request = _node_bootstrap_find(db_session, request)
-        payload = node_provisioning.issue_certs(
-            db_session, provision_request, settings.NODE_BOOTSTRAP_CERT_ROOT
-        )
-        db_session.commit()
-        response = HttpResponse(payload, content_type="application/gzip")
-        response["Content-Disposition"] = 'attachment; filename="certs.tar.gz"'
-        return response
     except node_provisioning.ProvisionError as error:
         return _node_bootstrap_error(db_session, error)
     finally:
@@ -11964,7 +11943,6 @@ def _admin_provision_request_payload(provision_request, script_versions=None):
         ),
         "claimed_ip": provision_request.claimed_ip,
         "ssh_port": provision_request.ssh_port,
-        "certs_issued": provision_request.certs_issued_at is not None,
         "remnawave_node_uuid": provision_request.remnawave_node_uuid,
         "error": provision_request.error,
         "created_by": provision_request.created_by,
@@ -12022,13 +12000,13 @@ def support_admin_api_node_provision(request):
                         node_type=provision_request.node_type,
                     )
                     db_session.commit()
-                    panel_domain = (
-                        settings.PANEL_DOMAINS[0]
-                        if settings.PANEL_DOMAINS
+                    bootstrap_domain = (
+                        settings.NODE_BOOTSTRAP_DOMAINS[0]
+                        if settings.NODE_BOOTSTRAP_DOMAINS
                         else normalize_host(request.get_host())
                     )
                     one_liner = (
-                        f"curl -fsSL https://{panel_domain}/node-bootstrap/runner/ "
+                        f"curl -fsSL https://{bootstrap_domain}/node-bootstrap/runner/ "
                         f"| bash -s -- {token}"
                     )
                     return JsonResponse(
@@ -12040,8 +12018,8 @@ def support_admin_api_node_provision(request):
                                 ),
                                 # Токен показывается ровно один раз
                                 "one_liner": one_liner,
-                                "panel_domains_configured": bool(
-                                    settings.PANEL_DOMAINS
+                                "bootstrap_domains_configured": bool(
+                                    settings.NODE_BOOTSTRAP_DOMAINS
                                 ),
                             },
                         }
@@ -12061,15 +12039,6 @@ def support_admin_api_node_provision(request):
                     node_provisioning.revoke_request(provision_request)
                     admin_audit_write(
                         db_session, request, "node_provision_revoke",
-                        target=provision_request.node_name,
-                    )
-                    db_session.commit()
-                    return JsonResponse({"status": "ok"})
-
-                if action == "reset_certs":
-                    provision_request.certs_issued_at = None
-                    admin_audit_write(
-                        db_session, request, "node_provision_reset_certs",
                         target=provision_request.node_name,
                     )
                     db_session.commit()
@@ -12130,7 +12099,9 @@ def support_admin_api_node_provision(request):
                         for key, label in node_provisioning.NODE_TYPES
                     ],
                     "scripts_ready": scripts_ready,
-                    "panel_domains_configured": bool(settings.PANEL_DOMAINS),
+                    "bootstrap_domains_configured": bool(
+                        settings.NODE_BOOTSTRAP_DOMAINS
+                    ),
                 },
             }
         )

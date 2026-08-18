@@ -4,13 +4,9 @@
 RWMS — mock.Mock() с proto-объектами, HTTP — RequestFactory на view-функциях.
 """
 
-import io
 import json
-import tarfile
-import tempfile
 from datetime import datetime
 from datetime import timedelta
-from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
@@ -288,58 +284,6 @@ class ClaimTests(NodeProvisioningDbTestCase):
             node_provisioning.find_request_by_token(self.session, token)
 
 
-class CertsTests(NodeProvisioningDbTestCase):
-    def claimed_request(self):
-        provision_request, token = self.make_request()
-        node_provisioning.claim_request(
-            self.session, provision_request, "1.2.3.4", make_rwms_mock()
-        )
-        return provision_request, token
-
-    def test_certs_tar_roundtrip_and_one_shot(self):
-        provision_request, _token = self.claimed_request()
-        with tempfile.TemporaryDirectory() as cert_root:
-            domain_dir = Path(cert_root) / "monkeyisland.xyz"
-            domain_dir.mkdir()
-            (domain_dir / "fullchain.pem").write_text("CERT")
-            (domain_dir / "privatekey.pem").write_text("KEY")
-
-            payload = node_provisioning.issue_certs(
-                self.session, provision_request, cert_root
-            )
-            with tarfile.open(fileobj=io.BytesIO(payload), mode="r:gz") as tar:
-                names = tar.getnames()
-            # Пути от корня ФС: распаковка tar -xzf -C / кладёт всё на место
-            self.assertTrue(
-                any(name.endswith("monkeyisland.xyz/fullchain.pem") for name in names)
-            )
-            self.assertTrue(all(not name.startswith("/") for name in names))
-
-            with self.assertRaises(node_provisioning.ProvisionError) as ctx:
-                node_provisioning.issue_certs(
-                    self.session, provision_request, cert_root
-                )
-            self.assertEqual(ctx.exception.http_status, 409)
-
-            # Сброс выдачи в админке разрешает повторную выдачу
-            provision_request.certs_issued_at = None
-            node_provisioning.issue_certs(self.session, provision_request, cert_root)
-
-    def test_certs_before_claim_rejected(self):
-        provision_request, _token = self.make_request()
-        with self.assertRaises(node_provisioning.ProvisionError) as ctx:
-            node_provisioning.issue_certs(self.session, provision_request, "/nope")
-        self.assertEqual(ctx.exception.http_status, 409)
-
-    def test_missing_cert_root_is_503(self):
-        provision_request, _token = self.claimed_request()
-        with self.assertRaises(node_provisioning.ProvisionError) as ctx:
-            node_provisioning.issue_certs(
-                self.session, provision_request, "/no/such/dir"
-            )
-        self.assertEqual(ctx.exception.http_status, 503)
-
-
 class ProgressAndCompleteTests(NodeProvisioningDbTestCase):
     def claimed_request(self):
         provision_request, token = self.make_request()
@@ -359,10 +303,10 @@ class ProgressAndCompleteTests(NodeProvisioningDbTestCase):
     def test_failed_stage_fails_request(self):
         provision_request, _token = self.claimed_request()
         node_provisioning.record_progress(
-            self.session, provision_request, "certs", "failed", "cert download failed", None
+            self.session, provision_request, "script", "failed", "sha256 mismatch", None
         )
         self.assertEqual(provision_request.status, NodeProvisionStatus.FAILED)
-        self.assertIn("cert download failed", provision_request.error)
+        self.assertIn("sha256 mismatch", provision_request.error)
 
     def test_complete_zero_installs_nonzero_fails(self):
         provision_request, _token = self.claimed_request()
@@ -394,7 +338,7 @@ class ProgressAndCompleteTests(NodeProvisioningDbTestCase):
         self.assertEqual(provision_request.status, NodeProvisionStatus.READY)
 
 
-@override_settings(PANEL_DOMAINS=["panel.test"])
+@override_settings(NODE_BOOTSTRAP_DOMAINS=["panel.test"])
 class BootstrapViewsTests(NodeProvisioningDbTestCase):
     """HTTP-слой bootstrap-эндпоинтов: host-gating, Bearer-токен, статусы."""
 
@@ -429,13 +373,13 @@ class BootstrapViewsTests(NodeProvisioningDbTestCase):
         self.assertEqual(payload["result"]["secret_key"], "panel-key")
         self.assertEqual(payload["result"]["node_type"], "self_steal")
 
-    def test_claim_rejected_on_foreign_host_and_without_panel_domains(self):
+    def test_claim_rejected_on_foreign_host_and_without_bootstrap_domains(self):
         _provision_request, token = self.make_request()
         with mock.patch("engine.views.rwms_client", make_rwms_mock()):
             response = self.post_claim(token, host="cabinet.test")
             self.assertEqual(response.status_code, 404)
 
-            with override_settings(PANEL_DOMAINS=[]):
+            with override_settings(NODE_BOOTSTRAP_DOMAINS=[]):
                 response = self.post_claim(token)
                 self.assertEqual(response.status_code, 404)
 
@@ -522,7 +466,7 @@ class BootstrapViewsTests(NodeProvisioningDbTestCase):
         self.assertEqual(node_bootstrap_runner(foreign).status_code, 404)
 
 
-@override_settings(PANEL_DOMAINS=["panel.test"])
+@override_settings(NODE_BOOTSTRAP_DOMAINS=["panel.test"])
 class AdminNodeProvisionApiTests(NodeProvisioningDbTestCase):
     def setUp(self):
         super().setUp()

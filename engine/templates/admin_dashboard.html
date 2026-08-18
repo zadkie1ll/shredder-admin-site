@@ -3757,7 +3757,7 @@
         <section id="panel-node-provision" class="tab-panel">
             <header class="panel-header">
                 <h1 class="admin-title">Установка нод</h1>
-                <p class="admin-subtitle">Автоматическая установка новых нод: заявка → одна команда на свежем сервере → нода в панели Remnawave</p>
+                <p class="admin-subtitle">Автоматическая установка новых нод: заявка → одна команда на свежем сервере → нода в панели Remnawave. Сертификаты деплоятся вручную (manage-node-certificates.sh)</p>
             </header>
 
             <div id="node-provision-alert"></div>
@@ -3787,7 +3787,6 @@
                 <div id="node-provision-stages"></div>
                 <pre id="node-provision-log" class="node-provision-log"></pre>
                 <div class="censor-form-actions">
-                    <button class="btn btn-secondary" type="button" id="node-provision-reset-certs"><i class="fas fa-certificate"></i>Сбросить выдачу сертов</button>
                     <button class="btn btn-secondary" type="button" id="node-provision-revoke"><i class="fas fa-ban"></i>Отозвать токен</button>
                     <button class="btn btn-secondary" type="button" id="node-provision-detail-close"><i class="fas fa-xmark"></i>Закрыть</button>
                 </div>
@@ -8899,8 +8898,8 @@
         function renderNodeProvision(result) {
             const alertTarget = document.getElementById('node-provision-alert');
             const notes = [];
-            if (!result.panel_domains_configured) {
-                notes.push('PANEL_DOMAINS не настроен — bootstrap-API выключено, установка работать не будет.');
+            if (!result.bootstrap_domains_configured) {
+                notes.push('NODE_BOOTSTRAP_DOMAINS не настроен — bootstrap-API выключено, установка работать не будет.');
             }
             if (!result.rwms_available) {
                 notes.push('RWMS недоступен — список нод панели не загружен, создание заявок не сработает.');
@@ -8974,7 +8973,7 @@
                 document.getElementById('node-provision-detail-title').innerHTML =
                     `#${request.id} · ${escapeHtml(request.node_name)} ${nodeProvisionStatusBadge(request.status)}`;
                 const stageIcons = {ok: 'fa-circle-check', failed: 'fa-circle-xmark', running: 'fa-spinner fa-spin', pending: 'fa-circle'};
-                const stageLabels = {claim: 'Сервер подключился, нода создана в панели', certs: 'Сертификаты доставлены', script: 'Install-скрипт', connect: 'Нода подключилась к панели'};
+                const stageLabels = {claim: 'Сервер подключился, нода создана в панели', script: 'Install-скрипт', connect: 'Нода подключилась к панели'};
                 document.getElementById('node-provision-stages').innerHTML = stages.map((s) => `
                     <div class="node-provision-stage is-${s.status}">
                         <i class="fas ${stageIcons[s.status] || 'fa-circle'}"></i>
@@ -9013,15 +9012,6 @@
                 showAdminToast('Токен отозван');
                 await refreshNodeProvisionDetail();
                 await loadNodeProvision();
-            }
-        });
-
-        document.getElementById('node-provision-reset-certs')?.addEventListener('click', async () => {
-            if (nodeProvisionDetailId === null) return;
-            if (!window.confirm('Разрешить повторную выдачу сертификатов по этой заявке?')) return;
-            if (await nodeProvisionAction('reset_certs', nodeProvisionDetailId)) {
-                showAdminToast('Выдача сертификатов сброшена');
-                await refreshNodeProvisionDetail();
             }
         });
 

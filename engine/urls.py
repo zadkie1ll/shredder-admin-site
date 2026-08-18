@@ -238,7 +238,7 @@ urlpatterns = [
         name="support_admin_api_node_provision_detail",
     ),
     # Bootstrap-API установки нод: публичные ручки для обёртки на сервере,
-    # отвечают только на панельных доменах (PANEL_DOMAINS)
+    # отвечают только на доменах из NODE_BOOTSTRAP_DOMAINS
     path(
         "node-bootstrap/runner/",
         views.node_bootstrap_runner,
@@ -248,11 +248,6 @@ urlpatterns = [
         "node-bootstrap/claim/",
         views.node_bootstrap_claim,
         name="node_bootstrap_claim",
-    ),
-    path(
-        "node-bootstrap/certs/",
-        views.node_bootstrap_certs,
-        name="node_bootstrap_certs",
     ),
     path(
         "node-bootstrap/script/",

@@ -73,23 +73,11 @@ NODE_TYPE=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["n
 SCRIPT_SHA256=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["script_sha256"])' <<<"$CLAIM_JSON")
 echo "claim ok: node_type=${NODE_TYPE}"
 
-# 2. Сертификаты: раскладываем до запуска скрипта, чтобы его хвостовая
-# проверка сертов сразу прошла и nginx включился. Повторный запуск после
-# обрыва: 409 (уже выдавались) не считается ошибкой, если серты на месте.
-if api GET certs -o "$WORKDIR/certs.tar.gz"; then
-    tar -xzf "$WORKDIR/certs.tar.gz" -C /
-    rm -f "$WORKDIR/certs.tar.gz"
-    report certs ok
-    echo "certs ok"
-elif [[ -d /etc/monkeyisland/ssl ]]; then
-    echo "certs: уже выданы ранее, каталог на месте — продолжаю"
-else
-    report certs failed "cert download failed"
-    echo "ОШИБКА: не удалось получить сертификаты (повторная выдача? сбрось её в админке)"
-    exit 1
-fi
+# Сертификаты в bootstrap не входят: их деплоишь вручную
+# (manage-node-certificates.sh deploy --host <ip> из devops-репозитория).
+# Install-скрипт сам скажет в конце, если сертов ещё нет.
 
-# 3. Скрипт установки: зафиксированная в заявке версия, сверяем sha256.
+# 2. Скрипт установки: зафиксированная в заявке версия, сверяем sha256.
 api GET script -o "$WORKDIR/install.sh"
 ACTUAL_SHA=$(sha256sum "$WORKDIR/install.sh" | cut -d' ' -f1)
 if [[ "$ACTUAL_SHA" != "$SCRIPT_SHA256" ]]; then
@@ -99,7 +87,7 @@ if [[ "$ACTUAL_SHA" != "$SCRIPT_SHA256" ]]; then
 fi
 chmod 700 "$WORKDIR/install.sh"
 
-# 4. Запуск ровно как руками: bash install.sh <SECRET_KEY>, stdin закрыт.
+# 3. Запуск ровно как руками: bash install.sh <SECRET_KEY>, stdin закрыт.
 report script running
 echo "-- запускаю скрипт установки, лог: $LOG_FILE --"
 
@@ -115,7 +103,7 @@ set -e
 kill "$LOG_PUSHER_PID" 2>/dev/null || true
 push_log
 
-# 5. Завершение: сайт переводит заявку в installed/failed; статус «нода
+# 4. Завершение: сайт переводит заявку в installed/failed; статус «нода
 # подключилась» появится в админке, когда панель увидит remnanode.
 api POST complete \
     -H 'Content-Type: application/json' \
