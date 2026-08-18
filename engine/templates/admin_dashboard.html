@@ -270,6 +270,9 @@
         #broadcast-segment-hint:empty { display: none; }
         #broadcast-segment-hint:not(:empty)::before { content: "\f0c0"; margin-right: 6px; color: var(--green); font: var(--fa-font-solid); font-size: 9px; }
         .broadcast-tools { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px; border: 1px solid var(--broadcast-line); border-radius: 11px; background: var(--broadcast-soft); }
+        .broadcast-preview-toggle { display: flex; align-items: center; gap: 9px; width: fit-content; color: var(--text-main); font-size: 12px; font-weight: 700; cursor: pointer; }
+        .broadcast-preview-toggle input { width: 16px; height: 16px; accent-color: var(--brand-gold); cursor: pointer; }
+        .broadcast-preview-toggle span { user-select: none; }
         .broadcast-media-row { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; font-size: 11px; }
         .broadcast-media-pick, #broadcast-add-button { min-height: 36px; padding: 0 11px; border-radius: 8px; cursor: pointer; }
         #broadcast-media-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -3165,6 +3168,10 @@
                             </div>
                             <button type="button" class="btn btn-secondary" id="broadcast-add-button"><i class="fas fa-plus"></i>Добавить кнопку</button>
                         </div>
+                        <label class="broadcast-preview-toggle" title="Telegram не будет разворачивать первую ссылку из текста в карточку-превью (как /sendmsg)">
+                            <input type="checkbox" id="broadcast-disable-preview" checked>
+                            <span>Отключить превью ссылок в сообщении</span>
+                        </label>
                         <div class="broadcast-buttons" id="broadcast-buttons"></div>
                         <div class="broadcast-actions">
                             <button class="btn broadcast-launch" type="button" id="broadcast-create"><i class="fas fa-paper-plane"></i>Запустить рассылку</button>
@@ -7391,6 +7398,7 @@
             body.append('segment', segment);
             body.append('text', text);
             body.append('buttons', JSON.stringify(buttons));
+            if (document.getElementById('broadcast-disable-preview')?.checked) body.append('disable_preview', '1');
             if (mediaFile) body.append('media', mediaFile);
             if (isTest) body.append('telegram_id', document.getElementById('broadcast-test-id').value.trim());
             const response = await fetch(main.dataset.broadcastsUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});

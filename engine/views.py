@@ -10394,6 +10394,7 @@ def admin_broadcast_payload(db_session, broadcast):
         "buttons": broadcast.buttons or [],
         "has_media": bool(broadcast.media_type),
         "is_test": bool(broadcast.test_telegram_id),
+        "disable_link_preview": bool(broadcast.disable_link_preview),
         "total": total,
         "covered": covered,
         "sent": sent,
@@ -10526,6 +10527,8 @@ def support_admin_api_broadcasts(request):
                 media=media_bytes,
                 media_type=media_type,
                 test_telegram_id=test_telegram_id,
+                # Отключить превью ссылок (как /sendmsg): чекбокс в админке.
+                disable_link_preview=request.POST.get("disable_preview") == "1",
                 total=int(total),
                 created_by=str(support_admin_actor(request))[:128],
             )

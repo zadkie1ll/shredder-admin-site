@@ -5175,6 +5175,27 @@ class AdminStage4Tests(SimpleTestCase):
         self.assertIn("function broadcastSegmentCountLabel", template)
         self.assertIn("broadcastSegmentCountLabel(segment)", template)
 
+    def test_broadcast_link_preview_can_be_disabled(self):
+        """Чекбокс «Отключить превью ссылок»: флаг сохраняется в broadcasts и
+        уходит ботам (боты шлют с disable_web_page_preview, как /sendmsg)."""
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_broadcasts)
+        self.assertIn('request.POST.get("disable_preview") == "1"', src)
+        payload_src = inspect.getsource(views.admin_broadcast_payload)
+        self.assertIn("disable_link_preview", payload_src)
+
+        from common.models.db import Broadcast
+
+        self.assertTrue(hasattr(Broadcast, "disable_link_preview"))
+
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.assertIn('id="broadcast-disable-preview"', template)
+        self.assertIn("checked", template)
+        self.assertIn("body.append('disable_preview', '1')", template)
+
     def test_fast_segment_counts_cover_every_segment(self):
         """У каждого сегмента из ADMIN_SEGMENTS должно быть условие быстрого
         подсчёта — иначе новый сегмент молча уйдёт на медленный fallback."""
