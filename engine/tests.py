@@ -5175,6 +5175,20 @@ class AdminStage4Tests(SimpleTestCase):
         self.assertIn("function broadcastSegmentCountLabel", template)
         self.assertIn("broadcastSegmentCountLabel(segment)", template)
 
+    def test_broadcast_history_polls_without_flicker(self):
+        """Автообновление истории рассылок (раз в 5с при running) не должно
+        подменять список спиннером — страница «моргала» на каждом тике."""
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("async function loadBroadcastsList(background = false)", template)
+        self.assertIn("setTimeout(() => loadBroadcastsList(true), 5000)", template)
+        self.assertIn("if (!background) {", template)
+        # Ручное обновление — через стрелку, иначе event станет background.
+        self.assertIn(
+            "addEventListener('click', () => loadBroadcastsList())", template
+        )
+        self.assertNotIn("setTimeout(loadBroadcastsList, 5000)", template)
+
     def test_broadcast_link_preview_can_be_disabled(self):
         """Чекбокс «Отключить превью ссылок»: флаг сохраняется в broadcasts и
         уходит ботам (боты шлют с disable_web_page_preview, как /sendmsg)."""

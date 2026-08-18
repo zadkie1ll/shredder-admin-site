@@ -7416,12 +7416,18 @@
             }
         }
 
-        async function loadBroadcastsList() {
+        async function loadBroadcastsList(background = false) {
             const target = document.getElementById('broadcasts-list');
             const refreshButton = document.getElementById('broadcasts-refresh');
             if (!target) return;
-            if (refreshButton) refreshButton.dataset.loading = 'true';
-            target.innerHTML = inlineLoading('Загружаем рассылки...');
+            // Фоновый автообновлятор (пока идёт рассылка) не показывает
+            // спиннер и не крутит кнопку «Обновить»: замена списка на
+            // «Загружаем…» каждые 5 секунд схлопывала контент — страница
+            // прыгала и «моргала». Готовая разметка подменяется атомарно.
+            if (!background) {
+                if (refreshButton) refreshButton.dataset.loading = 'true';
+                target.innerHTML = inlineLoading('Загружаем рассылки...');
+            }
             try {
                 const response = await fetch(main.dataset.broadcastsUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
                 const payload = await response.json();
@@ -7507,16 +7513,25 @@
                 }));
                 if (rows.some((row) => row.status === 'running')) {
                     clearTimeout(loadBroadcastsList._timer);
-                    loadBroadcastsList._timer = setTimeout(loadBroadcastsList, 5000);
+                    loadBroadcastsList._timer = setTimeout(() => loadBroadcastsList(true), 5000);
                 }
             } catch (error) {
-                target.innerHTML = '<div class="info-card red">Не удалось загрузить рассылки</div>';
+                // Фоновая ошибка (сеть мигнула) не стирает список — просто
+                // попробуем ещё раз следующим тиком.
+                if (!background) {
+                    target.innerHTML = '<div class="info-card red">Не удалось загрузить рассылки</div>';
+                } else {
+                    clearTimeout(loadBroadcastsList._timer);
+                    loadBroadcastsList._timer = setTimeout(() => loadBroadcastsList(true), 5000);
+                }
             } finally {
-                if (refreshButton) refreshButton.dataset.loading = 'false';
+                if (!background && refreshButton) refreshButton.dataset.loading = 'false';
             }
         }
 
-        document.getElementById('broadcasts-refresh')?.addEventListener('click', loadBroadcastsList);
+        // Стрелка обязательна: прямая передача коллбэка подставила бы event
+        // первым аргументом (background=truthy) и «Обновить» стал бы фоновым.
+        document.getElementById('broadcasts-refresh')?.addEventListener('click', () => loadBroadcastsList());
         document.getElementById('broadcast-create')?.addEventListener('click', () => submitBroadcast('create'));
         document.getElementById('broadcast-test-send')?.addEventListener('click', () => submitBroadcast('test'));
 
