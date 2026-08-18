@@ -317,6 +317,10 @@
         .broadcast-preview-caption { display: flex; align-items: center; gap: 6px; margin-top: 9px; color: rgba(255,255,255,.34); font-size: 8.5px; font-weight: 650; }
         .broadcast-history-card { padding: 0; overflow: hidden; }
         .broadcast-history-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 16px 18px; border-bottom: 1px solid var(--broadcast-line); }
+        .broadcast-history-actions { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; }
+        #broadcasts-archive-toggle[aria-pressed="true"] { border-color: rgba(255,199,0,.5); background: rgba(255,199,0,.12); color: var(--brand-gold); }
+        .broadcast-record-actions { display: inline-flex; align-items: center; gap: 8px; }
+        .broadcast-record-actions .btn { min-height: 34px; padding: 0 12px; font-size: 11px; }
         .broadcast-refresh { min-height: 36px; display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid rgba(255,199,0,.26); border-radius: 9px; background: rgba(255,199,0,.04); color: var(--muted); font: inherit; font-size: 10px; font-weight: 800; cursor: pointer; transition: all .14s; }
         .broadcast-refresh:hover { border-color: rgba(255,199,0,.48); background: rgba(255,199,0,.08); color: var(--brand-gold); }
         .broadcast-refresh[data-loading="true"] i { animation: broadcastSpin .7s linear infinite; }
@@ -3206,7 +3210,10 @@
                             <p>Результаты отправок и эффективность кампаний</p>
                         </div>
                     </div>
-                    <button type="button" class="broadcast-refresh" id="broadcasts-refresh"><i class="fas fa-rotate"></i><span>Обновить</span></button>
+                    <div class="broadcast-history-actions">
+                        <button type="button" class="broadcast-refresh" id="broadcasts-archive-toggle" aria-pressed="false"><i class="fas fa-box-archive"></i><span>Архив</span></button>
+                        <button type="button" class="broadcast-refresh" id="broadcasts-refresh"><i class="fas fa-rotate"></i><span>Обновить</span></button>
+                    </div>
                 </div>
                 <div id="broadcasts-list"></div>
             </section>
@@ -7416,6 +7423,10 @@
             }
         }
 
+        // Режим архива: основной список скрывает archived-рассылки (тестовые
+        // прогоны засоряют историю), переключатель показывает только архив.
+        let broadcastsArchiveView = false;
+
         async function loadBroadcastsList(background = false) {
             const target = document.getElementById('broadcasts-list');
             const refreshButton = document.getElementById('broadcasts-refresh');
@@ -7429,7 +7440,8 @@
                 target.innerHTML = inlineLoading('Загружаем рассылки...');
             }
             try {
-                const response = await fetch(main.dataset.broadcastsUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const listUrl = broadcastsArchiveView ? `${main.dataset.broadcastsUrl}?archived=1` : main.dataset.broadcastsUrl;
+                const response = await fetch(listUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error();
                 const rows = payload.result || [];
@@ -7498,10 +7510,14 @@
                         <div class="broadcast-record-progress" aria-hidden="true"><span style="width:${progress}%"></span></div>
                         <footer class="broadcast-record-footer">
                             <span class="broadcast-status-label">${status.label}</span>
-                            ${row.status === 'running' ? `<button class="btn btn-danger broadcast-stop" data-broadcast-stop="${Number(row.id)}"><i class="fas fa-stop"></i>Остановить</button>` : ''}
+                            <span class="broadcast-record-actions">
+                                ${row.status === 'running' ? `<button class="btn btn-danger broadcast-stop" data-broadcast-stop="${Number(row.id)}"><i class="fas fa-stop"></i>Остановить</button>` : ''}
+                                ${row.status !== 'running' && !row.archived ? `<button class="btn btn-secondary" data-broadcast-archive="${Number(row.id)}" title="Убрать из основного списка"><i class="fas fa-box-archive"></i>В архив</button>` : ''}
+                                ${row.archived ? `<button class="btn btn-secondary" data-broadcast-unarchive="${Number(row.id)}"><i class="fas fa-box-open"></i>Вернуть из архива</button>` : ''}
+                            </span>
                         </footer>
                     </article>`;
-                }).join('') : '<div class="info-card muted">Рассылок ещё не было.</div>';
+                }).join('') : (broadcastsArchiveView ? '<div class="info-card muted">Архив пуст.</div>' : '<div class="info-card muted">Рассылок ещё не было.</div>');
                 target.querySelectorAll('[data-broadcast-stop]').forEach((button) => button.addEventListener('click', async () => {
                     if (!confirm('Остановить рассылку? Неотправленные сообщения не уйдут.')) return;
                     const body = new FormData();
@@ -7511,6 +7527,19 @@
                     await fetch(main.dataset.broadcastsUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
                     loadBroadcastsList();
                 }));
+                const broadcastArchivePost = async (action, id) => {
+                    const body = new FormData();
+                    body.append('csrfmiddlewaretoken', csrfToken);
+                    body.append('action', action);
+                    body.append('id', id);
+                    const response = await fetch(main.dataset.broadcastsUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                    const result = await response.json();
+                    if (result.status !== 'ok') showAdminToast(result.message || 'Не удалось изменить архив', 'error');
+                    else showAdminToast(action === 'archive' ? 'Рассылка убрана в архив' : 'Рассылка возвращена из архива', 'success');
+                    loadBroadcastsList();
+                };
+                target.querySelectorAll('[data-broadcast-archive]').forEach((button) => button.addEventListener('click', () => broadcastArchivePost('archive', button.dataset.broadcastArchive)));
+                target.querySelectorAll('[data-broadcast-unarchive]').forEach((button) => button.addEventListener('click', () => broadcastArchivePost('unarchive', button.dataset.broadcastUnarchive)));
                 if (rows.some((row) => row.status === 'running')) {
                     clearTimeout(loadBroadcastsList._timer);
                     loadBroadcastsList._timer = setTimeout(() => loadBroadcastsList(true), 5000);
@@ -7532,6 +7561,14 @@
         // Стрелка обязательна: прямая передача коллбэка подставила бы event
         // первым аргументом (background=truthy) и «Обновить» стал бы фоновым.
         document.getElementById('broadcasts-refresh')?.addEventListener('click', () => loadBroadcastsList());
+        document.getElementById('broadcasts-archive-toggle')?.addEventListener('click', () => {
+            broadcastsArchiveView = !broadcastsArchiveView;
+            const toggle = document.getElementById('broadcasts-archive-toggle');
+            toggle.setAttribute('aria-pressed', String(broadcastsArchiveView));
+            toggle.querySelector('span').textContent = broadcastsArchiveView ? 'К активным' : 'Архив';
+            clearTimeout(loadBroadcastsList._timer);
+            loadBroadcastsList();
+        });
         document.getElementById('broadcast-create')?.addEventListener('click', () => submitBroadcast('create'));
         document.getElementById('broadcast-test-send')?.addEventListener('click', () => submitBroadcast('test'));
 

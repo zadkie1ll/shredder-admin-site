@@ -10395,6 +10395,7 @@ def admin_broadcast_payload(db_session, broadcast):
         "has_media": bool(broadcast.media_type),
         "is_test": bool(broadcast.test_telegram_id),
         "disable_link_preview": bool(broadcast.disable_link_preview),
+        "archived": bool(broadcast.archived_at),
         "total": total,
         "covered": covered,
         "sent": sent,
@@ -10414,8 +10415,16 @@ def support_admin_api_broadcasts(request):
     db_session = session_factory()
     try:
         if request.method == "GET":
+            # По умолчанию — только неархивные; ?archived=1 показывает архив
+            # (тестовые прогоны и старые кампании, убранные из основного списка).
+            show_archived = request.GET.get("archived") == "1"
             broadcasts = (
                 db_session.query(Broadcast)
+                .filter(
+                    Broadcast.archived_at.isnot(None)
+                    if show_archived
+                    else Broadcast.archived_at.is_(None)
+                )
                 .order_by(Broadcast.created_at.desc())
                 .limit(50)
                 .all()
@@ -10445,6 +10454,33 @@ def support_admin_api_broadcasts(request):
                     db_session, request, "broadcast_stop", target=str(broadcast.id)
                 )
                 db_session.commit()
+            return JsonResponse(
+                {"status": "ok", "result": admin_broadcast_payload(db_session, broadcast)}
+            )
+
+        if action in ("archive", "unarchive"):
+            broadcast = db_session.get(Broadcast, int(request.POST.get("id") or 0))
+            if not broadcast:
+                return JsonResponse({"status": "not_found"}, status=404)
+            if action == "archive":
+                if broadcast.status == "running":
+                    return JsonResponse(
+                        {
+                            "status": "error",
+                            "message": "Сначала остановите рассылку",
+                        },
+                        status=400,
+                    )
+                broadcast.archived_at = datetime.utcnow()
+            else:
+                broadcast.archived_at = None
+            admin_audit_write(
+                db_session,
+                request,
+                f"broadcast_{action}",
+                target=str(broadcast.id),
+            )
+            db_session.commit()
             return JsonResponse(
                 {"status": "ok", "result": admin_broadcast_payload(db_session, broadcast)}
             )

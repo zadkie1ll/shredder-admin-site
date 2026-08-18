@@ -5175,6 +5175,36 @@ class AdminStage4Tests(SimpleTestCase):
         self.assertIn("function broadcastSegmentCountLabel", template)
         self.assertIn("broadcastSegmentCountLabel(segment)", template)
 
+    def test_broadcasts_can_be_archived(self):
+        """Архив рассылок: тестовые прогоны убираются из основного списка.
+        Архивировать running нельзя; боты архив не видят и не учитывают."""
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_broadcasts)
+        self.assertIn('request.GET.get("archived") == "1"', src)
+        self.assertIn("Broadcast.archived_at.is_(None)", src)
+        self.assertIn("Broadcast.archived_at.isnot(None)", src)
+        self.assertIn('action in ("archive", "unarchive")', src)
+        self.assertIn("Сначала остановите рассылку", src)
+        self.assertIn('f"broadcast_{action}"', src)
+
+        from common.models.db import Broadcast
+
+        self.assertTrue(hasattr(Broadcast, "archived_at"))
+
+        payload_src = inspect.getsource(views.admin_broadcast_payload)
+        self.assertIn('"archived": bool(broadcast.archived_at)', payload_src)
+
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.assertIn('id="broadcasts-archive-toggle"', template)
+        self.assertIn("data-broadcast-archive=", template)
+        self.assertIn("data-broadcast-unarchive=", template)
+        self.assertIn("broadcastsArchiveView", template)
+        self.assertIn("?archived=1", template)
+        self.assertIn("Архив пуст.", template)
+
     def test_broadcast_history_polls_without_flicker(self):
         """Автообновление истории рассылок (раз в 5с при running) не должно
         подменять список спиннером — страница «моргала» на каждом тике."""
