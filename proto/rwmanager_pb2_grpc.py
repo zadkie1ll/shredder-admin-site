@@ -44,6 +44,11 @@ class RwManagerStub:
                 request_serializer=proto_dot_rwmanager__pb2.GetUserByUsernameRequest.SerializeToString,
                 response_deserializer=proto_dot_rwmanager__pb2.UserResponse.FromString,
                 _registered_method=True)
+        self.GetUserById = channel.unary_unary(
+                '/rwmanager.RwManager/GetUserById',
+                request_serializer=proto_dot_rwmanager__pb2.GetUserByIdRequest.SerializeToString,
+                response_deserializer=proto_dot_rwmanager__pb2.UserResponse.FromString,
+                _registered_method=True)
         self.AddUser = channel.unary_unary(
                 '/rwmanager.RwManager/AddUser',
                 request_serializer=proto_dot_rwmanager__pb2.AddUserRequest.SerializeToString,
@@ -79,6 +84,16 @@ class RwManagerStub:
                 request_serializer=proto_dot_rwmanager__pb2.GetNodeUsersUsageRequest.SerializeToString,
                 response_deserializer=proto_dot_rwmanager__pb2.GetNodeUsersUsageResponse.FromString,
                 _registered_method=True)
+        self.GetNodeSecret = channel.unary_unary(
+                '/rwmanager.RwManager/GetNodeSecret',
+                request_serializer=proto_dot_rwmanager__pb2.Empty.SerializeToString,
+                response_deserializer=proto_dot_rwmanager__pb2.GetNodeSecretResponse.FromString,
+                _registered_method=True)
+        self.CreateNode = channel.unary_unary(
+                '/rwmanager.RwManager/CreateNode',
+                request_serializer=proto_dot_rwmanager__pb2.CreateNodeRequest.SerializeToString,
+                response_deserializer=proto_dot_rwmanager__pb2.Node.FromString,
+                _registered_method=True)
 
 
 class RwManagerServicer:
@@ -91,6 +106,12 @@ class RwManagerServicer:
         raise NotImplementedError('Method not implemented!')
 
     def GetUserByUsername(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def GetUserById(self, request, context):
         """Missing associated documentation comment in .proto file."""
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -139,6 +160,22 @@ class RwManagerServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetNodeSecret(self, request, context):
+        """Автоматизация установки нод через админку сайта.
+        GetNodeSecret отдаёт панельный ключ (keygen), CreateNode идемпотентно
+        создаёт ноду (существующая с тем же именем/адресом возвращается как есть).
+        Удаления нод здесь нет намеренно (Remnawave Safety Rules).
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def CreateNode(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_RwManagerServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -150,6 +187,11 @@ def add_RwManagerServicer_to_server(servicer, server):
             'GetUserByUsername': grpc.unary_unary_rpc_method_handler(
                     servicer.GetUserByUsername,
                     request_deserializer=proto_dot_rwmanager__pb2.GetUserByUsernameRequest.FromString,
+                    response_serializer=proto_dot_rwmanager__pb2.UserResponse.SerializeToString,
+            ),
+            'GetUserById': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetUserById,
+                    request_deserializer=proto_dot_rwmanager__pb2.GetUserByIdRequest.FromString,
                     response_serializer=proto_dot_rwmanager__pb2.UserResponse.SerializeToString,
             ),
             'AddUser': grpc.unary_unary_rpc_method_handler(
@@ -186,6 +228,16 @@ def add_RwManagerServicer_to_server(servicer, server):
                     servicer.GetNodeUsersUsage,
                     request_deserializer=proto_dot_rwmanager__pb2.GetNodeUsersUsageRequest.FromString,
                     response_serializer=proto_dot_rwmanager__pb2.GetNodeUsersUsageResponse.SerializeToString,
+            ),
+            'GetNodeSecret': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetNodeSecret,
+                    request_deserializer=proto_dot_rwmanager__pb2.Empty.FromString,
+                    response_serializer=proto_dot_rwmanager__pb2.GetNodeSecretResponse.SerializeToString,
+            ),
+            'CreateNode': grpc.unary_unary_rpc_method_handler(
+                    servicer.CreateNode,
+                    request_deserializer=proto_dot_rwmanager__pb2.CreateNodeRequest.FromString,
+                    response_serializer=proto_dot_rwmanager__pb2.Node.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -241,6 +293,33 @@ class RwManager:
             target,
             '/rwmanager.RwManager/GetUserByUsername',
             proto_dot_rwmanager__pb2.GetUserByUsernameRequest.SerializeToString,
+            proto_dot_rwmanager__pb2.UserResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetUserById(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/rwmanager.RwManager/GetUserById',
+            proto_dot_rwmanager__pb2.GetUserByIdRequest.SerializeToString,
             proto_dot_rwmanager__pb2.UserResponse.FromString,
             options,
             channel_credentials,
@@ -431,6 +510,60 @@ class RwManager:
             '/rwmanager.RwManager/GetNodeUsersUsage',
             proto_dot_rwmanager__pb2.GetNodeUsersUsageRequest.SerializeToString,
             proto_dot_rwmanager__pb2.GetNodeUsersUsageResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetNodeSecret(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/rwmanager.RwManager/GetNodeSecret',
+            proto_dot_rwmanager__pb2.Empty.SerializeToString,
+            proto_dot_rwmanager__pb2.GetNodeSecretResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def CreateNode(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/rwmanager.RwManager/CreateNode',
+            proto_dot_rwmanager__pb2.CreateNodeRequest.SerializeToString,
+            proto_dot_rwmanager__pb2.Node.FromString,
             options,
             channel_credentials,
             insecure,

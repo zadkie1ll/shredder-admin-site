@@ -1405,6 +1405,72 @@ c `threshold=0`, та же метрика, что в разделе «Анали
 Покрыто тестами `NodeTrafficReportTests`, `NodeTrafficAdminApiTests`,
 `NodeTrafficTemplateTests` (`engine/tests.py`).
 
+## Админка: Установка нод (автоматический provisioning)
+
+Вкладка «Установка нод» (только роль admin) автоматизирует ручной процесс
+«зайти по SSH и выполнить install-скрипт». Поток:
+
+1. Админ один раз заливает в БД копии install-скриптов из devops-репозитория
+   (блок «Скрипты установки», по одному на тип ноды: `self_steal`,
+   `hysteria`, `whitelist`, `whitelist_self_steal`). Правка создаёт новую
+   версию с историей и откатом; активна ровно одна версия на тип. Пока
+   скрипта нет, вкладка пишет «задай скрипт» и не даёт создать заявку.
+   Эталонные скрипты в devops-репозитории не изменяются.
+2. «Новая нода»: имя, тип, нода-образец (с неё снимается конфиг-профиль
+   панели) → заявка + одноразовый токен (показывается один раз) и команда
+   `curl -fsSL https://<панельный-домен>/node-bootstrap/runner/ | bash -s -- <токен>`.
+3. На свежем сервере обёртка делает claim (фиксация IP, выдача `SECRET_KEY`
+   панели через RWMS `GetNodeSecret`, идемпотентное создание ноды в панели
+   через RWMS `CreateNode`), скачивает сертификаты и зафиксированную версию
+   скрипта (sha256 сверяется), запускает установку и стримит лог/стадии.
+4. Страница заявки показывает чеклист стадий (claim → certs → script →
+   connect) и хвост лога; когда панель видит коннект remnanode, заявка
+   становится `ready`. Остаётся один ручной шаг — добавить ноду в
+   cert-инвентарь `manage-node-certificates.sh` для автопродления сертов.
+
+Безопасность: токен хранится только sha256-хешем, TTL до claim —
+`NODE_BOOTSTRAP_TOKEN_TTL_MINUTES` (60), после claim привязан к IP;
+сертификаты выдаются один раз на заявку (сброс — кнопкой); `SECRET_KEY` и
+содержимое сертификатов не логируются; нода в панели только создаётся,
+удаления в этом потоке нет (Remnawave Safety Rules — висящую ноду от
+неудавшейся установки удаляют руками в панели).
+
+Admin-эндпоинты (`engine/views.py`, логика в `engine/node_provisioning.py`):
+
+- `GET/POST /support-admin/api/node-scripts/` — список/сохранение
+  (`action=save`, с мягкими предупреждениями об интерактивном `read` и
+  отсутствии shebang) и активация версий (`action=activate`);
+- `GET/POST /support-admin/api/node-provision/` — список заявок + данные для
+  формы; `action=create|revoke|reset_certs`;
+- `GET /support-admin/api/node-provision/detail/?id=` — стадии, лог,
+  авто-перевод в `ready` по коннекту ноды.
+
+Публичный bootstrap-API (Bearer-токен заявки, **отвечает только на доменах
+из `PANEL_DOMAINS`**, на прочих — 404; пустой `PANEL_DOMAINS` = выключено):
+
+- `GET /node-bootstrap/runner/` — обёртка (шаблон
+  `node_bootstrap_runner.sh`);
+- `POST /node-bootstrap/claim/` — конфиг + `secret_key` + `script_sha256`;
+- `GET /node-bootstrap/certs/` — tar.gz каталога
+  `NODE_BOOTSTRAP_CERT_ROOT` (пути от корня ФС, распаковка `tar -xzf -C /`);
+- `GET /node-bootstrap/script/` — зафиксированная версия скрипта;
+- `POST /node-bootstrap/progress/` — `{stage, status, message, log_tail}`;
+- `POST /node-bootstrap/complete/` — `{exit_code}`.
+
+Новые env-переменные: `PANEL_DOMAINS` (csv, обязательно для работы фичи),
+`NODE_BOOTSTRAP_CERT_ROOT` (по умолчанию `/etc/monkeyisland/ssl` — фича
+требует, чтобы сайт имел доступ к актуальным сертификатам, т.е. работал на
+хосте с acme.sh либо получал их синхронизацией), `NODE_BOOTSTRAP_TOKEN_TTL_MINUTES`.
+
+⚠️ **Требуется миграция** `38e96c718ea4` (таблицы `node_install_scripts`,
+`node_provision_requests`, `node_provision_stages`), сгенерирована штатным
+`./common/alembic-revision.sh`. Также требуется RWMS с методами
+`GetNodeSecret`/`CreateNode` (деплой RWMS раньше сайта).
+
+Покрыто тестами `engine/tests_node_provisioning.py` (31 тест: версии
+скриптов, токены/TTL/IP-binding, one-shot сертификаты, стадии, host-gating,
+admin-API).
+
 ## Полная блокировка пользователя (user_blocks)
 
 Пользователи с записью в таблице `user_blocks` (ставится ботом командой

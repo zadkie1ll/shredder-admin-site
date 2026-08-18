@@ -223,6 +223,53 @@ urlpatterns = [
         name="support_admin_api_ua_rules",
     ),
     path(
+        "support-admin/api/node-scripts/",
+        views.support_admin_api_node_scripts,
+        name="support_admin_api_node_scripts",
+    ),
+    path(
+        "support-admin/api/node-provision/",
+        views.support_admin_api_node_provision,
+        name="support_admin_api_node_provision",
+    ),
+    path(
+        "support-admin/api/node-provision/detail/",
+        views.support_admin_api_node_provision_detail,
+        name="support_admin_api_node_provision_detail",
+    ),
+    # Bootstrap-API установки нод: публичные ручки для обёртки на сервере,
+    # отвечают только на панельных доменах (PANEL_DOMAINS)
+    path(
+        "node-bootstrap/runner/",
+        views.node_bootstrap_runner,
+        name="node_bootstrap_runner",
+    ),
+    path(
+        "node-bootstrap/claim/",
+        views.node_bootstrap_claim,
+        name="node_bootstrap_claim",
+    ),
+    path(
+        "node-bootstrap/certs/",
+        views.node_bootstrap_certs,
+        name="node_bootstrap_certs",
+    ),
+    path(
+        "node-bootstrap/script/",
+        views.node_bootstrap_script,
+        name="node_bootstrap_script",
+    ),
+    path(
+        "node-bootstrap/progress/",
+        views.node_bootstrap_progress,
+        name="node_bootstrap_progress",
+    ),
+    path(
+        "node-bootstrap/complete/",
+        views.node_bootstrap_complete,
+        name="node_bootstrap_complete",
+    ),
+    path(
         "support-admin/tickets/<int:ticket_id>/",
         views.support_admin_ticket_detail,
         name="support_admin_ticket_detail",

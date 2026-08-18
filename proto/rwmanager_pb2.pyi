@@ -152,6 +152,12 @@ class GetUserByUsernameRequest(_message.Message):
     username: str
     def __init__(self, username: _Optional[str] = ...) -> None: ...
 
+class GetUserByIdRequest(_message.Message):
+    __slots__ = ("id",)
+    ID_FIELD_NUMBER: _ClassVar[int]
+    id: int
+    def __init__(self, id: _Optional[int] = ...) -> None: ...
+
 class AddUserRequest(_message.Message):
     __slots__ = ("username", "email", "telegram_id", "expire_at", "created_at", "last_traffic_reset_at", "active_internal_squads", "status", "traffic_limit_strategy", "description", "tag", "hwid_device_limit")
     USERNAME_FIELD_NUMBER: _ClassVar[int]
@@ -263,20 +269,24 @@ class Empty(_message.Message):
     def __init__(self) -> None: ...
 
 class Node(_message.Message):
-    __slots__ = ("uuid", "name", "address", "is_connected", "is_disabled", "country_code")
+    __slots__ = ("uuid", "name", "address", "is_connected", "is_disabled", "country_code", "config_profile_uuid", "active_inbound_uuids")
     UUID_FIELD_NUMBER: _ClassVar[int]
     NAME_FIELD_NUMBER: _ClassVar[int]
     ADDRESS_FIELD_NUMBER: _ClassVar[int]
     IS_CONNECTED_FIELD_NUMBER: _ClassVar[int]
     IS_DISABLED_FIELD_NUMBER: _ClassVar[int]
     COUNTRY_CODE_FIELD_NUMBER: _ClassVar[int]
+    CONFIG_PROFILE_UUID_FIELD_NUMBER: _ClassVar[int]
+    ACTIVE_INBOUND_UUIDS_FIELD_NUMBER: _ClassVar[int]
     uuid: str
     name: str
     address: str
     is_connected: bool
     is_disabled: bool
     country_code: str
-    def __init__(self, uuid: _Optional[str] = ..., name: _Optional[str] = ..., address: _Optional[str] = ..., is_connected: _Optional[bool] = ..., is_disabled: _Optional[bool] = ..., country_code: _Optional[str] = ...) -> None: ...
+    config_profile_uuid: str
+    active_inbound_uuids: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, uuid: _Optional[str] = ..., name: _Optional[str] = ..., address: _Optional[str] = ..., is_connected: _Optional[bool] = ..., is_disabled: _Optional[bool] = ..., country_code: _Optional[str] = ..., config_profile_uuid: _Optional[str] = ..., active_inbound_uuids: _Optional[_Iterable[str]] = ...) -> None: ...
 
 class GetNodesResponse(_message.Message):
     __slots__ = ("nodes",)
@@ -311,3 +321,25 @@ class GetNodeUsersUsageResponse(_message.Message):
     ITEMS_FIELD_NUMBER: _ClassVar[int]
     items: _containers.RepeatedCompositeFieldContainer[NodeUserUsage]
     def __init__(self, items: _Optional[_Iterable[_Union[NodeUserUsage, _Mapping]]] = ...) -> None: ...
+
+class GetNodeSecretResponse(_message.Message):
+    __slots__ = ("secret_key",)
+    SECRET_KEY_FIELD_NUMBER: _ClassVar[int]
+    secret_key: str
+    def __init__(self, secret_key: _Optional[str] = ...) -> None: ...
+
+class CreateNodeRequest(_message.Message):
+    __slots__ = ("name", "address", "port", "country_code", "config_profile_uuid", "inbound_uuids")
+    NAME_FIELD_NUMBER: _ClassVar[int]
+    ADDRESS_FIELD_NUMBER: _ClassVar[int]
+    PORT_FIELD_NUMBER: _ClassVar[int]
+    COUNTRY_CODE_FIELD_NUMBER: _ClassVar[int]
+    CONFIG_PROFILE_UUID_FIELD_NUMBER: _ClassVar[int]
+    INBOUND_UUIDS_FIELD_NUMBER: _ClassVar[int]
+    name: str
+    address: str
+    port: int
+    country_code: str
+    config_profile_uuid: str
+    inbound_uuids: _containers.RepeatedScalarFieldContainer[str]
+    def __init__(self, name: _Optional[str] = ..., address: _Optional[str] = ..., port: _Optional[int] = ..., country_code: _Optional[str] = ..., config_profile_uuid: _Optional[str] = ..., inbound_uuids: _Optional[_Iterable[str]] = ...) -> None: ...

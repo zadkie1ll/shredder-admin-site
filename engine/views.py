@@ -24,6 +24,7 @@ from django.http import HttpResponse
 from django.http import JsonResponse
 from django.http import FileResponse
 from django.http import Http404
+from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
 from django.shortcuts import render
 from django.shortcuts import redirect
@@ -101,6 +102,10 @@ from common.models.db import ReferralProgramBlock
 from common.models.db import CensorCheck
 from common.models.db import CensorCheckRun
 from common.models.db import RipeApiKey
+from common.models.db import NodeInstallScript
+from common.models.db import NodeProvisionRequest
+from common.models.db import NodeProvisionStage
+from common.models.db import NodeProvisionStatus
 from engine.user_block import ACCOUNT_BLOCKED_MESSAGE
 from engine.user_block import is_user_blocked
 from common.models.settings import BOOL_RUNTIME_SETTINGS
@@ -137,6 +142,7 @@ from common.models.tariff import ThreeMonthsTariff
 from common.rwms_client_sync import RwmsClientSync
 
 from . import node_traffic
+from . import node_provisioning
 from . import ripe_atlas
 from .rwms_helpers import create_user
 from .rwms_helpers import create_user_until
@@ -11632,6 +11638,555 @@ def support_admin_api_accounts(request):
 
         return JsonResponse(
             {"status": "error", "message": "Неизвестное действие"}, status=400
+        )
+    finally:
+        db_session.close()
+
+
+# ---------------------------------------------------------------------------
+# Установка нод через админку: публичный bootstrap-API (для обёртки на
+# сервере) и admin-API (скрипты установки + заявки). Логика — в
+# engine/node_provisioning.py, эти view только парсят запрос и держат сессию.
+# ---------------------------------------------------------------------------
+
+
+def _node_bootstrap_reject_host(request):
+    """Bootstrap-API отвечает только на панельных доменах.
+
+    Пустой PANEL_DOMAINS = API выключено. На остальных доменах отдаём 404
+    без тела, чтобы эндпоинты не светились на VPN/VPS/cabinet доменах.
+    """
+    if not settings.PANEL_DOMAINS:
+        return HttpResponse(status=404)
+    if normalize_host(request.get_host()) not in settings.PANEL_DOMAINS:
+        return HttpResponse(status=404)
+    return None
+
+
+def _node_bootstrap_token(request):
+    authorization = request.META.get("HTTP_AUTHORIZATION", "")
+    if authorization.startswith("Bearer "):
+        return authorization[len("Bearer "):].strip()
+    return ""
+
+
+def _node_bootstrap_error(db_session, error):
+    db_session.rollback()
+    return JsonResponse(
+        {"status": "error", "message": str(error)}, status=error.http_status
+    )
+
+
+def _node_bootstrap_find(db_session, request):
+    """Заявка по Bearer-токену + проверка привязки к IP (после claim)."""
+    provision_request = node_provisioning.find_request_by_token(
+        db_session, _node_bootstrap_token(request)
+    )
+    node_provisioning.check_claimed_ip(provision_request, admin_client_ip(request))
+    return provision_request
+
+
+def node_bootstrap_runner(request):
+    host_response = _node_bootstrap_reject_host(request)
+    if host_response:
+        return host_response
+    return render(
+        request,
+        "node_bootstrap_runner.sh",
+        {"base_url": f"{request.scheme}://{request.get_host()}"},
+        content_type="text/plain; charset=utf-8",
+    )
+
+
+@csrf_exempt
+def node_bootstrap_claim(request):
+    host_response = _node_bootstrap_reject_host(request)
+    if host_response:
+        return host_response
+    if request.method != "POST":
+        return JsonResponse(
+            {"status": "error", "message": "Только POST"}, status=405
+        )
+
+    db_session = session_factory()
+    try:
+        provision_request = node_provisioning.find_request_by_token(
+            db_session, _node_bootstrap_token(request)
+        )
+        payload = node_provisioning.claim_request(
+            db_session, provision_request, admin_client_ip(request), rwms_client
+        )
+        db_session.commit()
+        return JsonResponse({"status": "ok", "result": payload})
+    except node_provisioning.ProvisionError as error:
+        return _node_bootstrap_error(db_session, error)
+    finally:
+        db_session.close()
+
+
+def node_bootstrap_certs(request):
+    host_response = _node_bootstrap_reject_host(request)
+    if host_response:
+        return host_response
+
+    db_session = session_factory()
+    try:
+        provision_request = _node_bootstrap_find(db_session, request)
+        payload = node_provisioning.issue_certs(
+            db_session, provision_request, settings.NODE_BOOTSTRAP_CERT_ROOT
+        )
+        db_session.commit()
+        response = HttpResponse(payload, content_type="application/gzip")
+        response["Content-Disposition"] = 'attachment; filename="certs.tar.gz"'
+        return response
+    except node_provisioning.ProvisionError as error:
+        return _node_bootstrap_error(db_session, error)
+    finally:
+        db_session.close()
+
+
+def node_bootstrap_script(request):
+    host_response = _node_bootstrap_reject_host(request)
+    if host_response:
+        return host_response
+
+    db_session = session_factory()
+    try:
+        provision_request = _node_bootstrap_find(db_session, request)
+        node_provisioning.check_stage_allowed(provision_request)
+        script = db_session.query(NodeInstallScript).get(provision_request.script_id)
+        return HttpResponse(
+            script.content, content_type="text/plain; charset=utf-8"
+        )
+    except node_provisioning.ProvisionError as error:
+        return _node_bootstrap_error(db_session, error)
+    finally:
+        db_session.close()
+
+
+@csrf_exempt
+def node_bootstrap_progress(request):
+    host_response = _node_bootstrap_reject_host(request)
+    if host_response:
+        return host_response
+    if request.method != "POST":
+        return JsonResponse(
+            {"status": "error", "message": "Только POST"}, status=405
+        )
+
+    try:
+        body = json.loads(request.body or b"{}")
+    except (ValueError, UnicodeDecodeError):
+        return JsonResponse(
+            {"status": "error", "message": "Невалидный JSON"}, status=400
+        )
+
+    db_session = session_factory()
+    try:
+        provision_request = _node_bootstrap_find(db_session, request)
+        node_provisioning.record_progress(
+            db_session,
+            provision_request,
+            stage=str(body.get("stage") or ""),
+            status=str(body.get("status") or ""),
+            message=(str(body.get("message")) if body.get("message") else None),
+            log_tail=(str(body.get("log_tail")) if body.get("log_tail") else None),
+        )
+        db_session.commit()
+        return JsonResponse({"status": "ok"})
+    except node_provisioning.ProvisionError as error:
+        return _node_bootstrap_error(db_session, error)
+    finally:
+        db_session.close()
+
+
+@csrf_exempt
+def node_bootstrap_complete(request):
+    host_response = _node_bootstrap_reject_host(request)
+    if host_response:
+        return host_response
+    if request.method != "POST":
+        return JsonResponse(
+            {"status": "error", "message": "Только POST"}, status=405
+        )
+
+    try:
+        body = json.loads(request.body or b"{}")
+        exit_code = int(body.get("exit_code"))
+    except (ValueError, TypeError, UnicodeDecodeError):
+        return JsonResponse(
+            {"status": "error", "message": "Невалидный exit_code"}, status=400
+        )
+
+    db_session = session_factory()
+    try:
+        provision_request = _node_bootstrap_find(db_session, request)
+        node_provisioning.complete_request(db_session, provision_request, exit_code)
+        db_session.commit()
+        return JsonResponse({"status": "ok"})
+    except node_provisioning.ProvisionError as error:
+        return _node_bootstrap_error(db_session, error)
+    finally:
+        db_session.close()
+
+
+def _admin_node_script_payload(script, with_content=False):
+    payload = {
+        "id": script.id,
+        "node_type": script.node_type,
+        "version": script.version,
+        "is_active": script.is_active,
+        "comment": script.comment,
+        "created_by": script.created_by,
+        "created_at": admin_dt(script.created_at),
+        "size": len(script.content),
+        "sha256": node_provisioning.script_sha256(script.content),
+    }
+    if with_content:
+        payload["content"] = script.content
+    return payload
+
+
+def support_admin_api_node_scripts(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "POST":
+            action = request.POST.get("action") or ""
+            try:
+                if action == "save":
+                    node_type = request.POST.get("node_type") or ""
+                    content = request.POST.get("content") or ""
+                    script = node_provisioning.save_script_version(
+                        db_session,
+                        node_type,
+                        content,
+                        request.POST.get("comment") or "",
+                        str(support_admin_actor(request))[:128],
+                    )
+                    admin_audit_write(
+                        db_session, request, "node_script_save",
+                        target=node_type, version=script.version,
+                    )
+                    db_session.commit()
+                    return JsonResponse(
+                        {
+                            "status": "ok",
+                            "result": _admin_node_script_payload(script),
+                            "warnings": node_provisioning.script_warnings(content),
+                        }
+                    )
+
+                if action == "activate":
+                    script = node_provisioning.activate_script_version(
+                        db_session, int(request.POST.get("script_id") or 0)
+                    )
+                    admin_audit_write(
+                        db_session, request, "node_script_activate",
+                        target=script.node_type, version=script.version,
+                    )
+                    db_session.commit()
+                    return JsonResponse(
+                        {"status": "ok", "result": _admin_node_script_payload(script)}
+                    )
+            except node_provisioning.ProvisionError as error:
+                db_session.rollback()
+                return JsonResponse(
+                    {"status": "error", "message": str(error)},
+                    status=error.http_status,
+                )
+
+            return JsonResponse(
+                {"status": "error", "message": "Неизвестное действие"}, status=400
+            )
+
+        script_id = request.GET.get("script_id")
+        if script_id:
+            script = db_session.query(NodeInstallScript).get(int(script_id))
+            if script is None:
+                return JsonResponse(
+                    {"status": "error", "message": "Версия не найдена"}, status=404
+                )
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "result": _admin_node_script_payload(script, with_content=True),
+                }
+            )
+
+        all_scripts = (
+            db_session.query(NodeInstallScript)
+            .order_by(
+                NodeInstallScript.node_type,
+                NodeInstallScript.version.desc(),
+            )
+            .all()
+        )
+        by_type = {}
+        for script in all_scripts:
+            by_type.setdefault(script.node_type, []).append(script)
+
+        types_payload = []
+        for type_key, type_label in node_provisioning.NODE_TYPES:
+            versions = by_type.get(type_key, [])
+            active = next((s for s in versions if s.is_active), None)
+            types_payload.append(
+                {
+                    "key": type_key,
+                    "label": type_label,
+                    "has_active": active is not None,
+                    "active": (
+                        _admin_node_script_payload(active, with_content=True)
+                        if active
+                        else None
+                    ),
+                    "versions": [
+                        _admin_node_script_payload(s) for s in versions
+                    ],
+                }
+            )
+        return JsonResponse({"status": "ok", "result": {"types": types_payload}})
+    finally:
+        db_session.close()
+
+
+def _admin_provision_request_payload(provision_request, script_versions=None):
+    return {
+        "id": provision_request.id,
+        "node_name": provision_request.node_name,
+        "node_type": provision_request.node_type,
+        "status": provision_request.status.value,
+        "script_version": (
+            (script_versions or {}).get(provision_request.script_id)
+        ),
+        "claimed_ip": provision_request.claimed_ip,
+        "ssh_port": provision_request.ssh_port,
+        "certs_issued": provision_request.certs_issued_at is not None,
+        "remnawave_node_uuid": provision_request.remnawave_node_uuid,
+        "error": provision_request.error,
+        "created_by": provision_request.created_by,
+        "created_at": admin_dt(provision_request.created_at),
+        "expires_at": admin_dt(provision_request.expires_at),
+        "finished_at": admin_dt(provision_request.finished_at),
+    }
+
+
+def support_admin_api_node_provision(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "POST":
+            action = request.POST.get("action") or ""
+            try:
+                if action == "create":
+                    nodes_response = rwms_client.get_nodes()
+                    if nodes_response is None:
+                        return JsonResponse(
+                            {"status": "error", "message": "RWMS недоступен"},
+                            status=502,
+                        )
+                    source_uuid = request.POST.get("source_node_uuid") or ""
+                    source_node = next(
+                        (n for n in nodes_response.nodes if n.uuid == source_uuid),
+                        None,
+                    )
+                    if source_node is None:
+                        return JsonResponse(
+                            {
+                                "status": "error",
+                                "message": "Нода-образец не найдена в панели",
+                            },
+                            status=400,
+                        )
+                    provision_request, token = node_provisioning.create_request(
+                        db_session,
+                        node_name=request.POST.get("node_name") or "",
+                        node_type=request.POST.get("node_type") or "",
+                        source_node=source_node,
+                        country_code=(
+                            (request.POST.get("country_code") or "").upper()[:2]
+                            or None
+                        ),
+                        created_by=str(support_admin_actor(request))[:128],
+                        ttl_minutes=settings.NODE_BOOTSTRAP_TOKEN_TTL_MINUTES,
+                    )
+                    admin_audit_write(
+                        db_session, request, "node_provision_create",
+                        target=provision_request.node_name,
+                        node_type=provision_request.node_type,
+                    )
+                    db_session.commit()
+                    panel_domain = (
+                        settings.PANEL_DOMAINS[0]
+                        if settings.PANEL_DOMAINS
+                        else normalize_host(request.get_host())
+                    )
+                    one_liner = (
+                        f"curl -fsSL https://{panel_domain}/node-bootstrap/runner/ "
+                        f"| bash -s -- {token}"
+                    )
+                    return JsonResponse(
+                        {
+                            "status": "ok",
+                            "result": {
+                                "request": _admin_provision_request_payload(
+                                    provision_request
+                                ),
+                                # Токен показывается ровно один раз
+                                "one_liner": one_liner,
+                                "panel_domains_configured": bool(
+                                    settings.PANEL_DOMAINS
+                                ),
+                            },
+                        }
+                    )
+
+                provision_request = (
+                    db_session.query(NodeProvisionRequest)
+                    .get(int(request.POST.get("id") or 0))
+                )
+                if provision_request is None:
+                    return JsonResponse(
+                        {"status": "error", "message": "Заявка не найдена"},
+                        status=404,
+                    )
+
+                if action == "revoke":
+                    node_provisioning.revoke_request(provision_request)
+                    admin_audit_write(
+                        db_session, request, "node_provision_revoke",
+                        target=provision_request.node_name,
+                    )
+                    db_session.commit()
+                    return JsonResponse({"status": "ok"})
+
+                if action == "reset_certs":
+                    provision_request.certs_issued_at = None
+                    admin_audit_write(
+                        db_session, request, "node_provision_reset_certs",
+                        target=provision_request.node_name,
+                    )
+                    db_session.commit()
+                    return JsonResponse({"status": "ok"})
+            except node_provisioning.ProvisionError as error:
+                db_session.rollback()
+                return JsonResponse(
+                    {"status": "error", "message": str(error)},
+                    status=error.http_status,
+                )
+
+            return JsonResponse(
+                {"status": "error", "message": "Неизвестное действие"}, status=400
+            )
+
+        requests_rows = (
+            db_session.query(NodeProvisionRequest)
+            .order_by(NodeProvisionRequest.created_at.desc())
+            .limit(100)
+            .all()
+        )
+        script_versions = {
+            script.id: script.version
+            for script in db_session.query(NodeInstallScript).all()
+        }
+        scripts_ready = {
+            type_key: node_provisioning.active_script(db_session, type_key)
+            is not None
+            for type_key, _label in node_provisioning.NODE_TYPES
+        }
+
+        nodes_payload = []
+        nodes_response = rwms_client.get_nodes()
+        if nodes_response is not None:
+            nodes_payload = [
+                {
+                    "uuid": node.uuid,
+                    "name": node.name,
+                    "address": node.address,
+                    "is_connected": node.is_connected,
+                    "has_config_profile": bool(node.config_profile_uuid),
+                }
+                for node in nodes_response.nodes
+            ]
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "result": {
+                    "requests": [
+                        _admin_provision_request_payload(row, script_versions)
+                        for row in requests_rows
+                    ],
+                    "nodes": nodes_payload,
+                    "rwms_available": nodes_response is not None,
+                    "node_types": [
+                        {"key": key, "label": label}
+                        for key, label in node_provisioning.NODE_TYPES
+                    ],
+                    "scripts_ready": scripts_ready,
+                    "panel_domains_configured": bool(settings.PANEL_DOMAINS),
+                },
+            }
+        )
+    finally:
+        db_session.close()
+
+
+def support_admin_api_node_provision_detail(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        provision_request = (
+            db_session.query(NodeProvisionRequest)
+            .get(int(request.GET.get("id") or 0))
+        )
+        if provision_request is None:
+            return JsonResponse(
+                {"status": "error", "message": "Заявка не найдена"}, status=404
+            )
+
+        # Пока заявка в installed, каждый poll детали проверяет коннект ноды
+        node_provisioning.refresh_connect_status(
+            db_session, provision_request, rwms_client
+        )
+        db_session.commit()
+
+        stages_rows = (
+            db_session.query(NodeProvisionStage)
+            .filter(NodeProvisionStage.request_id == provision_request.id)
+            .all()
+        )
+        stages_by_name = {row.stage: row for row in stages_rows}
+        stages_payload = []
+        for stage_name in node_provisioning.STAGES:
+            row = stages_by_name.get(stage_name)
+            stages_payload.append(
+                {
+                    "stage": stage_name,
+                    "status": row.status if row else "pending",
+                    "message": row.message if row else None,
+                    "updated_at": admin_dt(row.updated_at) if row else None,
+                }
+            )
+
+        return JsonResponse(
+            {
+                "status": "ok",
+                "result": {
+                    "request": _admin_provision_request_payload(provision_request),
+                    "stages": stages_payload,
+                    "install_log": provision_request.install_log or "",
+                },
+            }
         )
     finally:
         db_session.close()

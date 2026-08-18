@@ -151,6 +151,18 @@ CABINET_DOMAINS = config(
 DEFAULT_CABINET_DOMAIN = config(
     "DEFAULT_CABINET_DOMAIN", default="http://localhost:8000"
 )
+# Панельные домены: только на них отвечает bootstrap-API установки нод
+# (/node-bootstrap/...). Пустой список = API выключено (безопасный дефолт).
+PANEL_DOMAINS = config("PANEL_DOMAINS", default="", cast=csv_domains)
+# Откуда bootstrap-API берёт сертификаты для новых нод (выпускает
+# manage-node-certificates.sh из devops-репозитория)
+NODE_BOOTSTRAP_CERT_ROOT = config(
+    "NODE_BOOTSTRAP_CERT_ROOT", default="/etc/monkeyisland/ssl"
+)
+# TTL одноразового токена установки до момента claim
+NODE_BOOTSTRAP_TOKEN_TTL_MINUTES = config(
+    "NODE_BOOTSTRAP_TOKEN_TTL_MINUTES", default=60, cast=int
+)
 PWA_MIRROR_SOURCE_URL = config("PWA_MIRROR_SOURCE_URL", default="")
 TG_BOT_USERNAME = config("TG_BOT_USERNAME", default="monkeyislandvpnbot")
 TELEGRAM_AUTH_BOT_TOKEN = config(

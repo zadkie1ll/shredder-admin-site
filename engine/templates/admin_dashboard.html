@@ -1349,6 +1349,31 @@
         #panel-system .panel-header::before { content: "\f1de"; }
         #panel-config-templates .panel-header::before { content: "\f1c9"; }
         #panel-node-traffic .panel-header::before { content: "\e522"; }
+        #panel-node-provision .panel-header::before { content: "\f233"; }
+        .admin-block-title { margin: 0 0 12px; display: flex; align-items: center; gap: 8px; font-size: 15px; }
+        .admin-block-title i { color: var(--brand-gold); }
+        .node-provision-log { margin: 12px 0; padding: 12px; max-height: 320px; overflow: auto; background: var(--input-bg); border: 1px solid var(--card-border); border-radius: var(--admin-radius); font-size: 12px; line-height: 1.45; white-space: pre-wrap; word-break: break-word; }
+        .node-provision-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+        .node-provision-table th, .node-provision-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid var(--card-border); }
+        .node-provision-table th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+        .node-provision-table tr.is-clickable { cursor: pointer; }
+        .node-provision-status { display: inline-flex; align-items: center; gap: 6px; padding: 2px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--inner-card-bg); }
+        .node-provision-status.is-ready { color: var(--green); }
+        .node-provision-status.is-failed, .node-provision-status.is-revoked { color: var(--red); }
+        .node-provision-status.is-progress { color: var(--brand-gold); }
+        .node-provision-oneliner { margin-top: 12px; padding: 12px; background: var(--input-bg); border: 1px dashed var(--brand-gold); border-radius: var(--admin-radius); font-size: 12px; word-break: break-all; }
+        .node-provision-stage { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; }
+        .node-provision-stage i { width: 16px; text-align: center; }
+        .node-provision-stage.is-ok i { color: var(--green); }
+        .node-provision-stage.is-failed i { color: var(--red); }
+        .node-provision-stage.is-running i { color: var(--brand-gold); }
+        .node-provision-stage.is-pending i { color: var(--muted); }
+        .node-provision-script-editor { width: 100%; min-height: 260px; margin: 8px 0; padding: 12px; background: var(--input-bg); color: var(--text-main); border: 1px solid var(--card-border); border-radius: var(--admin-radius); font-family: ui-monospace, monospace; font-size: 12px; line-height: 1.45; }
+        .node-provision-script-block { margin-bottom: 18px; padding: 14px; border: 1px solid var(--card-border); border-radius: var(--admin-radius); background: var(--inner-card-bg); }
+        .node-provision-script-block h4 { margin: 0 0 8px; display: flex; align-items: center; gap: 8px; font-size: 14px; }
+        .node-provision-versions { margin: 8px 0 0; font-size: 12px; color: var(--muted); }
+        .node-provision-versions button { margin-left: 8px; }
+        .node-provision-warning { margin: 8px 0; padding: 8px 12px; border-radius: var(--admin-radius); background: rgba(255,199,0,.12); color: var(--brand-gold); font-size: 12px; }
         #panel-censor-checks .panel-header::before { content: "\f7c0"; }
         #panel-reply-templates .panel-header::before { content: "\f4ad"; }
         #panel-support .panel-header::before { content: "\f590"; }
@@ -2333,6 +2358,7 @@
                 <button class="tab-btn" data-tab="system"><i class="fas fa-sliders"></i><span>Система</span></button>
                 <button class="tab-btn" data-tab="config-templates"><i class="fas fa-file-code"></i><span>Конфиги</span></button>
                 <button class="tab-btn" data-tab="node-traffic"><i class="fas fa-tower-broadcast"></i><span>Трафик нод</span></button>
+                <button class="tab-btn" data-tab="node-provision"><i class="fas fa-server"></i><span>Установка нод</span></button>
                 <button class="tab-btn" data-tab="censor-checks"><i class="fas fa-satellite-dish"></i><span>Замеры ТСПУ</span></button>
             {% endif %}
             <span class="nav-section-label">Поддержка</span>
@@ -2363,6 +2389,9 @@
         data-ua-rules-url="{% url 'support_admin_api_ua_rules' %}"
         data-traffic-nodes-url="{% url 'support_admin_api_traffic_nodes' %}"
         data-node-traffic-url="{% url 'support_admin_api_node_traffic' %}"
+        data-node-scripts-url="{% url 'support_admin_api_node_scripts' %}"
+        data-node-provision-url="{% url 'support_admin_api_node_provision' %}"
+        data-node-provision-detail-url="{% url 'support_admin_api_node_provision_detail' %}"
         data-audit-log-url="{% url 'support_admin_api_audit_log' %}"
         data-segments-url="{% url 'support_admin_api_segments' %}"
         data-broadcasts-url="{% url 'support_admin_api_broadcasts' %}"
@@ -3725,6 +3754,52 @@
             <div id="node-traffic-result"></div>
         </section>
 
+        <section id="panel-node-provision" class="tab-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Установка нод</h1>
+                <p class="admin-subtitle">Автоматическая установка новых нод: заявка → одна команда на свежем сервере → нода в панели Remnawave</p>
+            </header>
+
+            <div id="node-provision-alert"></div>
+
+            <details class="card censor-keys-card" id="node-provision-create-card" open>
+                <summary><i class="fas fa-plus"></i> Новая нода</summary>
+                <form id="node-provision-create-form" class="censor-key-form">
+                    {% csrf_token %}
+                    <input class="input" name="node_name" maxlength="30" placeholder="Имя ноды (3–30 символов)" required>
+                    <select class="input" name="node_type" id="node-provision-type" required></select>
+                    <select class="input" name="source_node_uuid" id="node-provision-source" required title="С этой ноды копируется конфиг-профиль панели"></select>
+                    <input class="input" name="country_code" maxlength="2" placeholder="Страна (NL)" title="Двухбуквенный код страны для панели">
+                    <div class="censor-form-actions">
+                        <button class="btn" type="submit"><i class="fas fa-terminal"></i>Создать заявку</button>
+                    </div>
+                </form>
+                <div id="node-provision-oneliner"></div>
+            </details>
+
+            <div class="card">
+                <h3 class="admin-block-title"><i class="fas fa-list-check"></i> Заявки на установку</h3>
+                <div id="node-provision-requests"></div>
+            </div>
+
+            <div class="card" id="node-provision-detail" hidden>
+                <h3 class="admin-block-title"><i class="fas fa-wave-square"></i> Заявка <span id="node-provision-detail-title"></span></h3>
+                <div id="node-provision-stages"></div>
+                <pre id="node-provision-log" class="node-provision-log"></pre>
+                <div class="censor-form-actions">
+                    <button class="btn btn-secondary" type="button" id="node-provision-reset-certs"><i class="fas fa-certificate"></i>Сбросить выдачу сертов</button>
+                    <button class="btn btn-secondary" type="button" id="node-provision-revoke"><i class="fas fa-ban"></i>Отозвать токен</button>
+                    <button class="btn btn-secondary" type="button" id="node-provision-detail-close"><i class="fas fa-xmark"></i>Закрыть</button>
+                </div>
+            </div>
+
+            <details class="card censor-keys-card" id="node-provision-scripts-card">
+                <summary><i class="fas fa-file-code"></i> Скрипты установки <span id="node-provision-scripts-badge" class="muted"></span></summary>
+                <p class="admin-subtitle">Копии install-скриптов из devops-репозитория. Правка создаёт новую версию; заявка фиксирует версию в момент создания. Скрипт исполняется на сервере без stdin — интерактивные read надо убирать.</p>
+                <div id="node-provision-scripts"></div>
+            </details>
+        </section>
+
         <section id="panel-censor-checks" class="tab-panel">
             <header class="panel-header">
                 <h1 class="admin-title">Замеры ТСПУ</h1>
@@ -4504,6 +4579,7 @@
                 loadReferralAntifraud();
             }
             if (tabId === 'node-traffic') initNodeTrafficTab();
+            if (tabId === 'node-provision') initNodeProvisionTab();
             if (tabId === 'censor-checks') loadCensorChecks();
             history.replaceState(null, '', `#${tabId}`);
             const activeBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
@@ -8780,6 +8856,313 @@
 
         let nodeTrafficNodesLoaded = false;
         let nodeTrafficInitialReportLoaded = false;
+        // --- Установка нод -------------------------------------------------
+        let nodeProvisionDetailId = null;
+        let nodeProvisionDetailTimer = null;
+
+        const NODE_PROVISION_STATUS_LABELS = {
+            created: ['Ожидает запуска', 'is-progress'],
+            claimed: ['Сервер подключился', 'is-progress'],
+            provisioning: ['Идёт установка', 'is-progress'],
+            installed: ['Скрипт завершён, ждём коннект', 'is-progress'],
+            ready: ['Готова', 'is-ready'],
+            failed: ['Ошибка', 'is-failed'],
+            revoked: ['Отозвана', 'is-revoked'],
+        };
+
+        function nodeProvisionStatusBadge(status) {
+            const [label, cls] = NODE_PROVISION_STATUS_LABELS[status] || [status, ''];
+            return `<span class="node-provision-status ${cls}">${escapeHtml(label)}</span>`;
+        }
+
+        async function initNodeProvisionTab() {
+            await loadNodeProvision();
+            await loadNodeScripts();
+        }
+
+        async function loadNodeProvision() {
+            const target = document.getElementById('node-provision-requests');
+            setLoading(target);
+            try {
+                const response = await fetch(main.dataset.nodeProvisionUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    setError(target, payload.message || 'Не удалось загрузить заявки');
+                    return;
+                }
+                renderNodeProvision(payload.result);
+            } catch (error) {
+                setError(target, 'Ошибка запроса заявок');
+            }
+        }
+
+        function renderNodeProvision(result) {
+            const alertTarget = document.getElementById('node-provision-alert');
+            const notes = [];
+            if (!result.panel_domains_configured) {
+                notes.push('PANEL_DOMAINS не настроен — bootstrap-API выключено, установка работать не будет.');
+            }
+            if (!result.rwms_available) {
+                notes.push('RWMS недоступен — список нод панели не загружен, создание заявок не сработает.');
+            }
+            const missingScripts = (result.node_types || []).filter((t) => !result.scripts_ready[t.key]);
+            if (missingScripts.length) {
+                notes.push(`Задай скрипт для типов: ${missingScripts.map((t) => t.label).join(', ')} (блок «Скрипты установки» ниже).`);
+            }
+            alertTarget.innerHTML = notes.map((n) => `<div class="node-provision-warning"><i class="fas fa-triangle-exclamation"></i> ${escapeHtml(n)}</div>`).join('');
+
+            const typeSelect = document.getElementById('node-provision-type');
+            typeSelect.innerHTML = (result.node_types || []).map((t) => {
+                const ready = result.scripts_ready[t.key];
+                const suffix = ready ? '' : ' — задай скрипт';
+                return `<option value="${escapeHtml(t.key)}" ${ready ? '' : 'disabled'}>${escapeHtml(t.label + suffix)}</option>`;
+            }).join('');
+
+            const sourceSelect = document.getElementById('node-provision-source');
+            const sources = (result.nodes || []).filter((n) => n.has_config_profile);
+            sourceSelect.innerHTML = sources.length
+                ? sources.map((n) => `<option value="${escapeHtml(n.uuid)}">Конфиг как у: ${escapeHtml(n.name)}${n.is_connected ? '' : ' (offline)'}</option>`).join('')
+                : '<option value="">Нет нод с конфиг-профилем</option>';
+
+            const target = document.getElementById('node-provision-requests');
+            if (!(result.requests || []).length) {
+                target.innerHTML = '<p class="muted">Заявок пока нет — создай первую в блоке «Новая нода».</p>';
+                return;
+            }
+            const rows = result.requests.map((r) => `
+                <tr class="is-clickable" data-request-id="${r.id}">
+                    <td>#${r.id}</td>
+                    <td>${escapeHtml(r.node_name)}</td>
+                    <td>${escapeHtml(r.node_type)} v${r.script_version || '?'}</td>
+                    <td>${nodeProvisionStatusBadge(r.status)}</td>
+                    <td>${escapeHtml(r.claimed_ip || '—')}</td>
+                    <td>${escapeHtml(r.created_at || '')}</td>
+                    <td>${escapeHtml(r.created_by || '')}</td>
+                </tr>`).join('');
+            target.innerHTML = `
+                <div style="overflow-x:auto"><table class="node-provision-table">
+                    <thead><tr><th>ID</th><th>Нода</th><th>Тип · скрипт</th><th>Статус</th><th>IP</th><th>Создана</th><th>Кем</th></tr></thead>
+                    <tbody>${rows}</tbody>
+                </table></div>`;
+            target.querySelectorAll('tr[data-request-id]').forEach((row) => {
+                row.addEventListener('click', () => openNodeProvisionDetail(Number(row.dataset.requestId)));
+            });
+        }
+
+        function stopNodeProvisionPolling() {
+            if (nodeProvisionDetailTimer) {
+                clearInterval(nodeProvisionDetailTimer);
+                nodeProvisionDetailTimer = null;
+            }
+        }
+
+        async function openNodeProvisionDetail(requestId) {
+            nodeProvisionDetailId = requestId;
+            document.getElementById('node-provision-detail').hidden = false;
+            await refreshNodeProvisionDetail();
+            stopNodeProvisionPolling();
+            nodeProvisionDetailTimer = setInterval(refreshNodeProvisionDetail, 5000);
+        }
+
+        async function refreshNodeProvisionDetail() {
+            if (nodeProvisionDetailId === null || activeAdminTab !== 'node-provision') return;
+            try {
+                const response = await fetch(`${main.dataset.nodeProvisionDetailUrl}?id=${nodeProvisionDetailId}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') return;
+                const {request, stages, install_log} = payload.result;
+                document.getElementById('node-provision-detail-title').innerHTML =
+                    `#${request.id} · ${escapeHtml(request.node_name)} ${nodeProvisionStatusBadge(request.status)}`;
+                const stageIcons = {ok: 'fa-circle-check', failed: 'fa-circle-xmark', running: 'fa-spinner fa-spin', pending: 'fa-circle'};
+                const stageLabels = {claim: 'Сервер подключился, нода создана в панели', certs: 'Сертификаты доставлены', script: 'Install-скрипт', connect: 'Нода подключилась к панели'};
+                document.getElementById('node-provision-stages').innerHTML = stages.map((s) => `
+                    <div class="node-provision-stage is-${s.status}">
+                        <i class="fas ${stageIcons[s.status] || 'fa-circle'}"></i>
+                        <span>${escapeHtml(stageLabels[s.stage] || s.stage)}</span>
+                        ${s.message ? `<span class="muted">— ${escapeHtml(s.message)}</span>` : ''}
+                    </div>`).join('');
+                const logEl = document.getElementById('node-provision-log');
+                logEl.textContent = install_log || (request.error ? `Ошибка: ${request.error}` : 'Лог пока пуст.');
+                if (['ready', 'failed', 'revoked'].includes(request.status)) stopNodeProvisionPolling();
+            } catch (error) {
+                console.warn('node provision detail failed', error);
+            }
+        }
+
+        async function nodeProvisionAction(action, requestId) {
+            const body = new FormData();
+            body.append('action', action);
+            body.append('id', String(requestId));
+            const response = await fetch(main.dataset.nodeProvisionUrl, {
+                method: 'POST',
+                headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                body,
+            });
+            const payload = await response.json();
+            if (!response.ok || payload.status !== 'ok') {
+                showAdminToast(payload.message || 'Не получилось', 'error');
+                return false;
+            }
+            return true;
+        }
+
+        document.getElementById('node-provision-revoke')?.addEventListener('click', async () => {
+            if (nodeProvisionDetailId === null) return;
+            if (!window.confirm('Отозвать токен заявки? Установку с этим токеном продолжить будет нельзя.')) return;
+            if (await nodeProvisionAction('revoke', nodeProvisionDetailId)) {
+                showAdminToast('Токен отозван');
+                await refreshNodeProvisionDetail();
+                await loadNodeProvision();
+            }
+        });
+
+        document.getElementById('node-provision-reset-certs')?.addEventListener('click', async () => {
+            if (nodeProvisionDetailId === null) return;
+            if (!window.confirm('Разрешить повторную выдачу сертификатов по этой заявке?')) return;
+            if (await nodeProvisionAction('reset_certs', nodeProvisionDetailId)) {
+                showAdminToast('Выдача сертификатов сброшена');
+                await refreshNodeProvisionDetail();
+            }
+        });
+
+        document.getElementById('node-provision-detail-close')?.addEventListener('click', () => {
+            stopNodeProvisionPolling();
+            nodeProvisionDetailId = null;
+            document.getElementById('node-provision-detail').hidden = true;
+        });
+
+        document.getElementById('node-provision-create-form')?.addEventListener('submit', async (event) => {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const body = new FormData(form);
+            body.append('action', 'create');
+            try {
+                const response = await fetch(main.dataset.nodeProvisionUrl, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                    body,
+                });
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    showAdminToast(payload.message || 'Не удалось создать заявку', 'error');
+                    return;
+                }
+                const oneliner = payload.result.one_liner;
+                document.getElementById('node-provision-oneliner').innerHTML = `
+                    <div class="node-provision-oneliner">
+                        <b>Выполни на свежем сервере под root (токен показан один раз):</b><br>
+                        <code id="node-provision-oneliner-code">${escapeHtml(oneliner)}</code>
+                        <div class="censor-form-actions" style="margin-top:8px">
+                            <button class="btn btn-secondary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('node-provision-oneliner-code').textContent).then(() => showAdminToast('Скопировано'))"><i class="fas fa-copy"></i>Скопировать</button>
+                        </div>
+                    </div>`;
+                form.reset();
+                showAdminToast('Заявка создана');
+                await loadNodeProvision();
+                openNodeProvisionDetail(payload.result.request.id);
+            } catch (error) {
+                showAdminToast('Ошибка запроса', 'error');
+            }
+        });
+
+        async function loadNodeScripts() {
+            const target = document.getElementById('node-provision-scripts');
+            setLoading(target);
+            try {
+                const response = await fetch(main.dataset.nodeScriptsUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    setError(target, payload.message || 'Не удалось загрузить скрипты');
+                    return;
+                }
+                renderNodeScripts(payload.result.types || []);
+            } catch (error) {
+                setError(target, 'Ошибка запроса скриптов');
+            }
+        }
+
+        function renderNodeScripts(types) {
+            const missing = types.filter((t) => !t.has_active).length;
+            document.getElementById('node-provision-scripts-badge').textContent =
+                missing ? `(задай скрипт: ${missing})` : '';
+            const target = document.getElementById('node-provision-scripts');
+            target.innerHTML = types.map((type) => {
+                const statusHtml = type.has_active
+                    ? `<span class="node-provision-status is-ready">активна v${type.active.version}</span>`
+                    : '<span class="node-provision-status is-failed">задай скрипт</span>';
+                const versionsHtml = (type.versions || []).map((v) => {
+                    const activateBtn = v.is_active
+                        ? ''
+                        : `<button class="btn btn-secondary" type="button" data-activate-script="${v.id}"><i class="fas fa-rotate-left"></i>Сделать активной</button>`;
+                    return `<div class="node-provision-versions">v${v.version} · ${escapeHtml(v.created_at || '')} · ${escapeHtml(v.created_by || '')} ${v.comment ? `· ${escapeHtml(v.comment)}` : ''} ${v.is_active ? '· <b>активна</b>' : ''}${activateBtn}</div>`;
+                }).join('');
+                return `
+                    <div class="node-provision-script-block" data-node-type="${escapeHtml(type.key)}">
+                        <h4><i class="fas fa-file-code"></i>${escapeHtml(type.label)} ${statusHtml}</h4>
+                        <textarea class="node-provision-script-editor" data-script-editor="${escapeHtml(type.key)}" placeholder="Вставь сюда содержимое install-скрипта из devops-репозитория">${type.active ? escapeHtml(type.active.content) : ''}</textarea>
+                        <input class="input" data-script-comment="${escapeHtml(type.key)}" maxlength="256" placeholder="Комментарий к версии (что поменял)">
+                        <div class="censor-form-actions" style="margin-top:8px">
+                            <button class="btn" type="button" data-save-script="${escapeHtml(type.key)}"><i class="fas fa-save"></i>Сохранить новой версией</button>
+                        </div>
+                        <div data-script-warnings="${escapeHtml(type.key)}"></div>
+                        ${versionsHtml}
+                    </div>`;
+            }).join('');
+
+            target.querySelectorAll('[data-save-script]').forEach((button) => {
+                button.addEventListener('click', () => saveNodeScript(button.dataset.saveScript));
+            });
+            target.querySelectorAll('[data-activate-script]').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    const body = new FormData();
+                    body.append('action', 'activate');
+                    body.append('script_id', button.dataset.activateScript);
+                    const response = await fetch(main.dataset.nodeScriptsUrl, {
+                        method: 'POST',
+                        headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                        body,
+                    });
+                    const payload = await response.json();
+                    if (!response.ok || payload.status !== 'ok') {
+                        showAdminToast(payload.message || 'Не удалось активировать версию', 'error');
+                        return;
+                    }
+                    showAdminToast('Версия активирована');
+                    await loadNodeScripts();
+                    await loadNodeProvision();
+                });
+            });
+        }
+
+        async function saveNodeScript(nodeType) {
+            const editor = document.querySelector(`[data-script-editor="${nodeType}"]`);
+            const comment = document.querySelector(`[data-script-comment="${nodeType}"]`);
+            const body = new FormData();
+            body.append('action', 'save');
+            body.append('node_type', nodeType);
+            body.append('content', editor.value);
+            body.append('comment', comment.value);
+            try {
+                const response = await fetch(main.dataset.nodeScriptsUrl, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                    body,
+                });
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    showAdminToast(payload.message || 'Не удалось сохранить скрипт', 'error');
+                    return;
+                }
+                const warningsTarget = document.querySelector(`[data-script-warnings="${nodeType}"]`);
+                warningsTarget.innerHTML = (payload.warnings || []).map((w) => `<div class="node-provision-warning"><i class="fas fa-triangle-exclamation"></i> ${escapeHtml(w)}</div>`).join('');
+                showAdminToast(`Сохранена версия v${payload.result.version}`);
+                await loadNodeScripts();
+                await loadNodeProvision();
+            } catch (error) {
+                showAdminToast('Ошибка запроса', 'error');
+            }
+        }
+
         async function initNodeTrafficTab() {
             const form = document.getElementById('node-traffic-form');
             if (!nodeTrafficInitialReportLoaded && form) {

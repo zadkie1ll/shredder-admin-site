@@ -86,6 +86,12 @@ message GetUserByUsernameRequest {
   string username = 1;
 }
 
+// Числовой ID пользователя в панели Remnawave (колонка ID в UI). Именно он
+// пишется в поле email access-лога xray, поэтому ip-guard оперирует им.
+message GetUserByIdRequest {
+  int64 id = 1;
+}
+
 message AddUserRequest {
   string username = 1;
   optional string email = 2;
@@ -156,6 +162,10 @@ message Node {
   bool is_connected = 4;
   bool is_disabled = 5;
   optional string country_code = 6;
+  // Конфиг-профиль ноды: нужен админке сайта, чтобы создавать новую ноду
+  // "как существующую" (CreateNode требует профиль и список inbound'ов).
+  optional string config_profile_uuid = 7;
+  repeated string active_inbound_uuids = 8;
 }
 
 message GetNodesResponse {
@@ -180,9 +190,25 @@ message GetNodeUsersUsageResponse {
   repeated NodeUserUsage items = 1;
 }
 
+// Панельный ключ для remnanode (SECRET_KEY в docker-compose ноды).
+// Один и тот же для всех нод, к записи ноды в панели не привязан.
+message GetNodeSecretResponse {
+  string secret_key = 1;
+}
+
+message CreateNodeRequest {
+  string name = 1;
+  string address = 2;
+  int32 port = 3;
+  optional string country_code = 4;
+  string config_profile_uuid = 5;
+  repeated string inbound_uuids = 6;
+}
+
 service RwManager {
   rpc GetUserByUuid(GetUserByUuidRequest) returns (UserResponse) {}
   rpc GetUserByUsername(GetUserByUsernameRequest) returns (UserResponse) {}
+  rpc GetUserById(GetUserByIdRequest) returns (UserResponse) {}
   rpc AddUser(AddUserRequest) returns (UserResponse) {}
   rpc UpdateUser(UpdateUserRequest) returns (UserResponse) {}
   rpc GetAllUsers(GetAllUsersRequest) returns (GetAllUsersReply) {}
@@ -193,4 +219,11 @@ service RwManager {
   // Read-only статистика для поиска аномального потребления трафика
   rpc GetNodes(Empty) returns (GetNodesResponse) {}
   rpc GetNodeUsersUsage(GetNodeUsersUsageRequest) returns (GetNodeUsersUsageResponse) {}
+
+  // Автоматизация установки нод через админку сайта.
+  // GetNodeSecret отдаёт панельный ключ (keygen), CreateNode идемпотентно
+  // создаёт ноду (существующая с тем же именем/адресом возвращается как есть).
+  // Удаления нод здесь нет намеренно (Remnawave Safety Rules).
+  rpc GetNodeSecret(Empty) returns (GetNodeSecretResponse) {}
+  rpc CreateNode(CreateNodeRequest) returns (Node) {}
 }
