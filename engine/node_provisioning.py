@@ -32,13 +32,12 @@ import proto.rwmanager_pb2 as rw_proto
 
 logger = logging.getLogger("engine")
 
-NODE_TYPES = [
-    ("self_steal", "Self-steal (Reality + haproxy/nginx)"),
-    ("hysteria", "Hysteria2"),
-    ("whitelist", "Whitelist (чистый Reality)"),
-    ("whitelist_self_steal", "Whitelist self-steal"),
-]
-NODE_TYPE_KEYS = {key for key, _ in NODE_TYPES}
+LEGACY_SCRIPT_NAMES = {
+    "self_steal": "Self-steal (Reality + haproxy/nginx)",
+    "hysteria": "Hysteria2",
+    "whitelist": "Whitelist (чистый Reality)",
+    "whitelist_self_steal": "Whitelist self-steal",
+}
 
 STAGES = ["claim", "script", "connect"]
 
@@ -72,6 +71,97 @@ def hash_token(token: str) -> str:
 
 def script_sha256(content: str) -> str:
     return hashlib.sha256(content.encode()).hexdigest()
+
+
+def normalize_script_name(value: str) -> str:
+    """Имя динамической группы версий в пределах существующей колонки БД."""
+    name = " ".join((value or "").split())
+    if not name:
+        raise ProvisionError("Задай название скрипта")
+    if len(name) > 32:
+        raise ProvisionError("Название скрипта: не больше 32 символов")
+    if any(ord(character) < 32 for character in name):
+        raise ProvisionError("Название скрипта содержит недопустимые символы")
+    return name
+
+
+def script_display_name(name: str) -> str:
+    """Красивые подписи для четырёх старых ключей до их переименования."""
+    return LEGACY_SCRIPT_NAMES.get(name, name)
+
+
+def _script_name_exists(db_session, name, *, except_name=None):
+    normalized = name.casefold()
+    return any(
+        stored_name.casefold() == normalized and stored_name != except_name
+        for stored_name, in db_session.query(NodeInstallScript.node_type).distinct()
+    )
+
+
+def create_script_group(db_session, name, created_by):
+    """Создать сохраняемый черновик, который при первом save станет v1."""
+    name = normalize_script_name(name)
+    if _script_name_exists(db_session, name):
+        raise ProvisionError("Скрипт с таким названием уже существует")
+    draft = NodeInstallScript(
+        node_type=name,
+        version=0,
+        content="",
+        is_active=False,
+        comment="Черновик",
+        created_by=created_by,
+    )
+    db_session.add(draft)
+    db_session.flush()
+    return draft
+
+
+def rename_script_group(db_session, old_name, new_name):
+    """Переименовать группу версий, не меняя script_id существующих заявок."""
+    old_name = (old_name or "").strip()
+    new_name = normalize_script_name(new_name)
+    scripts = (
+        db_session.query(NodeInstallScript)
+        .filter(NodeInstallScript.node_type == old_name)
+        .all()
+    )
+    if not scripts:
+        raise ProvisionError("Скрипт не найден", http_status=404)
+    if new_name == old_name:
+        return scripts[0]
+    if _script_name_exists(db_session, new_name, except_name=old_name):
+        raise ProvisionError("Скрипт с таким названием уже существует")
+    for script in scripts:
+        script.node_type = new_name
+    db_session.flush()
+    return scripts[0]
+
+
+def delete_script_group(db_session, name):
+    """Удалить только группу, версии которой не зафиксированы в заявках."""
+    name = (name or "").strip()
+    scripts = (
+        db_session.query(NodeInstallScript)
+        .filter(NodeInstallScript.node_type == name)
+        .all()
+    )
+    if not scripts:
+        raise ProvisionError("Скрипт не найден", http_status=404)
+    script_ids = [script.id for script in scripts]
+    used_count = (
+        db_session.query(NodeProvisionRequest)
+        .filter(NodeProvisionRequest.script_id.in_(script_ids))
+        .count()
+    )
+    if used_count:
+        raise ProvisionError(
+            f"Скрипт используется в {used_count} заявках и хранит их историю; "
+            "его нельзя удалить"
+        )
+    for script in scripts:
+        db_session.delete(script)
+    db_session.flush()
+    return len(scripts)
 
 
 def active_script(db_session, node_type):
@@ -109,8 +199,7 @@ def script_warnings(content: str) -> list[str]:
 
 def save_script_version(db_session, node_type, content, comment, created_by):
     """Новая версия скрипта; становится активной, старая остаётся в истории."""
-    if node_type not in NODE_TYPE_KEYS:
-        raise ProvisionError("Неизвестный тип ноды")
+    node_type = normalize_script_name(node_type)
     if not content.strip():
         raise ProvisionError("Пустой скрипт")
 
@@ -125,15 +214,24 @@ def save_script_version(db_session, node_type, content, comment, created_by):
         NodeInstallScript.is_active.is_(True),
     ).update({"is_active": False}, synchronize_session=False)
 
-    script = NodeInstallScript(
-        node_type=node_type,
-        version=(last.version + 1) if last else 1,
-        content=content,
-        is_active=True,
-        comment=(comment or None),
-        created_by=created_by,
-    )
-    db_session.add(script)
+    if last is not None and last.version == 0 and not last.content:
+        # Неактивный технический черновик ещё никем не мог быть выбран.
+        script = last
+        script.version = 1
+        script.content = content
+        script.is_active = True
+        script.comment = comment or None
+        script.created_by = created_by
+    else:
+        script = NodeInstallScript(
+            node_type=node_type,
+            version=(last.version + 1) if last else 1,
+            content=content,
+            is_active=True,
+            comment=(comment or None),
+            created_by=created_by,
+        )
+        db_session.add(script)
     db_session.flush()
     return script
 
@@ -176,13 +274,12 @@ def create_request(
     node_name = (node_name or "").strip()
     if not (3 <= len(node_name) <= 30):
         raise ProvisionError("Имя ноды: от 3 до 30 символов (ограничение панели)")
-    if node_type not in NODE_TYPE_KEYS:
-        raise ProvisionError("Неизвестный тип ноды")
+    node_type = normalize_script_name(node_type)
 
     script = active_script(db_session, node_type)
     if script is None:
         raise ProvisionError(
-            "Для этого типа ноды не задан скрипт установки — задай скрипт "
+            "Для выбранного скрипта нет активной версии — сохрани её "
             "на вкладке «Установка нод»."
         )
 

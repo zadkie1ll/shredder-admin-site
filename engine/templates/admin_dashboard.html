@@ -1424,11 +1424,16 @@
         .node-provision-stage.is-pending i { color: var(--muted); }
         .node-provision-scripts-health { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-bottom: 14px; padding: 12px 14px; border: 1px solid var(--card-border); border-radius: 11px; color: var(--muted); background: var(--card-bg); font-size: 12px; font-weight: 700; }
         .node-provision-scripts-health.is-ready { border-color: rgba(var(--green-rgb), .3); color: var(--green); background: rgba(var(--green-rgb), .07); }
-        .node-provision-scripts-layout { display: grid; grid-template-columns: minmax(220px, .62fr) minmax(0, 1.7fr); gap: 16px; }
-        .node-provision-script-nav, .node-provision-script-editor-panel { border: 1px solid var(--panel-border); border-radius: var(--admin-radius); background: var(--card-bg); }
-        .node-provision-script-nav { align-self: start; padding: 8px; }
-        .node-provision-script-choice { width: 100%; display: block; padding: 12px; border: 0; border-radius: 9px; color: var(--text-main); background: transparent; text-align: left; cursor: pointer; }
-        .node-provision-script-choice + .node-provision-script-choice { margin-top: 3px; }
+        .node-provision-scripts-layout { display: grid; gap: 14px; }
+        .node-provision-script-manager, .node-provision-script-editor-panel { border: 1px solid var(--panel-border); border-radius: var(--admin-radius); background: var(--card-bg); }
+        .node-provision-script-manager-head { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border-bottom: 1px solid var(--card-border); }
+        .node-provision-script-manager-title { min-width: 0; color: var(--text-main); font-size: 12px; font-weight: 800; }
+        .node-provision-script-manager-title span { margin-left: 7px; color: var(--muted); font-weight: 600; }
+        .node-provision-script-name-form { display: grid; grid-template-columns: minmax(180px, 420px) auto; gap: 10px; align-items: end; padding: 12px 14px; border-bottom: 1px solid var(--card-border); background: var(--inner-card-bg); }
+        .node-provision-script-name-form[hidden] { display: none; }
+        .node-provision-script-name-actions { display: flex; gap: 8px; }
+        .node-provision-script-nav { display: flex; gap: 7px; padding: 9px; overflow-x: auto; scrollbar-width: thin; }
+        .node-provision-script-choice { min-width: 210px; max-width: 310px; flex: 1 0 210px; display: block; padding: 11px 12px; border: 0; border-radius: 9px; color: var(--text-main); background: transparent; text-align: left; cursor: pointer; }
         .node-provision-script-choice[aria-selected="true"] { background: var(--inner-card-bg); box-shadow: inset 0 0 0 1px var(--card-border); }
         .node-provision-script-choice strong { display: block; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
         .node-provision-script-choice-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 5px; color: var(--muted); font-size: 10.5px; font-weight: 700; }
@@ -1436,14 +1441,16 @@
         .node-provision-script-choice-state.is-missing { color: var(--red); }
         .node-provision-editor-head, .node-provision-editor-body, .node-provision-editor-footer { padding: 16px; }
         .node-provision-editor-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; border-bottom: 1px solid var(--card-border); }
+        .node-provision-editor-head-main { min-width: 0; }
+        .node-provision-editor-management { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
         .node-provision-editor-title { margin: 0; color: var(--text-main); font-size: 15px; }
         .node-provision-editor-version { color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
         .node-provision-code-label { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 7px; color: var(--muted); font-size: 11px; font-weight: 700; }
-        .node-provision-code-editor { display: grid; grid-template-columns: 44px minmax(0, 1fr); min-height: 320px; overflow: hidden; border: 1px solid var(--card-border); border-radius: 10px; background: #0c0f14; }
+        .node-provision-code-editor { display: grid; grid-template-columns: 44px minmax(0, 1fr); min-height: 520px; overflow: hidden; border: 1px solid var(--card-border); border-radius: 10px; background: #0c0f14; }
         .node-provision-code-editor:focus-within { border-color: var(--brand-gold); box-shadow: 0 0 0 3px rgba(255,199,0,.12); }
         .node-provision-code-gutter { overflow: hidden; border-right: 1px solid rgba(127,143,163,.16); background: #12161d; color: #626b78; user-select: none; }
         .node-provision-code-lines { padding: 13px 10px 13px 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; line-height: 1.55; text-align: right; white-space: pre; }
-        .node-provision-code-stage { position: relative; min-width: 0; min-height: 320px; }
+        .node-provision-code-stage { position: relative; min-width: 0; min-height: 520px; }
         .node-provision-editor-highlight, .node-provision-script-editor { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 13px 14px; overflow: auto; border: 0; border-radius: 0; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; font-size: 12px; line-height: 1.55; tab-size: 2; white-space: pre; }
         .node-provision-editor-highlight { z-index: 1; color: #d7dce5; background: transparent; pointer-events: none; scrollbar-width: none; }
         .node-provision-editor-highlight::-webkit-scrollbar { display: none; }
@@ -1479,9 +1486,7 @@
         html[data-admin-theme="light"] .node-provision-bash-string { color: #18765b; }
         html[data-admin-theme="light"] .node-provision-bash-option { color: #a63e54; }
         @media (max-width: 980px) {
-            .node-provision-scripts-layout { grid-template-columns: 1fr; }
-            .node-provision-script-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-            .node-provision-script-choice + .node-provision-script-choice { margin-top: 0; }
+            .node-provision-code-editor, .node-provision-code-stage { min-height: 420px; }
         }
         @media (max-width: 760px) {
             .node-provision-readiness { grid-column: 2; grid-row: 3; justify-self: start; margin-top: 8px; }
@@ -1493,7 +1498,7 @@
         }
         @media (max-width: 520px) {
             .node-provision-workspace-tabs { display: grid; grid-template-columns: 1fr 1fr; }
-            .node-provision-flow, .node-provision-script-nav { grid-template-columns: 1fr; }
+            .node-provision-flow { grid-template-columns: 1fr; }
             .node-provision-section-head, .node-provision-form-actions, .node-provision-editor-head, .node-provision-editor-footer, .node-provision-detail-head { display: grid; }
             .node-provision-request-row { grid-template-columns: 1fr; }
             .node-provision-request-main { grid-column: auto; }
@@ -1501,6 +1506,12 @@
             .node-provision-editor-actions { display: grid; grid-template-columns: 1fr 1fr; }
             .node-provision-version-row { grid-template-columns: auto 1fr; }
             .node-provision-version-row .btn { grid-column: 1 / -1; }
+            .node-provision-script-manager-head, .node-provision-script-name-form { grid-template-columns: 1fr; display: grid; }
+            .node-provision-script-manager-head .btn, .node-provision-script-name-actions, .node-provision-script-name-actions .btn { width: 100%; }
+            .node-provision-script-name-actions { display: grid; grid-template-columns: 1fr 1fr; }
+            .node-provision-script-choice { min-width: 180px; flex-basis: 180px; }
+            .node-provision-editor-management { justify-content: stretch; }
+            .node-provision-editor-management .btn { flex: 1; }
         }
         #panel-censor-checks .panel-header::before { content: "\f7c0"; }
         #panel-reply-templates .panel-header::before { content: "\f4ad"; }
@@ -3908,7 +3919,7 @@
                     <div class="node-provision-section-head">
                         <div class="node-provision-section-title">
                             <i class="fas fa-plus"></i>
-                            <div><h3>Новая установка</h3><p class="node-provision-section-copy">Выбери профиль — активная версия скрипта зафиксируется в заявке.</p></div>
+                            <div><h3>Новая установка</h3><p class="node-provision-section-copy">Выбери скрипт — его активная версия зафиксируется в заявке.</p></div>
                         </div>
                     </div>
                     <form id="node-provision-create-form" class="node-provision-create-form">
@@ -3919,8 +3930,8 @@
                                 <input class="input" id="node-provision-name" name="node_name" maxlength="30" placeholder="Например: nl-ams-03" required>
                             </div>
                             <div class="node-provision-field">
-                                <label for="node-provision-type">Профиль установки</label>
-                                <select class="input" name="node_type" id="node-provision-type" required></select>
+                                <label for="node-provision-type">Скрипт установки</label>
+                                <select class="input" name="script_name" id="node-provision-type" required></select>
                             </div>
                             <div class="node-provision-field">
                                 <label for="node-provision-source">Конфигурация ключей</label>
@@ -3932,7 +3943,7 @@
                             </div>
                         </div>
                         <div class="node-provision-form-actions">
-                            <p id="node-provision-create-summary" class="node-provision-create-summary">Выбери профиль установки</p>
+                            <p id="node-provision-create-summary" class="node-provision-create-summary">Выбери скрипт установки</p>
                             <button class="btn" type="submit"><i class="fas fa-terminal"></i>Создать заявку</button>
                         </div>
                     </form>
@@ -3964,7 +3975,7 @@
             </section>
 
             <section id="node-provision-scripts-view" class="node-provision-view" data-node-provision-panel="scripts" hidden>
-                <div id="node-provision-scripts-health" class="node-provision-scripts-health"><span><i class="fas fa-spinner fa-spin"></i> Загружаем профили установки</span></div>
+                <div id="node-provision-scripts-health" class="node-provision-scripts-health"><span><i class="fas fa-spinner fa-spin"></i> Загружаем скрипты установки</span></div>
                 <div id="node-provision-scripts"></div>
             </section>
         </section>
@@ -9083,7 +9094,7 @@
         }
 
         function nodeProvisionTypeLabel(typeKey) {
-            const type = (nodeProvisionState?.node_types || []).find((item) => item.key === typeKey)
+            const type = (nodeProvisionState?.scripts || nodeProvisionState?.node_types || []).find((item) => item.key === typeKey)
                 || nodeScriptTypes.find((item) => item.key === typeKey);
             return type?.label || typeKey;
         }
@@ -9122,29 +9133,29 @@
             if (!result.rwms_available) {
                 notes.push('RWMS недоступен — список нод панели не загружен, создание заявок не сработает.');
             }
-            const missingScripts = (result.node_types || []).filter((t) => !result.scripts_ready[t.key]);
+            const scripts = result.scripts || result.node_types || [];
+            const missingScripts = scripts.filter((script) => !result.scripts_ready[script.key]);
             if (missingScripts.length) {
-                notes.push(`Не готовы профили: ${missingScripts.map((t) => t.label).join(', ')}. Задай скрипты на соседней вкладке.`);
+                notes.push(`Нет активной версии: ${missingScripts.map((script) => script.label).join(', ')}. Сохрани скрипты на соседней вкладке.`);
             }
             alertTarget.innerHTML = notes.map((n) => `<div class="node-provision-warning"><i class="fas fa-triangle-exclamation"></i> ${escapeHtml(n)}</div>`).join('');
 
-            const nodeTypes = result.node_types || [];
-            const readyCount = nodeTypes.length - missingScripts.length;
+            const readyCount = scripts.length - missingScripts.length;
             const readiness = document.getElementById('node-provision-readiness');
-            readiness.className = `node-provision-readiness ${readyCount === nodeTypes.length && nodeTypes.length ? 'is-ready' : 'is-warning'}`;
-            readiness.innerHTML = readyCount === nodeTypes.length && nodeTypes.length
-                ? `<i class="fas fa-circle-check"></i> ${readyCount} из ${nodeTypes.length} скриптов готовы`
-                : `<i class="fas fa-triangle-exclamation"></i> ${readyCount} из ${nodeTypes.length} скриптов готовы`;
-            document.getElementById('node-provision-scripts-count').textContent = nodeTypes.length ? String(nodeTypes.length) : '';
+            readiness.className = `node-provision-readiness ${readyCount === scripts.length && scripts.length ? 'is-ready' : 'is-warning'}`;
+            readiness.innerHTML = scripts.length && readyCount === scripts.length
+                ? `<i class="fas fa-circle-check"></i> ${readyCount} из ${scripts.length} скриптов готовы`
+                : `<i class="fas fa-triangle-exclamation"></i> ${readyCount} из ${scripts.length} скриптов готовы`;
+            document.getElementById('node-provision-scripts-count').textContent = scripts.length ? String(scripts.length) : '';
 
             const typeSelect = document.getElementById('node-provision-type');
             const previousType = typeSelect.value;
-            typeSelect.innerHTML = nodeTypes.map((t) => {
-                const ready = result.scripts_ready[t.key];
-                const suffix = ready ? '' : ' — задай скрипт';
-                return `<option value="${escapeHtml(t.key)}" ${ready ? '' : 'disabled'}>${escapeHtml(t.label + suffix)}</option>`;
+            typeSelect.innerHTML = scripts.map((script) => {
+                const ready = result.scripts_ready[script.key];
+                const suffix = ready ? ` · v${script.active_version || '?'}` : ' — нет активной версии';
+                return `<option value="${escapeHtml(script.key)}" ${ready ? '' : 'disabled'}>${escapeHtml(script.label + suffix)}</option>`;
             }).join('');
-            const firstReadyType = nodeTypes.find((type) => result.scripts_ready[type.key]);
+            const firstReadyType = scripts.find((script) => result.scripts_ready[script.key]);
             typeSelect.value = result.scripts_ready[previousType]
                 ? previousType
                 : firstReadyType?.key || '';
@@ -9172,7 +9183,7 @@
                         <span class="node-provision-request-icon"><i class="fas fa-server"></i></span>
                         <div><div class="node-provision-request-name">${escapeHtml(request.node_name)}</div><div class="node-provision-request-note">#${request.id} · ${escapeHtml(request.claimed_ip || 'IP пока не получен')}</div></div>
                     </div>
-                    <div><div class="node-provision-cell-label">Профиль</div><div class="node-provision-cell-value">${escapeHtml(nodeProvisionTypeLabel(request.node_type))} · v${request.script_version || '?'}</div></div>
+                    <div><div class="node-provision-cell-label">Скрипт</div><div class="node-provision-cell-value">${escapeHtml(request.script_name || nodeProvisionTypeLabel(request.node_type))} · v${request.script_version || '?'}</div></div>
                     <div><div class="node-provision-cell-label">Создана</div><div class="node-provision-cell-value">${escapeHtml(nodeProvisionDateLabel(request.created_at))}</div></div>
                     <div>${nodeProvisionStatusBadge(request.status)}</div>
                     <button class="btn btn-secondary" type="button" data-open-provision-request="${request.id}">Открыть</button>
@@ -9186,14 +9197,14 @@
             const select = document.getElementById('node-provision-type');
             const summary = document.getElementById('node-provision-create-summary');
             if (!select || !summary || !select.value) {
-                if (summary) summary.textContent = 'Нет готового профиля установки';
+                if (summary) summary.textContent = 'Нет скрипта с активной версией';
                 return;
             }
             const type = nodeScriptTypes.find((item) => item.key === select.value);
             const version = type?.active?.version;
             summary.innerHTML = version
                 ? `Будет использован <strong>${escapeHtml(type.label)} · v${version}</strong> · сертификат устанавливается отдельно`
-                : `<strong>${escapeHtml(nodeProvisionTypeLabel(select.value))}</strong> · активная версия будет зафиксирована в заявке`;
+                : `<strong>${escapeHtml(nodeProvisionTypeLabel(select.value))}</strong> · версия будет зафиксирована в заявке`;
         }
 
         document.getElementById('node-provision-type')?.addEventListener('change', updateNodeProvisionCreateSummary);
@@ -9330,7 +9341,7 @@
                     setError(target, payload.message || 'Не удалось загрузить скрипты');
                     return;
                 }
-                renderNodeScripts(payload.result.types || []);
+                renderNodeScripts(payload.result.scripts || payload.result.types || []);
             } catch (error) {
                 setError(target, 'Ошибка запроса скриптов');
             }
@@ -9342,35 +9353,124 @@
             const missing = types.filter((t) => !t.has_active).length;
             document.getElementById('node-provision-scripts-count').textContent = types.length ? String(types.length) : '';
             const health = document.getElementById('node-provision-scripts-health');
-            health.className = `node-provision-scripts-health ${missing ? '' : 'is-ready'}`;
-            health.innerHTML = missing
-                ? `<span><i class="fas fa-triangle-exclamation"></i> Готово ${types.length - missing} из ${types.length}: для ${missing} профилей нужно задать скрипт</span><span>Заявки доступны только для готовых профилей</span>`
-                : `<span><i class="fas fa-circle-check"></i> Все ${types.length} профиля готовы к созданию заявок</span><span>Правка всегда создаёт новую версию</span>`;
+            health.className = `node-provision-scripts-health ${types.length && !missing ? 'is-ready' : ''}`;
+            health.innerHTML = !types.length
+                ? `<span><i class="fas fa-circle-info"></i> Скриптов пока нет — создай первый</span><span>В заявку можно выбрать только скрипт с активной версией</span>`
+                : missing
+                    ? `<span><i class="fas fa-triangle-exclamation"></i> Активны ${types.length - missing} из ${types.length}: у ${missing} скриптов пока только черновик</span><span>Черновики недоступны в заявках</span>`
+                    : `<span><i class="fas fa-circle-check"></i> Все ${types.length} скриптов готовы к установке</span><span>Правка всегда создаёт новую версию</span>`;
 
             if (!selectedNodeScriptType || !types.some((type) => type.key === selectedNodeScriptType)) {
                 selectedNodeScriptType = types[0]?.key || null;
             }
             const target = document.getElementById('node-provision-scripts');
-            if (!types.length) {
-                target.innerHTML = '<div class="node-provision-empty">Профили установки не настроены.</div>';
-                return;
-            }
             target.innerHTML = `
                 <div class="node-provision-scripts-layout">
-                    <nav class="node-provision-script-nav" aria-label="Профили установки">
-                        ${types.map((type) => `
-                            <button class="node-provision-script-choice" type="button" data-select-node-script="${escapeHtml(type.key)}" aria-selected="${type.key === selectedNodeScriptType}">
-                                <strong>${escapeHtml(type.label)}</strong>
-                                <span class="node-provision-script-choice-meta"><span>${escapeHtml(type.key)}</span><span class="node-provision-script-choice-state ${type.has_active ? 'is-ready' : 'is-missing'}">${type.has_active ? `v${type.active.version} · готов` : 'скрипт не задан'}</span></span>
-                            </button>`).join('')}
-                    </nav>
-                    <div id="node-provision-script-editor-slot"></div>
+                    <section class="node-provision-script-manager">
+                        <header class="node-provision-script-manager-head">
+                            <div class="node-provision-script-manager-title">Скрипты установки <span>выбери скрипт — редактор откроется на всю ширину</span></div>
+                            <button class="btn" type="button" id="node-provision-script-add"><i class="fas fa-plus"></i>Добавить скрипт</button>
+                        </header>
+                        <form id="node-provision-script-name-form" class="node-provision-script-name-form" hidden>
+                            <input type="hidden" name="action">
+                            <input type="hidden" name="node_type">
+                            <div class="node-provision-field"><label for="node-provision-script-name" id="node-provision-script-name-label">Название нового скрипта</label><input class="input" id="node-provision-script-name" name="name" maxlength="32" placeholder="Например: Reality + HAProxy" required></div>
+                            <div class="node-provision-script-name-actions"><button class="btn btn-secondary" type="button" id="node-provision-script-name-cancel">Отменить</button><button class="btn" type="submit"><i class="fas fa-check"></i>Сохранить</button></div>
+                        </form>
+                        <nav class="node-provision-script-nav" aria-label="Скрипты установки">
+                            ${types.length ? types.map((type) => `
+                                <button class="node-provision-script-choice" type="button" data-select-node-script="${escapeHtml(type.key)}" aria-selected="${type.key === selectedNodeScriptType}">
+                                    <strong>${escapeHtml(type.label)}</strong>
+                                    <span class="node-provision-script-choice-meta"><span>${escapeHtml(type.key)}</span><span class="node-provision-script-choice-state ${type.has_active ? 'is-ready' : 'is-missing'}">${type.has_active ? `v${type.active.version} · активен` : 'черновик'}</span></span>
+                                </button>`).join('') : '<div class="node-provision-empty">Создай скрипт, назови его и сохрани первую Bash-версию.</div>'}
+                        </nav>
+                    </section>
+                    <div id="node-provision-script-editor-slot">${types.length ? '' : '<div class="node-provision-empty">Редактор появится после создания скрипта.</div>'}</div>
                 </div>`;
+            document.getElementById('node-provision-script-add').addEventListener('click', () => openNodeScriptNameForm('create'));
+            document.getElementById('node-provision-script-name-cancel').addEventListener('click', closeNodeScriptNameForm);
+            document.getElementById('node-provision-script-name-form').addEventListener('submit', submitNodeScriptNameForm);
             target.querySelectorAll('[data-select-node-script]').forEach((button) => {
                 button.addEventListener('click', () => selectNodeScriptType(button.dataset.selectNodeScript));
             });
-            renderSelectedNodeScript();
+            if (types.length) renderSelectedNodeScript();
             updateNodeProvisionCreateSummary();
+        }
+
+        function openNodeScriptNameForm(action, nodeType = '') {
+            if (nodeScriptEditorDirty && !window.confirm('Отменить несохранённые изменения текущего скрипта?')) return;
+            const form = document.getElementById('node-provision-script-name-form');
+            if (!form) return;
+            nodeScriptEditorDirty = false;
+            form.elements.action.value = action;
+            form.elements.node_type.value = nodeType;
+            form.elements.name.value = action === 'rename' ? nodeType : '';
+            document.getElementById('node-provision-script-name-label').textContent = action === 'rename' ? 'Новое название' : 'Название нового скрипта';
+            form.hidden = false;
+            form.elements.name.focus();
+        }
+
+        function closeNodeScriptNameForm() {
+            const form = document.getElementById('node-provision-script-name-form');
+            if (form) form.hidden = true;
+        }
+
+        async function submitNodeScriptNameForm(event) {
+            event.preventDefault();
+            const form = event.currentTarget;
+            const submitButton = form.querySelector('button[type="submit"]');
+            submitButton.disabled = true;
+            try {
+                const response = await fetch(main.dataset.nodeScriptsUrl, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                    body: new FormData(form),
+                });
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    showAdminToast(payload.message || 'Не удалось сохранить название', 'error');
+                    return;
+                }
+                const previousKey = form.elements.node_type.value;
+                if (previousKey && nodeScriptWarnings.has(previousKey)) {
+                    nodeScriptWarnings.set(payload.result.key, nodeScriptWarnings.get(previousKey));
+                    nodeScriptWarnings.delete(previousKey);
+                }
+                selectedNodeScriptType = payload.result.key;
+                showAdminToast(form.elements.action.value === 'rename' ? 'Скрипт переименован' : 'Скрипт создан — добавь Bash-код');
+                await Promise.all([loadNodeScripts(), loadNodeProvision()]);
+            } catch (error) {
+                showAdminToast('Ошибка запроса', 'error');
+            } finally {
+                if (submitButton.isConnected) submitButton.disabled = false;
+            }
+        }
+
+        async function deleteNodeScript(nodeType, label) {
+            if (nodeScriptEditorDirty && !window.confirm('Удалить скрипт вместе с несохранёнными изменениями?')) return;
+            if (!window.confirm(`Удалить скрипт «${label}» и всю его историю версий? Использованные в заявках скрипты система удалить не даст.`)) return;
+            const body = new FormData();
+            body.append('action', 'delete');
+            body.append('node_type', nodeType);
+            try {
+                const response = await fetch(main.dataset.nodeScriptsUrl, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                    body,
+                });
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') {
+                    showAdminToast(payload.message || 'Не удалось удалить скрипт', 'error');
+                    return;
+                }
+                selectedNodeScriptType = null;
+                nodeScriptEditorDirty = false;
+                nodeScriptWarnings.delete(nodeType);
+                showAdminToast('Скрипт удалён');
+                await Promise.all([loadNodeScripts(), loadNodeProvision()]);
+            } catch (error) {
+                showAdminToast('Ошибка запроса', 'error');
+            }
         }
 
         function selectNodeScriptType(nodeType) {
@@ -9536,8 +9636,12 @@
             slot.innerHTML = `
                 <section class="node-provision-script-editor-panel">
                     <div class="node-provision-editor-head">
-                        <div><h3 class="node-provision-editor-title">${escapeHtml(type.label)}</h3><p class="node-provision-section-copy">${escapeHtml(type.key)} · скрипт исполняется без stdin</p></div>
-                        <span id="node-provision-editor-version" class="node-provision-editor-version">${type.active ? `Текущая версия v${type.active.version}` : 'Активная версия не задана'}</span>
+                        <div class="node-provision-editor-head-main"><h3 class="node-provision-editor-title">${escapeHtml(type.label)}</h3><p class="node-provision-section-copy">Имя: ${escapeHtml(type.key)} · скрипт исполняется без stdin</p></div>
+                        <div class="node-provision-editor-management">
+                            <span id="node-provision-editor-version" class="node-provision-editor-version">${type.active ? `Текущая версия v${type.active.version}` : 'Черновик · сохрани первую версию'}</span>
+                            <button class="btn btn-secondary" type="button" id="node-provision-script-rename"><i class="fas fa-pen"></i>Переименовать</button>
+                            <button class="btn btn-danger" type="button" id="node-provision-script-delete"><i class="fas fa-trash"></i>Удалить</button>
+                        </div>
                     </div>
                     <div class="node-provision-editor-body">
                         <div class="node-provision-code-label"><span>Install-скрипт</span><span id="node-provision-editor-meta">Bash</span></div>
@@ -9561,13 +9665,15 @@
                 </section>`;
             nodeScriptEditorDirty = false;
             mountNodeScriptEditor();
+            document.getElementById('node-provision-script-rename').addEventListener('click', () => openNodeScriptNameForm('rename', type.key));
+            document.getElementById('node-provision-script-delete').addEventListener('click', () => deleteNodeScript(type.key, type.label));
             document.getElementById('node-provision-script-save').addEventListener('click', () => saveNodeScript(type.key));
             document.getElementById('node-provision-script-reset').addEventListener('click', () => {
                 const editor = document.querySelector('[data-node-script-editor]');
                 editor.value = type.active?.content || '';
                 nodeScriptEditorDirty = false;
                 renderNodeScriptEditor();
-                document.getElementById('node-provision-editor-version').textContent = type.active ? `Текущая версия v${type.active.version}` : 'Активная версия не задана';
+                document.getElementById('node-provision-editor-version').textContent = type.active ? `Текущая версия v${type.active.version}` : 'Черновик · сохрани первую версию';
             });
             slot.querySelectorAll('[data-activate-script]').forEach((button) => {
                 button.addEventListener('click', () => activateNodeScriptVersion(button.dataset.activateScript));

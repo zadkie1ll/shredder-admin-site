@@ -129,6 +129,23 @@ class NodeProvisioningDbTestCase(SimpleTestCase):
 
 
 class InstallScriptTests(NodeProvisioningDbTestCase):
+    def test_create_group_persists_draft_and_first_save_becomes_v1(self):
+        draft = node_provisioning.create_script_group(
+            self.session, "Reality Europe", "tester"
+        )
+        self.session.commit()
+
+        self.assertEqual(draft.version, 0)
+        self.assertFalse(draft.is_active)
+        script = node_provisioning.save_script_version(
+            self.session, "Reality Europe", SCRIPT_BODY, "first", "tester"
+        )
+        self.session.commit()
+
+        self.assertEqual(script.id, draft.id)
+        self.assertEqual(script.version, 1)
+        self.assertTrue(script.is_active)
+
     def test_save_creates_versions_and_switches_active(self):
         first = self.make_script()
         second = node_provisioning.save_script_version(
@@ -154,15 +171,75 @@ class InstallScriptTests(NodeProvisioningDbTestCase):
         active = node_provisioning.active_script(self.session, "self_steal")
         self.assertEqual(active.id, first.id)
 
-    def test_save_rejects_unknown_type_and_empty_content(self):
-        with self.assertRaises(node_provisioning.ProvisionError):
-            node_provisioning.save_script_version(
-                self.session, "no_such_type", SCRIPT_BODY, "", "tester"
-            )
+    def test_save_accepts_dynamic_name_and_rejects_invalid_content(self):
+        script = node_provisioning.save_script_version(
+            self.session, "Мой Reality", SCRIPT_BODY, "", "tester"
+        )
+        self.assertEqual(script.node_type, "Мой Reality")
         with self.assertRaises(node_provisioning.ProvisionError):
             node_provisioning.save_script_version(
                 self.session, "self_steal", "   ", "", "tester"
             )
+        with self.assertRaises(node_provisioning.ProvisionError):
+            node_provisioning.save_script_version(
+                self.session, "x" * 33, SCRIPT_BODY, "", "tester"
+            )
+
+    def test_rename_changes_group_but_keeps_versions(self):
+        first = self.make_script("Reality old")
+        second = node_provisioning.save_script_version(
+            self.session, "Reality old", SCRIPT_BODY + "echo v2\n", "v2", "tester"
+        )
+        node_provisioning.rename_script_group(
+            self.session, "Reality old", "Reality new"
+        )
+        self.session.commit()
+
+        self.assertIsNone(node_provisioning.active_script(self.session, "Reality old"))
+        self.assertEqual(
+            node_provisioning.active_script(self.session, "Reality new").id,
+            second.id,
+        )
+        self.assertEqual(
+            self.session.query(NodeInstallScript)
+            .filter(NodeInstallScript.node_type == "Reality new")
+            .count(),
+            2,
+        )
+        self.assertIn(
+            first.id,
+            {
+                script.id
+                for script in self.session.query(NodeInstallScript)
+                .filter(NodeInstallScript.node_type == "Reality new")
+                .all()
+            },
+        )
+
+    def test_duplicate_name_is_rejected_case_insensitively(self):
+        node_provisioning.create_script_group(self.session, "Reality EU", "tester")
+        with self.assertRaises(node_provisioning.ProvisionError):
+            node_provisioning.create_script_group(
+                self.session, "reality eu", "tester"
+            )
+
+    def test_delete_unused_group_and_protect_used_group(self):
+        node_provisioning.create_script_group(self.session, "Unused", "tester")
+        node_provisioning.delete_script_group(self.session, "Unused")
+        self.assertEqual(
+            self.session.query(NodeInstallScript)
+            .filter(NodeInstallScript.node_type == "Unused")
+            .count(),
+            0,
+        )
+
+        provision_request, _token = self.make_request(node_type="Used script")
+        with self.assertRaises(node_provisioning.ProvisionError) as context:
+            node_provisioning.delete_script_group(self.session, "Used script")
+        self.assertIn("используется", str(context.exception))
+        self.assertIsNotNone(
+            self.session.query(NodeInstallScript).get(provision_request.script_id)
+        )
 
     def test_script_warnings_detect_interactive_read_and_missing_shebang(self):
         warnings = node_provisioning.script_warnings(
@@ -183,7 +260,7 @@ class CreateRequestTests(NodeProvisioningDbTestCase):
                 source_node=make_source_node(),
                 created_by="tester",
             )
-        self.assertIn("задай скрипт", str(ctx.exception))
+        self.assertIn("нет активной версии", str(ctx.exception))
 
     def test_create_snapshots_config_profile(self):
         provision_request, token = self.make_request()
@@ -195,6 +272,16 @@ class CreateRequestTests(NodeProvisioningDbTestCase):
         self.assertNotEqual(provision_request.token_hash, token)
         self.assertEqual(
             provision_request.token_hash, node_provisioning.hash_token(token)
+        )
+
+    def test_create_accepts_arbitrary_selected_script(self):
+        provision_request, _token = self.make_request(node_type="Reality Nordics")
+        self.assertEqual(provision_request.node_type, "Reality Nordics")
+        self.assertEqual(
+            self.session.query(NodeInstallScript)
+            .get(provision_request.script_id)
+            .node_type,
+            "Reality Nordics",
         )
 
     def test_create_rejects_source_without_profile(self):
@@ -503,7 +590,7 @@ class AdminNodeProvisionApiTests(NodeProvisioningDbTestCase):
             {
                 "action": "create",
                 "node_name": "DE Node",
-                "node_type": "self_steal",
+                "script_name": "self_steal",
                 "source_node_uuid": NODE_UUID,
             },
         )
@@ -545,12 +632,16 @@ class AdminNodeProvisionApiTests(NodeProvisioningDbTestCase):
             response = support_admin_api_node_provision(request)
 
         self.assertEqual(response.status_code, 400)
-        self.assertIn("задай скрипт", json.loads(response.content)["message"])
+        self.assertIn(
+            "нет активной версии", json.loads(response.content)["message"]
+        )
 
-    def test_scripts_listing_reports_missing_types(self):
+    def test_scripts_listing_is_dynamic_and_reports_drafts(self):
         from engine.views import support_admin_api_node_scripts
 
         self.make_script()
+        node_provisioning.create_script_group(self.session, "Custom draft", "tester")
+        self.session.commit()
         request = self.factory.get("/support-admin/api/node-scripts/")
         with mock.patch(
             "engine.views.require_support_admin_role", return_value=None
@@ -558,10 +649,48 @@ class AdminNodeProvisionApiTests(NodeProvisioningDbTestCase):
             response = support_admin_api_node_scripts(request)
 
         payload = json.loads(response.content)
-        by_key = {t["key"]: t for t in payload["result"]["types"]}
+        by_key = {t["key"]: t for t in payload["result"]["scripts"]}
         self.assertTrue(by_key["self_steal"]["has_active"])
-        self.assertFalse(by_key["hysteria"]["has_active"])
+        self.assertFalse(by_key["Custom draft"]["has_active"])
         self.assertEqual(by_key["self_steal"]["active"]["content"], SCRIPT_BODY)
+        self.assertNotIn("hysteria", by_key)
+
+    def test_scripts_api_can_create_rename_and_delete_group(self):
+        from engine.views import support_admin_api_node_scripts
+
+        def post(data):
+            request = self.factory.post("/support-admin/api/node-scripts/", data)
+            with (
+                mock.patch(
+                    "engine.views.require_support_admin_role", return_value=None
+                ),
+                mock.patch("engine.views.support_admin_actor", return_value="tester"),
+                mock.patch("engine.views.admin_audit_write"),
+            ):
+                return support_admin_api_node_scripts(request)
+
+        created = post({"action": "create", "name": "Custom Reality"})
+        self.assertEqual(created.status_code, 200)
+        self.assertEqual(
+            json.loads(created.content)["result"]["key"], "Custom Reality"
+        )
+
+        renamed = post(
+            {
+                "action": "rename",
+                "node_type": "Custom Reality",
+                "name": "Custom Hysteria",
+            }
+        )
+        self.assertEqual(renamed.status_code, 200)
+        self.assertEqual(
+            json.loads(renamed.content)["result"]["key"], "Custom Hysteria"
+        )
+
+        deleted = post({"action": "delete", "node_type": "Custom Hysteria"})
+        self.assertEqual(deleted.status_code, 200)
+        self.session.expire_all()
+        self.assertEqual(self.session.query(NodeInstallScript).count(), 0)
 
     def test_detail_marks_ready_when_node_connected(self):
         from engine.views import support_admin_api_node_provision_detail

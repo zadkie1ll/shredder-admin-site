@@ -3987,11 +3987,18 @@ class NodeProvisionTemplateTests(SimpleTestCase):
             'class="node-provision-form-grid"',
             'class="node-provision-request-row"',
             'class="node-provision-scripts-layout"',
+            'class="node-provision-script-manager"',
+            'id="node-provision-script-add"',
+            'id="node-provision-script-rename"',
+            'id="node-provision-script-delete"',
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)
 
         self.assertIn("function setNodeProvisionView(view)", self.template)
+        self.assertIn("function submitNodeScriptNameForm(event)", self.template)
+        self.assertIn("function deleteNodeScript(nodeType, label)", self.template)
+        self.assertIn('name="script_name"', self.template)
         self.assertNotIn('class="node-provision-script-block"', self.template)
         self.assertNotIn('class="node-provision-table"', self.template)
 
@@ -4022,7 +4029,9 @@ class NodeProvisionTemplateTests(SimpleTestCase):
         self.assertIn("@media (max-width: 760px)", self.template)
         self.assertIn(".node-provision-form-grid { grid-template-columns: 1fr; }", self.template)
         self.assertIn(".node-provision-request-row { grid-template-columns: 1fr; }", self.template)
-        self.assertIn(".node-provision-script-nav { grid-template-columns: 1fr; }", self.template)
+        self.assertIn(".node-provision-script-nav { display: flex;", self.template)
+        self.assertIn("overflow-x: auto", self.template)
+        self.assertIn("min-height: 520px", self.template)
         self.assertIn(
             'html[data-admin-theme="light"] .node-provision-code-editor',
             self.template,

@@ -11826,6 +11826,39 @@ def _admin_node_script_payload(script, with_content=False):
     return payload
 
 
+def _admin_node_script_groups(db_session):
+    """Динамические именованные группы; version=0 — внутренний черновик."""
+    all_scripts = (
+        db_session.query(NodeInstallScript)
+        .order_by(NodeInstallScript.node_type, NodeInstallScript.version.desc())
+        .all()
+    )
+    by_name = {}
+    for script in all_scripts:
+        by_name.setdefault(script.node_type, []).append(script)
+
+    groups = []
+    for name, rows in by_name.items():
+        versions = [script for script in rows if script.version > 0]
+        active = next((script for script in versions if script.is_active), None)
+        groups.append(
+            {
+                "key": name,
+                "label": node_provisioning.script_display_name(name),
+                "has_active": active is not None,
+                "active": (
+                    _admin_node_script_payload(active, with_content=True)
+                    if active
+                    else None
+                ),
+                "versions": [
+                    _admin_node_script_payload(script) for script in versions
+                ],
+            }
+        )
+    return sorted(groups, key=lambda group: group["label"].casefold())
+
+
 def support_admin_api_node_scripts(request):
     auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
     if auth_response:
@@ -11836,6 +11869,71 @@ def support_admin_api_node_scripts(request):
         if request.method == "POST":
             action = request.POST.get("action") or ""
             try:
+                if action == "create":
+                    script = node_provisioning.create_script_group(
+                        db_session,
+                        request.POST.get("name") or "",
+                        str(support_admin_actor(request))[:128],
+                    )
+                    admin_audit_write(
+                        db_session,
+                        request,
+                        "node_script_create",
+                        target=script.node_type,
+                    )
+                    db_session.commit()
+                    return JsonResponse(
+                        {
+                            "status": "ok",
+                            "result": {
+                                "key": script.node_type,
+                                "label": node_provisioning.script_display_name(
+                                    script.node_type
+                                ),
+                            },
+                        }
+                    )
+
+                if action == "rename":
+                    script = node_provisioning.rename_script_group(
+                        db_session,
+                        request.POST.get("node_type") or "",
+                        request.POST.get("name") or "",
+                    )
+                    admin_audit_write(
+                        db_session,
+                        request,
+                        "node_script_rename",
+                        target=script.node_type,
+                    )
+                    db_session.commit()
+                    return JsonResponse(
+                        {
+                            "status": "ok",
+                            "result": {
+                                "key": script.node_type,
+                                "label": node_provisioning.script_display_name(
+                                    script.node_type
+                                ),
+                            },
+                        }
+                    )
+
+                if action == "delete":
+                    node_type = request.POST.get("node_type") or ""
+                    deleted_versions = node_provisioning.delete_script_group(
+                        db_session, node_type
+                    )
+                    admin_audit_write(
+                        db_session,
+                        request,
+                        "node_script_delete",
+                        target=node_type,
+                        versions=deleted_versions,
+                    )
+                    db_session.commit()
+                    return JsonResponse({"status": "ok"})
+
                 if action == "save":
                     node_type = request.POST.get("node_type") or ""
                     content = request.POST.get("content") or ""
@@ -11896,51 +11994,32 @@ def support_admin_api_node_scripts(request):
                 }
             )
 
-        all_scripts = (
-            db_session.query(NodeInstallScript)
-            .order_by(
-                NodeInstallScript.node_type,
-                NodeInstallScript.version.desc(),
-            )
-            .all()
+        groups = _admin_node_script_groups(db_session)
+        # `types` остаётся на время совместимости со старой админкой.
+        return JsonResponse(
+            {"status": "ok", "result": {"scripts": groups, "types": groups}}
         )
-        by_type = {}
-        for script in all_scripts:
-            by_type.setdefault(script.node_type, []).append(script)
-
-        types_payload = []
-        for type_key, type_label in node_provisioning.NODE_TYPES:
-            versions = by_type.get(type_key, [])
-            active = next((s for s in versions if s.is_active), None)
-            types_payload.append(
-                {
-                    "key": type_key,
-                    "label": type_label,
-                    "has_active": active is not None,
-                    "active": (
-                        _admin_node_script_payload(active, with_content=True)
-                        if active
-                        else None
-                    ),
-                    "versions": [
-                        _admin_node_script_payload(s) for s in versions
-                    ],
-                }
-            )
-        return JsonResponse({"status": "ok", "result": {"types": types_payload}})
     finally:
         db_session.close()
 
 
 def _admin_provision_request_payload(provision_request, script_versions=None):
+    script_meta = (script_versions or {}).get(provision_request.script_id)
+    if isinstance(script_meta, dict):
+        script_version = script_meta.get("version")
+        script_name = script_meta.get("name")
+    else:
+        script_version = script_meta
+        script_name = node_provisioning.script_display_name(
+            provision_request.node_type
+        )
     return {
         "id": provision_request.id,
         "node_name": provision_request.node_name,
         "node_type": provision_request.node_type,
         "status": provision_request.status.value,
-        "script_version": (
-            (script_versions or {}).get(provision_request.script_id)
-        ),
+        "script_name": script_name,
+        "script_version": script_version,
         "claimed_ip": provision_request.claimed_ip,
         "ssh_port": provision_request.ssh_port,
         "remnawave_node_uuid": provision_request.remnawave_node_uuid,
@@ -11985,7 +12064,11 @@ def support_admin_api_node_provision(request):
                     provision_request, token = node_provisioning.create_request(
                         db_session,
                         node_name=request.POST.get("node_name") or "",
-                        node_type=request.POST.get("node_type") or "",
+                        node_type=(
+                            request.POST.get("script_name")
+                            or request.POST.get("node_type")
+                            or ""
+                        ),
                         source_node=source_node,
                         country_code=(
                             (request.POST.get("country_code") or "").upper()[:2]
@@ -12060,15 +12143,41 @@ def support_admin_api_node_provision(request):
             .limit(100)
             .all()
         )
+        script_rows = db_session.query(NodeInstallScript).all()
         script_versions = {
-            script.id: script.version
-            for script in db_session.query(NodeInstallScript).all()
+            script.id: {
+                "version": script.version,
+                "name": node_provisioning.script_display_name(script.node_type),
+            }
+            for script in script_rows
         }
+        script_names = sorted(
+            {script.node_type for script in script_rows},
+            key=lambda name: node_provisioning.script_display_name(name).casefold(),
+        )
         scripts_ready = {
-            type_key: node_provisioning.active_script(db_session, type_key)
-            is not None
-            for type_key, _label in node_provisioning.NODE_TYPES
+            name: any(
+                script.node_type == name and script.is_active
+                for script in script_rows
+            )
+            for name in script_names
         }
+        scripts_payload = [
+            {
+                "key": name,
+                "label": node_provisioning.script_display_name(name),
+                "has_active": scripts_ready[name],
+                "active_version": next(
+                    (
+                        script.version
+                        for script in script_rows
+                        if script.node_type == name and script.is_active
+                    ),
+                    None,
+                ),
+            }
+            for name in script_names
+        ]
 
         nodes_payload = []
         nodes_response = rwms_client.get_nodes()
@@ -12094,9 +12203,11 @@ def support_admin_api_node_provision(request):
                     ],
                     "nodes": nodes_payload,
                     "rwms_available": nodes_response is not None,
+                    "scripts": scripts_payload,
+                    # Старое поле сохраняем для обратной совместимости API.
                     "node_types": [
-                        {"key": key, "label": label}
-                        for key, label in node_provisioning.NODE_TYPES
+                        {"key": script["key"], "label": script["label"]}
+                        for script in scripts_payload
                     ],
                     "scripts_ready": scripts_ready,
                     "bootstrap_domains_configured": bool(
