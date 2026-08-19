@@ -5064,3 +5064,39 @@ html[data-admin-theme="light"] .acq-chart-scroll-hint.is-active strong {
 
     #panel-stats .sources-total-badge { white-space: normal; }
 }
+
+/* === Мобильный guard, часть 2 (2026-08-19): layout-гриды с жёсткими px-минимумами
+   (аналитика/рассылки/промокоды/формы) складываются в одну колонку — именно они
+   распирали страницу шире вьюпорта. Таблицы-списки остаются в своих скролл-обёртках. === */
+@media (max-width: 760px) {
+    .tab-panel, .card { min-width: 0; max-width: 100%; }
+
+    #panel-stats .analytics-insights,
+    .broadcast-composer,
+    .broadcast-primary-fields,
+    .promo-guide-hero,
+    .promo-compose-grid,
+    .promo-audience,
+    .promo-batch-layout,
+    .promo-cohort-overview-grid,
+    .promo-cohort-insights,
+    .promo-live-card,
+    .promo-batch-row,
+    .promo-code-row,
+    .promo-cohort-tariff-row,
+    .form-grid-two,
+    .form-grid-stats,
+    .node-traffic-form,
+    .censor-key-form {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
+
+    .censor-district-row,
+    .censor-key-row,
+    .censor-check-row,
+    .censor-run-row,
+    .censor-probe-row {
+        grid-template-columns: minmax(0, 1fr) !important;
+        min-width: 0 !important;
+    }
+}
