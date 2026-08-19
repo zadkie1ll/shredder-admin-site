@@ -3354,6 +3354,15 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
             template,
         )
 
+    def test_quick_access_waits_for_deferred_install_prompt(self):
+        """Первый клик по «Быстрому доступу» не должен сваливаться в
+        инструкцию, если beforeinstallprompt ещё не успел прийти."""
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn("function waitForInstallPrompt(", template)
+        self.assertIn("const installPrompt = await waitForInstallPrompt(1500);", template)
+        self.assertIn("installPromptWaiters.splice(0).forEach((resolve) => resolve(event));", template)
+
     def test_faq_back_returns_to_origin_tab(self):
         """«Назад» из FAQ возвращает на вкладку, с которой FAQ открыли
         (например, «Поддержка»), а не всегда в «Профиль»."""

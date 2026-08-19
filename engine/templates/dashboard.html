@@ -8490,10 +8490,29 @@
         }
 
         let deferredInstallPrompt = null;
+        // Chrome присылает beforeinstallprompt асинхронно (после активации
+        // service worker), поэтому ранний клик по «Быстрому доступу» его ещё
+        // не застаёт — даём событию дойти, прежде чем показывать инструкцию.
+        const installPromptWaiters = [];
         window.addEventListener('beforeinstallprompt', (event) => {
             event.preventDefault();
             deferredInstallPrompt = event;
+            installPromptWaiters.splice(0).forEach((resolve) => resolve(event));
         });
+
+        function waitForInstallPrompt(timeoutMs) {
+            if (deferredInstallPrompt) return Promise.resolve(deferredInstallPrompt);
+            if (!('onbeforeinstallprompt' in window)) return Promise.resolve(null);
+            return new Promise((resolve) => {
+                const onPrompt = (event) => { clearTimeout(timer); resolve(event); };
+                const timer = setTimeout(() => {
+                    const idx = installPromptWaiters.indexOf(onPrompt);
+                    if (idx !== -1) installPromptWaiters.splice(idx, 1);
+                    resolve(null);
+                }, timeoutMs);
+                installPromptWaiters.push(onPrompt);
+            });
+        }
 
         function isStandalonePWA() {
             return window.matchMedia('(display-mode: standalone)').matches
@@ -8528,11 +8547,13 @@
                 openQuickAccessModal('Приложение уже установлено', 'Кабинет уже открыт как приложение или добавлен на главный экран — отдельная установка не нужна.');
                 return;
             }
-            // Android / Chrome / Edge — нативная установка PWA
-            if (deferredInstallPrompt) {
-                deferredInstallPrompt.prompt();
+            // Android / Chrome / Edge — нативная установка PWA. Событие может
+            // ещё не дойти к моменту первого клика — ждём его до 1.5 секунд.
+            const installPrompt = await waitForInstallPrompt(1500);
+            if (installPrompt) {
+                installPrompt.prompt();
                 try {
-                    await deferredInstallPrompt.userChoice;
+                    await installPrompt.userChoice;
                 } catch (err) {}
                 deferredInstallPrompt = null;
                 return;
