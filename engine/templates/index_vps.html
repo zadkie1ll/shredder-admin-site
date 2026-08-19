@@ -20,7 +20,6 @@
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     </noscript>
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
         
         :root {
@@ -450,13 +449,14 @@
         }
     </style>
     {% include "includes/yandex_metrika.html" %}
+    <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
 </head>
 <body class="antialiased">
 
     <div class="hero-bg">
         <nav class="container mx-auto px-6 py-7 flex justify-between items-center relative z-10">
             <div class="landing-brand" aria-label="Monkey Island VPS">
-                <img class="landing-brand-mark" src="{% static 'icons/monkey-island-logo-animated.gif' %}" alt="" width="42" height="42" decoding="async">
+                <img class="landing-brand-mark" src="{% static 'icons/monkey-island-logo-animated.webp' %}" alt="" width="42" height="42" decoding="async">
                 <span class="landing-brand-text">
                     MONKEY ISLAND<span class="text-[#ffc700]"> VPS</span>
                 </span>
@@ -844,8 +844,10 @@
                                 <p>Перед оплатой выберите подходящий период доступа и укажите email для ссылки в личный кабинет:</p>
                                 <div class="bg-white/5 p-4 rounded-xl space-y-2">
                                     <p>1. <span class="text-[#ffc700] font-bold">Оплата на сайте:</span> Доступ открывается после успешной оплаты выбранного тарифа.</p>
+                                    {% if payment_gateway != "yookassa" %}
                                     <p>2. <span class="text-[#ffc700] font-bold">Без автоплатежей:</span> После окончания оплаченного периода продление не списывается автоматически.</p>
-                                    <p>3. <span class="text-[#ffc700] font-bold">Возврат средств:</span> Если сервис не подошел, вернем деньги в течение 3 дней после оплаты. Подробные условия — в <a href="/offer/" class="text-[#ffc700] font-bold hover:text-white transition">оферте</a>.</p>
+                                    {% endif %}
+                                    <p>{% if payment_gateway != "yookassa" %}3{% else %}2{% endif %}. <span class="text-[#ffc700] font-bold">Возврат средств:</span> Если сервис не подошел, вернем деньги в течение 3 дней после оплаты. Подробные условия — в <a href="/offer/" class="text-[#ffc700] font-bold hover:text-white transition">оферте</a>.</p>
                                 </div>
                             </div>
                         </div>

@@ -14,734 +14,528 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap"></noscript>
     <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap">
-        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
-    </noscript>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <noscript><link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css"></noscript>
     <style>
-
         :root {
-            --island-bg: #090a0f;
-            --island-panel: rgba(17, 18, 23, 0.86);
-            --island-panel-strong: rgba(20, 21, 27, 0.94);
-            --island-border: rgba(255, 255, 255, 0.08);
-            --island-muted: rgba(255, 255, 255, 0.58);
-            --island-yellow: #ffc700;
+            --hold: #090a0f;
+            --gold: #ffc700;
+            --mint: #38d996;
+            --ink: #e9edf3;
+            --font: 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
         }
 
-        html {
-            min-height: 100%;
-            background: var(--island-bg);
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html { scroll-behavior: smooth; }
 
         body {
-            font-family: 'Montserrat', sans-serif;
             background:
-                radial-gradient(circle at 50% 20%, rgba(255, 199, 0, 0.08), transparent 26rem),
-                linear-gradient(180deg, #0b0c12 0%, var(--island-bg) 100%);
-            color: #ffffff;
+                radial-gradient(circle at 50% 10%, rgba(255, 199, 0, .07), transparent 42rem),
+                radial-gradient(circle at 85% 70%, rgba(255, 168, 0, .04), transparent 36rem),
+                var(--hold);
+            color: var(--ink);
+            font-family: var(--font);
             overflow-x: hidden;
-            min-height: 100%;
         }
 
+        .grid-bg {
+            position: fixed; inset: 0; pointer-events: none; z-index: 0;
+            background-image:
+                linear-gradient(rgba(233, 237, 243, .011) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(233, 237, 243, .011) 1px, transparent 1px);
+            background-size: 72px 72px;
+        }
+
+        #cursor-glow {
+            position: fixed; width: 520px; height: 520px; border-radius: 50%;
+            pointer-events: none; z-index: 1;
+            background: radial-gradient(circle, rgba(255, 199, 0, .10) 0%, rgba(56, 217, 150, .05) 40%, transparent 70%);
+            transform: translate(-50%, -50%);
+        }
+
+        .wrap { position: relative; z-index: 2; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+        /* навигация */
+        .mi-nav {
+            position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+            display: flex; align-items: center; justify-content: space-between;
+            padding: 14px 32px;
+            background: rgba(9, 10, 15, .75); backdrop-filter: blur(12px);
+            border-bottom: 1px solid rgba(233, 237, 243, .07);
+        }
+        .mi-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
+        .mi-logo-mark { width: 42px; height: 42px; border-radius: 10px; display: block; }
+        .mi-logo-name { font-weight: 800; font-size: 15px; letter-spacing: -.01em; }
+        .mi-logo-name span { color: var(--gold); }
+        .mi-nav-links { display: flex; gap: 26px; align-items: center; }
+        .mi-nav-links a { color: rgba(233, 237, 243, .72); text-decoration: none; font-size: 14px; font-weight: 600; transition: color .2s; }
+        .mi-nav-links a:hover { color: var(--gold); }
+
+        .btn {
+            display: inline-block; font-family: var(--font); font-weight: 700;
+            font-size: 15px; padding: 14px 28px; border-radius: 12px; text-decoration: none;
+            transition: transform .2s, box-shadow .2s; text-align: center;
+        }
+        .btn-gold { background: var(--gold); color: #090a0f !important; box-shadow: 0 0 24px rgba(255, 199, 0, .25); }
+        .btn-gold:hover { transform: translateY(-2px); box-shadow: 0 6px 32px rgba(255, 199, 0, .4); color: #090a0f !important; }
+        .btn-ghost { border: 1px solid rgba(233, 237, 243, .25); color: var(--ink); }
+        .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+        .mi-nav-links .btn { font-size: 13px; padding: 11px 20px; }
+
+        /* hero */
         .hero-bg {
-            background:
-                radial-gradient(circle at 72% 50%, rgba(255, 199, 0, 0.13), transparent 28rem),
-                radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.04), transparent 20rem),
-                linear-gradient(180deg, #0b0c12 0%, #090a0f 100%);
-            min-height: 100svh;
-            display: flex;
-            flex-direction: column;
-            position: relative;
-            overflow: hidden;
+            min-height: 100svh; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; text-align: center;
+            position: relative; padding: 120px 24px 80px;
         }
+        .hero-motion { position: absolute; inset: 0; z-index: -1; }
+        .hero-motion picture, .hero-motion img { width: 100%; height: 100%; object-fit: cover; display: block; }
+        .hero-motion picture { position: absolute; inset: 0; }
+        .hero-motion .mist { position: absolute; inset: 0; mix-blend-mode: screen; opacity: .8; }
+        /* мобильные: статичный постер вместо анимации (через <picture>), дымку с blend-режимом не рисуем вовсе */
+        @media (max-width: 900px) {
+            .hero-motion .mist { display: none; }
+        }
+        .hero-motion::after {
+            content: ""; position: absolute; inset: 0;
+            background: linear-gradient(rgba(9, 10, 15, .55), rgba(9, 10, 15, .25) 45%, var(--hold) 96%);
+        }
+        .chip {
+            display: inline-flex; align-items: center; gap: 8px;
+            font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+            color: var(--gold); border: 1px solid rgba(255, 199, 0, .3);
+            padding: 8px 16px; border-radius: 100px; margin-bottom: 36px;
+            background: rgba(9, 10, 15, .6);
+        }
+        .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 8px var(--mint); animation: pulse 2s infinite; }
+        @keyframes pulse { 50% { opacity: .4; } }
 
-        .hero-bg::after {
-            content: "";
-            position: absolute;
-            inset: auto 0 0;
-            height: 34%;
-            background: linear-gradient(180deg, transparent 0%, var(--island-bg) 100%);
-            pointer-events: none;
+        .hero-bg h1 {
+            font-weight: 800; font-size: clamp(34px, 4.6vw, 66px); line-height: 1.08;
+            letter-spacing: -.025em; max-width: 860px; margin: 0 auto; color: #fff;
         }
+        .hero-bg h1 .gold { color: var(--gold); text-shadow: 0 0 60px rgba(255, 199, 0, .35); }
+        .hero-sub { margin: 28px auto 40px; max-width: 560px; font-size: 18px; line-height: 1.6; color: rgba(233, 237, 243, .75); }
+        .hero-sub b { color: var(--mint); font-weight: 600; }
+        .hero-cta { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
+        .hero-known { margin-top: 18px; font-size: 14px; color: rgba(233, 237, 243, .5); }
+        .hero-known a { color: rgba(233, 237, 243, .8); text-decoration: underline; text-underline-offset: 4px; }
+        .hero-known a:hover { color: var(--gold); }
+        .hero-proto { margin-top: 48px; font-size: 12px; font-weight: 600; letter-spacing: .22em; color: rgba(233, 237, 243, .35); text-transform: uppercase; }
 
-        /* Добавим тень для всей навигации, чтобы буквы не сливались с небом */
-        nav {
-            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+        /* статистика */
+        .stats {
+            display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px;
+            background: rgba(233, 237, 243, .08); border-radius: 16px; overflow: hidden;
+            margin: 0 auto 120px;
         }
+        .stat { background: var(--hold); padding: 34px 24px; text-align: center; }
+        .stat-num { font-weight: 800; font-size: 34px; letter-spacing: -.02em; color: var(--gold); }
+        .stat-label { font-size: 12px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: rgba(233, 237, 243, .5); margin-top: 10px; }
 
-        .landing-brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            min-width: 0;
+        /* секции */
+        section { padding: 70px 0; position: relative; }
+        .sec-head { display: flex; align-items: baseline; gap: 20px; margin-bottom: 52px; }
+        .sec-num {
+            font-weight: 800; font-size: 15px; color: var(--hold);
+            background: var(--gold); padding: 6px 14px; border-radius: 8px; flex: 0 0 auto;
         }
+        .sec-title { min-width: 0; font-weight: 800; font-size: clamp(28px, 3.6vw, 44px); letter-spacing: -.02em; line-height: 1.08; color: #fff; }
+        .sec-title small {
+            display: block; font-family: 'JetBrains Mono', ui-monospace, monospace;
+            font-size: 11px; font-weight: 500; letter-spacing: .22em; text-transform: uppercase;
+            color: var(--mint); margin-top: 14px; overflow-wrap: anywhere;
+        }
+        .sec-title small::before { content: "// "; }
 
-        .landing-brand-mark {
-            width: 42px;
-            height: 42px;
-            flex: 0 0 auto;
-            border: 1px solid rgba(255, 199, 0, 0.2);
-            border-radius: 12px;
-            background: rgba(255, 199, 0, 0.06);
-            object-fit: cover;
-            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
+        .cards { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; }
+        .card {
+            border: 1px solid rgba(233, 237, 243, .09); border-radius: 18px;
+            padding: 30px 26px; background: linear-gradient(160deg, rgba(255, 255, 255, .04), rgba(9, 10, 15, 0) 55%);
+            transition: transform .3s, border-color .3s;
         }
+        .card:hover { transform: translateY(-6px); border-color: rgba(255, 199, 0, .4); }
+        .card .card-icon { font-size: 26px; color: var(--gold); margin-bottom: 20px; }
+        .card h3 { font-weight: 700; font-size: 17px; margin-bottom: 10px; letter-spacing: -.01em; color: #fff; }
+        .card p { font-size: 14px; line-height: 1.65; color: rgba(233, 237, 243, .65); }
 
-        .landing-brand-text {
-            display: block;
-            font-size: 20px;
-            line-height: 1;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0;
-            white-space: nowrap;
+        /* баннер входа для существующих клиентов */
+        .known-banner {
+            display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+            border: 1px solid rgba(233, 237, 243, .1); border-radius: 18px; padding: 22px 28px;
+            background: rgba(255, 255, 255, .03); margin-bottom: 40px;
         }
+        .known-banner p { font-size: 15px; color: rgba(233, 237, 243, .75); }
+        .known-banner p i { color: var(--gold); margin-right: 8px; }
 
-        .benefit-card {
-            background: var(--island-panel);
-            backdrop-filter: blur(18px);
-            border: 1px solid var(--island-border);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.3s ease;
-        }
+        /* тарифы */
+        .trust { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; background: rgba(233, 237, 243, .08); border-radius: 14px; overflow: hidden; margin-bottom: 28px; }
+        .trust-item { background: var(--hold); padding: 18px 20px; font-size: 12px; color: rgba(233, 237, 243, .55); }
+        .trust-item i { color: var(--gold); margin-bottom: 8px; display: block; font-size: 16px; }
+        .trust-item b { display: block; color: #fff; font-size: 14px; margin-bottom: 4px; font-weight: 700; }
 
-        .benefit-card:hover {
-            background: rgba(255, 255, 255, 0.07);
-            border-color: #ffc700;
+        .plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; align-items: stretch; }
+        .plan {
+            border: 1px solid rgba(233, 237, 243, .1); border-radius: 18px; padding: 28px 26px;
+            display: flex; flex-direction: column; gap: 4px; position: relative; background: rgba(9, 10, 15, .7);
         }
-
-        .tilda-yellow {
-            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%);
-            color: #08090d;
-            box-shadow: 0 18px 48px rgba(255, 199, 0, 0.24), inset 0 -4px 0 rgba(0,0,0,0.16);
+        .plan.feat { border-color: var(--gold); box-shadow: 0 0 50px rgba(255, 199, 0, .12); }
+        .plan .tag {
+            position: absolute; top: -13px; left: 50%; transform: translateX(-50%);
+            background: #c7502e; color: #fff; font-size: 12px; font-weight: 700;
+            padding: 5px 14px; border-radius: 100px; white-space: nowrap;
         }
-        .tilda-yellow:hover { background-color: #e6b400; }
-        
-        .tariff-card {
-            background: var(--island-panel-strong);
-            border: 1px solid var(--island-border);
-            border-radius: 18px;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-        
-        .tariff-card:hover {
-            transform: translateY(-10px);
-            border-color: #ffc700;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-        }
+        .plan .tag.tag-quiet { background: #c7502e; color: #fff; }
+        .plan h3 { font-size: 15px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: .04em; }
+        .price-row { display: flex; align-items: baseline; gap: 12px; margin: 12px 0 16px; flex-wrap: wrap; }
+        .plan .price { font-weight: 800; font-size: 44px; letter-spacing: -.02em; color: var(--gold); }
+        .plan .price-sub { font-size: 13px; color: rgba(233, 237, 243, .5); }
+        .plan ul { list-style: none; margin: 0 0 18px; flex: 1; }
+        .plan li { font-size: 13.5px; line-height: 1.95; color: rgba(233, 237, 243, .7); }
+        .plan li i { color: var(--mint); margin-right: 10px; font-size: 12px; }
+        .plan .pay-cta { background: transparent; border: 1px solid rgba(233, 237, 243, .25); color: #fff; box-shadow: none; }
+        .plan .pay-cta:hover { border-color: var(--gold); color: var(--gold); background: transparent; box-shadow: none; transform: none; }
+        .plan.feat .pay-cta { background: var(--gold); border-color: var(--gold); color: #090a0f; box-shadow: 0 0 24px rgba(255, 199, 0, .25); }
+        .plan.feat .pay-cta:hover { background: #ffd21a; transform: translateY(-2px); box-shadow: 0 6px 32px rgba(255, 199, 0, .4); }
+        .plans-legal { margin-top: 26px; text-align: center; font-size: 12px; line-height: 1.8; color: rgba(233, 237, 243, .45); }
+        .plans-legal a { color: var(--mint); font-weight: 600; }
 
         .input-field {
-            background-color: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.12);
-            color: white;
-            border-radius: 12px;
+            width: 100%; background: rgba(255, 255, 255, .05); border: 1px solid rgba(233, 237, 243, .15);
+            border-radius: 12px; color: #fff; padding: 15px 16px; font-family: var(--font);
+            font-size: 15px; font-weight: 500; outline: none; transition: border-color .2s;
         }
-
-        .hero-title {
-            font-weight: 700;
-            letter-spacing: 0;
-            text-shadow: none;
-        }
-
-        .drop-shadow-custom {
-            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
-        }
-
-        .discount-badge {
-            position: absolute;
-            top: -15px;
-            right: 20px;
-            background: #ffc700;
-            color: #000;
-            padding: 5px 15px;
-            border-radius: 50px;
-            font-size: 14px;
-            font-weight: 900;
-            text-transform: uppercase;
-            box-shadow: 0 10px 20px rgba(255, 199, 0, 0.3);
-            z-index: 10;
-        }
-
-        .tariff-popular {
-            border-color: #ffc700;
-            box-shadow: 0 0 0 1px #ffc700, 0 24px 60px rgba(255, 199, 0, 0.14);
-        }
-
-        .popular-pill {
-            display: inline-block;
-            background: #ffc700;
-            color: #08090d;
-            font-size: 11px;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 4px 12px;
-            border-radius: 999px;
-            margin-bottom: 12px;
-        }
-
-        .mobile-buybar {
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 40;
-            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-            background: rgba(9, 10, 15, 0.94);
-            backdrop-filter: blur(14px);
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
-            transform: translateY(130%);
-            transition: transform 0.25s ease;
-        }
-
-        .mobile-buybar.is-visible {
-            transform: translateY(0);
-        }
-
-        @media (min-width: 768px) {
-            .mobile-buybar { display: none !important; }
-        }
+        .input-field:focus { border-color: var(--gold); }
+        .input-field::placeholder { color: rgba(233, 237, 243, .4); }
 
         .pay-cta {
-            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%);
-            color: #08090d;
-            border: 0;
-            box-shadow: 0 18px 38px rgba(255, 199, 0, .24), inset 0 -3px 0 rgba(0,0,0,.16);
+            width: 100%; border: 0; cursor: pointer; font-family: var(--font); font-weight: 700;
+            font-size: 15px; padding: 15px 20px; border-radius: 12px;
+            background: var(--gold); color: #090a0f; box-shadow: 0 0 24px rgba(255, 199, 0, .25);
+            transition: transform .2s, box-shadow .2s;
+        }
+        .pay-cta:hover { transform: translateY(-2px); box-shadow: 0 6px 32px rgba(255, 199, 0, .4); background: #ffd21a; }
+        .plan-refund { display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 12px; font-weight: 600; color: var(--mint); }
+        .plan-paymethods { display: flex; align-items: center; justify-content: center; gap: 10px; color: rgba(233, 237, 243, .55); font-size: 12px; font-weight: 700; }
+        .plan-paymethods i { font-size: 17px; }
+        .plan-paymethods .fa-lock { color: var(--gold); font-size: 12px; }
+        .plan-legal { text-align: center; font-size: 11px; line-height: 1.7; color: rgba(233, 237, 243, .4); }
+        .plan-legal a { color: var(--gold); font-weight: 600; text-decoration: none; }
+        .plan-legal a:hover { color: #fff; }
+
+        /* шаги */
+        .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; counter-reset: step; }
+        .step { border-left: 2px solid rgba(255, 199, 0, .4); padding: 8px 0 8px 24px; }
+        .step::before {
+            counter-increment: step; content: "0" counter(step);
+            font-weight: 800; font-size: 30px; color: rgba(255, 199, 0, .5);
+            display: block; margin-bottom: 14px; letter-spacing: -.02em;
+        }
+        .step h4 { font-size: 17px; font-weight: 700; margin-bottom: 10px; color: #fff; letter-spacing: -.01em; }
+        .step p { font-size: 14px; line-height: 1.65; color: rgba(233, 237, 243, .6); }
+
+        /* локации */
+        .fleet { display: grid; grid-template-columns: 1.2fr .8fr; gap: 32px; align-items: stretch; }
+        .fleet-img { width: 100%; height: 100%; min-height: 340px; object-fit: cover; border-radius: 16px; display: block; }
+        .loc-list { display: flex; flex-direction: column; gap: 12px; justify-content: center; }
+        .loc {
+            display: flex; justify-content: space-between; align-items: center;
+            border: 1px solid rgba(233, 237, 243, .09); border-radius: 12px; padding: 16px 20px;
+            font-size: 14px; font-weight: 600;
+        }
+        .loc .status { color: var(--mint); font-size: 12px; font-weight: 700; letter-spacing: .08em; }
+        .loc .status::before { content: "● "; }
+
+        /* как устроен сервис */
+        .heroes { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; }
+        .hero-card img { width: 100%; aspect-ratio: 1; border-radius: 16px; display: block; margin-bottom: 16px; }
+        .hero-card figcaption { font-size: 14px; line-height: 1.65; color: rgba(233, 237, 243, .65); }
+        .hero-card figcaption b { display: block; color: var(--gold); font-size: 16px; font-weight: 700; margin-bottom: 8px; letter-spacing: -.01em; }
+
+        /* FAQ: разметка исходная (tailwind), стиль — концепт: тонкие строки с «+» */
+        .faq-card {
+            border-radius: 14px !important;
+            background: rgba(255, 255, 255, .02) !important;
+            border: 1px solid rgba(233, 237, 243, .09) !important;
+            box-shadow: none !important;
+        }
+        details[open].faq-card { background: rgba(255, 255, 255, .04) !important; border-color: rgba(255, 199, 0, .3) !important; }
+        .faq-card summary { padding: 20px 24px !important; }
+        .faq-card summary h4 {
+            font-family: var(--font); font-size: 13px !important; font-weight: 600 !important;
+            letter-spacing: .07em !important; text-transform: uppercase;
+        }
+        .faq-card summary > span { display: none !important; }
+        .faq-card summary::after {
+            content: "+"; color: var(--gold); font-size: 20px; font-weight: 600;
+            line-height: 1; transition: transform .25s; flex: 0 0 auto; margin-left: 16px;
+        }
+        details[open].faq-card summary::after { transform: rotate(45deg); }
+        #faq .space-y-4 { max-width: none !important; margin-left: 0 !important; margin-right: 0 !important; }
+
+        /* финальный CTA */
+        .final { position: relative; border-radius: 24px; overflow: hidden; margin: 40px 0 90px; min-height: 340px; display: flex; flex-direction: column; justify-content: center; padding: 60px; }
+        .final h2 { font-weight: 800; font-size: clamp(28px, 4vw, 52px); letter-spacing: -.02em; line-height: 1.08; max-width: 560px; color: #fff; }
+        .final h2 span { color: var(--gold); }
+        .final .btn { margin-top: 32px; align-self: flex-start; }
+
+        .final-alt { margin-top: 18px; font-size: 14px; color: rgba(233, 237, 243, .6); }
+        .final-alt a { color: var(--mint); font-weight: 600; }
+
+        /* футер: компактный, как в концепте */
+        .mi-footer {
+            border-top: 1px solid rgba(233, 237, 243, .07);
+            padding: 44px 32px; position: relative; z-index: 2;
+            display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap;
+            font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+            color: rgba(233, 237, 243, .4);
+        }
+        .mi-footer .foot-sub { margin-top: 8px; color: rgba(233, 237, 243, .25); }
+        .mi-footer .foot-links { display: flex; gap: 22px; flex-wrap: wrap; }
+        .mi-footer .foot-links a { color: rgba(233, 237, 243, .5); text-decoration: none; transition: color .2s; }
+        .mi-footer .foot-links a:hover { color: var(--gold); }
+
+        /* мобильный buy-bar (логика в скриптах ниже, класс из исходника) */
+        .mobile-buybar {
+            position: fixed; left: 16px; right: 16px;
+            bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+            z-index: 60;
+            transform: translateY(160%); transition: transform .3s ease; display: none;
+        }
+        .mobile-buybar.is-visible { transform: translateY(0); }
+        .tilda-yellow {
+            background: var(--gold); color: #090a0f; font-family: var(--font); font-weight: 700;
+            border-radius: 14px !important; box-shadow: 0 10px 30px rgba(0, 0, 0, .45), 0 0 24px rgba(255, 199, 0, .3);
+            text-transform: none; letter-spacing: 0;
         }
 
-        .pay-cta:hover {
-            background: linear-gradient(180deg, #ffdb3d 0%, #ffc700 58%, #f0ae00 100%);
-            box-shadow: 0 22px 48px rgba(255, 199, 0, .32), inset 0 -3px 0 rgba(0,0,0,.16);
-        }
+        /* scroll reveal */
+        .reveal { opacity: 0; transform: translateY(36px); transition: opacity .8s ease, transform .8s ease; }
+        .reveal.visible { opacity: 1; transform: none; }
+        @media (prefers-reduced-motion: reduce) { .reveal { opacity: 1; transform: none; transition: none; } }
 
-        .hero-art {
-            width: min(92vw, 560px);
-            filter: drop-shadow(0 46px 80px rgba(0,0,0,0.55));
-        }
-
-        .hero-art-scene {
-            position: relative;
-            display: inline-grid;
-            place-items: center;
-            isolation: isolate;
-            width: min(92vw, 560px);
-            max-width: 100%;
-        }
-
-        .hero-art-scene::before,
-        .hero-art-scene::after {
-            content: "";
-            position: absolute;
-            inset: 8%;
-            pointer-events: none;
-        }
-
-        .hero-art-scene::before {
-            z-index: -1;
-            border-radius: 999px;
-            background:
-                radial-gradient(circle at 50% 45%, rgba(255, 199, 0, 0.33), transparent 34%),
-                radial-gradient(circle at 28% 62%, rgba(255, 199, 0, 0.2), transparent 26%),
-                radial-gradient(circle at 72% 60%, rgba(255, 232, 130, 0.18), transparent 28%);
-            filter: blur(18px);
-            opacity: 0.72;
-            animation: island-art-glow 4.8s ease-in-out infinite;
-        }
-
-        .hero-art-scene::after {
-            z-index: 2;
-            background:
-                radial-gradient(circle, rgba(255, 232, 130, 0.95) 0 2px, transparent 3px) 18% 32% / 86px 86px,
-                radial-gradient(circle, rgba(255, 199, 0, 0.9) 0 1.5px, transparent 3px) 72% 40% / 112px 112px,
-                radial-gradient(circle, rgba(255, 255, 255, 0.72) 0 1px, transparent 2.5px) 58% 74% / 96px 96px;
-            mix-blend-mode: screen;
-            opacity: 0.38;
-            animation: island-art-sparks 7.2s linear infinite;
-        }
-
-        .hero-art-scene .hero-art,
-        .hero-art-scene .hero-art-mobile {
-            position: relative;
-            z-index: 1;
-            width: 100%;
-            transform-origin: 50% 58%;
-            animation: island-art-float 6.4s ease-in-out infinite;
-            will-change: transform;
-        }
-
-        .hero-art-scene-mobile {
-            display: none;
-        }
-
-        .hero-art-mobile {
-            display: none;
-        }
-
-        @keyframes island-art-float {
-            0%, 100% {
-                transform: translate3d(0, 0, 0) scale(1) rotate(-0.35deg);
-            }
-
-            50% {
-                transform: translate3d(0, -12px, 0) scale(1.015) rotate(0.35deg);
-            }
-        }
-
-        @keyframes island-art-glow {
-            0%, 100% {
-                opacity: 0.56;
-                transform: scale(0.96);
-            }
-
-            50% {
-                opacity: 0.9;
-                transform: scale(1.04);
-            }
-        }
-
-        @keyframes island-art-sparks {
-            0% {
-                opacity: 0.22;
-                transform: translate3d(-8px, 8px, 0);
-            }
-
-            45% {
-                opacity: 0.48;
-            }
-
-            100% {
-                opacity: 0.22;
-                transform: translate3d(10px, -12px, 0);
-            }
-        }
-
-        .island-section {
-            background:
-                radial-gradient(circle at 50% 10%, rgba(255, 199, 0, 0.05), transparent 26rem),
-                var(--island-bg) !important;
-        }
-
-        body > section,
-        footer {
-            background:
-                radial-gradient(circle at 50% 0%, rgba(255, 199, 0, 0.045), transparent 28rem),
-                var(--island-bg) !important;
-            border-color: var(--island-border) !important;
-        }
-
-        .font-black {
-            font-weight: 700 !important;
-        }
-
-        .tilda-yellow,
-        .pay-cta,
-        .discount-badge {
-            font-weight: 800 !important;
-        }
-
-        @media (max-width: 768px) {
-            nav {
-                padding-top: max(18px, env(safe-area-inset-top)) !important;
-            }
-
-            .landing-brand {
-                gap: 10px;
-            }
-
-            .landing-brand-mark {
-                width: 36px;
-                height: 36px;
-                border-radius: 11px;
-            }
-
-            .landing-brand-text {
-                font-size: 15px;
-            }
-
-            .hero-title {
-                font-size: clamp(2rem, 8vw, 3rem) !important;
-                line-height: 1.06 !important;
-                text-align: left;
-            }
-
-            .hero-copy {
-                align-items: flex-start !important;
-                text-align: left !important;
-            }
-
-            .hero-art {
-                display: none;
-            }
-
-            .hero-art-scene-desktop {
-                display: none;
-            }
-
-            .hero-art-scene-mobile {
-                display: inline-grid;
-                width: min(96vw, 430px);
-                margin: -8px auto 6px;
-            }
-
-            .hero-art-mobile {
-                display: block;
-                width: 100%;
-                margin: 0;
-                filter: drop-shadow(0 38px 70px rgba(0,0,0,0.52));
-            }
-
-            .tariff-card {
-                border-radius: 16px;
-            }
-        }
-
-        @media (max-width: 380px) {
-            .landing-brand {
-                gap: 9px;
-            }
-
-            .landing-brand-mark {
-                width: 34px;
-                height: 34px;
-            }
-
-            .landing-brand-text {
-                font-size: 13px;
-            }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-            .hero-art-scene::before,
-            .hero-art-scene::after,
-            .hero-art-scene .hero-art,
-            .hero-art-scene .hero-art-mobile {
-                animation: none;
-            }
-        }
-
-        /* Убираем стандартный маркер списка у details */
-        details summary::-webkit-details-marker {
-            display: none;
-        }
-        details summary {
-            list-style: none;
-        }
-
-        /* Плавный поворот стрелки при открытии */
-        details[open] .faq-icon {
-            transform: rotate(180deg);
-            color: #ffc700;
-        }
-
-        /* Плавное появление текста */
-        details[open] summary ~ * {
-            animation: sweep .3s ease-in-out;
-        }
-
-        @keyframes sweep {
-            0%    {opacity: 0; transform: translateY(-10px)}
-            100%  {opacity: 1; transform: translateY(0)}
+        @media (max-width: 900px) {
+            .cards, .plans, .steps, .heroes { grid-template-columns: 1fr; }
+            .fleet { grid-template-columns: 1fr; }
+            .stats, .trust { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .mi-nav { padding: 12px 16px; }
+            .mi-nav-links { gap: 14px; }
+            .mi-nav-links a:not(.btn) { display: none; }
+            .mi-nav-links .btn { white-space: nowrap; font-size: 12px; padding: 10px 14px; }
+            .mi-logo { gap: 8px; }
+            .mi-logo-mark { width: 34px; height: 34px; }
+            .mi-logo-name { font-size: 12px; white-space: nowrap; }
+            .sec-head { gap: 14px; margin-bottom: 36px; }
+            .final { padding: 40px 28px; }
+            .stat { padding: 24px 12px; }
+            .mobile-buybar { display: block; }
+            /* запас снизу, чтобы фиксированный buybar не перекрывал ссылки футера */
+            .mi-footer { padding-bottom: calc(110px + env(safe-area-inset-bottom, 0px)); }
         }
     </style>
     {% include "includes/yandex_metrika.html" %}
+    <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
 </head>
 <body class="antialiased">
+<div class="grid-bg"></div>
+<div id="cursor-glow"></div>
 
-    <div class="hero-bg">
-        <nav class="container mx-auto px-6 py-7 flex justify-between items-center relative z-10">
-            <div class="landing-brand" aria-label="Monkey Island VPN">
-                <img class="landing-brand-mark" src="{% static 'icons/monkey-island-logo-animated.gif' %}" alt="" width="42" height="42" decoding="async">
-                <span class="landing-brand-text">
-                    MONKEY ISLAND<span class="text-[#ffc700]"> VPN</span>
-                </span>
-            </div>
-            <div class="flex items-center space-x-4 md:space-x-10 font-bold text-xs md:text-sm uppercase">
-                <a href="#prices" class="hover:text-[#ffc700] transition hidden sm:inline">Тарифы</a>
-                <a href="/login/" class="px-5 py-2 border border-[#ffc700] text-[#ffc700] rounded-full hover:bg-[#ffc700] hover:text-black transition">
-                    Войти
-                </a>
-            </div>
-        </nav>
+<nav class="mi-nav">
+    <a class="mi-logo" href="/" aria-label="Monkey Island VPN">
+        <img class="mi-logo-mark" src="{% static 'icons/monkey-island-logo-animated.webp' %}" alt="" width="42" height="42" decoding="async">
+        <span class="mi-logo-name">MONKEY ISLAND<span> VPN</span></span>
+    </a>
+    <div class="mi-nav-links">
+        <a href="#prices">Тарифы</a>
+        <a href="#how-it-works">Как подключить</a>
+        <a href="/login/">Войти</a>
+        <a href="#prices" data-conversion-goal="tariff_cta_click" class="btn btn-gold">Подключить VPN</a>
+    </div>
+</nav>
 
-        <section class="container mx-auto px-6 py-8 md:py-16 flex-grow grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(360px,560px)] items-center gap-8 lg:gap-12 relative z-10">
-            <div class="hero-copy flex flex-col items-center text-center lg:items-start lg:text-left max-w-3xl">
-                <h1 class="hero-title text-4xl sm:text-5xl md:text-6xl mb-7 leading-[1.02]">
-                    VPN, который работает, когда остальные&nbsp;— нет
-                </h1>
+<header class="hero-bg">
+    <div class="hero-motion">
+        <picture>
+            <source media="(max-width: 900px)" srcset="{% static 'brand/poster.svg' %}">
+            <img src="{% static 'brand/hero-loop.svg' %}" alt="" aria-hidden="true" fetchpriority="high">
+        </picture>
+        <img class="mist" src="{% static 'brand/sea-mist.svg' %}" alt="" aria-hidden="true" loading="lazy">
+    </div>
+    <div class="chip"><span class="dot"></span> Остров на связи · Uptime 99.9%</div>
+    <h1>VPN, который <span class="gold">работает</span>, когда остальные&nbsp;— нет</h1>
+    <p class="hero-sub">YouTube без рекламы, открытые сайты даже при «белых списках», <b>безлимитный трафик</b> и до 15 устройств — на одной подписке.</p>
+    <div class="hero-cta">
+        <a href="#prices" data-conversion-goal="tariff_cta_click" class="btn btn-gold">Подключить VPN от&nbsp;{{ tariffs.0.price }}&nbsp;₽</a>
+        {% if user.is_authenticated %}
+        <a href="/dashboard/" class="btn btn-ghost">Мой кабинет</a>
+        {% else %}
+        <a href="/login/" data-known-user-cta class="btn btn-ghost">Войти в кабинет</a>
+        {% endif %}
+    </div>
+    {% if not user.is_authenticated %}
+    <p class="hero-known">Уже покупали? <a href="/login/">Войти в кабинет</a></p>
+    {% endif %}
+    <div class="hero-proto">iOS / macOS · Android · Windows · Linux · Smart TV</div>
+</header>
 
-                <p class="text-white/60 text-xl md:text-3xl mb-10 font-medium max-w-2xl leading-snug">
-                    YouTube без рекламы, открытые сайты даже при «белых списках», безлимитный трафик и до 15 устройств — на одной подписке.
-                </p>
-
-                <div class="hero-art-scene hero-art-scene-mobile">
-                    <img class="hero-art-mobile" src="{% static 'img/onboarding/family-vpn.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
-                </div>
-
-                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-4 mb-4 w-full sm:w-auto">
-                    <a href="#prices" data-conversion-goal="tariff_cta_click" class="tilda-yellow w-full sm:w-auto px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95">
-                        ПОДКЛЮЧИТЬ VPN ОТ {{ tariffs.0.price }} ₽
-                    </a>
-                    {% if user.is_authenticated %}
-                    <a href="/dashboard/" class="w-full sm:w-auto px-8 md:px-10 py-4 md:py-5 rounded-full border border-white/10 bg-white/5 text-white/70 font-black uppercase text-sm md:text-base transition hover:border-[#ffc700]/40 hover:text-[#ffc700] active:scale-95">
-                        МОЙ КАБИНЕТ
-                    </a>
-                    {% endif %}
-                </div>
-                {% if not user.is_authenticated %}
-                <p class="text-white/45 text-sm md:text-base mb-10 text-center lg:text-left">
-                    Уже покупали?
-                    <a href="/login/" data-known-user-cta class="text-white/75 underline underline-offset-4 hover:text-[#ffc700] transition font-semibold">Войти в кабинет</a>
-                </p>
-                {% endif %}
-
-                <div class="w-full grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5 pt-8 border-t border-white/10">
-                    <div class="benefit-card flex flex-col items-center">
-                        <div class="text-[#ffc700] mb-3 text-2xl">
-                            <i class="fas fa-unlock"></i>
-                        </div>
-                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2 text-center">Обходит белые списки</h4>
-                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Открывает нужные сайты и сервисы, даже когда доступны лишь отдельные ресурсы.
-                        </p>
-                    </div>
-
-                    <div class="benefit-card flex flex-col items-center">
-                        <div class="text-[#ffc700] mb-3 text-2xl">
-                            <i class="fab fa-youtube"></i>
-                        </div>
-                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2 text-center">YouTube без рекламы</h4>
-                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Смотрите видео быстро и без рекламных пауз на любом устройстве.
-                        </p>
-                    </div>
-
-                    <div class="benefit-card flex flex-col items-center">
-                        <div class="text-[#ffc700] mb-3 text-2xl">
-                            <i class="fas fa-infinity"></i>
-                        </div>
-                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2 text-center">Безлимитный трафик</h4>
-                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Без ограничений по объему и без снижения скорости.
-                        </p>
-                    </div>
-
-                    <div class="benefit-card flex flex-col items-center">
-                        <div class="text-[#ffc700] mb-3 text-2xl">
-                            <i class="fas fa-users"></i>
-                        </div>
-                        <h4 class="font-bold uppercase text-xs md:text-sm tracking-widest mb-2 text-center">До 15 устройств</h4>
-                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Одна подписка на семью: телефоны, компьютеры, планшеты и роутер.
-                        </p>
-                    </div>
-                </div>
-            </div>
-            <div class="flex justify-center lg:justify-end">
-                <div class="hero-art-scene hero-art-scene-desktop">
-                    <img class="hero-art" src="{% static 'img/onboarding/family-vpn.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
-                </div>
-            </div>
-        </section>
+<div class="wrap">
+    <div class="stats reveal">
+        <div class="stat"><div class="stat-num">99.9%</div><div class="stat-label">Uptime серверов</div></div>
+        <div class="stat"><div class="stat-num">15</div><div class="stat-label">Устройств на подписке</div></div>
+        <div class="stat"><div class="stat-num">&infin;</div><div class="stat-label">Безлимитный трафик</div></div>
+        <div class="stat"><div class="stat-num">Сразу</div><div class="stat-label">Доступ после оплаты</div></div>
     </div>
 
-    <section class="py-12 bg-[#0d0d0d] border-y border-white/5">
-        <div class="container mx-auto px-6 flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition duration-500">
-            <div class="flex items-center gap-2"><i class="fab fa-apple text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">iOS / macOS</span></div>
-            <div class="flex items-center gap-2"><i class="fab fa-android text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Android</span></div>
-            <div class="flex items-center gap-2"><i class="fab fa-windows text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Windows</span></div>
-            <div class="flex items-center gap-2"><i class="fab fa-linux text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Linux</span></div>
-            <div class="flex items-center gap-2"><i class="fas fa-tv text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Smart TV</span></div>
-        </div>
-    </section>
-
     {% if not user.is_authenticated %}
-    <section class="py-10 bg-[#0d0d0d] border-b border-white/5">
-        <div class="container mx-auto px-6">
-            <div class="rounded-2xl border border-white/10 bg-white/[0.03] px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <p class="text-white/70 text-sm md:text-base font-medium">
-                    <i class="fas fa-user-shield text-[#ffc700] mr-2"></i>
-                    Уже оплачивали доступ или есть подписка из Telegram-бота?
-                </p>
-                <a href="/login/" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-white/15 text-white/80 font-bold text-sm hover:border-[#ffc700]/50 hover:text-[#ffc700] transition whitespace-nowrap">
-                    <i class="fas fa-right-to-bracket"></i> Войти в кабинет
-                </a>
-            </div>
-        </div>
-    </section>
+    <div class="known-banner reveal">
+        <p><i class="fas fa-user-shield"></i> Уже оплачивали доступ или есть подписка из Telegram-бота?</p>
+        <a href="/login/" class="btn btn-ghost"><i class="fas fa-right-to-bracket"></i>&nbsp; Войти в кабинет</a>
+    </div>
     {% endif %}
 
-    <section class="py-24 relative overflow-hidden bg-[#111111]">
-        <div class="container mx-auto px-6 relative z-10">
-            <div class="text-center mb-20">
-                <h2 class="text-3xl md:text-5xl font-black uppercase mb-4 text-white">Удобный VPN <span class="text-[#ffc700]">на каждый день</span></h2>
-                <p class="text-white text-sm md:text-lg max-w-2xl mx-auto leading-relaxed opacity-90">Стабильное подключение, понятная настройка и безопасная передача данных на ваших устройствах.</p>
+    <section class="reveal">
+        <div class="sec-head">
+            <div class="sec-num">01</div>
+            <div class="sec-title">Что вы получаете<small>Конкретные выгоды, а не обещания</small></div>
+        </div>
+        <div class="cards">
+            <div class="card"><div class="card-icon"><i class="fas fa-unlock"></i></div>
+                <h3>Обход белых списков</h3><p>Открывает нужные сайты и сервисы, даже когда доступны лишь отдельные ресурсы.</p></div>
+            <div class="card"><div class="card-icon"><i class="fab fa-youtube"></i></div>
+                <h3>YouTube без рекламы</h3><p>Смотрите видео быстро и без рекламных пауз на любом устройстве.</p></div>
+            <div class="card"><div class="card-icon"><i class="fas fa-infinity"></i></div>
+                <h3>Безлимитный трафик</h3><p>Без ограничений по объему и без снижения скорости.</p></div>
+            <div class="card"><div class="card-icon"><i class="fas fa-users"></i></div>
+                <h3>До 15 устройств</h3><p>Одна подписка на семью: телефоны, компьютеры, планшеты и роутер.</p></div>
+        </div>
+    </section>
+
+    <section id="prices" class="reveal">
+        <div class="sec-head">
+            <div class="sec-num">02</div>
+            <div class="sec-title">Тарифы<small>Выберите период, укажите email и оплатите картой — кабинет с ключами откроется сразу</small></div>
+        </div>
+        <div class="trust">
+            <div class="trust-item"><i class="fas fa-credit-card"></i><b>Оплата картой</b>Visa · MC · Mir · СБП</div>
+            <div class="trust-item"><i class="fas fa-bolt"></i><b>Доступ сразу</b>после оплаты</div>
+            <div class="trust-item"><i class="fas fa-envelope"></i><b>Ссылка на email</b>и вход в ЛК</div>
+            <div class="trust-item"><i class="fab fa-telegram-plane"></i><b>Поддержка</b>поможем подключить</div>
+        </div>
+        <div class="plans">
+            {% for tariff in tariffs %}
+            <div class="plan{% if "3 месяца" in tariff.description %} feat{% endif %}">
+                {% if "3 месяца" in tariff.description %}
+                    <div class="tag">Выбирают чаще всего · −20%</div>
+                {% elif "1 год" in tariff.description %}
+                    <div class="tag tag-quiet">Скидка 40%</div>
+                {% endif %}
+                <h3>
+                    {% if tariff.db_tariff_id == "month" %}1 месяц{% elif tariff.db_tariff_id == "threemonths" %}3 месяца{% elif tariff.db_tariff_id == "year" %}12 месяцев{% else %}{{ tariff.description }}{% endif %}
+                </h3>
+                <div class="price-row">
+                    <div class="price">{{ tariff.price }}₽</div>
+                    <div class="price-sub">
+                        {% if tariff.db_tariff_id == "threemonths" %}≈ {{ tariff.price|floor_div:3 }}₽ в месяц{% elif tariff.db_tariff_id == "year" %}≈ {{ tariff.price|floor_div:12 }}₽ в месяц{% else %}за месяц доступа{% endif %}
+                    </div>
+                </div>
+                <ul>
+                    <li><i class="fas fa-check"></i>Открывает сайты при «белых списках»</li>
+                    <li><i class="fas fa-check"></i>YouTube без рекламы</li>
+                    <li><i class="fas fa-check"></i>Безлимитный трафик</li>
+                    <li><i class="fas fa-check"></i>До 15 устройств на подписке</li>
+                </ul>
+                <form action="/pay/" method="POST" class="space-y-4" data-payment-form data-tariff-id="{{ tariff.db_tariff_id }}" data-tariff-price="{{ tariff.price }}">
+                    {% csrf_token %}
+                    <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
+                    <input type="hidden" name="login_link_kind" value="purchase_permanent">
+                    {% for key, value in tracking_params.items %}
+                        <input type="hidden" name="{{ key }}" value="{{ value }}">
+                    {% endfor %}
+                    <input type="email" name="email" placeholder="Ваш email" required autocomplete="email" inputmode="email" class="input-field">
+                    <button type="submit" class="pay-cta">Оплатить и подключиться</button>
+                    <p class="plan-refund"><i class="fas fa-rotate-left"></i> Не подойдёт — вернём деньги в течение 3 дней</p>
+                </form>
             </div>
+            {% endfor %}
+        </div>
+        <p class="plans-legal">
+            <i class="fas fa-lock" style="color:var(--gold)"></i>
+            Безопасная оплата картой Visa · MC · Mir · СБП, данные карты не храним. Нажимая «Оплатить», вы принимаете
+            <a href="/offer/" target="_blank" style="color:var(--gold)">условия оферты</a>. После оплаты сразу откроется личный кабинет.
+            Уже есть подписка из Telegram-бота? <a href="/login/">Войти в кабинет</a>
+        </p>
+    </section>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
-                        <i class="fas fa-mask text-black text-xl"></i>
-                    </div>
-                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Безопасное соединение</h3>
-                    <p class="text-white text-sm leading-relaxed opacity-80">Современные протоколы помогают защитить соединение в общественных Wi-Fi сетях и поездках.</p>
-                </div>
-
-                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
-                        <i class="fas fa-bolt text-black text-xl"></i>
-                    </div>
-                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Быстрая работа</h3>
-                    <p class="text-white text-sm leading-relaxed opacity-80">Скорости хватает для видео, звонков, рабочих сервисов и ежедневного использования.</p>
-                </div>
-
-                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
-                        <i class="fas fa-eye-slash text-black text-xl"></i>
-                    </div>
-                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Для всех устройств</h3>
-                    <p class="text-white text-sm leading-relaxed opacity-80">Подключайте до 15 устройств по одной подписке: телефон, ноутбук, планшет и роутер.</p>
-                </div>
-
-                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
-                        <i class="fas fa-unlock text-black text-xl"></i>
-                    </div>
-                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Мобильные сети</h3>
-                    <p class="text-white text-sm leading-relaxed opacity-80">VPN работает как через домашний интернет, так и через мобильную сеть оператора.</p>
-                </div>
+    <section class="reveal">
+        <div class="sec-head">
+            <div class="sec-num">03</div>
+            <div class="sec-title">Локации серверов<small>Низкий пинг и быстрые маршруты из РФ</small></div>
+        </div>
+        <div class="fleet">
+            <img class="fleet-img" src="{% static 'brand/bay-lighthouse.svg' %}" alt="" loading="lazy">
+            <div class="loc-list">
+                <div class="loc"><span>🇳🇱 Амстердам</span><span class="status">ONLINE</span></div>
+                <div class="loc"><span>🇩🇪 Франкфурт</span><span class="status">ONLINE</span></div>
+                <div class="loc"><span>🇫🇮 Хельсинки</span><span class="status">ONLINE</span></div>
+                <div class="loc"><span>🇬🇧 Лондон</span><span class="status">ONLINE</span></div>
             </div>
         </div>
     </section>
 
-    <section id="prices" class="py-24 bg-[#0a0a0a] rounded-t-[60px] border-t border-white/5">
-        <div class="container mx-auto px-6">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-6xl font-black uppercase mb-4 tracking-tighter">ТАРИФЫ</h2>
-                <p class="text-white/60 text-base md:text-xl font-bold max-w-2xl mx-auto mb-8">
-                    Выберите период, укажите email и оплатите картой. После подтверждения мы автоматически откроем личный кабинет с ключами.
-                </p>
-                <div class="w-20 h-1.5 bg-[#ffc700] mx-auto"></div>
-            </div>
-            <div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-3 mb-12">
-                <div class="benefit-card text-center"><i class="fas fa-credit-card text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Оплата картой</p><span class="text-white/50 text-xs">Visa · MC · Mir · СБП</span></div>
-                <div class="benefit-card text-center"><i class="fas fa-bolt text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Доступ сразу</p><span class="text-white/50 text-xs">после оплаты</span></div>
-                <div class="benefit-card text-center"><i class="fas fa-envelope text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Ссылка на email</p><span class="text-white/50 text-xs">и вход в ЛК</span></div>
-                <div class="benefit-card text-center"><i class="fab fa-telegram-plane text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Поддержка</p><span class="text-white/50 text-xs">поможем подключить</span></div>
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-6xl mx-auto">
-                {% for tariff in tariffs %}
-                <div class="tariff-card p-10 flex flex-col justify-between{% if "3 месяца" in tariff.description %} tariff-popular{% endif %}">
-
-                    {% if "3 месяца" in tariff.description %}
-                        <div class="discount-badge">Скидка 20%</div>
-                    {% elif "1 год" in tariff.description %}
-                        <div class="discount-badge">Скидка 40%</div>
-                    {% endif %}
-
-                    <div>
-                        {% if "3 месяца" in tariff.description %}
-                            <div class="popular-pill">Выбирают чаще всего</div>
-                        {% endif %}
-                        <h3 class="text-[#ffc700] font-black text-xl uppercase mb-2">
-                            {% if tariff.db_tariff_id == "month" %}1 месяц{% elif tariff.db_tariff_id == "threemonths" %}3 месяца{% elif tariff.db_tariff_id == "year" %}12 месяцев{% else %}{{ tariff.description }}{% endif %}
-                        </h3>
-                        <div class="mb-8">
-                            <div class="text-5xl font-black">{{ tariff.price }} ₽</div>
-                            <div class="text-white/45 text-sm font-bold mt-1">
-                                {% if tariff.db_tariff_id == "threemonths" %}≈ {{ tariff.price|floor_div:3 }} ₽ в месяц{% elif tariff.db_tariff_id == "year" %}≈ {{ tariff.price|floor_div:12 }} ₽ в месяц{% else %}за месяц доступа{% endif %}
-                            </div>
-                        </div>
-
-                        <ul class="text-gray-400 space-y-4 mb-10 text-sm font-medium">
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Открывает сайты при «белых списках»</li>
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> YouTube без рекламы</li>
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Безлимитный трафик</li>
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> До 15 устройств на подписке</li>
-                        </ul>
-                    </div>
-
-                    <form action="/pay/" method="POST" class="space-y-4" data-payment-form data-tariff-id="{{ tariff.db_tariff_id }}" data-tariff-price="{{ tariff.price }}">
-                        {% csrf_token %}
-                        <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
-                        <input type="hidden" name="login_link_kind" value="purchase_permanent">
-                        {% for key, value in tracking_params.items %}
-                            <input type="hidden" name="{{ key }}" value="{{ value }}">
-                        {% endfor %}
-                        <input type="email" name="email" placeholder="Ваш email" required autocomplete="email" inputmode="email"
-                            class="w-full input-field px-4 py-4 font-bold text-base focus:border-[#ffc700] outline-none transition">
-                        <button type="submit" class="w-full pay-cta py-4 rounded-xl font-black uppercase text-sm tracking-widest transition shadow-lg">
-                            Оплатить и подключиться
-                        </button>
-                        <p class="flex items-center justify-center gap-2 text-[11px] font-bold text-[#00ff88]">
-                            <i class="fas fa-rotate-left"></i> Не подойдёт — вернём деньги в течение 3 дней
-                        </p>
-                        <div class="flex items-center justify-center gap-3 text-white/55">
-                            <i class="fas fa-lock text-[#ffc700] text-xs"></i>
-                            <i class="fab fa-cc-visa text-lg"></i>
-                            <i class="fab fa-cc-mastercard text-lg"></i>
-                            <span class="text-[10px] font-black uppercase tracking-wider">Mir · СБП</span>
-                        </div>
-                        <p class="text-center text-gray-500 text-[10px] leading-relaxed">
-                            Безопасная оплата картой, данные карты не храним. Нажимая «Оплатить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-bold hover:text-white transition">условия оферты</a>. После оплаты сразу откроется личный кабинет.
-                        </p>
-                    </form>
-                </div>
-                {% endfor %}
-            </div>
+    <section class="reveal">
+        <div class="sec-head">
+            <div class="sec-num">04</div>
+            <div class="sec-title">Как устроен сервис<small>Что происходит за кулисами, пока вы просто пользуетесь</small></div>
+        </div>
+        <div class="heroes">
+            <figure class="hero-card"><img src="{% static 'brand/helm.svg' %}" alt="" loading="lazy">
+                <figcaption><b>Мониторинг 24/7</b>Каждая нода под наблюдением круглосуточно. Деградация канала видна нам раньше, чем у вас начнёт лагать видео — трафик переводится на здоровый маршрут.</figcaption></figure>
+            <figure class="hero-card"><img src="{% static 'brand/spyglass.svg' %}" alt="" loading="lazy">
+                <figcaption><b>Разведка блокировок</b>Отслеживаем новые методы блокировок и обновляем конфигурации серверов до того, как вы что-то заметите. Подписка обновляется сама.</figcaption></figure>
+            <figure class="hero-card"><img src="{% static 'brand/hold.svg' %}" alt="" loading="lazy">
+                <figcaption><b>Собственные серверы</b>Своё железо, а не перепроданные чужие VPS. Мы контролируем каналы и нагрузку — поэтому отвечаем за скорость и uptime 99.9%.</figcaption></figure>
         </div>
     </section>
 
-    <section id="how-it-works" class="py-24 bg-[#111111] relative">
-        <div class="container mx-auto px-6 relative z-10">
-            <h2 class="text-4xl md:text-6xl font-black uppercase text-center mb-20 text-white">
-                3 ШАГА К <span class="text-[#ffc700]">ПОДКЛЮЧЕНИЮ</span>
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
-                <div class="text-center group">
-                    <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110 group-hover:shadow-[#ffc700]/50">1</div>
-                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Выбери тариф</h3>
-                    <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                        Оплатите подписку на сайте. После оплаты мы подготовим личный кабинет и ключ доступа.
-                    </p>
-                </div>
-
-                <div class="text-center group">
-                    <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110 group-hover:shadow-[#ffc700]/50">2</div>
-                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Скачай приложение</h3>
-                    <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                        Выберите свое устройство и установите рекомендованное приложение по инструкции.
-                    </p>
-                </div>
-
-                <div class="text-center group">
-                    <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110 group-hover:shadow-[#ffc700]/50">3</div>
-                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Включите VPN</h3>
-                    <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                        Добавьте ключ в приложение и включайте защищенное подключение, когда оно нужно.
-                    </p>
-                </div>
-            </div>
+    <section class="reveal">
+        <div class="sec-head">
+            <div class="sec-num">05</div>
+            <div class="sec-title">Удобный VPN на каждый день<small>Стабильное подключение, понятная настройка и безопасная передача данных</small></div>
         </div>
-
-        <div class="absolute bottom-0 left-0 w-full overflow-hidden leading-[0] transform rotate-180">
-            <svg class="relative block w-[calc(100%+1.3px)] h-[60px]" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-                <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" fill="#0a0a0a"></path>
-            </svg>
+        <div class="cards">
+            <div class="card"><div class="card-icon"><i class="fas fa-mask"></i></div>
+                <h3>Безопасное соединение</h3><p>Современные протоколы помогают защитить соединение в общественных Wi-Fi сетях и поездках.</p></div>
+            <div class="card"><div class="card-icon"><i class="fas fa-bolt"></i></div>
+                <h3>Быстрая работа</h3><p>Скорости хватает для видео, звонков, рабочих сервисов и ежедневного использования.</p></div>
+            <div class="card"><div class="card-icon"><i class="fas fa-laptop-house"></i></div>
+                <h3>Для всех устройств</h3><p>Подключайте до 15 устройств по одной подписке: телефон, ноутбук, планшет и роутер.</p></div>
+            <div class="card"><div class="card-icon"><i class="fas fa-signal"></i></div>
+                <h3>Мобильные сети</h3><p>VPN работает как через домашний интернет, так и через мобильную сеть оператора.</p></div>
         </div>
     </section>
 
-    <section class="py-24 bg-[#0a0a0a]">
-    <div class="container mx-auto px-6 max-w-4xl">
-        <h2 class="text-4xl md:text-6xl font-black uppercase text-center mb-20 text-white">
-            ВОПРОСЫ <span class="text-[#ffc700]">И ОТВЕТЫ</span>
-        </h2>
-        
+    
+
+    <section id="how-it-works" class="reveal">
+        <div class="sec-head">
+            <div class="sec-num">06</div>
+            <div class="sec-title">3 шага к подключению<small>От оплаты до работающего VPN — несколько минут</small></div>
+        </div>
+        <div class="steps">
+            <div class="step"><h4>Выберите тариф</h4><p>Оплатите подписку на сайте. После оплаты мы подготовим личный кабинет и ключ доступа.</p></div>
+            <div class="step"><h4>Скачайте приложение</h4><p>Выберите свое устройство и установите рекомендованное приложение по инструкции.</p></div>
+            <div class="step"><h4>Включите VPN</h4><p>Добавьте ключ в приложение и включайте защищенное подключение, когда оно нужно.</p></div>
+        </div>
+    </section>
+
+    <section id="faq" class="reveal">
+        <div class="sec-head">
+            <div class="sec-num">07</div>
+            <div class="sec-title">Вопросы и ответы<small>Коротко о главном</small></div>
+        </div>
+        <div>
         <div class="space-y-4 max-w-4xl mx-auto">
             
             <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
@@ -854,8 +648,10 @@
                             <p>Перед оплатой выберите подходящий период доступа и укажите email для ссылки в личный кабинет:</p>
                             <div class="bg-white/5 p-4 rounded-xl space-y-2">
                                 <p>1. <span class="text-[#ffc700] font-bold">Оплата на сайте:</span> Доступ открывается после успешной оплаты выбранного тарифа.</p>
+                                {% if payment_gateway != "yookassa" %}
                                 <p>2. <span class="text-[#ffc700] font-bold">Без автоплатежей:</span> После окончания оплаченного периода продление не списывается автоматически.</p>
-                                <p>3. <span class="text-[#ffc700] font-bold">Возврат средств:</span> Если сервис не подошел, вернем деньги в течение 3 дней после оплаты. Подробные условия — в <a href="/offer/" class="text-[#ffc700] font-bold hover:text-white transition">оферте</a>.</p>
+                                {% endif %}
+                                <p>{% if payment_gateway != "yookassa" %}3{% else %}2{% endif %}. <span class="text-[#ffc700] font-bold">Возврат средств:</span> Если сервис не подошел, вернем деньги в течение 3 дней после оплаты. Подробные условия — в <a href="/offer/" class="text-[#ffc700] font-bold hover:text-white transition">оферте</a>.</p>
                             </div>
                         </div>
                     </div>
@@ -884,44 +680,58 @@
     </div>
 </section>
 
-    <footer class="bg-[#0a0a0a] border-t border-white/5 pt-20 pb-10">
-        <div class="container mx-auto px-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
-                <div class="col-span-1 md:col-span-2">
-                    <div class="text-2xl font-black uppercase mb-6">MONKEY ISLAND<span class="text-[#ffc700]"> VPN</span></div>
-                    <p class="text-gray-500 text-sm max-w-xs leading-relaxed">Удобный VPN для телефона, компьютера и роутера. Быстрое подключение, стабильная скорость и безопасное соединение.</p>
-                </div>
-                <div>
-                    <h4 class="font-bold uppercase text-xs tracking-widest mb-6 text-white">Навигация</h4>
-                    <ul class="text-gray-500 text-sm space-y-4 font-medium">
-                        <li><a href="#how-it-works" class="hover:text-[#ffc700] transition">Как подключить</a></li>
-                        <li><a href="#prices" class="hover:text-[#ffc700] transition">Тарифы</a></li>
-                        <li><a href="/login/" class="hover:text-[#ffc700] transition">Личный кабинет</a></li>
-                        <li><a href="/offer/" class="hover:text-[#ffc700] transition">Оферта</a></li>
-                        <li><a href="/terms/" class="hover:text-[#ffc700] transition">Пользовательское соглашение</a></li>
-                    </ul>
-                </div>
-                <div>
-                    <h4 class="font-bold uppercase text-xs tracking-widest mb-6 text-white">Поддержка</h4>
-                    <div class="flex space-x-4">
-                        <a href="https://t.me/monkeyislandsupportbot" class="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center hover:bg-[#ffc700] transition group"><i class="fab fa-telegram-plane group-hover:text-black"></i></a>
-                        <a href="#" class="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center hover:bg-[#ffc700] transition group"><i class="fas fa-envelope group-hover:text-black"></i></a>
-                    </div>
-                </div>
-            </div>
-            <div class="border-t border-white/5 pt-10 text-center text-gray-600 text-[10px] uppercase tracking-[0.3em]">
-                &copy; 2026 MONKEY ISLAND VPN | ИНН 616617872421 | Быстрый и безопасный VPN
-            </div>
+    <div class="final reveal">
+        <img src="{% static 'brand/flagship.svg' %}" alt="" style="position:absolute;inset:0;width:100%;height:100%;object-fit:cover;z-index:-1">
+        <h2>Подключите VPN — <span>от&nbsp;{{ tariffs.0.price }}&nbsp;₽ в&nbsp;месяц</span></h2>
+        <a href="#prices" data-conversion-goal="tariff_cta_click" class="btn btn-gold">Выбрать тариф</a>
+        <div class="final-alt">Хотите сначала попробовать? <a href="https://t.me/monkeyislandvpnbot" target="_blank" rel="noopener">7 дней бесплатно в Telegram-боте</a></div>
+    </div>
+</div>
+
+<script>
+    (function setupBrandUi() {
+        var glow = document.getElementById('cursor-glow');
+        if (glow && matchMedia('(pointer: fine)').matches) {
+            addEventListener('mousemove', function (e) {
+                glow.style.left = e.clientX + 'px';
+                glow.style.top = e.clientY + 'px';
+            });
+        } else if (glow) {
+            glow.style.display = 'none';
+        }
+        if ('IntersectionObserver' in window) {
+            var io = new IntersectionObserver(function (entries) {
+                entries.forEach(function (en) {
+                    if (en.isIntersecting) { en.target.classList.add('visible'); io.unobserve(en.target); }
+                });
+            }, { threshold: .1 });
+            document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+        } else {
+            document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('visible'); });
+        }
+    })();
+</script>
+
+    <footer class="mi-footer">
+        <div class="foot-left">
+            <div>&copy; 2026 MONKEY ISLAND VPN &middot; ИНН 616617872421</div>
+            <div class="foot-sub">Быстрый и безопасный VPN для телефона, компьютера и роутера</div>
+        </div>
+        <div class="foot-links">
+            <a href="#prices">Тарифы</a>
+            <a href="#how-it-works">Как подключить</a>
+            <a href="/login/">Личный кабинет</a>
+            <a href="/offer/">Оферта</a>
+            <a href="/terms/">Пользовательское соглашение</a>
+            <a href="https://t.me/monkeyislandsupportbot" target="_blank" rel="noopener">Поддержка</a>
         </div>
     </footer>
 
-    {% if not user.is_authenticated %}
     <div class="mobile-buybar" id="mobileBuybar" aria-hidden="true">
         <a href="#prices" data-conversion-goal="tariff_cta_click" class="tilda-yellow w-full flex items-center justify-center gap-2 py-4 rounded-full font-black uppercase text-base shadow-2xl active:scale-95">
             Купить VPN от {{ tariffs.0.price }} ₽
         </a>
     </div>
-    {% endif %}
 
     <script>
         (function setupStickyBuyBar() {
@@ -946,7 +756,7 @@
                 new IntersectionObserver((entries) => {
                     pricesIn = entries[0].isIntersecting;
                     update();
-                }, { threshold: 0.1 }).observe(prices);
+                }, { threshold: [0, 0.1] }).observe(prices);
             }
         })();
 

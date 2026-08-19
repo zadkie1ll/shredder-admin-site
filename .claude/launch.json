@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "website",
+      "runtimeExecutable": "./.venv/bin/python",
+      "runtimeArgs": ["manage.py", "runserver", "8123"],
+      "port": 8123
+    },
+    {
       "name": "concept-preview",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["-m", "http.server", "8899", "--directory", "/Users/apugachev/Desktop/monkey-island-vpn-assets"],

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <rect width="1600" height="900" fill="#090A0F"/>
+  <!-- тонкая координатная сетка -->
+  <g stroke="#E9EDF3" stroke-width="1" opacity=".03">
+    <path d="M100 0V900 M200 0V900 M300 0V900 M400 0V900 M500 0V900 M600 0V900 M700 0V900 M800 0V900 M900 0V900 M1000 0V900 M1100 0V900 M1200 0V900 M1300 0V900 M1400 0V900 M1500 0V900"/>
+    <path d="M0 100H1600 M0 200H1600 M0 300H1600 M0 400H1600 M0 500H1600 M0 600H1600 M0 700H1600 M0 800H1600"/>
+  </g>
+  <!-- радарные кольца -->
+  <g fill="none" stroke="#38D996">
+    <circle cx="800" cy="450" r="120" opacity=".14" stroke-width="1.5"/>
+    <circle cx="800" cy="450" r="240" opacity=".11" stroke-width="1.5"/>
+    <circle cx="800" cy="450" r="360" opacity=".09" stroke-width="1.5"/>
+    <circle cx="800" cy="450" r="480" opacity=".07" stroke-width="1.5"/>
+    <circle cx="800" cy="450" r="600" opacity=".05" stroke-width="1.5"/>
+  </g>
+  <!-- азимутальные лучи -->
+  <g stroke="#38D996" stroke-width="1" opacity=".07">
+    <path d="M800 450 L800 -150 M800 450 L1400 450 M800 450 L800 900 M800 450 L200 450"/>
+    <path d="M800 450 L1320 150 M800 450 L1320 750 M800 450 L280 750 M800 450 L280 150"/>
+  </g>
+  <!-- сектор развёртки -->
+  <path d="M800 450 L800 -150 A600 600 0 0 1 1319 150 Z" fill="#38D996" opacity=".05"/>
+  <!-- цели-блипы -->
+  <g fill="#FFC700">
+    <circle cx="1010" cy="300" r="5" opacity=".8"/>
+    <circle cx="1010" cy="300" r="12" fill="none" stroke="#FFC700" stroke-width="1.5" opacity=".3"/>
+    <circle cx="560" cy="580" r="4" opacity=".55"/>
+    <circle cx="1150" cy="620" r="4" opacity=".4"/>
+    <circle cx="450" cy="260" r="3.5" opacity=".3"/>
+  </g>
+</svg>

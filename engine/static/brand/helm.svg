@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <!-- Герой 1: «За штурвалом» — капитан на мостике, мониторы маршрутов -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#090A0F"/><stop offset="1" stop-color="#0d0e14"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="50%" cy="42%" r="52%">
+      <stop offset="0" stop-color="#FFC700" stop-opacity=".12"/><stop offset="1" stop-opacity="0" stop-color="#FFC700"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg)"/>
+  <!-- радарные кольца фона -->
+  <g fill="none" stroke="#38D996" opacity=".08">
+    <circle cx="400" cy="380" r="180"/><circle cx="400" cy="380" r="280"/><circle cx="400" cy="380" r="380"/>
+  </g>
+  <rect width="800" height="800" fill="url(#glow)"/>
+  <!-- мониторы -->
+  <g>
+    <rect x="70" y="120" width="180" height="120" rx="10" fill="#090A0F" stroke="#38D996" stroke-width="2.5" opacity=".9"/>
+    <path d="M90 210 L120 180 L150 195 L180 160 L210 175 L230 150" fill="none" stroke="#38D996" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="230" cy="150" r="4" fill="#FFC700"/>
+    <rect x="550" y="120" width="180" height="120" rx="10" fill="#090A0F" stroke="#38D996" stroke-width="2.5" opacity=".9"/>
+    <g stroke="#38D996" stroke-width="3" stroke-linecap="round" opacity=".8">
+      <path d="M575 155 H705 M575 180 H675 M575 205 H695"/>
+    </g>
+    <circle cx="712" cy="205" r="4" fill="#FFC700"/>
+    <rect x="330" y="80" width="140" height="90" rx="8" fill="#090A0F" stroke="#FFC700" stroke-width="2.5" opacity=".9"/>
+    <path d="M350 140 Q375 110 400 128 Q425 145 450 112" fill="none" stroke="#FFC700" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <!-- капитан -->
+  <g>
+    <!-- тело -->
+    <path d="M310 560 Q310 460 400 455 Q490 460 490 560 L490 620 L310 620 Z" fill="#6B4F28"/>
+    <!-- голова -->
+    <circle cx="400" cy="380" r="78" fill="#6B4F28"/>
+    <circle cx="318" cy="378" r="24" fill="#6B4F28"/>
+    <circle cx="482" cy="378" r="24" fill="#6B4F28"/>
+    <!-- морда -->
+    <path d="M348 400 Q348 448 400 452 Q452 448 452 400 Q428 382 400 382 Q372 382 348 400 Z" fill="#E9EDF3" opacity=".92"/>
+    <circle cx="374" cy="376" r="9" fill="#E9EDF3" opacity=".92"/>
+    <circle cx="426" cy="376" r="9" fill="#E9EDF3" opacity=".92"/>
+    <circle cx="374" cy="376" r="4.5" fill="#090A0F"/>
+    <circle cx="426" cy="376" r="4.5" fill="#090A0F"/>
+    <circle cx="388" cy="420" r="3.5" fill="#090A0F"/>
+    <circle cx="412" cy="420" r="3.5" fill="#090A0F"/>
+    <path d="M386 436 Q400 444 414 436" fill="none" stroke="#090A0F" stroke-width="3" stroke-linecap="round"/>
+    <!-- красная бандана (как у персонажа бота) -->
+    <path d="M322 332 Q330 290 400 286 Q470 290 478 332 Q440 312 400 312 Q360 312 322 332 Z" fill="#C7502E"/>
+    <path d="M476 324 Q506 314 520 294 Q514 326 492 336 Z" fill="#C7502E"/>
+    <path d="M480 336 Q506 338 518 352 Q496 354 478 344 Z" fill="#C7502E"/>
+    <circle cx="370" cy="306" r="4.5" fill="#8F3A22"/>
+    <circle cx="400" cy="299" r="4.5" fill="#8F3A22"/>
+    <circle cx="430" cy="306" r="4.5" fill="#8F3A22"/>
+    <!-- серьга -->
+    <circle cx="486" cy="398" r="8" fill="none" stroke="#FFC700" stroke-width="3"/>
+    <!-- ремень с пряжкой -->
+    <rect x="310" y="560" width="180" height="16" fill="#090A0F"/>
+    <rect x="384" y="556" width="32" height="24" rx="4" fill="none" stroke="#FFC700" stroke-width="3"/>
+  </g>
+  <!-- штурвал на переднем плане -->
+  <g fill="none" stroke="#FFC700" stroke-linecap="round">
+    <circle cx="400" cy="660" r="150" stroke-width="10"/>
+    <circle cx="400" cy="660" r="46" stroke-width="8"/>
+    <g stroke-width="8">
+      <path d="M400 614 L400 512 M400 706 L400 800 M354 660 L252 660 M446 660 L548 660"/>
+      <path d="M432 628 L505 555 M368 628 L295 555 M432 692 L505 765 M368 692 L295 765"/>
+    </g>
+    <g stroke-width="10">
+      <path d="M400 512 L400 488 M252 660 L228 660 M548 660 L572 660 M505 555 L522 538 M295 555 L278 538"/>
+    </g>
+    <circle cx="400" cy="660" r="14" fill="#FFC700" stroke="none"/>
+  </g>
+  <!-- руки на штурвале -->
+  <circle cx="295" cy="556" r="20" fill="#6B4F28" stroke="#FFC700" stroke-width="3"/>
+  <circle cx="505" cy="556" r="20" fill="#6B4F28" stroke="#FFC700" stroke-width="3"/>
+</svg>

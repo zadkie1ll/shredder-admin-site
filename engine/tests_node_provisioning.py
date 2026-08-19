@@ -146,6 +146,20 @@ class InstallScriptTests(NodeProvisioningDbTestCase):
         self.assertEqual(script.version, 1)
         self.assertTrue(script.is_active)
 
+    def test_save_normalizes_crlf_line_endings(self):
+        # Браузерная textarea шлёт CRLF; без нормализации bash на ноде падает
+        # на "set -euo pipefail\r" (инцидент 2026-08-19)
+        crlf_body = "#!/usr/bin/env bash\r\nset -euo pipefail\r\necho ok\r\n"
+        script = node_provisioning.save_script_version(
+            self.session, "self_steal", crlf_body, "crlf", "tester"
+        )
+        self.session.commit()
+
+        self.assertNotIn("\r", script.content)
+        self.assertEqual(
+            script.content, "#!/usr/bin/env bash\nset -euo pipefail\necho ok\n"
+        )
+
     def test_save_creates_versions_and_switches_active(self):
         first = self.make_script()
         second = node_provisioning.save_script_version(
@@ -359,6 +373,32 @@ class ClaimTests(NodeProvisioningDbTestCase):
                 self.session, provision_request, "1.2.3.4", rwms
             )
         self.assertEqual(ctx.exception.http_status, 502)
+
+    def test_failed_request_can_be_retried_with_same_token(self):
+        # Упавшая установка перезапускается тем же one-liner'ом: токен жив,
+        # claim с того же IP сбрасывает ошибку и начинает заново
+        provision_request, token = self.make_request()
+        rwms = make_rwms_mock()
+        node_provisioning.claim_request(self.session, provision_request, "1.2.3.4", rwms)
+        node_provisioning.complete_request(self.session, provision_request, 2)
+        self.session.commit()
+        self.assertEqual(provision_request.status, NodeProvisionStatus.FAILED)
+
+        found = node_provisioning.find_request_by_token(self.session, token)
+        self.assertEqual(found.id, provision_request.id)
+
+        node_provisioning.claim_request(self.session, provision_request, "1.2.3.4", rwms)
+        self.assertEqual(provision_request.status, NodeProvisionStatus.CLAIMED)
+        self.assertIsNone(provision_request.error)
+        self.assertIsNone(provision_request.finished_at)
+
+        # Чужой IP по-прежнему отвергается и в failed-ретрае
+        provision_request.status = NodeProvisionStatus.FAILED
+        with self.assertRaises(node_provisioning.ProvisionError) as ctx:
+            node_provisioning.claim_request(
+                self.session, provision_request, "5.6.7.8", rwms
+            )
+        self.assertEqual(ctx.exception.http_status, 403)
 
     def test_find_by_token_rejects_unknown_and_revoked(self):
         provision_request, token = self.make_request()

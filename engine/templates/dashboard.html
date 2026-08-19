@@ -71,11 +71,14 @@
             if (ios) document.documentElement.classList.add('ios-device');
         })();
     </script>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800;900&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800;900&display=swap"></noscript>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js" defer></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Montserrat:wght@400;500;600;700;800;900&display=swap');
+        /* шрифты подключаются неблокирующим <link> в head (см. выше) */
 
         html, body {
             width: 100%;
@@ -1359,7 +1362,7 @@
             width: 30px;
             height: 30px;
             border-radius: 10px;
-            background: url("{% static 'icons/icon-192x192.png' %}") center / cover no-repeat;
+            background: url("{% static 'icons/monkey-island-logo-animated.webp' %}") center / cover no-repeat;
             border: 1px solid rgba(255, 199, 0, 0.26);
         }
 
@@ -2413,7 +2416,7 @@
             width: 30px;
             height: 30px;
             border-radius: 10px;
-            background: url("{% static 'icons/icon-192x192.png' %}") center / cover no-repeat;
+            background: url("{% static 'icons/monkey-island-logo-animated.webp' %}") center / cover no-repeat;
             border: 1px solid rgba(255, 199, 0, 0.26);
             box-shadow: 0 0 24px rgba(255, 199, 0, 0.12);
         }
@@ -2850,8 +2853,8 @@
             justify-content: center;
             flex: 0 0 auto;
             overflow: hidden;
-            border: 1px solid rgba(255, 199, 0, 0.72);
-            border-radius: 50%;
+            border: 1px solid rgba(255, 199, 0, 0.45);
+            border-radius: 12px;
             background: #090a0f;
         }
 
@@ -3895,8 +3898,76 @@
             }
         }
 
+        /* === Новый UI v3: типографика Inter (по мотивам T-Bank). UX и раскладка не тронуты === */
+        body {
+            font-family: 'Inter', 'Montserrat', ui-sans-serif, system-ui, -apple-system, sans-serif;
+        }
+
+        h1, h2 {
+            font-family: 'Inter', 'Montserrat', sans-serif;
+            font-weight: 800;
+            letter-spacing: -.02em;
+        }
+
+        /* фон и кнопки — язык лендинга */
+        body {
+            background:
+                radial-gradient(circle at 50% 0%, rgba(255, 199, 0, .06), transparent 40rem),
+                var(--bg-color);
+        }
+
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image:
+                linear-gradient(rgba(233, 237, 243, .011) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(233, 237, 243, .011) 1px, transparent 1px);
+            background-size: 72px 72px;
+        }
+
+        .dashboard-v2 .quick-access-btn,
+        .plans-submit {
+            border-radius: 14px !important;
+            box-shadow: 0 0 24px rgba(255, 199, 0, .25) !important;
+        }
+
+        /* акцент на продлении подписки */
+        .tg-mini-action-row.tg-mini-action-accent {
+            width: calc(100% - 12px);
+            margin: 6px;
+            border: 1px solid rgba(255, 199, 0, .45);
+            border-radius: 14px;
+            background: rgba(255, 199, 0, .08);
+            box-shadow: 0 0 18px rgba(255, 199, 0, .10);
+        }
+
+        .tg-mini-action-row + .tg-mini-action-row.tg-mini-action-accent { border-top: 1px solid rgba(255, 199, 0, .45); }
+        .tg-mini-action-accent + .tg-mini-action-row { border-top: 0; }
+        .tg-mini-action-accent .tg-mini-action-label { color: #ffc700; font-weight: 700; }
+        .tg-mini-action-accent i { color: #ffc700 !important; }
+
+        /* Экран выбора тарифа: на ПК — две колонки, чтобы влезал в один экран */
+        @media (min-width: 1024px) {
+            .plans-topbar { width: min(100%, 920px); margin-bottom: 28px; }
+            .plans-panel {
+                width: min(100%, 920px);
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+                column-gap: 56px;
+                align-content: start;
+            }
+            .plans-title { grid-column: 1; margin-bottom: 18px; }
+            .plans-title + p { grid-column: 1; }
+            .plans-benefits { grid-column: 1; margin-bottom: 0; }
+            .plans-form { grid-column: 2; grid-row: 1 / span 3; }
+        }
+
     </style>
     {% include "includes/yandex_metrika.html" %}
+    <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
 </head>
 <body class="dashboard-v2{% if tg_webapp_mode %} tg-webapp{% endif %}" style="--dashboard-bg-image: url('{% static 'img/bg6.png' %}');">
 
@@ -4014,7 +4085,7 @@
                     <div class="tg-mini-home">
                         <div class="tg-mini-brand">
                             <span class="tg-mini-brand-mark" aria-hidden="true">
-                                <img src="{% static 'icons/icon-192x192.png' %}" alt="">
+                                <img src="{% static 'icons/monkey-island-logo-animated.webp' %}" alt="">
                             </span>
                             <span>Monkey Island</span>
                         </div>
@@ -4085,7 +4156,7 @@
                                 <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
                             </button>
                             {% else %}
-                            <button type="button" onclick="showTariffs()" class="tg-mini-action-row">
+                            <button type="button" onclick="showTariffs()" class="tg-mini-action-row tg-mini-action-accent">
                                 <i class="fas fa-tag" aria-hidden="true"></i>
                                 <span class="tg-mini-action-label">Продлить подписку</span>
                                 <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>

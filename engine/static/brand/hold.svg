@@ -1,0 +1,85 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <!-- Герой 3: «В трюме» — серверный трюм, капитан с фонарём -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#090A0F"/><stop offset="1" stop-color="#0d0e14"/>
+    </linearGradient>
+    <radialGradient id="lantern" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#FFC700" stop-opacity=".35"/><stop offset="1" stop-color="#FFC700" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg)"/>
+  <!-- балки трюма -->
+  <g stroke="#6B4F28" stroke-width="10" opacity=".5" fill="none">
+    <path d="M0 90 Q400 40 800 90"/>
+    <path d="M60 0 L60 800 M740 0 L740 800"/>
+  </g>
+  <!-- серверные стойки -->
+  <g>
+    <rect x="120" y="180" width="150" height="460" rx="10" fill="#090A0F" stroke="#6B4F28" stroke-width="4"/>
+    <rect x="530" y="180" width="150" height="460" rx="10" fill="#090A0F" stroke="#6B4F28" stroke-width="4"/>
+    <!-- юниты слева -->
+    <g stroke="#6B4F28" stroke-width="2.5">
+      <path d="M132 240 H258 M132 300 H258 M132 360 H258 M132 420 H258 M132 480 H258 M132 540 H258 M132 600 H258"/>
+    </g>
+    <!-- юниты справа -->
+    <g stroke="#6B4F28" stroke-width="2.5">
+      <path d="M542 240 H668 M542 300 H668 M542 360 H668 M542 420 H668 M542 480 H668 M542 540 H668 M542 600 H668"/>
+    </g>
+    <!-- диоды -->
+    <g fill="#38D996">
+      <circle cx="146" cy="212" r="4"/><circle cx="162" cy="212" r="4"/><circle cx="146" cy="272" r="4"/>
+      <circle cx="146" cy="332" r="4"/><circle cx="162" cy="332" r="4"/><circle cx="146" cy="392" r="4"/>
+      <circle cx="146" cy="452" r="4"/><circle cx="146" cy="512" r="4"/><circle cx="162" cy="512" r="4"/>
+      <circle cx="556" cy="212" r="4"/><circle cx="572" cy="212" r="4"/><circle cx="556" cy="272" r="4"/>
+      <circle cx="556" cy="332" r="4"/><circle cx="556" cy="392" r="4"/><circle cx="572" cy="392" r="4"/>
+      <circle cx="556" cy="452" r="4"/><circle cx="556" cy="572" r="4"/>
+    </g>
+    <g fill="#FFC700">
+      <circle cx="240" cy="212" r="4"/><circle cx="240" cy="392" r="4"/><circle cx="240" cy="572" r="4"/>
+      <circle cx="650" cy="272" r="4"/><circle cx="650" cy="452" r="4"/><circle cx="650" cy="512" r="4"/>
+    </g>
+  </g>
+  <!-- кабели-лианы под потолком -->
+  <g fill="none" stroke="#38D996" stroke-width="4" opacity=".5" stroke-linecap="round">
+    <path d="M270 180 Q400 260 530 180"/>
+    <path d="M270 200 Q400 300 530 200" opacity=".6"/>
+  </g>
+  <!-- пол -->
+  <path d="M0 720 L800 720" stroke="#6B4F28" stroke-width="4" opacity=".6"/>
+  <!-- свет фонаря -->
+  <circle cx="400" cy="470" r="260" fill="url(#lantern)"/>
+  <!-- капитан с фонарём -->
+  <g>
+    <!-- тело -->
+    <path d="M330 700 Q330 600 400 595 Q470 600 470 700 Z" fill="#6B4F28"/>
+    <!-- голова -->
+    <circle cx="400" cy="540" r="62" fill="#6B4F28"/>
+    <circle cx="336" cy="538" r="19" fill="#6B4F28"/>
+    <circle cx="464" cy="538" r="19" fill="#6B4F28"/>
+    <!-- морда -->
+    <path d="M360 556 Q360 592 400 596 Q440 592 440 556 Q420 542 400 542 Q380 542 360 556 Z" fill="#E9EDF3" opacity=".92"/>
+    <circle cx="380" cy="536" r="7" fill="#E9EDF3" opacity=".92"/>
+    <circle cx="420" cy="536" r="7" fill="#E9EDF3" opacity=".92"/>
+    <circle cx="380" cy="536" r="3.5" fill="#090A0F"/>
+    <circle cx="420" cy="536" r="3.5" fill="#090A0F"/>
+    <circle cx="391" cy="570" r="3" fill="#090A0F"/>
+    <circle cx="409" cy="570" r="3" fill="#090A0F"/>
+    <!-- красная бандана (как у персонажа бота) -->
+    <path d="M338 502 Q346 468 400 464 Q454 468 462 502 Q432 486 400 486 Q368 486 338 502 Z" fill="#C7502E"/>
+    <path d="M460 496 Q484 488 494 472 Q490 498 472 506 Z" fill="#C7502E"/>
+    <path d="M462 506 Q484 508 494 520 Q476 522 462 512 Z" fill="#C7502E"/>
+    <circle cx="376" cy="481" r="3.5" fill="#8F3A22"/>
+    <circle cx="400" cy="476" r="3.5" fill="#8F3A22"/>
+    <circle cx="424" cy="481" r="3.5" fill="#8F3A22"/>
+    <!-- рука с фонарём -->
+    <path d="M452 600 Q500 580 524 540" fill="none" stroke="#6B4F28" stroke-width="20" stroke-linecap="round"/>
+    <!-- фонарь -->
+    <g>
+      <path d="M524 500 L524 516" stroke="#FFC700" stroke-width="4"/>
+      <rect x="504" y="516" width="40" height="52" rx="8" fill="none" stroke="#FFC700" stroke-width="4"/>
+      <circle cx="524" cy="542" r="10" fill="#FFC700"/>
+      <path d="M512 568 L536 568" stroke="#FFC700" stroke-width="4" stroke-linecap="round"/>
+    </g>
+  </g>
+</svg>

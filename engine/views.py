@@ -2581,6 +2581,7 @@ def index(request):
                 "tariffs": get_runtime_actual_tariffs(),
                 "tracking_params": get_tracking_params(request),
                 "trial_period_days_label": format_days_ru(trial_period_days),
+                "payment_gateway": settings.PAYMENT_GATEWAY.lower(),
             },
         )
         return set_tracking_cookies(request, response, captured_tracking_params)
@@ -2597,6 +2598,7 @@ def index(request):
             "tariffs": get_runtime_actual_tariffs(),
             "tracking_params": get_tracking_params(request),
             "trial_period_days_label": format_days_ru(trial_period_days),
+            "payment_gateway": settings.PAYMENT_GATEWAY.lower(),
         },
     )
     return set_tracking_cookies(request, response, captured_tracking_params)

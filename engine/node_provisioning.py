@@ -44,12 +44,15 @@ STAGES = ["claim", "script", "connect"]
 DEFAULT_SSH_PORT = 40022
 REMNANODE_PORT = 2222
 INSTALL_LOG_MAX_BYTES = 64 * 1024
-# Статусы, в которых токен ещё принимается bootstrap-эндпоинтами
+# Статусы, в которых токен ещё принимается bootstrap-эндпоинтами.
+# FAILED здесь намеренно: упавшую установку перезапускают тем же
+# one-liner'ом (токен уже привязан к IP сервера, это безопасно).
 TOKEN_ALIVE_STATUSES = {
     NodeProvisionStatus.CREATED,
     NodeProvisionStatus.CLAIMED,
     NodeProvisionStatus.PROVISIONING,
     NodeProvisionStatus.INSTALLED,
+    NodeProvisionStatus.FAILED,
 }
 
 
@@ -202,6 +205,11 @@ def save_script_version(db_session, node_type, content, comment, created_by):
     node_type = normalize_script_name(node_type)
     if not content.strip():
         raise ProvisionError("Пустой скрипт")
+
+    # Браузерная textarea отправляет форму с CRLF-переводами строк; bash на
+    # ноде падает уже на "set -euo pipefail\r" (инцидент 2026-08-19).
+    # Храним канонический LF.
+    content = content.replace("\r\n", "\n").replace("\r", "\n")
 
     last = (
         db_session.query(NodeInstallScript)
@@ -368,6 +376,13 @@ def claim_request(db_session, provision_request, client_ip, rwms_client):
             raise ProvisionError("Токен истёк — создай новую заявку", http_status=410)
     else:
         check_claimed_ip(provision_request, client_ip)
+
+    # Перезапуск после падения: тот же one-liner с того же сервера начинает
+    # установку заново, прошлая ошибка сбрасывается.
+    if provision_request.status == NodeProvisionStatus.FAILED:
+        provision_request.status = NodeProvisionStatus.CLAIMED
+        provision_request.error = None
+        provision_request.finished_at = None
 
     secret_response = rwms_client.get_node_secret()
     if secret_response is None or not secret_response.secret_key:

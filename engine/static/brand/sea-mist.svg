@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <!-- Морская дымка: прозрачный фон, накладывать поверх секций (mix-blend-mode: screen) -->
+  <defs><filter id="soft" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="55"/></filter></defs>
+  <g fill="#E9EDF3" filter="url(#soft)">
+    <ellipse cx="300" cy="960" rx="480" ry="130" opacity=".07"/>
+    <ellipse cx="900" cy="1020" rx="560" ry="150" opacity=".09"/>
+    <ellipse cx="1560" cy="950" rx="500" ry="120" opacity=".06"/>
+    <ellipse cx="620" cy="860" rx="360" ry="90" opacity=".05"/>
+    <ellipse cx="1250" cy="880" rx="420" ry="100" opacity=".06"/>
+    <ellipse cx="180" cy="760" rx="280" ry="70" opacity=".03"/>
+    <ellipse cx="1700" cy="780" rx="300" ry="80" opacity=".04"/>
+  </g>
+</svg>

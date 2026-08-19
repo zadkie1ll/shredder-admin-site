@@ -22,7 +22,6 @@
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
-    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/material-darker.min.css" rel="stylesheet">
@@ -2452,8 +2451,9 @@
             #source-users-modal .modal-pagination, #source-users-modal .modal-pagination .btn { width: 100%; }
         }
     </style>
-    <link href="{% static 'css/admin_dashboard.css' %}" rel="stylesheet">
+    <link href="{% static 'css/admin_dashboard.css' %}?v=4" rel="stylesheet">
     {% include "includes/yandex_metrika.html" %}
+    <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
 </head>
 <body>
     <div class="page-bg"></div>
@@ -2486,8 +2486,8 @@
                 <button class="tab-btn" data-tab="acquisition"><i class="fas fa-magnet"></i><span>Привлечение</span></button>
             {% endif %}
             <span class="nav-section-label">Управление</span>
-            <button class="tab-btn {% if not support_admin_is_full_admin and not support_admin_is_marketer %}active{% endif %}" data-tab="user-payments"><i class="fas fa-user"></i><span>Клиент</span></button>
-            <button class="tab-btn" data-tab="payment-info"><i class="fas fa-credit-card"></i><span>Найти платёж</span></button>
+            <button class="tab-btn {% if not support_admin_is_full_admin and not support_admin_is_marketer %}active{% endif %}" data-tab="user-payments"><i class="fas fa-user"></i><span>Пользователи</span></button>
+            <button class="tab-btn" data-tab="payment-info"><i class="fas fa-credit-card"></i><span>Платежи</span></button>
             {% if support_admin_is_full_admin or support_admin_is_marketer %}
                 <button class="tab-btn" data-tab="broadcasts"><i class="fas fa-bullhorn"></i><span>Рассылки</span></button>
                 <button class="tab-btn" data-tab="promocodes"><i class="fas fa-ticket"></i><span>Промокоды</span></button>
@@ -3224,7 +3224,7 @@
         <section id="panel-user-payments" class="tab-panel {% if not support_admin_is_full_admin and not support_admin_is_marketer %}active{% endif %}">
             <header class="panel-header client-panel-header">
                 <div>
-                    <h1 class="admin-title">Клиент</h1>
+                    <h1 class="admin-title">Пользователи</h1>
                     <p class="admin-subtitle">Профиль, подписка, платежи и рефералы — всё по одному пользователю</p>
                 </div>
                 <button class="btn btn-secondary client-new-search-button" type="button" id="client-new-search" hidden>

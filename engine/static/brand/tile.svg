@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240">
+  <!-- Бесшовный тайл: пальмовые ветви, канатные кольца, дублоны. background-repeat -->
+  <rect width="240" height="240" fill="#090A0F"/>
+  <g fill="none" stroke="#1C5F4A" stroke-width="2.5" stroke-linecap="round" opacity=".55">
+    <!-- пальмовая ветвь -->
+    <path d="M36 44 Q56 28 80 30"/>
+    <path d="M44 40 L48 30 M54 36 L60 26 M66 32 L72 24"/>
+    <!-- вторая ветвь -->
+    <path d="M204 168 Q184 184 160 182"/>
+    <path d="M196 172 L192 182 M186 176 L180 186 M174 180 L168 188"/>
+    <!-- канатное кольцо -->
+    <circle cx="180" cy="60" r="17" stroke-dasharray="5 4"/>
+    <!-- узел -->
+    <path d="M52 172 Q64 160 76 172 Q64 184 52 172 Z"/>
+    <path d="M76 172 Q86 166 94 172"/>
+  </g>
+  <g fill="#FFC700" opacity=".45">
+    <!-- дублоны -->
+    <circle cx="120" cy="120" r="5"/>
+    <circle cx="120" cy="120" r="10" fill="none" stroke="#FFC700" stroke-width="1.5"/>
+    <circle cx="36" cy="108" r="3"/>
+    <circle cx="208" cy="228" r="3"/>
+    <circle cx="148" cy="36" r="2.5"/>
+    <circle cx="92" cy="216" r="2.5"/>
+  </g>
+  <g fill="#38D996" opacity=".4">
+    <circle cx="228" cy="120" r="2"/>
+    <circle cx="12" cy="120" r="2"/>
+    <circle cx="120" cy="12" r="2"/>
+    <circle cx="120" cy="228" r="2"/>
+  </g>
+</svg>

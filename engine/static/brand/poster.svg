@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <!-- Постер-кадр лупа: статичная версия для fallback -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#090A0F"/><stop offset="1" stop-color="#0b0c12"/>
+    </linearGradient>
+    <radialGradient id="moon" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#FFC700" stop-opacity=".2"/><stop offset="1" stop-color="#FFC700" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="mist" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="45"/></filter>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <g fill="#E9EDF3">
+    <circle cx="240" cy="140" r="2" opacity=".4"/><circle cx="420" cy="90" r="1.6" opacity=".3"/>
+    <circle cx="650" cy="180" r="2" opacity=".45"/><circle cx="800" cy="100" r="1.5" opacity=".3"/>
+    <circle cx="330" cy="260" r="1.5" opacity=".25"/><circle cx="740" cy="320" r="1.6" opacity=".35"/>
+    <circle cx="1240" cy="120" r="2" opacity=".4"/><circle cx="1500" cy="200" r="1.6" opacity=".3"/>
+    <circle cx="1800" cy="140" r="2" opacity=".45"/><circle cx="1650" cy="300" r="1.5" opacity=".3"/>
+  </g>
+  <circle cx="1560" cy="220" r="300" fill="url(#moon)"/>
+  <circle cx="1560" cy="220" r="80" fill="#FFC700" opacity=".9"/>
+  <circle cx="1536" cy="196" r="16" fill="#090A0F" opacity=".12"/>
+  <path fill="#5A4820" d="M1160 810 Q1180 760 1230 742 Q1250 700 1300 692 Q1330 640 1400 630 Q1470 624 1510 664 Q1560 672 1586 712 Q1640 726 1668 770 Q1700 786 1716 810 Z"/>
+  <g fill="none" stroke="#FFC700" stroke-width="10" stroke-linecap="round">
+    <path d="M1400 640 Q1394 560 1408 500"/>
+    <path d="M1408 500 Q1360 478 1312 496"/>
+    <path d="M1408 500 Q1390 448 1342 434"/>
+    <path d="M1408 500 Q1436 448 1490 442"/>
+    <path d="M1408 500 Q1460 480 1502 506"/>
+  </g>
+  <ellipse cx="1560" cy="880" rx="120" ry="5" fill="#FFC700" opacity=".15"/>
+  <ellipse cx="1540" cy="940" rx="160" ry="6" fill="#FFC700" opacity=".12"/>
+  <g fill="none" stroke="#38D996" stroke-width="4" opacity=".4" stroke-linecap="round">
+    <path d="M0 850 Q100 834 200 850 T400 850 T600 850 T800 850 T1000 850 T1200 850 T1400 850 T1600 850 T1800 850 T2000 850"/>
+  </g>
+  <g fill="none" stroke="#5A4820" stroke-width="4" opacity=".5" stroke-linecap="round">
+    <path d="M0 920 Q100 906 200 920 T400 920 T600 920 T800 920 T1000 920 T1200 920 T1400 920 T1600 920 T1800 920 T2000 920"/>
+  </g>
+  <g fill="#E9EDF3" filter="url(#mist)">
+    <ellipse cx="400" cy="1020" rx="480" ry="110" opacity=".06"/>
+    <ellipse cx="1200" cy="1050" rx="560" ry="120" opacity=".07"/>
+    <ellipse cx="1750" cy="1000" rx="400" ry="90" opacity=".05"/>
+  </g>
+</svg>

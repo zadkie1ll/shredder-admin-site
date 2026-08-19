@@ -5028,3 +5028,39 @@ html[data-admin-theme="light"] .client-referral-manage-card {
         transition-duration: .01ms !important;
     }
 }
+
+/* === Багфиксы светлой темы (2026-08-19) === */
+
+/* Редактор install-скриптов: generic-правило светлой темы красило overlay-textarea
+   в непрозрачный белый поверх слоя подсветки — код становился невидимым. */
+html[data-admin-theme="light"] textarea.node-provision-script-editor {
+    background-color: transparent;
+    color: transparent;
+    -webkit-text-fill-color: transparent;
+    box-shadow: none;
+    caret-color: #1b1f27;
+}
+
+/* Подсказка «Прокрутка таблицы» в Привлечении: активное состояние наследовало
+   бледно-жёлтый текст тёмной темы и не читалось на светлом фоне. */
+html[data-admin-theme="light"] .acq-chart-scroll-hint.is-active {
+    color: rgba(110, 82, 0, .88);
+}
+
+html[data-admin-theme="light"] .acq-chart-scroll-hint.is-active > i,
+html[data-admin-theme="light"] .acq-chart-scroll-hint.is-active strong {
+    color: #8a6400;
+}
+
+/* === Мобильный guard (2026-08-19): страница админки никогда не скроллится вбок;
+   внутренние scroll-области (сводка источников, таблицы) продолжают свайпаться. === */
+@media (max-width: 760px) {
+    html, body { overflow-x: hidden; }
+
+    #panel-stats .sources-toolbar-subtitle > span {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    #panel-stats .sources-total-badge { white-space: normal; }
+}

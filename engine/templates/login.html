@@ -17,12 +17,13 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
     <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
     <noscript>
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     </noscript>
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
 
         :root {
@@ -554,8 +555,58 @@
                 max-height: 40vh;
             }
         }
+
+        /* === Новый UI v3: типографика Inter (по мотивам T-Bank). UX не тронут === */
+        #app-container::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image:
+                linear-gradient(rgba(233, 237, 243, .012) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(233, 237, 243, .012) 1px, transparent 1px);
+            background-size: 72px 72px;
+        }
+
+        body,
+        button,
+        input {
+            font-family: 'Inter', 'Montserrat', -apple-system, system-ui, sans-serif;
+        }
+
+        .login-brand,
+        .cabinet-onboarding-title,
+        h1, h2 {
+            font-family: 'Inter', 'Montserrat', sans-serif;
+            font-weight: 800;
+            letter-spacing: -.02em;
+        }
+
+        /* кнопки и поля — плоский язык лендинга */
+        .tilda-yellow {
+            background: #ffc700 !important;
+            border-radius: 14px !important;
+            box-shadow: 0 0 24px rgba(255, 199, 0, .25) !important;
+        }
+
+        .tilda-yellow:hover {
+            filter: none;
+            transform: translateY(-2px);
+            box-shadow: 0 6px 32px rgba(255, 199, 0, .4) !important;
+        }
+
+        .cabinet-onboarding-next {
+            background: #ffc700 !important;
+            color: #090a0f !important;
+            border-radius: 14px !important;
+            box-shadow: 0 0 24px rgba(255, 199, 0, .25) !important;
+        }
+
+        .input-field { border-radius: 14px !important; }
     </style>
     {% include "includes/yandex_metrika.html" %}
+    <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
 </head>
 <body class="antialiased">
     <div class="page-background">

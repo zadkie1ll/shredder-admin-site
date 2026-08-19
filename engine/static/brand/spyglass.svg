@@ -1,0 +1,80 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800">
+  <!-- Герой 2: «На марсе» — вперёдсмотрящий на мачте-антенне с подзорной трубой -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#090A0F"/><stop offset="1" stop-color="#0b0c12"/>
+    </linearGradient>
+    <radialGradient id="moon" cx="0%" cy="0%" r="100%">
+      <stop offset="0" stop-color="#FFC700" stop-opacity=".22"/><stop offset="1" stop-color="#FFC700" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="800" height="800" fill="url(#bg)"/>
+  <!-- луна-дублон -->
+  <circle cx="160" cy="150" r="260" fill="url(#moon)"/>
+  <circle cx="160" cy="150" r="70" fill="#FFC700"/>
+  <circle cx="140" cy="130" r="14" fill="#090A0F" opacity=".12"/>
+  <!-- звёзды -->
+  <g fill="#E9EDF3">
+    <circle cx="560" cy="90" r="2" opacity=".5"/><circle cx="680" cy="160" r="1.6" opacity=".4"/>
+    <circle cx="470" cy="200" r="1.6" opacity=".35"/><circle cx="740" cy="70" r="2" opacity=".5"/>
+    <circle cx="620" cy="280" r="1.4" opacity=".3"/><circle cx="330" cy="80" r="1.6" opacity=".4"/>
+  </g>
+  <!-- море -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M0 660 Q100 646 200 660 T400 660 T600 660 T800 660" stroke="#38D996" stroke-width="3" opacity=".3"/>
+    <path d="M0 710 Q100 698 200 710 T400 710 T600 710 T800 710" stroke="#6B4F28" stroke-width="3" opacity=".4"/>
+    <path d="M0 760 Q100 748 200 760 T400 760 T600 760 T800 760" stroke="#38D996" stroke-width="2.5" opacity=".2"/>
+  </g>
+  <ellipse cx="170" cy="700" rx="90" ry="4" fill="#FFC700" opacity=".15"/>
+  <!-- мачта-антенна -->
+  <g stroke="#6B4F28" stroke-width="14" stroke-linecap="round">
+    <path d="M560 800 L560 300"/>
+  </g>
+  <g stroke="#6B4F28" stroke-width="8" stroke-linecap="round">
+    <path d="M470 800 L560 560 M650 800 L560 560"/>
+  </g>
+  <!-- антенные перекладины с излучателями -->
+  <g stroke="#FFC700" stroke-width="6" stroke-linecap="round">
+    <path d="M500 300 L620 300 M516 250 L604 250 M532 200 L588 200"/>
+  </g>
+  <g fill="#38D996">
+    <circle cx="500" cy="300" r="6"/><circle cx="620" cy="300" r="6"/>
+    <circle cx="516" cy="250" r="5"/><circle cx="604" cy="250" r="5"/>
+    <circle cx="532" cy="200" r="4.5"/><circle cx="588" cy="200" r="4.5"/>
+  </g>
+  <!-- сигнальные дуги от верхушки -->
+  <g fill="none" stroke="#38D996" stroke-width="3" opacity=".5" stroke-linecap="round">
+    <path d="M560 160 Q590 130 560 100" transform="rotate(90 560 130)"/>
+    <path d="M576 140 Q600 115 576 90" transform="rotate(90 576 115)"/>
+  </g>
+  <!-- «воронье гнездо» -->
+  <path d="M480 560 L640 560 L620 640 L500 640 Z" fill="#6B4F28"/>
+  <path d="M480 560 L640 560" stroke="#FFC700" stroke-width="5" stroke-linecap="round"/>
+  <!-- вперёдсмотрящий (смещён влево от оси мачты) -->
+  <g transform="translate(-34,0)">
+    <!-- тело за бортом гнезда -->
+    <path d="M520 560 Q522 500 560 496 Q596 500 600 560 Z" fill="#6B4F28"/>
+    <!-- голова в профиль, смотрит влево на луну -->
+    <circle cx="548" cy="452" r="44" fill="#6B4F28"/>
+    <circle cx="592" cy="452" r="15" fill="#6B4F28"/>
+    <!-- морда -->
+    <path d="M512 466 Q506 448 516 440 Q530 452 528 470 Z" fill="#E9EDF3" opacity=".9"/>
+    <!-- красная бандана в профиль, хвосты по ветру -->
+    <path d="M504 434 Q510 402 548 398 Q580 400 590 428 Q566 414 540 416 Q520 420 504 434 Z" fill="#C7502E"/>
+    <path d="M506 428 Q482 418 466 424 Q480 434 502 436 Z" fill="#C7502E"/>
+    <path d="M508 438 Q488 444 478 454 Q496 454 510 446 Z" fill="#C7502E"/>
+    <circle cx="534" cy="410" r="3" fill="#8F3A22"/>
+    <circle cx="556" cy="408" r="3" fill="#8F3A22"/>
+    <!-- глаз у трубы -->
+    <circle cx="524" cy="446" r="4" fill="#090A0F"/>
+    <!-- подзорная труба к луне -->
+    <g stroke="#FFC700" stroke-linecap="round">
+      <path d="M516 448 L438 400" stroke-width="16"/>
+      <path d="M446 404 L394 372" stroke-width="12"/>
+      <path d="M400 376 L360 352" stroke-width="9"/>
+    </g>
+    <circle cx="354" cy="348" r="9" fill="none" stroke="#FFC700" stroke-width="4"/>
+    <!-- рука на трубе -->
+    <circle cx="470" cy="418" r="13" fill="#6B4F28" stroke="#FFC700" stroke-width="3"/>
+  </g>
+</svg>

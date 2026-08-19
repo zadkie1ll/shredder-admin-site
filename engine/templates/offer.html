@@ -7,13 +7,12 @@
     <title>Договор-оферта — Monkey Island</title>
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
-    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
         body {
-            font-family: 'Montserrat', sans-serif;
+            font-family: 'Inter', 'Montserrat', -apple-system, system-ui, sans-serif;
             background-color: #0a0a0a;
             color: #ffffff;
         }
@@ -49,8 +48,28 @@
             color: #ffc700;
             font-weight: 700;
         }
+
+        /* === Новый UI v3: доводка под лендинг === */
+        body {
+            background:
+                radial-gradient(circle at 50% 6%, rgba(255, 199, 0, .06), transparent 40rem),
+                #090a0f;
+        }
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 0;
+            background-image:
+                linear-gradient(rgba(233, 237, 243, .011) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(233, 237, 243, .011) 1px, transparent 1px);
+            background-size: 72px 72px;
+        }
+        h1, h2, h3 { letter-spacing: -.02em; }
     </style>
     {% include "includes/yandex_metrika.html" %}
+    <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
 </head>
 <body class="antialiased">
     <header class="border-b border-white/5 bg-[#111111]">
