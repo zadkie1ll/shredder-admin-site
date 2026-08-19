@@ -94,6 +94,16 @@ class RwManagerStub:
                 request_serializer=proto_dot_rwmanager__pb2.CreateNodeRequest.SerializeToString,
                 response_deserializer=proto_dot_rwmanager__pb2.Node.FromString,
                 _registered_method=True)
+        self.GetUserHwidDevices = channel.unary_unary(
+                '/rwmanager.RwManager/GetUserHwidDevices',
+                request_serializer=proto_dot_rwmanager__pb2.GetUserHwidDevicesRequest.SerializeToString,
+                response_deserializer=proto_dot_rwmanager__pb2.GetUserHwidDevicesResponse.FromString,
+                _registered_method=True)
+        self.DeleteUserHwidDevice = channel.unary_unary(
+                '/rwmanager.RwManager/DeleteUserHwidDevice',
+                request_serializer=proto_dot_rwmanager__pb2.DeleteUserHwidDeviceRequest.SerializeToString,
+                response_deserializer=proto_dot_rwmanager__pb2.DeleteUserHwidDeviceResponse.FromString,
+                _registered_method=True)
 
 
 class RwManagerServicer:
@@ -176,6 +186,19 @@ class RwManagerServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetUserHwidDevices(self, request, context):
+        """HWID-устройства подписки: список и удаление одного устройства из кабинета.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def DeleteUserHwidDevice(self, request, context):
+        """Missing associated documentation comment in .proto file."""
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_RwManagerServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -238,6 +261,16 @@ def add_RwManagerServicer_to_server(servicer, server):
                     servicer.CreateNode,
                     request_deserializer=proto_dot_rwmanager__pb2.CreateNodeRequest.FromString,
                     response_serializer=proto_dot_rwmanager__pb2.Node.SerializeToString,
+            ),
+            'GetUserHwidDevices': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetUserHwidDevices,
+                    request_deserializer=proto_dot_rwmanager__pb2.GetUserHwidDevicesRequest.FromString,
+                    response_serializer=proto_dot_rwmanager__pb2.GetUserHwidDevicesResponse.SerializeToString,
+            ),
+            'DeleteUserHwidDevice': grpc.unary_unary_rpc_method_handler(
+                    servicer.DeleteUserHwidDevice,
+                    request_deserializer=proto_dot_rwmanager__pb2.DeleteUserHwidDeviceRequest.FromString,
+                    response_serializer=proto_dot_rwmanager__pb2.DeleteUserHwidDeviceResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -564,6 +597,60 @@ class RwManager:
             '/rwmanager.RwManager/CreateNode',
             proto_dot_rwmanager__pb2.CreateNodeRequest.SerializeToString,
             proto_dot_rwmanager__pb2.Node.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetUserHwidDevices(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/rwmanager.RwManager/GetUserHwidDevices',
+            proto_dot_rwmanager__pb2.GetUserHwidDevicesRequest.SerializeToString,
+            proto_dot_rwmanager__pb2.GetUserHwidDevicesResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def DeleteUserHwidDevice(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/rwmanager.RwManager/DeleteUserHwidDevice',
+            proto_dot_rwmanager__pb2.DeleteUserHwidDeviceRequest.SerializeToString,
+            proto_dot_rwmanager__pb2.DeleteUserHwidDeviceResponse.FromString,
             options,
             channel_credentials,
             insecure,

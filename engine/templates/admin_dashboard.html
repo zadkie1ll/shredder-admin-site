@@ -2451,7 +2451,7 @@
             #source-users-modal .modal-pagination, #source-users-modal .modal-pagination .btn { width: 100%; }
         }
     </style>
-    <link href="{% static 'css/admin_dashboard.css' %}?v=5" rel="stylesheet">
+    <link href="{% static 'css/admin_dashboard.css' %}?v=6" rel="stylesheet">
     {% include "includes/yandex_metrika.html" %}
     <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
 </head>
@@ -5770,6 +5770,7 @@
             }
 
             canvas.__salesChartMeta = {
+                series,
                 buckets,
                 leftPadding,
                 plotWidth,
@@ -5779,6 +5780,17 @@
             };
             render(null);
         }
+
+        let salesChartResizeFrame = null;
+        window.addEventListener('resize', () => {
+            window.cancelAnimationFrame(salesChartResizeFrame);
+            salesChartResizeFrame = window.requestAnimationFrame(() => {
+                document.querySelectorAll('.sales-chart-canvas-wrap canvas').forEach((canvas) => {
+                    const series = canvas.__salesChartMeta?.series;
+                    if (series) drawSalesSeriesChart(canvas, series);
+                });
+            });
+        });
 
         function bindSalesChartTooltip(canvas, tooltip, labelFormatter = (row) => row.label) {
             if (!canvas || !tooltip) return;

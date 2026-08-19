@@ -2,6 +2,12 @@
   "version": "0.0.1",
   "configurations": [
     {
+      "name": "website-fake-rwms",
+      "runtimeExecutable": "/private/tmp/claude-501/-Users-apugachev-Work-projects-monkeyislandvpn-monkey-island-website/ed3d83b8-06ff-4eaa-9b2e-efd17954a9c3/scratchpad/run_site_fake.sh",
+      "runtimeArgs": [],
+      "port": 8124
+    },
+    {
       "name": "website",
       "runtimeExecutable": "./.venv/bin/python",
       "runtimeArgs": ["manage.py", "runserver", "8123"],

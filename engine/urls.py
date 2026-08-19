@@ -42,6 +42,12 @@ urlpatterns = [
         views.support_attachment,
         name="support_attachment",
     ),
+    path("api/cabinet/devices/", views.cabinet_devices, name="cabinet_devices"),
+    path(
+        "api/cabinet/devices/delete/",
+        views.cabinet_device_delete,
+        name="cabinet_device_delete",
+    ),
     path("support-admin/login/", views.support_admin_login, name="support_admin_login"),
     path(
         "support-admin/logout/", views.support_admin_logout, name="support_admin_logout"

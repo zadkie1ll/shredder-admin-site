@@ -205,6 +205,39 @@ message CreateNodeRequest {
   repeated string inbound_uuids = 6;
 }
 
+
+// --- HWID-устройства подписки (личный кабинет) ---
+// Только чтение списка и точечное удаление устройства по явному действию
+// владельца подписки. Управление самой подпиской здесь отсутствует намеренно.
+message HwidDevice {
+  string hwid = 1;
+  optional string platform = 2;
+  optional string os_version = 3;
+  optional string device_model = 4;
+  optional string user_agent = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+}
+
+message GetUserHwidDevicesRequest {
+  string user_uuid = 1;
+}
+
+message GetUserHwidDevicesResponse {
+  int64 total = 1;
+  repeated HwidDevice devices = 2;
+}
+
+message DeleteUserHwidDeviceRequest {
+  string user_uuid = 1;
+  string hwid = 2;
+}
+
+message DeleteUserHwidDeviceResponse {
+  int64 total = 1;
+  repeated HwidDevice devices = 2;
+}
+
 service RwManager {
   rpc GetUserByUuid(GetUserByUuidRequest) returns (UserResponse) {}
   rpc GetUserByUsername(GetUserByUsernameRequest) returns (UserResponse) {}
@@ -226,4 +259,8 @@ service RwManager {
   // Удаления нод здесь нет намеренно (Remnawave Safety Rules).
   rpc GetNodeSecret(Empty) returns (GetNodeSecretResponse) {}
   rpc CreateNode(CreateNodeRequest) returns (Node) {}
+
+  // HWID-устройства подписки: список и удаление одного устройства из кабинета.
+  rpc GetUserHwidDevices(GetUserHwidDevicesRequest) returns (GetUserHwidDevicesResponse) {}
+  rpc DeleteUserHwidDevice(DeleteUserHwidDeviceRequest) returns (DeleteUserHwidDeviceResponse) {}
 }

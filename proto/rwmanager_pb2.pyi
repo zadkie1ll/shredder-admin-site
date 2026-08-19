@@ -343,3 +343,51 @@ class CreateNodeRequest(_message.Message):
     config_profile_uuid: str
     inbound_uuids: _containers.RepeatedScalarFieldContainer[str]
     def __init__(self, name: _Optional[str] = ..., address: _Optional[str] = ..., port: _Optional[int] = ..., country_code: _Optional[str] = ..., config_profile_uuid: _Optional[str] = ..., inbound_uuids: _Optional[_Iterable[str]] = ...) -> None: ...
+
+class HwidDevice(_message.Message):
+    __slots__ = ("hwid", "platform", "os_version", "device_model", "user_agent", "created_at", "updated_at")
+    HWID_FIELD_NUMBER: _ClassVar[int]
+    PLATFORM_FIELD_NUMBER: _ClassVar[int]
+    OS_VERSION_FIELD_NUMBER: _ClassVar[int]
+    DEVICE_MODEL_FIELD_NUMBER: _ClassVar[int]
+    USER_AGENT_FIELD_NUMBER: _ClassVar[int]
+    CREATED_AT_FIELD_NUMBER: _ClassVar[int]
+    UPDATED_AT_FIELD_NUMBER: _ClassVar[int]
+    hwid: str
+    platform: str
+    os_version: str
+    device_model: str
+    user_agent: str
+    created_at: _timestamp_pb2.Timestamp
+    updated_at: _timestamp_pb2.Timestamp
+    def __init__(self, hwid: _Optional[str] = ..., platform: _Optional[str] = ..., os_version: _Optional[str] = ..., device_model: _Optional[str] = ..., user_agent: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ...) -> None: ...
+
+class GetUserHwidDevicesRequest(_message.Message):
+    __slots__ = ("user_uuid",)
+    USER_UUID_FIELD_NUMBER: _ClassVar[int]
+    user_uuid: str
+    def __init__(self, user_uuid: _Optional[str] = ...) -> None: ...
+
+class GetUserHwidDevicesResponse(_message.Message):
+    __slots__ = ("total", "devices")
+    TOTAL_FIELD_NUMBER: _ClassVar[int]
+    DEVICES_FIELD_NUMBER: _ClassVar[int]
+    total: int
+    devices: _containers.RepeatedCompositeFieldContainer[HwidDevice]
+    def __init__(self, total: _Optional[int] = ..., devices: _Optional[_Iterable[_Union[HwidDevice, _Mapping]]] = ...) -> None: ...
+
+class DeleteUserHwidDeviceRequest(_message.Message):
+    __slots__ = ("user_uuid", "hwid")
+    USER_UUID_FIELD_NUMBER: _ClassVar[int]
+    HWID_FIELD_NUMBER: _ClassVar[int]
+    user_uuid: str
+    hwid: str
+    def __init__(self, user_uuid: _Optional[str] = ..., hwid: _Optional[str] = ...) -> None: ...
+
+class DeleteUserHwidDeviceResponse(_message.Message):
+    __slots__ = ("total", "devices")
+    TOTAL_FIELD_NUMBER: _ClassVar[int]
+    DEVICES_FIELD_NUMBER: _ClassVar[int]
+    total: int
+    devices: _containers.RepeatedCompositeFieldContainer[HwidDevice]
+    def __init__(self, total: _Optional[int] = ..., devices: _Optional[_Iterable[_Union[HwidDevice, _Mapping]]] = ...) -> None: ...

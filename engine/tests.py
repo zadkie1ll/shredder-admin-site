@@ -5854,3 +5854,108 @@ class AdminScriptScopeTests(SimpleTestCase):
         self.assertGreaterEqual(block.count("adminTable("), 5)
         self.assertIn("function renderPromoCodes(", block)
         self.assertIn("function renderPromoBatches(", block)
+
+
+from django.test import TestCase as _CabTestCase
+from engine import views as _cab_views
+
+
+class CabinetDevicesApiTests(_CabTestCase):
+    """HWID-устройства подписки: список и удаление из личного кабинета."""
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+
+        self.user = User.objects.create_user(
+            username="hwid_tester", password="x"
+        )
+        self.client.force_login(self.user)
+
+    def _proto_device(self, hwid="dev-1", model="iPhone 15 Pro"):
+        import proto.rwmanager_pb2 as proto
+
+        d = proto.HwidDevice(hwid=hwid, platform="ios", device_model=model)
+        d.updated_at.GetCurrentTime()
+        return d
+
+    def _subscription(self, uuid="rw-uuid-1", limit=15):
+        import proto.rwmanager_pb2 as proto
+
+        sub = proto.UserResponse(uuid=uuid, username="hwid_tester")
+        sub.hwid_device_limit = limit
+        return sub
+
+    def test_devices_list_ok(self):
+        import proto.rwmanager_pb2 as proto
+        from unittest.mock import patch
+
+        resp_proto = proto.GetUserHwidDevicesResponse(
+            total=1, devices=[self._proto_device()]
+        )
+        with patch.object(
+            _cab_views.rwms_client, "get_user_by_username",
+            return_value=self._subscription(),
+        ), patch.object(
+            _cab_views.rwms_client, "get_user_hwid_devices",
+            return_value=resp_proto,
+        ) as mocked:
+            response = self.client.get("/api/cabinet/devices/")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["total"], 1)
+        self.assertEqual(payload["limit"], 15)
+        self.assertEqual(payload["devices"][0]["hwid"], "dev-1")
+        self.assertEqual(payload["devices"][0]["device_model"], "iPhone 15 Pro")
+        mocked.assert_called_once_with("rw-uuid-1")
+
+    def test_devices_list_no_subscription(self):
+        from unittest.mock import patch
+
+        with patch.object(
+            _cab_views.rwms_client, "get_user_by_username", return_value=None
+        ):
+            response = self.client.get("/api/cabinet/devices/")
+        self.assertEqual(response.status_code, 404)
+
+    def test_devices_list_requires_auth(self):
+        self.client.logout()
+        response = self.client.get("/api/cabinet/devices/")
+        self.assertEqual(response.status_code, 302)
+
+    def test_device_delete_ok(self):
+        import proto.rwmanager_pb2 as proto
+        from unittest.mock import patch
+
+        resp_proto = proto.DeleteUserHwidDeviceResponse(total=0, devices=[])
+        with patch.object(
+            _cab_views.rwms_client, "get_user_by_username",
+            return_value=self._subscription(),
+        ), patch.object(
+            _cab_views.rwms_client, "delete_user_hwid_device",
+            return_value=resp_proto,
+        ) as mocked:
+            response = self.client.post(
+                "/api/cabinet/devices/delete/", {"hwid": "dev-1"}
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["total"], 0)
+        mocked.assert_called_once_with("rw-uuid-1", "dev-1")
+
+    def test_device_delete_requires_hwid(self):
+        from unittest.mock import patch
+
+        with patch.object(
+            _cab_views.rwms_client, "get_user_by_username",
+            return_value=self._subscription(),
+        ):
+            response = self.client.post("/api/cabinet/devices/delete/", {})
+        self.assertEqual(response.status_code, 400)
+
+    def test_device_delete_get_not_allowed(self):
+        response = self.client.get("/api/cabinet/devices/delete/")
+        self.assertEqual(response.status_code, 405)

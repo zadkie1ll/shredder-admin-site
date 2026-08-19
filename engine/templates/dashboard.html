@@ -1362,7 +1362,7 @@
             width: 30px;
             height: 30px;
             border-radius: 10px;
-            background: url("{% static 'icons/monkey-island-logo-animated.webp' %}") center / cover no-repeat;
+            background: url("{% static 'icons/logo-face-white.png' %}") center / cover no-repeat;
             border: 1px solid rgba(255, 199, 0, 0.26);
         }
 
@@ -2416,7 +2416,7 @@
             width: 30px;
             height: 30px;
             border-radius: 10px;
-            background: url("{% static 'icons/monkey-island-logo-animated.webp' %}") center / cover no-repeat;
+            background: url("{% static 'icons/logo-face-white.png' %}") center / cover no-repeat;
             border: 1px solid rgba(255, 199, 0, 0.26);
             box-shadow: 0 0 24px rgba(255, 199, 0, 0.12);
         }
@@ -3949,6 +3949,196 @@
         .tg-mini-action-accent .tg-mini-action-label { color: #ffc700; font-weight: 700; }
         .tg-mini-action-accent i { color: #ffc700 !important; }
 
+        /* Кабинет v3: мобильные экраны Рефералов и Поддержки (десктоп не тронут) */
+        .mi3-only-mobile { display: none; }
+        @media (max-width: 1024px) {
+            .mi3-only-mobile { display: block; }
+            #tab-profile > .referral-mobile-header,
+            #tab-profile > .overview-grid,
+            #tab-support > header,
+            #tab-support > section.setup-shell { display: none !important; }
+        }
+        .mi3-stat-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; margin: 16px 0; }
+        .mi3-stat {
+            border: 1px solid rgba(255,255,255,.09); border-radius: 16px; background: rgba(255,255,255,.03);
+            padding: 14px 16px;
+        }
+        .mi3-stat b { display: block; font-size: 26px; font-weight: 800; letter-spacing: -.02em; color: #fff; margin-top: 6px; }
+        .mi3-stat span { font-size: 12.5px; font-weight: 600; color: rgba(255,255,255,.5); }
+        .mi3-stat.is-green b { color: #38d996; }
+        .mi3-stat.is-gold { border-color: rgba(255,199,0,.4); background: rgba(255,199,0,.07); }
+        .mi3-stat.is-gold b { color: #ffc700; }
+        .mi3-link-card { border: 1px solid rgba(255,255,255,.09); border-radius: 16px; background: rgba(255,255,255,.03); padding: 15px; margin-bottom: 12px; }
+        .mi3-link-head { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+        .mi3-link-title { font-size: 15px; font-weight: 700; color: #fff; }
+        .mi3-link-sub { font-size: 12px; color: rgba(255,255,255,.5); }
+        .mi3-link-url { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; color: rgba(255,255,255,.65); word-break: break-all; margin-bottom: 12px; }
+        .mi3-link-actions { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1.2fr); gap: 8px; }
+        .mi3-link-btn {
+            display: flex; align-items: center; justify-content: center; gap: 8px;
+            border: 1px solid rgba(255,255,255,.12); border-radius: 12px; background: transparent;
+            color: #fff; font: inherit; font-size: 13px; font-weight: 600; padding: 12px; cursor: pointer;
+        }
+        .mi3-link-btn.is-gold { border-color: rgba(255,199,0,.45); color: #ffc700; background: rgba(255,199,0,.07); }
+        .mi3-note { display: flex; align-items: center; gap: 10px; margin-top: 14px; font-size: 13px; color: rgba(255,255,255,.5); }
+        .mi3-note i { color: #38d996; }
+        .mi3-bonus-step { display: grid; grid-template-columns: 34px minmax(0,1fr); gap: 14px; margin-top: 18px; position: relative; }
+        .mi3-bonus-num {
+            width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(255,199,0,.5);
+            display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; color: #ffc700;
+            background: rgba(255,199,0,.06);
+        }
+        .mi3-bonus-days { font-size: 16px; font-weight: 800; color: #ffc700; }
+        .mi3-bonus-name { font-size: 14.5px; font-weight: 700; color: #fff; margin-top: 2px; }
+        .mi3-bonus-desc { font-size: 13px; color: rgba(255,255,255,.5); margin-top: 3px; }
+        .mi3-status-banner {
+            display: flex; align-items: center; justify-content: space-between; gap: 10px;
+            border: 1px solid rgba(56,217,150,.3); border-radius: 14px; background: rgba(56,217,150,.06);
+            padding: 14px 16px; font-size: 13px; font-weight: 600; margin-bottom: 18px;
+        }
+        .mi3-status-banner .st { color: #38d996; }
+        .mi3-status-banner .st::before { content: "● "; }
+        .mi3-status-banner .eta { color: rgba(255,255,255,.5); font-weight: 500; }
+        .mi3-support-row {
+            width: 100%; display: flex; align-items: center; gap: 14px; padding: 17px 4px;
+            background: none; border: 0; border-bottom: 1px solid rgba(255,255,255,.08);
+            color: #fff; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; text-align: left;
+        }
+        .mi3-support-row i:first-child { width: 24px; color: #ffc700; font-size: 17px; }
+        .mi3-support-row .chev { margin-left: auto; color: rgba(255,255,255,.35); }
+
+        /* === Кабинет v3 (мобайл): дизайн-концепт «остров на связи» === */
+        .mi3-topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .mi3-brand-name { font-weight: 800; font-size: 15px; letter-spacing: .01em; }
+        .mi3-brand-name b { color: #ffc700; }
+        .mi3-avatar {
+            width: 44px; height: 44px; border-radius: 50%; flex: 0 0 auto;
+            display: flex; align-items: center; justify-content: center;
+            background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
+            font-weight: 700; font-size: 14px; color: rgba(255,255,255,.85); text-transform: uppercase;
+        }
+        .mi3-chip {
+            display: inline-flex; align-items: center; gap: 8px; margin: 22px auto 26px;
+            font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
+            color: #ffc700; border: 1px solid rgba(255,199,0,.3); border-radius: 100px;
+            padding: 9px 18px; background: rgba(9,10,15,.6);
+        }
+        .mi3-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: #38d996; box-shadow: 0 0 8px #38d996; animation: mi3pulse 2s infinite; }
+        @keyframes mi3pulse { 50% { opacity: .4; } }
+        .mi3-hero { text-align: center; margin-bottom: 26px; }
+        .mi3-label { font-size: 12px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: rgba(255,255,255,.45); margin-bottom: 12px; }
+        .mi3-title { font-size: 34px; line-height: 1.12; font-weight: 800; letter-spacing: -.02em; color: #fff; }
+        .mi3-title b { color: #ffc700; font-weight: 800; }
+        .mi3-sub { margin-top: 12px; font-size: 15px; line-height: 1.55; color: rgba(255,255,255,.55); }
+        .mi3-card {
+            border: 1px solid rgba(255,255,255,.09); border-radius: 18px;
+            background: rgba(255,255,255,.035); padding: 18px; margin-bottom: 16px; text-align: left;
+        }
+        .mi3-status-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+        .mi3-status { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: #38d996; }
+        .mi3-status::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; }
+        .mi3-status.is-warning { color: #ffc700; }
+        .mi3-status.is-off { color: #ff5c67; }
+        .mi3-days { font-size: 13px; font-weight: 600; color: rgba(255,255,255,.5); }
+        .mi3-date { font-size: 30px; font-weight: 800; letter-spacing: -.02em; color: #fff; margin-bottom: 14px; }
+        .mi3-progress { height: 6px; border-radius: 100px; background: rgba(255,255,255,.09); overflow: hidden; margin-bottom: 14px; }
+        .mi3-progress i { display: block; height: 100%; border-radius: 100px; background: #ffc700; box-shadow: 0 0 12px rgba(255,199,0,.5); }
+        .mi3-card-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 13px; font-weight: 600; color: rgba(255,255,255,.55); }
+        .mi3-card-foot i { margin-right: 6px; }
+        .mi3-tiles { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 10px; margin-bottom: 16px; }
+        .mi3-tile {
+            border: 1px solid rgba(255,255,255,.09); border-radius: 16px; background: rgba(255,255,255,.03);
+            padding: 16px 8px 14px; display: flex; flex-direction: column; align-items: center; gap: 9px;
+            color: rgba(255,255,255,.8); font-size: 13px; font-weight: 600; font-family: inherit; cursor: pointer;
+        }
+        .mi3-tile i { font-size: 18px; color: rgba(255,255,255,.75); }
+        .mi3-tile:active { background: rgba(255,199,0,.07); border-color: rgba(255,199,0,.3); }
+        .mi3-section-head { display: flex; align-items: center; justify-content: space-between; margin: 22px 2px 12px; }
+        .mi3-section-head h3 { font-size: 17px; font-weight: 700; color: #fff; letter-spacing: -.01em; }
+        .mi3-section-head button { background: none; border: 0; color: #ffc700; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .mi3-device-row {
+            width: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 16px;
+            border: 1px solid rgba(255,255,255,.08); border-radius: 16px; background: rgba(255,255,255,.03);
+            margin-bottom: 10px; text-align: left; color: #fff; font-family: inherit;
+        }
+        .mi3-device-icon {
+            width: 44px; height: 44px; flex: 0 0 auto; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+            background: rgba(255,199,0,.09); border: 1px solid rgba(255,199,0,.2); color: #ffc700; font-size: 17px;
+        }
+        .mi3-device-name { font-size: 15px; font-weight: 700; }
+        .mi3-device-meta { font-size: 12.5px; color: rgba(255,255,255,.5); margin-top: 3px; }
+        .mi3-device-meta.is-online { color: #38d996; }
+        .mi3-device-meta.is-online::before { content: "● "; }
+        .mi3-device-main { min-width: 0; flex: 1; }
+        .mi3-device-del {
+            flex: 0 0 auto; border: 1px solid rgba(255,92,103,.35); background: rgba(255,92,103,.08);
+            color: #ff5c67; border-radius: 10px; padding: 9px 12px; font: inherit; font-size: 12px; font-weight: 700; cursor: pointer;
+        }
+        .mi3-device-del.is-armed { background: #ff5c67; color: #fff; }
+        .mi3-empty { text-align: center; color: rgba(255,255,255,.45); font-size: 13.5px; padding: 18px 10px; }
+        /* Шторки */
+        .mi3-sheet-overlay {
+            position: fixed; inset: 0; z-index: 220; background: rgba(0,0,0,.6);
+            backdrop-filter: blur(4px); opacity: 0; pointer-events: none; transition: opacity .25s;
+        }
+        .mi3-sheet-overlay.is-open { opacity: 1; pointer-events: auto; }
+        .mi3-sheet {
+            position: fixed; left: 0; right: 0; bottom: 0; z-index: 221;
+            background: #14151b; border-radius: 24px 24px 0 0; border: 1px solid rgba(255,255,255,.08); border-bottom: 0;
+            padding: 10px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+            transform: translateY(105%); transition: transform .3s ease; max-height: 86vh; overflow-y: auto;
+        }
+        .mi3-sheet.is-open { transform: translateY(0); }
+        .mi3-sheet-grab { width: 44px; height: 4px; border-radius: 100px; background: rgba(255,255,255,.18); margin: 4px auto 16px; }
+        .mi3-sheet-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .mi3-sheet-kicker { font-size: 11px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: #ffc700; margin-bottom: 8px; }
+        .mi3-sheet-title { font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: #fff; }
+        .mi3-sheet-close {
+            flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; border: 0;
+            background: rgba(255,255,255,.08); color: #fff; font-size: 15px; cursor: pointer;
+        }
+        .mi3-sheet-text { margin-top: 10px; font-size: 14px; line-height: 1.55; color: rgba(255,255,255,.55); }
+        .mi3-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; margin-top: 18px; }
+        .mi3-choice {
+            display: flex; align-items: center; gap: 10px; padding: 16px 14px;
+            border: 1px solid rgba(255,255,255,.1); border-radius: 14px; background: rgba(255,255,255,.03);
+            color: #fff; font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; text-align: left;
+        }
+        .mi3-choice i { color: rgba(255,255,255,.7); font-size: 16px; }
+        .mi3-choice.is-active { border-color: #ffc700; background: rgba(255,199,0,.09); }
+        .mi3-choice.is-active i { color: #ffc700; }
+        .mi3-choice-extra { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+        .mi3-choice-mini {
+            border: 1px solid rgba(255,255,255,.12); border-radius: 100px; background: transparent;
+            color: rgba(255,255,255,.6); font: inherit; font-size: 12px; font-weight: 600; padding: 8px 14px; cursor: pointer;
+        }
+        .mi3-choice-mini.is-active { border-color: #ffc700; color: #ffc700; background: rgba(255,199,0,.08); }
+        .mi3-sheet-cta {
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            width: 100%; margin-top: 20px; padding: 16px; border: 0; border-radius: 14px;
+            background: #ffc700; color: #090a0f; font: inherit; font-size: 15px; font-weight: 700; cursor: pointer;
+            box-shadow: 0 0 24px rgba(255,199,0,.25);
+        }
+        .mi3-sheet-cta:disabled { opacity: .45; box-shadow: none; }
+        .mi3-sheet-cta.is-ghost { background: transparent; color: #fff; border: 1px solid rgba(255,255,255,.2); box-shadow: none; }
+        .mi3-app-row {
+            width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px;
+            border: 1px solid rgba(255,255,255,.1); border-radius: 14px; background: rgba(255,255,255,.03);
+            color: #fff; font: inherit; cursor: pointer; text-align: left; margin-top: 10px;
+        }
+        .mi3-app-row.is-active { border-color: #ffc700; background: rgba(255,199,0,.08); }
+        .mi3-app-name { font-size: 15px; font-weight: 700; }
+        .mi3-app-note { font-size: 12.5px; color: rgba(255,255,255,.5); margin-top: 2px; }
+        .mi3-key-box { margin-top: 18px; border: 1px solid rgba(255,199,0,.3); border-radius: 14px; background: rgba(255,199,0,.05); padding: 14px; }
+        .mi3-key-label { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #ffc700; margin-bottom: 8px; }
+        .mi3-key-value {
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; line-height: 1.5;
+            color: rgba(255,255,255,.85); word-break: break-all; max-height: 84px; overflow: auto;
+        }
+        .mi3-summary { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 13px 14px; border: 1px solid rgba(255,255,255,.09); border-radius: 14px; background: rgba(255,255,255,.03); font-size: 14px; font-weight: 600; }
+        .mi3-summary i { color: #ffc700; }
+        .mi3-support-faq-row { margin-top: 14px; }
+
         /* Экран выбора тарифа: на ПК — две колонки, чтобы влезал в один экран */
         @media (min-width: 1024px) {
             .plans-topbar { width: min(100%, 920px); margin-bottom: 28px; }
@@ -4083,44 +4273,45 @@
             <div id="tab-home" class="tab-content active">
                 <div id="main-dashboard-view">
                     <div class="tg-mini-home">
-                        <div class="tg-mini-brand">
-                            <span class="tg-mini-brand-mark" aria-hidden="true">
-                                <img src="{% static 'icons/monkey-island-logo-animated.webp' %}" alt="">
-                            </span>
-                            <span>Monkey Island</span>
+                        <div class="mi3-topbar">
+                            <div class="tg-mini-brand" style="margin-bottom:0">
+                                <span class="tg-mini-brand-mark" aria-hidden="true">
+                                    <img src="{% static 'icons/logo-face-white.png' %}" alt="">
+                                </span>
+                                <span class="mi3-brand-name">MONKEY ISLAND <b>VPN</b></span>
+                            </div>
+                            <span class="mi3-avatar" aria-hidden="true">{{ user.username|slice:":2" }}</span>
                         </div>
 
-                        <section class="tg-mini-status-card{% if show_expiring_banner %} is-warning{% elif not has_subscription_access %} is-inactive{% endif %}">
-                            <p class="tg-mini-status">
-                                {% if not has_subscription_access %}
-                                    Подписка не активна
-                                {% elif show_expiring_banner %}
-                                    Подписка скоро закончится
-                                {% else %}
-                                    Подписка активна
-                                {% endif %}
+                        <div style="text-align:center"><span class="mi3-chip"><span class="dot"></span> Остров на связи · Uptime 99.9%</span></div>
+
+                        <div class="mi3-hero">
+                            <div class="mi3-label">Личный кабинет</div>
+                            <h1 class="mi3-title">
+                                {% if has_subscription_access %}Ваш VPN <b>готов</b><br>к работе{% else %}Подключите VPN<br>за пару минут{% endif %}
+                            </h1>
+                            <p class="mi3-sub">
+                                {% if has_subscription_access %}Подключайте устройства и управляйте подпиской без лишних экранов.{% else %}Выберите тариф — доступ откроется сразу после оплаты.{% endif %}
                             </p>
-                            <div class="tg-mini-expiry">
-                                <i class="far fa-calendar" aria-hidden="true"></i>
-                                <h1>
-                                    {% if has_subscription_access %}
-                                        До {{ user.expire_at|date:"j E Y" }}
-                                    {% else %}
-                                        Доступ не активен
-                                    {% endif %}
-                                </h1>
+                        </div>
+
+                        <section class="mi3-card" aria-label="Статус подписки">
+                            <div class="mi3-status-row">
+                                <span class="mi3-status{% if show_expiring_banner %} is-warning{% elif not has_subscription_access %} is-off{% endif %}">
+                                    {% if not has_subscription_access %}Подписка не активна{% elif show_expiring_banner %}Скоро закончится{% else %}Подписка активна{% endif %}
+                                </span>
+                                {% if has_subscription_access %}<span class="mi3-days">{{ days_left }} дн.</span>{% endif %}
                             </div>
-                            <p class="tg-mini-status-note">
-                                {% if not has_subscription_access %}
-                                    Выберите тариф, чтобы получить доступ к подключению.
-                                {% elif show_not_connected_banner %}
-                                    Осталось установить приложение и добавить подписку.
-                                {% elif show_expiring_banner %}
-                                    Продлите подписку заранее, чтобы доступ не прерывался.
-                                {% else %}
-                                    Доступ работает на подключённых устройствах.
-                                {% endif %}
-                            </p>
+                            <div class="mi3-date">
+                                {% if has_subscription_access %}До {{ user.expire_at|date:"j E Y" }}{% else %}Доступ не активен{% endif %}
+                            </div>
+                            {% if has_subscription_access %}
+                            <div class="mi3-progress" aria-hidden="true"><i id="mi3-progress-fill" style="width:0%"></i></div>
+                            {% endif %}
+                            <div class="mi3-card-foot">
+                                <span><i class="fas fa-infinity" aria-hidden="true"></i>Безлимитный трафик</span>
+                                <span id="mi3-devices-chip" hidden><i class="fas fa-laptop" aria-hidden="true"></i><span id="mi3-devices-count"></span></span>
+                            </div>
                         </section>
 
                         {% if not has_subscription_access %}
@@ -4134,10 +4325,26 @@
                                 Продлить подписку
                             </button>
                         {% else %}
-                            <button type="button" onclick="showTab('setup')" class="tg-mini-primary">
+                            <button type="button" onclick="mi3OpenConnect()" class="tg-mini-primary">
                                 <i class="fas fa-plug" aria-hidden="true"></i>
-                                Подключить VPN
+                                Подключить устройство
                             </button>
+                        {% endif %}
+
+                        {% if has_subscription_access %}
+                        <div class="mi3-tiles" role="group" aria-label="Быстрые действия">
+                            <button type="button" class="mi3-tile" onclick="showTariffs()"><i class="far fa-calendar-plus"></i>Продлить</button>
+                            <button type="button" class="mi3-tile" onclick="mi3OpenDevices()"><i class="fas fa-laptop"></i>Устройства</button>
+                            <button type="button" class="mi3-tile" onclick="showTab('support')"><i class="far fa-comments"></i>Помощь</button>
+                        </div>
+
+                        <section aria-label="Подключённые устройства" id="mi3-connected-block" hidden>
+                            <div class="mi3-section-head">
+                                <h3>Сейчас подключено</h3>
+                                <button type="button" onclick="mi3OpenDevices()">Все устройства</button>
+                            </div>
+                            <div id="mi3-connected-list"></div>
+                        </section>
                         {% endif %}
 
                         <section class="tg-mini-action-list" aria-label="Действия с подпиской">
@@ -4444,6 +4651,50 @@
             </div>
 
             <div id="tab-profile" class="tab-content">
+                <div class="mi3-only-mobile">
+                    <div class="mi3-label" style="text-align:left;margin-top:6px">Реферальная программа</div>
+                    <h1 class="mi3-title" style="font-size:32px;text-align:left">Дарите VPN.<br><b>Получайте дни.</b></h1>
+                    <p class="mi3-sub" style="text-align:left">Приглашайте друзей и получайте до {{ max_referral_bonus_days }} бонусных дней за каждого.</p>
+
+                    <button type="button" class="mi3-device-row" style="margin-top:18px" onclick="mi3OpenBonus()">
+                        <span class="mi3-device-icon"><i class="fas fa-gift"></i></span>
+                        <span class="mi3-device-main"><span class="mi3-device-name">Как начисляются бонусы</span></span>
+                        <i class="fas fa-chevron-right" style="color:rgba(255,255,255,.35)"></i>
+                    </button>
+
+                    <div class="mi3-stat-grid">
+                        <div class="mi3-stat"><span>Приглашено</span><b>{{ ref_invited_count }}</b></div>
+                        <div class="mi3-stat is-green"><span>Активных</span><b>{{ ref_connected_count }}</b></div>
+                        <div class="mi3-stat"><span>Покупок рефералов</span><b>{{ ref_purchased_count }}</b></div>
+                        <div class="mi3-stat is-gold"><span>Получено дней</span><b>+{{ bonus_days }}</b></div>
+                    </div>
+
+                    <div class="mi3-link-card">
+                        <div class="mi3-link-head">
+                            <span class="mi3-device-icon" style="background:rgba(0,136,204,.15);border-color:rgba(0,136,204,.35);color:#4db8ff"><i class="fab fa-telegram-plane"></i></span>
+                            <span><span class="mi3-link-title" style="display:block">Ссылка для Telegram</span><span class="mi3-link-sub">Рекомендуем</span></span>
+                        </div>
+                        <div class="mi3-link-url">{{ referral_link }}</div>
+                        <div class="mi3-link-actions">
+                            <button type="button" class="mi3-link-btn" onclick="openRefShare('tg')"><i class="fas fa-qrcode"></i> QR-код</button>
+                            <button type="button" class="mi3-link-btn is-gold" data-mi3-copy="{{ referral_link|escapejs }}"><i class="far fa-copy"></i> Скопировать</button>
+                        </div>
+                    </div>
+
+                    <div class="mi3-link-card">
+                        <div class="mi3-link-head">
+                            <span class="mi3-device-icon"><i class="fas fa-globe"></i></span>
+                            <span><span class="mi3-link-title" style="display:block">Ссылка на сайт</span><span class="mi3-link-sub">Для браузера</span></span>
+                        </div>
+                        <div class="mi3-link-url">{{ site_referral_link }}</div>
+                        <div class="mi3-link-actions">
+                            <button type="button" class="mi3-link-btn" onclick="openRefShare('site')"><i class="fas fa-qrcode"></i> QR-код</button>
+                            <button type="button" class="mi3-link-btn is-gold" data-mi3-copy="{{ site_referral_link|escapejs }}"><i class="far fa-copy"></i> Скопировать</button>
+                        </div>
+                    </div>
+
+                    <div class="mi3-note"><i class="fas fa-shield-halved"></i> Бонусы начисляются автоматически после выполнения условий.</div>
+                </div>
                 <header class="mb-7 referral-mobile-header">
                     <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Приглашения и бонусы</h1>
                 </header>
@@ -4506,6 +4757,24 @@
             </div>
 
             <div id="tab-support" class="tab-content">
+                <div class="mi3-only-mobile">
+                    <div class="mi3-label" style="text-align:left;margin-top:6px">Поддержка</div>
+                    <h1 class="mi3-title" style="font-size:32px;text-align:left">Мы рядом,<br>если что-то <b>не так</b></h1>
+                    <p class="mi3-sub" style="text-align:left;margin-bottom:20px">Сначала быстрые решения, затем живой оператор — без поиска нужного раздела.</p>
+
+                    <div class="mi3-status-banner">
+                        <span class="st">Все системы работают</span>
+                        <span class="eta">Ответим примерно за 3 минуты</span>
+                    </div>
+
+                    <button type="button" class="mi3-support-row" onclick="openSettingsFaq()">
+                        <i class="far fa-circle-question"></i> Часто задаваемые вопросы <i class="fas fa-chevron-right chev"></i>
+                    </button>
+
+                    <a href="{{ support_telegram_url }}" target="_blank" rel="noopener" class="mi3-sheet-cta" style="text-decoration:none;margin-top:24px">
+                        <i class="far fa-comment"></i> Написать оператору
+                    </a>
+                </div>
                 <header class="mb-8 mobile-compact-header">
                     <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-3">Поддержка</h1>
                     <p class="text-gray-500 text-sm md:text-base font-bold max-w-2xl">
@@ -4524,6 +4793,11 @@
                         <i class="fab fa-telegram-plane mr-2"></i>
                         Написать в поддержку
                     </a>
+                    <button type="button" onclick="openSettingsFaq()" class="tg-mini-action-row mi3-support-faq-row" style="border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.03)">
+                        <i class="far fa-circle-question" aria-hidden="true"></i>
+                        <span class="tg-mini-action-label">Часто задаваемые вопросы</span>
+                        <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
+                    </button>
                 </section>
                 <div class="hidden" data-support-ticket-ui-hidden>
                     {% if support_ticket and support_ticket.status == support_status_open %}
@@ -6444,7 +6718,12 @@
         // по-прежнему форсит мастер для всех (серверный override).
         const forceSetupWizard = {% if use_new_setup_flow %}true{% else %}false{% endif %};
 
+        // Новый флоу подключения живёт в шторках кабинета (mi3*); мастер с
+        // орбом-«крутилкой» скрыт этим флагом, код мастера сохранён целиком.
+        const MI_HIDE_SETUP_WIZARD = true;
+
         function shouldUseSetupWizard() {
+            if (MI_HIDE_SETUP_WIZARD) return false;
             if (forceSetupWizard) return true;
             if (document.body.classList.contains('tg-webapp')) return true;
             const platform = detectNewSetupPlatform();
@@ -7293,12 +7572,13 @@
             const list = document.getElementById('faq-sections-list');
             list.innerHTML = FAQ_DATA.map((section, i) => `
                 <button type="button" onclick="openFaqSection(${i})"
-                        class="settings-item w-full flex items-center justify-between gap-4 px-4 py-5 text-left group">
-                    <span class="min-w-0">
-                        <span class="block text-white font-semibold text-[16px] leading-snug">${section.emoji} ${section.title}</span>
+                        class="settings-item w-full flex items-center gap-4 px-4 py-5 text-left group">
+                    <i class="fas ${section.icon} text-[19px] text-[#ffc700] flex-shrink-0 w-6 text-center"></i>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-white font-semibold text-[16px] leading-snug">${section.title}</span>
                         <span class="block text-gray-500 text-xs font-medium mt-1.5">${section.items.length} ${pluralFaqArticles(section.items.length)}</span>
                     </span>
-                    <i class="fas ${section.icon} text-2xl text-[#ffc700]/50 flex-shrink-0 group-hover:text-[#ffc700]/80 transition-colors"></i>
+                    <i class="fas fa-chevron-right text-sm text-gray-600 flex-shrink-0 group-hover:text-[#ffc700]/70 transition-colors"></i>
                 </button>`).join('');
         }
 
@@ -7856,5 +8136,421 @@
             initReferralTermsSwipe();
         });
     </script>
+
+    <!-- === Кабинет v3: шторки подключения и устройств === -->
+    <div class="mi3-sheet-overlay" id="mi3-overlay" onclick="mi3CloseSheets()"></div>
+
+    <div class="mi3-sheet" id="mi3-connect-sheet" role="dialog" aria-modal="true" aria-label="Подключение устройства">
+        <div class="mi3-sheet-grab" aria-hidden="true"></div>
+        <div class="mi3-sheet-top">
+            <div>
+                <div class="mi3-sheet-kicker" id="mi3-connect-kicker">Шаг 1 из 3</div>
+                <div class="mi3-sheet-title" id="mi3-connect-title">Что подключаем?</div>
+            </div>
+            <button type="button" class="mi3-sheet-close" onclick="mi3CloseSheets()" aria-label="Закрыть"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div id="mi3-connect-body"></div>
+    </div>
+
+    <div class="mi3-sheet" id="mi3-bonus-sheet" role="dialog" aria-modal="true" aria-label="Условия реферальной программы">
+        <div class="mi3-sheet-grab" aria-hidden="true"></div>
+        <div class="mi3-sheet-top">
+            <div>
+                <div class="mi3-sheet-kicker">До {{ max_referral_bonus_days }} дней за друга</div>
+                <div class="mi3-sheet-title">Условия программы</div>
+            </div>
+            <button type="button" class="mi3-sheet-close" onclick="mi3CloseSheets()" aria-label="Закрыть"><i class="fas fa-xmark"></i></button>
+        </div>
+        <div class="mi3-bonus-step">
+            <span class="mi3-bonus-num">1</span>
+            <span>
+                <span class="mi3-bonus-days">+{{ join_referrer_bonus_days }} дн.</span>
+                <span class="mi3-bonus-name" style="display:block">Подключение</span>
+                <span class="mi3-bonus-desc" style="display:block">Друг зарегистрировался и начал пользоваться сервисом</span>
+            </span>
+        </div>
+        <div class="mi3-bonus-step">
+            <span class="mi3-bonus-num">2</span>
+            <span>
+                <span class="mi3-bonus-days">+{{ traffic_referrer_bonus_days }} дн.</span>
+                <span class="mi3-bonus-name" style="display:block">Активность</span>
+                <span class="mi3-bonus-desc" style="display:block">Друг использовал 100 МБ трафика</span>
+            </span>
+        </div>
+        <div class="mi3-bonus-step">
+            <span class="mi3-bonus-num">3</span>
+            <span>
+                <span class="mi3-bonus-days">+{{ purchase_referrer_bonus_days }} дн.</span>
+                <span class="mi3-bonus-name" style="display:block">Покупка</span>
+                <span class="mi3-bonus-desc" style="display:block">Друг оплатил подписку от 1 месяца</span>
+            </span>
+        </div>
+        <button type="button" class="mi3-sheet-cta" onclick="mi3CloseSheets()">Понятно</button>
+    </div>
+
+    <div class="mi3-sheet" id="mi3-devices-sheet" role="dialog" aria-modal="true" aria-label="Устройства подписки">
+        <div class="mi3-sheet-grab" aria-hidden="true"></div>
+        <div class="mi3-sheet-top">
+            <div>
+                <div class="mi3-sheet-kicker">Подписка</div>
+                <div class="mi3-sheet-title">Устройства</div>
+            </div>
+            <button type="button" class="mi3-sheet-close" onclick="mi3CloseSheets()" aria-label="Закрыть"><i class="fas fa-xmark"></i></button>
+        </div>
+        <p class="mi3-sheet-text" id="mi3-devices-note">Устройства, на которых добавлена ваша подписка.</p>
+        <div id="mi3-devices-list"><div class="mi3-empty">Загружаем…</div></div>
+    </div>
+
+    <script>
+    (function mi3Cabinet() {
+        const PLATFORMS = [
+            { key: 'ios', label: 'iPhone / iPad', icon: 'fas fa-mobile-screen' },
+            { key: 'android', label: 'Android', icon: 'fab fa-android' },
+            { key: 'windows', label: 'Windows', icon: 'fab fa-windows' },
+            { key: 'macos', label: 'macOS', icon: 'fab fa-apple' },
+        ];
+        const PLATFORMS_EXTRA = [
+            { key: 'linux', label: 'Linux' },
+            { key: 'androidtv', label: 'Android TV' },
+            { key: 'appletv', label: 'Apple TV' },
+        ];
+        const PLATFORM_ICONS = {
+            ios: 'fas fa-mobile-screen', android: 'fab fa-android', windows: 'fab fa-windows',
+            macos: 'fab fa-apple', linux: 'fab fa-linux', androidtv: 'fas fa-tv', appletv: 'fas fa-tv',
+        };
+
+        let step = 1;
+        let platformKey = null;
+        let appChoice = null; // 'main' | 'incy'
+        let keyShown = false;
+        let devicesCache = null;
+
+        const overlay = document.getElementById('mi3-overlay');
+        const connectSheet = document.getElementById('mi3-connect-sheet');
+        const devicesSheet = document.getElementById('mi3-devices-sheet');
+
+        function esc(v) {
+            return String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+            }[c]));
+        }
+
+        function openSheet(el) {
+            overlay.classList.add('is-open');
+            el.classList.add('is-open');
+            document.body.style.overflow = 'hidden';
+        }
+
+        window.mi3CloseSheets = function () {
+            overlay.classList.remove('is-open');
+            connectSheet.classList.remove('is-open');
+            devicesSheet.classList.remove('is-open');
+            const bonus = document.getElementById('mi3-bonus-sheet');
+            if (bonus) bonus.classList.remove('is-open');
+            document.body.style.overflow = '';
+        };
+
+        function platformLabel(key) {
+            const all = PLATFORMS.concat(PLATFORMS_EXTRA);
+            const item = all.find((x) => x.key === key);
+            return item ? item.label : key;
+        }
+
+        // Happ для Apple-платформ фиксируем отдельно: при apple_recommended_app=incy
+        // существующий код кабинета подменяет newSetupApps.ios/.macos на Incy,
+        // и в каталоге Happ для Apple исчезает.
+        const MI3_APPLE_HAPP = {
+            name: 'Happ',
+            installUrl: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6788279553',
+            subscriptionUrl: '{{ happ_subscription_url }}',
+        };
+
+        function mi3IsApple() { return platformKey === 'ios' || platformKey === 'macos'; }
+        function mi3IncyAvailable() {
+            return mi3IsApple() && appleRecommendedApp === 'incy' && appleSubscriptionUrl;
+        }
+
+        function currentApp() {
+            const cfg = newSetupApps[platformKey];
+            if (!cfg) return null;
+            if (appChoice === 'incy' && mi3IncyAvailable()) {
+                return {
+                    name: 'INCY',
+                    installUrl: platformKey === 'macos' ? INCY_MACOS_ARM_URL : INCY_IOS_APPSTORE_URL,
+                    subscriptionUrl: appleSubscriptionUrl,
+                    copyValue: appleSubscriptionUrl,
+                };
+            }
+            if (appChoice === 'happ' && mi3IsApple()) {
+                return {
+                    name: MI3_APPLE_HAPP.name,
+                    installUrl: MI3_APPLE_HAPP.installUrl,
+                    subscriptionUrl: MI3_APPLE_HAPP.subscriptionUrl,
+                    copyValue: MI3_APPLE_HAPP.subscriptionUrl,
+                };
+            }
+            return {
+                name: cfg.appName,
+                installUrl: cfg.installUrl,
+                fallbackText: cfg.fallbackText,
+                fallbackUrl: cfg.fallbackUrl,
+                subscriptionUrl: cfg.subscriptionUrl,
+                copyValue: cfg.copyValue || cfg.subscriptionUrl,
+            };
+        }
+
+        function renderConnect() {
+            const kicker = document.getElementById('mi3-connect-kicker');
+            const title = document.getElementById('mi3-connect-title');
+            const body = document.getElementById('mi3-connect-body');
+            kicker.textContent = 'Шаг ' + step + ' из 3';
+
+            if (step === 1) {
+                title.textContent = 'Что подключаем?';
+                body.innerHTML = `
+                    <p class="mi3-sheet-text">Покажем только подходящее приложение и короткую инструкцию для выбранного устройства.</p>
+                    <div class="mi3-choice-grid">
+                        ${PLATFORMS.map((pl) => `
+                            <button type="button" class="mi3-choice${platformKey === pl.key ? ' is-active' : ''}" data-mi3-platform="${pl.key}">
+                                <i class="${pl.icon}"></i>${pl.label}
+                            </button>`).join('')}
+                    </div>
+                    <div class="mi3-choice-extra">
+                        ${PLATFORMS_EXTRA.map((pl) => `
+                            <button type="button" class="mi3-choice-mini${platformKey === pl.key ? ' is-active' : ''}" data-mi3-platform="${pl.key}">${pl.label}</button>`).join('')}
+                    </div>
+                    <button type="button" class="mi3-sheet-cta" id="mi3-step1-next" ${platformKey ? '' : 'disabled'}>
+                        Продолжить${platformKey ? ' для ' + esc(platformLabel(platformKey)) : ''} <i class="fas fa-arrow-right"></i>
+                    </button>`;
+                body.querySelectorAll('[data-mi3-platform]').forEach((btn) => {
+                    btn.addEventListener('click', () => { platformKey = btn.dataset.mi3Platform; appChoice = null; renderConnect(); });
+                });
+                const next = document.getElementById('mi3-step1-next');
+                if (next) next.addEventListener('click', () => { if (platformKey) { step = 2; renderConnect(); } });
+                return;
+            }
+
+            if (step === 2) {
+                title.textContent = 'Выберите приложение';
+                const cfg = newSetupApps[platformKey] || {};
+                const options = [];
+                if (mi3IncyAvailable()) {
+                    options.push({ id: 'incy', name: 'INCY', note: 'Рекомендуем для ' + esc(platformLabel(platformKey)) });
+                    options.push({ id: 'happ', name: 'Happ', note: 'Альтернатива для ' + esc(platformLabel(platformKey)) });
+                } else {
+                    options.push({ id: 'main', name: cfg.appName, note: 'Рекомендуемое приложение для ' + esc(cfg.platformLabel || '') });
+                }
+                if (!appChoice) appChoice = options[0].id;
+                body.innerHTML = `
+                    <p class="mi3-sheet-text">Установите приложение, если его ещё нет — подписку добавим на следующем шаге.</p>
+                    ${options.map((o) => `
+                        <button type="button" class="mi3-app-row${appChoice === o.id ? ' is-active' : ''}" data-mi3-app="${o.id}">
+                            <span class="mi3-device-icon"><i class="${PLATFORM_ICONS[platformKey] || 'fas fa-mobile-screen'}"></i></span>
+                            <span class="mi3-device-main">
+                                <span class="mi3-app-name">${esc(o.name)}</span>
+                                <span class="mi3-app-note" style="display:block">${o.note}</span>
+                            </span>
+                            <i class="fas fa-check" style="color:${appChoice === o.id ? '#ffc700' : 'transparent'}"></i>
+                        </button>`).join('')}
+                    <button type="button" class="mi3-sheet-cta is-ghost" id="mi3-install-btn"><i class="fas fa-download"></i> Установить приложение</button>
+                    <button type="button" class="mi3-sheet-cta" id="mi3-step2-next">Продолжить <i class="fas fa-arrow-right"></i></button>`;
+                body.querySelectorAll('[data-mi3-app]').forEach((btn) => {
+                    btn.addEventListener('click', () => { appChoice = btn.dataset.mi3App; renderConnect(); });
+                });
+                document.getElementById('mi3-install-btn').addEventListener('click', () => {
+                    const app = currentApp();
+                    if (app && app.installUrl) window.open(app.installUrl, '_blank', 'noopener');
+                });
+                document.getElementById('mi3-step2-next').addEventListener('click', () => { step = 3; keyShown = false; renderConnect(); });
+                return;
+            }
+
+            title.textContent = 'Добавьте подписку';
+            const app = currentApp();
+            body.innerHTML = `
+                <div class="mi3-summary">
+                    <i class="${PLATFORM_ICONS[platformKey] || 'fas fa-mobile-screen'}"></i>
+                    ${esc(platformLabel(platformKey))} · ${esc(app ? app.name : '')}
+                </div>
+                <p class="mi3-sheet-text" style="font-size:15px;color:rgba(255,255,255,.8)">Нажмите кнопку ниже — откроется ${esc(app ? app.name : 'приложение')}, и подписка добавится в него <b style="color:#fff">автоматически</b>:</p>
+                <a class="mi3-sheet-cta" id="mi3-add-btn" href="${esc(app ? app.subscriptionUrl : '#')}" style="text-decoration:none"><i class="fas fa-bolt"></i> Подключиться в 1 клик</a>
+                <div class="mi3-key-label" style="margin-top:24px">Если не сработало — добавьте вручную</div>
+                <div class="mi3-key-box" style="margin-top:8px">
+                    <div class="mi3-key-label">Ключ подписки</div>
+                    <div class="mi3-key-value" id="mi3-key-value">${esc(app.copyValue)}</div>
+                </div>
+                <button type="button" class="mi3-sheet-cta is-ghost" id="mi3-copy-btn"><i class="far fa-copy"></i> Скопировать ключ</button>
+                <p class="mi3-sheet-text" style="text-align:center;font-size:12.5px">Скопируйте ключ, откройте ${esc(app ? app.name : 'приложение')} и добавьте подписку из буфера обмена.</p>`;
+            document.getElementById('mi3-copy-btn').addEventListener('click', async function () {
+                const value = app.copyValue || '';
+                let ok = false;
+                try { await navigator.clipboard.writeText(value); ok = true; } catch (e) {
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = value; document.body.appendChild(ta); ta.select();
+                        ok = document.execCommand('copy'); ta.remove();
+                    } catch (err) { ok = false; }
+                }
+                this.innerHTML = ok ? '<i class="fas fa-check"></i> Скопировано' : '<i class="far fa-copy"></i> Не удалось — выделите вручную';
+            });
+        }
+
+        window.mi3OpenConnect = function () {
+            step = 1; keyShown = false;
+            renderConnect();
+            openSheet(connectSheet);
+        };
+
+        // --- Устройства ---
+        function deviceTitle(d) {
+            return d.device_model || d.platform || 'Устройство';
+        }
+
+        function deviceMeta(d) {
+            if (!d.updated_at) return { text: d.platform || '', online: false };
+            const diffMin = Math.max(0, Math.round((Date.now() - new Date(d.updated_at).getTime()) / 60000));
+            if (diffMin < 10) return { text: 'В сети сейчас', online: true };
+            if (diffMin < 60) return { text: 'Был в сети ' + diffMin + ' мин назад', online: false };
+            if (diffMin < 60 * 24) return { text: 'Был в сети ' + Math.round(diffMin / 60) + ' ч назад', online: false };
+            return { text: 'Был в сети ' + Math.round(diffMin / 1440) + ' дн назад', online: false };
+        }
+
+        function deviceIcon(d) {
+            const raw = ((d.platform || '') + ' ' + (d.device_model || '') + ' ' + (d.user_agent || '')).toLowerCase();
+            if (/iphone|ipad|ios/.test(raw)) return 'fas fa-mobile-screen';
+            if (/android/.test(raw)) return 'fab fa-android';
+            if (/mac/.test(raw)) return 'fab fa-apple';
+            if (/windows/.test(raw)) return 'fab fa-windows';
+            if (/linux/.test(raw)) return 'fab fa-linux';
+            if (/tv/.test(raw)) return 'fas fa-tv';
+            return 'fas fa-laptop';
+        }
+
+        function updateHomeDevices(data) {
+            const chip = document.getElementById('mi3-devices-chip');
+            const count = document.getElementById('mi3-devices-count');
+            if (chip && count) {
+                const limit = data.limit ? ' из ' + data.limit : '';
+                count.textContent = data.total + limit + ' устройств';
+                chip.hidden = false;
+            }
+            const block = document.getElementById('mi3-connected-block');
+            const list = document.getElementById('mi3-connected-list');
+            if (!block || !list) return;
+            if (!data.devices.length) { block.hidden = true; return; }
+            block.hidden = false;
+            list.innerHTML = data.devices.slice(0, 2).map((d) => {
+                const meta = deviceMeta(d);
+                return `
+                    <div class="mi3-device-row">
+                        <span class="mi3-device-icon"><i class="${deviceIcon(d)}"></i></span>
+                        <span class="mi3-device-main">
+                            <span class="mi3-device-name">${esc(deviceTitle(d))}</span>
+                            <span class="mi3-device-meta${meta.online ? ' is-online' : ''}" style="display:block">${esc(meta.text)}</span>
+                        </span>
+                        <i class="fas fa-chevron-right" style="color:rgba(255,255,255,.35)"></i>
+                    </div>`;
+            }).join('');
+            list.querySelectorAll('.mi3-device-row').forEach((row) => {
+                row.addEventListener('click', () => window.mi3OpenDevices());
+            });
+        }
+
+        function renderDevicesSheet(data) {
+            const list = document.getElementById('mi3-devices-list');
+            const note = document.getElementById('mi3-devices-note');
+            const limit = data.limit ? ' из ' + data.limit : '';
+            note.textContent = data.total
+                ? 'Подключено ' + data.total + limit + ' устройств. Удалите лишнее, чтобы освободить слот.'
+                : 'Пока ни одно устройство не добавило подписку.';
+            if (!data.devices.length) {
+                list.innerHTML = '<div class="mi3-empty">Подключите первое устройство с главного экрана.</div>';
+                return;
+            }
+            list.innerHTML = data.devices.map((d) => {
+                const meta = deviceMeta(d);
+                return `
+                    <div class="mi3-device-row">
+                        <span class="mi3-device-icon"><i class="${deviceIcon(d)}"></i></span>
+                        <span class="mi3-device-main">
+                            <span class="mi3-device-name">${esc(deviceTitle(d))}</span>
+                            <span class="mi3-device-meta${meta.online ? ' is-online' : ''}" style="display:block">${esc(meta.text)}</span>
+                        </span>
+                        <button type="button" class="mi3-device-del" data-mi3-hwid="${esc(d.hwid)}">Удалить</button>
+                    </div>`;
+            }).join('');
+            list.querySelectorAll('.mi3-device-del').forEach((btn) => {
+                btn.addEventListener('click', async function () {
+                    if (!this.classList.contains('is-armed')) {
+                        this.classList.add('is-armed');
+                        this.textContent = 'Точно?';
+                        setTimeout(() => { this.classList.remove('is-armed'); this.textContent = 'Удалить'; }, 3500);
+                        return;
+                    }
+                    this.disabled = true;
+                    this.textContent = '…';
+                    try {
+                        const body = new URLSearchParams({ hwid: this.dataset.mi3Hwid });
+                        const resp = await fetch('/api/cabinet/devices/delete/', {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '',
+                            },
+                            body,
+                        });
+                        const payload = await resp.json();
+                        if (!resp.ok || payload.status !== 'ok') throw new Error(payload.message || 'fail');
+                        devicesCache = payload;
+                        renderDevicesSheet(payload);
+                        updateHomeDevices(payload);
+                    } catch (e) {
+                        this.disabled = false;
+                        this.textContent = 'Ошибка';
+                        setTimeout(() => { this.classList.remove('is-armed'); this.textContent = 'Удалить'; }, 2500);
+                    }
+                });
+            });
+        }
+
+        async function loadDevices() {
+            try {
+                const resp = await fetch('/api/cabinet/devices/', { credentials: 'same-origin' });
+                if (!resp.ok) return null;
+                const payload = await resp.json();
+                if (payload.status !== 'ok') return null;
+                devicesCache = payload;
+                return payload;
+            } catch (e) { return null; }
+        }
+
+        window.mi3OpenDevices = async function () {
+            openSheet(devicesSheet);
+            if (devicesCache) renderDevicesSheet(devicesCache);
+            const data = await loadDevices();
+            if (data) { renderDevicesSheet(data); updateHomeDevices(data); }
+            else if (!devicesCache) {
+                document.getElementById('mi3-devices-list').innerHTML =
+                    '<div class="mi3-empty">Не удалось загрузить устройства. Попробуйте позже.</div>';
+            }
+        };
+
+        // Прогресс подписки: доля оставшегося от года, минимум 4% для видимости
+        (function initProgress() {
+            const fill = document.getElementById('mi3-progress-fill');
+            if (!fill) return;
+            const days = parseInt('{{ days_left|default:0 }}', 10) || 0;
+            const pct = Math.max(4, Math.min(100, Math.round((days / 365) * 100)));
+            requestAnimationFrame(() => { fill.style.width = pct + '%'; });
+        })();
+
+        // Устройства на главной — фоновая загрузка
+        if (document.getElementById('mi3-devices-chip')) {
+            loadDevices().then((data) => { if (data) updateHomeDevices(data); });
+        }
+    })();
+    </script>
+
 </body>
 </html>

@@ -5055,7 +5055,75 @@ html[data-admin-theme="light"] .acq-chart-scroll-hint.is-active strong {
 /* === Мобильный guard (2026-08-19): страница админки никогда не скроллится вбок;
    внутренние scroll-области (сводка источников, таблицы) продолжают свайпаться. === */
 @media (max-width: 760px) {
-    html, body { overflow-x: hidden; }
+    html, body {
+        max-width: 100%;
+        overflow-x: hidden;
+    }
+
+    /* Legacy mobile CSS used overflow:hidden on .main. It hid the right side of
+       analytics cards instead of letting the cards shrink and their dedicated
+       table/chart scrollers handle wide content. */
+    .main {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        overflow: visible;
+    }
+
+    .tab-panel,
+    .subtab-panel,
+    .result-stack,
+    .tab-panel > *,
+    .subtab-panel > * {
+        min-width: 0;
+        max-width: 100%;
+    }
+
+    .panel-header,
+    .panel-header > *,
+    .form-card > *,
+    .modal-card,
+    .modal-header > * {
+        min-width: 0;
+    }
+
+    .admin-title,
+    .admin-subtitle,
+    .modal-title,
+    .modal-subtitle {
+        overflow-wrap: anywhere;
+    }
+
+    .subtabs {
+        max-width: 100%;
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: thin;
+    }
+
+    .subtab {
+        flex: 0 0 auto;
+        width: auto;
+    }
+
+    /* Wide reports remain readable, but can only expand their own scroller —
+       never the page. */
+    .data-table,
+    .payments-board-scroll,
+    .node-traffic-scroll,
+    .node-traffic-table-scroll,
+    .sources-table-scroll,
+    .promo-cohort-table-scroll,
+    .acq-chart-data-scroll,
+    [style*="overflow-x:auto"],
+    [style*="overflow-x: auto"] {
+        width: 100%;
+        max-width: 100%;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+    }
 
     #panel-stats .sources-toolbar-subtitle > span {
         min-width: 0;
@@ -5098,5 +5166,253 @@ html[data-admin-theme="light"] .acq-chart-scroll-hint.is-active strong {
     .censor-probe-row {
         grid-template-columns: minmax(0, 1fr) !important;
         min-width: 0 !important;
+    }
+}
+
+/* === Полная мобильная раскладка аналитики (2026-08-19) === */
+@media (max-width: 760px) {
+    #panel-stats,
+    #panel-stats #stats-result,
+    #panel-stats #cohort-result,
+    #panel-stats #sources-section,
+    #panel-stats .chart-card,
+    #panel-stats .sources-panel,
+    #panel-stats .sources-cards-body,
+    #panel-stats .sources-grid,
+    #panel-stats .analytics-insight-card {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    #panel-stats .sales-chart-head {
+        min-width: 0;
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    #panel-stats .sales-chart-head > div,
+    #panel-stats .sales-chart-title,
+    #panel-stats .sales-chart-subtitle,
+    #panel-stats .sales-chart-note {
+        min-width: 0;
+        max-width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    #panel-stats .sales-chart-title {
+        flex-wrap: wrap;
+    }
+
+    #panel-stats .sales-chart-note {
+        text-align: left;
+    }
+
+    #panel-stats .sales-chart-legend {
+        width: 100%;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr);
+        gap: 7px;
+    }
+
+    #panel-stats .sales-chart-legend-item {
+        width: 100%;
+        overflow-wrap: anywhere;
+    }
+
+    #panel-stats .sales-chart-canvas-wrap {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+        min-height: 280px;
+        overflow-x: auto;
+        overscroll-behavior-x: contain;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    #panel-stats .sales-chart-canvas-wrap canvas {
+        height: 280px;
+    }
+
+    #panel-stats .sources-panel-head {
+        width: 100%;
+        min-width: 0;
+        padding: 12px;
+    }
+
+    #panel-stats .sources-panel-heading,
+    #panel-stats .sources-panel-heading > div,
+    #panel-stats .sources-toolbar-subtitle {
+        width: 100%;
+        min-width: 0;
+    }
+
+    #panel-stats .sources-panel-heading {
+        align-items: flex-start;
+    }
+
+    #panel-stats .sources-toolbar-subtitle {
+        display: grid;
+        justify-items: start;
+    }
+
+    #panel-stats .sources-total-badge {
+        width: fit-content;
+        max-width: 100%;
+        border-radius: 8px;
+        overflow-wrap: anywhere;
+    }
+
+    #panel-stats .sources-summary-scroll {
+        width: 100%;
+        max-width: 100%;
+        overflow: visible;
+    }
+
+    #panel-stats .sources-summary {
+        width: 100%;
+        min-width: 0;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+        padding: 10px;
+    }
+
+    #panel-stats .sources-summary-lead {
+        grid-column: 1 / -1;
+    }
+
+    #panel-stats .sources-summary-item span {
+        overflow: visible;
+        text-overflow: clip;
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
+    #panel-stats .sources-cards-body {
+        padding: 10px;
+    }
+
+    #panel-stats .sources-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #panel-stats .source-card {
+        width: 100%;
+        max-width: 100%;
+        min-width: 0;
+    }
+
+    #panel-stats .source-title,
+    #panel-stats .source-tariff-name {
+        min-width: 0;
+        overflow-wrap: anywhere;
+    }
+
+    #panel-stats .source-actions {
+        width: 100%;
+        justify-content: flex-start;
+    }
+
+    #panel-stats .source-metrics {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    #panel-stats .source-metric {
+        min-width: 0;
+    }
+
+    #panel-stats .analytics-insight-head {
+        min-width: 0;
+        align-items: flex-start;
+        flex-direction: column;
+        padding: 12px;
+    }
+
+    #panel-stats .analytics-insight-heading,
+    #panel-stats .analytics-insight-heading > div {
+        min-width: 0;
+    }
+
+    #panel-stats .analytics-insight-heading h3,
+    #panel-stats .analytics-insight-heading p {
+        overflow-wrap: anywhere;
+    }
+
+    #panel-stats .analytics-insight-total {
+        max-width: 100%;
+        white-space: normal;
+    }
+
+    #panel-stats .analytics-tariff-row {
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 8px;
+    }
+
+    #panel-stats .analytics-tariff-track {
+        grid-column: 1 / -1;
+        grid-row: 2;
+    }
+
+    #panel-stats .analytics-tariff-value {
+        min-width: 0;
+    }
+
+    #source-users-modal .source-users-modal-card {
+        width: 100%;
+        max-width: 100%;
+    }
+
+    #source-users-modal .modal-header {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 34px;
+        gap: 10px;
+        align-items: start;
+        padding: 12px;
+    }
+
+    #source-users-modal .source-modal-heading {
+        grid-column: 1;
+        min-width: 0;
+    }
+
+    #source-users-modal .source-modal-heading > div {
+        min-width: 0;
+    }
+
+    #source-users-modal .modal-title {
+        font-size: 17px;
+    }
+
+    #source-users-modal .modal-close {
+        grid-column: 2;
+        grid-row: 1;
+        width: 34px;
+        height: 34px;
+        margin: 0;
+    }
+
+    #source-users-modal .modal-body {
+        min-width: 0;
+        overflow-x: hidden;
+    }
+}
+
+@media (max-width: 380px) {
+    #panel-stats .source-metrics,
+    #panel-stats .sources-summary {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #panel-stats .sources-summary-lead {
+        grid-column: auto;
+    }
+
+    #source-users-modal .source-user-row {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    #source-users-modal .source-user-identity {
+        grid-column: auto;
     }
 }

@@ -3184,6 +3184,114 @@ def confirm_email(request, token):
     return redirect("dashboard")
 
 
+def _hwid_device_to_dict(device) -> dict:
+    def ts_iso(ts):
+        try:
+            if ts.seconds or ts.nanos:
+                return ts.ToDatetime().isoformat() + "Z"
+        except Exception:
+            pass
+        return None
+
+    return {
+        "hwid": device.hwid,
+        "platform": device.platform or "",
+        "os_version": device.os_version or "",
+        "device_model": device.device_model or "",
+        "user_agent": device.user_agent or "",
+        "created_at": ts_iso(device.created_at),
+        "updated_at": ts_iso(device.updated_at),
+    }
+
+
+def _cabinet_rw_subscription(request):
+    return rwms_client.get_user_by_username(request.user.username)
+
+
+@login_required(login_url="/login/")
+def cabinet_devices(request):
+    """Список HWID-устройств подписки текущего пользователя."""
+    subscription = _cabinet_rw_subscription(request)
+    if subscription is None:
+        return JsonResponse(
+            {"status": "error", "message": "subscription not found"}, status=404
+        )
+
+    limit = (
+        subscription.hwid_device_limit
+        if subscription.HasField("hwid_device_limit")
+        else None
+    )
+
+    resp = rwms_client.get_user_hwid_devices(subscription.uuid)
+    if resp is None:
+        return JsonResponse(
+            {"status": "error", "message": "devices unavailable"}, status=502
+        )
+
+    return JsonResponse(
+        {
+            "status": "ok",
+            "total": resp.total,
+            "limit": limit,
+            "devices": [_hwid_device_to_dict(d) for d in resp.devices],
+        }
+    )
+
+
+@login_required(login_url="/login/")
+def cabinet_device_delete(request):
+    """Удаление одного HWID-устройства из подписки текущего пользователя.
+
+    Удаление строго в рамках uuid собственной подписки пользователя —
+    чужие устройства недостижимы by design.
+    """
+    if request.method != "POST":
+        return JsonResponse(
+            {"status": "error", "message": "method not allowed"}, status=405
+        )
+
+    hwid = (request.POST.get("hwid") or "").strip()
+    if not hwid:
+        return JsonResponse(
+            {"status": "error", "message": "hwid required"}, status=400
+        )
+
+    subscription = _cabinet_rw_subscription(request)
+    if subscription is None:
+        return JsonResponse(
+            {"status": "error", "message": "subscription not found"}, status=404
+        )
+
+    logging.info(
+        "cabinet device delete requested: user_id=%s rw_uuid=%s hwid=%s",
+        request.user.id,
+        subscription.uuid,
+        hwid,
+    )
+
+    resp = rwms_client.delete_user_hwid_device(subscription.uuid, hwid)
+    if resp is None:
+        return JsonResponse(
+            {"status": "error", "message": "delete failed"}, status=502
+        )
+
+    limit = (
+        subscription.hwid_device_limit
+        if subscription.HasField("hwid_device_limit")
+        else None
+    )
+
+    return JsonResponse(
+        {
+            "status": "ok",
+            "total": resp.total,
+            "limit": limit,
+            "devices": [_hwid_device_to_dict(d) for d in resp.devices],
+        }
+    )
+
+
 @login_required(login_url="/login/")
 def create_support_ticket(request):
     if request.method != "POST":
