@@ -3182,7 +3182,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("traffic_referrer_bonus_days", dashboard_source)
         self.assertIn("purchase_referrer_bonus_days", dashboard_source)
 
-    def test_desktop_home_replaces_duplicate_cards_with_payment_history_action(self):
+    def test_desktop_home_uses_inline_devices_without_summary_or_detail_panel(self):
         template = Path("engine/templates/dashboard.html").read_text()
         desktop_home = template[
             template.index('<div class="standard-dashboard-home">'):
@@ -3194,31 +3194,61 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertNotIn("Установка на ваши устройства", desktop_home)
         self.assertNotIn("Помощь в Telegram", desktop_home)
         self.assertNotIn("+40 дней за друга", desktop_home)
-        self.assertIn("home-subscription-actions", desktop_home)
-        self.assertIn("home-payments-btn", desktop_home)
-        self.assertIn("desktop-renewal-card", desktop_home)
+        self.assertNotIn("Кратко", desktop_home)
+        self.assertNotIn("Переподключить", desktop_home)
+        self.assertNotIn("desktop-renewal-card", desktop_home)
+        self.assertNotIn("mi3-desktop-devices-note", desktop_home)
+        self.assertIn("desktop-subscription-card", desktop_home)
+        self.assertIn("desktop-devices-panel", desktop_home)
+        self.assertIn('id="desktop-devices-list"', desktop_home)
+        self.assertIn('data-desktop-device-filter="all"', desktop_home)
+        self.assertIn('onclick="quickAccessInstall()"', desktop_home)
+        self.assertIn('class="desktop-home-actions"', desktop_home)
+        self.assertIn('onclick="quickAccessInstall()" class="desktop-secondary-action"', desktop_home)
+        self.assertIn("Быстрый доступ", desktop_home)
+        self.assertIn('onclick="showTab(\'setup\')" class="desktop-primary-action"', desktop_home)
+        self.assertIn('onclick="showTab(\'setup\')" class="desktop-secondary-action"', desktop_home)
+        self.assertIn("Подключить устройство", desktop_home)
         self.assertIn('onclick="openPaymentsHistorySheet()"', desktop_home)
         self.assertIn("История платежей", desktop_home)
         self.assertIn("fas fa-receipt", desktop_home)
 
-    def test_desktop_home_uses_semantic_tonal_surface_palette(self):
+    def test_mobile_home_uses_white_monkey_face_without_tint(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+        logo_styles = template[
+            template.index(".tg-mini-brand-mark img {"):
+            template.index("}", template.index(".tg-mini-brand-mark img {")) + 1
+        ]
+
+        self.assertIn("{% static 'icons/logo-face-white.png' %}", template)
+        self.assertIn("filter: none;", logo_styles)
+        self.assertNotIn("sepia", logo_styles)
+
+    def test_desktop_home_uses_full_width_compact_surface_palette(self):
         template = Path("engine/templates/dashboard.html").read_text()
 
-        self.assertIn(".standard-dashboard-home .status-overview-card", template)
-        self.assertIn("rgba(255, 178, 0, 0.065)", template)
-        self.assertNotIn("rgba(255, 178, 0, 0.16)", template)
-        self.assertIn(".standard-dashboard-home .status-overview-card::after", template)
-        self.assertIn("feTurbulence", template)
-        self.assertIn("baseFrequency='.78'", template)
-        self.assertIn("mix-blend-mode: screen;", template)
-        self.assertIn("mask-image: radial-gradient(ellipse 58% 118% at 82% 0%", template)
+        self.assertIn(".desktop-cabinet-home", template)
+        self.assertIn("width: min(100%, 1280px);", template)
+        self.assertIn(".desktop-subscription-card", template)
+        self.assertIn(".desktop-devices-panel", template)
+        self.assertIn(".desktop-device-row", template)
+        self.assertIn("grid-template-columns: minmax(0, 1fr) minmax(210px, 0.46fr) auto;", template)
         self.assertIn("linear-gradient(90deg, #35c966, #62df85);", template)
-        self.assertIn(".standard-dashboard-home .desktop-renewal-card", template)
-        self.assertIn("rgba(113, 130, 160, 0.07)", template)
         self.assertIn("rgba(255, 190, 67, 0.18)", template)
         self.assertIn("linear-gradient(105deg, rgba(31, 26, 17, 0.90), rgba(18, 18, 20, 0.92));", template)
-        self.assertIn("body.dashboard-v2 .home-payments-btn i", template)
-        self.assertIn("color: rgba(218, 224, 235, 0.78);", template)
+        self.assertIn(".desktop-quick-actions", template)
+
+    def test_desktop_devices_render_from_existing_api_and_delete_safely(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn("function renderDesktopDevices(data)", template)
+        self.assertIn("function bindDeviceDeleteButtons(root)", template)
+        self.assertIn("data-desktop-device-status", template)
+        self.assertIn("data-mi3-hwid", template)
+        self.assertIn("this.classList.contains('is-armed')", template)
+        self.assertIn("/api/cabinet/devices/delete/", template)
+        self.assertIn("updateHomeDevices(payload)", template)
+        self.assertIn("desktopDeviceFilter === 'online'", template)
 
     def test_mobile_home_uses_compact_state_driven_layout(self):
         template = Path("engine/templates/dashboard.html").read_text()
@@ -3229,7 +3259,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("body.tg-webapp .tg-mini-home", template)
         self.assertIn("{% if not tg_webapp_mode %}", template)
         self.assertIn('<div class="standard-dashboard-home">', template)
-        self.assertIn('class="tg-mini-status-card', template)
+        self.assertIn('class="mi3-card" aria-label="Статус подписки"', template)
         self.assertIn('До {{ user.expire_at|date:"j E Y" }}', template)
         self.assertIn('class="tg-mini-primary"', template)
         self.assertIn("Подключить VPN", template)
@@ -3290,6 +3320,50 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn(".ref-desktop-dialog {\n            display: none;", template)
         self.assertIn("const isDesktop = window.matchMedia('(min-width: 1025px)').matches;", template)
         self.assertIn("content.classList.replace('translate-y-full', 'translate-y-0')", template)
+
+    def test_mobile_referral_copy_buttons_have_click_handler(self):
+        """Кнопки «Скопировать» мобильного экрана рефералов (data-mi3-copy)
+        должны иметь обработчик: раньше его не было и кнопки не кликались."""
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # В HTML-атрибуте работает автоэскейпинг Django; |escapejs здесь
+        # портил ссылку литеральными =-последовательностями.
+        self.assertIn('data-mi3-copy="{{ referral_link }}"', template)
+        self.assertIn('data-mi3-copy="{{ site_referral_link }}"', template)
+        self.assertIn("document.querySelectorAll('[data-mi3-copy]')", template)
+        self.assertIn("navigator.clipboard.writeText(value)", template)
+        # Fallback для webview без clipboard API
+        self.assertIn("document.execCommand('copy')", template)
+
+    def test_connect_sheet_has_back_button(self):
+        """Шторка подключения: назад | прогресс шагов | закрыть, заголовок
+        отдельной строкой (кнопки не смещают его). На шаге 1 «Назад»
+        невидима, но держит место."""
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn('id="mi3-connect-back"', template)
+        self.assertIn('onclick="mi3ConnectBack()"', template)
+        self.assertIn("window.mi3ConnectBack = function ()", template)
+        self.assertIn('class="mi3-sheet-nav"', template)
+        self.assertIn('id="mi3-connect-bars"', template)
+        self.assertIn("back.classList.toggle('is-ghosted', step === 1)", template)
+        self.assertIn("bar.classList.toggle('is-on', i < step)", template)
+        # Заголовок вне flex-строки с кнопками
+        self.assertIn(
+            '<div class="mi3-sheet-title" id="mi3-connect-title">Что подключаем?</div>\n        <div id="mi3-connect-body"></div>',
+            template,
+        )
+
+    def test_faq_back_returns_to_origin_tab(self):
+        """«Назад» из FAQ возвращает на вкладку, с которой FAQ открыли
+        (например, «Поддержка»), а не всегда в «Профиль»."""
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn("let faqReturnTab = 'settings';", template)
+        self.assertIn("faqReturnTab = activeTab ? activeTab.id.replace('tab-', '') : 'settings';", template)
+        self.assertIn("function backFromSettingsFaq()", template)
+        self.assertIn("showTab(faqReturnTab || 'settings');", template)
+        self.assertIn('onclick="backFromSettingsFaq()"', template)
 
     def test_referral_dialog_supports_escape_focus_and_safe_telegram_share(self):
         template = Path("engine/templates/dashboard.html").read_text()
@@ -5870,6 +5944,9 @@ class CabinetDevicesApiTests(_CabTestCase):
             username="hwid_tester", password="x"
         )
         self.client.force_login(self.user)
+        # Кеш панельного fallback-лимита живёт на модуле — сбрасываем,
+        # чтобы тесты не влияли друг на друга.
+        _cab_views._hwid_settings_cache.update({"value": None, "expires_at": 0.0})
 
     def _proto_device(self, hwid="dev-1", model="iPhone 15 Pro"):
         import proto.rwmanager_pb2 as proto
@@ -5910,8 +5987,33 @@ class CabinetDevicesApiTests(_CabTestCase):
         self.assertEqual(payload["devices"][0]["device_model"], "iPhone 15 Pro")
         mocked.assert_called_once_with("rw-uuid-1")
 
-    def test_devices_list_limit_fallback(self):
-        """Без hwid_device_limit в панели кабинет показывает продуктовый лимит."""
+    def test_devices_list_limit_panel_fallback(self):
+        """Без личного hwid_device_limit кабинет показывает глобальный
+        лимит панели (hwidSettings.fallbackDeviceLimit)."""
+        import proto.rwmanager_pb2 as proto
+        from unittest.mock import patch
+
+        sub = proto.UserResponse(uuid="rw-uuid-1", username="hwid_tester")
+        resp_proto = proto.GetUserHwidDevicesResponse(total=0, devices=[])
+        hwid_settings = proto.GetHwidSettingsResponse(
+            enabled=True, fallback_device_limit=25
+        )
+        with patch.object(
+            _cab_views.rwms_client, "get_user_by_username", return_value=sub
+        ), patch.object(
+            _cab_views.rwms_client, "get_user_hwid_devices",
+            return_value=resp_proto,
+        ), patch.object(
+            _cab_views.rwms_client, "get_hwid_settings",
+            return_value=hwid_settings,
+        ):
+            response = self.client.get("/api/cabinet/devices/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["limit"], 25)
+
+    def test_devices_list_limit_product_fallback(self):
+        """Панельные настройки недоступны — остаётся продуктовый лимит."""
         import proto.rwmanager_pb2 as proto
         from unittest.mock import patch
 
@@ -5922,11 +6024,60 @@ class CabinetDevicesApiTests(_CabTestCase):
         ), patch.object(
             _cab_views.rwms_client, "get_user_hwid_devices",
             return_value=resp_proto,
+        ), patch.object(
+            _cab_views.rwms_client, "get_hwid_settings", return_value=None
         ):
             response = self.client.get("/api/cabinet/devices/")
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["limit"], 15)
+
+    def test_devices_list_personal_limit_wins(self):
+        """Личный hwid_device_limit подписки важнее панельного fallback."""
+        import proto.rwmanager_pb2 as proto
+        from unittest.mock import patch
+
+        resp_proto = proto.GetUserHwidDevicesResponse(total=0, devices=[])
+        with patch.object(
+            _cab_views.rwms_client, "get_user_by_username",
+            return_value=self._subscription(limit=5),
+        ), patch.object(
+            _cab_views.rwms_client, "get_user_hwid_devices",
+            return_value=resp_proto,
+        ), patch.object(
+            _cab_views.rwms_client, "get_hwid_settings",
+        ) as settings_mock:
+            response = self.client.get("/api/cabinet/devices/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["limit"], 5)
+        settings_mock.assert_not_called()
+
+    def test_panel_fallback_limit_cached(self):
+        """Fallback-лимит панели кешируется — RWMS дёргается один раз."""
+        import proto.rwmanager_pb2 as proto
+        from unittest.mock import patch
+
+        sub = proto.UserResponse(uuid="rw-uuid-1", username="hwid_tester")
+        resp_proto = proto.GetUserHwidDevicesResponse(total=0, devices=[])
+        hwid_settings = proto.GetHwidSettingsResponse(
+            enabled=True, fallback_device_limit=25
+        )
+        with patch.object(
+            _cab_views.rwms_client, "get_user_by_username", return_value=sub
+        ), patch.object(
+            _cab_views.rwms_client, "get_user_hwid_devices",
+            return_value=resp_proto,
+        ), patch.object(
+            _cab_views.rwms_client, "get_hwid_settings",
+            return_value=hwid_settings,
+        ) as settings_mock:
+            first = self.client.get("/api/cabinet/devices/")
+            second = self.client.get("/api/cabinet/devices/")
+
+        self.assertEqual(first.json()["limit"], 25)
+        self.assertEqual(second.json()["limit"], 25)
+        settings_mock.assert_called_once()
 
     def test_devices_list_no_subscription(self):
         from unittest.mock import patch

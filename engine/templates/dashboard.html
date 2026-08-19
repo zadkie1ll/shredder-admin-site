@@ -2862,7 +2862,7 @@
             width: 36px;
             height: 36px;
             object-fit: cover;
-            filter: sepia(1) saturate(7) hue-rotate(2deg) brightness(1.08);
+            filter: none;
         }
 
         .tg-mini-status-card,
@@ -3229,6 +3229,478 @@
 
             body.dashboard-v2 .home-payments-btn i {
                 color: rgba(218, 224, 235, 0.78);
+            }
+
+            body.dashboard-v2 .desktop-cabinet-home {
+                width: min(100%, 1280px);
+                margin: 0 auto;
+            }
+
+            body.dashboard-v2 .desktop-home-heading {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 24px;
+                margin-bottom: 24px;
+            }
+
+            body.dashboard-v2 .desktop-home-heading h1 {
+                margin: 0 0 6px;
+                color: #fff;
+                font-size: clamp(30px, 3vw, 42px);
+                line-height: 1.05;
+            }
+
+            body.dashboard-v2 .desktop-home-heading p {
+                margin: 0;
+                color: rgba(255, 255, 255, 0.48);
+                font-size: 14px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .desktop-home-actions {
+                display: flex;
+                align-items: center;
+                justify-content: flex-end;
+                gap: 10px;
+                flex: 0 0 auto;
+                flex-wrap: wrap;
+            }
+
+            body.dashboard-v2 .desktop-primary-action,
+            body.dashboard-v2 .desktop-secondary-action {
+                min-height: 44px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 9px;
+                padding: 0 18px;
+                border-radius: 9px;
+                font-size: 13px;
+                line-height: 1;
+                font-weight: 700;
+                white-space: nowrap;
+                transition: transform 0.18s ease, border-color 0.18s ease,
+                    background 0.18s ease, color 0.18s ease;
+            }
+
+            body.dashboard-v2 .desktop-primary-action {
+                border: 1px solid #ffc700;
+                background: #ffc700;
+                color: #090a0f;
+                box-shadow: 0 12px 30px rgba(255, 199, 0, 0.17);
+            }
+
+            body.dashboard-v2 .desktop-secondary-action {
+                border: 1px solid rgba(204, 213, 228, 0.18);
+                background: rgba(20, 23, 30, 0.86);
+                color: rgba(255, 255, 255, 0.88);
+            }
+
+            body.dashboard-v2 .desktop-primary-action:hover,
+            body.dashboard-v2 .desktop-secondary-action:hover {
+                transform: translateY(-1px);
+            }
+
+            body.dashboard-v2 .desktop-secondary-action:hover {
+                border-color: rgba(255, 199, 0, 0.48);
+                color: #ffc700;
+            }
+
+            body.dashboard-v2 .desktop-primary-action:focus-visible,
+            body.dashboard-v2 .desktop-secondary-action:focus-visible,
+            body.dashboard-v2 .desktop-device-filter:focus-visible,
+            body.dashboard-v2 .desktop-device-delete:focus-visible,
+            body.dashboard-v2 .desktop-quick-action:focus-visible {
+                outline: 2px solid rgba(255, 199, 0, 0.82);
+                outline-offset: 3px;
+            }
+
+            body.dashboard-v2 .desktop-cabinet-stack {
+                display: grid;
+                gap: 18px;
+            }
+
+            body.dashboard-v2 .desktop-notice {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 20px;
+                padding: 16px 18px;
+                border: 1px solid rgba(255, 199, 0, 0.22);
+                border-radius: 12px;
+                background: rgba(255, 199, 0, 0.055);
+            }
+
+            body.dashboard-v2 .desktop-notice-copy {
+                display: flex;
+                align-items: center;
+                gap: 13px;
+                min-width: 0;
+            }
+
+            body.dashboard-v2 .desktop-notice-copy > i {
+                color: #ffc700;
+                font-size: 18px;
+            }
+
+            body.dashboard-v2 .desktop-notice-copy strong,
+            body.dashboard-v2 .desktop-notice-copy span {
+                display: block;
+            }
+
+            body.dashboard-v2 .desktop-notice-copy strong {
+                margin-bottom: 3px;
+                color: #fff;
+                font-size: 14px;
+            }
+
+            body.dashboard-v2 .desktop-notice-copy span {
+                color: rgba(255, 255, 255, 0.48);
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .desktop-subscription-card,
+            body.dashboard-v2 .desktop-devices-panel {
+                overflow: hidden;
+                border: 1px solid rgba(199, 209, 226, 0.15);
+                border-radius: 16px;
+                background:
+                    radial-gradient(circle at 88% 0%, rgba(255, 190, 35, 0.055), transparent 24rem),
+                    linear-gradient(135deg, rgba(20, 22, 29, 0.98), rgba(12, 14, 19, 0.98));
+                box-shadow: 0 24px 58px rgba(0, 0, 0, 0.30);
+            }
+
+            body.dashboard-v2 .desktop-subscription-card {
+                padding: 24px;
+            }
+
+            body.dashboard-v2 .desktop-subscription-main,
+            body.dashboard-v2 .desktop-subscription-footer {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 24px;
+            }
+
+            body.dashboard-v2 .desktop-subscription-status {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+                margin-bottom: 12px;
+                color: #52df8e;
+                font-size: 12px;
+                font-weight: 700;
+                letter-spacing: 0.03em;
+                text-transform: uppercase;
+            }
+
+            body.dashboard-v2 .desktop-subscription-status.is-warning {
+                color: #ffbd4a;
+            }
+
+            body.dashboard-v2 .desktop-subscription-status.is-off {
+                color: #ff7186;
+            }
+
+            body.dashboard-v2 .desktop-subscription-status::before {
+                content: "";
+                width: 8px;
+                height: 8px;
+                border-radius: 999px;
+                background: currentColor;
+                box-shadow: 0 0 14px currentColor;
+            }
+
+            body.dashboard-v2 .desktop-subscription-title {
+                display: flex;
+                align-items: baseline;
+                gap: 12px;
+                flex-wrap: wrap;
+            }
+
+            body.dashboard-v2 .desktop-subscription-title h2 {
+                margin: 0;
+                color: #fff;
+                font-size: 30px;
+                line-height: 1.1;
+            }
+
+            body.dashboard-v2 .desktop-subscription-title > span {
+                color: rgba(255, 255, 255, 0.48);
+                font-size: 14px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .desktop-subscription-track {
+                height: 5px;
+                margin: 22px 0 18px;
+                overflow: hidden;
+                border-radius: 999px;
+                background: rgba(91, 104, 126, 0.18);
+            }
+
+            body.dashboard-v2 .desktop-subscription-track .status-progress-bar {
+                background: linear-gradient(90deg, #35c966, #62df85);
+                box-shadow: 0 0 18px rgba(69, 221, 121, 0.24);
+            }
+
+            body.dashboard-v2 .desktop-subscription-footer {
+                color: rgba(255, 255, 255, 0.48);
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .desktop-subscription-footer strong {
+                color: #fff;
+                font-weight: 700;
+            }
+
+            body.dashboard-v2 .desktop-subscription-footer-actions {
+                display: flex;
+                align-items: center;
+                gap: 10px;
+            }
+
+            body.dashboard-v2 .desktop-devices-header {
+                display: flex;
+                align-items: center;
+                justify-content: space-between;
+                gap: 20px;
+                padding: 22px 24px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+            }
+
+            body.dashboard-v2 .desktop-devices-header h2 {
+                margin: 0 0 5px;
+                color: #fff;
+                font-size: 22px;
+            }
+
+            body.dashboard-v2 .desktop-devices-header p {
+                margin: 0;
+                color: rgba(255, 255, 255, 0.46);
+                font-size: 13px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .desktop-device-filters {
+                display: flex;
+                align-items: center;
+                gap: 8px;
+                padding: 14px 24px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.075);
+                background: rgba(255, 255, 255, 0.012);
+            }
+
+            body.dashboard-v2 .desktop-device-filter {
+                min-height: 34px;
+                padding: 0 13px;
+                border: 1px solid rgba(196, 207, 224, 0.16);
+                border-radius: 8px;
+                background: transparent;
+                color: rgba(255, 255, 255, 0.60);
+                font-size: 12px;
+                font-weight: 600;
+            }
+
+            body.dashboard-v2 .desktop-device-filter[aria-pressed="true"] {
+                border-color: rgba(255, 199, 0, 0.48);
+                background: rgba(255, 199, 0, 0.095);
+                color: #ffc700;
+            }
+
+            body.dashboard-v2 .desktop-device-list {
+                min-height: 86px;
+            }
+
+            body.dashboard-v2 .desktop-device-row {
+                display: grid;
+                grid-template-columns: minmax(0, 1fr) minmax(210px, 0.46fr) auto;
+                align-items: center;
+                gap: 22px;
+                min-height: 82px;
+                padding: 15px 24px;
+                border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            }
+
+            body.dashboard-v2 .desktop-device-row:last-child {
+                border-bottom: 0;
+            }
+
+            body.dashboard-v2 .desktop-device-main {
+                display: flex;
+                align-items: center;
+                gap: 14px;
+                min-width: 0;
+            }
+
+            body.dashboard-v2 .desktop-device-icon {
+                width: 42px;
+                height: 42px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                flex: 0 0 auto;
+                border: 1px solid rgba(255, 199, 0, 0.16);
+                border-radius: 10px;
+                background: rgba(255, 199, 0, 0.08);
+                color: #ffc700;
+                font-size: 16px;
+            }
+
+            body.dashboard-v2 .desktop-device-copy {
+                min-width: 0;
+            }
+
+            body.dashboard-v2 .desktop-device-copy strong,
+            body.dashboard-v2 .desktop-device-copy span {
+                display: block;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            body.dashboard-v2 .desktop-device-copy strong {
+                margin-bottom: 4px;
+                color: #fff;
+                font-size: 14px;
+            }
+
+            body.dashboard-v2 .desktop-device-copy span,
+            body.dashboard-v2 .desktop-device-state {
+                color: rgba(255, 255, 255, 0.46);
+                font-size: 12px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .desktop-device-state {
+                display: inline-flex;
+                align-items: center;
+                gap: 8px;
+            }
+
+            body.dashboard-v2 .desktop-device-state::before {
+                content: "";
+                width: 7px;
+                height: 7px;
+                border-radius: 999px;
+                background: rgba(255, 255, 255, 0.28);
+            }
+
+            body.dashboard-v2 .desktop-device-state.is-online {
+                color: #52df8e;
+            }
+
+            body.dashboard-v2 .desktop-device-state.is-online::before {
+                background: currentColor;
+                box-shadow: 0 0 12px rgba(82, 223, 142, 0.54);
+            }
+
+            body.dashboard-v2 .desktop-device-delete {
+                min-height: 36px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                gap: 7px;
+                padding: 0 12px;
+                border: 1px solid rgba(255, 255, 255, 0.12);
+                border-radius: 8px;
+                background: transparent;
+                color: rgba(255, 255, 255, 0.52);
+                font-size: 12px;
+                font-weight: 600;
+            }
+
+            body.dashboard-v2 .desktop-device-delete:hover,
+            body.dashboard-v2 .desktop-device-delete.is-armed {
+                border-color: rgba(255, 92, 117, 0.48);
+                background: rgba(255, 92, 117, 0.07);
+                color: #ff7186;
+            }
+
+            body.dashboard-v2 .desktop-device-delete:disabled {
+                cursor: wait;
+                opacity: 0.58;
+            }
+
+            body.dashboard-v2 .desktop-devices-empty {
+                padding: 26px 24px;
+                color: rgba(255, 255, 255, 0.46);
+                font-size: 13px;
+                font-weight: 500;
+                text-align: center;
+            }
+
+            body.dashboard-v2 .desktop-quick-actions {
+                display: grid;
+                grid-template-columns: repeat(3, minmax(0, 1fr));
+                gap: 12px;
+            }
+
+            body.dashboard-v2 .desktop-quick-action {
+                display: grid;
+                grid-template-columns: 40px minmax(0, 1fr) auto;
+                align-items: center;
+                gap: 12px;
+                min-height: 76px;
+                padding: 14px 16px;
+                border: 1px solid rgba(198, 209, 226, 0.13);
+                border-radius: 12px;
+                background: rgba(18, 20, 27, 0.86);
+                color: #fff;
+                text-align: left;
+                transition: transform 0.18s ease, border-color 0.18s ease,
+                    background 0.18s ease;
+            }
+
+            body.dashboard-v2 .desktop-quick-action:hover {
+                transform: translateY(-1px);
+                border-color: rgba(255, 199, 0, 0.32);
+                background: rgba(24, 25, 30, 0.94);
+            }
+
+            body.dashboard-v2 .desktop-quick-action-icon {
+                width: 40px;
+                height: 40px;
+                display: inline-flex;
+                align-items: center;
+                justify-content: center;
+                border-radius: 10px;
+                background: rgba(255, 199, 0, 0.08);
+                color: #ffc700;
+            }
+
+            body.dashboard-v2 .desktop-quick-action strong,
+            body.dashboard-v2 .desktop-quick-action small {
+                display: block;
+            }
+
+            body.dashboard-v2 .desktop-quick-action strong {
+                margin-bottom: 4px;
+                font-size: 13px;
+            }
+
+            body.dashboard-v2 .desktop-quick-action small {
+                color: rgba(255, 255, 255, 0.44);
+                font-size: 11px;
+                font-weight: 500;
+            }
+
+            body.dashboard-v2 .desktop-quick-action > i {
+                color: rgba(255, 255, 255, 0.32);
+                font-size: 11px;
+            }
+
+            @media (max-width: 1240px) {
+                body.dashboard-v2 .desktop-quick-actions {
+                    grid-template-columns: 1fr;
+                }
+
+                body.dashboard-v2 .desktop-device-row {
+                    grid-template-columns: minmax(0, 1fr) minmax(180px, 0.46fr) auto;
+                }
             }
 
             body.dashboard-v2 .standard-dashboard-home .status-overview-card {
@@ -4092,6 +4564,20 @@
             flex: 0 0 auto; width: 40px; height: 40px; border-radius: 50%; border: 0;
             background: rgba(255,255,255,.08); color: #fff; font-size: 15px; cursor: pointer;
         }
+        /* Шапка мастера подключения: назад | прогресс шагов | закрыть.
+           Заголовок идёт отдельной строкой и не смещается кнопками. */
+        .mi3-sheet-nav { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .mi3-sheet-nav .mi3-sheet-close {
+            width: 44px; height: 44px; border-radius: 16px;
+            border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.06);
+        }
+        #mi3-connect-back.is-ghosted { visibility: hidden; pointer-events: none; }
+        .mi3-sheet-progress { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; gap: 9px; }
+        .mi3-step-bars { display: flex; gap: 8px; width: 100%; max-width: 210px; }
+        .mi3-step-bars span { flex: 1; height: 4px; border-radius: 100px; background: rgba(255,255,255,.14); }
+        .mi3-step-bars span.is-on { background: #ffc700; }
+        .mi3-sheet-nav .mi3-sheet-kicker { margin-bottom: 0; color: rgba(255,255,255,.5); }
+        #mi3-connect-sheet .mi3-sheet-title { margin-top: 20px; }
         .mi3-sheet-text { margin-top: 10px; font-size: 14px; line-height: 1.55; color: rgba(255,255,255,.55); }
         .mi3-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 10px; margin-top: 18px; }
         .mi3-choice {
@@ -4396,192 +4882,149 @@
                     </div>
                     {% if not tg_webapp_mode %}
                     <div class="standard-dashboard-home">
-                    <header class="mb-10">
-                        {% if not has_subscription_access %}
-                            <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Нет активной подписки</h1>
-                            <p class="text-gray-500 text-sm md:text-base font-bold">Выберите тариф, оплатите доступ и мы сразу откроем ключи подключения.</p>
-                        {% elif show_not_connected_banner %}
-                            <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Подключитесь к серверу</h1>
-                            <p class="text-gray-500 text-sm md:text-base font-bold">Подписка готова, осталось добавить ее в приложение</p>
+                    <div class="desktop-cabinet-home">
+                    <header class="desktop-home-heading">
+                        <div>
+                            {% if not has_subscription_access %}
+                                <h1>Нет активной подписки</h1>
+                                <p>Оформите доступ — ключи и инструкции появятся в этом кабинете.</p>
+                            {% elif show_not_connected_banner %}
+                                <h1>Подписка готова</h1>
+                                <p>Подключите первое устройство и включите VPN в приложении.</p>
+                            {% else %}
+                                <h1>Привет!</h1>
+                                <p>Подписка и устройства — на одном экране.</p>
+                            {% endif %}
+                        </div>
+                        {% if has_subscription_access %}
+                            <div class="desktop-home-actions">
+                                <button type="button" onclick="quickAccessInstall()" class="desktop-secondary-action">
+                                    <i class="fas fa-bolt" aria-hidden="true"></i>
+                                    Быстрый доступ
+                                </button>
+                                <button type="button" onclick="showTab('setup')" class="desktop-primary-action">
+                                    <i class="fas fa-plus" aria-hidden="true"></i>
+                                    Подключить устройство
+                                </button>
+                            </div>
                         {% else %}
-                            <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Привет!</h1>
-                            <p class="text-gray-500 text-sm md:text-base font-bold">Управление вашей подпиской</p>
+                            <button type="button" onclick="showTariffs()" class="desktop-primary-action">
+                                Купить подписку
+                            </button>
                         {% endif %}
                     </header>
 
-                    <button type="button" onclick="quickAccessInstall()" class="quick-access-btn tg-webapp-hide inline-flex items-center gap-2 mb-8 hover:brightness-105 active:scale-95 transition">
-                        <i class="fas fa-bolt"></i> Быстрый доступ
-                    </button>
-
-                    {% if has_subscription_access %}
-                    <section class="mb-8 max-w-2xl rounded-2xl border border-white/10 bg-white/[0.04] p-5 flex items-center justify-between gap-4" aria-label="Устройства подписки">
-                        <div class="flex items-center gap-4 min-w-0">
-                            <div class="w-11 h-11 flex-shrink-0 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/25 text-[#ffc700] flex items-center justify-center">
-                                <i class="fas fa-laptop"></i>
-                            </div>
-                            <div class="min-w-0">
-                                <div class="font-black">Устройства</div>
-                                <div class="text-gray-500 text-sm font-bold truncate" id="mi3-desktop-devices-note">Подключение и удаление устройств подписки</div>
-                            </div>
-                        </div>
-                        <button type="button" onclick="mi3OpenDevices()" class="flex-shrink-0 px-5 py-3 rounded-xl border border-white/15 font-bold text-sm hover:border-[#ffc700]/50 hover:text-[#ffc700] transition">
-                            Управлять
-                        </button>
-                    </section>
-                    {% endif %}
-
-                    <div class="overview-grid space-y-7">
-                        {% if show_not_connected_banner %}
-                            <section class="setup-shell p-6 md:p-8 border border-[#00ff88]/30 bg-[#00ff88]/5">
-                                <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-7">
-                                    <div class="flex items-start gap-4">
-                                        <div class="w-12 h-12 rounded-2xl bg-[#00ff88]/10 flex items-center justify-center text-[#00ff88] flex-shrink-0">
-                                            <i class="fas fa-bolt text-lg"></i>
-                                        </div>
-                                        <div>
-                                            <h3 class="text-xl md:text-2xl font-black mb-3">Начните с подключения</h3>
-                                            <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-2xl">Выберите устройство, установите приложение и нажмите кнопку добавления подписки. После этого VPN можно включить в приложении.</p>
-                                            <div class="mt-5 flex flex-col sm:flex-row gap-x-6 gap-y-2 text-sm font-black text-white">
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-[#00ff88]">1.</span>
-                                                    <span>Выберите устройство</span>
-                                                </div>
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-[#00ff88]">2.</span>
-                                                    <span>Установите приложение</span>
-                                                </div>
-                                                <div class="flex items-center gap-2">
-                                                    <span class="text-[#00ff88]">3.</span>
-                                                    <span>Добавьте подписку</span>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button type="button" onclick="showTab('setup')" class="setup-cta-btn dashboard-action-btn !w-full lg:!w-auto !whitespace-nowrap !mb-0 !mr-0">
-                                        Подключить VPN
-                                    </button>
-                                </div>
-                            </section>
-                        {% endif %}
-
+                    <div class="desktop-cabinet-stack">
                         {% if show_telegram_bind_banner and has_subscription_access %}
-                            <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-[#ffc700]/40 bg-[#ffc700]/5">
-                                <div class="flex items-start gap-4">
-                                    <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 flex items-center justify-center text-[#ffc700] flex-shrink-0">
-                                        <i class="fab fa-telegram text-xl"></i>
-                                    </div>
+                            <section class="desktop-notice">
+                                <div class="desktop-notice-copy">
+                                    <i class="fab fa-telegram" aria-hidden="true"></i>
                                     <div>
-                                        <h3 class="text-lg font-black mb-2">Привяжите Telegram и получите +7 дней</h3>
-                                        <p class="text-gray-500 text-sm font-bold leading-relaxed">Добавим 7 дней к подписке, напомним о продлении и поможем с подключением, если что-то пойдет не так.</p>
+                                        <strong>Привяжите Telegram и получите +7 дней</strong>
+                                        <span>Добавим дни к подписке и напомним о продлении.</span>
                                     </div>
                                 </div>
-                                <a href="{{ tg_bind_link }}" class="setup-link-btn dashboard-action-btn !w-full md:!w-auto !whitespace-nowrap !mb-0 !mr-0">
+                                <a href="{{ tg_bind_link }}" class="desktop-secondary-action">
                                     Забрать +7 дней
                                 </a>
                             </section>
                         {% endif %}
 
                         {% if show_email_bind_banner and has_subscription_access %}
-                            <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-[#ffc700]/40 bg-[#ffc700]/5">
-                                <div class="flex items-start gap-4">
-                                    <div class="w-12 h-12 rounded-2xl bg-[#ffc700]/10 flex items-center justify-center text-[#ffc700] flex-shrink-0">
-                                        <i class="fas fa-envelope text-lg"></i>
-                                    </div>
+                            <section class="desktop-notice">
+                                <div class="desktop-notice-copy">
+                                    <i class="fas fa-envelope" aria-hidden="true"></i>
                                     <div>
-                                        <h3 class="text-lg font-black mb-2">Привяжите email, чтобы не потерять доступ</h3>
-                                        <p class="text-gray-500 text-sm font-bold leading-relaxed">Почта поможет не потерять доступ к подписке, получать письма об оплате и быстро входить в кабинет без Telegram.</p>
+                                        <strong>Привяжите email, чтобы не потерять доступ</strong>
+                                        <span>Почта пригодится для входа и уведомлений об оплате.</span>
                                     </div>
                                 </div>
-                                <button type="button" onclick="openEmailBindSheet()" class="setup-link-btn dashboard-action-btn !w-full md:!w-auto !whitespace-nowrap !mb-0 !mr-0">
+                                <button type="button" onclick="openEmailBindSheet()" class="desktop-secondary-action">
                                     Привязать email
                                 </button>
                             </section>
                         {% endif %}
 
-                        {% if show_expiring_banner %}
-                            <section class="setup-shell p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5 border border-red-400/30 bg-red-400/5">
-                                <div class="flex items-start gap-4">
-                                    <div class="w-12 h-12 rounded-2xl bg-red-400/10 flex items-center justify-center text-red-400 flex-shrink-0">
-                                        <i class="fas fa-hourglass-half text-lg"></i>
-                                    </div>
+                        <section class="desktop-subscription-card" aria-label="Состояние подписки">
+                            {% if not has_subscription_access %}
+                                <div class="desktop-subscription-main">
                                     <div>
-                                        <h3 class="text-lg font-black mb-2">Подписка скоро закончится</h3>
-                                        <p class="text-gray-500 text-sm font-bold leading-relaxed">Осталось {{ time_left_value }} {{ time_left_label }}. Продлите доступ заранее, чтобы VPN не отключился в неподходящий момент.</p>
+                                        <span class="desktop-subscription-status is-off">Подписка не активна</span>
+                                        <div class="desktop-subscription-title">
+                                            <h2>Доступ не оплачен</h2>
+                                            <span>Ключи откроются сразу после оплаты</span>
+                                        </div>
                                     </div>
-                                </div>
-                                <div class="home-subscription-actions w-full md:w-auto">
-                                    <button type="button" onclick="openPaymentsHistorySheet()" class="home-payments-btn w-full sm:w-auto">
-                                        <i class="fas fa-receipt" aria-hidden="true"></i>
-                                        История платежей
+                                    <button type="button" onclick="showTariffs()" class="desktop-primary-action">
+                                        Купить подписку
                                     </button>
-                                    <button type="button" onclick="showTariffs()" class="setup-cta-btn dashboard-action-btn !w-full sm:!w-auto !mb-0 !mr-0">
+                                </div>
+                            {% else %}
+                                <div class="desktop-subscription-main">
+                                    <div>
+                                        <span class="desktop-subscription-status{% if show_expiring_banner %} is-warning{% endif %}">
+                                            {% if show_expiring_banner %}Скоро закончится{% else %}Подписка активна{% endif %}
+                                        </span>
+                                        <div class="desktop-subscription-title">
+                                            <h2>
+                                                <span id="days-left-count" data-seconds-left="{{ seconds_left|floatformat:0 }}" data-time-left-value="{{ time_left_value }}" data-time-left-label="{{ time_left_label }}">—</span>
+                                                {{ time_left_unit }} доступа
+                                            </h2>
+                                            <span>до {{ user.expire_at|date:"d.m.Y" }}</span>
+                                        </div>
+                                    </div>
+                                    <button type="button" onclick="showTariffs()" class="desktop-primary-action">
+                                        <i class="fas fa-rotate" aria-hidden="true"></i>
                                         Продлить
                                     </button>
                                 </div>
-                            </section>
-                        {% endif %}
-
-                        <section class="setup-shell status-overview-card">
-                            <div class="relative z-10 flex flex-col gap-7">
-                                {% if not has_subscription_access %}
-                                    <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-5">
-                                        <div>
-                                            <p class="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-3">Подписка</p>
-                                            <h2 class="text-3xl font-black mb-3">Доступ не оплачен</h2>
-                                            <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-xl">Оформите подписку, и в кабинете появятся ключи, инструкции для устройств и поддержка.</p>
-                                        </div>
-                                        <button type="button" onclick="showTariffs()" class="setup-cta-btn dashboard-action-btn !w-full md:!w-auto !mb-0 !mr-0">
-                                            Купить подписку
+                                <div class="desktop-subscription-track">
+                                    <div id="subscription-progress-bar" class="status-progress-bar"></div>
+                                </div>
+                                <div class="desktop-subscription-footer">
+                                    <span>
+                                        Автопродление:
+                                        {% if has_recurrent %}
+                                            <strong style="color:#52df8e">включено</strong>
+                                        {% else %}
+                                            <strong>не подключено</strong>
+                                        {% endif %}
+                                    </span>
+                                    <div class="desktop-subscription-footer-actions">
+                                        <button type="button" onclick="openPaymentsHistorySheet()" class="desktop-secondary-action">
+                                            <i class="fas fa-receipt" aria-hidden="true"></i>
+                                            История платежей
                                         </button>
                                     </div>
-                                {% else %}
-                                    <div>
-                                        <p class="text-gray-500 text-[11px] font-black uppercase tracking-[0.2em] mb-4">Подписка</p>
-                                        <div class="flex items-baseline gap-2.5 mb-3">
-                                            <span id="days-left-count" data-seconds-left="{{ seconds_left|floatformat:0 }}" data-time-left-value="{{ time_left_value }}" data-time-left-label="{{ time_left_label }}" class="text-6xl font-black leading-none text-white">—</span>
-                                            <span class="text-3xl font-black leading-none text-white">{{ time_left_unit }}</span>
-                                        </div>
-                                        <div class="flex items-center gap-2 text-[#00ff88] text-base font-black">
-                                            <span class="w-2.5 h-2.5 rounded-full bg-[#00ff88] flex-shrink-0"></span>
-                                            Активна до {{ user.expire_at|date:"d.m.Y" }}
-                                        </div>
-                                    </div>
-
-                                    <div class="status-progress-track">
-                                        <div id="subscription-progress-bar" class="status-progress-bar"></div>
-                                    </div>
-
-                                    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                                        <div class="text-gray-500 text-sm font-bold">
-                                            Автопродление:
-                                            {% if has_recurrent %}
-                                                <span class="text-[#00ff88]">включено</span>
-                                            {% else %}
-                                                <span class="text-white">не подключено</span>
-                                            {% endif %}
-                                        </div>
-                                        <button type="button" onclick="showTab('setup')" class="setup-cta-btn dashboard-action-btn !w-full sm:!w-auto !mb-0 !mr-0">
-                                            <i class="fas fa-plug"></i> Подключить VPN
-                                        </button>
-                                    </div>
-                                {% endif %}
-                            </div>
+                                </div>
+                            {% endif %}
                         </section>
 
-                        {% if not show_expiring_banner and not show_not_connected_banner and seconds_left > 0 %}
-                            <section class="setup-shell desktop-renewal-card p-6 md:p-8 flex flex-col md:flex-row md:items-center md:justify-between gap-5">
-                                <div>
-                                    <h3 class="text-lg font-black mb-2">Продлить подписку</h3>
-                                    <p class="text-gray-500 text-sm font-bold">Выберите новый тариф или добавьте дней к текущей подписке.</p>
+                        {% if has_subscription_access %}
+                            <section class="desktop-devices-panel" aria-labelledby="desktop-devices-title">
+                                <header class="desktop-devices-header">
+                                    <div>
+                                        <h2 id="desktop-devices-title">Мои устройства</h2>
+                                        <p id="desktop-devices-note">Загружаем подключённые устройства…</p>
+                                    </div>
+                                    <button type="button" onclick="showTab('setup')" class="desktop-secondary-action">
+                                        <i class="fas fa-plus" aria-hidden="true"></i>
+                                        Добавить
+                                    </button>
+                                </header>
+                                <div class="desktop-device-filters" role="group" aria-label="Фильтр устройств">
+                                    <button type="button" class="desktop-device-filter" data-desktop-device-filter="all" aria-pressed="true">
+                                        Все <span id="desktop-devices-all-count">0</span>
+                                    </button>
+                                    <button type="button" class="desktop-device-filter" data-desktop-device-filter="online" aria-pressed="false">
+                                        Активные <span id="desktop-devices-online-count">0</span>
+                                    </button>
+                                    <button type="button" class="desktop-device-filter" data-desktop-device-filter="idle" aria-pressed="false">
+                                        Неактивные <span id="desktop-devices-idle-count">0</span>
+                                    </button>
                                 </div>
-                                <div class="home-subscription-actions w-full md:w-auto">
-                                    <button type="button" onclick="openPaymentsHistorySheet()" class="home-payments-btn w-full sm:w-auto">
-                                        <i class="fas fa-receipt" aria-hidden="true"></i>
-                                        История платежей
-                                    </button>
-                                    <button type="button" onclick="showTariffs()" class="setup-cta-btn dashboard-action-btn !w-full sm:!w-auto !mb-0 !mr-0">
-                                        Продлить
-                                    </button>
+                                <div id="desktop-devices-list" class="desktop-device-list" aria-live="polite">
+                                    <div class="desktop-devices-empty">Загружаем устройства…</div>
                                 </div>
                             </section>
                         {% endif %}
@@ -4600,6 +5043,34 @@
                             </button>
                         </section>
 
+                        <section class="desktop-quick-actions" aria-label="Быстрые действия">
+                            <button type="button" class="desktop-quick-action" onclick="showTab('setup')">
+                                <span class="desktop-quick-action-icon"><i class="fas fa-bolt" aria-hidden="true"></i></span>
+                                <span>
+                                    <strong>Установить VPN</strong>
+                                    <small>Инструкция для любого устройства</small>
+                                </span>
+                                <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                            </button>
+                            <button type="button" class="desktop-quick-action" onclick="showTab('support')">
+                                <span class="desktop-quick-action-icon"><i class="fas fa-headset" aria-hidden="true"></i></span>
+                                <span>
+                                    <strong>Поддержка</strong>
+                                    <small>Ответим и поможем подключиться</small>
+                                </span>
+                                <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                            </button>
+                            <button type="button" class="desktop-quick-action" onclick="openSettingsFaq()">
+                                <span class="desktop-quick-action-icon"><i class="far fa-circle-question" aria-hidden="true"></i></span>
+                                <span>
+                                    <strong>Частые вопросы</strong>
+                                    <small>Короткие ответы без ожидания</small>
+                                </span>
+                                <i class="fas fa-chevron-right" aria-hidden="true"></i>
+                            </button>
+                        </section>
+
+                    </div>
                     </div>
                     </div>
                     {% endif %}
@@ -4705,7 +5176,7 @@
                         <div class="mi3-link-url">{{ referral_link }}</div>
                         <div class="mi3-link-actions">
                             <button type="button" class="mi3-link-btn" onclick="openRefShare('tg')"><i class="fas fa-qrcode"></i> QR-код</button>
-                            <button type="button" class="mi3-link-btn is-gold" data-mi3-copy="{{ referral_link|escapejs }}"><i class="far fa-copy"></i> Скопировать</button>
+                            <button type="button" class="mi3-link-btn is-gold" data-mi3-copy="{{ referral_link }}"><i class="far fa-copy"></i> Скопировать</button>
                         </div>
                     </div>
 
@@ -4717,7 +5188,7 @@
                         <div class="mi3-link-url">{{ site_referral_link }}</div>
                         <div class="mi3-link-actions">
                             <button type="button" class="mi3-link-btn" onclick="openRefShare('site')"><i class="fas fa-qrcode"></i> QR-код</button>
-                            <button type="button" class="mi3-link-btn is-gold" data-mi3-copy="{{ site_referral_link|escapejs }}"><i class="far fa-copy"></i> Скопировать</button>
+                            <button type="button" class="mi3-link-btn is-gold" data-mi3-copy="{{ site_referral_link }}"><i class="far fa-copy"></i> Скопировать</button>
                         </div>
                     </div>
 
@@ -4938,7 +5409,7 @@
                 {# FAQ по схеме Akenai: разделы -> вопросы -> статья в bottom-sheet; данные и рендер — FAQ_DATA в JS, тексты согласованы с handlers/faq.py бота #}
                 <section id="settings-faq-view" class="max-w-2xl mb-7 hidden">
                     <div id="faq-sections-view">
-                        <button type="button" onclick="closeSettingsFaq()" class="flex items-center gap-3 mb-4 text-left group">
+                        <button type="button" onclick="backFromSettingsFaq()" class="flex items-center gap-3 mb-4 text-left group">
                             <div class="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0 group-hover:border-white/25 transition-colors">
                                 <i class="fas fa-arrow-left text-sm"></i>
                             </div>
@@ -7564,6 +8035,8 @@
             ]},
         ];
         let faqSectionIdx = 0;
+        // Вкладка, с которой открыли FAQ («Поддержка» или «Профиль»)
+        let faqReturnTab = 'settings';
         let faqItemIdx = 0;
 
         function faqScrollTop() {
@@ -7581,6 +8054,10 @@
         }
 
         function openSettingsFaq() {
+            // Запоминаем, откуда открыли FAQ (например, «Поддержка»),
+            // чтобы кнопка «Назад» вернула на исходную вкладку.
+            const activeTab = document.querySelector('.tab-content.active');
+            faqReturnTab = activeTab ? activeTab.id.replace('tab-', '') : 'settings';
             // Вызывается и со страницы «Поддержка» — сперва переключаем вкладку
             showTab('settings');
             document.getElementById('settings-header').classList.add('hidden');
@@ -7596,6 +8073,11 @@
             document.getElementById('settings-header').classList.remove('hidden');
             document.getElementById('settings-account-section').classList.remove('hidden');
             document.getElementById('settings-autopay-section').classList.remove('hidden');
+        }
+
+        function backFromSettingsFaq() {
+            // showTab сам сбросит суб-экран FAQ через closeSettingsFaq()
+            showTab(faqReturnTab || 'settings');
         }
 
         function renderFaqSections() {
@@ -8172,13 +8654,15 @@
 
     <div class="mi3-sheet" id="mi3-connect-sheet" role="dialog" aria-modal="true" aria-label="Подключение устройства">
         <div class="mi3-sheet-grab" aria-hidden="true"></div>
-        <div class="mi3-sheet-top">
-            <div>
+        <div class="mi3-sheet-nav">
+            <button type="button" class="mi3-sheet-close" id="mi3-connect-back" onclick="mi3ConnectBack()" aria-label="Назад"><i class="fas fa-chevron-left"></i></button>
+            <div class="mi3-sheet-progress">
+                <div class="mi3-step-bars" id="mi3-connect-bars" aria-hidden="true"><span></span><span></span><span></span></div>
                 <div class="mi3-sheet-kicker" id="mi3-connect-kicker">Шаг 1 из 3</div>
-                <div class="mi3-sheet-title" id="mi3-connect-title">Что подключаем?</div>
             </div>
             <button type="button" class="mi3-sheet-close" onclick="mi3CloseSheets()" aria-label="Закрыть"><i class="fas fa-xmark"></i></button>
         </div>
+        <div class="mi3-sheet-title" id="mi3-connect-title">Что подключаем?</div>
         <div id="mi3-connect-body"></div>
     </div>
 
@@ -8333,7 +8817,14 @@
             const kicker = document.getElementById('mi3-connect-kicker');
             const title = document.getElementById('mi3-connect-title');
             const body = document.getElementById('mi3-connect-body');
+            const back = document.getElementById('mi3-connect-back');
             kicker.textContent = 'Шаг ' + step + ' из 3';
+            // На шаге 1 кнопка невидима, но место держит — прогресс не прыгает
+            if (back) back.classList.toggle('is-ghosted', step === 1);
+            const bars = document.getElementById('mi3-connect-bars');
+            if (bars) {
+                Array.from(bars.children).forEach((bar, i) => bar.classList.toggle('is-on', i < step));
+            }
 
             if (step === 1) {
                 title.textContent = 'Что подключаем?';
@@ -8431,6 +8922,10 @@
             openSheet(connectSheet);
         };
 
+        window.mi3ConnectBack = function () {
+            if (step > 1) { step -= 1; keyShown = false; renderConnect(); }
+        };
+
         // --- Устройства ---
         function mi3PluralDevices(n) {
             const abs = Math.abs(n) % 100;
@@ -8465,6 +8960,113 @@
             return 'fas fa-laptop';
         }
 
+        let desktopDeviceFilter = 'all';
+
+        function bindDeviceDeleteButtons(root) {
+            if (!root) return;
+            root.querySelectorAll('[data-mi3-hwid]').forEach((btn) => {
+                btn.addEventListener('click', async function () {
+                    const defaultMarkup = this.innerHTML;
+                    if (!this.classList.contains('is-armed')) {
+                        this.classList.add('is-armed');
+                        this.innerHTML = '<i class="fas fa-triangle-exclamation"></i> Точно?';
+                        setTimeout(() => {
+                            if (!document.body.contains(this) || this.disabled) return;
+                            this.classList.remove('is-armed');
+                            this.innerHTML = defaultMarkup;
+                        }, 3500);
+                        return;
+                    }
+                    this.disabled = true;
+                    this.textContent = '…';
+                    try {
+                        const body = new URLSearchParams({ hwid: this.dataset.mi3Hwid });
+                        const resp = await fetch('/api/cabinet/devices/delete/', {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: {
+                                'Content-Type': 'application/x-www-form-urlencoded',
+                                'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '',
+                            },
+                            body,
+                        });
+                        const payload = await resp.json();
+                        if (!resp.ok || payload.status !== 'ok') throw new Error(payload.message || 'fail');
+                        devicesCache = payload;
+                        renderDevicesSheet(payload);
+                        updateHomeDevices(payload);
+                    } catch (e) {
+                        this.disabled = false;
+                        this.textContent = 'Ошибка';
+                        setTimeout(() => {
+                            if (!document.body.contains(this)) return;
+                            this.classList.remove('is-armed');
+                            this.innerHTML = defaultMarkup;
+                        }, 2500);
+                    }
+                });
+            });
+        }
+
+        function renderDesktopDevices(data) {
+            const list = document.getElementById('desktop-devices-list');
+            if (!list) return;
+
+            const devices = Array.isArray(data.devices) ? data.devices : [];
+            const onlineCount = devices.filter((device) => deviceMeta(device).online).length;
+            const idleCount = Math.max(0, devices.length - onlineCount);
+            const available = data.limit ? Math.max(0, data.limit - data.total) : null;
+            const note = document.getElementById('desktop-devices-note');
+            const allCount = document.getElementById('desktop-devices-all-count');
+            const onlineCountNode = document.getElementById('desktop-devices-online-count');
+            const idleCountNode = document.getElementById('desktop-devices-idle-count');
+
+            if (note) {
+                note.textContent = data.total
+                    ? data.total + ' подключено' + (available === null ? '' : ' · доступно ещё ' + available)
+                    : 'Пока нет подключённых устройств';
+            }
+            if (allCount) allCount.textContent = data.total;
+            if (onlineCountNode) onlineCountNode.textContent = onlineCount;
+            if (idleCountNode) idleCountNode.textContent = idleCount;
+
+            const visibleDevices = devices.filter((device) => {
+                if (desktopDeviceFilter === 'all') return true;
+                const online = deviceMeta(device).online;
+                return desktopDeviceFilter === 'online' ? online : !online;
+            });
+
+            if (!devices.length) {
+                list.innerHTML = '<div class="desktop-devices-empty">Подключите первое устройство — оно появится здесь автоматически.</div>';
+                return;
+            }
+            if (!visibleDevices.length) {
+                list.innerHTML = '<div class="desktop-devices-empty">В этой группе пока нет устройств.</div>';
+                return;
+            }
+
+            list.innerHTML = visibleDevices.map((device) => {
+                const meta = deviceMeta(device);
+                const platform = device.platform || 'Платформа не определена';
+                return `
+                    <div class="desktop-device-row" data-desktop-device-status="${meta.online ? 'online' : 'idle'}">
+                        <span class="desktop-device-main">
+                            <span class="desktop-device-icon"><i class="${deviceIcon(device)}"></i></span>
+                            <span class="desktop-device-copy">
+                                <strong>${esc(deviceTitle(device))}</strong>
+                                <span>${esc(platform)}</span>
+                            </span>
+                        </span>
+                        <span class="desktop-device-state${meta.online ? ' is-online' : ''}">${esc(meta.text)}</span>
+                        <button type="button" class="desktop-device-delete" data-mi3-hwid="${esc(device.hwid)}" aria-label="Удалить ${esc(deviceTitle(device))}">
+                            <i class="far fa-trash-can" aria-hidden="true"></i>
+                            Удалить
+                        </button>
+                    </div>`;
+            }).join('');
+            bindDeviceDeleteButtons(list);
+        }
+
         function updateHomeDevices(data) {
             const chip = document.getElementById('mi3-devices-chip');
             const count = document.getElementById('mi3-devices-count');
@@ -8474,14 +9076,7 @@
                 count.textContent = data.total + limit + ' ' + word;
                 chip.hidden = false;
             }
-            const desktopNote = document.getElementById('mi3-desktop-devices-note');
-            if (desktopNote) {
-                const limit = data.limit ? ' из ' + data.limit : '';
-                const word = data.limit ? 'устройств' : mi3PluralDevices(data.total);
-                desktopNote.textContent = data.total
-                    ? 'Подключено ' + data.total + limit + ' ' + word
-                    : 'Подключение и удаление устройств подписки';
-            }
+            renderDesktopDevices(data);
             const block = document.getElementById('mi3-connected-block');
             const list = document.getElementById('mi3-connected-list');
             if (!block || !list) return;
@@ -8528,39 +9123,7 @@
                         <button type="button" class="mi3-device-del" data-mi3-hwid="${esc(d.hwid)}">Удалить</button>
                     </div>`;
             }).join('');
-            list.querySelectorAll('.mi3-device-del').forEach((btn) => {
-                btn.addEventListener('click', async function () {
-                    if (!this.classList.contains('is-armed')) {
-                        this.classList.add('is-armed');
-                        this.textContent = 'Точно?';
-                        setTimeout(() => { this.classList.remove('is-armed'); this.textContent = 'Удалить'; }, 3500);
-                        return;
-                    }
-                    this.disabled = true;
-                    this.textContent = '…';
-                    try {
-                        const body = new URLSearchParams({ hwid: this.dataset.mi3Hwid });
-                        const resp = await fetch('/api/cabinet/devices/delete/', {
-                            method: 'POST',
-                            credentials: 'same-origin',
-                            headers: {
-                                'Content-Type': 'application/x-www-form-urlencoded',
-                                'X-CSRFToken': (document.cookie.match(/csrftoken=([^;]+)/) || [])[1] || '',
-                            },
-                            body,
-                        });
-                        const payload = await resp.json();
-                        if (!resp.ok || payload.status !== 'ok') throw new Error(payload.message || 'fail');
-                        devicesCache = payload;
-                        renderDevicesSheet(payload);
-                        updateHomeDevices(payload);
-                    } catch (e) {
-                        this.disabled = false;
-                        this.textContent = 'Ошибка';
-                        setTimeout(() => { this.classList.remove('is-armed'); this.textContent = 'Удалить'; }, 2500);
-                    }
-                });
-            });
+            bindDeviceDeleteButtons(list);
         }
 
         async function loadDevices() {
@@ -8594,10 +9157,58 @@
             requestAnimationFrame(() => { fill.style.width = pct + '%'; });
         })();
 
-        // Устройства на главной — фоновая загрузка
-        if (document.getElementById('mi3-devices-chip')) {
-            loadDevices().then((data) => { if (data) updateHomeDevices(data); });
+        document.querySelectorAll('[data-desktop-device-filter]').forEach((button) => {
+            button.addEventListener('click', function () {
+                desktopDeviceFilter = this.dataset.desktopDeviceFilter || 'all';
+                document.querySelectorAll('[data-desktop-device-filter]').forEach((item) => {
+                    item.setAttribute('aria-pressed', String(item === this));
+                });
+                if (devicesCache) renderDesktopDevices(devicesCache);
+            });
+        });
+
+        // Устройства на главной — фоновая загрузка для mobile и desktop.
+        if (document.getElementById('mi3-devices-chip') || document.getElementById('desktop-devices-list')) {
+            loadDevices().then((data) => {
+                if (data) {
+                    updateHomeDevices(data);
+                    return;
+                }
+                const desktopList = document.getElementById('desktop-devices-list');
+                if (desktopList) {
+                    desktopList.innerHTML = '<div class="desktop-devices-empty">Не удалось загрузить устройства. Попробуйте обновить страницу.</div>';
+                }
+            });
         }
+
+        // Кнопки «Скопировать» реферальных ссылок (мобильный экран рефералов)
+        document.querySelectorAll('[data-mi3-copy]').forEach((btn) => {
+            const original = btn.innerHTML;
+            let restoreTimer = null;
+            btn.addEventListener('click', async function () {
+                const value = this.dataset.mi3Copy || '';
+                let ok = false;
+                try { await navigator.clipboard.writeText(value); ok = true; } catch (e) {
+                    // Fallback для webview без clipboard API
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = value;
+                        ta.style.position = 'fixed';
+                        ta.style.opacity = '0';
+                        document.body.appendChild(ta);
+                        ta.focus();
+                        ta.select();
+                        ok = document.execCommand('copy');
+                        ta.remove();
+                    } catch (err) { ok = false; }
+                }
+                this.innerHTML = ok
+                    ? '<i class="fas fa-check"></i> Скопировано'
+                    : '<i class="far fa-copy"></i> Не удалось';
+                clearTimeout(restoreTimer);
+                restoreTimer = setTimeout(() => { this.innerHTML = original; }, 2000);
+            });
+        });
     })();
     </script>
 

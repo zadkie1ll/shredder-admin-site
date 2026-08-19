@@ -3208,6 +3208,46 @@ def _cabinet_rw_subscription(request):
     return rwms_client.get_user_by_username(request.user.username)
 
 
+# Панельный fallback-лимит HWID общий для всех подписок и меняется только
+# руками в панели — кешируем, чтобы не дёргать RWMS на каждый запрос кабинета.
+_HWID_SETTINGS_CACHE_TTL = 600  # секунд
+_hwid_settings_cache = {"value": None, "expires_at": 0.0}
+
+
+def _panel_hwid_fallback_limit():
+    now = monotonic()
+    if now < _hwid_settings_cache["expires_at"]:
+        return _hwid_settings_cache["value"]
+    reply = rwms_client.get_hwid_settings()
+    if reply is None:
+        # RWMS недоступен — не кешируем отказ, попробуем при следующем запросе
+        return None
+    value = (
+        reply.fallback_device_limit
+        if reply.enabled
+        and reply.HasField("fallback_device_limit")
+        and reply.fallback_device_limit > 0
+        else None
+    )
+    _hwid_settings_cache["value"] = value
+    _hwid_settings_cache["expires_at"] = now + _HWID_SETTINGS_CACHE_TTL
+    return value
+
+
+def _cabinet_device_limit(subscription):
+    """Реальный лимит устройств подписки: личный hwid_device_limit,
+    иначе глобальный fallback панели, и лишь затем продуктовая константа."""
+    if (
+        subscription.HasField("hwid_device_limit")
+        and subscription.hwid_device_limit > 0
+    ):
+        return subscription.hwid_device_limit
+    panel_limit = _panel_hwid_fallback_limit()
+    if panel_limit:
+        return panel_limit
+    return settings.CABINET_DEVICE_LIMIT_FALLBACK
+
+
 @login_required(login_url="/login/")
 def cabinet_devices(request):
     """Список HWID-устройств подписки текущего пользователя."""
@@ -3217,12 +3257,7 @@ def cabinet_devices(request):
             {"status": "error", "message": "subscription not found"}, status=404
         )
 
-    limit = (
-        subscription.hwid_device_limit
-        if subscription.HasField("hwid_device_limit")
-        and subscription.hwid_device_limit > 0
-        else settings.CABINET_DEVICE_LIMIT_FALLBACK
-    )
+    limit = _cabinet_device_limit(subscription)
 
     resp = rwms_client.get_user_hwid_devices(subscription.uuid)
     if resp is None:
@@ -3277,12 +3312,7 @@ def cabinet_device_delete(request):
             {"status": "error", "message": "delete failed"}, status=502
         )
 
-    limit = (
-        subscription.hwid_device_limit
-        if subscription.HasField("hwid_device_limit")
-        and subscription.hwid_device_limit > 0
-        else settings.CABINET_DEVICE_LIMIT_FALLBACK
-    )
+    limit = _cabinet_device_limit(subscription)
 
     return JsonResponse(
         {

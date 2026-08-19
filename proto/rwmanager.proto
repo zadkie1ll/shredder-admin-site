@@ -238,6 +238,14 @@ message DeleteUserHwidDeviceResponse {
   repeated HwidDevice devices = 2;
 }
 
+// Панельные настройки HWID (из /api/subscription-settings панели):
+// enabled — включён ли учёт устройств, fallback_device_limit — глобальный
+// лимит устройств для подписок без личного hwid_device_limit.
+message GetHwidSettingsResponse {
+  bool enabled = 1;
+  optional int64 fallback_device_limit = 2;
+}
+
 service RwManager {
   rpc GetUserByUuid(GetUserByUuidRequest) returns (UserResponse) {}
   rpc GetUserByUsername(GetUserByUsernameRequest) returns (UserResponse) {}
@@ -263,4 +271,8 @@ service RwManager {
   // HWID-устройства подписки: список и удаление одного устройства из кабинета.
   rpc GetUserHwidDevices(GetUserHwidDevicesRequest) returns (GetUserHwidDevicesResponse) {}
   rpc DeleteUserHwidDevice(DeleteUserHwidDeviceRequest) returns (DeleteUserHwidDeviceResponse) {}
+
+  // Панельные настройки HWID: нужны кабинету, чтобы показать реальный
+  // лимит устройств подписки, когда личный hwid_device_limit не задан.
+  rpc GetHwidSettings(Empty) returns (GetHwidSettingsResponse) {}
 }

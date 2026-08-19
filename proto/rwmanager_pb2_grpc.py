@@ -104,6 +104,11 @@ class RwManagerStub:
                 request_serializer=proto_dot_rwmanager__pb2.DeleteUserHwidDeviceRequest.SerializeToString,
                 response_deserializer=proto_dot_rwmanager__pb2.DeleteUserHwidDeviceResponse.FromString,
                 _registered_method=True)
+        self.GetHwidSettings = channel.unary_unary(
+                '/rwmanager.RwManager/GetHwidSettings',
+                request_serializer=proto_dot_rwmanager__pb2.Empty.SerializeToString,
+                response_deserializer=proto_dot_rwmanager__pb2.GetHwidSettingsResponse.FromString,
+                _registered_method=True)
 
 
 class RwManagerServicer:
@@ -199,6 +204,14 @@ class RwManagerServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def GetHwidSettings(self, request, context):
+        """Панельные настройки HWID: нужны кабинету, чтобы показать реальный
+        лимит устройств подписки, когда личный hwid_device_limit не задан.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_RwManagerServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -271,6 +284,11 @@ def add_RwManagerServicer_to_server(servicer, server):
                     servicer.DeleteUserHwidDevice,
                     request_deserializer=proto_dot_rwmanager__pb2.DeleteUserHwidDeviceRequest.FromString,
                     response_serializer=proto_dot_rwmanager__pb2.DeleteUserHwidDeviceResponse.SerializeToString,
+            ),
+            'GetHwidSettings': grpc.unary_unary_rpc_method_handler(
+                    servicer.GetHwidSettings,
+                    request_deserializer=proto_dot_rwmanager__pb2.Empty.FromString,
+                    response_serializer=proto_dot_rwmanager__pb2.GetHwidSettingsResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -651,6 +669,33 @@ class RwManager:
             '/rwmanager.RwManager/DeleteUserHwidDevice',
             proto_dot_rwmanager__pb2.DeleteUserHwidDeviceRequest.SerializeToString,
             proto_dot_rwmanager__pb2.DeleteUserHwidDeviceResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def GetHwidSettings(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/rwmanager.RwManager/GetHwidSettings',
+            proto_dot_rwmanager__pb2.Empty.SerializeToString,
+            proto_dot_rwmanager__pb2.GetHwidSettingsResponse.FromString,
             options,
             channel_credentials,
             insecure,

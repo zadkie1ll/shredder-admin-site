@@ -391,3 +391,11 @@ class DeleteUserHwidDeviceResponse(_message.Message):
     total: int
     devices: _containers.RepeatedCompositeFieldContainer[HwidDevice]
     def __init__(self, total: _Optional[int] = ..., devices: _Optional[_Iterable[_Union[HwidDevice, _Mapping]]] = ...) -> None: ...
+
+class GetHwidSettingsResponse(_message.Message):
+    __slots__ = ("enabled", "fallback_device_limit")
+    ENABLED_FIELD_NUMBER: _ClassVar[int]
+    FALLBACK_DEVICE_LIMIT_FIELD_NUMBER: _ClassVar[int]
+    enabled: bool
+    fallback_device_limit: int
+    def __init__(self, enabled: _Optional[bool] = ..., fallback_device_limit: _Optional[int] = ...) -> None: ...
