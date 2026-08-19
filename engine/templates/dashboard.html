@@ -1362,7 +1362,7 @@
             width: 30px;
             height: 30px;
             border-radius: 10px;
-            background: url("{% static 'icons/logo-face-white.png' %}") center / cover no-repeat;
+            background: url("{% static 'icons/logo-face-white.png' %}?v=2") center / cover no-repeat;
             border: 1px solid rgba(255, 199, 0, 0.26);
         }
 
@@ -2416,7 +2416,7 @@
             width: 30px;
             height: 30px;
             border-radius: 10px;
-            background: url("{% static 'icons/logo-face-white.png' %}") center / cover no-repeat;
+            background: url("{% static 'icons/logo-face-white.png' %}?v=2") center / cover no-repeat;
             border: 1px solid rgba(255, 199, 0, 0.26);
             box-shadow: 0 0 24px rgba(255, 199, 0, 0.12);
         }
@@ -4017,14 +4017,6 @@
             background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.12);
             font-weight: 700; font-size: 14px; color: rgba(255,255,255,.85); text-transform: uppercase;
         }
-        .mi3-chip {
-            display: inline-flex; align-items: center; gap: 8px; margin: 22px auto 26px;
-            font-size: 11px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase;
-            color: #ffc700; border: 1px solid rgba(255,199,0,.3); border-radius: 100px;
-            padding: 9px 18px; background: rgba(9,10,15,.6);
-        }
-        .mi3-chip .dot { width: 6px; height: 6px; border-radius: 50%; background: #38d996; box-shadow: 0 0 8px #38d996; animation: mi3pulse 2s infinite; }
-        @keyframes mi3pulse { 50% { opacity: .4; } }
         .mi3-hero { text-align: center; margin-bottom: 26px; }
         .mi3-label { font-size: 12px; font-weight: 600; letter-spacing: .22em; text-transform: uppercase; color: rgba(255,255,255,.45); margin-bottom: 12px; }
         .mi3-title { font-size: 34px; line-height: 1.12; font-weight: 800; letter-spacing: -.02em; color: #fff; }
@@ -4053,6 +4045,9 @@
         }
         .mi3-tile i { font-size: 18px; color: rgba(255,255,255,.75); }
         .mi3-tile:active { background: rgba(255,199,0,.07); border-color: rgba(255,199,0,.3); }
+        /* лёгкий акцент на продлении — заметно, но не кричит */
+        .mi3-tile-renew { border-color: rgba(255,199,0,.32); background: rgba(255,199,0,.05); }
+        .mi3-tile-renew i { color: #ffc700; }
         .mi3-section-head { display: flex; align-items: center; justify-content: space-between; margin: 22px 2px 12px; }
         .mi3-section-head h3 { font-size: 17px; font-weight: 700; color: #fff; letter-spacing: -.01em; }
         .mi3-section-head button { background: none; border: 0; color: #ffc700; font: inherit; font-size: 13px; font-weight: 600; cursor: pointer; }
@@ -4138,6 +4133,30 @@
         .mi3-summary { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 13px 14px; border: 1px solid rgba(255,255,255,.09); border-radius: 14px; background: rgba(255,255,255,.03); font-size: 14px; font-weight: 600; }
         .mi3-summary i { color: #ffc700; }
         .mi3-support-faq-row { margin-top: 14px; }
+
+        /* Десктоп: шторки превращаются в центрированные модалки */
+        @media (min-width: 1024px) {
+            .mi3-sheet {
+                left: 50%;
+                right: auto;
+                bottom: auto;
+                top: 50%;
+                width: 480px;
+                max-height: 82vh;
+                border-radius: 24px;
+                border-bottom: 1px solid rgba(255, 255, 255, .08);
+                transform: translate(-50%, -46%);
+                opacity: 0;
+                pointer-events: none;
+                transition: transform .25s ease, opacity .25s ease;
+            }
+            .mi3-sheet.is-open {
+                transform: translate(-50%, -50%);
+                opacity: 1;
+                pointer-events: auto;
+            }
+            .mi3-sheet-grab { display: none; }
+        }
 
         /* Экран выбора тарифа: на ПК — две колонки, чтобы влезал в один экран */
         @media (min-width: 1024px) {
@@ -4276,14 +4295,12 @@
                         <div class="mi3-topbar">
                             <div class="tg-mini-brand" style="margin-bottom:0">
                                 <span class="tg-mini-brand-mark" aria-hidden="true">
-                                    <img src="{% static 'icons/logo-face-white.png' %}" alt="">
+                                    <img src="{% static 'icons/logo-face-white.png' %}?v=2" alt="">
                                 </span>
                                 <span class="mi3-brand-name">MONKEY ISLAND <b>VPN</b></span>
                             </div>
                             <span class="mi3-avatar" aria-hidden="true">{{ user.username|slice:":2" }}</span>
                         </div>
-
-                        <div style="text-align:center"><span class="mi3-chip"><span class="dot"></span> Остров на связи · Uptime 99.9%</span></div>
 
                         <div class="mi3-hero">
                             <div class="mi3-label">Личный кабинет</div>
@@ -4333,7 +4350,7 @@
 
                         {% if has_subscription_access %}
                         <div class="mi3-tiles" role="group" aria-label="Быстрые действия">
-                            <button type="button" class="mi3-tile" onclick="showTariffs()"><i class="far fa-calendar-plus"></i>Продлить</button>
+                            <button type="button" class="mi3-tile mi3-tile-renew" onclick="showTariffs()"><i class="far fa-calendar-plus"></i>Продлить</button>
                             <button type="button" class="mi3-tile" onclick="mi3OpenDevices()"><i class="fas fa-laptop"></i>Устройства</button>
                             <button type="button" class="mi3-tile" onclick="showTab('support')"><i class="far fa-comments"></i>Помощь</button>
                         </div>
@@ -4360,12 +4377,6 @@
                             <button type="button" onclick="showTab('setup')" class="tg-mini-action-row">
                                 <i class="fas fa-plug" aria-hidden="true"></i>
                                 <span class="tg-mini-action-label">Подключить VPN</span>
-                                <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
-                            </button>
-                            {% else %}
-                            <button type="button" onclick="showTariffs()" class="tg-mini-action-row tg-mini-action-accent">
-                                <i class="fas fa-tag" aria-hidden="true"></i>
-                                <span class="tg-mini-action-label">Продлить подписку</span>
                                 <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
                             </button>
                             {% endif %}
@@ -4401,6 +4412,23 @@
                     <button type="button" onclick="quickAccessInstall()" class="quick-access-btn tg-webapp-hide inline-flex items-center gap-2 mb-8 hover:brightness-105 active:scale-95 transition">
                         <i class="fas fa-bolt"></i> Быстрый доступ
                     </button>
+
+                    {% if has_subscription_access %}
+                    <section class="mb-8 max-w-2xl rounded-2xl border border-white/10 bg-white/[0.04] p-5 flex items-center justify-between gap-4" aria-label="Устройства подписки">
+                        <div class="flex items-center gap-4 min-w-0">
+                            <div class="w-11 h-11 flex-shrink-0 rounded-xl bg-[#ffc700]/10 border border-[#ffc700]/25 text-[#ffc700] flex items-center justify-center">
+                                <i class="fas fa-laptop"></i>
+                            </div>
+                            <div class="min-w-0">
+                                <div class="font-black">Устройства</div>
+                                <div class="text-gray-500 text-sm font-bold truncate" id="mi3-desktop-devices-note">Подключение и удаление устройств подписки</div>
+                            </div>
+                        </div>
+                        <button type="button" onclick="mi3OpenDevices()" class="flex-shrink-0 px-5 py-3 rounded-xl border border-white/15 font-bold text-sm hover:border-[#ffc700]/50 hover:text-[#ffc700] transition">
+                            Управлять
+                        </button>
+                    </section>
+                    {% endif %}
 
                     <div class="overview-grid space-y-7">
                         {% if show_not_connected_banner %}
@@ -4864,7 +4892,7 @@
 
                     {# FAQ — суб-экран как у Akenai; пункта «Поддержка» тут нет намеренно — поддержка живёт вкладкой в нижней навигации #}
                     <button type="button" onclick="openSettingsFaq()" class="settings-item w-full flex items-center gap-4 px-4 py-4 text-left group">
-                        <div class="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0">
+                        <div class="w-11 h-11 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                             <i class="fas fa-circle-question text-lg"></i>
                         </div>
                         <div class="min-w-0 flex-1">
@@ -4876,7 +4904,7 @@
 
                     {# Добавить на рабочий стол (PWA) #}
                     <button type="button" onclick="onAddToHomeClick()" class="settings-item w-full flex items-center gap-4 px-4 py-4 text-left group">
-                        <div class="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0">
+                        <div class="w-11 h-11 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                             <i class="fas fa-mobile-screen-button text-lg"></i>
                         </div>
                         <div class="min-w-0 flex-1">
@@ -4888,7 +4916,7 @@
 
                     {# Документы #}
                     <a href="{% url 'offer' %}" target="_blank" rel="noopener" class="settings-item flex items-center gap-4 px-4 py-4 group">
-                        <div class="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0">
+                        <div class="w-11 h-11 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                             <i class="fas fa-file-contract text-lg"></i>
                         </div>
                         <div class="min-w-0 flex-1">
@@ -4897,7 +4925,7 @@
                         <i class="fas fa-chevron-right text-gray-600 group-hover:text-[#ffc700] transition-colors"></i>
                     </a>
                     <a href="{% url 'privacy' %}" target="_blank" rel="noopener" class="settings-item flex items-center gap-4 px-4 py-4 group">
-                        <div class="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0">
+                        <div class="w-11 h-11 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                             <i class="fas fa-shield-alt text-lg"></i>
                         </div>
                         <div class="min-w-0 flex-1">
@@ -4960,7 +4988,7 @@
                     </button>
 
                     <button type="button" onclick="window.location.href='{% url 'logout' %}'" class="tg-webapp-hide w-full flex items-center gap-4 px-4 py-4 setup-shell !mb-0 text-left hover:border-white/20 transition-colors">
-                        <div class="w-11 h-11 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center text-white flex-shrink-0">
+                        <div class="w-11 h-11 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] flex-shrink-0">
                             <i class="fas fa-sign-out-alt text-lg"></i>
                         </div>
                         <div class="min-w-0 flex-1">
@@ -7553,6 +7581,8 @@
         }
 
         function openSettingsFaq() {
+            // Вызывается и со страницы «Поддержка» — сперва переключаем вкладку
+            showTab('settings');
             document.getElementById('settings-header').classList.add('hidden');
             document.getElementById('settings-account-section').classList.add('hidden');
             document.getElementById('settings-autopay-section').classList.add('hidden');
@@ -8198,7 +8228,7 @@
             <button type="button" class="mi3-sheet-close" onclick="mi3CloseSheets()" aria-label="Закрыть"><i class="fas fa-xmark"></i></button>
         </div>
         <p class="mi3-sheet-text" id="mi3-devices-note">Устройства, на которых добавлена ваша подписка.</p>
-        <div id="mi3-devices-list"><div class="mi3-empty">Загружаем…</div></div>
+        <div id="mi3-devices-list" style="margin-top:16px"><div class="mi3-empty">Загружаем…</div></div>
     </div>
 
     <script>
@@ -8402,6 +8432,15 @@
         };
 
         // --- Устройства ---
+        function mi3PluralDevices(n) {
+            const abs = Math.abs(n) % 100;
+            const d = abs % 10;
+            if (abs > 10 && abs < 20) return 'устройств';
+            if (d === 1) return 'устройство';
+            if (d >= 2 && d <= 4) return 'устройства';
+            return 'устройств';
+        }
+
         function deviceTitle(d) {
             return d.device_model || d.platform || 'Устройство';
         }
@@ -8431,8 +8470,17 @@
             const count = document.getElementById('mi3-devices-count');
             if (chip && count) {
                 const limit = data.limit ? ' из ' + data.limit : '';
-                count.textContent = data.total + limit + ' устройств';
+                const word = data.limit ? 'устройств' : mi3PluralDevices(data.total);
+                count.textContent = data.total + limit + ' ' + word;
                 chip.hidden = false;
+            }
+            const desktopNote = document.getElementById('mi3-desktop-devices-note');
+            if (desktopNote) {
+                const limit = data.limit ? ' из ' + data.limit : '';
+                const word = data.limit ? 'устройств' : mi3PluralDevices(data.total);
+                desktopNote.textContent = data.total
+                    ? 'Подключено ' + data.total + limit + ' ' + word
+                    : 'Подключение и удаление устройств подписки';
             }
             const block = document.getElementById('mi3-connected-block');
             const list = document.getElementById('mi3-connected-list');
@@ -8460,8 +8508,9 @@
             const list = document.getElementById('mi3-devices-list');
             const note = document.getElementById('mi3-devices-note');
             const limit = data.limit ? ' из ' + data.limit : '';
+            const word = data.limit ? 'устройств' : mi3PluralDevices(data.total);
             note.textContent = data.total
-                ? 'Подключено ' + data.total + limit + ' устройств. Удалите лишнее, чтобы освободить слот.'
+                ? 'Подключено ' + data.total + limit + ' ' + word + '. Удалите лишнее, чтобы освободить слот.'
                 : 'Пока ни одно устройство не добавило подписку.';
             if (!data.devices.length) {
                 list.innerHTML = '<div class="mi3-empty">Подключите первое устройство с главного экрана.</div>';

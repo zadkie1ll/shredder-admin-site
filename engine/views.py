@@ -3220,7 +3220,8 @@ def cabinet_devices(request):
     limit = (
         subscription.hwid_device_limit
         if subscription.HasField("hwid_device_limit")
-        else None
+        and subscription.hwid_device_limit > 0
+        else settings.CABINET_DEVICE_LIMIT_FALLBACK
     )
 
     resp = rwms_client.get_user_hwid_devices(subscription.uuid)
@@ -3279,7 +3280,8 @@ def cabinet_device_delete(request):
     limit = (
         subscription.hwid_device_limit
         if subscription.HasField("hwid_device_limit")
-        else None
+        and subscription.hwid_device_limit > 0
+        else settings.CABINET_DEVICE_LIMIT_FALLBACK
     )
 
     return JsonResponse(

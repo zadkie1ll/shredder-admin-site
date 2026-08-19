@@ -5910,6 +5910,24 @@ class CabinetDevicesApiTests(_CabTestCase):
         self.assertEqual(payload["devices"][0]["device_model"], "iPhone 15 Pro")
         mocked.assert_called_once_with("rw-uuid-1")
 
+    def test_devices_list_limit_fallback(self):
+        """Без hwid_device_limit в панели кабинет показывает продуктовый лимит."""
+        import proto.rwmanager_pb2 as proto
+        from unittest.mock import patch
+
+        sub = proto.UserResponse(uuid="rw-uuid-1", username="hwid_tester")
+        resp_proto = proto.GetUserHwidDevicesResponse(total=0, devices=[])
+        with patch.object(
+            _cab_views.rwms_client, "get_user_by_username", return_value=sub
+        ), patch.object(
+            _cab_views.rwms_client, "get_user_hwid_devices",
+            return_value=resp_proto,
+        ):
+            response = self.client.get("/api/cabinet/devices/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["limit"], 15)
+
     def test_devices_list_no_subscription(self):
         from unittest.mock import patch
 

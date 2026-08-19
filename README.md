@@ -69,6 +69,15 @@ UI-слой поверх существующего UX (бизнес-логик�
   кнопка ЧЗВ ведёт в тот же FAQ, что и в Профиле).
 - Тесты: engine.tests.CabinetDevicesApiTests (6 шт, RWMS замокан).
 
+### Устройства подписки в кабинете (2026-08-19)
+
+- Эндпоинты `/api/cabinet/devices/` (список) и `/api/cabinet/devices/delete/`
+  (удаление одного HWID-устройства) — работают через новые RPC RWMS
+  `GetUserHwidDevices`/`DeleteUserHwidDevice` (см. README rwms).
+- `CABINET_DEVICE_LIMIT_FALLBACK` (env, по умолчанию 15) — продуктовый лимит
+  устройств, который кабинет показывает, если у пользователя в Remnawave
+  не задан `hwid_device_limit`.
+
 ### Производительность (2026-08-19)
 
 - Tailwind CDN (JIT-компилятор ~350КБ JS на каждом устройстве) заменён на

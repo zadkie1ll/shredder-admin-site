@@ -148,6 +148,11 @@ CABINET_DOMAINS = config(
     default="localhost,127.0.0.1",
     cast=csv_domains,
 )
+# Продуктовый лимит устройств на подписке для личного кабинета: используется,
+# когда у пользователя в Remnawave не задан hwid_device_limit.
+CABINET_DEVICE_LIMIT_FALLBACK = config(
+    "CABINET_DEVICE_LIMIT_FALLBACK", default=15, cast=int
+)
 DEFAULT_CABINET_DOMAIN = config(
     "DEFAULT_CABINET_DOMAIN", default="http://localhost:8000"
 )
