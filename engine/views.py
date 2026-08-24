@@ -99,6 +99,7 @@ from common.models.db import UserDiscount
 from common.models.db import PromoBatch
 from common.models.db import PromoCode
 from common.models.db import ReferralProgramBlock
+from engine.bot_push import push_admin_temporary_ban
 from common.models.db import CensorCheck
 from common.models.db import CensorCheckRun
 from common.models.db import RipeApiKey
@@ -6188,6 +6189,7 @@ def admin_referral_payload(db_session, user):
     return {
         "user": admin_user_payload(user),
         "referral_block": admin_referral_block_payload(db_session, user),
+        "account_block": admin_account_block_payload(db_session, user),
         "summary": {
             "referrals": len(referrals),
             "paid_referrals": sum(1 for row in referral_rows if row["paid"]),
@@ -6234,36 +6236,56 @@ def support_admin_api_subscription_manage(request):
             "BAN_SQUAD_UUID", "be4e12f0-098a-4d44-88d4-37cff58bf2d7"
         )
 
-        if action == "disable_subscription":
-            # Как «Отключение подписки» в трафик-алертах бота: статус RWMS
-            # DISABLED + выключаем автоплатёж. Ручная оплата реактивирует.
-            user.autopay_allow = False
-            removed_recurrents = (
-                db_session.query(YkRecurrentPayment)
-                .filter(YkRecurrentPayment.user_id == user.id)
-                .delete(synchronize_session=False)
+        if action in ("block_account", "disable_subscription"):
+            # «Отключить доступ» = полная блокировка, 1:1 с /block-user в боте:
+            # user_blocks (бот отвечает только ACCOUNT_BLOCKED), блок рефералки,
+            # автоплатёж выключен и рекуррент удалён, подписка в RWMS → DISABLED.
+            # Ключ disable_subscription оставлен для обратной совместимости.
+            reason = (
+                request.POST.get("reason") or "admin panel: access blocked"
+            ).strip()[:512]
+            removed_recurrents, rwms_updated = admin_block_account(
+                db_session, request, user, reason
             )
-            admin_audit_write(
-                db_session, request, "subscription_disable", target=user.username
-            )
-            db_session.commit()
-            rwms_updated = False
-            rwms_user = rwms_client.get_user_by_username(user.username)
-            if rwms_user:
-                response = rwms_client.update_user(
-                    proto.UpdateUserRequest(
-                        uuid=rwms_user.uuid,
-                        status=proto.UserStatus.DISABLED,
-                    )
-                )
-                rwms_updated = response is not None
             return JsonResponse({
                 "status": "ok",
                 "result": {
                     "user": admin_user_payload(user),
-                    "action_label": "Подписка отключена (DISABLED)",
+                    "account_block": admin_account_block_payload(db_session, user),
+                    "action_label": (
+                        "Аккаунт заблокирован: бот отвечает только «аккаунт "
+                        "заблокирован», рефералка и автоплатёж отключены, "
+                        "RWMS → DISABLED"
+                    ),
                     "removed_recurrents": removed_recurrents,
                     "rwms_updated": rwms_updated,
+                },
+            })
+
+        if action == "unblock_account":
+            # Как /unblock-user: доступ к боту и рефералка возвращаются, RWMS →
+            # ACTIVE только если срок не истёк; автоплатёж остаётся выключенным.
+            if db_session.get(UserBlock, user.id) is None:
+                return JsonResponse(
+                    {"status": "error", "message": "Аккаунт не заблокирован"},
+                    status=400,
+                )
+            rwms_updated = admin_unblock_account(db_session, request, user)
+            return JsonResponse({
+                "status": "ok",
+                "result": {
+                    "user": admin_user_payload(user),
+                    "account_block": admin_account_block_payload(db_session, user),
+                    "action_label": (
+                        "Блокировка снята: доступ к боту и рефералка возвращены"
+                        + (
+                            ", RWMS → ACTIVE"
+                            if rwms_updated
+                            else ", RWMS не активировался (срок истёк или ошибка)"
+                        )
+                        + "; автоплатёж остаётся выключенным"
+                    ),
+                    "rwms_updated": bool(rwms_updated),
                 },
             })
 
@@ -6318,12 +6340,19 @@ def support_admin_api_subscription_manage(request):
                 db_session, request, "temp_ban", target=user.username, hours=hours
             )
             db_session.commit()
+            # Уведомление пользователю — тем же текстом, что у кнопки
+            # «Временный бан» в трафик-алертах бота (NOTIFY_TEMPORARY_BAN):
+            # служебный пуш в Redis-очереди ботов, шлёт сам бот.
+            user_notified = push_admin_temporary_ban(
+                user.telegram_id, int(round(hours * 60))
+            )
             return JsonResponse({
                 "status": "ok",
                 "result": {
                     "user": admin_user_payload(user),
                     "action_label": f"Временный бан до {unban_at:%Y-%m-%d %H:%M} UTC (снимет бот)",
                     "rwms_updated": True,
+                    "user_notified": user_notified,
                 },
             })
 
@@ -6350,8 +6379,20 @@ def support_admin_api_subscription_manage(request):
                 }
             )
 
+        removed_recurrents = None
         if action == "set_trial_hour":
+            # Подготовка возврата: срок = 1 час. Обязательно снимаем автоплатёж
+            # (как stop_autopay / бот-команда /set-trial-hour): иначе подписка
+            # через минуты попадёт в окно автосписания yk-recurrent
+            # [expire-4ч; expire+overdue] и клиенту, которому возвращают
+            # деньги, спишут их снова. Ручная оплата снова включит автоплатёж.
             target_expire = datetime.now(timezone.utc) + timedelta(hours=1)
+            user.autopay_allow = False
+            removed_recurrents = (
+                db_session.query(YkRecurrentPayment)
+                .filter(YkRecurrentPayment.user_id == user.id)
+                .delete(synchronize_session=False)
+            )
         elif action == "extend":
             try:
                 days = int(request.POST.get("days") or "0")
@@ -6381,6 +6422,7 @@ def support_admin_api_subscription_manage(request):
             target=user.username,
             old=str(old_expire),
             new=str(user.expire_at),
+            removed_recurrents=removed_recurrents,
         )
         db_session.commit()
 
@@ -6425,6 +6467,13 @@ def support_admin_api_subscription_manage(request):
                     "old_expire_at": admin_date_label(old_expire),
                     "new_expire_at": admin_date_label(user.expire_at),
                     "rwms_updated": rwms_updated,
+                    "removed_recurrents": removed_recurrents,
+                    "action_label": (
+                        "Возврат подготовлен: срок 1 час, автоплатёж отключён"
+                        f" (удалено рекуррентов: {removed_recurrents})"
+                        if action == "set_trial_hour"
+                        else None
+                    ),
                 },
             }
         )
@@ -10343,6 +10392,9 @@ BROADCAST_BUTTON_STYLES = {"success", "danger", "primary"}
 BROADCAST_MEDIA_MAX_BYTES = 3 * 1024 * 1024
 BROADCAST_MEDIA_TYPES = {"image/jpeg": "photo", "image/png": "photo"}
 BROADCAST_TARIFF_IDS = {"oneday", "threedays", "month", "threemonths", "sixmonths", "year"}
+# Получатели промокода из кнопки claim_promo: all — всем в сегменте (повторно и
+# уже активировавшим), exclude_activated — без активировавших (promo_code_uses).
+BROADCAST_PROMO_RECIPIENTS = {"all", "exclude_activated"}
 
 
 def admin_broadcast_parse_buttons(db_session, raw_buttons):
@@ -10523,6 +10575,19 @@ def admin_broadcast_progress(db_session, broadcast):
     return int(covered), int(sent)
 
 
+def admin_broadcast_exclude_promo_code(broadcast):
+    """Код промокода, активировавшие который исключены из рассылки
+    (exclude_promo_id всегда ссылается на промокод кнопки claim_promo,
+    поэтому код берём из кнопок без лишнего запроса)."""
+    promo_id = getattr(broadcast, "exclude_promo_id", None)
+    if not promo_id:
+        return None
+    for button in broadcast.buttons or []:
+        if button.get("type") == "claim_promo" and button.get("promo_id") == promo_id:
+            return button.get("code")
+    return None
+
+
 def admin_broadcast_payload(db_session, broadcast):
     covered, sent = admin_broadcast_progress(db_session, broadcast)
     total = broadcast.total or 0
@@ -10543,6 +10608,8 @@ def admin_broadcast_payload(db_session, broadcast):
         "has_media": bool(broadcast.media_type),
         "is_test": bool(broadcast.test_telegram_id),
         "disable_link_preview": bool(broadcast.disable_link_preview),
+        "exclude_promo_id": broadcast.exclude_promo_id,
+        "exclude_promo_code": admin_broadcast_exclude_promo_code(broadcast),
         "archived": bool(broadcast.archived_at),
         "total": total,
         "covered": covered,
@@ -10667,6 +10734,37 @@ def support_admin_api_broadcasts(request):
                     {"status": "error", "message": str(error)}, status=400
                 )
 
+            # Режим получателей промокода — явный выбор админа в форме:
+            # all — слать всем в сегменте (и уже активировавшим, повторно);
+            # exclude_activated — исключить тех, у кого есть активация
+            # промокода кнопки claim_promo (promo_code_uses). Режим привязан
+            # к кнопке — без неё исключать нечего.
+            exclude_promo_id = None
+            promo_recipients = (request.POST.get("promo_recipients") or "all").strip()
+            if promo_recipients not in BROADCAST_PROMO_RECIPIENTS:
+                return JsonResponse(
+                    {"status": "error", "message": "Неизвестный режим получателей промокода"},
+                    status=400,
+                )
+            if promo_recipients == "exclude_activated":
+                promo_button = next(
+                    (
+                        entry
+                        for entry in clean_buttons
+                        if entry.get("type") == "claim_promo"
+                    ),
+                    None,
+                )
+                if promo_button is None:
+                    return JsonResponse(
+                        {
+                            "status": "error",
+                            "message": "Исключение активировавших требует кнопку промокода",
+                        },
+                        status=400,
+                    )
+                exclude_promo_id = int(promo_button["promo_id"])
+
             test_telegram_id = None
             if is_test:
                 try:
@@ -10692,6 +10790,22 @@ def support_admin_api_broadcasts(request):
                         status=400,
                     )
                 total = 1
+            elif exclude_promo_id:
+                total = (
+                    db_session.execute(
+                        sa_text(segment_count_sql(segment, exclude_promo=True)),
+                        {"exclude_promo_id": exclude_promo_id},
+                    ).scalar()
+                    or 0
+                )
+                if not total:
+                    return JsonResponse(
+                        {
+                            "status": "error",
+                            "message": "В сегменте нет получателей без активации этого промокода",
+                        },
+                        status=400,
+                    )
             else:
                 total = (
                     db_session.execute(sa_text(segment_count_sql(segment))).scalar() or 0
@@ -10713,6 +10827,7 @@ def support_admin_api_broadcasts(request):
                 test_telegram_id=test_telegram_id,
                 # Отключить превью ссылок (как /sendmsg): чекбокс в админке.
                 disable_link_preview=request.POST.get("disable_preview") == "1",
+                exclude_promo_id=exclude_promo_id,
                 total=int(total),
                 created_by=str(support_admin_actor(request))[:128],
             )
@@ -10724,6 +10839,7 @@ def support_admin_api_broadcasts(request):
                 target=title,
                 segment=segment,
                 total=int(total),
+                exclude_promo_id=exclude_promo_id,
             )
             db_session.commit()
             return JsonResponse(
@@ -10791,6 +10907,100 @@ def admin_bulk_extend(db_session, user, days):
     if response is None:
         raise RuntimeError("RWMS не принял продление")
     return f"продлено до {target_expire:%Y-%m-%d %H:%M} UTC"
+
+
+def admin_account_block_payload(db_session, user):
+    """Состояние полной блокировки аккаунта (user_blocks) для карточки клиента."""
+    block = db_session.get(UserBlock, user.id)
+    return {
+        "blocked": block is not None,
+        "reason": block.reason if block else None,
+        "created_at": admin_date_label(block.created_at) if block else None,
+    }
+
+
+def admin_block_account(db_session, request, user, reason):
+    """Полная блокировка аккаунта — 1:1 с /block-user в боте: user_blocks
+    (UserBlockMiddleware бота отвечает только ACCOUNT_BLOCKED), блок рефералки,
+    автоплатёж выключен и сохранённый рекуррент удалён, подписка в RWMS →
+    DISABLED. Возвращает (удалено рекуррентов, обновлён ли RWMS)."""
+    block = db_session.get(UserBlock, user.id)
+    if block is None:
+        db_session.add(UserBlock(user_id=user.id, reason=reason))
+    else:
+        block.reason = reason
+    ref_block = db_session.get(ReferralProgramBlock, user.id)
+    if ref_block is None:
+        db_session.add(ReferralProgramBlock(user_id=user.id, reason=reason))
+    else:
+        ref_block.reason = reason
+    user.autopay_allow = False
+    removed_recurrents = (
+        db_session.query(YkRecurrentPayment)
+        .filter(YkRecurrentPayment.user_id == user.id)
+        .delete(synchronize_session=False)
+    )
+    admin_audit_write(
+        db_session,
+        request,
+        "account_block",
+        target=user.username,
+        reason=reason,
+        removed_recurrents=removed_recurrents,
+    )
+    db_session.commit()
+
+    rwms_updated = False
+    rwms_user = rwms_client.get_user_by_username(user.username)
+    if rwms_user is not None:
+        response = rwms_client.update_user(
+            proto.UpdateUserRequest(
+                uuid=rwms_user.uuid, status=proto.UserStatus.DISABLED
+            )
+        )
+        rwms_updated = response is not None
+    logging.info(
+        "account blocked from admin panel: username=%s reason=%r "
+        "removed_recurrents=%s rwms_updated=%s",
+        user.username,
+        reason,
+        removed_recurrents,
+        rwms_updated,
+    )
+    return removed_recurrents, rwms_updated
+
+
+def admin_unblock_account(db_session, request, user):
+    """Снятие полной блокировки — как /unblock-user: user_blocks и блок
+    рефералки удаляются, RWMS → ACTIVE только если срок подписки не истёк;
+    автоплатёж остаётся выключенным (пользователь включит сам при оплате).
+    Возвращает, активирован ли RWMS (None — срок истёк, не трогали)."""
+    db_session.query(UserBlock).filter(UserBlock.user_id == user.id).delete(
+        synchronize_session=False
+    )
+    db_session.execute(
+        sa_delete(ReferralProgramBlock).where(ReferralProgramBlock.user_id == user.id)
+    )
+    admin_audit_write(db_session, request, "account_unblock", target=user.username)
+    db_session.commit()
+
+    rwms_updated = None
+    db_expire = admin_dt(user.expire_at)
+    if db_expire and db_expire > datetime.utcnow():
+        rwms_user = rwms_client.get_user_by_username(user.username)
+        if rwms_user is not None:
+            response = rwms_client.update_user(
+                proto.UpdateUserRequest(
+                    uuid=rwms_user.uuid, status=proto.UserStatus.ACTIVE
+                )
+            )
+            rwms_updated = response is not None
+    logging.info(
+        "account unblocked from admin panel: username=%s rwms_updated=%s",
+        user.username,
+        rwms_updated,
+    )
+    return rwms_updated
 
 
 def admin_bulk_block(db_session, user, reason):

@@ -215,6 +215,16 @@ TELEGRAM_ALERT_BOT_TOKEN = config(
 )
 # Telegram user id(ы) для алертов (через запятую). Пусто — алерты отключены.
 TELEGRAM_ALERT_CHAT_ID = config("TELEGRAM_ALERT_CHAT_ID", default="")
+# Служебные пуши ботам через Redis-очереди (тот же канал, что у user-notify):
+# уведомление пользователю о временной блокировке из карточки клиента.
+# Пустой BOT_REDIS_HOST — пуши отключены (бан ставится, уведомление не уходит).
+BOT_REDIS_HOST = config("BOT_REDIS_HOST", default="")
+BOT_REDIS_PORT = config("BOT_REDIS_PORT", default=6379, cast=int)
+BOT_REDIS_PASSWORD = config("BOT_REDIS_PASSWORD", default="")
+# Очереди всех ботов бренда (vpn/vps) через запятую — как MI_UN_BOT_QUEUES.
+BOT_REDIS_QUEUES = config(
+    "BOT_REDIS_QUEUES", default="monkey-island-vpn-bot,monkey-island-vps-bot"
+)
 # Фоновый воркер «Замеров ТСПУ» (расписание + сбор результатов + алерты) внутри
 # процесса сайта. Отключите, если крутите обслуживание отдельно (крон/воркер).
 CENSOR_WORKER_ENABLED = config("CENSOR_WORKER_ENABLED", default=True, cast=bool)

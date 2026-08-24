@@ -272,6 +272,21 @@
         .broadcast-preview-toggle { display: flex; align-items: center; gap: 9px; width: fit-content; color: var(--text-main); font-size: 12px; font-weight: 700; cursor: pointer; }
         .broadcast-preview-toggle input { width: 16px; height: 16px; accent-color: var(--brand-gold); cursor: pointer; }
         .broadcast-preview-toggle span { user-select: none; }
+        .broadcast-promo-audience { display: grid; gap: 8px; padding: 10px 12px; border: 1px solid var(--broadcast-line); border-radius: 10px; background: var(--broadcast-soft); }
+        .broadcast-promo-audience-title { display: flex; align-items: center; gap: 7px; color: var(--text-main); font-size: 12px; font-weight: 800; }
+        .broadcast-promo-audience-title i { color: var(--brand-gold); font-size: 11px; }
+        .broadcast-promo-audience-options { display: flex; flex-wrap: wrap; gap: 8px; }
+        .broadcast-promo-audience-option { flex: 1 1 220px; display: flex; align-items: flex-start; gap: 9px; min-width: 0; padding: 8px 10px; border: 1px solid var(--broadcast-line); border-radius: 9px; background: var(--broadcast-surface-strong); cursor: pointer; transition: border-color .14s, background .14s; }
+        .broadcast-promo-audience-option:hover { border-color: rgba(255,199,0,.3); }
+        .broadcast-promo-audience-option:has(input:checked) { border-color: rgba(255,199,0,.5); background: rgba(255,199,0,.07); }
+        .broadcast-promo-audience-option input { flex: 0 0 auto; width: 15px; height: 15px; margin-top: 2px; accent-color: var(--brand-gold); cursor: pointer; }
+        .broadcast-promo-audience-option b, .broadcast-promo-audience-option small { display: block; }
+        .broadcast-promo-audience-option b { color: var(--text-main); font-size: 11.5px; font-weight: 750; }
+        .broadcast-promo-audience-option small { margin-top: 2px; color: var(--muted); font-size: 9.5px; font-weight: 600; line-height: 1.3; }
+        .broadcast-promo-audience-hint { color: var(--muted); font-size: 10px; font-weight: 650; }
+        .broadcast-promo-audience[data-has-promo="true"] .broadcast-promo-audience-hint { display: none; }
+        .broadcast-promo-audience[data-has-promo="false"] .broadcast-promo-audience-option { opacity: .5; cursor: not-allowed; }
+        .broadcast-promo-audience[data-has-promo="false"] .broadcast-promo-audience-option input { cursor: not-allowed; }
         .broadcast-media-row { display: flex; align-items: center; gap: 8px; flex: 1 1 260px; min-width: 0; font-size: 11px; }
         .broadcast-media-pick, #broadcast-add-button { min-height: 36px; padding: 0 11px; border-radius: 8px; cursor: pointer; }
         #broadcast-media-name { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -744,7 +759,7 @@
         .date-trigger { width: 100%; min-height: 40px; display: flex; align-items: center; justify-content: space-between; gap: 10px; border: 1px solid rgba(255,255,255,.08); background: rgba(0,0,0,.22); color: var(--text-main); border-radius: 9px; padding: 0 13px; font-size: 13px; font-weight: 700; cursor: pointer; transition: all .14s; }
         .date-trigger i { color: var(--brand-gold); }
         .date-field.open .date-trigger { border-color: rgba(255,199,0,.38); background: rgba(255,199,0,.06); }
-        .date-popover { position: absolute; top: calc(100% + 10px); left: 0; z-index: 140; width: min(330px, calc(100vw - 40px)); display: none; border: 1px solid var(--panel-border); border-radius: 14px; background: rgba(17, 18, 23, .98); box-shadow: 0 20px 60px rgba(0,0,0,.55); backdrop-filter: blur(14px); padding: 14px; }
+        .date-popover { position: absolute; top: calc(100% + 10px); left: 0; z-index: 140; width: min(330px, calc(100vw - 40px)); transform: translateX(var(--date-popover-shift, 0px)); display: none; border: 1px solid var(--panel-border); border-radius: 14px; background: rgba(17, 18, 23, .98); box-shadow: 0 20px 60px rgba(0,0,0,.55); backdrop-filter: blur(14px); padding: 14px; }
         .date-field.open .date-popover { display: block; }
         .date-picker-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
         .date-picker-title { color: #fff; font-size: 14px; font-weight: 800; }
@@ -2062,7 +2077,7 @@
             .json-editor-textarea { min-height: 440px; }
             .input { min-height: 42px; border-radius: 11px; font-size: 12px; text-align: center; appearance: none; -webkit-appearance: none; }
             .date-trigger { min-height: 42px; border-radius: 11px; font-size: 12px; }
-            .date-popover { left: 50%; transform: translateX(-50%); width: min(330px, calc(100vw - 32px)); }
+            .date-popover { left: 50%; transform: translateX(calc(-50% + var(--date-popover-shift, 0px))); width: min(330px, calc(100vw - 32px)); }
             .date-presets { gap: 7px; }
             .date-presets-label { flex-basis: 100%; }
             .date-preset-group { width: 100%; }
@@ -3344,6 +3359,20 @@
                             <input type="checkbox" id="broadcast-disable-preview" checked>
                             <span>Отключить превью ссылок в сообщении</span>
                         </label>
+                        <div class="broadcast-promo-audience" id="broadcast-promo-audience" data-has-promo="false">
+                            <div class="broadcast-promo-audience-title"><i class="fas fa-ticket"></i>Кому отправлять промокод из кнопки</div>
+                            <div class="broadcast-promo-audience-options" role="radiogroup" aria-label="Получатели промокода">
+                                <label class="broadcast-promo-audience-option">
+                                    <input type="radio" name="broadcast-promo-recipients" value="all" checked disabled>
+                                    <span><b>Всем в сегменте</b><small>включая тех, кто уже активировал этот промокод — отправится повторно</small></span>
+                                </label>
+                                <label class="broadcast-promo-audience-option">
+                                    <input type="radio" name="broadcast-promo-recipients" value="exclude_activated" disabled>
+                                    <span><b>Исключить активировавших</b><small>кто уже активировал промокод из кнопки, сообщение не получит</small></span>
+                                </label>
+                            </div>
+                            <div class="broadcast-promo-audience-hint" id="broadcast-promo-audience-hint">Выбор доступен после добавления кнопки «Промокод».</div>
+                        </div>
                         <div class="broadcast-buttons" id="broadcast-buttons"></div>
                         <div class="broadcast-actions">
                             <button class="btn broadcast-launch" type="button" id="broadcast-create"><i class="fas fa-paper-plane"></i>Запустить рассылку</button>
@@ -4643,6 +4672,21 @@
             return partner ? localDateFromIso(partner.value) : null;
         }
 
+        // Сдвигает открытый календарь внутрь окна, если он вылезает за правый/левый край экрана
+        // (поля «Дата конца» у правого края карточки иначе обрезаются viewport'ом).
+        function positionDatePopover(field) {
+            const popover = field.querySelector('[data-date-popover]');
+            if (!popover || !field.classList.contains('open')) return;
+            popover.style.setProperty('--date-popover-shift', '0px');
+            const margin = 12;
+            const rect = popover.getBoundingClientRect();
+            const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+            let shift = 0;
+            if (rect.right > viewportWidth - margin) shift = viewportWidth - margin - rect.right;
+            if (rect.left + shift < margin) shift = margin - rect.left;
+            popover.style.setProperty('--date-popover-shift', `${Math.round(shift)}px`);
+        }
+
         function renderDatePicker(field, viewDate) {
             const popover = field.querySelector('[data-date-popover]');
             const input = field.querySelector('input[type="hidden"]');
@@ -4682,6 +4726,7 @@
                     <button type="button" class="date-quick" data-date-close>Закрыть</button>
                 </div>
             `;
+            positionDatePopover(field);
             popover.querySelector('[data-date-prev]').addEventListener('click', () => renderDatePicker(field, new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1)));
             popover.querySelector('[data-date-next]').addEventListener('click', () => renderDatePicker(field, new Date(viewDate.getFullYear(), viewDate.getMonth() + 1, 1)));
             popover.querySelector('[data-date-today]').addEventListener('click', () => {
@@ -4732,6 +4777,9 @@
                 popover.addEventListener('click', (event) => event.stopPropagation());
             });
             document.addEventListener('click', () => closeDatePickers());
+            window.addEventListener('resize', () => {
+                document.querySelectorAll('[data-date-picker].open').forEach(positionDatePopover);
+            });
         }
 
         function setupStatsPresets() {
@@ -6846,6 +6894,8 @@
             if (main.dataset.fullAdmin !== '1') return '';
             const autopayActive = Boolean(result.autopay?.yk || result.autopay?.wata);
             const referralBlocked = Boolean(refResult?.referral_block?.blocked);
+            const accountBlock = refResult?.account_block || null;
+            const accountBlocked = Boolean(accountBlock?.blocked);
             return `
                 <section class="client-overview-workspace">
                     <div class="client-overview-heading">
@@ -6874,7 +6924,7 @@
                                     <span class="client-action-icon"><i class="fas fa-rotate-left"></i></span>
                                     <div class="client-action-copy">
                                         <strong>Подготовить возврат</strong>
-                                        <span>Срок станет 1 час · автоплатёж не изменится</span>
+                                        <span>Срок станет 1 час · автоплатёж отключится, рекуррент удалится</span>
                                     </div>
                                     <div class="client-action-controls">
                                         <button class="btn btn-secondary client-action-button" type="button" data-client-sub-action="set_trial_hour">Подготовить</button>
@@ -6902,7 +6952,7 @@
                                     <span class="client-action-icon"><i class="fas fa-user-lock"></i></span>
                                     <div class="client-action-copy">
                                         <strong>Временная блокировка</strong>
-                                        <span>Ban-сквад; бот снимет блокировку автоматически</span>
+                                        <span>Ban-сквад; бот снимет блокировку автоматически · пользователю уйдёт уведомление от бота</span>
                                     </div>
                                     <div class="client-action-controls">
                                         <label class="client-number-field"><input class="input" id="client-ban-hours" type="number" min="1" step="1" value="24" aria-label="Длительность блокировки"><span>часа</span></label>
@@ -6910,13 +6960,17 @@
                                     </div>
                                 </div>
                                 <div class="client-action-row">
-                                    <span class="client-action-icon"><i class="fas fa-power-off"></i></span>
+                                    <span class="client-action-icon"><i class="fas ${accountBlocked ? 'fa-lock' : 'fa-power-off'}"></i></span>
                                     <div class="client-action-copy">
-                                        <strong>Отключить доступ</strong>
-                                        <span>RWMS → DISABLED; автоплатёж отключится</span>
+                                        <div class="client-action-title-line"><strong>${accountBlocked ? 'Аккаунт заблокирован' : 'Отключить доступ'}</strong><span class="client-inline-status ${accountBlocked ? 'is-blocked' : 'is-active'}">${accountBlocked ? 'Заблокирован' : 'Активен'}</span></div>
+                                        <span>${accountBlocked
+                                            ? `Как /block-user: бот отвечает только «аккаунт заблокирован», рефералка и автоплатёж отключены${accountBlock?.reason ? ` · причина: ${escapeHtml(accountBlock.reason)}` : ''}${accountBlock?.created_at ? ` · с ${escapeHtml(accountBlock.created_at)}` : ''}`
+                                            : 'Полная блокировка, как /block-user: бот отвечает только «аккаунт заблокирован», рефералка и автоплатёж отключаются, RWMS → DISABLED'}</span>
                                     </div>
                                     <div class="client-action-controls">
-                                        <button class="btn btn-danger client-action-button" type="button" data-client-sub-action="disable_subscription">Отключить</button>
+                                        ${accountBlocked
+                                            ? '<button class="btn btn-secondary client-action-button" type="button" data-client-sub-action="unblock_account">Снять блокировку</button>'
+                                            : '<button class="btn btn-danger client-action-button" type="button" data-client-sub-action="block_account">Заблокировать</button>'}
                                     </div>
                                 </div>
                             </div>
@@ -7505,16 +7559,38 @@
                 row.querySelector('.broadcast-btn-url').hidden = type !== 'url';
                 row.querySelector('.broadcast-btn-promo').hidden = type !== 'claim_promo';
                 row.querySelector('.broadcast-btn-tariffs').hidden = type !== 'tariffs';
+                syncBroadcastPromoAudience();
                 renderBroadcastPreview();
             };
             typeSelect.addEventListener('change', sync);
             row.querySelectorAll('input, select').forEach((field) => field.addEventListener('input', renderBroadcastPreview));
             row.querySelector('.broadcast-btn-remove').addEventListener('click', () => {
                 row.remove();
-                renderBroadcastPreview();
+                syncBroadcastPromoAudience();
+                renderBroadcadPreviewSafe();
             });
             container.appendChild(row);
             sync();
+        }
+
+        function broadcastHasPromoButton() {
+            return Array.from(document.querySelectorAll('#broadcast-buttons .broadcast-btn-type'))
+                .some((select) => select.value === 'claim_promo');
+        }
+
+        // Режим получателей промокода (всем / исключить активировавших) —
+        // явный выбор админа; без кнопки claim_promo переключатель неактивен.
+        function syncBroadcastPromoAudience() {
+            const block = document.getElementById('broadcast-promo-audience');
+            if (!block) return;
+            const hasPromo = broadcastHasPromoButton();
+            block.dataset.hasPromo = String(hasPromo);
+            block.querySelectorAll('input[name="broadcast-promo-recipients"]').forEach((input) => { input.disabled = !hasPromo; });
+        }
+
+        function broadcastPromoRecipients() {
+            if (!broadcastHasPromoButton()) return 'all';
+            return document.querySelector('input[name="broadcast-promo-recipients"]:checked')?.value || 'all';
         }
 
         function parseBroadcastTariffSpec(raw) {
@@ -7662,9 +7738,16 @@
             if (isTest) {
                 const testId = document.getElementById('broadcast-test-id').value.trim();
                 if (!/^\d+$/.test(testId)) return showAdminToast('Укажите Telegram ID для теста', 'error');
-            } else {
+            }
+            const hasPromoButton = buttons.some((button) => button.type === 'claim_promo');
+            const promoRecipients = hasPromoButton ? broadcastPromoRecipients() : 'all';
+            if (!isTest) {
                 const hint = document.getElementById('broadcast-segment-hint').textContent;
-                if (!confirm(`Запустить рассылку «${title}»?\n${hint}\nОтправка начнётся немедленно.`)) return;
+                const promoLine = !hasPromoButton ? ''
+                    : promoRecipients === 'exclude_activated'
+                        ? '\nПромокод: без тех, кто уже активировал его.'
+                        : '\nПромокод: всем в сегменте, включая уже активировавших (повторно).';
+                if (!confirm(`Запустить рассылку «${title}»?\n${hint}${promoLine}\nОтправка начнётся немедленно.`)) return;
             }
             const body = new FormData();
             body.append('csrfmiddlewaretoken', csrfToken);
@@ -7674,6 +7757,7 @@
             body.append('text', text);
             body.append('buttons', JSON.stringify(buttons));
             if (document.getElementById('broadcast-disable-preview')?.checked) body.append('disable_preview', '1');
+            if (hasPromoButton) body.append('promo_recipients', promoRecipients);
             if (mediaFile) body.append('media', mediaFile);
             if (isTest) body.append('telegram_id', document.getElementById('broadcast-test-id').value.trim());
             const response = await fetch(main.dataset.broadcastsUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
@@ -7740,6 +7824,7 @@
                         `<span class="broadcast-badge accent"><i class="fas fa-users"></i>${escapeHtml(row.segment_label || 'Сегмент')}</span>`,
                         row.is_test ? '<span class="broadcast-badge"><i class="fas fa-vial"></i>тест</span>' : '',
                         row.has_media ? '<span class="broadcast-badge"><i class="fas fa-image"></i>фото</span>' : '',
+                        row.exclude_promo_id ? `<span class="broadcast-badge" title="Активировавшие промокод исключены из рассылки"><i class="fas fa-user-slash"></i>без активировавших ${escapeHtml(row.exclude_promo_code || 'промокод')}</span>` : '',
                         ...(row.buttons || []).map((button) => button.type === 'claim_promo'
                             ? `<span class="broadcast-badge"><i class="fas fa-ticket"></i>${escapeHtml(button.code || 'промокод')}</span>`
                             : button.type === 'tariffs' ? '<span class="broadcast-badge"><i class="fas fa-layer-group"></i>тарифы</span>' : ''),
@@ -8525,10 +8610,11 @@
         }
 
         const CLIENT_SUB_CONFIRMS = {
-            set_trial_hour: 'Сбросить подписку до 1 часа? Используется при возврате средств.',
+            set_trial_hour: 'Подготовить возврат: срок подписки станет 1 час, автоплатёж будет отключён (рекуррент удалён)?',
             stop_autopay: 'Отключить автоплатёж этому клиенту?',
-            disable_subscription: 'Отключить подписку (DISABLED) и автоплатёж? Клиент потеряет доступ до ручной оплаты.',
-            temp_ban: 'Временно забанить подписку (ban-сквад)? Снимется автоматически по истечении срока.',
+            block_account: 'Полностью заблокировать аккаунт (как /block-user)? Бот будет отвечать только «аккаунт заблокирован», рефералка и автоплатёж отключатся, подписка в RWMS → DISABLED.',
+            unblock_account: 'Снять блокировку аккаунта? Доступ к боту и рефералка вернутся, подписка в RWMS станет ACTIVE (если срок не истёк); автоплатёж останется выключенным.',
+            temp_ban: 'Временно забанить подписку (ban-сквад)? Снимется автоматически по истечении срока. Пользователю уйдёт уведомление о блокировке от бота.',
         };
 
         async function clientSubscriptionAction(action) {
@@ -8580,6 +8666,7 @@
             if (result.old_expire_at) parts.push(`Было: <span class="green">${escapeHtml(result.old_expire_at)}</span>`);
             if (result.new_expire_at) parts.push(`Стало: <span class="green">${escapeHtml(result.new_expire_at)}</span>`);
             if (typeof result.rwms_updated !== 'undefined') parts.push(`RWMS: <span class="${result.rwms_updated ? 'green' : 'red'}">${result.rwms_updated ? 'обновлен' : 'не обновлен'}</span>`);
+            if (typeof result.user_notified !== 'undefined') parts.push(`Уведомление пользователю: <span class="${result.user_notified ? 'green' : 'red'}">${result.user_notified ? 'передано боту' : 'не отправлено'}</span>`);
             clientCardState.lastAction = parts.length
                 ? `<i class="fas fa-circle-check"></i> ${parts.join(' · ')}`
                 : '<i class="fas fa-circle-check"></i> Готово';

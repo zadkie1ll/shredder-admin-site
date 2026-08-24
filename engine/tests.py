@@ -4043,6 +4043,18 @@ class NodeTrafficTemplateTests(SimpleTestCase):
             template,
         )
 
+    def test_date_popover_is_kept_inside_viewport(self):
+        # Календарь у правого края карточки не должен вылезать за экран:
+        # после открытия/перелистывания/ресайза JS считает сдвиг и кладёт его в CSS-переменную.
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn("function positionDatePopover(field)", template)
+        self.assertIn("popover.style.setProperty('--date-popover-shift', `${Math.round(shift)}px`);", template)
+        self.assertIn("transform: translateX(var(--date-popover-shift, 0px));", template)
+        self.assertIn("transform: translateX(calc(-50% + var(--date-popover-shift, 0px)));", template)
+        self.assertIn("positionDatePopover(field);\n            popover.querySelector('[data-date-prev]')", template)
+        self.assertIn("document.querySelectorAll('[data-date-picker].open').forEach(positionDatePopover);", template)
+
     def test_node_traffic_loads_today_report_on_first_tab_open(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
@@ -5367,6 +5379,176 @@ class AdminStage4Tests(SimpleTestCase):
             "addEventListener('click', () => loadBroadcastsList())", template
         )
         self.assertNotIn("setTimeout(loadBroadcastsList, 5000)", template)
+
+    def test_disable_access_is_full_account_block_like_bot_block_user(self):
+        """«Отключить доступ» = полная блокировка, как /block-user в боте:
+        user_blocks (бот отвечает только «аккаунт заблокирован»), блок
+        рефералки, автоплатёж выключен и рекуррент удалён, RWMS → DISABLED.
+        Обратное действие — как /unblock-user (RWMS ACTIVE только при живом
+        сроке, автоплатёж остаётся выключенным)."""
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_subscription_manage)
+        self.assertIn('if action in ("block_account", "disable_subscription"):', src)
+        self.assertIn('if action == "unblock_account":', src)
+        self.assertIn("admin_block_account(", src)
+        self.assertIn("admin_unblock_account(", src)
+
+        block_src = inspect.getsource(views.admin_block_account)
+        for needle in (
+            "UserBlock(user_id=user.id, reason=reason)",
+            "ReferralProgramBlock(user_id=user.id, reason=reason)",
+            "user.autopay_allow = False",
+            "YkRecurrentPayment.user_id == user.id",
+            "proto.UserStatus.DISABLED",
+            '"account_block"',
+        ):
+            self.assertIn(needle, block_src)
+        unblock_src = inspect.getsource(views.admin_unblock_account)
+        self.assertIn("UserBlock.user_id == user.id", unblock_src)
+        self.assertIn("sa_delete(ReferralProgramBlock)", unblock_src)
+        self.assertIn("proto.UserStatus.ACTIVE", unblock_src)
+        self.assertNotIn("autopay_allow = True", unblock_src)
+
+        payload_src = inspect.getsource(views.admin_referral_payload)
+        self.assertIn('"account_block": admin_account_block_payload(db_session, user)', payload_src)
+
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.assertIn('data-client-sub-action="block_account"', template)
+        self.assertIn('data-client-sub-action="unblock_account"', template)
+        self.assertNotIn('data-client-sub-action="disable_subscription"', template)
+        self.assertIn("const accountBlocked = Boolean(accountBlock?.blocked);", template)
+        self.assertIn("Полностью заблокировать аккаунт (как /block-user)?", template)
+
+    def test_temp_ban_pushes_notice_to_bot_queues(self):
+        """Временный бан из админки уведомляет пользователя тем же текстом, что
+        бот (NOTIFY_TEMPORARY_BAN): служебный пуш admin-temporary-ban в
+        Redis-очереди всех ботов (как user-notify), шлёт сам бот."""
+        import inspect
+        from unittest import mock
+
+        from django.test import override_settings
+
+        from engine import bot_push, views
+
+        src = inspect.getsource(views.support_admin_api_subscription_manage)
+        self.assertIn("push_admin_temporary_ban(", src)
+        self.assertIn('"user_notified": user_notified', src)
+
+        with override_settings(BOT_REDIS_HOST="", BOT_REDIS_QUEUES="a,b"):
+            self.assertFalse(bot_push.is_enabled())
+            self.assertFalse(bot_push.push_admin_temporary_ban(42, 120))
+
+        fake = mock.Mock()
+        with override_settings(
+            BOT_REDIS_HOST="redis", BOT_REDIS_QUEUES="brand-vpn-bot, brand-vps-bot"
+        ), mock.patch.object(bot_push, "_redis_client", return_value=fake):
+            self.assertTrue(bot_push.push_admin_temporary_ban("42", 120))
+            # Без telegram_id уведомлять некого
+            self.assertFalse(bot_push.push_admin_temporary_ban(None, 120))
+
+        self.assertEqual(fake.rpush.call_count, 2)
+        queues = [call.args[0] for call in fake.rpush.call_args_list]
+        self.assertEqual(queues, ["brand-vpn-bot", "brand-vps-bot"])
+        payload = json.loads(fake.rpush.call_args_list[0].args[1])
+        self.assertEqual(payload["type"], "admin-temporary-ban")
+        self.assertEqual(payload["notification_type"], "admin_temporary_ban")
+        self.assertEqual(payload["telegram_id"], 42)
+        self.assertEqual(payload["ban_minutes"], 120)
+
+        # Redis недоступен — действие не падает, пуш просто не уходит (False).
+        fake_err = mock.Mock()
+        fake_err.rpush.side_effect = RuntimeError("down")
+        with override_settings(BOT_REDIS_HOST="redis", BOT_REDIS_QUEUES="q"), mock.patch.object(
+            bot_push, "_redis_client", return_value=fake_err
+        ), self.assertLogs(level="ERROR"):
+            self.assertFalse(bot_push.push_admin_temporary_ban(42, 60))
+
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.assertIn("result.user_notified", template)
+
+    def test_prepare_refund_removes_recurrent_payments(self):
+        """«Подготовить возврат» (set_trial_hour) обязан снимать автоплатёж:
+        срок 1 час сразу попадает в окно автосписания yk-recurrent
+        [expire-4ч; expire+overdue], и без удаления рекуррента клиенту,
+        которому возвращают деньги, спишут их снова. Поведение — как у
+        stop_autopay и бот-команды /set-trial-hour."""
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_subscription_manage)
+        trial = src[src.index('if action == "set_trial_hour":'):src.index('elif action == "extend":')]
+        self.assertIn("user.autopay_allow = False", trial)
+        self.assertIn("YkRecurrentPayment.user_id == user.id", trial)
+        self.assertIn(".delete(synchronize_session=False)", trial)
+        self.assertIn("removed_recurrents=removed_recurrents", src)
+        self.assertIn('"removed_recurrents": removed_recurrents', src)
+        self.assertIn("Возврат подготовлен: срок 1 час, автоплатёж отключён", src)
+
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.assertIn("Срок станет 1 час · автоплатёж отключится, рекуррент удалится", template)
+        self.assertNotIn("автоплатёж не изменится", template)
+        self.assertIn("автоплатёж будет отключён (рекуррент удалён)?", template)
+
+    def test_broadcast_can_exclude_users_who_activated_promo(self):
+        """Переключатель «Кому отправлять промокод из кнопки»: режим
+        promo_recipients=exclude_activated привязан к кнопке claim_promo, promo_id
+        кнопки пишется в broadcasts.exclude_promo_id; total считается с тем же
+        фильтром (EXCLUDE_PROMO_USED_SQL), что применяют боты при выборке."""
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_broadcasts)
+        self.assertIn('request.POST.get("promo_recipients") or "all"', src)
+        self.assertIn("promo_recipients not in BROADCAST_PROMO_RECIPIENTS", src)
+        self.assertIn('promo_recipients == "exclude_activated"', src)
+        self.assertEqual(views.BROADCAST_PROMO_RECIPIENTS, {"all", "exclude_activated"})
+        self.assertIn("Исключение активировавших требует кнопку промокода", src)
+        self.assertIn("segment_count_sql(segment, exclude_promo=True)", src)
+        self.assertIn('{"exclude_promo_id": exclude_promo_id}', src)
+        self.assertIn("exclude_promo_id=exclude_promo_id,", src)
+        payload_src = inspect.getsource(views.admin_broadcast_payload)
+        self.assertIn('"exclude_promo_id"', payload_src)
+        self.assertIn('"exclude_promo_code"', payload_src)
+
+        from types import SimpleNamespace
+
+        buttons = [{"type": "claim_promo", "promo_id": 7, "code": "SALE20"}]
+        self.assertEqual(
+            views.admin_broadcast_exclude_promo_code(
+                SimpleNamespace(exclude_promo_id=7, buttons=buttons)
+            ),
+            "SALE20",
+        )
+        self.assertIsNone(
+            views.admin_broadcast_exclude_promo_code(
+                SimpleNamespace(exclude_promo_id=None, buttons=buttons)
+            )
+        )
+
+        from common.models.db import Broadcast
+        from common.models.segments import EXCLUDE_PROMO_USED_SQL, segment_count_sql
+
+        self.assertTrue(hasattr(Broadcast, "exclude_promo_id"))
+        self.assertIn("promo_code_uses", EXCLUDE_PROMO_USED_SQL)
+        self.assertIn(":exclude_promo_id", EXCLUDE_PROMO_USED_SQL)
+        self.assertNotIn("promo_code_uses", segment_count_sql("all"))
+        self.assertIn("promo_code_uses", segment_count_sql("all", exclude_promo=True))
+
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        # Явный переключатель режима (всем / исключить активировавших),
+        # по умолчанию — всем; без кнопки промокода радио неактивны.
+        self.assertIn('id="broadcast-promo-audience" data-has-promo="false"', template)
+        self.assertIn('name="broadcast-promo-recipients" value="all" checked disabled', template)
+        self.assertIn('name="broadcast-promo-recipients" value="exclude_activated" disabled', template)
+        self.assertIn("function syncBroadcastPromoAudience()", template)
+        self.assertIn("function broadcastPromoRecipients()", template)
+        self.assertIn("body.append('promo_recipients', promoRecipients)", template)
+        self.assertIn("row.exclude_promo_id ?", template)
 
     def test_broadcast_link_preview_can_be_disabled(self):
         """Чекбокс «Отключить превью ссылок»: флаг сохраняется в broadcasts и
