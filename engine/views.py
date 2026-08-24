@@ -2631,8 +2631,12 @@ def offer(request):
         "offer.html",
         {
             "site_role": get_site_role(request),
+            # В таблице 2.1 — все платные тарифы, включая «Пробный период на
+            # 3 дня» и «Подписку на 1 день» (продаются в Telegram-боте): оферта
+            # обязана перечислять всё, что можно оплатить, особенно тарифы с
+            # автопродлением через YooKassa (раздел 4).
             "tariffs": [
-                offer_tariffs[tariff.db_tariff_id] for tariff in ACTUAL_TARIFFS
+                offer_tariffs[tariff.db_tariff_id] for tariff in OFFER_TARIFFS
             ],
             "offer_tariffs": offer_tariffs,
             "trial_period_days_label": format_days_ru(settings.SITE_TRIAL_PERIOD_DAYS),

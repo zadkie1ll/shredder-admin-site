@@ -953,6 +953,27 @@ class OfferTemplateTests(SimpleTestCase):
         self.assertNotIn("19 ₽", template)
         self.assertIn("покупка является разовой", template)
 
+    def test_offer_tariff_table_lists_all_paid_tariffs(self):
+        """Таблица 2.1 обязана перечислять ВСЕ платные тарифы, включая
+        «Пробный период на 3 дня» (10 ₽) и «Подписку на 1 день» (19 ₽) —
+        они продаются в боте и подключают автопродление YooKassa (раздел 4),
+        поэтому не могут отсутствовать в перечне тарифов оферты."""
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.offer)
+        self.assertIn("for tariff in OFFER_TARIFFS", src)
+        self.assertNotIn("for tariff in ACTUAL_TARIFFS", src)
+        # OFFER_TARIFFS = trial 3 дня + 1 день + витрина сайта
+        ids = [tariff.db_tariff_id for tariff in views.OFFER_TARIFFS]
+        self.assertEqual(ids, ["threedays", "oneday", "month", "threemonths", "year"])
+
+        template = Path("engine/templates/offer.html").read_text()
+        # 2.2 не дублирует таблицу ценой, а говорит, где какие тарифы доступны.
+        self.assertIn("доступны для оплаты в Telegram-боте Сервиса", template)
+        self.assertNotIn("также доступен тариф «Подписка на 1 день» стоимостью", template)
+
     def test_offer_brand_follows_site_role(self):
         # Шапка оферты обязана подстраиваться под тип домена: на VPS-доменах
         # "MONKEY ISLAND VPS", на VPN/кабинетных — "MONKEY ISLAND VPN".
