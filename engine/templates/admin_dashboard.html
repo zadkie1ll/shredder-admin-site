@@ -2214,6 +2214,18 @@
         #panel-node-traffic .node-traffic-user-copy { min-width: 0; }
         #panel-node-traffic .node-traffic-user-copy b,
         #panel-node-traffic .node-traffic-user-copy small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        #panel-node-traffic button.node-traffic-user { border: 0; padding: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+        #panel-node-traffic button.node-traffic-user:hover .node-traffic-user-copy b,
+        #panel-node-traffic button.node-traffic-user:focus-visible .node-traffic-user-copy b { color: var(--brand-gold); }
+        #panel-node-traffic button.node-traffic-user:hover .node-traffic-user-icon { color: var(--brand-gold); background: rgba(255,199,0,.08); }
+        .node-traffic-user-modal-card { width: min(640px, 100%); }
+        .nt-user-modal-body { padding: 16px 18px 18px; display: grid; gap: 12px; overflow-y: auto; }
+        .nt-user-modal-status { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .nt-user-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; }
+        .nt-user-fact { min-width: 0; padding: 10px 12px; border: 1px solid var(--panel-border); border-radius: 10px; background: rgba(255,255,255,.03); }
+        .nt-user-fact span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 9.5px; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+        .nt-user-fact strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-main); font-size: 13px; }
+        .nt-user-modal-actions { display: flex; justify-content: flex-end; gap: 10px; padding-top: 2px; }
         #panel-node-traffic .node-traffic-user-copy b { margin-bottom: 3px; color: var(--text-main); font-size: 13px; font-weight: 800; }
         #panel-node-traffic .node-traffic-user-copy small { color: var(--muted); font-size: 9.5px; font-weight: 600; }
         #panel-node-traffic .node-traffic-total { color: #eef2f7; font-size: 13px; font-weight: 850; }
@@ -3907,10 +3919,12 @@
                 <select class="input" name="node" id="node-traffic-node">
                     <option value="all">Все ноды</option>
                 </select>
-                <!-- Статистика панели посуточная (UTC): начало периода выравнивается
-                     вниз до полуночи, поэтому пресеты короче суток не имеют смысла -->
+                <!-- Статистика панели посуточная по СУТКАМ UTC (03:00–03:00 МСК):
+                     начало периода выравнивается вниз до полуночи UTC, поэтому
+                     пресеты короче суток не имеют смысла, а «Сегодня» начинается
+                     в 03:00 по Москве -->
                 <select class="input" name="hours">
-                    <option value="1" selected>Сегодня (UTC)</option>
+                    <option value="1" selected>Сегодня (с 03:00 МСК)</option>
                     <option value="24">Вчера + сегодня</option>
                     <option value="168">7 дней</option>
                     <option value="720">30 дней</option>
@@ -4212,6 +4226,18 @@
         </section>
     </main>
 
+    <div id="node-traffic-user-modal" class="modal-overlay" aria-hidden="true">
+        <section class="modal-card node-traffic-user-modal-card" role="dialog" aria-modal="true" aria-labelledby="node-traffic-user-modal-title">
+            <header class="modal-header">
+                <div>
+                    <h2 id="node-traffic-user-modal-title" class="modal-title">Подписка</h2>
+                    <div class="modal-subtitle">Быстрая карточка из отчёта по трафику</div>
+                </div>
+                <button type="button" class="modal-close" data-nt-user-modal-close aria-label="Закрыть"><i class="fas fa-xmark"></i></button>
+            </header>
+            <div class="nt-user-modal-body" id="node-traffic-user-modal-body"></div>
+        </section>
+    </div>
     <div id="config-template-modal" class="modal-overlay" aria-hidden="true">
         <section class="modal-card config-template-modal-card" role="dialog" aria-modal="true" aria-labelledby="config-template-modal-title">
             <header class="modal-header">
@@ -6847,6 +6873,87 @@
                 </section>`;
         }
 
+        // ---------- Быстрая карточка подписки из «Трафика нод» ----------
+
+        function closeNodeTrafficUserModal() {
+            const modal = document.getElementById('node-traffic-user-modal');
+            if (!modal || !modal.classList.contains('open')) return;
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+            unlockBodyScroll();
+        }
+
+        function ntUserFact(label, value, tone = '') {
+            return `<div class="nt-user-fact"><span>${label}</span><strong class="${tone}" title="${escapeHtml(String(value))}">${escapeHtml(String(value))}</strong></div>`;
+        }
+
+        function ntUserModalHtml(result, traffic) {
+            const user = result.user || {};
+            const autopayActive = Boolean(result.autopay?.yk || result.autopay?.wata);
+            const daysLeft = typeof user.days_left === 'number' ? user.days_left : null;
+            const statusPill = `<span class="client-status-pill ${user.is_active ? 'is-active' : 'is-expired'}">${user.is_active ? 'Активна' : 'Истекла'}</span>`;
+            const trafficLine = traffic?.available
+                ? `${formatClientTrafficBytes(traffic.used_traffic_bytes)} · всего ${formatClientTrafficBytes(traffic.lifetime_used_traffic_bytes)}`
+                : 'Нет данных RWMS';
+            return `
+                <div class="nt-user-modal-status">${statusPill}<span class="muted">до ${escapeHtml(user.expire_at || '—')}${user.is_active && daysLeft !== null ? ` · осталось дней: ${daysLeft}` : ''}</span></div>
+                <div class="nt-user-facts">
+                    ${ntUserFact('Telegram ID', user.telegram_id || '—')}
+                    ${ntUserFact('Email', user.email || '—')}
+                    ${ntUserFact('Автоплатёж', autopayActive ? 'Подключён' : 'Отключён', autopayActive ? 'green' : '')}
+                    ${ntUserFact('LTV', money(result.ltv))}
+                    ${ntUserFact('Регистрация', result.first_seen || '—')}
+                    ${ntUserFact('Первое подключение', traffic?.available ? (traffic.first_connected || 'Не подключался') : '—')}
+                    ${ntUserFact('Трафик RWMS', trafficLine)}
+                    ${ntUserFact('Платежей', (result.history || []).length)}
+                </div>
+                <div class="nt-user-modal-actions">
+                    <button type="button" class="btn" data-nt-user-open-card="${escapeHtml(user.username || '')}"><i class="fas fa-user-gear"></i>Открыть карточку клиента</button>
+                </div>`;
+        }
+
+        async function openNodeTrafficUserModal(username) {
+            const modal = document.getElementById('node-traffic-user-modal');
+            const body = document.getElementById('node-traffic-user-modal-body');
+            const title = document.getElementById('node-traffic-user-modal-title');
+            if (!modal || !body) return;
+            title.textContent = username;
+            body.innerHTML = '<div class="muted"><i class="fas fa-spinner fa-spin"></i> Загружаем данные подписки…</div>';
+            modal.classList.add('open');
+            modal.setAttribute('aria-hidden', 'false');
+            lockBodyScroll();
+            const params = new URLSearchParams({q: username});
+            const options = {headers: {'X-Requested-With': 'XMLHttpRequest'}};
+            try {
+                const [paymentsResponse, trafficResponse] = await Promise.all([
+                    fetch(`${main.dataset.userPaymentsUrl}?${params}`, options),
+                    fetch(`${main.dataset.userTrafficUrl}?${params}`, options),
+                ]);
+                if (!paymentsResponse.ok) {
+                    body.innerHTML = '<div class="muted">Пользователь не найден в БД сайта — подписка есть только в панели.</div>';
+                    return;
+                }
+                const {result} = await paymentsResponse.json();
+                let traffic = null;
+                if (trafficResponse.ok) {
+                    try { traffic = (await trafficResponse.json())?.result || null; } catch (error) { traffic = null; }
+                }
+                body.innerHTML = ntUserModalHtml(result, traffic);
+            } catch (error) {
+                body.innerHTML = '<div class="muted">Ошибка запроса — попробуйте ещё раз.</div>';
+            }
+        }
+
+        function openClientCardFromNodeTraffic(username) {
+            closeNodeTrafficUserModal();
+            const form = document.getElementById('user-payments-form');
+            if (form?.elements.q) form.elements.q.value = username;
+            clientCardState.q = username;
+            clientCardState.lastAction = '';
+            showAdminTab('user-payments');
+            renderClientCard();
+        }
+
         function clientSummaryHtml(result) {
             const user = result.user || {};
             const autopayActive = Boolean(result.autopay?.yk || result.autopay?.wata);
@@ -6882,6 +6989,10 @@
                     <div class="client-summary-stat">
                         <span class="client-summary-label"><i class="fas fa-calendar"></i>Регистрация</span>
                         <strong class="client-summary-value">${escapeHtml(result.first_seen)}</strong>
+                    </div>
+                    <div class="client-summary-stat" data-client-first-connected-stat>
+                        <span class="client-summary-label"><i class="fas fa-plug"></i>Первое подключение <small>RWMS</small></span>
+                        <strong class="client-summary-value" data-client-first-connected-value aria-live="polite">Загрузка…</strong>
                     </div>
                     <div class="client-summary-stat">
                         <span class="client-summary-label"><i class="fas fa-arrows-rotate"></i>Автоплатёж</span>
@@ -7009,6 +7120,8 @@
             const valueTarget = document.querySelector('[data-client-traffic-value]');
             const metaTarget = document.querySelector('[data-client-traffic-meta]');
             const statTarget = document.querySelector('[data-client-traffic-stat]');
+            const firstConnectedTarget = document.querySelector('[data-client-first-connected-value]');
+            const setFirstConnected = (text) => { if (firstConnectedTarget?.isConnected) firstConnectedTarget.textContent = text; };
             if (!valueTarget || !metaTarget || !main.dataset.userTrafficUrl) return;
             try {
                 const params = new URLSearchParams({q: query});
@@ -7020,8 +7133,10 @@
                     valueTarget.textContent = '—';
                     metaTarget.textContent = 'Нет данных RWMS';
                     statTarget?.classList.add('is-unavailable');
+                    setFirstConnected('—');
                     return;
                 }
+                setFirstConnected(traffic.first_connected || 'Не подключался');
                 const used = formatClientTrafficBytes(traffic.used_traffic_bytes);
                 const lifetime = formatClientTrafficBytes(traffic.lifetime_used_traffic_bytes);
                 valueTarget.textContent = used;
@@ -7033,6 +7148,7 @@
                 valueTarget.textContent = '—';
                 metaTarget.textContent = 'RWMS временно недоступен';
                 statTarget?.classList.add('is-unavailable');
+                setFirstConnected('—');
             }
         }
 
@@ -9915,12 +10031,12 @@
                             <span class="node-traffic-section-icon"><i class="fas fa-chart-pie"></i></span>
                             <div class="node-traffic-section-copy"><h3>Сводка за период</h3><p>Объём потребления по выбранным нодам и фильтрам</p></div>
                         </div>
-                        <span class="node-traffic-report-badge"><i class="fas fa-clock"></i>UTC · посуточная статистика</span>
+                        <span class="node-traffic-report-badge" title="Панель хранит трафик по суткам UTC: одни сутки = 03:00–03:00 по Москве"><i class="fas fa-clock"></i>посуточно · сутки панели 03:00–03:00 МСК</span>
                     </header>
                     <div class="node-traffic-summary-grid">
                         <div class="node-traffic-summary-item is-primary">
                             <span class="node-traffic-summary-item-icon"><i class="fas fa-calendar-days"></i></span>
-                            <div class="node-traffic-summary-item-copy"><span>Период</span><strong title="${escapeHtml(report.start)} — ${escapeHtml(report.end)} UTC">${escapeHtml(report.start)} — ${escapeHtml(report.end)} UTC</strong></div>
+                            <div class="node-traffic-summary-item-copy"><span>Период</span><strong title="${escapeHtml(report.start)} — ${escapeHtml(report.end)} МСК">${escapeHtml(report.start)} — ${escapeHtml(report.end)} МСК</strong></div>
                         </div>
                         <div class="node-traffic-summary-item">
                             <span class="node-traffic-summary-item-icon"><i class="fas fa-server"></i></span>
@@ -9957,7 +10073,7 @@
                 return `
                     <div class="admin-table-row node-traffic-row${share >= 10 ? ' is-anomaly' : ''}">
                         <span class="node-traffic-rank">${index + 1}</span>
-                        <span class="node-traffic-user"><span class="node-traffic-user-icon"><i class="fas fa-user"></i></span><span class="node-traffic-user-copy"><b title="${escapeHtml(user.username)}">${escapeHtml(user.username)}</b><small>Подписка Remnawave</small></span></span>
+                        <button type="button" class="node-traffic-user" data-node-traffic-user="${escapeHtml(user.username)}" title="Открыть быструю карточку подписки"><span class="node-traffic-user-icon"><i class="fas fa-user"></i></span><span class="node-traffic-user-copy"><b title="${escapeHtml(user.username)}">${escapeHtml(user.username)}</b><small>Подписка Remnawave · клик — карточка</small></span></button>
                         <span class="node-traffic-cell-num node-traffic-total">${formatTrafficBytes(user.total_bytes)}</span>
                         <span class="node-traffic-share${shareTone}"><strong>${pct(share)}</strong><span class="node-traffic-share-track"><i style="width:${Math.min(100, Math.max(0, share))}%"></i></span></span>
                         <span class="node-traffic-cell-num">${formatTrafficBytes(avgValue)}</span>
@@ -10602,6 +10718,12 @@
             if (clientSubtabButton) showClientSection(clientSubtabButton.dataset.clientSubtab);
             const clientSectionLink = event.target.closest('[data-client-section-link]');
             if (clientSectionLink) showClientSection(clientSectionLink.dataset.clientSectionLink);
+            const ntUserButton = event.target.closest('[data-node-traffic-user]');
+            if (ntUserButton) openNodeTrafficUserModal(ntUserButton.dataset.nodeTrafficUser);
+            const ntUserOpenCard = event.target.closest('[data-nt-user-open-card]');
+            if (ntUserOpenCard) openClientCardFromNodeTraffic(ntUserOpenCard.dataset.ntUserOpenCard);
+            if (event.target.closest('[data-nt-user-modal-close]')) closeNodeTrafficUserModal();
+            if (event.target === document.getElementById('node-traffic-user-modal')) closeNodeTrafficUserModal();
             const clientSubActionButton = event.target.closest('[data-client-sub-action]');
             if (clientSubActionButton) clientSubscriptionAction(clientSubActionButton.dataset.clientSubAction);
             const clientReferralBlockButton = event.target.closest('[data-client-referral-block-action]');

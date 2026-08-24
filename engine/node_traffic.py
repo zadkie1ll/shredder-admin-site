@@ -11,7 +11,7 @@ import logging
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -203,7 +203,7 @@ def build_report(
                 proto.UserStatus.Name(d.status) if d.HasField("status") else None
             )
             row["expire_at"] = (
-                d.expire_at.ToDatetime().strftime("%Y-%m-%d")
+                (d.expire_at.ToDatetime() + timedelta(hours=3)).strftime("%Y-%m-%d")
                 if d.HasField("expire_at")
                 else None
             )
@@ -213,9 +213,12 @@ def build_report(
             row["telegram_id"] = d.telegram_id if d.HasField("telegram_id") else None
         users_payload.append(row)
 
+    # Метки периода показываем в МСК (данные панели при этом остаются
+    # посуточными по UTC: сутки панели = 03:00–03:00 МСК).
+    msk = timedelta(hours=3)
     return {
-        "start": start.strftime("%Y-%m-%d %H:%M"),
-        "end": end.strftime("%Y-%m-%d %H:%M"),
+        "start": (start + msk).strftime("%Y-%m-%d %H:%M"),
+        "end": (end + msk).strftime("%Y-%m-%d %H:%M"),
         "period_hours": round(period_hours, 2),
         "nodes_total": len(nodes),
         "failed_nodes": failed_nodes,

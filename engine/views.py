@@ -4220,10 +4220,23 @@ def admin_dt(value):
     return value
 
 
+# Админка работает по московскому времени (UTC+3, сезонных переходов нет).
+# В БД все таймстампы хранятся naive UTC; смещение применяется на границах:
+# в метках времени (admin_date_label), в разбиении на дни/недели/месяцы в
+# аналитике (admin_stats_bucket_sql + границы периодов) и в текстовых подписях.
+ADMIN_TZ_OFFSET = timedelta(hours=3)
+ADMIN_TZ_LABEL = "МСК"
+
+
+def admin_msk_today():
+    return (datetime.utcnow() + ADMIN_TZ_OFFSET).date()
+
+
 def admin_date_label(value, with_time=True):
     value = admin_dt(value)
     if not value:
         return "Нет данных"
+    value = value + ADMIN_TZ_OFFSET
     return value.strftime("%d.%m.%Y %H:%M" if with_time else "%d.%m.%Y")
 
 
@@ -4306,7 +4319,14 @@ def admin_stats_bucket_label(bucket_start, bucket_end, granularity):
     return bucket_start.strftime("%m.%Y")
 
 
+def admin_stats_msk_sql(value):
+    """naive-UTC таймстамп БД → naive-МСК: timezone('Europe/Moscow',
+    timezone('UTC', value)). Бакеты аналитики режутся по московским суткам."""
+    return func.timezone("Europe/Moscow", func.timezone("UTC", value))
+
+
 def admin_stats_bucket_sql(value, granularity):
+    value = admin_stats_msk_sql(value)
     if granularity == "day":
         return func.date_trunc("day", value)
     if granularity == "week":
@@ -4452,8 +4472,9 @@ def build_admin_sales_series(
     granularity_note,
     sales_mode="cohort",
 ):
-    start_datetime = datetime.combine(start_date, time.min)
-    end_datetime = datetime.combine(end_date, time.max)
+    # Границы периода — московские сутки, в UTC-времени БД это −3 часа.
+    start_datetime = datetime.combine(start_date, time.min) - ADMIN_TZ_OFFSET
+    end_datetime = datetime.combine(end_date, time.max) - ADMIN_TZ_OFFSET
     sales_mode = "absolute" if sales_mode == "absolute" else "cohort"
     bucket_start = admin_stats_bucket_start(start_date, granularity)
     buckets = {}
@@ -4879,6 +4900,7 @@ def admin_rwms_traffic_payload(username, client=None):
         "available": False,
         "used_traffic_bytes": None,
         "lifetime_used_traffic_bytes": None,
+        "first_connected": None,
     }
     if not username:
         return empty
@@ -4901,12 +4923,22 @@ def admin_rwms_traffic_payload(username, client=None):
             return 0
         return max(0, int(number))
 
+    # Дата первого подключения из панели (optional-поле proto): показывается
+    # в карточке клиента и быстрой карточке «Трафика нод».
+    first_connected = None
+    try:
+        if rwms_user.HasField("first_connected"):
+            first_connected = admin_date_label(rwms_user.first_connected.ToDatetime())
+    except (AttributeError, ValueError, TypeError):
+        first_connected = None
+
     return {
         "available": True,
         "used_traffic_bytes": safe_bytes(rwms_user.used_traffic_bytes),
         "lifetime_used_traffic_bytes": safe_bytes(
             rwms_user.lifetime_used_traffic_bytes
         ),
+        "first_connected": first_connected,
     }
 
 
@@ -5055,8 +5087,9 @@ def support_admin_api_user_traffic(request):
 def build_admin_interval_stats(
     db_session, start_date, end_date, requested_granularity="week", sales_mode="cohort"
 ):
-    start_datetime = datetime.combine(start_date, time.min)
-    end_datetime = datetime.combine(end_date, time.max)
+    # Границы периода — московские сутки, в UTC-времени БД это −3 часа.
+    start_datetime = datetime.combine(start_date, time.min) - ADMIN_TZ_OFFSET
+    end_datetime = datetime.combine(end_date, time.max) - ADMIN_TZ_OFFSET
     granularity, requested_granularity, granularity_note = (
         admin_stats_normalize_granularity(requested_granularity, start_date, end_date)
     )
@@ -5351,10 +5384,11 @@ def build_admin_cohort_retention_stats(
     а сама серия графика — build_admin_sales_series в режиме "cohort". Никакой
     существующий код при этом не меняется.
     """
-    period_start_dt = datetime.combine(period_start, time.min)
-    period_end_dt = datetime.combine(period_end, time.max)
-    cohort_start_dt = datetime.combine(cohort_start, time.min)
-    cohort_end_dt = datetime.combine(cohort_end, time.max)
+    # Границы периодов — московские сутки, в UTC-времени БД это −3 часа.
+    period_start_dt = datetime.combine(period_start, time.min) - ADMIN_TZ_OFFSET
+    period_end_dt = datetime.combine(period_end, time.max) - ADMIN_TZ_OFFSET
+    cohort_start_dt = datetime.combine(cohort_start, time.min) - ADMIN_TZ_OFFSET
+    cohort_end_dt = datetime.combine(cohort_end, time.max) - ADMIN_TZ_OFFSET
 
     granularity, requested_granularity, granularity_note = (
         admin_stats_normalize_granularity(
@@ -5575,7 +5609,7 @@ def support_admin_api_stats(request):
         return auth_response
 
     try:
-        today = date.today()
+        today = admin_msk_today()
         start_date = (
             admin_parse_date(request.GET.get("start"))
             if request.GET.get("start")
@@ -5620,7 +5654,7 @@ def support_admin_api_stats_source_users(request):
         return auth_response
 
     try:
-        today = date.today()
+        today = admin_msk_today()
         start_date = (
             admin_parse_date(request.GET.get("start"))
             if request.GET.get("start")
@@ -5655,8 +5689,9 @@ def support_admin_api_stats_source_users(request):
             status=400,
         )
 
-    start_datetime = datetime.combine(start_date, time.min)
-    end_datetime = datetime.combine(end_date, time.max)
+    # Границы периода — московские сутки, в UTC-времени БД это −3 часа.
+    start_datetime = datetime.combine(start_date, time.min) - ADMIN_TZ_OFFSET
+    end_datetime = datetime.combine(end_date, time.max) - ADMIN_TZ_OFFSET
     db_session = session_factory()
     try:
         first_subscription_events = (
@@ -5786,7 +5821,7 @@ def support_admin_api_cohort_stats(request):
         return auth_response
 
     try:
-        today = date.today()
+        today = admin_msk_today()
         # По умолчанию: внешний период — последние 12 месяцев, когорта — первый месяц.
         period_start = (
             admin_parse_date(request.GET.get("start"))
@@ -6354,7 +6389,7 @@ def support_admin_api_subscription_manage(request):
                 "status": "ok",
                 "result": {
                     "user": admin_user_payload(user),
-                    "action_label": f"Временный бан до {unban_at:%Y-%m-%d %H:%M} UTC (снимет бот)",
+                    "action_label": f"Временный бан до {unban_at + ADMIN_TZ_OFFSET:%Y-%m-%d %H:%M} МСК (снимет бот)",
                     "rwms_updated": True,
                     "user_notified": user_notified,
                 },
@@ -8265,7 +8300,7 @@ def _acq_renew45(db_session, months):
                 "payers": payers,
                 "renewed": renewed,
                 "renew_pct": round(100.0 * renewed / payers, 1) if payers else 0.0,
-                "mature": date.today() >= next_month + timedelta(days=45),
+                "mature": admin_msk_today() >= next_month + timedelta(days=45),
             }
         )
     return {"months": result}
@@ -9253,7 +9288,7 @@ def _acq_recurrent_dynamics(event_rows, months, today=None):
             active.add(user_id)
         return active
 
-    today = today or date.today()
+    today = today or admin_msk_today()
     today_month = date(today.year, today.month, 1)
     dynamics = []
     month_iter = month_back(today_month, months - 1)
@@ -10910,7 +10945,7 @@ def admin_bulk_extend(db_session, user, days):
     )
     if response is None:
         raise RuntimeError("RWMS не принял продление")
-    return f"продлено до {target_expire:%Y-%m-%d %H:%M} UTC"
+    return f"продлено до {target_expire + ADMIN_TZ_OFFSET:%Y-%m-%d %H:%M} МСК"
 
 
 def admin_account_block_payload(db_session, user):
@@ -11096,7 +11131,7 @@ def support_admin_api_bulk(request):
                 preview = {
                     "extend_days": (
                         f"будет продлён на {days} дн. "
-                        f"(сейчас до {current:%Y-%m-%d %H:%M} UTC)"
+                        f"(сейчас до {current + ADMIN_TZ_OFFSET:%Y-%m-%d %H:%M} МСК)"
                         if current
                         else f"будет продлён на {days} дн. (сейчас без подписки)"
                     ),
@@ -11738,7 +11773,7 @@ def support_admin_api_promo_cohort(request):
                     if first_paid_at.tzinfo
                     else first_paid_at
                 )
-                paid_day = naive_paid.date().isoformat()
+                paid_day = (naive_paid + ADMIN_TZ_OFFSET).date().isoformat()
                 first_payments_by_day[paid_day] = (
                     first_payments_by_day.get(paid_day, 0) + 1
                 )
@@ -11747,7 +11782,7 @@ def support_admin_api_promo_cohort(request):
                 if delta_days >= 0:
                     days_to_purchase.append(delta_days)
             if row.activated_at:
-                day = row.activated_at.date().isoformat()
+                day = (row.activated_at + ADMIN_TZ_OFFSET).date().isoformat()
                 activations_by_day[day] = activations_by_day.get(day, 0) + 1
             if len(users) < PROMO_COHORT_USERS_LIMIT:
                 users.append(

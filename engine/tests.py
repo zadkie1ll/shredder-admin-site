@@ -4079,7 +4079,7 @@ class NodeTrafficTemplateTests(SimpleTestCase):
     def test_node_traffic_loads_today_report_on_first_tab_open(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
-        self.assertIn('<option value="1" selected>Сегодня (UTC)</option>', template)
+        self.assertIn('<option value="1" selected>Сегодня (с 03:00 МСК)</option>', template)
         self.assertIn('<option value="24">Вчера + сегодня</option>', template)
         self.assertIn("let nodeTrafficInitialReportLoaded = false;", template)
         self.assertIn("if (!nodeTrafficInitialReportLoaded && form)", template)
@@ -4181,10 +4181,11 @@ class NodeTrafficDayGranularityTests(SimpleTestCase):
             with_details=False,
         )
 
-        # запрос к rwms ушёл с началом в полночь — суточный бакет 9 июля
+        # запрос к rwms ушёл с началом в полночь UTC — суточный бакет 9 июля
         # (created_at = 09.07 00:00) не будет отброшен фильтром панели
         self.assertEqual(captured["start"], datetime(2026, 7, 9, 0, 0))
-        self.assertEqual(report["start"], "2026-07-09 00:00")
+        # метки периода в отчёте показываются по МСК (UTC+3)
+        self.assertEqual(report["start"], "2026-07-09 03:00")
 
 
 class AcquisitionJourneyTests(SimpleTestCase):
@@ -5118,6 +5119,47 @@ class AdminClientWorkspaceTests(SimpleTestCase):
         self.assertEqual(payload["used_traffic_bytes"], 12_345_678)
         self.assertEqual(payload["lifetime_used_traffic_bytes"], 98_765_432)
         rwms.get_user_by_username.assert_called_once_with("594514115")
+        # SimpleNamespace без HasField — first_connected деградирует в None.
+        self.assertIsNone(payload["first_connected"])
+
+    def test_rwms_traffic_payload_exposes_first_connected_date(self):
+        """Дата первого подключения тянется из RWMS (proto first_connected)
+        и показывается в карточке клиента и быстрой карточке «Трафика нод»."""
+        from engine import views
+
+        class FakeRwmsUser:
+            used_traffic_bytes = 1
+            lifetime_used_traffic_bytes = 2
+            first_connected = SimpleNamespace(
+                ToDatetime=lambda: datetime(2026, 5, 1, 12, 30)
+            )
+
+            def HasField(self, name):
+                return name == "first_connected"
+
+        rwms = mock.Mock()
+        rwms.get_user_by_username.return_value = FakeRwmsUser()
+
+        payload = views.admin_rwms_traffic_payload("594514115", client=rwms)
+
+        # Метка в МСК: 12:30 UTC → 15:30 (админка работает по Москве)
+        self.assertEqual(payload["first_connected"], "01.05.2026 15:30")
+
+    def test_node_traffic_user_popup_opens_quick_card(self):
+        """Клик по пользователю в «Трафике нод» открывает модалку с данными
+        подписки (user-payments + user-traffic) и кнопкой перехода в полную
+        карточку клиента с управлением подпиской."""
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('data-node-traffic-user="${escapeHtml(user.username)}"', template)
+        self.assertIn('id="node-traffic-user-modal"', template)
+        self.assertIn("async function openNodeTrafficUserModal(username)", template)
+        self.assertIn("function openClientCardFromNodeTraffic(username)", template)
+        self.assertIn("data-nt-user-open-card", template)
+        self.assertIn("showAdminTab('user-payments');", template)
+        # Первое подключение — и в модалке, и в сводке карточки клиента.
+        self.assertIn("data-client-first-connected-value", template)
+        self.assertIn("traffic.first_connected || 'Не подключался'", template)
 
     def test_rwms_traffic_payload_degrades_without_breaking_client_card(self):
         from engine import views
@@ -5134,6 +5176,7 @@ class AdminClientWorkspaceTests(SimpleTestCase):
                 "available": False,
                 "used_traffic_bytes": None,
                 "lifetime_used_traffic_bytes": None,
+                "first_connected": None,
             },
         )
 
@@ -5165,10 +5208,58 @@ class AdminClientWorkspaceTests(SimpleTestCase):
         self.assertIn("Действия с клиентом", template)
         self.assertIn("Подписка и оплата", template)
         self.assertIn("Ограничения доступа", template)
-        self.assertIn("автоплатёж не изменится", template)
+        self.assertIn("автоплатёж отключится, рекуррент удалится", template)
         self.assertNotIn("function clientSubscriptionManageHtml", template)
         self.assertIn(".client-actions-grid", css)
         self.assertIn(".client-danger-panel", css)
+
+
+class AdminMoscowTimeTests(SimpleTestCase):
+    """Админка работает по московскому времени (UTC+3): метки времени
+    сдвигаются при показе, бакеты аналитики режутся по московским суткам,
+    границы периодов конвертируются в UTC-время БД вычитанием смещения."""
+
+    def test_admin_labels_and_buckets_use_moscow_time(self):
+        import inspect
+
+        from engine import views
+
+        from datetime import timedelta
+
+        self.assertEqual(views.ADMIN_TZ_OFFSET, timedelta(hours=3))
+        # 24.08 22:30 UTC — это уже 25.08 01:30 по Москве.
+        self.assertEqual(
+            views.admin_date_label(datetime(2026, 8, 24, 22, 30)),
+            "25.08.2026 01:30",
+        )
+        self.assertEqual(
+            views.admin_date_label(datetime(2026, 8, 24, 22, 30), with_time=False),
+            "25.08.2026",
+        )
+
+        # SQL-бакеты: naive-UTC переводится в Europe/Moscow ДО date_trunc.
+        sql = str(
+            views.admin_stats_bucket_sql(views.EventLog.timestamp, "day").compile(
+                compile_kwargs={"literal_binds": True}
+            )
+        )
+        self.assertIn("Europe/Moscow", sql)
+        self.assertIn("date_trunc", sql)
+
+        # Границы периодов аналитики — московские сутки (−3ч в UTC БД).
+        for func_obj in (
+            views.build_admin_interval_stats,
+            views.build_admin_sales_series,
+            views.support_admin_api_stats_source_users,
+        ):
+            self.assertIn("- ADMIN_TZ_OFFSET", inspect.getsource(func_obj))
+        # «Сегодня» по умолчанию — московская дата.
+        self.assertIn("admin_msk_today()", inspect.getsource(views.support_admin_api_stats))
+
+        # Явных подписей UTC в админке не осталось (кроме комментариев кода).
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.assertNotIn("Сегодня (UTC)", template)
+        self.assertNotIn("} UTC<", template)
 
 
 class AdminPaymentJournalTests(SimpleTestCase):
