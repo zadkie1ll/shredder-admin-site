@@ -6317,6 +6317,81 @@ class AdminStage4Tests(SimpleTestCase):
         self.assertIn("body.append('promo_recipients', promoRecipients)", template)
         self.assertIn("row.exclude_promo_id ?", template)
 
+    def test_broadcast_tariff_button_has_no_price_override(self):
+        """Промо-цена на кнопках тарифов убрана: в callback_data бота цена ехала
+        из рассылки и принималась на веру (payment сумму не сверял), поэтому
+        механизм вырезан целиком — скидки делаются только промокодом. Кнопка
+        type=tariffs остаётся и означает «тарифы по актуальным ценам»,
+        tariff_ids сохраняется. Легаси-ключ price_overrides во входящем JSON
+        игнорируется, а не отвергается: старые рассылки с ним в buttons должны
+        открываться и пересохраняться без ошибок (данные не мигрируем)."""
+        import inspect
+
+        from engine import views
+
+        parse = views.admin_broadcast_parse_buttons
+
+        # Обычная кнопка тарифов: сохраняются только идентификаторы.
+        self.assertEqual(
+            parse(None, json.dumps([{"type": "tariffs", "tariff_ids": ["month", "year"]}])),
+            [{"type": "tariffs", "tariff_ids": ["month", "year"]}],
+        )
+        # Пустой список — вся витрина тарифов.
+        self.assertEqual(
+            parse(None, json.dumps([{"type": "tariffs"}])),
+            [{"type": "tariffs", "tariff_ids": None}],
+        )
+        # Присланная промо-цена не сохраняется и не добавляет свой тариф в список.
+        cleaned = parse(
+            None,
+            json.dumps(
+                [
+                    {
+                        "type": "tariffs",
+                        "tariff_ids": ["month"],
+                        "price_overrides": {"year": 1},
+                    }
+                ]
+            ),
+        )
+        self.assertEqual(cleaned, [{"type": "tariffs", "tariff_ids": ["month"]}])
+        self.assertNotIn("price_overrides", cleaned[0])
+        # Существующая рассылка: её buttons из БД проходят валидацию заново
+        # (открыть и сохранить) без исключения, ключ просто отбрасывается.
+        legacy = [
+            {"type": "url", "text": "Сайт", "url": "https://example.com", "style": None},
+            {
+                "type": "tariffs",
+                "tariff_ids": ["month", "year"],
+                "price_overrides": {"month": 1, "year": 1},
+            },
+        ]
+        self.assertEqual(
+            parse(None, json.dumps(legacy)),
+            [
+                {"type": "url", "text": "Сайт", "url": "https://example.com", "style": None},
+                {"type": "tariffs", "tariff_ids": ["month", "year"]},
+            ],
+        )
+        # Неизвестный тариф по-прежнему отвергается.
+        with self.assertRaises(ValueError):
+            parse(None, json.dumps([{"type": "tariffs", "tariff_ids": ["decade"]}]))
+
+        src = inspect.getsource(views.admin_broadcast_parse_buttons)
+        self.assertNotIn('"price_overrides": overrides', src)
+        self.assertNotIn("Некорректная цена тарифа", src)
+
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        # В форме не осталось ни поля с ценой, ни разбора "month=199".
+        self.assertNotIn("price_overrides", template)
+        self.assertNotIn("month=199", template)
+        self.assertNotIn("Некорректная цена: ${item}", template)
+        self.assertIn(
+            'placeholder="month, year (пусто — все тарифы; цены всегда актуальные)"',
+            template,
+        )
+        self.assertIn("return {tariff_ids: tariff_ids.length ? tariff_ids : null};", template)
+
     def test_broadcast_link_preview_can_be_disabled(self):
         """Чекбокс «Отключить превью ссылок»: флаг сохраняется в broadcasts и
         уходит ботам (боты шлют с disable_web_page_preview, как /sendmsg)."""

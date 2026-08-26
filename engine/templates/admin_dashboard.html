@@ -7665,7 +7665,7 @@
                 <input class="input broadcast-btn-text" placeholder="Текст кнопки">
                 <input class="input broadcast-btn-url" placeholder="https://ссылка">
                 <select class="input broadcast-btn-promo" hidden>${broadcastPromoOptions}</select>
-                <input class="input broadcast-btn-tariffs" hidden placeholder="month=199, year=999 (пусто — все тарифы по обычным ценам)">
+                <input class="input broadcast-btn-tariffs" hidden placeholder="month, year (пусто — все тарифы; цены всегда актуальные)">
                 <button type="button" class="broadcast-btn-remove" title="Убрать кнопку"><i class="fas fa-xmark"></i></button>`;
             const typeSelect = row.querySelector('.broadcast-btn-type');
             const sync = () => {
@@ -7710,22 +7710,17 @@
         }
 
         function parseBroadcastTariffSpec(raw) {
-            // Синтаксис как в /sendmsg: "month=199, year=999" или "month, year".
+            // Только список тарифов: "month, year" (пусто — витрина целиком).
+            // Промо-цена кнопки убрана: цена ехала в callback_data и бот брал её
+            // на веру — скидки делаются промокодом (кнопка «Промокод»).
             const tariff_ids = [];
-            const price_overrides = {};
             for (const rawItem of (raw || '').split(',')) {
-                const item = rawItem.trim().toLowerCase();
-                if (!item) continue;
-                const [tariffId, rawPrice] = item.split('=').map((piece) => piece.trim());
+                const tariffId = rawItem.trim().toLowerCase();
+                if (!tariffId) continue;
                 if (!(tariffId in BROADCAST_TARIFF_LABELS)) throw new Error(`Неизвестный тариф: ${tariffId}`);
-                if (rawPrice !== undefined) {
-                    const price = parseInt(rawPrice, 10);
-                    if (!price || price < 1) throw new Error(`Некорректная цена: ${item}`);
-                    price_overrides[tariffId] = price;
-                }
                 if (!tariff_ids.includes(tariffId)) tariff_ids.push(tariffId);
             }
-            return {tariff_ids: tariff_ids.length ? tariff_ids : null, price_overrides};
+            return {tariff_ids: tariff_ids.length ? tariff_ids : null};
         }
 
         function collectBroadcastButtons() {
@@ -7794,9 +7789,8 @@
                     try {
                         const spec = parseBroadcastTariffSpec(row.querySelector('.broadcast-btn-tariffs').value);
                         const ids = spec.tariff_ids || Object.keys(BROADCAST_TARIFF_LABELS).filter((id) => id !== 'threedays' && id !== 'oneday');
-                        ids.forEach((id) => rendered.push({label: spec.price_overrides[id]
-                            ? `${spec.price_overrides[id]}₽ за ${BROADCAST_TARIFF_LABELS[id]}`
-                            : `Тариф ${BROADCAST_TARIFF_LABELS[id]}`, style: id === 'month' ? 'success' : ''}));
+                        ids.forEach((id) => rendered.push({label: `Тариф ${BROADCAST_TARIFF_LABELS[id]}`,
+                            style: id === 'month' ? 'success' : ''}));
                     } catch (error) {
                         rendered.push({label: '⚠️ ' + error.message, style: 'danger'});
                     }

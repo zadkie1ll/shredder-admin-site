@@ -11015,6 +11015,13 @@ def admin_broadcast_parse_buttons(db_session, raw_buttons):
             )
             plain_count += 1
         elif button_type == "tariffs":
+            # Кнопки тарифов всегда идут по актуальным ценам. Промо-цена кнопки
+            # (легаси-ключ price_overrides) убрана: цена ехала в callback_data,
+            # бот принимал её на веру, а payment период брал из metadata и сумму
+            # не сверял — «год за рубль». Скидки делаются только промокодами
+            # (кнопка claim_promo: max_uses, срок, однократность на пользователя).
+            # Присланный price_overrides молча игнорируем — так старые рассылки
+            # с этим ключом в buttons открываются и пересохраняются без ошибок.
             tariff_ids = [
                 str(item).strip().lower()
                 for item in (button.get("tariff_ids") or [])
@@ -11023,29 +11030,9 @@ def admin_broadcast_parse_buttons(db_session, raw_buttons):
             unknown = [item for item in tariff_ids if item not in BROADCAST_TARIFF_IDS]
             if unknown:
                 raise ValueError(f"Неизвестный тариф: {', '.join(unknown)}")
-            overrides = {}
-            for key, value in (button.get("price_overrides") or {}).items():
-                key = str(key).strip().lower()
-                if key not in BROADCAST_TARIFF_IDS:
-                    raise ValueError(f"Неизвестный тариф: {key}")
-                try:
-                    price = int(value)
-                except (TypeError, ValueError):
-                    raise ValueError(f"Некорректная цена тарифа {key}")
-                if not 1 <= price <= 100000:
-                    raise ValueError(f"Некорректная цена тарифа {key}")
-                overrides[key] = price
-                if key not in tariff_ids:
-                    tariff_ids.append(key)
             if any(entry.get("type") == "tariffs" for entry in clean):
                 raise ValueError("Кнопки тарифов можно добавить один раз")
-            clean.append(
-                {
-                    "type": "tariffs",
-                    "tariff_ids": tariff_ids or None,
-                    "price_overrides": overrides,
-                }
-            )
+            clean.append({"type": "tariffs", "tariff_ids": tariff_ids or None})
         else:
             raise ValueError("Неизвестный тип кнопки")
     if plain_count > BROADCAST_MAX_BUTTONS:
