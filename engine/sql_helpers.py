@@ -2,10 +2,55 @@ import logging
 from datetime import datetime
 
 from sqlalchemy import select
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from common.models.db import User
 from common.models.db import WataInvoice
+
+
+def lock_registration_email(db_session, email) -> None:
+    """Сериализовать регистрации по одному email транзакционным advisory-локом.
+
+    Без него две одновременные регистрации на один новый email (два клика по
+    «войти», магик-линк и OAuth параллельно, ретрай платёжной формы) могут обе
+    дойти до панельного ``AddUser``: проигравший по уникальному индексу
+    ``users.email`` откатит строку в postgres, но СОЗДАННАЯ ИМ ПОДПИСКА в
+    Remnawave останется сиротой. Лок держится до конца транзакции
+    (``pg_advisory_xact_lock`` снимается на commit/rollback), поэтому его нужно
+    брать ДО любых обращений к панели.
+
+    Ключ — ``hashtext`` нормализованного email. Пустой email (регистрация
+    только по telegram_id) и не-postgres бэкенды (SQLite в тестах) — no-op.
+    """
+    normalized = (email or "").strip().lower()
+    if not normalized:
+        return
+    if db_session.get_bind().dialect.name != "postgresql":
+        return
+    db_session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:email))"),
+        {"email": normalized},
+    )
+
+
+def lock_registration_telegram_id(db_session, telegram_id) -> None:
+    """Сериализовать регистрации одной Telegram-учётки.
+
+    Email-lock не защищает Telegram widget/Mini App, где email отсутствует.
+    Без отдельного лока два запроса одновременно создавали две разные
+    Remnawave-подписки, после чего одна DB-транзакция проигрывала уникальному
+    ``users.telegram_id`` и оставляла подписку-сироту. Пространство ключей
+    отделено префиксом от email-lock; на SQLite это no-op, как и email-вариант.
+    """
+    if telegram_id is None:
+        return
+    if db_session.get_bind().dialect.name != "postgresql":
+        return
+    db_session.execute(
+        text("SELECT pg_advisory_xact_lock(hashtext(:identity))"),
+        {"identity": f"telegram:{int(telegram_id)}"},
+    )
 
 
 def save_wata_invoice(

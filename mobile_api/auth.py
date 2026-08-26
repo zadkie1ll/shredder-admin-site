@@ -15,7 +15,6 @@ import secrets
 from datetime import datetime, timedelta
 
 from django.conf import settings
-from sqlalchemy import text
 
 from common.models.db import (
     EmailLoginCode,
@@ -23,6 +22,7 @@ from common.models.db import (
     MobileAuthCode,
     User,
 )
+from engine.sql_helpers import lock_registration_email
 from engine.user_block import is_user_blocked
 
 # One-time login code lifetime.
@@ -169,13 +169,12 @@ def lock_email(db_session, email):
     provision an RWMS trial subscription — the DB-row loser rolls back, but its
     gRPC ``AddUser`` already created a second (orphaned) subscription. Holding the
     lock for the whole find-or-provision section guarantees only one provisioner
-    runs per email. No-op on non-Postgres backends (e.g. the test SQLite)."""
-    if db_session.get_bind().dialect.name != "postgresql":
-        return
-    db_session.execute(
-        text("SELECT pg_advisory_xact_lock(hashtext(:email))"),
-        {"email": email},
-    )
+    runs per email. No-op on non-Postgres backends (e.g. the test SQLite).
+
+    Тонкая обёртка над общим ``lock_registration_email``: сайтовая регистрация
+    берёт ТОТ ЖЕ лок по тому же ключу, поэтому мобильный и сайтовый flow для
+    одного email сериализуются друг с другом, а не только сами с собой."""
+    lock_registration_email(db_session, email)
 
 
 def bearer_token(request):

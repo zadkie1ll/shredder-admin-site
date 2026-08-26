@@ -140,16 +140,25 @@ from common.models.tariff import OneDayTariff
 from common.models.tariff import OneMonthTariff
 from common.models.tariff import OneYearTariff
 from common.models.tariff import ThreeMonthsTariff
+from common.rwms_client import RwmsUnavailableError
 from common.rwms_client_sync import RwmsClientSync
 
 from . import node_traffic
 from . import node_provisioning
 from . import ripe_atlas
+from .rwms_helpers import RwmsSubscriptionOwnershipError
+from .rwms_helpers import assert_subscription_owned_by_email
+from .rwms_helpers import assert_subscription_owned_by_telegram_id
 from .rwms_helpers import create_user
 from .rwms_helpers import create_user_until
+from .rwms_helpers import deterministic_username
+from .rwms_helpers import get_proto_optional
+from .rwms_helpers import normalize_email
 from .encrypt_happ_url import encrypt_happ_url1
 from .incy import IncyEncoderError
 from .incy import encrypt_incy_url
+from .sql_helpers import lock_registration_email
+from .sql_helpers import lock_registration_telegram_id
 from .sql_helpers import save_wata_invoice
 
 from database import session_factory
@@ -981,15 +990,23 @@ def unknown_site_account_error():
     )
 
 
-def get_proto_optional(message, field_name, default=None):
-    try:
-        if message.HasField(field_name):
-            return getattr(message, field_name)
-    except ValueError:
-        value = getattr(message, field_name, default)
-        return value if value not in ("", 0) else default
+class SiteRegistrationUnavailable(Exception):
+    """Регистрацию сайтового пользователя сейчас завершить нельзя.
 
-    return default
+    Поднимается, когда состояние подписки в Remnawave установить не удалось
+    (панель недоступна) или оно неоднозначно (найденная подписка явно чужая).
+    В обоих случаях НЕЛЬЗЯ ни создавать подписку (получим сироту/дубль), ни
+    заводить локальный аккаунт «как будто подписки нет» — это разошло бы БД и
+    панель. Вьюхи ловят это и просят пользователя повторить позже; сама
+    регистрация не «ломается навсегда» — следующая попытка выведет ТО ЖЕ
+    детерминированное имя и продолжит с того же места.
+    """
+
+
+SITE_REGISTRATION_RETRY_MESSAGE = (
+    "Сервис временно недоступен, попробуйте позже. "
+    "Ваш аккаунт не потерян — повторите вход через пару минут."
+)
 
 
 def rwms_expire_at(rw_user):
@@ -1034,6 +1051,53 @@ def sync_local_user_from_rwms(
 
     user = db_session.query(User).filter(User.username == rw_user.username).first()
     if user:
+        # Второй рубеж владения (первый — assert_subscription_owned_by_email по
+        # email ПАНЕЛЬНОЙ записи). Имя детерминировано от email, поэтому строку
+        # users по этому имени можно найти и тогда, когда её владелец давно
+        # сменил почту: панель при смене email обновляется best-effort и на
+        # блипе RWMS остаётся со старым адресом. Без этой проверки человек,
+        # получивший освобождённый адрес A, при регистрации попадал бы в чужой
+        # аккаунт (magic-link/purchase-token выдались бы на строку жертвы).
+        # Явное расхождение email = неоднозначное состояние: панель не трогаем,
+        # регистрацию останавливаем.
+        existing_email = normalize_email(user.email)
+        requested_email = normalize_email(email)
+        if existing_email and requested_email and existing_email != requested_email:
+            logging.critical(
+                "ALERT: refusing to adopt local user %s (id=%s) for %s: "
+                "row email %s does not match requested %s; "
+                "panel untouched, registration stopped",
+                user.username,
+                user.id,
+                creation_channel,
+                existing_email,
+                requested_email,
+            )
+            raise SiteRegistrationUnavailable(
+                f"local user {user.username} belongs to another email"
+            )
+
+        existing_telegram_id = user.telegram_id
+        requested_telegram_id = telegram_id
+        if (
+            existing_telegram_id is not None
+            and requested_telegram_id is not None
+            and int(existing_telegram_id) != int(requested_telegram_id)
+        ):
+            logging.critical(
+                "ALERT: refusing to adopt local user %s (id=%s) for %s: "
+                "row telegram_id %s does not match requested %s; "
+                "panel untouched, registration stopped",
+                user.username,
+                user.id,
+                creation_channel,
+                existing_telegram_id,
+                requested_telegram_id,
+            )
+            raise SiteRegistrationUnavailable(
+                f"local user {user.username} belongs to another telegram account"
+            )
+
         if local_email and not user.email:
             user.email = local_email
         if local_telegram_id is not None and user.telegram_id is None:
@@ -1109,6 +1173,94 @@ def create_local_site_user_without_rwms(
     return user
 
 
+def site_registration_username(email, telegram_id=None):
+    """Имя подписки для НОВОГО сайтового пользователя.
+
+    Регистрация по email (magic link, Google/Yandex OAuth, форма оплаты) —
+    детерминированное имя от email: то же самое, что использует mobile_api, и
+    единственное, что закрывает окно «панель создала — БД не успела». Повтор
+    регистрации выводит ТО ЖЕ имя, находит подписку и принимает её вместо
+    создания второй.
+
+    Регистрация только по telegram_id (виджет/Mini App, email ещё нет) использует
+    ``str(telegram_id)`` — тот же стабильный username, что и бот. Это закрывает
+    гонку/крэш после AddUser: повтор находит ту же подписку вместо создания
+    новой со случайным uuid. Уже существующие legacy-строки с uuid не меняются.
+
+    Существующих пользователей это не касается: функция вызывается ТОЛЬКО при
+    создании новой строки users, ни один путь не пересчитывает username
+    существующего аккаунта.
+    """
+    normalized_email = (email or "").strip().lower()
+    if normalized_email:
+        return deterministic_username(normalized_email)
+    if telegram_id is not None:
+        return str(int(telegram_id))
+    return str(uuid.uuid4().hex)
+
+
+def resolve_existing_site_subscription(username, email):
+    """Строгое чтение подписки ``username`` перед созданием новой.
+
+    Возвращает подписку для adoption либо ``None`` при ДОСТОВЕРНОМ NOT_FOUND.
+
+    - ``RwmsUnavailableError`` → ``SiteRegistrationUnavailable``: недоступность
+      панели нельзя трактовать ни как «имя свободно» (создадим дубль), ни как
+      «подписка есть» (примем непроверенную).
+    - подписка есть, но её email явно чужой → ALERT и
+      ``SiteRegistrationUnavailable``: панель не трогаем, регистрацию
+      останавливаем.
+    """
+    try:
+        existing = rwms_client.get_user_by_username_strict(username)
+    except RwmsUnavailableError as error:
+        logging.warning(
+            "RWMS unavailable while checking username %s for site user %s, "
+            "aborting registration: %s",
+            username,
+            email,
+            error,
+        )
+        raise SiteRegistrationUnavailable(
+            f"rwms unavailable for {username}"
+        ) from error
+
+    if existing is not None:
+        try:
+            assert_subscription_owned_by_email(existing, email, flow="site")
+        except RwmsSubscriptionOwnershipError as error:
+            raise SiteRegistrationUnavailable(str(error)) from error
+
+    return existing
+
+
+def resolve_existing_telegram_subscription(username, telegram_id):
+    """Строго найти и проверить подписку Telegram-only регистрации."""
+    try:
+        existing = rwms_client.get_user_by_username_strict(username)
+    except RwmsUnavailableError as error:
+        logging.warning(
+            "RWMS unavailable while checking username %s for telegram user %s, "
+            "aborting registration: %s",
+            username,
+            telegram_id,
+            error,
+        )
+        raise SiteRegistrationUnavailable(
+            f"rwms unavailable for {username}"
+        ) from error
+
+    if existing is not None:
+        try:
+            assert_subscription_owned_by_telegram_id(
+                existing, telegram_id, flow="site_telegram"
+            )
+        except RwmsSubscriptionOwnershipError as error:
+            raise SiteRegistrationUnavailable(str(error)) from error
+
+    return existing
+
+
 def create_site_user(
     db_session,
     email,
@@ -1116,9 +1268,50 @@ def create_site_user(
     telegram_id=None,
     creation_channel="site",
 ):
+    # Лок берём ПЕРВЫМ делом — до чтения контекста и до любых обращений к
+    # панели: две параллельные регистрации на один email иначе обе дойдут до
+    # AddUser, и подписка проигравшего останется сиротой.
+    lock_registration_email(db_session, email)
+    lock_registration_telegram_id(db_session, telegram_id)
+
     context = get_registration_context(request, db_session)
+
+    # Вызывающая view читает users до входа в create_site_user. Пока запрос
+    # ждал advisory-lock, конкурент мог уже закоммитить строку. Повторное
+    # чтение под локом не даёт дойти до второго AddUser/дублирующего INSERT.
+    if email:
+        existing_local_user = (
+            db_session.query(User).filter(User.email == email).first()
+        )
+    elif telegram_id is not None:
+        existing_local_user = (
+            db_session.query(User)
+            .filter(User.telegram_id == telegram_id)
+            .first()
+        )
+    else:
+        existing_local_user = None
+
+    if existing_local_user is not None:
+        same_email_owner = bool(
+            email
+            and normalize_email(existing_local_user.email) == normalize_email(email)
+        )
+        same_telegram_owner = bool(
+            telegram_id is not None
+            and existing_local_user.telegram_id is not None
+            and int(existing_local_user.telegram_id) == int(telegram_id)
+        )
+        if same_email_owner or same_telegram_owner:
+            # Конкурент уже полностью создал именно этого владельца, пока мы
+            # ждали advisory-lock. Повторного AddUser/INSERT не требуется.
+            return existing_local_user
+        # Несовпавшую строку нельзя возвращать как владельцу запроса. Для
+        # deterministic username продолжаем strict panel lookup: второй guard
+        # в sync_local_user_from_rwms оставит ALERT и остановит adoption.
+
     referrer = context["referrer"]
-    username = str(uuid.uuid4().hex)
+    username = site_registration_username(email, telegram_id)
     user_label = email or f"telegram_id={telegram_id}"
     create_trial_subscription = should_create_trial_for_channel(
         db_session,
@@ -1165,6 +1358,55 @@ def create_site_user(
         if referrer
         else settings.SITE_TRIAL_PERIOD_DAYS
     )
+
+    if email:
+        # Регистрация по email: имя детерминировано, поэтому перед AddUser
+        # можно СТРОГО проверить, не создали ли мы эту подписку в прошлый раз и
+        # не упали ли до commit'а. Есть подписка → принимаем её и панель не
+        # трогаем (никакого второго AddUser, никакого recreate — существующие
+        # клиентские конфиги остаются рабочими). Панель недоступна или подписка
+        # явно чужая → SiteRegistrationUnavailable (см. resolve_...).
+        adoptable = resolve_existing_site_subscription(username, email)
+        if adoptable is not None:
+            logging.warning(
+                "adopting existing RWMS subscription %s for site user %s "
+                "(crash-window recovery, panel untouched, channel=%s)",
+                username,
+                user_label,
+                creation_channel,
+            )
+            return sync_local_user_from_rwms(
+                db_session,
+                adoptable,
+                email,
+                telegram_id,
+                context,
+                creation_channel,
+            )
+    elif telegram_id is not None:
+        # Telegram-only путь теперь столь же восстанавливаем, как email:
+        # стабильный username + strict lookup + ownership guard. Это также
+        # принимает подписку, ранее созданную ботом, если DB-строка потеряна.
+        adoptable = resolve_existing_telegram_subscription(
+            username, telegram_id
+        )
+        if adoptable is not None:
+            logging.warning(
+                "adopting existing RWMS subscription %s for telegram user %s "
+                "(crash-window recovery, panel untouched, channel=%s)",
+                username,
+                telegram_id,
+                creation_channel,
+            )
+            return sync_local_user_from_rwms(
+                db_session,
+                adoptable,
+                email,
+                telegram_id,
+                context,
+                creation_channel,
+            )
+
     rw_user = create_user(
         rwms_client=rwms_client,
         username=username,
@@ -1731,6 +1973,21 @@ def send_magic_link(request):
 
             send_magic_link_email(email, link)
 
+        except SiteRegistrationUnavailable as e:
+            # Регистрация НЕ состоялась (панель недоступна/состояние
+            # неоднозначно) — письма не будет, поэтому обычный «status: ok»
+            # (анти-энумерация) здесь обманул бы пользователя. Отдаём внятное
+            # «попробуйте позже»; лик «этот email новый» возможен только пока
+            # панель лежит, и это меньшее зло, чем молчаливый провал входа.
+            logging.warning("site registration postponed for %s: %s", email, e)
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": SITE_REGISTRATION_RETRY_MESSAGE,
+                },
+                status=503,
+            )
+
         except Exception as e:
             logging.error(f"Error during sign-up/login: {e}")
 
@@ -1870,6 +2127,13 @@ def auth_by_google_callback(request):
 
         authorize_user_session(request, user)
         return redirect("dashboard")
+    except SiteRegistrationUnavailable as e:
+        logging.warning("google oauth registration postponed for %s: %s", email, e)
+        return render_login(
+            request,
+            {"error": SITE_REGISTRATION_RETRY_MESSAGE},
+            status=503,
+        )
     except Exception as e:
         logging.exception(f"google oauth user authorization failed for {email}: {e}")
         return render_login(
@@ -2011,6 +2275,13 @@ def auth_by_yandex_callback(request):
 
         authorize_user_session(request, user)
         return redirect("dashboard")
+    except SiteRegistrationUnavailable as e:
+        logging.warning("yandex oauth registration postponed for %s: %s", email, e)
+        return render_login(
+            request,
+            {"error": SITE_REGISTRATION_RETRY_MESSAGE},
+            status=503,
+        )
     except Exception as e:
         logging.exception(f"yandex oauth user authorization failed for {email}: {e}")
         return render_login(
@@ -2755,14 +3026,32 @@ def dashboard(request):
         .scalar()
     )
 
-    subscription = rwms_client.get_user_by_username(user.username)
+    # Политика «БД — истина по времени, панель — истина по существованию ключа»:
+    # - strict вернул None (достоверный NOT_FOUND) — подписки в панели нет,
+    #   показываем «истекла» (легитимный кейс: удалена после долгой просрочки);
+    # - RwmsUnavailableError (блип RWMS/панели) — деградация к БД: остаток
+    #   считаем из user.time_until_expiration и НИКОГДА не показываем
+    #   «истекла» платящему клиенту из-за недоступности панели.
+    rwms_unavailable = False
+    try:
+        subscription = rwms_client.get_user_by_username_strict(user.username)
+    except RwmsUnavailableError as error:
+        subscription = None
+        rwms_unavailable = True
+        logging.warning(
+            "dashboard: RWMS unavailable for %s, degrading to DB expiration: %s",
+            user.username,
+            error,
+        )
     seconds_left = (
         user.time_until_expiration.total_seconds() if user.time_until_expiration else -1
     )
-    if subscription is None:
+    if subscription is None and not rwms_unavailable:
         seconds_left = -1
 
-    has_subscription_access = subscription is not None and seconds_left > 0
+    has_subscription_access = (
+        subscription is not None or rwms_unavailable
+    ) and seconds_left > 0
     days_left = int((seconds_left + 86399) // 86400) if seconds_left > 0 else 0
     expiring_banner_threshold_seconds = 3 * 24 * 60 * 60
     show_expiring_banner = 0 < seconds_left <= expiring_banner_threshold_seconds
@@ -2796,13 +3085,18 @@ def dashboard(request):
             seconds_left = -1
 
         if request.GET.get("debug_no_rwms") == "1":
+            # Симулируем достоверный NOT_FOUND (подписки нет в панели),
+            # а не недоступность панели — иначе сработала бы деградация к БД.
             subscription = None
+            rwms_unavailable = False
             seconds_left = -1
 
         show_expiring_banner = 0 < seconds_left <= expiring_banner_threshold_seconds
         days_left = int((seconds_left + 86399) // 86400) if seconds_left > 0 else 0
 
-    has_subscription_access = subscription is not None and seconds_left > 0
+    has_subscription_access = (
+        subscription is not None or rwms_unavailable
+    ) and seconds_left > 0
 
     if not has_subscription_access:
         show_expiring_banner = False
@@ -2827,17 +3121,21 @@ def dashboard(request):
         time_left_label = "дней осталось"
         time_left_unit = "дн."
 
+    # В режиме деградации (rwms_unavailable) панельных данных нет: ссылки
+    # установки пустые (для них нужна панель), но кабинет рендерится штатно
+    # с остатком из БД.
+    has_panel_data = has_subscription_access and subscription is not None
     plain_subscription_url = (
-        subscription.subscription_url if has_subscription_access else ""
+        subscription.subscription_url if has_panel_data else ""
     )
     happ_subscription_url = (
         encrypt_happ_url1(subscription.subscription_url + "/custom-json")
-        if has_subscription_access
+        if has_panel_data
         else ""
     )
     # Рекомендуемое приложение для iOS/macOS из админки: happ (по умолчанию)
     # или incy — для INCY ссылка добавления подписки шифруется отдельно.
-    if has_subscription_access:
+    if has_panel_data:
         apple_recommended_app, apple_subscription_url = build_apple_subscription_link(
             session, subscription.subscription_url
         )
@@ -3210,7 +3508,24 @@ def _hwid_device_to_dict(device) -> dict:
 
 
 def _cabinet_rw_subscription(request):
-    return rwms_client.get_user_by_username(request.user.username)
+    """UserResponse подписки текущего пользователя из панели.
+
+    None — только достоверный NOT_FOUND (подписки нет в панели). При
+    недоступности RWMS/панели бросает RwmsUnavailableError: вызывающие
+    эндпоинты обязаны отвечать «данные временно недоступны», а не
+    «подписки нет» (Политика: БД — истина по времени, панель — истина
+    по существованию ключа)."""
+    return rwms_client.get_user_by_username_strict(request.user.username)
+
+
+def _cabinet_rwms_unavailable_response():
+    return JsonResponse(
+        {
+            "status": "error",
+            "message": "Данные временно недоступны, попробуйте позже",
+        },
+        status=503,
+    )
 
 
 # Панельный fallback-лимит HWID общий для всех подписок и меняется только
@@ -3256,7 +3571,10 @@ def _cabinet_device_limit(subscription):
 @login_required(login_url="/login/")
 def cabinet_devices(request):
     """Список HWID-устройств подписки текущего пользователя."""
-    subscription = _cabinet_rw_subscription(request)
+    try:
+        subscription = _cabinet_rw_subscription(request)
+    except RwmsUnavailableError:
+        return _cabinet_rwms_unavailable_response()
     if subscription is None:
         return JsonResponse(
             {"status": "error", "message": "subscription not found"}, status=404
@@ -3298,7 +3616,10 @@ def cabinet_device_delete(request):
             {"status": "error", "message": "hwid required"}, status=400
         )
 
-    subscription = _cabinet_rw_subscription(request)
+    try:
+        subscription = _cabinet_rw_subscription(request)
+    except RwmsUnavailableError:
+        return _cabinet_rwms_unavailable_response()
     if subscription is None:
         return JsonResponse(
             {"status": "error", "message": "subscription not found"}, status=404
@@ -7398,6 +7719,37 @@ def pay(request):
                     }
                 )
             return redirect(confirmation_url)
+
+        except SiteRegistrationUnavailable as e:
+            # Аккаунт под оплату подготовить нельзя (панель недоступна или
+            # состояние подписки неоднозначно). Ничего не создано и не списано —
+            # просим повторить позже, чтобы не плодить сироты в Remnawave.
+            db_session.rollback()
+            logging.warning("payment registration postponed for %s: %s", email, e)
+            if payment_launch_json:
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": SITE_REGISTRATION_RETRY_MESSAGE,
+                    },
+                    status=503,
+                )
+            messages.error(request, SITE_REGISTRATION_RETRY_MESSAGE)
+            if settings.PAYMENT_GATEWAY.lower() == "wata":
+                return render(
+                    request,
+                    "payment_status.html",
+                    {
+                        "initial_status": "failed",
+                        "initial_message": SITE_REGISTRATION_RETRY_MESSAGE,
+                        "login_url": "",
+                        "payment_url": "",
+                        "status_api_url": "",
+                        "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
+                    },
+                    status=503,
+                )
+            return redirect("index")
 
         except Exception as e:
             db_session.rollback()

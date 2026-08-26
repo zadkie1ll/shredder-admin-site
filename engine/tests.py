@@ -27,6 +27,10 @@ from common.models.db import CustomConfigTemplate
 from common.models.db import MagicToken
 from common.models.db import RipeApiKey
 from common.models.db import User
+from common.rwms_client import RwmsUnavailableError
+from engine.rwms_helpers import deterministic_username
+from engine.sql_helpers import lock_registration_email
+from engine.sql_helpers import lock_registration_telegram_id
 from engine.payments import create_wata_payment_sync
 from engine.payments import create_yk_payment_sync
 from engine.payments import fetch_wata_transaction_status
@@ -39,7 +43,12 @@ from engine.views import admin_stats_row_bucket_key
 from engine.views import support_admin_api_cohort_stats
 from engine.views import support_admin_api_censor_checks
 from engine.views import auth_by_telegram_widget
+from engine.views import SITE_REGISTRATION_RETRY_MESSAGE
+from engine.views import SiteRegistrationUnavailable
 from engine.views import create_site_user
+from engine.views import resolve_existing_site_subscription
+from engine.views import send_magic_link
+from engine.views import site_registration_username
 from engine.views import custom_config_template_payload
 from engine.views import form_bool_enabled
 from engine.views import get_runtime_actual_tariffs
@@ -80,6 +89,94 @@ from engine.views import verify_telegram_widget_auth
 from engine.views import verify_telegram_webapp_init_data
 from engine.views import get_telegram_webapp_user_id
 from web_app.settings import telegram_web_login_start_codes
+
+
+class _FakeProtoTimestamp:
+    """Stand-in для protobuf Timestamp (нужен только ``ToDatetime``)."""
+
+    def __init__(self, value):
+        self._value = value
+
+    def ToDatetime(self):  # noqa: N802 - mirrors protobuf API
+        return self._value
+
+
+class _FakeSiteRwUser(SimpleNamespace):
+    """Stand-in for proto.UserResponse в тестах сайтовой регистрации.
+
+    ``HasField`` отвечает по фактически переданным атрибутам, поэтому запись
+    панели можно создать как с email (проверка владельца), так и без него
+    (неоднозначная запись, которую ownership guard обязан отвергнуть)."""
+
+    def HasField(self, field_name):  # noqa: N802 - mirrors protobuf API
+        return getattr(self, field_name, None) is not None
+
+
+class _SiteRegistrationFakeSession:
+    """Минимальная сессия для unit-тестов ``create_site_user``.
+
+    ``get_bind`` отдаёт не-postgres диалект: транзакционный advisory-лок по
+    email в такой сессии — no-op (как и на SQLite в тестах), сама регистрация
+    проверяется без базы."""
+
+    next_user_id = 1
+
+    def __init__(self):
+        self.added = []
+        self.queries = []
+
+    def get(self, model, key):
+        return None
+
+    def add(self, obj):
+        self.added.append(obj)
+        if isinstance(obj, User):
+            obj.id = self.next_user_id
+
+    def flush(self):
+        return None
+
+    def get_bind(self):
+        return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+    def query(self, *args, **kwargs):
+        self.queries.append(args)
+        return _EmptyQuery()
+
+
+class _EmptyQuery:
+    def filter(self, *args, **kwargs):
+        return self
+
+    def first(self):
+        return None
+
+    def one_or_none(self):
+        return None
+
+
+class _ExistingUserQuery(_EmptyQuery):
+    def __init__(self, user):
+        self.__user = user
+
+    def first(self):
+        return self.__user
+
+    def one_or_none(self):
+        return self.__user
+
+
+class _SiteRegistrationSessionWithExistingUser(_SiteRegistrationFakeSession):
+    """Сессия, в которой строка users под вычисленным username уже есть —
+    например, у пользователя, сменившего почту уже после регистрации."""
+
+    def __init__(self, existing_user):
+        super().__init__()
+        self.existing_user = existing_user
+
+    def query(self, *args, **kwargs):
+        self.queries.append(args)
+        return _ExistingUserQuery(self.existing_user)
 
 
 class StaticAssetVersioningTests(SimpleTestCase):
@@ -2603,20 +2700,8 @@ class PaymentRedirectTests(SimpleTestCase):
 
     @override_settings(SITE_TRIAL_REGISTRATION_ENABLED=False)
     def test_create_site_user_without_trial_creates_local_user_without_rwms(self):
-        class FakeSession:
-            def __init__(self):
-                self.added = []
-
-            def get(self, model, key):
-                return None
-
-            def add(self, obj):
-                self.added.append(obj)
-                if isinstance(obj, User):
-                    obj.id = 1
-
-            def flush(self):
-                return None
+        class FakeSession(_SiteRegistrationFakeSession):
+            pass
 
         session = FakeSession()
         request = SimpleNamespace()
@@ -2652,32 +2737,19 @@ class PaymentRedirectTests(SimpleTestCase):
 
     @override_settings(SITE_TRIAL_REGISTRATION_ENABLED=True, SITE_TRIAL_PERIOD_DAYS=7)
     def test_create_site_user_with_trial_flag_keeps_rwms_trial_path(self):
-        class FakeRwUser(SimpleNamespace):
-            def HasField(self, field_name):
-                return False
-
-        class FakeSession:
-            def __init__(self):
-                self.added = []
-
-            def get(self, model, key):
-                return None
-
-            def add(self, obj):
-                self.added.append(obj)
-                if isinstance(obj, User):
-                    obj.id = 2
-
-            def flush(self):
-                return None
+        class FakeSession(_SiteRegistrationFakeSession):
+            next_user_id = 2
 
         session = FakeSession()
         request = SimpleNamespace()
-        rw_user = FakeRwUser(username="rw-user")
+        rw_user = _FakeSiteRwUser(username="rw-user")
 
         with mock.patch(
             "engine.views.get_registration_context",
             return_value={"referrer": None, "traffic_source": 42, "ymid": None},
+        ), mock.patch(
+            "engine.views.resolve_existing_site_subscription",
+            return_value=None,
         ), mock.patch(
             "engine.views.create_user",
             return_value=rw_user,
@@ -2838,6 +2910,577 @@ class PaymentRedirectTests(SimpleTestCase):
             "https://example.com/login/purchase/token/",
         )
         self.assertEqual(captured["json"]["failRedirectUrl"], "https://example.com/")
+
+
+class RegistrationAdvisoryLockTests(SimpleTestCase):
+    """``lock_registration_email`` — общий транзакционный лок регистрации.
+
+    Его берут и сайтовые flow (``create_site_user``), и мобильный email-логин
+    (``mobile_api.auth.lock_email``), причём ПО ОДНОМУ И ТОМУ ЖЕ ключу: иначе
+    параллельные сайтовая и мобильная регистрации на один новый email обе
+    дошли бы до AddUser, и подписка проигравшего осталась бы сиротой."""
+
+    def _session(self, dialect_name):
+        session = mock.Mock()
+        session.get_bind.return_value = SimpleNamespace(
+            dialect=SimpleNamespace(name=dialect_name)
+        )
+        return session
+
+    def test_locks_on_postgres_with_normalized_email(self):
+        session = self._session("postgresql")
+
+        lock_registration_email(session, "  User@Example.COM ")
+
+        session.execute.assert_called_once()
+        statement, params = session.execute.call_args.args
+        self.assertIn("pg_advisory_xact_lock(hashtext(:email))", str(statement))
+        self.assertEqual(params, {"email": "user@example.com"})
+
+    def test_noop_on_non_postgres_backend(self):
+        session = self._session("sqlite")
+
+        lock_registration_email(session, "user@example.com")
+
+        session.execute.assert_not_called()
+
+    def test_noop_without_email(self):
+        session = self._session("postgresql")
+
+        lock_registration_email(session, None)
+        lock_registration_email(session, "   ")
+
+        session.execute.assert_not_called()
+
+    def test_mobile_lock_email_delegates_to_the_same_helper(self):
+        from mobile_api import auth as mobile_auth
+
+        session = self._session("postgresql")
+        mobile_auth.lock_email(session, "User@Example.com")
+
+        session.execute.assert_called_once()
+        _statement, params = session.execute.call_args.args
+        self.assertEqual(params, {"email": "user@example.com"})
+
+    def test_telegram_registration_has_its_own_postgres_lock(self):
+        session = self._session("postgresql")
+
+        lock_registration_telegram_id(session, 123456789)
+
+        session.execute.assert_called_once()
+        statement, params = session.execute.call_args.args
+        self.assertIn("pg_advisory_xact_lock(hashtext(:identity))", str(statement))
+        self.assertEqual(params, {"identity": "telegram:123456789"})
+
+    def test_telegram_lock_is_noop_without_id_or_postgres(self):
+        postgres = self._session("postgresql")
+        sqlite = self._session("sqlite")
+
+        lock_registration_telegram_id(postgres, None)
+        lock_registration_telegram_id(sqlite, 42)
+
+        postgres.execute.assert_not_called()
+        sqlite.execute.assert_not_called()
+
+
+@override_settings(SITE_TRIAL_REGISTRATION_ENABLED=True, SITE_TRIAL_PERIOD_DAYS=7)
+class SiteRegistrationOrphanTests(SimpleTestCase):
+    """P1: обычная сайтовая регистрация больше не плодит сирот в Remnawave.
+
+    Было: ``username = uuid4().hex`` → AddUser в панель → только потом строка
+    users. Крэш между AddUser и commit'ом оставлял активную подписку навсегда,
+    а повтор регистрации брал НОВЫЙ uuid и создавал ЕЩЁ ОДНУ подписку.
+
+    Стало (как в mobile_api): детерминированное имя от email → advisory-лок по
+    email → строгое чтение панели → adoption найденной подписки / создание при
+    достоверном NOT_FOUND / отказ при недоступности панели."""
+
+    EMAIL = "new@example.com"
+    CONTEXT = {"referrer": None, "traffic_source": 42, "ymid": None}
+
+    def _run(self, session, email, client, create_user_return=None):
+        request = SimpleNamespace()
+        with mock.patch(
+            "engine.views.get_registration_context",
+            return_value=dict(self.CONTEXT),
+        ), mock.patch(
+            "engine.views.rwms_client", client
+        ), mock.patch(
+            "engine.views.create_user",
+            return_value=create_user_return,
+        ) as create_rwms_user, mock.patch(
+            "engine.views.add_user_to_traffic_progress",
+        ), mock.patch(
+            "engine.views.add_event_log",
+        ):
+            user = create_site_user(
+                session,
+                email,
+                request,
+                creation_channel="site_magic_link",
+            )
+        return user, create_rwms_user
+
+    def test_email_registration_reuses_the_mobile_deterministic_generator(self):
+        from mobile_api.provisioning import deterministic_username as mobile_name
+
+        # Один генератор на оба flow: подписку-сироту, оставленную сайтом,
+        # сможет принять мобильный вход и наоборот.
+        self.assertEqual(
+            site_registration_username(self.EMAIL),
+            mobile_name(self.EMAIL),
+        )
+        self.assertEqual(
+            site_registration_username(" New@Example.COM "),
+            site_registration_username(self.EMAIL),
+        )
+
+    def test_two_different_emails_get_different_usernames(self):
+        self.assertNotEqual(
+            site_registration_username("a@example.com"),
+            site_registration_username("b@example.com"),
+        )
+        self.assertRegex(site_registration_username("a@example.com"), r"^m[0-9a-f]{31}$")
+
+    def test_telegram_only_registration_uses_bot_deterministic_username(self):
+        # Тот же telegram_id всегда выводит то же имя, совпадающее с ботом.
+        first = site_registration_username(None, telegram_id=42)
+        second = site_registration_username(None, telegram_id=42)
+
+        self.assertEqual(first, "42")
+        self.assertEqual(second, "42")
+
+    def test_telegram_only_registration_strict_reads_before_add_user(self):
+        session = _SiteRegistrationFakeSession()
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None
+        rw_user = _FakeSiteRwUser(username="42", telegram_id=42)
+
+        request = SimpleNamespace()
+        with mock.patch(
+            "engine.views.get_registration_context",
+            return_value=dict(self.CONTEXT),
+        ), mock.patch("engine.views.rwms_client", client), mock.patch(
+            "engine.views.create_user", return_value=rw_user
+        ) as create_rwms_user, mock.patch(
+            "engine.views.add_user_to_traffic_progress"
+        ), mock.patch("engine.views.add_event_log"):
+            user = create_site_user(
+                session,
+                None,
+                request,
+                telegram_id=42,
+                creation_channel="site_telegram_widget",
+            )
+
+        client.get_user_by_username_strict.assert_called_once_with("42")
+        create_rwms_user.assert_called_once()
+        self.assertEqual(create_rwms_user.call_args.kwargs["username"], "42")
+        self.assertIsNotNone(user)
+
+    def test_telegram_crash_retry_adopts_without_second_adduser(self):
+        session = _SiteRegistrationFakeSession()
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = _FakeSiteRwUser(
+            username="42",
+            telegram_id=42,
+            expire_at=_FakeProtoTimestamp(datetime(2030, 1, 1)),
+        )
+        request = SimpleNamespace()
+
+        with mock.patch(
+            "engine.views.get_registration_context",
+            return_value=dict(self.CONTEXT),
+        ), mock.patch("engine.views.rwms_client", client), mock.patch(
+            "engine.views.create_user"
+        ) as create_rwms_user, mock.patch(
+            "engine.views.add_user_to_traffic_progress"
+        ), mock.patch("engine.views.add_event_log"):
+            user = create_site_user(
+                session,
+                None,
+                request,
+                telegram_id=42,
+                creation_channel="site_telegram_widget",
+            )
+
+        create_rwms_user.assert_not_called()
+        client.add_user.assert_not_called()
+        self.assertEqual(user.username, "42")
+        self.assertEqual(user.telegram_id, 42)
+
+    def test_telegram_adoption_refuses_missing_or_foreign_owner(self):
+        for panel_telegram_id in (None, 777):
+            with self.subTest(panel_telegram_id=panel_telegram_id):
+                session = _SiteRegistrationFakeSession()
+                client = mock.Mock()
+                client.get_user_by_username_strict.return_value = _FakeSiteRwUser(
+                    username="42", telegram_id=panel_telegram_id
+                )
+                request = SimpleNamespace()
+                with mock.patch(
+                    "engine.views.get_registration_context",
+                    return_value=dict(self.CONTEXT),
+                ), mock.patch("engine.views.rwms_client", client), mock.patch(
+                    "engine.views.create_user"
+                ) as create_rwms_user, self.assertLogs(level="CRITICAL"):
+                    with self.assertRaises(SiteRegistrationUnavailable):
+                        create_site_user(
+                            session,
+                            None,
+                            request,
+                            telegram_id=42,
+                            creation_channel="site_telegram_widget",
+                        )
+
+                create_rwms_user.assert_not_called()
+
+    def test_crash_window_retry_adopts_subscription_without_second_adduser(self):
+        """Панель создала подписку, БД не успела: повтор регистрации выводит ТО
+        ЖЕ имя, находит подписку и ПРИНИМАЕТ её. Второго AddUser нет."""
+        session = _SiteRegistrationFakeSession()
+        username = deterministic_username(self.EMAIL)
+        expire = datetime(2030, 1, 1, 12, 0, 0)
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = _FakeSiteRwUser(
+            username=username,
+            email=self.EMAIL,
+            expire_at=_FakeProtoTimestamp(expire),
+        )
+
+        user, create_rwms_user = self._run(session, self.EMAIL, client)
+
+        client.get_user_by_username_strict.assert_called_once_with(username)
+        # КРИТИЧНО: панель не тронута — ни второго AddUser, ни recreate.
+        create_rwms_user.assert_not_called()
+        client.add_user.assert_not_called()
+        self.assertEqual(user.username, username)
+        self.assertEqual(user.email, self.EMAIL)
+        self.assertEqual(user.expire_at, expire)
+
+    def test_adoption_refuses_panel_record_without_email(self):
+        session = _SiteRegistrationFakeSession()
+        username = deterministic_username(self.EMAIL)
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = _FakeSiteRwUser(
+            username=username
+        )
+
+        with self.assertLogs(level="CRITICAL"):
+            with self.assertRaises(SiteRegistrationUnavailable):
+                self._run(session, self.EMAIL, client)
+
+        client.add_user.assert_not_called()
+        self.assertEqual(session.added, [])
+
+    def test_foreign_subscription_is_never_adopted_and_raises_alert(self):
+        """P2 (тот же guard на сайтовом adoption): подписка под вычисленным
+        именем с ЧУЖИМ email — неоднозначное состояние. Ни adoption, ни запись
+        в панель: ALERT и отказ."""
+        session = _SiteRegistrationFakeSession()
+        username = deterministic_username(self.EMAIL)
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = _FakeSiteRwUser(
+            username=username,
+            email="someone-else@example.com",
+        )
+
+        with self.assertLogs(level="CRITICAL") as captured_logs:
+            with self.assertRaises(SiteRegistrationUnavailable):
+                self._run(session, self.EMAIL, client)
+
+        self.assertTrue(any("ALERT:" in line for line in captured_logs.output))
+        self.assertTrue(
+            any("someone-else@example.com" in line for line in captured_logs.output)
+        )
+        client.add_user.assert_not_called()
+
+    def test_adoption_refuses_local_row_owned_by_another_email(self):
+        """Захват аккаунта по «освобождённому» email. Жертва зарегистрировалась
+        на A, позже сменила почту на B; панель осталась с A (её обновление
+        best-effort и на блипе RWMS молча пропускается). Новый владелец адреса A
+        вводит его в форму: имя детерминировано от A, панельный guard проходит
+        (email панели == A), но строка users принадлежит уже адресу B. Без
+        проверки владельца локальной строки регистрация вернула бы аккаунт
+        жертвы (magic-link и purchase-token выдались бы чужому человеку)."""
+        username = deterministic_username(self.EMAIL)
+        victim = User(email="victim-new@example.com", username=username)
+        victim.id = 777
+        session = _SiteRegistrationSessionWithExistingUser(victim)
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = _FakeSiteRwUser(
+            username=username,
+            email=self.EMAIL,  # панель осталась со старым адресом жертвы
+        )
+
+        with self.assertLogs(level="CRITICAL") as captured_logs:
+            with self.assertRaises(SiteRegistrationUnavailable):
+                self._run(session, self.EMAIL, client)
+
+        self.assertTrue(any("ALERT:" in line for line in captured_logs.output))
+        # Ни панель, ни БД не тронуты, чужой аккаунт не отдан
+        client.add_user.assert_not_called()
+        self.assertEqual(session.added, [])
+        self.assertEqual(victim.email, "victim-new@example.com")
+
+    def test_adoption_reuses_local_row_of_the_same_email(self):
+        """Обратная сторона guard'а: строка того же владельца принимается как
+        раньше (crash-window recovery не сломан)."""
+        username = deterministic_username(self.EMAIL)
+        existing = User(email=self.EMAIL, username=username)
+        existing.id = 42
+        session = _SiteRegistrationSessionWithExistingUser(existing)
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = _FakeSiteRwUser(
+            username=username,
+            email=self.EMAIL,
+        )
+
+        user, create_rwms_user = self._run(session, self.EMAIL, client)
+
+        create_rwms_user.assert_not_called()
+        client.add_user.assert_not_called()
+        self.assertIs(user, existing)
+        client.update_user.assert_not_called()
+        self.assertEqual(session.added, [])
+
+    def test_rwms_unavailable_aborts_registration_without_touching_panel(self):
+        session = _SiteRegistrationFakeSession()
+        username = deterministic_username(self.EMAIL)
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = RwmsUnavailableError(
+            username, None, "panel down"
+        )
+
+        with self.assertRaises(SiteRegistrationUnavailable):
+            self._run(session, self.EMAIL, client)
+
+        client.add_user.assert_not_called()
+        # Ни локальной строки: «зарегистрировали без подписки» разошло бы БД и
+        # панель, если подписка на самом деле уже существует.
+        self.assertEqual(session.added, [])
+
+    def test_confirmed_not_found_creates_subscription_with_deterministic_name(self):
+        session = _SiteRegistrationFakeSession()
+        username = deterministic_username(self.EMAIL)
+        expire = datetime(2030, 6, 1, 9, 0, 0)
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None  # достоверный NOT_FOUND
+
+        user, create_rwms_user = self._run(
+            session,
+            self.EMAIL,
+            client,
+            create_user_return=_FakeSiteRwUser(
+                username=username, expire_at=_FakeProtoTimestamp(expire)
+            ),
+        )
+
+        create_rwms_user.assert_called_once()
+        self.assertEqual(create_rwms_user.call_args.kwargs["username"], username)
+        self.assertEqual(create_rwms_user.call_args.kwargs["trial_period_days"], 7)
+        self.assertEqual(user.username, username)
+        self.assertEqual(user.expire_at, expire)
+
+    def test_advisory_lock_is_taken_before_any_panel_call(self):
+        order = []
+        session = _SiteRegistrationFakeSession()
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = lambda name: order.append(
+            "strict_read"
+        )
+        request = SimpleNamespace()
+
+        with mock.patch(
+            "engine.views.lock_registration_email",
+            side_effect=lambda *args: order.append("advisory_lock"),
+        ), mock.patch(
+            "engine.views.get_registration_context",
+            side_effect=lambda *args: order.append("context") or dict(self.CONTEXT),
+        ), mock.patch(
+            "engine.views.rwms_client", client
+        ), mock.patch(
+            "engine.views.create_user",
+            side_effect=lambda **kwargs: order.append("add_user")
+            or _FakeSiteRwUser(username=kwargs["username"]),
+        ), mock.patch(
+            "engine.views.add_user_to_traffic_progress",
+        ), mock.patch(
+            "engine.views.add_event_log",
+        ):
+            create_site_user(session, self.EMAIL, request)
+
+        self.assertEqual(order, ["advisory_lock", "context", "strict_read", "add_user"])
+
+    def test_resolve_helper_translates_outage_and_conflict(self):
+        username = deterministic_username(self.EMAIL)
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = RwmsUnavailableError(
+            username, None, "down"
+        )
+        with mock.patch("engine.views.rwms_client", client):
+            with self.assertRaises(SiteRegistrationUnavailable):
+                resolve_existing_site_subscription(username, self.EMAIL)
+
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None
+        with mock.patch("engine.views.rwms_client", client):
+            self.assertIsNone(
+                resolve_existing_site_subscription(username, self.EMAIL)
+            )
+
+
+class SiteRegistrationViewFallbackTests(SimpleTestCase):
+    """Пользовательская реакция на отказ регистрации: «попробуйте позже», а не
+    молчаливый «ok» и не «регистрация не удалась навсегда»."""
+
+    class _FakeBegin:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args):
+            return False
+
+    def _fake_session(self, existing_user):
+        outer = self
+
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return existing_user
+
+        class FakeSession:
+            def __init__(self):
+                self.closed = False
+
+            def begin(self):
+                return outer._FakeBegin()
+
+            def query(self, *args, **kwargs):
+                return FakeQuery()
+
+            def add(self, obj):
+                if isinstance(obj, MagicToken):
+                    obj.token = "magic-token"
+
+            def close(self):
+                self.closed = True
+
+        return FakeSession()
+
+    def _post(self, email):
+        request = RequestFactory().post("/magic/", {"email": email})
+        request.session = {}
+        return request
+
+    def test_magic_link_asks_to_retry_when_registration_unavailable(self):
+        session = self._fake_session(None)
+
+        with mock.patch(
+            "engine.views.session_factory", return_value=session
+        ), mock.patch(
+            "engine.views.create_site_user",
+            side_effect=SiteRegistrationUnavailable("rwms unavailable"),
+        ), mock.patch(
+            "engine.views.send_magic_link_email"
+        ) as send_email:
+            response = send_magic_link(self._post("new@example.com"))
+
+        self.assertEqual(response.status_code, 503)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["message"], SITE_REGISTRATION_RETRY_MESSAGE)
+        self.assertIn("попробуйте позже", payload["message"])
+        send_email.assert_not_called()
+        self.assertTrue(session.closed)
+
+    def test_legacy_random_username_user_logs_in_unchanged(self):
+        """Аккаунты, заведённые старым ``uuid4().hex``-генератором, не
+        пересчитываются нигде: вход идёт по существующей строке users."""
+        legacy_username = "0123456789abcdef0123456789abcdef"
+        legacy_user = SimpleNamespace(
+            id=7,
+            email="legacy@example.com",
+            username=legacy_username,
+        )
+        session = self._fake_session(legacy_user)
+
+        with mock.patch(
+            "engine.views.session_factory", return_value=session
+        ), mock.patch(
+            "engine.views.create_site_user"
+        ) as create_site, mock.patch(
+            "engine.views.get_registration_context",
+            return_value={"referrer": None, "traffic_source": None, "ymid": None},
+        ), mock.patch(
+            "engine.views.sync_existing_user_tracking"
+        ), mock.patch(
+            "engine.views.send_magic_link_email"
+        ) as send_email:
+            response = send_magic_link(self._post("legacy@example.com"))
+
+        create_site.assert_not_called()
+        self.assertEqual(legacy_user.username, legacy_username)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content), {"status": "ok"})
+        send_email.assert_called_once()
+
+    @override_settings(PAYMENT_GATEWAY="wata")
+    def test_pay_asks_to_retry_instead_of_creating_orphan(self):
+        """Деньги: если аккаунт под оплату подготовить нельзя, форма оплаты не
+        открывается и в панели ничего не создаётся."""
+        tariff = SimpleNamespace(price=100, db_tariff_id="month", description="1 месяц")
+
+        class SessionDict(dict):
+            modified = False
+
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return None
+
+        class FakeSession:
+            def query(self, model):
+                return FakeQuery()
+
+            def commit(self):
+                return None
+
+            def rollback(self):
+                return None
+
+            def close(self):
+                return None
+
+        request = RequestFactory().post(
+            "/pay/",
+            {"email": "new@example.com", "tariff_id": "month"},
+            HTTP_HOST="example.com",
+            HTTP_X_PAYMENT_LAUNCH="new-tab",
+        )
+        request.user = SimpleNamespace(is_authenticated=False, id=None)
+        request.session = SessionDict()
+
+        with (
+            mock.patch("engine.views.session_factory", return_value=FakeSession()),
+            mock.patch("engine.views.get_runtime_actual_tariffs", return_value=[tariff]),
+            mock.patch(
+                "engine.views.create_site_user",
+                side_effect=SiteRegistrationUnavailable("rwms unavailable"),
+            ),
+            mock.patch("engine.views.create_wata_payment_sync") as create_invoice,
+        ):
+            response = pay(request)
+
+        self.assertEqual(response.status_code, 503)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["message"], SITE_REGISTRATION_RETRY_MESSAGE)
+        create_invoice.assert_not_called()
 
 
 class LoginOnboardingTests(SimpleTestCase):
@@ -6273,7 +6916,7 @@ class CabinetDevicesApiTests(_CabTestCase):
             total=1, devices=[self._proto_device()]
         )
         with patch.object(
-            _cab_views.rwms_client, "get_user_by_username",
+            _cab_views.rwms_client, "get_user_by_username_strict",
             return_value=self._subscription(),
         ), patch.object(
             _cab_views.rwms_client, "get_user_hwid_devices",
@@ -6302,7 +6945,7 @@ class CabinetDevicesApiTests(_CabTestCase):
             enabled=True, fallback_device_limit=25
         )
         with patch.object(
-            _cab_views.rwms_client, "get_user_by_username", return_value=sub
+            _cab_views.rwms_client, "get_user_by_username_strict", return_value=sub
         ), patch.object(
             _cab_views.rwms_client, "get_user_hwid_devices",
             return_value=resp_proto,
@@ -6323,7 +6966,7 @@ class CabinetDevicesApiTests(_CabTestCase):
         sub = proto.UserResponse(uuid="rw-uuid-1", username="hwid_tester")
         resp_proto = proto.GetUserHwidDevicesResponse(total=0, devices=[])
         with patch.object(
-            _cab_views.rwms_client, "get_user_by_username", return_value=sub
+            _cab_views.rwms_client, "get_user_by_username_strict", return_value=sub
         ), patch.object(
             _cab_views.rwms_client, "get_user_hwid_devices",
             return_value=resp_proto,
@@ -6342,7 +6985,7 @@ class CabinetDevicesApiTests(_CabTestCase):
 
         resp_proto = proto.GetUserHwidDevicesResponse(total=0, devices=[])
         with patch.object(
-            _cab_views.rwms_client, "get_user_by_username",
+            _cab_views.rwms_client, "get_user_by_username_strict",
             return_value=self._subscription(limit=5),
         ), patch.object(
             _cab_views.rwms_client, "get_user_hwid_devices",
@@ -6367,7 +7010,7 @@ class CabinetDevicesApiTests(_CabTestCase):
             enabled=True, fallback_device_limit=25
         )
         with patch.object(
-            _cab_views.rwms_client, "get_user_by_username", return_value=sub
+            _cab_views.rwms_client, "get_user_by_username_strict", return_value=sub
         ), patch.object(
             _cab_views.rwms_client, "get_user_hwid_devices",
             return_value=resp_proto,
@@ -6386,7 +7029,7 @@ class CabinetDevicesApiTests(_CabTestCase):
         from unittest.mock import patch
 
         with patch.object(
-            _cab_views.rwms_client, "get_user_by_username", return_value=None
+            _cab_views.rwms_client, "get_user_by_username_strict", return_value=None
         ):
             response = self.client.get("/api/cabinet/devices/")
         self.assertEqual(response.status_code, 404)
@@ -6402,7 +7045,7 @@ class CabinetDevicesApiTests(_CabTestCase):
 
         resp_proto = proto.DeleteUserHwidDeviceResponse(total=0, devices=[])
         with patch.object(
-            _cab_views.rwms_client, "get_user_by_username",
+            _cab_views.rwms_client, "get_user_by_username_strict",
             return_value=self._subscription(),
         ), patch.object(
             _cab_views.rwms_client, "delete_user_hwid_device",
@@ -6422,7 +7065,7 @@ class CabinetDevicesApiTests(_CabTestCase):
         from unittest.mock import patch
 
         with patch.object(
-            _cab_views.rwms_client, "get_user_by_username",
+            _cab_views.rwms_client, "get_user_by_username_strict",
             return_value=self._subscription(),
         ):
             response = self.client.post("/api/cabinet/devices/delete/", {})
@@ -6431,3 +7074,186 @@ class CabinetDevicesApiTests(_CabTestCase):
     def test_device_delete_get_not_allowed(self):
         response = self.client.get("/api/cabinet/devices/delete/")
         self.assertEqual(response.status_code, 405)
+
+
+class CabinetDevicesRwmsUnavailableTests(_CabTestCase):
+    """Недоступность RWMS/панели в HWID-эндпоинтах кабинета: «данные временно
+    недоступны» (503), а НЕ «subscription not found» (404) — блип панели
+    нельзя показывать как отсутствие подписки."""
+
+    def setUp(self):
+        from django.contrib.auth.models import User
+
+        self.user = User.objects.create_user(
+            username="hwid_tester_down", password="x"
+        )
+        self.client.force_login(self.user)
+        _cab_views._hwid_settings_cache.update({"value": None, "expires_at": 0.0})
+
+    def _unavailable_patch(self):
+        from unittest.mock import patch
+
+        from common.rwms_client import RwmsUnavailableError
+
+        return patch.object(
+            _cab_views.rwms_client,
+            "get_user_by_username_strict",
+            side_effect=RwmsUnavailableError("hwid_tester_down", None, "panel down"),
+        )
+
+    def test_devices_list_rwms_unavailable_is_503_not_404(self):
+        with self._unavailable_patch():
+            response = self.client.get("/api/cabinet/devices/")
+        self.assertEqual(response.status_code, 503)
+        payload = response.json()
+        self.assertEqual(payload["status"], "error")
+        self.assertIn("временно недоступны", payload["message"])
+
+    def test_device_delete_rwms_unavailable_is_503_not_404(self):
+        with self._unavailable_patch():
+            response = self.client.post(
+                "/api/cabinet/devices/delete/", {"hwid": "dev-1"}
+            )
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(response.json()["status"], "error")
+
+
+class DashboardRwmsDegradationTests(SimpleTestCase):
+    """Оплаченный клиент не должен видеть «истекла» из-за блипа RWMS/панели.
+
+    Политика «БД — истина по времени, панель — истина по существованию ключа»:
+    - RwmsUnavailableError → деградация к остатку из user.time_until_expiration
+      (кабинет рендерится штатно, has_subscription_access по БД);
+    - достоверный NOT_FOUND (strict → None) → прежнее поведение: «истекла».
+    """
+
+    def _dashboard_context(self, rwms_patch_kwargs, time_left=None):
+        from django.http import HttpResponse
+
+        from engine import views as _views
+
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def order_by(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return None
+
+            def scalar(self):
+                return 0
+
+            def all(self):
+                return []
+
+        class FakeSession:
+            def query(self, *args, **kwargs):
+                return FakeQuery()
+
+            def commit(self):
+                return None
+
+            def rollback(self):
+                return None
+
+            def close(self):
+                return None
+
+        class SessionDict(dict):
+            modified = False
+
+        request = RequestFactory().get("/dashboard/")
+        request.user = SimpleNamespace(
+            is_authenticated=True,
+            id=42,
+            username="user-42",
+            telegram_id=100500,
+            email="user@example.com",
+            time_until_expiration=time_left,
+        )
+        request.session = SessionDict()
+
+        with (
+            mock.patch("engine.views.session_factory", return_value=FakeSession()),
+            mock.patch.object(
+                _views.rwms_client, "get_user_by_username_strict", **rwms_patch_kwargs
+            ),
+            mock.patch("engine.views.get_runtime_actual_tariffs", return_value=[]),
+            mock.patch(
+                "engine.views.runtime_int_from_db",
+                side_effect=lambda _s, _k, default_value, **kw: default_value,
+            ),
+            mock.patch(
+                "engine.views.build_apple_subscription_link",
+                return_value=("happ", "happ://sub"),
+            ),
+            mock.patch(
+                "engine.views.encrypt_happ_url1", return_value="happ://encrypted"
+            ),
+            mock.patch(
+                "engine.views.render", return_value=HttpResponse("ok")
+            ) as render_mock,
+        ):
+            response = _views.dashboard(request)
+
+        self.assertEqual(response.status_code, 200)
+        return render_mock.call_args.args[2]
+
+    def test_rwms_unavailable_degrades_to_db_expiration(self):
+        from datetime import timedelta
+
+        from common.rwms_client import RwmsUnavailableError
+
+        context = self._dashboard_context(
+            {"side_effect": RwmsUnavailableError("user-42", None, "panel down")},
+            time_left=timedelta(days=5),
+        )
+        # Активный по БД юзер НЕ видит «истекла» при недоступности панели.
+        self.assertTrue(context["has_subscription_access"])
+        self.assertGreater(context["seconds_left"], 0)
+        self.assertEqual(context["days_left"], 5)
+        self.assertEqual(context["time_left_value"], 5)
+        # Панельных данных нет — ссылки установки пустые (для них нужна панель).
+        self.assertEqual(context["plain_subscription_url"], "")
+        self.assertEqual(context["happ_subscription_url"], "")
+        self.assertEqual(context["apple_subscription_url"], "")
+
+    def test_confirmed_not_found_still_shows_expired(self):
+        from datetime import timedelta
+
+        context = self._dashboard_context(
+            {"return_value": None}, time_left=timedelta(days=5)
+        )
+        # Достоверный NOT_FOUND: подписки в панели нет — «истекла», как раньше.
+        self.assertFalse(context["has_subscription_access"])
+        self.assertEqual(context["seconds_left"], -1)
+        self.assertEqual(context["days_left"], 0)
+        self.assertEqual(context["time_left_value"], 0)
+
+    def test_rwms_unavailable_does_not_grant_access_to_expired_db_user(self):
+        from datetime import timedelta
+
+        from common.rwms_client import RwmsUnavailableError
+
+        context = self._dashboard_context(
+            {"side_effect": RwmsUnavailableError("user-42", None, "down")},
+            time_left=timedelta(seconds=-100),
+        )
+        # Деградация не «дарит» доступ: истёкший по БД остаётся истёкшим.
+        self.assertFalse(context["has_subscription_access"])
+        self.assertEqual(context["days_left"], 0)
+
+    def test_normal_flow_uses_panel_subscription_url(self):
+        from datetime import timedelta
+
+        sub = SimpleNamespace(subscription_url="https://sub.example/u")
+        context = self._dashboard_context(
+            {"return_value": sub}, time_left=timedelta(days=3)
+        )
+        self.assertTrue(context["has_subscription_access"])
+        self.assertEqual(
+            context["plain_subscription_url"], "https://sub.example/u"
+        )
+        self.assertEqual(context["days_left"], 3)

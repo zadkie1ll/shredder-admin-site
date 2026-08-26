@@ -6,6 +6,7 @@ import logging
 
 from django.conf import settings
 
+from common.rwms_client import RwmsUnavailableError
 from common.rwms_client_sync import RwmsClientSync
 
 _client = None
@@ -19,10 +20,17 @@ def rwms_client():
 
 
 def get_rwms_user(username):
-    """Return the RWMS UserResponse for ``username`` (subscription_url/expire/status),
-    or ``None`` on any error — the caller degrades gracefully."""
+    """Return the RWMS UserResponse for ``username`` (subscription_url/expire/status).
+
+    ``None`` — ТОЛЬКО достоверный NOT_FOUND (подписки нет в панели). При
+    недоступности RWMS/панели (или любой неожиданной ошибке) бросает
+    ``RwmsUnavailableError``: вызывающий код обязан отвечать «временно
+    недоступно», а не показывать отсутствие подписки (Политика: БД — истина
+    по времени, панель — истина по существованию ключа)."""
     try:
-        return rwms_client().get_user_by_username(username)
+        return rwms_client().get_user_by_username_strict(username)
+    except RwmsUnavailableError:
+        raise
     except Exception as error:  # noqa: BLE001 - never let RWMS errors 500 the API
         logging.warning("mobile_api: RWMS lookup failed for %s: %s", username, error)
-        return None
+        raise RwmsUnavailableError(username, None, str(error)) from error

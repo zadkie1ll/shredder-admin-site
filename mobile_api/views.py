@@ -1,4 +1,5 @@
 import json
+import logging
 import re
 import secrets
 from datetime import datetime, timedelta, timezone
@@ -13,7 +14,9 @@ from django.views.decorators.http import require_http_methods
 
 import proto.rwmanager_pb2 as proto
 from common.models.db import EmailLoginCode, User
+from common.rwms_client import RwmsUnavailableError
 from database import session_factory
+from engine.rwms_helpers import RwmsSubscriptionOwnershipError
 
 from .auth import (
     EMAIL_CODE_TTL,
@@ -120,7 +123,17 @@ def auth_exchange(request):
         if user is None:
             session.rollback()
             return JsonResponse({"error": "invalid_or_expired_code"}, status=401)
-        rw = get_rwms_user(user.username)
+        try:
+            rw = get_rwms_user(user.username)
+        except RwmsUnavailableError as error:
+            # Блип RWMS/панели не должен валить успешный вход: токен выдаём,
+            # subscription_url приложение добирает позже через /me.
+            logging.warning(
+                "mobile_api: RWMS unavailable during auth_exchange for %s: %s",
+                user.username,
+                error,
+            )
+            rw = None
         subscription_url = rw.subscription_url if rw is not None else None
         session.commit()
         return JsonResponse(
@@ -241,14 +254,39 @@ def auth_email_verify(request):
             # Brand-new user: provision a full trial the bot way (real RWMS sub).
             from .provisioning import provision_trial_user
 
-            user = provision_trial_user(session, rwms_client(), email)
+            try:
+                user = provision_trial_user(session, rwms_client(), email)
+            except RwmsSubscriptionOwnershipError:
+                # Найденная подписка ЯВНО принадлежит другому email — состояние
+                # неоднозначное (ALERT уже залогирован). Панель не тронута,
+                # аккаунт не создан: отдаём внятное «попробуйте позже», а не
+                # чужой доступ и не «неверный код».
+                session.rollback()
+                return JsonResponse(
+                    {
+                        "error": "temporarily_unavailable",
+                        "message": "Не удалось подготовить аккаунт. "
+                        "Попробуйте позже или напишите в поддержку.",
+                    },
+                    status=503,
+                )
             if user is None:
                 session.rollback()
                 return JsonResponse({"error": "invalid_or_expired_code"}, status=401)
         # Existing user: DO NOT touch RWMS, DO NOT re-provision a trial.
 
         raw_token = _issue_access_token(session, user, now=now)
-        rw = get_rwms_user(user.username)
+        try:
+            rw = get_rwms_user(user.username)
+        except RwmsUnavailableError as error:
+            # Вход уже состоялся — не показываем «нет подписки» из-за блипа
+            # панели; subscription_url приложение добирает через /me.
+            logging.warning(
+                "mobile_api: RWMS unavailable during email verify for %s: %s",
+                user.username,
+                error,
+            )
+            rw = None
         subscription_url = rw.subscription_url if rw is not None else None
         session.commit()
         return JsonResponse(
@@ -270,7 +308,24 @@ def me(request):
         user, _token = authenticate(session, request)
         if user is None:
             return JsonResponse({"error": "unauthorized"}, status=401)
-        rw = get_rwms_user(user.username)
+        try:
+            rw = get_rwms_user(user.username)
+        except RwmsUnavailableError as error:
+            # Панель недоступна — статус подписки выяснить нельзя. Отвечаем
+            # «временно недоступно» (503), а НЕ null-полями, которые
+            # приложение показало бы как «нет подписки/истекла».
+            logging.warning(
+                "mobile_api: RWMS unavailable during /me for %s: %s",
+                user.username,
+                error,
+            )
+            return JsonResponse(
+                {
+                    "error": "temporarily_unavailable",
+                    "message": "Данные временно недоступны, попробуйте позже",
+                },
+                status=503,
+            )
         expire_iso, days_left = _expire_fields(rw)
         payload = {
             "user": _serialize_user(user),

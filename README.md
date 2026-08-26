@@ -81,6 +81,54 @@ UI-слой поверх существующего UX (бизнес-логик�
   умолчанию 15), если RWMS/панель недоступны. Требуется деплой RWMS с RPC
   `GetHwidSettings` и обновлённые pb2-стабы (`./makepb.sh`).
 
+### Недоступность RWMS ≠ «подписка истекла» (2026-08-25)
+
+Политика «БД — истина по времени, панель — истина по существованию ключа»
+(фикс High-бага: при блипе RWMS/панели оплаченному клиенту в кабинете
+показывалось «истекла»/0 дней):
+
+- Кабинет и mobile_api используют строгий метод
+  `RwmsClientSync.get_user_by_username_strict` (из common): `None` — только
+  достоверный `NOT_FOUND` (подписки реально нет в панели, легитимный кейс —
+  удалена rw-cleaner'ом после долгой просрочки); любая другая ошибка —
+  исключение `RwmsUnavailableError` (из `common.rwms_client`). Старый
+  `get_user_by_username` (глотает всё как `None`) — deprecated; админские
+  и фоновые вызовы в `engine/views.py` пока остаются на нём осознанно.
+- `dashboard` при `RwmsUnavailableError` деградирует к БД: `seconds_left`
+  считается из `user.time_until_expiration`, `has_subscription_access` — по
+  БД (`seconds_left > 0`), кабинет рендерится штатно с остатком и кнопками;
+  в лог пишется warning. Ссылки установки (`plain/happ/apple_subscription_url`)
+  в этом режиме пустые — для них нужны данные панели. Debug-ветка
+  `?debug_no_rwms=1` симулирует именно достоверный NOT_FOUND.
+- HWID-эндпоинты кабинета (`/api/cabinet/devices/`,
+  `/api/cabinet/devices/delete/`) при недоступности панели отвечают
+  `503 {"status": "error", "message": "Данные временно недоступны…"}`
+  вместо прежнего ложного `404 subscription not found`.
+- mobile_api: `GET /me` → `503 temporarily_unavailable`; `auth/exchange` и
+  `auth/email/verify` при блипе панели НЕ валят успешный вход — токен
+  выдаётся, `subscription_url: null`, приложение добирает его через `/me`.
+  Провижининг триала (`provisioning.provision_trial_user`) при недоступности
+  RWMS прерывается: outage не считается ни «username свободен», ни
+  «подписка существует» (SAFETY).
+- Сайтовая регистрация по email (`engine.views.create_site_user`) при
+  `RwmsUnavailableError` тоже прерывается — `SiteRegistrationUnavailable`,
+  пользователю «Сервис временно недоступен, попробуйте позже»; локальный
+  аккаунт без подписки в этом случае не создаётся. Подробности — в разделе
+  «Сайтовая регистрация по email: детерминированный username и adoption».
+
+Тесты: `engine.tests.DashboardRwmsDegradationTests`,
+`engine.tests.CabinetDevicesRwmsUnavailableTests`,
+`mobile_api.tests.MobileMeRwmsPolicyTests`,
+`mobile_api.tests.MobileAuthRwmsDegradationTests`,
+`mobile_api.tests.ProvisioningRwmsUnavailableTests`,
+`mobile_api.tests.DeterministicUsernameTests`,
+`mobile_api.tests.ProvisioningAdoptionTests`,
+`mobile_api.tests.ProvisioningOwnershipGuardTests`,
+`mobile_api.tests.MobileVerifyOwnershipConflictViewTests`,
+`engine.tests.SiteRegistrationOrphanTests`,
+`engine.tests.SiteRegistrationViewFallbackTests`,
+`engine.tests.RegistrationAdvisoryLockTests`.
+
 ### Производительность (2026-08-19)
 
 - Tailwind CDN (JIT-компилятор ~350КБ JS на каждом устройстве) заменён на
@@ -480,6 +528,74 @@ DOMContentLoaded `applySetupFlowMode()` переключает видимост�
 > поведения в проде проверьте и env-переменную, и runtime-настройку
 > `site_trial_registration_enabled` в админке («Общие»): runtime-значение перекрывает env.
 
+#### Сайтовая регистрация: детерминированный username и adoption
+
+`engine.views.create_site_user` — единственная точка создания сайтового
+пользователя. Её вызывают magic link (`send_magic_link`), Google OAuth
+(`auth_by_google_callback`), Yandex OAuth (`auth_by_yandex_callback`), форма
+оплаты (`pay`), Telegram-виджет (`auth_by_telegram_widget`) и Telegram Mini App
+(`auth_by_telegram_webapp`).
+
+Раньше все они брали `username = uuid4().hex`, создавали подписку в панели и
+только потом строку `users`. Крэш между `AddUser` и commit'ом БД оставлял
+активную подписку-сироту **навсегда**, а повторная регистрация брала новый uuid
+и создавала **ещё одну** подписку. Теперь регистрация по email и только по
+Telegram использует восстанавливаемую схему (общий код в
+`engine/rwms_helpers.py` и `engine/sql_helpers.py`, не копия):
+
+1. **Advisory-лок по email** — `sql_helpers.lock_registration_email`
+   (`pg_advisory_xact_lock(hashtext(email))`) в самом начале, **до** чтения
+   контекста и до любых обращений к панели. Ключ общий с мобильным
+   `mobile_api.auth.lock_email`, поэтому сайтовая и мобильная регистрации на
+   один новый email сериализуются друг с другом. На не-postgres бэкендах и при
+   пустом email — no-op.
+2. **Детерминированный username** — `rwms_helpers.deterministic_username(email)`
+   (`"m" + sha256(email.lower())[:31]`), тот же генератор, что у `mobile_api`.
+   Один email → одно имя в обоих flow, поэтому сироту, оставленную сайтом,
+   может принять мобильный вход и наоборот.
+3. **Строгое чтение перед AddUser** —
+   `views.resolve_existing_site_subscription`:
+   - подписка найдена → **adoption**: создаётся строка `users` по данным панели
+     (`sync_local_user_from_rwms`), панель **не трогается** (ни второго
+     `AddUser`, ни update, ни recreate — существующие клиентские конфиги живы);
+   - достоверный `NOT_FOUND` → обычный `create_user` (`AddUser`);
+   - `RwmsUnavailableError` → `SiteRegistrationUnavailable`: регистрация
+     прерывается, локальный аккаунт «как будто подписки нет» **не** создаётся
+     (иначе БД и панель разошлись бы);
+   - у найденной подписки отсутствующий или чужой email → guard
+     `assert_subscription_owned_by_email`: `logging.critical("ALERT: …")` и та же
+     `SiteRegistrationUnavailable`, панель не трогается.
+4. **Реакция вьюх на `SiteRegistrationUnavailable`** — понятное «Сервис временно
+   недоступен, попробуйте позже» (`views.SITE_REGISTRATION_RETRY_MESSAGE`),
+   а не «регистрация не удалась навсегда»: следующая попытка выведет то же имя и
+   продолжит с того же места. `send_magic_link` отвечает
+   `503 {"status": "error", "message": …}` (это единственный случай, когда он
+   отходит от анти-энумерационного `{"status": "ok"}`); OAuth-колбэки рендерят
+   логин-страницу с этим текстом и статусом 503; `pay` — 503 JSON или
+   `payment_status.html`.
+
+Ограничения и совместимость:
+
+- **Существующие пользователи не затронуты**: `create_site_user` вызывается
+  только когда строки `users` нет, а username существующего аккаунта не
+  пересчитывается ни на одном пути. Legacy-аккаунты со случайными
+  `uuid4().hex`-именами логинятся как раньше.
+- **Регистрация только по `telegram_id`** (виджет / Mini App, email ещё нет)
+  использует `str(telegram_id)` — тот же детерминированный username, что бот,
+  — и отдельный advisory-лок `telegram:<id>`. Перед `AddUser` выполняется
+  strict-чтение; adoption разрешён только при точном совпадении непустого
+  `telegram_id` панельной записи. Пустой/чужой владелец даёт ALERT и временный
+  отказ, а крэш после AddUser безопасно восстанавливается повторной попыткой.
+- Ветка «триал выключен» (`SITE_TRIAL_REGISTRATION_ENABLED=false`) подписку не
+  создаёт вовсе: она как и раньше пытается подобрать существующую подписку
+  через `find_rwms_user_by_identity`, а при её отсутствии создаёт локальную
+  строку с тем же детерминированным username. Advisory-лок и повторное чтение
+  `users` под локом защищают её от конкурентного дублирующего INSERT.
+
+Тесты: `engine.tests.SiteRegistrationOrphanTests`,
+`engine.tests.SiteRegistrationViewFallbackTests`,
+`engine.tests.RegistrationAdvisoryLockTests`.
+
 Telegram-вход через бота сохраняет доменный контекст через короткие start-коды.
 Сайт не передаёт полный URL в Telegram: вместо этого env
 `TELEGRAM_WEB_LOGIN_START_CODES` задаёт allowlist вида
@@ -637,7 +753,7 @@ Django-приложение `mobile_api` обслуживает мобильно
 | `POST /api/mobile/v1/auth/exchange` `{code}` | Обменять одноразовый код на `{access_token, subscription_url, user}` (код one-time, TTL 10 мин). Rate-limit per-IP: 90 запросов/мин (Django cache, per-process LocMemCache) → `429 rate_limited`; приложение трактует 429 как transient и продолжает поллинг |
 | `POST /api/mobile/v1/auth/email/request` `{email}` | Сгенерировать 6-значный код и отправить письмо. Ответ `{ok, ttl_seconds}`. Всегда 200 для валидного email (не раскрывает, существует ли пользователь). `400 invalid_email`, `429 rate_limited` |
 | `POST /api/mobile/v1/auth/email/verify` `{email, code}` | Проверить код → `{access_token, subscription_url, user}` (тот же формат, что `/auth/exchange`). `401 invalid_or_expired_code`, `429 rate_limited` |
-| `GET /api/mobile/v1/me` (Bearer) | Статус подписки: `status`, `expire_at`, `days_left` (округление вверх, как в кабинете: 23ч → 1 день), `subscription_url` |
+| `GET /api/mobile/v1/me` (Bearer) | Статус подписки: `status`, `expire_at`, `days_left` (округление вверх, как в кабинете: 23ч → 1 день), `subscription_url`. При недоступности RWMS/панели — `503 temporarily_unavailable` («попробуйте позже»), а НЕ null-поля: блип панели нельзя показывать как «нет подписки» |
 | `GET /api/mobile/v1/tariffs` | Список тарифов |
 | `POST /api/mobile/v1/auth/logout` (Bearer) | Отозвать access-токен |
 | `GET /app/auth-redirect?code=…` | Мост https → `monkeyisland://auth?code=…` (кнопка «Войти» в боте) |
@@ -657,11 +773,46 @@ Django-приложение `mobile_api` обслуживает мобильно
 в Remnawave через существующий sync-хелпер `engine.rwms_helpers.create_user(...)`
 (`expire_at = now + SITE_TRIAL_PERIOD_DAYS`, по умолчанию 7 дней) + строка `users`.
 Триал создаётся **безусловно** (НЕ зависит от `SITE_TRIAL_REGISTRATION_ENABLED`).
-Перед `AddUser` username проверяется через `get_user_by_username` (должен быть `None`) —
-никогда не пишем поверх чужой подписки, ничего не удаляем/не пересоздаём. Для
-**существующего** пользователя RWMS не трогается вообще (ни create, ни extend).
-Логика вынесена в `mobile_api/provisioning.py`. Username генерируется тем же
-способом, что и в `create_site_user` (`uuid4().hex`; fallback `mi_` + `token_hex`).
+Для **существующего** пользователя RWMS не трогается вообще (ни create, ни extend).
+Логика вынесена в `mobile_api/provisioning.py`.
+
+**Детерминированный username и adoption после крэша.** Username email-регистрации
+— детерминированная функция от нормализованного email:
+`"m" + sha256(email.lower())[:31]` (32 символа `[m0-9a-f]`; панель принимает
+`^[a-zA-Z0-9_-]+$`, 3..36). Формат не пересекается ни с именами бота
+(чистые цифры `str(telegram_id)`), ни с legacy-сайтовыми `uuid4().hex` (`m` — не
+hex-символ), ни с legacy `mi_`-фолбэком. Сам генератор живёт в
+`engine.rwms_helpers.deterministic_username` (в `mobile_api/provisioning.py`
+только ре-экспорт) и используется **и** сайтовой регистрацией по email, так что
+подписку, осиротевшую в одном flow, принимает другой. Перед `AddUser`
+выполняется **строгое** чтение по этому имени (`get_user_by_username_strict`,
+под per-email advisory-локом):
+
+- подписка **существует**, а строки `users` нет → это crash-окно предыдущей
+  попытки («панель создала, процесс упал до commit»): подписка **принимается**
+  (adoption) — создаётся строка `users`, панель не трогается (никакого второго
+  `AddUser`, ничего не удаляем/не пересоздаём), в лог пишется adoption;
+- достоверный `NOT_FOUND` → обычный `AddUser`;
+- `RwmsUnavailableError` → провижининг прерывается (outage не считается ни
+  «свободно», ни «существует»).
+
+**Guard владельца перед adoption.** Совпадения имени недостаточно, чтобы считать
+найденную подписку нашей: помимо (маловероятной) хеш-коллизии бывают записи,
+созданные руками, импортом или ошибочным прошлым кодом. Перед adoption
+`rwms_helpers.assert_subscription_owned_by_email` сверяет нормализованный email
+панельной записи с запрошенным:
+
+- совпал — adoption;
+- email отсутствует или не совпадает — неоднозначное состояние:
+  `logging.critical("ALERT: …")`,
+  `RwmsSubscriptionOwnershipError`, панель не трогается, провижининг остановлен.
+  `POST /api/mobile/v1/auth/email/verify` отвечает
+  `503 {"error": "temporarily_unavailable", "message": …}` — не «неверный код» и
+  тем более не чужой доступ.
+
+Существующие пользователи со старыми случайными username не затрагиваются:
+провижининг вызывается только когда строки `users` по email нет, и ни один
+путь не пересчитывает username существующего пользователя.
 
 **Новые таблицы БД** (в общем сабмодуле `common/models/db.py`, аддитивно — существующие
 не меняются): `mobile_auth_codes` (code_hash, user_id, expires_at, used_at, source),
