@@ -112,8 +112,10 @@ UI-слой поверх существующего UX (бизнес-логик�
   «подписка существует» (SAFETY).
 - Сайтовая регистрация по email (`engine.views.create_site_user`) при
   `RwmsUnavailableError` тоже прерывается — `SiteRegistrationUnavailable`,
-  пользователю «Сервис временно недоступен, попробуйте позже»; локальный
-  аккаунт без подписки в этом случае не создаётся. Подробности — в разделе
+  пользователю «Сервис временно недоступен, попробуйте позже» (503); локальный
+  аккаунт без подписки в этом случае не создаётся. Конфликт владельца —
+  отдельный, НЕ временный случай (`SiteRegistrationOwnershipConflict`, 409,
+  «напишите в поддержку»). Подробности — в разделе
   «Сайтовая регистрация по email: детерминированный username и adoption».
 
 Тесты: `engine.tests.DashboardRwmsDegradationTests`,
@@ -124,9 +126,12 @@ UI-слой поверх существующего UX (бизнес-логик�
 `mobile_api.tests.DeterministicUsernameTests`,
 `mobile_api.tests.ProvisioningAdoptionTests`,
 `mobile_api.tests.ProvisioningOwnershipGuardTests`,
+`mobile_api.tests.ProvisioningLocalRowOwnershipTests`,
 `mobile_api.tests.MobileVerifyOwnershipConflictViewTests`,
 `engine.tests.SiteRegistrationOrphanTests`,
 `engine.tests.SiteRegistrationViewFallbackTests`,
+`engine.tests.SiteRegistrationLocalRowOwnershipTests`,
+`engine.tests.SiteRegistrationOwnershipMessageTests`,
 `engine.tests.RegistrationAdvisoryLockTests`.
 
 ### Производительность (2026-08-19)
@@ -247,6 +252,38 @@ async function pollStatus() {
 `YkPayment` / `WataTransaction`, которые пишет вебхук платёжного сервиса. У Wata экран
 успеха держит пользователя ~10 секунд перед собственным редиректом, а вебхук может
 прийти не сразу — поэтому есть **активная проверка статуса напрямую у Wata**:
+
+> **Исход заказа определяется фактом оплаты, а не временем последней транзакции.**
+> `views.has_paid_wata_transaction(db_session, order_ids)` сначала ищет по заказам
+> покупки (order_id инвойса и/или `payment_reference` токена) транзакцию со
+> статусом `Paid`, и только если её нет — используется прежний fallback
+> «последняя по `payment_time`». Причина: у одного `order_id` бывает несколько
+> попыток, а `payment_time` каждой строки — время её собственного события из
+> вебхука Wata (`monkey-island-payment`, `wata_webhook_handler`:
+> `_add_wata_transaction` / `_mark_wata_transaction_paid`). Поэтому отклонённая
+> попытка, случившаяся ПОСЛЕ оплаченной, оказывалась «последней» и оплатившему
+> показывалось «платёж не прошёл». Правило совпадает с активной проверкой у Wata
+> (`fetch_wata_transaction_status`: `Paid` в списке транзакций заказа побеждает).
+> Тесты: `engine.tests.PurchasePaymentOutcomeTests`.
+
+> **Отказ — только явный терминальный статус.** Терминальных статусов у Wata два:
+> `Paid` (успех) и `Declined` (отказ). Всё остальное (`Created` / `Pending` у СБП
+> и 3DS) — промежуточное состояние: платёжный сервис сохраняет такую строку
+> отдельным вебхуком (`monkey-island-payment`, `wata_webhook_handler`, ветка
+> «прочие статусы» → `_add_wata_transaction`) и переводит её в `Paid` следующим
+> вебхуком через десятки секунд. Поэтому fallback-ветки
+> `get_purchase_payment_status` интерпретируют строку транзакции через
+> `views.wata_transaction_purchase_status`: `Paid` → `succeeded`,
+> `Declined` → `failed`, любой другой статус → `pending` (ждём). Раньше обе ветки
+> возвращали `failed` для ЛЮБОГО статуса `!= Paid`, и человек, открывший страницу
+> между двумя вебхуками, видел «Платеж не прошёл»: на `failed` шаблон
+> `payment_status.html` НАВСЕГДА останавливает опрос, шлёт цель `payment_failed` и
+> прячет кнопку входа, так что пришедший следом `Paid` уже не отображался.
+> Правило симметрично успеху (успех — только явный `Paid`) и активной проверке
+> `active_wata_status_for_token`. Ветка истёкшего инвойса
+> (`is_wata_invoice_expired` → «Время оплаты истекло») не изменилась и
+> срабатывает, как и раньше, только когда транзакций по заказу нет вовсе.
+> Тесты: `engine.tests.PurchasePaymentNonTerminalStatusTests`.
 
 - `fetch_wata_transaction_status(order_id)` (`engine/payments.py`) — read-only
   `GET {WATA_HOST}/transactions?orderId=…` с `Bearer WATA_TOKEN`; возвращает
@@ -563,16 +600,41 @@ Telegram использует восстанавливаемую схему (о�
      прерывается, локальный аккаунт «как будто подписки нет» **не** создаётся
      (иначе БД и панель разошлись бы);
    - у найденной подписки отсутствующий или чужой email → guard
-     `assert_subscription_owned_by_email`: `logging.critical("ALERT: …")` и та же
-     `SiteRegistrationUnavailable`, панель не трогается.
-4. **Реакция вьюх на `SiteRegistrationUnavailable`** — понятное «Сервис временно
-   недоступен, попробуйте позже» (`views.SITE_REGISTRATION_RETRY_MESSAGE`),
-   а не «регистрация не удалась навсегда»: следующая попытка выведет то же имя и
-   продолжит с того же места. `send_magic_link` отвечает
-   `503 {"status": "error", "message": …}` (это единственный случай, когда он
-   отходит от анти-энумерационного `{"status": "ok"}`); OAuth-колбэки рендерят
-   логин-страницу с этим текстом и статусом 503; `pay` — 503 JSON или
-   `payment_status.html`.
+     `assert_subscription_owned_by_email`: `logging.critical("ALERT: …")` и
+     `SiteRegistrationOwnershipConflict`, панель не трогается.
+4. **Второй рубеж владения — ЛОКАЛЬНАЯ строка `users`** (`sync_local_user_from_rwms`).
+   Панельный guard сверяет только email записи в Remnawave. Имя детерминировано
+   от email, поэтому строка `users` под ним находится и тогда, когда её владелец
+   давно сменил почту (панель при смене email обновляется best-effort и на блипе
+   RWMS остаётся со старым адресом). Тогда человек, получивший «освобождённый»
+   адрес A, прошёл бы панельный guard и получил чужой аккаунт (magic-link и
+   purchase-token выдались бы на строку жертвы). Правило: непустой чужой
+   `email` (или чужой непустой `telegram_id`) в найденной строке →
+   `logging.critical("ALERT: …")` + `SiteRegistrationOwnershipConflict`;
+   ни панель, ни строка не изменяются. Проверка живёт **внутри**
+   `sync_local_user_from_rwms`, поэтому закрывает все четыре пути, которые туда
+   ведут: adoption по email, adoption по `telegram_id`, ветку «триал выключен» и
+   восстановление после провала `create_user`
+   (тесты: `engine.tests.SiteRegistrationLocalRowOwnershipTests`).
+5. **Реакция вьюх на отказ** различает два случая:
+   - `SiteRegistrationUnavailable` (панель недоступна, ВРЕМЕННО) — «Сервис
+     временно недоступен, попробуйте позже»
+     (`views.SITE_REGISTRATION_RETRY_MESSAGE`), статус **503**: следующая
+     попытка выведет то же имя и продолжит с того же места;
+   - `SiteRegistrationOwnershipConflict` (подкласс первого; конфликт владельца,
+     сам НЕ пройдёт) — «Не удалось завершить регистрацию автоматически,
+     напишите в поддержку» (`views.SITE_REGISTRATION_SUPPORT_MESSAGE`), статус
+     **409**. Просить «повторить через пару минут» здесь бессмысленно: повтор
+     выведет то же детерминированное имя и упрётся в тот же guard, а оператору
+     есть за что зацепиться — ALERT уже в логе.
+
+   `send_magic_link` отвечает `{"status": "error", "message": …}` (это
+   единственный случай, когда он отходит от анти-энумерационного
+   `{"status": "ok"}`); OAuth-колбэки рендерят логин-страницу с этим текстом;
+   `pay` — JSON или `payment_status.html`. Наследование
+   `SiteRegistrationOwnershipConflict` от `SiteRegistrationUnavailable`
+   сохраняет обратную совместимость: любой обработчик, ловящий базовый класс,
+   по-прежнему останавливает регистрацию и не создаёт ни подписку, ни аккаунт.
 
 Ограничения и совместимость:
 
@@ -594,6 +656,8 @@ Telegram использует восстанавливаемую схему (о�
 
 Тесты: `engine.tests.SiteRegistrationOrphanTests`,
 `engine.tests.SiteRegistrationViewFallbackTests`,
+`engine.tests.SiteRegistrationLocalRowOwnershipTests`,
+`engine.tests.SiteRegistrationOwnershipMessageTests`,
 `engine.tests.RegistrationAdvisoryLockTests`.
 
 Telegram-вход через бота сохраняет доменный контекст через короткие start-коды.
@@ -809,6 +873,19 @@ hex-символ), ни с legacy `mi_`-фолбэком. Сам генерат�
   `POST /api/mobile/v1/auth/email/verify` отвечает
   `503 {"error": "temporarily_unavailable", "message": …}` — не «неверный код» и
   тем более не чужой доступ.
+
+**Guard владельца ЛОКАЛЬНОЙ строки `users`** (`provisioning.assert_local_row_free_for_email`)
+— зеркало сайтового guard'а и выполняется **первым**, до strict-чтения панели и
+до любого `AddUser`. Панельная проверка знает только про Remnawave; если
+владелец сменил почту, а панель осталась со старым адресом, новый владелец
+«освобождённого» адреса проходил панельный guard и упирался в уникальный индекс
+`users.username` уже на INSERT: `IntegrityError` → `rollback` (который заодно
+откатывал инкремент счётчика попыток кода и снятый advisory-лок) → пользователь
+видел `401 invalid_or_expired_code`. Теперь строка `users` по вычисленному
+username проверяется явно: непустой чужой email → `logging.critical("ALERT: …")`
++ `RwmsSubscriptionOwnershipError` → та же понятная `503`-ошибка вьюхи. Пустой
+email в строке «явно чужим» не считается (правило совпадает с сайтовым).
+Тесты: `mobile_api.tests.ProvisioningLocalRowOwnershipTests`.
 
 Существующие пользователи со старыми случайными username не затрагиваются:
 провижининг вызывается только когда строки `users` по email нет, и ни один

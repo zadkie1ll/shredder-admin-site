@@ -22,6 +22,12 @@ must never come here. For a new user we:
      explicitly names somebody else is never adopted — that would hand a
      stranger's subscription to the current login. Such a mismatch is an
      ambiguous state: ALERT log, provisioning stopped, panel untouched.
+   - A SECOND ownership guard (``assert_local_row_free_for_email``) checks the
+     LOCAL ``users`` row under the same derived username BEFORE anything else:
+     a row whose non-empty email names somebody else (the owner changed their
+     email, the panel kept the old one) means the name is taken by a stranger.
+     Without it the flow died on the ``users.username`` unique index with an
+     IntegrityError and the user saw "invalid_or_expired_code".
    - Confirmed NOT_FOUND → create the RWMS subscription via ``create_user``
      with ``expire_at = now + trial days`` (unconditionally — trial gating
      does not apply to the mobile email-login flow).
@@ -57,8 +63,47 @@ from engine.rwms_helpers import RwmsSubscriptionOwnershipError  # noqa: F401
 from engine.rwms_helpers import assert_subscription_owned_by_email
 from engine.rwms_helpers import create_user
 from engine.rwms_helpers import deterministic_username  # noqa: F401 - re-export
+from engine.rwms_helpers import normalize_email
 
 logger = logging.getLogger(__name__)
+
+
+def assert_local_row_free_for_email(db_session, username, email):
+    """Второй рубеж владения — уже НЕ панельный, а по строке ``users``.
+
+    ``assert_subscription_owned_by_email`` сверяет email ПАНЕЛЬНОЙ записи, но
+    ничего не знает о локальной строке. Имя детерминировано от email, поэтому
+    строка users под ним находится и тогда, когда её владелец давно сменил
+    почту: панель при смене email обновляется best-effort и на блипе RWMS
+    остаётся со старым адресом. Тогда человек, получивший «освобождённый»
+    адрес A, проходил панельный guard (email панели == A) и упирался в
+    уникальный индекс ``users.username`` уже на INSERT: IntegrityError →
+    rollback (который заодно откатывал инкремент счётчика попыток кода и
+    advisory-лок) → 401 «invalid_or_expired_code».
+
+    Правило то же, что в ``engine.views.sync_local_user_from_rwms``: непустой
+    чужой email в строке → неоднозначное владение, ALERT и остановка. Панель не
+    трогаем, строку не трогаем, чужой доступ не выдаём.
+    """
+    existing_row = (
+        db_session.query(User).filter(User.username == username).one_or_none()
+    )
+    if existing_row is None:
+        return
+
+    row_email = normalize_email(existing_row.email)
+    requested_email = normalize_email(email)
+    if row_email and requested_email and row_email != requested_email:
+        logger.critical(
+            "ALERT: mobile_api: refusing to provision %s for %s — local users row "
+            "(id=%s) belongs to %s; panel and row left untouched, provisioning "
+            "stopped",
+            username,
+            requested_email,
+            existing_row.id,
+            row_email,
+        )
+        raise RwmsSubscriptionOwnershipError(username, row_email, requested_email)
 
 
 def provision_trial_user(db_session, rwms_client, email):
@@ -68,10 +113,16 @@ def provision_trial_user(db_session, rwms_client, email):
     on a concurrent insert, re-fetched) ``User``, or ``None`` if provisioning
     failed (RWMS unavailable / RWMS create failed).
 
-    Raises ``RwmsSubscriptionOwnershipError`` when the panel record found under
-    the derived username explicitly belongs to a different email — an ambiguous
-    state the caller must surface, not silently work around."""
+    Raises ``RwmsSubscriptionOwnershipError`` when the panel record OR the local
+    ``users`` row found under the derived username explicitly belongs to a
+    different email — an ambiguous state the caller must surface, not silently
+    work around."""
     username = deterministic_username(email)
+
+    # Владелец локальной строки проверяется ПЕРВЫМ — до любого обращения к
+    # панели: если имя занято чужим аккаунтом, создавать подписку нельзя
+    # (получим сироту), а INSERT всё равно упрётся в уникальный username.
+    assert_local_row_free_for_email(db_session, username, email)
 
     # SAFETY: strict read — None is ONLY a confirmed NOT_FOUND. An RWMS outage
     # aborts provisioning: it must never be read as "free" (would double-create)

@@ -781,6 +781,11 @@ class ProvisioningRwmsUnavailableTests(SimpleTestCase):
             "candidate", None, "down"
         )
         db_session = mock.Mock()
+        # Локальная строка под вычисленным именем свободна: guard владения
+        # локальной строки проверяется отдельно (ProvisioningLocalRowOwnership...).
+        db_session.query.return_value.filter.return_value.one_or_none.return_value = (
+            None
+        )
         with mock.patch("mobile_api.provisioning.create_user") as create_user:
             result = provisioning.provision_trial_user(
                 db_session, client, "down@example.com"
@@ -1349,5 +1354,154 @@ class MobileVerifyOwnershipConflictViewTests(SimpleTestCase):
         client.add_user.assert_not_called()
         session = self.Session()
         self.assertEqual(session.query(User).count(), 0)
+        self.assertEqual(session.query(MobileAccessToken).count(), 0)
+        session.close()
+
+
+class ProvisioningLocalRowOwnershipTests(SimpleTestCase):
+    """P2: guard владения зеркалирован на ЛОКАЛЬНУЮ строку users.
+
+    ``assert_subscription_owned_by_email`` сверяет только email ПАНЕЛЬНОЙ
+    записи. Если владелец сменил почту (панель осталась со старой), новый
+    владелец «освобождённого» адреса проходил панельный guard и упирался в
+    уникальный индекс ``users.username`` уже на INSERT: IntegrityError →
+    rollback (уносивший заодно инкремент счётчика попыток кода и advisory-лок)
+    → 401 «invalid_or_expired_code». Теперь строка проверяется явно ДО INSERT и
+    ДО любого обращения к панели."""
+
+    def setUp(self):
+        self.engine = _make_engine()
+        self.Session = sessionmaker(bind=self.engine)
+
+    def test_foreign_local_row_blocks_provisioning_with_alert(self):
+        from mobile_api import provisioning
+        from mobile_api.provisioning import (
+            RwmsSubscriptionOwnershipError,
+            deterministic_username,
+        )
+
+        email = "reused@example.com"
+        username = deterministic_username(email)
+        session = self.Session()
+        # Жертва: имя выведено из СТАРОГО адреса, в строке — уже новый.
+        session.add(User(id=1, username=username, email="victim-new@example.com"))
+        session.commit()
+
+        client = mock.Mock()
+        with self.assertLogs(level="CRITICAL") as captured_logs:
+            with self.assertRaises(RwmsSubscriptionOwnershipError):
+                with mock.patch(
+                    "mobile_api.provisioning.create_user"
+                ) as create_user:
+                    provisioning.provision_trial_user(session, client, email)
+
+        self.assertTrue(any("ALERT:" in line for line in captured_logs.output))
+        self.assertTrue(
+            any("victim-new@example.com" in line for line in captured_logs.output)
+        )
+        # Панель не тронута вообще: отказ раньше strict-чтения и AddUser.
+        client.get_user_by_username_strict.assert_not_called()
+        create_user.assert_not_called()
+        client.add_user.assert_not_called()
+        client.update_user.assert_not_called()
+        session.rollback()
+        # Чужая строка не изменена, новой не появилось.
+        self.assertEqual(session.query(User).count(), 1)
+        self.assertEqual(
+            session.query(User).filter(User.username == username).one().email,
+            "victim-new@example.com",
+        )
+        session.close()
+
+    def test_free_username_still_provisions_as_before(self):
+        from mobile_api import provisioning
+        from mobile_api.provisioning import deterministic_username
+
+        email = "fresh@example.com"
+        username = deterministic_username(email)
+        expire = datetime.utcnow() + timedelta(days=7)
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None
+        session = self.Session()
+
+        with mock.patch(
+            "mobile_api.provisioning.create_user",
+            return_value=_FakeRwUser(expire_at=expire, username=username),
+        ) as create_user:
+            user = provisioning.provision_trial_user(session, client, email)
+        session.commit()
+
+        create_user.assert_called_once()
+        self.assertIsNotNone(user)
+        self.assertEqual(user.username, username)
+        self.assertEqual(user.email, email)
+        session.close()
+
+    def test_own_row_without_email_is_not_treated_as_foreign(self):
+        """Пустой email в строке — не «явно чужой»: правило то же, что на сайте
+        (блокирует только НЕПУСТОЕ расхождение)."""
+        from mobile_api import provisioning
+        from mobile_api.provisioning import deterministic_username
+
+        email = "noemail@example.com"
+        username = deterministic_username(email)
+        session = self.Session()
+        session.add(User(id=1, username=username, email=None))
+        session.commit()
+
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None
+        with mock.patch("mobile_api.provisioning.create_user", return_value=None):
+            # Провижининг идёт дальше guard'а (панель отвечает провалом создания),
+            # то есть guard именно на НЕПУСТОМ чужом email.
+            result = provisioning.provision_trial_user(session, client, email)
+
+        self.assertIsNone(result)
+        client.get_user_by_username_strict.assert_called_once_with(username)
+        session.rollback()
+        session.close()
+
+    def test_verify_view_returns_clear_error_instead_of_invalid_code(self):
+        from mobile_api import views
+        from mobile_api.provisioning import deterministic_username
+
+        email = "reused@example.com"
+        username = deterministic_username(email)
+        session = self.Session()
+        session.add(User(id=1, username=username, email="victim-new@example.com"))
+        auth.register_email_code(session, email, "123456")
+        session.commit()
+        session.close()
+
+        with (
+            mock.patch("mobile_api.views.session_factory", side_effect=self.Session),
+            mock.patch("mobile_api.views.rwms_client") as rwms_client,
+            mock.patch("mobile_api.provisioning.create_user") as create_user,
+        ):
+            client = rwms_client.return_value
+            # Панель осталась со СТАРЫМ адресом жертвы — ровно тем, который
+            # ввёл новый владелец: панельный guard такую запись пропускает,
+            # и без проверки локальной строки провижининг доходил до INSERT.
+            client.get_user_by_username_strict.return_value = _FakeRwUser(
+                expire_at=datetime.utcnow() + timedelta(days=7),
+                email=email,
+                username=username,
+            )
+            request = mock.Mock()
+            request.method = "POST"
+            request.body = json.dumps({"email": email, "code": "123456"}).encode()
+            with self.assertLogs(level="CRITICAL"):
+                resp = views.auth_email_verify(request)
+
+        # Было: IntegrityError → rollback → 401 «invalid_or_expired_code».
+        self.assertEqual(resp.status_code, 503)
+        payload = json.loads(resp.content)
+        self.assertEqual(payload["error"], "temporarily_unavailable")
+        self.assertIn("поддержку", payload["message"])
+        create_user.assert_not_called()
+        client.add_user.assert_not_called()
+
+        session = self.Session()
+        self.assertEqual(session.query(User).count(), 1)
         self.assertEqual(session.query(MobileAccessToken).count(), 0)
         session.close()

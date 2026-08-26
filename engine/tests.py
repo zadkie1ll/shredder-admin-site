@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import json
 import time
+from contextlib import ExitStack
 from datetime import date
 from datetime import datetime
 from datetime import timezone
@@ -14,6 +15,14 @@ from django.conf import settings
 from django.test import RequestFactory
 from django.test import SimpleTestCase
 from django.test import override_settings
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from common.models.db import Base
+from common.models.db import WataInvoice
+from common.models.db import WataTransaction
+from common.models.db import YkPayment
 
 from common.models.settings import BOT_APPLE_RECOMMENDED_APP_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_ONEDAY_SETTING
@@ -44,8 +53,11 @@ from engine.views import support_admin_api_cohort_stats
 from engine.views import support_admin_api_censor_checks
 from engine.views import auth_by_telegram_widget
 from engine.views import SITE_REGISTRATION_RETRY_MESSAGE
+from engine.views import SITE_REGISTRATION_SUPPORT_MESSAGE
+from engine.views import SiteRegistrationOwnershipConflict
 from engine.views import SiteRegistrationUnavailable
 from engine.views import create_site_user
+from engine.views import get_purchase_payment_status
 from engine.views import resolve_existing_site_subscription
 from engine.views import send_magic_link
 from engine.views import site_registration_username
@@ -7257,3 +7269,750 @@ class DashboardRwmsDegradationTests(SimpleTestCase):
             context["plain_subscription_url"], "https://sub.example/u"
         )
         self.assertEqual(context["days_left"], 3)
+
+
+class PurchasePaymentStatusFixtureMixin:
+    """Общая фикстура для тестов ``get_purchase_payment_status``."""
+
+    ORDER_ID = "order-1"
+
+    def setUp(self):
+        self.engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(
+            self.engine,
+            tables=[
+                WataInvoice.__table__,
+                WataTransaction.__table__,
+                YkPayment.__table__,
+            ],
+        )
+        self.Session = sessionmaker(bind=self.engine)
+        self.session = self.Session()
+        self.addCleanup(self.session.close)
+
+    def _login_token(self, payment_reference=ORDER_ID):
+        return SimpleNamespace(
+            user_id=42,
+            created_at=datetime(2026, 8, 26, 10, 0, 0),
+            payment_gateway="wata",
+            payment_reference=payment_reference,
+        )
+
+    def _add_invoice(self, order_id=ORDER_ID, expires_at=datetime(2030, 1, 1)):
+        self.session.add(
+            WataInvoice(
+                id=1,
+                user_id=42,
+                invoice_id=f"inv-{order_id}",
+                amount=299,
+                currency="RUB",
+                status="Opened",
+                url="https://wata.example/pay",
+                terminal_name="t",
+                terminal_public_id="tp",
+                creation_time=datetime(2026, 8, 26, 10, 1, 0),
+                order_id=order_id,
+                expiration_datetime=expires_at,
+                tariff_id="month",
+            )
+        )
+        self.session.flush()
+
+    def _add_transaction(self, row_id, status, payment_time, order_id=ORDER_ID):
+        self.session.add(
+            WataTransaction(
+                id=row_id,
+                transaction_id=f"tx-{row_id}",
+                transaction_type="Payment",
+                terminal_public_id="tp",
+                transaction_status=status,
+                terminal_name="t",
+                amount=299,
+                currency="RUB",
+                order_id=order_id,
+                order_description="месяц",
+                commission=0,
+                payment_time=payment_time,
+            )
+        )
+        self.session.flush()
+
+
+class PurchasePaymentOutcomeTests(PurchasePaymentStatusFixtureMixin, SimpleTestCase):
+    """P1: исход заказа — ФАКТ оплаты, а не «последняя по времени» транзакция.
+
+    Declined-строку платёжный сервис добирает из вебхука с
+    ``payment_time`` = ВРЕМЕНЕМ ОТКАЗА (monkey-island-payment,
+    ``_add_wata_transaction``). Поэтому у заказа с несколькими попытками
+    отклонённая попытка легко оказывается «последней» уже ПОСЛЕ успешной
+    оплаты, и оплатившему показывалось «платёж не прошёл» — вместо ссылки в
+    кабинет. Оплаченный заказ обязан быть успешным независимо от времени
+    прочих попыток."""
+
+    def test_paid_attempt_wins_over_later_declined_attempt(self):
+        """Попытка B оплачена в T3, попытка A отклонена в T4 > T3."""
+        self._add_invoice()
+        self._add_transaction(1, "Paid", datetime(2026, 8, 26, 10, 3, 0))
+        self._add_transaction(2, "Declined", datetime(2026, 8, 26, 10, 4, 0))
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "succeeded")
+        self.assertEqual(message, "Платеж прошел успешно")
+
+    def test_paid_attempt_wins_without_invoice_row(self):
+        """Зеркальный путь без строки инвойса: заказ известен только из токена."""
+        self._add_transaction(1, "Paid", datetime(2026, 8, 26, 10, 2, 0))
+        self._add_transaction(2, "Declined", datetime(2026, 8, 26, 10, 9, 0))
+
+        status, _message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "succeeded")
+
+    def test_only_declined_transactions_still_fail(self):
+        self._add_invoice()
+        self._add_transaction(1, "Declined", datetime(2026, 8, 26, 10, 3, 0))
+        self._add_transaction(2, "Declined", datetime(2026, 8, 26, 10, 4, 0))
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "failed")
+        self.assertEqual(message, "Платеж не прошел")
+
+    def test_no_transactions_keeps_previous_behaviour(self):
+        self._add_invoice()
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "pending")
+        self.assertEqual(message, "Ждем подтверждения платежа")
+
+    def test_expired_invoice_without_transactions_still_fails(self):
+        self._add_invoice(expires_at=datetime(2020, 1, 1))
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "failed")
+        self.assertEqual(message, "Время оплаты истекло")
+
+    def test_paid_transaction_of_another_order_is_not_counted(self):
+        """Чужой заказ не делает эту покупку успешной."""
+        self._add_invoice()
+        self._add_transaction(
+            1, "Paid", datetime(2026, 8, 26, 10, 3, 0), order_id="other-order"
+        )
+        self._add_transaction(2, "Declined", datetime(2026, 8, 26, 10, 4, 0))
+
+        status, _message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "failed")
+
+
+class PurchasePaymentNonTerminalStatusTests(
+    PurchasePaymentStatusFixtureMixin, SimpleTestCase
+):
+    """P1: НЕтерминальный статус транзакции — это ожидание, а не отказ.
+
+    У Wata терминальны только ``Paid`` и ``Declined``. Промежуточные
+    ``Created``/``Pending`` (СБП, 3DS) платёжный сервис сохраняет отдельной
+    строкой (monkey-island-payment/wata_webhook_handler.py, ветка «прочие
+    статусы» -> ``_add_wata_transaction``) и лишь потом переводит их в ``Paid``
+    вторым вебхуком.
+
+    Раньше обе fallback-ветки возвращали ``failed`` для ЛЮБОГО статуса != Paid,
+    и человек, который в этот момент открыл /payment/status/<token>/, видел
+    «Платеж не прошел». Шаблон payment_status.html на ``failed`` НАВСЕГДА
+    останавливает опрос, шлёт цель ``payment_failed`` и прячет кнопку входа —
+    пришедший через 10-30 секунд ``Paid`` пользователь уже не увидел бы."""
+
+    def test_pending_transaction_is_not_a_failure(self):
+        self._add_invoice()
+        self._add_transaction(1, "Pending", datetime(2026, 8, 26, 10, 3, 0))
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "pending")
+        self.assertEqual(message, "Ждем подтверждения платежа")
+
+    def test_created_transaction_is_not_a_failure(self):
+        self._add_invoice()
+        self._add_transaction(1, "Created", datetime(2026, 8, 26, 10, 3, 0))
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "pending")
+        self.assertEqual(message, "Ждем подтверждения платежа")
+
+    def test_pending_transaction_without_invoice_row_is_not_a_failure(self):
+        """Зеркальная ветка: заказ известен только из токена, строки инвойса нет."""
+        self._add_transaction(1, "Pending", datetime(2026, 8, 26, 10, 3, 0))
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "pending")
+        self.assertEqual(message, "Ждем подтверждения платежа")
+
+    def test_pending_then_paid_same_row_is_succeeded(self):
+        """Реальный путь: ``_mark_wata_transaction_paid`` обновляет ту же строку."""
+        self._add_invoice()
+        self._add_transaction(1, "Pending", datetime(2026, 8, 26, 10, 3, 0))
+
+        status, _message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+        self.assertEqual(status, "pending")
+
+        transaction = (
+            self.session.query(WataTransaction)
+            .filter(WataTransaction.id == 1)
+            .one()
+        )
+        transaction.transaction_status = "Paid"
+        transaction.payment_time = datetime(2026, 8, 26, 10, 3, 30)
+        self.session.flush()
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "succeeded")
+        self.assertEqual(message, "Платеж прошел успешно")
+
+    def test_pending_then_paid_separate_row_is_succeeded(self):
+        self._add_invoice()
+        self._add_transaction(1, "Pending", datetime(2026, 8, 26, 10, 3, 0))
+        self._add_transaction(2, "Paid", datetime(2026, 8, 26, 10, 3, 30))
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "succeeded")
+        self.assertEqual(message, "Платеж прошел успешно")
+
+    def test_declined_transaction_still_fails(self):
+        """Явный отказ остаётся отказом — поведение не ослаблено."""
+        self._add_invoice()
+        self._add_transaction(1, "Declined", datetime(2026, 8, 26, 10, 3, 0))
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "failed")
+        self.assertEqual(message, "Платеж не прошел")
+
+    def test_declined_without_invoice_row_still_fails(self):
+        self._add_transaction(1, "Declined", datetime(2026, 8, 26, 10, 3, 0))
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "failed")
+        self.assertEqual(message, "Платеж не прошел")
+
+    def test_expired_invoice_without_transactions_keeps_failing(self):
+        """Ветка истёкшего инвойса не тронута: отказ там обоснован."""
+        self._add_invoice(expires_at=datetime(2020, 1, 1))
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "failed")
+        self.assertEqual(message, "Время оплаты истекло")
+
+    def test_just_expired_invoice_with_pending_transaction_waits(self):
+        """Начатый платёж важнее срока инвойса — но только в пределах grace.
+
+        ``Paid`` по СБП приходит вторым вебхуком через десятки секунд и вполне
+        может прийти уже после ``expiration_datetime``. Закрывать экран сразу
+        значило бы воспроизвести ту же ошибку: опрос встал бы навсегда и
+        итоговый ``Paid`` пользователь бы не увидел."""
+        from datetime import timedelta as _timedelta
+
+        self._add_invoice(expires_at=datetime.utcnow() - _timedelta(minutes=1))
+        self._add_transaction(1, "Pending", datetime(2026, 8, 26, 10, 3, 0))
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "pending")
+        self.assertEqual(message, "Ждем подтверждения платежа")
+
+    def test_long_expired_invoice_with_stuck_pending_transaction_stops_waiting(self):
+        """Обратная сторона: застрявшая нетерминальная строка (терминальный
+        вебхук так и не пришёл) не должна крутить опрос вечно — после grace
+        экран закрывается понятным «время истекло»."""
+        self._add_invoice(expires_at=datetime(2020, 1, 1))
+        self._add_transaction(1, "Pending", datetime(2026, 8, 26, 10, 3, 0))
+
+        status, message = get_purchase_payment_status(
+            self.session, self._login_token()
+        )
+
+        self.assertEqual(status, "failed")
+        self.assertEqual(message, "Время оплаты истекло")
+
+    def test_paid_wins_even_for_long_expired_invoice(self):
+        """Оплата важнее любого срока: факт Paid проверяется до всех веток."""
+        self._add_invoice(expires_at=datetime(2020, 1, 1))
+        self._add_transaction(1, "Paid", datetime(2026, 8, 26, 10, 3, 0))
+
+        status, _ = get_purchase_payment_status(self.session, self._login_token())
+
+        self.assertEqual(status, "succeeded")
+
+
+@override_settings(SITE_TRIAL_REGISTRATION_ENABLED=True, SITE_TRIAL_PERIOD_DAYS=7)
+class SiteRegistrationLocalRowOwnershipTests(SimpleTestCase):
+    """P1: guard владельца ЛОКАЛЬНОЙ строки живёт в ``sync_local_user_from_rwms``
+    и потому работает на ВСЕХ путях, которые туда ведут.
+
+    Сценарий один и тот же: жертва зарегистрировалась на адрес A, позже сменила
+    почту на B; панель осталась с A (её обновление best-effort). Новый владелец
+    адреса A вводит его в форму — имя детерминировано от A, панельный guard
+    проходит, но строка users под этим именем принадлежит уже адресу B.
+
+    Путей в ``sync_local_user_from_rwms`` четыре: adoption по email, adoption по
+    telegram_id, ветка «триал выключен» и восстановление после провала
+    ``create_user``. Проверка обязана оставаться в самой функции: перенос её в
+    одну лишь ветку adoption оставит три других пути незакрытыми."""
+
+    EMAIL = "reused@example.com"
+    CONTEXT = {"referrer": None, "traffic_source": 42, "ymid": None}
+    VICTIM_EMAIL = "victim-new@example.com"
+
+    def _victim(self, telegram_id=None, email=None):
+        victim = User(
+            email=self.VICTIM_EMAIL if email is None else email,
+            username=deterministic_username(self.EMAIL),
+            telegram_id=telegram_id,
+        )
+        victim.id = 777
+        return victim
+
+    def _panel_record(self, username=None):
+        return _FakeSiteRwUser(
+            username=username or deterministic_username(self.EMAIL),
+            email=self.EMAIL,  # панель осталась со СТАРЫМ адресом жертвы
+        )
+
+    def _assert_nothing_touched(self, session, victim, client=None):
+        self.assertEqual(session.added, [])
+        self.assertEqual(victim.email, self.VICTIM_EMAIL)
+        if client is not None:
+            client.add_user.assert_not_called()
+            client.update_user.assert_not_called()
+
+    def test_email_adoption_refuses_foreign_row_even_when_it_has_telegram_id(self):
+        """Мутация «...and user.telegram_id is None» в условии обязана падать:
+        привязанный телеграм жертвы НЕ делает захват аккаунта допустимым."""
+        victim = self._victim(telegram_id=555000)
+        session = _SiteRegistrationSessionWithExistingUser(victim)
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = self._panel_record()
+
+        with self.assertLogs(level="CRITICAL") as captured_logs:
+            with self.assertRaises(SiteRegistrationOwnershipConflict):
+                with mock.patch(
+                    "engine.views.get_registration_context",
+                    return_value=dict(self.CONTEXT),
+                ), mock.patch("engine.views.rwms_client", client), mock.patch(
+                    "engine.views.create_user"
+                ) as create_rwms_user:
+                    create_site_user(
+                        session,
+                        self.EMAIL,
+                        SimpleNamespace(),
+                        creation_channel="site_magic_link",
+                    )
+
+        self.assertTrue(any("ALERT:" in line for line in captured_logs.output))
+        create_rwms_user.assert_not_called()
+        self._assert_nothing_touched(session, victim, client)
+        self.assertEqual(victim.telegram_id, 555000)
+
+    @override_settings(SITE_TRIAL_REGISTRATION_ENABLED=False)
+    def test_disabled_trial_path_refuses_foreign_local_row(self):
+        """Ветка «триал выключен»: подписка ищется по identity, но чужую строку
+        users принимать всё так же нельзя."""
+        victim = self._victim()
+        session = _SiteRegistrationSessionWithExistingUser(victim)
+
+        with self.assertLogs(level="CRITICAL") as captured_logs:
+            with self.assertRaises(SiteRegistrationOwnershipConflict):
+                with mock.patch(
+                    "engine.views.get_registration_context",
+                    return_value=dict(self.CONTEXT),
+                ), mock.patch(
+                    "engine.views.find_rwms_user_by_identity",
+                    return_value=self._panel_record(),
+                ), mock.patch(
+                    "engine.views.create_user"
+                ) as create_rwms_user:
+                    create_site_user(
+                        session,
+                        self.EMAIL,
+                        SimpleNamespace(),
+                        creation_channel="site_magic_link",
+                    )
+
+        self.assertTrue(any("ALERT:" in line for line in captured_logs.output))
+        create_rwms_user.assert_not_called()
+        self._assert_nothing_touched(session, victim)
+
+    def test_recovery_after_failed_create_refuses_foreign_local_row(self):
+        """Восстановление после провала ``create_user``: найденная по identity
+        подписка тоже не даёт права занять чужую строку users."""
+        victim = self._victim()
+        session = _SiteRegistrationSessionWithExistingUser(victim)
+
+        with self.assertLogs(level="CRITICAL") as captured_logs:
+            with self.assertRaises(SiteRegistrationOwnershipConflict):
+                with mock.patch(
+                    "engine.views.get_registration_context",
+                    return_value=dict(self.CONTEXT),
+                ), mock.patch(
+                    "engine.views.resolve_existing_site_subscription",
+                    return_value=None,
+                ), mock.patch(
+                    "engine.views.create_user", return_value=None
+                ), mock.patch(
+                    "engine.views.find_rwms_user_by_identity",
+                    return_value=self._panel_record(),
+                ):
+                    create_site_user(
+                        session,
+                        self.EMAIL,
+                        SimpleNamespace(),
+                        creation_channel="site_magic_link",
+                    )
+
+        self.assertTrue(any("ALERT:" in line for line in captured_logs.output))
+        self._assert_nothing_touched(session, victim)
+
+    def test_telegram_adoption_refuses_row_of_another_telegram_account(self):
+        """Тот же guard на telegram-пути: строка users под именем ``42``,
+        привязанная к другому telegram_id, не отдаётся текущему входу."""
+        foreign_row = User(email=None, username="42", telegram_id=999)
+        foreign_row.id = 778
+        session = _SiteRegistrationSessionWithExistingUser(foreign_row)
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = _FakeSiteRwUser(
+            username="42", telegram_id=42
+        )
+
+        with self.assertLogs(level="CRITICAL") as captured_logs:
+            with self.assertRaises(SiteRegistrationOwnershipConflict):
+                with mock.patch(
+                    "engine.views.get_registration_context",
+                    return_value=dict(self.CONTEXT),
+                ), mock.patch("engine.views.rwms_client", client), mock.patch(
+                    "engine.views.create_user"
+                ) as create_rwms_user:
+                    create_site_user(
+                        session,
+                        None,
+                        SimpleNamespace(),
+                        telegram_id=42,
+                        creation_channel="site_telegram_widget",
+                    )
+
+        self.assertTrue(any("ALERT:" in line for line in captured_logs.output))
+        create_rwms_user.assert_not_called()
+        client.add_user.assert_not_called()
+        self.assertEqual(session.added, [])
+        self.assertEqual(foreign_row.telegram_id, 999)
+
+    def test_same_owner_row_is_still_adopted_on_every_path(self):
+        """Обратная сторона guard'а: своя строка принимается на всех путях —
+        crash-window recovery не сломан ни на одном из них."""
+        for path in ("adoption", "trial_disabled", "recovery"):
+            with self.subTest(path=path):
+                own_row = self._victim(email=self.EMAIL)
+                session = _SiteRegistrationSessionWithExistingUser(own_row)
+                client = mock.Mock()
+                client.get_user_by_username_strict.return_value = self._panel_record()
+
+                patches = [
+                    mock.patch(
+                        "engine.views.get_registration_context",
+                        return_value=dict(self.CONTEXT),
+                    ),
+                    mock.patch("engine.views.rwms_client", client),
+                    mock.patch("engine.views.add_user_to_traffic_progress"),
+                    mock.patch("engine.views.add_event_log"),
+                    mock.patch("engine.views.create_user", return_value=None),
+                ]
+                if path != "adoption":
+                    patches.append(
+                        mock.patch(
+                            "engine.views.find_rwms_user_by_identity",
+                            return_value=self._panel_record(),
+                        )
+                    )
+                if path == "recovery":
+                    patches.append(
+                        mock.patch(
+                            "engine.views.resolve_existing_site_subscription",
+                            return_value=None,
+                        )
+                    )
+
+                with ExitStack() as stack:
+                    stack.enter_context(
+                        override_settings(
+                            SITE_TRIAL_REGISTRATION_ENABLED=(path != "trial_disabled")
+                        )
+                    )
+                    for patcher in patches:
+                        stack.enter_context(patcher)
+                    user = create_site_user(
+                        session,
+                        self.EMAIL,
+                        SimpleNamespace(),
+                        creation_channel="site_magic_link",
+                    )
+
+                self.assertIs(user, own_row)
+                self.assertEqual(session.added, [])
+
+
+class SiteRegistrationOwnershipMessageTests(SimpleTestCase):
+    """P2: конфликт владельца — не «сервис временно недоступен».
+
+    Повтор выведет ТО ЖЕ детерминированное имя и упрётся в тот же guard,
+    поэтому «повторите через пару минут» отправляло пользователя в бесконечный
+    цикл. Такому пользователю нужен оператор."""
+
+    def test_ownership_conflict_is_a_registration_failure_subtype(self):
+        # Обратная совместимость: любой существующий обработчик
+        # SiteRegistrationUnavailable продолжает ловить конфликт владельца
+        # (регистрация останавливается, подписка не создаётся).
+        self.assertTrue(
+            issubclass(SiteRegistrationOwnershipConflict, SiteRegistrationUnavailable)
+        )
+        self.assertNotEqual(
+            SITE_REGISTRATION_SUPPORT_MESSAGE, SITE_REGISTRATION_RETRY_MESSAGE
+        )
+        self.assertIn("поддержку", SITE_REGISTRATION_SUPPORT_MESSAGE)
+        self.assertNotIn("через пару минут", SITE_REGISTRATION_SUPPORT_MESSAGE)
+
+    def test_unavailable_docstring_no_longer_promises_a_successful_retry(self):
+        # Докстринг обязан отражать, что «следующая попытка продолжит с того же
+        # места» — это про временный отказ, а не про конфликт владельца.
+        docstring = SiteRegistrationUnavailable.__doc__ or ""
+        self.assertIn("SiteRegistrationOwnershipConflict", docstring)
+        self.assertIn("ВРЕМЕННЫЙ", docstring)
+
+    def _magic_link_session(self):
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return None
+
+        class FakeBegin:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        class FakeSession:
+            def begin(self):
+                return FakeBegin()
+
+            def query(self, *args, **kwargs):
+                return FakeQuery()
+
+            def add(self, obj):
+                return None
+
+            def close(self):
+                return None
+
+        return FakeSession()
+
+    def test_magic_link_sends_ownership_conflict_to_support(self):
+        request = RequestFactory().post("/magic/", {"email": "reused@example.com"})
+        request.session = {}
+
+        with mock.patch(
+            "engine.views.session_factory", return_value=self._magic_link_session()
+        ), mock.patch(
+            "engine.views.create_site_user",
+            side_effect=SiteRegistrationOwnershipConflict("row belongs to other"),
+        ), mock.patch(
+            "engine.views.send_magic_link_email"
+        ) as send_email:
+            response = send_magic_link(request)
+
+        self.assertEqual(response.status_code, 409)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["message"], SITE_REGISTRATION_SUPPORT_MESSAGE)
+        send_email.assert_not_called()
+
+    @override_settings(PAYMENT_GATEWAY="wata")
+    def test_pay_sends_ownership_conflict_to_support(self):
+        tariff = SimpleNamespace(price=100, db_tariff_id="month", description="1 месяц")
+
+        class SessionDict(dict):
+            modified = False
+
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return None
+
+        class FakeSession:
+            def query(self, model):
+                return FakeQuery()
+
+            def commit(self):
+                return None
+
+            def rollback(self):
+                return None
+
+            def close(self):
+                return None
+
+        request = RequestFactory().post(
+            "/pay/",
+            {"email": "reused@example.com", "tariff_id": "month"},
+            HTTP_HOST="example.com",
+            HTTP_X_PAYMENT_LAUNCH="new-tab",
+        )
+        request.user = SimpleNamespace(is_authenticated=False, id=None)
+        request.session = SessionDict()
+
+        with (
+            mock.patch("engine.views.session_factory", return_value=FakeSession()),
+            mock.patch("engine.views.get_runtime_actual_tariffs", return_value=[tariff]),
+            mock.patch(
+                "engine.views.create_site_user",
+                side_effect=SiteRegistrationOwnershipConflict("row belongs to other"),
+            ),
+            mock.patch("engine.views.create_wata_payment_sync") as create_invoice,
+        ):
+            response = pay(request)
+
+        self.assertEqual(response.status_code, 409)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["message"], SITE_REGISTRATION_SUPPORT_MESSAGE)
+        create_invoice.assert_not_called()
+
+
+from engine import views  # noqa: E402  (локальный импорт для тестов ниже)
+from common.models.db import PurchaseLoginToken  # noqa: E402
+
+
+class PurchaseLinkAuthRequiresPaymentTests(SimpleTestCase):
+    """CRITICAL: purchase-токен выпускается ДО оплаты, и его сырое значение
+    возвращается инициатору платежа в payment_status_url (pay() отдаёт JSON с
+    этим URL). Раньше auth_by_purchase_link логинил по нему БЕЗ проверки
+    оплаты — значит, любой, кто ввёл ЧУЖОЙ email в форму оплаты, получал
+    рабочий вход в чужой аккаунт, ничего не заплатив. Вход разрешён только по
+    подтверждённой оплате этого токена."""
+
+    def _run_auth(self, payment_status):
+        token_row = SimpleNamespace(
+            user_id=42,
+            token_hash=views.hash_purchase_login_token("raw-token"),
+            revoked_at=None,
+            last_used_at=None,
+            payment_gateway="wata",
+            payment_reference="order-1",
+            created_at=datetime(2026, 8, 26, 10, 0, 0),
+        )
+        victim = SimpleNamespace(id=42, email="victim@example.com")
+
+        class _Q:
+            def __init__(self, result):
+                self.__result = result
+
+            def filter(self, *a, **kw):
+                return self
+
+            def first(self):
+                return self.__result
+
+        class _Session:
+            def __init__(self):
+                self.committed = False
+
+            def query(self, model):
+                return _Q(token_row if model is PurchaseLoginToken else victim)
+
+            def commit(self):
+                self.committed = True
+
+            def close(self):
+                pass
+
+        session = _Session()
+        authorized = []
+
+        with mock.patch.object(views, "session_factory", return_value=session), \
+                mock.patch.object(
+                    views,
+                    "get_purchase_payment_status",
+                    return_value=(payment_status, "msg"),
+                ), \
+                mock.patch.object(
+                    views,
+                    "authorize_user_session",
+                    side_effect=lambda r, u: authorized.append(u),
+                ), \
+                mock.patch.object(views, "add_event_log_once"), \
+                mock.patch.object(
+                    views, "render_login", side_effect=lambda r, ctx: ("login", ctx)
+                ), \
+                mock.patch.object(views, "redirect", side_effect=lambda name: ("redirect", name)):
+            result = views.auth_by_purchase_link(mock.Mock(), "raw-token")
+
+        return result, authorized, session
+
+    def test_unpaid_token_does_not_authorize(self):
+        for status in ("pending", "failed"):
+            with self.subTest(status=status):
+                result, authorized, session = self._run_auth(status)
+                self.assertEqual(result[0], "login")
+                self.assertEqual(authorized, [], "вход по неоплаченному токену")
+                self.assertFalse(session.committed)
+
+    def test_paid_token_authorizes_as_before(self):
+        result, authorized, _ = self._run_auth("succeeded")
+
+        self.assertEqual(result, ("redirect", "dashboard"))
+        self.assertEqual([u.id for u in authorized], [42])

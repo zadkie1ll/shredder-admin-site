@@ -993,19 +993,42 @@ def unknown_site_account_error():
 class SiteRegistrationUnavailable(Exception):
     """Регистрацию сайтового пользователя сейчас завершить нельзя.
 
-    Поднимается, когда состояние подписки в Remnawave установить не удалось
-    (панель недоступна) или оно неоднозначно (найденная подписка явно чужая).
-    В обоих случаях НЕЛЬЗЯ ни создавать подписку (получим сироту/дубль), ни
-    заводить локальный аккаунт «как будто подписки нет» — это разошло бы БД и
-    панель. Вьюхи ловят это и просят пользователя повторить позже; сама
-    регистрация не «ломается навсегда» — следующая попытка выведет ТО ЖЕ
-    детерминированное имя и продолжит с того же места.
+    Базовый случай — ВРЕМЕННЫЙ: состояние подписки в Remnawave установить не
+    удалось, потому что панель недоступна. Тогда НЕЛЬЗЯ ни создавать подписку
+    (получим сироту/дубль), ни заводить локальный аккаунт «как будто подписки
+    нет» — это разошло бы БД и панель. Вьюхи ловят это и просят пользователя
+    повторить позже; регистрация не «ломается навсегда» — следующая попытка
+    выведет ТО ЖЕ детерминированное имя и продолжит с того же места.
+
+    Неоднозначное ВЛАДЕНИЕ (найденная подписка или локальная строка явно
+    принадлежат другому) — это отдельный, НЕ временный случай: см. наследника
+    ``SiteRegistrationOwnershipConflict``.
+    """
+
+
+class SiteRegistrationOwnershipConflict(SiteRegistrationUnavailable):
+    """Регистрация упёрлась в чужого владельца — сама собой не рассосётся.
+
+    Подписка под вычисленным именем или строка users под ним принадлежат
+    другому email/telegram-аккаунту. Повтор выведет ТО ЖЕ детерминированное имя
+    и упрётся в тот же guard, поэтому «повторите через пару минут» здесь —
+    неправда: нужен оператор (ALERT в логе уже есть).
+
+    Наследуется от ``SiteRegistrationUnavailable`` намеренно: все существующие
+    обработчики (в том числе в соседних ветках кода) продолжают ловить отказ и
+    НЕ создают ни подписку, ни локальный аккаунт; отличается только текст и код
+    ответа в тех вьюхах, что обрабатывают конфликт явно.
     """
 
 
 SITE_REGISTRATION_RETRY_MESSAGE = (
     "Сервис временно недоступен, попробуйте позже. "
     "Ваш аккаунт не потерян — повторите вход через пару минут."
+)
+
+SITE_REGISTRATION_SUPPORT_MESSAGE = (
+    "Не удалось завершить регистрацию автоматически. "
+    "Напишите в поддержку — мы вручную свяжем аккаунт с вашей почтой."
 )
 
 
@@ -1073,7 +1096,7 @@ def sync_local_user_from_rwms(
                 existing_email,
                 requested_email,
             )
-            raise SiteRegistrationUnavailable(
+            raise SiteRegistrationOwnershipConflict(
                 f"local user {user.username} belongs to another email"
             )
 
@@ -1094,7 +1117,7 @@ def sync_local_user_from_rwms(
                 existing_telegram_id,
                 requested_telegram_id,
             )
-            raise SiteRegistrationUnavailable(
+            raise SiteRegistrationOwnershipConflict(
                 f"local user {user.username} belongs to another telegram account"
             )
 
@@ -1208,8 +1231,8 @@ def resolve_existing_site_subscription(username, email):
       панели нельзя трактовать ни как «имя свободно» (создадим дубль), ни как
       «подписка есть» (примем непроверенную).
     - подписка есть, но её email явно чужой → ALERT и
-      ``SiteRegistrationUnavailable``: панель не трогаем, регистрацию
-      останавливаем.
+      ``SiteRegistrationOwnershipConflict``: панель не трогаем, регистрацию
+      останавливаем, и это НЕ временный отказ (повтор выведет то же имя).
     """
     try:
         existing = rwms_client.get_user_by_username_strict(username)
@@ -1229,7 +1252,7 @@ def resolve_existing_site_subscription(username, email):
         try:
             assert_subscription_owned_by_email(existing, email, flow="site")
         except RwmsSubscriptionOwnershipError as error:
-            raise SiteRegistrationUnavailable(str(error)) from error
+            raise SiteRegistrationOwnershipConflict(str(error)) from error
 
     return existing
 
@@ -1256,7 +1279,7 @@ def resolve_existing_telegram_subscription(username, telegram_id):
                 existing, telegram_id, flow="site_telegram"
             )
         except RwmsSubscriptionOwnershipError as error:
-            raise SiteRegistrationUnavailable(str(error)) from error
+            raise SiteRegistrationOwnershipConflict(str(error)) from error
 
     return existing
 
@@ -1973,12 +1996,25 @@ def send_magic_link(request):
 
             send_magic_link_email(email, link)
 
+        except SiteRegistrationOwnershipConflict as e:
+            # Владелец не совпал: повтор выведет ТО ЖЕ имя и упрётся в тот же
+            # guard, поэтому «повторите через пару минут» было бы враньём.
+            # Отправляем к поддержке — ALERT в логе уже есть.
+            logging.warning("site registration ownership conflict for %s: %s", email, e)
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": SITE_REGISTRATION_SUPPORT_MESSAGE,
+                },
+                status=409,
+            )
+
         except SiteRegistrationUnavailable as e:
-            # Регистрация НЕ состоялась (панель недоступна/состояние
-            # неоднозначно) — письма не будет, поэтому обычный «status: ok»
-            # (анти-энумерация) здесь обманул бы пользователя. Отдаём внятное
-            # «попробуйте позже»; лик «этот email новый» возможен только пока
-            # панель лежит, и это меньшее зло, чем молчаливый провал входа.
+            # Регистрация НЕ состоялась (панель недоступна) — письма не будет,
+            # поэтому обычный «status: ok» (анти-энумерация) здесь обманул бы
+            # пользователя. Отдаём внятное «попробуйте позже»; лик «этот email
+            # новый» возможен только пока панель лежит, и это меньшее зло, чем
+            # молчаливый провал входа.
             logging.warning("site registration postponed for %s: %s", email, e)
             return JsonResponse(
                 {
@@ -2127,6 +2163,15 @@ def auth_by_google_callback(request):
 
         authorize_user_session(request, user)
         return redirect("dashboard")
+    except SiteRegistrationOwnershipConflict as e:
+        logging.warning(
+            "google oauth registration ownership conflict for %s: %s", email, e
+        )
+        return render_login(
+            request,
+            {"error": SITE_REGISTRATION_SUPPORT_MESSAGE},
+            status=409,
+        )
     except SiteRegistrationUnavailable as e:
         logging.warning("google oauth registration postponed for %s: %s", email, e)
         return render_login(
@@ -2275,6 +2320,15 @@ def auth_by_yandex_callback(request):
 
         authorize_user_session(request, user)
         return redirect("dashboard")
+    except SiteRegistrationOwnershipConflict as e:
+        logging.warning(
+            "yandex oauth registration ownership conflict for %s: %s", email, e
+        )
+        return render_login(
+            request,
+            {"error": SITE_REGISTRATION_SUPPORT_MESSAGE},
+            status=409,
+        )
     except SiteRegistrationUnavailable as e:
         logging.warning("yandex oauth registration postponed for %s: %s", email, e)
         return render_login(
@@ -2393,6 +2447,33 @@ def auth_by_purchase_link(request, token):
             logging.warning("purchase login token points to missing user")
             return render_login(request, {"error": "Ссылка истекла или неверна"})
 
+        # Токен выпускается ДО оплаты, и его сырое значение возвращается
+        # инициатору платежа в payment_status_url (см. pay()). Без проверки
+        # оплаты любой, кто ввёл ЧУЖОЙ email в форму оплаты, получал бы
+        # рабочую ссылку входа в чужой аккаунт, ничего не заплатив.
+        # Вход разрешён только по подтверждённой оплате этого токена.
+        payment_status, _ = get_purchase_payment_status(session, login_token)
+        if payment_status != "succeeded":
+            logging.warning(
+                "ALERT: purchase login token used without a confirmed payment: "
+                "user_id=%s status=%s gateway=%s reference=%s",
+                login_token.user_id,
+                payment_status,
+                login_token.payment_gateway,
+                login_token.payment_reference,
+            )
+            return render_login(
+                request,
+                {
+                    "error": (
+                        "Оплата по этой ссылке пока не подтверждена. "
+                        "Если вы только что оплатили — подождите минуту и "
+                        "откройте ссылку снова. Чтобы войти без оплаты, "
+                        "запросите ссылку для входа по вашей почте ниже."
+                    )
+                },
+            )
+
         login_token.last_used_at = datetime.utcnow()
         add_event_log_once(
             session,
@@ -2422,11 +2503,21 @@ def get_purchase_login_token(db_session, token):
     return login_token
 
 
-def is_wata_invoice_expired(invoice):
+# Терминальный вебхук Wata по уже начатому платежу (СБП/3DS) приходит вторым
+# и может опоздать относительно expiration_datetime на десятки секунд. Поэтому
+# начатый платёж ждём ещё это окно после протухания инвойса — и только потом
+# закрываем экран «время истекло», чтобы опрос не крутился вечно из-за
+# застрявшей нетерминальной строки.
+WATA_PENDING_AFTER_EXPIRY_GRACE = timedelta(minutes=10)
+
+
+def is_wata_invoice_expired(invoice, grace=None):
     if not invoice or not invoice.expiration_datetime:
         return False
 
     expires_at = invoice.expiration_datetime
+    if grace is not None:
+        expires_at = expires_at + grace
     if expires_at.tzinfo is None:
         return datetime.utcnow() > expires_at
     return datetime.now(timezone.utc) > expires_at
@@ -2446,6 +2537,63 @@ def get_purchase_wata_invoice(db_session, login_token):
         .order_by(WataInvoice.creation_time.desc())
         .first()
     )
+
+
+def has_paid_wata_transaction(db_session, order_ids):
+    """Есть ли хотя бы одна ОПЛАЧЕННАЯ транзакция среди этих заказов.
+
+    Исход заказа нельзя выводить из «последней по payment_time» транзакции.
+    У одного order_id бывает несколько попыток, и ``payment_time`` каждой
+    строки — это время ЕЁ события из вебхука Wata (см.
+    monkey-island-payment/wata_webhook_handler.py: ``_add_wata_transaction`` и
+    ``_mark_wata_transaction_paid``). Отклонённая попытка, случившаяся ПОСЛЕ
+    оплаченной, поэтому легко становится «последней», и человек, который
+    заплатил, видел бы «платёж не прошёл».
+
+    Оплата — терминальный и необратимый для пользователя исход: сначала ищем
+    Paid, и только если его нет, падаем в fallback «последняя по времени».
+    """
+    unique_order_ids = [order_id for order_id in dict.fromkeys(order_ids) if order_id]
+    if not unique_order_ids:
+        return False
+
+    return (
+        db_session.query(WataTransaction)
+        .filter(
+            WataTransaction.order_id.in_(unique_order_ids),
+            WataTransaction.transaction_status == "Paid",
+        )
+        .first()
+        is not None
+    )
+
+
+PURCHASE_PENDING_STATUS = ("pending", "Ждем подтверждения платежа")
+
+
+def wata_transaction_purchase_status(wata_transaction):
+    """Статус покупки по строке транзакции Wata.
+
+    Терминальных статусов у Wata ровно два: ``Paid`` (успех) и ``Declined``
+    (отказ). Всё остальное (``Created``/``Pending`` у СБП и 3DS) — ПРОМЕЖУТОЧНОЕ
+    состояние: платёжный сервис сохраняет такую строку по вебхуку
+    (monkey-island-payment/wata_webhook_handler.py, ветка «прочие статусы» ->
+    ``_add_wata_transaction``) и переводит её в ``Paid`` отдельным вебхуком
+    через несколько секунд.
+
+    Поэтому отказом считаем ТОЛЬКО явный ``Declined`` — симметрично тому, что
+    успехом считается только явный ``Paid`` (см. ``active_wata_status_for_token``).
+    Иначе страница /payment/status/<token>/ показала бы «Платеж не прошел» ещё
+    до того, как платёж завершился: шаблон payment_status.html на статусе
+    ``failed`` НАВСЕГДА останавливает опрос, шлёт аналитику ``payment_failed`` и
+    прячет кнопку входа, так что пришедший позже ``Paid`` пользователь уже не
+    увидит.
+    """
+    if wata_transaction.transaction_status == "Paid":
+        return "succeeded", "Платеж прошел успешно"
+    if wata_transaction.transaction_status == "Declined":
+        return "failed", "Платеж не прошел"
+    return PURCHASE_PENDING_STATUS
 
 
 def get_purchase_payment_status(db_session, login_token):
@@ -2470,6 +2618,17 @@ def get_purchase_payment_status(db_session, login_token):
             return "failed", "Платеж не прошел"
 
     wata_invoice = get_purchase_wata_invoice(db_session, login_token)
+
+    # ПЕРВЫМ делом — факт оплаты по заказам этой покупки. Только если Paid нет,
+    # смотрим на «последнюю по времени» транзакцию (см. has_paid_wata_transaction).
+    purchase_order_ids = []
+    if wata_invoice:
+        purchase_order_ids.append(wata_invoice.order_id)
+    if login_token.payment_gateway == "wata" and login_token.payment_reference:
+        purchase_order_ids.append(login_token.payment_reference)
+    if has_paid_wata_transaction(db_session, purchase_order_ids):
+        return "succeeded", "Платеж прошел успешно"
+
     if wata_invoice:
         wata_transaction = (
             db_session.query(WataTransaction)
@@ -2478,9 +2637,16 @@ def get_purchase_payment_status(db_session, login_token):
             .first()
         )
         if wata_transaction:
-            if wata_transaction.transaction_status == "Paid":
-                return "succeeded", "Платеж прошел успешно"
-            return "failed", "Платеж не прошел"
+            status = wata_transaction_purchase_status(wata_transaction)
+            # Нетерминальная строка (Created/Pending) означает «ждём», но
+            # ждать вечно нельзя: если инвойс уже протух, оплаты не будет, и
+            # экран должен закрыться понятным «время истекло», а не крутить
+            # опрос бесконечно. Терминальный Declined остаётся отказом.
+            if status == PURCHASE_PENDING_STATUS and is_wata_invoice_expired(
+                wata_invoice, grace=WATA_PENDING_AFTER_EXPIRY_GRACE
+            ):
+                return "failed", "Время оплаты истекло"
+            return status
         if is_wata_invoice_expired(wata_invoice):
             return "failed", "Время оплаты истекло"
 
@@ -2492,11 +2658,9 @@ def get_purchase_payment_status(db_session, login_token):
             .first()
         )
         if wata_transaction:
-            if wata_transaction.transaction_status == "Paid":
-                return "succeeded", "Платеж прошел успешно"
-            return "failed", "Платеж не прошел"
+            return wata_transaction_purchase_status(wata_transaction)
 
-    return "pending", "Ждем подтверждения платежа"
+    return PURCHASE_PENDING_STATUS
 
 
 # Активная проверка статуса оплаты у Wata лимитирована (у Wata GET — 1 запрос
@@ -7721,33 +7885,46 @@ def pay(request):
             return redirect(confirmation_url)
 
         except SiteRegistrationUnavailable as e:
-            # Аккаунт под оплату подготовить нельзя (панель недоступна или
-            # состояние подписки неоднозначно). Ничего не создано и не списано —
-            # просим повторить позже, чтобы не плодить сироты в Remnawave.
+            # Аккаунт под оплату подготовить нельзя. Ничего не создано и не
+            # списано — не плодим сироты в Remnawave. Временная недоступность
+            # панели → «повторите позже»; конфликт владельца сам не пройдёт →
+            # отправляем в поддержку (ALERT в логе уже есть).
+            ownership_conflict = isinstance(e, SiteRegistrationOwnershipConflict)
+            error_message = (
+                SITE_REGISTRATION_SUPPORT_MESSAGE
+                if ownership_conflict
+                else SITE_REGISTRATION_RETRY_MESSAGE
+            )
+            status_code = 409 if ownership_conflict else 503
             db_session.rollback()
-            logging.warning("payment registration postponed for %s: %s", email, e)
+            logging.warning(
+                "payment registration %s for %s: %s",
+                "ownership conflict" if ownership_conflict else "postponed",
+                email,
+                e,
+            )
             if payment_launch_json:
                 return JsonResponse(
                     {
                         "status": "error",
-                        "message": SITE_REGISTRATION_RETRY_MESSAGE,
+                        "message": error_message,
                     },
-                    status=503,
+                    status=status_code,
                 )
-            messages.error(request, SITE_REGISTRATION_RETRY_MESSAGE)
+            messages.error(request, error_message)
             if settings.PAYMENT_GATEWAY.lower() == "wata":
                 return render(
                     request,
                     "payment_status.html",
                     {
                         "initial_status": "failed",
-                        "initial_message": SITE_REGISTRATION_RETRY_MESSAGE,
+                        "initial_message": error_message,
                         "login_url": "",
                         "payment_url": "",
                         "status_api_url": "",
                         "support_telegram_url": settings.SUPPORT_TELEGRAM_URL,
                     },
-                    status=503,
+                    status=status_code,
                 )
             return redirect("index")
 
