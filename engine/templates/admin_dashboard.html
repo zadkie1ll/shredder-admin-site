@@ -89,19 +89,62 @@
         .infra-legacy-panel { display: block; }
         #panel-infrastructure .infra-legacy-panel .panel-header { margin-bottom: 14px; }
         /* Вкладка «Серверы» */
-        .infra-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 16px; }
-        .infra-summary-card { padding: 14px 16px; }
+        .infra-page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 22px; margin-bottom: 18px; }
+        .infra-page-title { margin: 0 0 5px; color: var(--text-main); font-size: clamp(24px, 2vw, 34px); line-height: 1.05; font-weight: 900; letter-spacing: -.025em; }
+        .infra-page-copy { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; font-weight: 600; }
+        .infra-toolbar { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+        .infra-search { position: relative; flex: 1 1 240px; min-width: min(240px, 100%); }
+        .infra-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 11px; pointer-events: none; }
+        .infra-search input { width: 100%; min-height: 38px; padding-left: 33px; }
+        .infra-filter { flex: 0 0 170px; width: 170px; min-width: 148px; min-height: 38px; }
+        .infra-refresh-btn { min-width: 38px; min-height: 38px; display: inline-flex; align-items: center; justify-content: center; padding: 0 12px; }
+        .infra-refresh-btn.is-loading i { animation: spin .7s linear infinite; }
+        .infra-archive-filter { min-height: 38px; display: inline-flex; align-items: center; gap: 7px; padding: 0 11px; border: 1px solid var(--panel-border); border-radius: 9px; background: var(--input-bg); color: var(--muted); font-size: 10.5px; font-weight: 750; cursor: pointer; white-space: nowrap; }
+        .infra-archive-filter input { accent-color: var(--brand-gold); }
+        .infra-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 14px; }
+        .infra-summary-card { min-width: 0; overflow: hidden; padding: 16px 17px; }
+        .infra-summary-card::after { content: ""; position: absolute; width: 86px; height: 86px; right: -30px; top: -36px; border-radius: 50%; background: rgba(255,199,0,.07); pointer-events: none; }
+        .infra-summary-card.is-ok::after { background: rgba(56,217,150,.08); }
+        .infra-summary-card.is-warn::after { background: rgba(255,92,103,.09); }
+        .infra-metric-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .infra-metric-icon { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; border: 1px solid rgba(255,199,0,.14); background: rgba(255,199,0,.07); color: var(--brand-gold); font-size: 11px; }
+        .infra-summary-card.is-ok .infra-metric-icon { border-color: rgba(56,217,150,.17); background: rgba(56,217,150,.08); color: var(--green); }
+        .infra-summary-card.is-warn .infra-metric-icon { border-color: rgba(255,92,103,.18); background: rgba(255,92,103,.08); color: var(--red); }
         .infra-summary-card .infra-metric-label { color: var(--muted); font-size: 10.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .06em; }
-        .infra-summary-card .infra-metric-value { margin-top: 6px; font-size: 20px; font-weight: 850; color: var(--text-main); }
-        .infra-summary-card .infra-metric-sub { margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 600; }
+        .infra-summary-card .infra-metric-value { margin-top: 7px; font-size: 23px; line-height: 1; font-weight: 900; color: var(--text-main); font-variant-numeric: tabular-nums; }
+        .infra-summary-card .infra-metric-sub { margin-top: 7px; color: var(--muted); font-size: 10.5px; font-weight: 600; }
+        .infra-workspace { display: grid; grid-template-columns: 1fr; gap: 14px; align-items: start; }
+        .infra-table-card { min-width: 0; overflow: hidden; }
+        .infra-table-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 17px 13px; border-bottom: 1px solid var(--panel-border); }
+        .infra-table-heading h3 { margin: 0; color: var(--text-main); font-size: 13px; font-weight: 850; }
+        .infra-table-heading span { color: var(--muted); font-size: 10.5px; font-weight: 650; }
         .infra-table-wrap { overflow-x: auto; }
-        .infra-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-        .infra-table th { padding: 9px 10px; border-bottom: 1px solid var(--panel-border); color: var(--muted); font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; text-align: left; white-space: nowrap; }
-        .infra-table td { padding: 9px 10px; border-bottom: 1px solid var(--panel-border); color: var(--text-main); font-weight: 600; white-space: nowrap; }
-        .infra-table tbody tr { cursor: pointer; transition: background .12s; }
-        .infra-table tbody tr:hover { background: rgba(255,255,255,.045); }
-        .infra-table tbody tr.infra-row-offline { background: rgba(255,92,103,.08); }
-        .infra-table tbody tr.infra-row-offline:hover { background: rgba(255,92,103,.14); }
+        .infra-table { width: 100%; border-collapse: collapse; font-size: 11.5px; }
+        .infra-table th { padding: 10px 9px; border-bottom: 1px solid var(--panel-border); background: rgba(255,255,255,.018); color: var(--muted); font-size: 9.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .055em; text-align: left; white-space: nowrap; }
+        .infra-table td { padding: 10px 9px; border-bottom: 1px solid var(--panel-border); color: var(--text-main); font-weight: 650; white-space: nowrap; vertical-align: middle; }
+        .infra-table tbody tr { cursor: pointer; transition: background .12s, box-shadow .12s; }
+        .infra-table tbody tr:last-child td { border-bottom: 0; }
+        .infra-table tbody tr:hover { background: rgba(255,255,255,.04); }
+        .infra-table tbody tr.is-selected { background: linear-gradient(90deg, rgba(255,199,0,.12), rgba(255,199,0,.035)); box-shadow: inset 3px 0 0 var(--brand-gold); }
+        .infra-table tbody tr.infra-row-offline:not(.is-selected) { background: rgba(255,92,103,.055); }
+        .infra-table tbody tr.infra-row-offline:hover { background: rgba(255,92,103,.1); }
+        html[data-admin-theme="light"] .infra-table tbody tr:not(.is-selected):hover { background: rgba(181,139,0,.075); box-shadow: inset 3px 0 0 rgba(154,113,0,.42); }
+        html[data-admin-theme="light"] .infra-table tbody tr.infra-row-offline:not(.is-selected):hover { background: rgba(211,65,78,.09); box-shadow: inset 3px 0 0 rgba(197,54,69,.46); }
+        .infra-server-link { appearance: none; display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: transparent; color: var(--text-main); font: inherit; font-weight: 850; cursor: pointer; text-align: left; }
+        .infra-server-link:hover { color: var(--brand-gold); }
+        .infra-server-icon { width: 28px; height: 28px; display: inline-flex; align-items: center; justify-content: center; border-radius: 8px; border: 1px solid var(--panel-border); background: var(--inner-card-bg); color: var(--brand-gold); font-size: 10px; }
+        .infra-server-copy { display: grid; gap: 2px; }
+        .infra-server-host { color: var(--muted); font-size: 9.5px; font-weight: 600; }
+        .infra-network-cell { display: grid; gap: 2px; font-variant-numeric: tabular-nums; }
+        .infra-network-cell small { color: var(--muted); font-size: 9.5px; font-weight: 600; }
+        .infra-load-cell { min-width: 76px; }
+        .infra-load-value { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; font-size: 10px; }
+        .infra-load-track { height: 4px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.08); }
+        .infra-load-fill { height: 100%; border-radius: inherit; background: var(--green); }
+        .infra-load-fill.warn { background: var(--brand-gold); }
+        .infra-load-fill.crit { background: var(--red); }
+        .infra-row-action { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; padding: 0; border-radius: 8px; }
+        .infra-empty { min-height: 260px; display: grid; place-items: center; padding: 28px; color: var(--muted); font-size: 12px; text-align: center; }
         .infra-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 800; }
         .infra-badge-online { background: rgba(56,217,150,.14); color: var(--green); border: 1px solid rgba(56,217,150,.35); }
         .infra-badge-offline { background: rgba(255,92,103,.16); color: var(--red); border: 1px solid rgba(255,92,103,.4); }
@@ -109,18 +152,57 @@
         .infra-badge-muted { background: rgba(255,255,255,.06); color: var(--muted); border: 1px solid var(--panel-border); }
         .infra-load-warn { color: var(--brand-gold); font-weight: 850; }
         .infra-load-crit { color: var(--red); font-weight: 850; }
-        .infra-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+        .infra-detail-primary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+        .infra-detail-ips-wide { margin-top: 12px; }
+        .infra-detail-secondary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
         .infra-detail-card { padding: 14px 16px; }
         .infra-detail-card h4 { margin: 0 0 10px; color: var(--text-main); font-size: 12.5px; font-weight: 850; }
         .infra-kv { display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: 4px 12px; font-size: 12px; }
         .infra-kv dt { color: var(--muted); font-weight: 650; }
         .infra-kv dd { margin: 0; color: var(--text-main); font-weight: 650; overflow-wrap: anywhere; }
+        .infra-ip-groups { display: grid; gap: 10px; }
+        .infra-ip-group { overflow: hidden; border: 1px solid var(--panel-border); border-radius: 11px; background: rgba(255,255,255,.012); }
+        .infra-ip-group-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 7px 10px; min-height: 38px; padding: 8px 10px; border-bottom: 1px solid var(--panel-border); background: rgba(255,255,255,.025); }
+        .infra-ip-group-name { display: flex; flex: 1 1 120px; align-items: center; gap: 8px; min-width: 0; color: var(--text-main); font-size: 11.5px; font-weight: 850; }
+        .infra-ip-group-name i { width: 14px; color: var(--brand-gold); text-align: center; }
+        .infra-ip-group-name code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .infra-ip-group-meta { display: flex; flex: 0 1 auto; align-items: center; justify-content: flex-end; gap: 5px; flex-wrap: wrap; margin-left: auto; }
+        .infra-ip-count { color: var(--muted); font-size: 9.5px; font-weight: 750; white-space: nowrap; }
+        .infra-ip-group-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; padding: 10px; }
+        .infra-ip-tile { display: flex; flex-direction: column; gap: 6px; min-width: 0; padding: 9px 10px; border: 1px solid var(--panel-border); border-radius: 9px; background: var(--inner-card-bg); }
+        .infra-ip-tile.is-blocked { border-color: rgba(255,92,103,.35); background: rgba(255,92,103,.05); }
+        .infra-ip-tile-head { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; min-width: 0; }
+        .infra-ip-tile-head code { min-width: 0; color: var(--text-main); font-size: 12px; font-weight: 750; overflow-wrap: anywhere; }
+        .infra-ip-tile .infra-ip-copy-note { font-size: 9.5px; }
+        .infra-ip-tile-actions { display: flex; gap: 5px; flex-wrap: wrap; margin-top: auto; }
+        .infra-icon-btn { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 24px; border: 1px solid var(--panel-border); border-radius: 7px; background: transparent; color: var(--muted); font-size: 10.5px; cursor: pointer; transition: color .12s, border-color .12s; }
+        .infra-icon-btn:hover { color: var(--text-main); border-color: rgba(255,255,255,.3); }
+        html[data-admin-theme="light"] .infra-icon-btn:hover { border-color: rgba(0,0,0,.3); }
+        .infra-icon-btn.danger:hover { color: var(--red); border-color: rgba(255,92,103,.5); }
+        .infra-set-limit { padding: 3px 8px; border: 1px dashed var(--panel-border); border-radius: 7px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+        .infra-set-limit:hover { color: var(--brand-gold); border-color: rgba(255,199,0,.5); }
+        .infra-summary-card[data-infra-filter] { cursor: pointer; transition: transform .12s, border-color .12s; }
+        .infra-summary-card[data-infra-filter]:hover { border-color: rgba(255,199,0,.4); }
+        .infra-row-menu { position: absolute; z-index: 260; min-width: 210px; padding: 5px; border: 1px solid var(--panel-border); border-radius: 11px; background: var(--card-bg); box-shadow: 0 18px 50px rgba(0,0,0,.35); backdrop-filter: blur(12px); }
+        .infra-row-menu button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--text-main); font-size: 11.5px; font-weight: 700; text-align: left; cursor: pointer; }
+        .infra-row-menu button:hover { background: rgba(255,199,0,.1); }
+        .infra-row-menu button i { width: 14px; color: var(--brand-gold); text-align: center; }
         .infra-ip-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--panel-border); font-size: 12px; }
         .infra-ip-row:last-child { border-bottom: 0; }
+        .infra-ip-copy { min-width: 0; }
+        .infra-ip-copy-main { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .infra-ip-copy-note { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; overflow-wrap: anywhere; }
         .infra-ip-actions { display: flex; gap: 6px; flex-wrap: wrap; }
-        .infra-mini-btn { padding: 3px 9px; border: 1px solid var(--panel-border); border-radius: 7px; background: transparent; color: var(--muted); font-size: 10.5px; font-weight: 750; cursor: pointer; }
+        .infra-ip-group-list .infra-ip-row { align-items: flex-start; flex-wrap: wrap; }
+        .infra-ip-group-list .infra-ip-copy { flex: 1 1 120px; }
+        .infra-ip-group-list .infra-ip-actions { flex: 0 1 auto; justify-content: flex-end; margin-left: auto; }
+        .infra-mini-btn { padding: 3px 9px; border: 1px solid var(--panel-border); border-radius: 7px; background: transparent; color: var(--muted); font-size: 10.5px; font-weight: 750; cursor: pointer; transition: color .14s, border-color .14s, background .14s, box-shadow .14s; }
         .infra-mini-btn:hover { color: #fff; border-color: rgba(255,255,255,.3); }
         .infra-mini-btn.danger:hover { color: var(--red); border-color: rgba(255,92,103,.5); }
+        .infra-mini-btn:focus-visible { outline: 0; border-color: rgba(255,199,0,.55); box-shadow: 0 0 0 3px rgba(255,199,0,.09); }
+        html[data-admin-theme="light"] .infra-mini-btn:hover { border-color: rgba(154,113,0,.38); background: rgba(181,139,0,.07); color: #242a34; }
+        html[data-admin-theme="light"] .infra-mini-btn.danger:hover { border-color: rgba(197,54,69,.4); background: rgba(211,65,78,.06); color: #b52f3e; }
+        html[data-admin-theme="light"] .infra-mini-btn:focus-visible { border-color: rgba(154,113,0,.5); box-shadow: 0 0 0 3px rgba(181,139,0,.1); color: #242a34; }
         .infra-chart-canvas { width: 100%; height: 260px; display: block; }
         .infra-chart-canvas.small { height: 170px; }
         .infra-period-btn.active { color: var(--brand-gold); border-color: rgba(255,199,0,.42); }
@@ -128,9 +210,119 @@
         .infra-log-row { padding: 6px 0; border-bottom: 1px solid var(--panel-border); }
         .infra-log-row:last-child { border-bottom: 0; }
         .infra-log-time { color: var(--muted); font-size: 10px; }
+        .infra-preview { position: sticky; top: 14px; min-height: 540px; overflow: hidden; }
+        .infra-preview-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; padding: 17px; border-bottom: 1px solid var(--panel-border); }
+        .infra-preview-server { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .infra-preview-server .infra-server-icon { width: 36px; height: 36px; font-size: 12px; }
+        .infra-preview-name { margin: 0 0 4px; color: var(--text-main); font-size: 15px; line-height: 1; font-weight: 900; }
+        .infra-preview-body { padding: 16px 17px 17px; }
+        .infra-preview-section + .infra-preview-section { margin-top: 17px; padding-top: 16px; border-top: 1px solid var(--panel-border); }
+        .infra-preview-section h4 { margin: 0 0 11px; color: var(--text-main); font-size: 11px; font-weight: 850; text-transform: uppercase; letter-spacing: .055em; }
+        .infra-preview-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+        .infra-preview-metric { min-width: 0; padding: 10px; border: 1px solid var(--panel-border); border-radius: 10px; background: var(--inner-card-bg); }
+        .infra-preview-metric span { display: block; overflow: hidden; color: var(--muted); font-size: 9px; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+        .infra-preview-metric b { display: block; margin-top: 5px; color: var(--text-main); font-size: 12px; font-weight: 850; font-variant-numeric: tabular-nums; }
+        .infra-preview-kv { display: grid; gap: 9px; }
+        .infra-preview-kv-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 10.5px; font-weight: 650; }
+        .infra-preview-kv-row b, .infra-preview-kv-row code { max-width: 62%; color: var(--text-main); font-size: 10.5px; font-weight: 750; text-align: right; overflow-wrap: anywhere; }
+        .infra-domain-list { display: grid; gap: 7px; }
+        .infra-domain-item { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--text-main); font-size: 10.5px; font-weight: 700; }
+        .infra-domain-item i { color: var(--brand-gold); font-size: 9px; }
+        .infra-domain-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .infra-activity-list { display: grid; gap: 9px; }
+        .infra-activity-item { display: grid; grid-template-columns: 7px 1fr; gap: 8px; color: var(--muted); font-size: 10px; line-height: 1.35; font-weight: 650; }
+        .infra-activity-dot { width: 7px; height: 7px; margin-top: 3px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 3px rgba(56,217,150,.1); }
+        .infra-activity-dot.warn { background: var(--brand-gold); box-shadow: 0 0 0 3px rgba(255,199,0,.1); }
+        .infra-preview-capabilities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px; }
+        .infra-preview-capability { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 8px 9px; border: 1px solid var(--panel-border); border-radius: 9px; background: var(--inner-card-bg); color: var(--muted); font-size: 9.5px; font-weight: 700; }
+        .infra-preview-capability i { width: 12px; color: var(--brand-gold); text-align: center; }
+        .infra-preview-open { width: 100%; min-height: 40px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; margin-top: 17px; }
+        .infra-preview-placeholder { min-height: 540px; display: grid; place-items: center; padding: 34px; color: var(--muted); text-align: center; }
+        .infra-preview-placeholder i { display: block; margin-bottom: 12px; color: var(--brand-gold); font-size: 26px; }
+        .infra-skeleton { position: relative; overflow: hidden; border-radius: 7px; background: rgba(255,255,255,.07); }
+        .infra-skeleton::after { content: ""; position: absolute; inset: 0; transform: translateX(-100%); background: linear-gradient(90deg, transparent, rgba(255,255,255,.08), transparent); animation: infra-skeleton 1.3s infinite; }
+        @keyframes infra-skeleton { to { transform: translateX(100%); } }
+        .infra-detail-modal { padding: 12px; }
+        .infra-detail-modal-card { width: min(1780px, calc(100vw - 24px)); max-height: calc(100vh - 24px); overflow: hidden; border: 1px solid rgba(255,199,0,.16); border-radius: 16px; background: var(--bg-color); box-shadow: 0 34px 110px rgba(0,0,0,.72); }
+        #infra-server-detail { max-height: calc(100vh - 24px); overflow-y: auto; padding: 14px; overscroll-behavior: contain; scrollbar-gutter: stable; }
+        #infra-server-detail > .card:first-child { border-color: rgba(255,199,0,.15); }
+        .infra-detail-title-copy { min-width: 0; }
+        .infra-detail-title-copy h3 { margin: 0; font-size: 16px; font-weight: 900; }
+        .infra-detail-title-copy p { margin: 4px 0 0; color: var(--muted); font-size: 10px; font-weight: 650; }
+        .infra-detail-nav { display: flex; gap: 6px; margin: 0 0 14px; padding: 8px; overflow-x: auto; border: 1px solid var(--panel-border); border-radius: 10px; background: rgba(255,255,255,.018); scrollbar-width: thin; }
+        .infra-detail-nav button { display: inline-flex; align-items: center; gap: 6px; flex: 0 0 auto; min-height: 30px; padding: 5px 9px; border: 1px solid transparent; border-radius: 7px; background: transparent; color: var(--muted); font-size: 10px; font-weight: 750; cursor: pointer; }
+        .infra-detail-nav button:hover { border-color: rgba(255,199,0,.25); background: rgba(255,199,0,.06); color: var(--text-main); }
+        .infra-detail-nav button i { color: var(--brand-gold); }
+        .infra-form { display: grid; gap: 12px; }
+        .infra-form-field { display: grid; gap: 6px; min-width: 0; }
+        .infra-form-label { color: var(--muted); font-size: 9.5px; font-weight: 850; letter-spacing: .055em; text-transform: uppercase; }
+        .infra-form-hint { margin-top: -2px; color: rgba(177,184,198,.65); font-size: 9px; line-height: 1.35; }
+        .infra-control-wrap { position: relative; min-width: 0; }
+        .infra-control-icon { position: absolute; z-index: 1; top: 50%; left: 12px; transform: translateY(-50%); color: rgba(255,199,0,.58); font-size: 10px; pointer-events: none; }
+        .infra-control-wrap.textarea .infra-control-icon { top: 14px; transform: none; }
+        .infra-control { width: 100%; min-width: 0; min-height: 42px; padding: 0 12px 0 34px; border: 1px solid rgba(145,153,170,.2); border-radius: 10px; outline: 0; background: linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.028)); color: var(--text-main); font: inherit; font-size: 11.5px; font-weight: 700; caret-color: var(--brand-gold); box-shadow: inset 0 1px 0 rgba(255,255,255,.025); transition: border-color .16s, background .16s, box-shadow .16s; }
+        .infra-control:hover { border-color: rgba(177,184,198,.34); background: rgba(255,255,255,.055); }
+        .infra-control:focus { border-color: rgba(255,199,0,.62); background: rgba(255,199,0,.035); box-shadow: 0 0 0 3px rgba(255,199,0,.09), inset 0 1px 0 rgba(255,255,255,.035); }
+        .infra-control::placeholder { color: rgba(177,184,198,.42); font-weight: 650; }
+        textarea.infra-control { min-height: 82px; padding-top: 11px; padding-bottom: 11px; line-height: 1.45; resize: vertical; }
+        .infra-form-submit { width: 100%; min-height: 42px; }
+        .infra-address-fields { display: grid; grid-template-columns: minmax(0, 1fr) 64px; gap: 8px; }
+        .infra-address-fields .infra-form-field:last-child { grid-column: 1 / -1; }
+        .infra-prefix-control { padding-left: 12px; text-align: center; font-variant-numeric: tabular-nums; }
+        .infra-settings-btn { min-height: 38px; padding: 0 12px; font-size: 10.5px; }
+        .infra-settings-modal { padding: 16px; }
+        .infra-settings-dialog { width: min(900px, calc(100vw - 32px)); max-height: min(860px, calc(100vh - 32px)); display: flex; flex-direction: column; overflow: hidden; border: 1px solid rgba(255,199,0,.18); border-radius: 16px; background: var(--bg-color); box-shadow: 0 34px 110px rgba(0,0,0,.72); }
+        .infra-settings-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; padding: 18px 20px; border-bottom: 1px solid var(--panel-border); background: rgba(255,255,255,.018); }
+        .infra-settings-title { display: flex; align-items: flex-start; gap: 11px; min-width: 0; }
+        .infra-settings-title-icon { width: 36px; height: 36px; display: grid; flex: 0 0 auto; place-items: center; border: 1px solid rgba(255,199,0,.24); border-radius: 10px; background: rgba(255,199,0,.08); color: var(--brand-gold); }
+        .infra-settings-title h2 { margin: 0; color: var(--text-main); font-size: 16px; font-weight: 900; }
+        .infra-settings-title p { margin: 5px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.4; }
+        .infra-settings-body { min-height: 180px; overflow-y: auto; padding: 14px 18px 18px; overscroll-behavior: contain; }
+        .infra-settings-list { display: grid; gap: 8px; }
+        .infra-setting-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 16px; padding: 12px 13px; border: 1px solid var(--panel-border); border-radius: 11px; background: rgba(255,255,255,.018); }
+        .infra-setting-description { color: var(--text-main); font-size: 11.5px; line-height: 1.35; font-weight: 750; }
+        .infra-setting-key { margin-top: 4px; color: var(--muted); font-size: 9.5px; }
+        .infra-setting-actions { display: flex; align-items: center; justify-content: flex-end; gap: 7px; }
+        .infra-setting-control { width: 122px; min-height: 34px; padding: 0 10px; border: 1px solid rgba(145,153,170,.22); border-radius: 8px; outline: 0; background: rgba(255,255,255,.04); color: var(--text-main); font: inherit; font-size: 10.5px; font-weight: 750; color-scheme: dark; }
+        .infra-setting-control:focus { border-color: rgba(255,199,0,.62); box-shadow: 0 0 0 3px rgba(255,199,0,.08); }
+        .infra-detail-modal .infra-summary-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+        .infra-detail-loading { min-height: min(620px, calc(100vh - 52px)); display: grid; grid-template-rows: auto auto 1fr; gap: 14px; }
+        .infra-detail-loading-head { height: 64px; }
+        .infra-detail-loading-metrics { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+        .infra-detail-loading-metrics .infra-skeleton { height: 120px; }
+        .infra-detail-loading-chart { min-height: 340px; }
+        @media (max-width: 1450px) {
+            .infra-page-head { align-items: stretch; flex-direction: column; }
+            .infra-toolbar { justify-content: flex-start; }
+            .infra-search { flex: 1 1 280px; }
+        }
+        @media (max-width: 1160px) {
+            .infra-workspace { grid-template-columns: 1fr; }
+            .infra-preview { position: relative; top: auto; min-height: 0; }
+            .infra-detail-primary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
         @media (max-width: 760px) {
-            .infra-detail-grid { grid-template-columns: 1fr; }
+            .infra-page-head { align-items: stretch; flex-direction: column; }
+            .infra-toolbar { justify-content: stretch; }
+            .infra-search { flex: 1 1 100%; min-width: 100%; }
+            .infra-filter { flex: 1 1 140px; width: auto; min-width: 0; }
+            .infra-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .infra-detail-primary-grid, .infra-detail-secondary-grid { grid-template-columns: 1fr; }
             .infra-table td, .infra-table th { padding: 7px 6px; }
+            .infra-preview { min-height: 0; }
+            .infra-detail-modal { padding: 0; }
+            .infra-detail-modal-card { width: 100vw; max-height: 100vh; border: 0; border-radius: 0; }
+            #infra-server-detail { max-height: 100vh; padding: 8px; }
+            .infra-settings-modal { padding: 0; }
+            .infra-settings-dialog { width: 100vw; max-height: 100vh; border: 0; border-radius: 0; }
+            .infra-settings-head { padding: 15px 14px; }
+            .infra-settings-body { padding: 10px; }
+            .infra-setting-row { grid-template-columns: 1fr; gap: 10px; }
+            .infra-setting-actions { justify-content: stretch; }
+            .infra-setting-control { width: 100%; }
+            .infra-setting-actions .infra-mini-btn { min-height: 34px; }
+            .infra-detail-modal .infra-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .infra-detail-loading-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
         }
         .censor-check-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
         .censor-check-form .input[name="target_ip"] { flex: 1 1 130px; min-width: 120px; }
@@ -4228,25 +4420,47 @@
         </section>
             </div>
             <div id="subpanel-inf-servers" class="subtab-panel">
+                <header class="infra-page-head">
+                    <div>
+                        <h1 class="infra-page-title">Серверы</h1>
+                        <p class="infra-page-copy">Состояние инфраструктуры, нагрузка и подключения в реальном времени</p>
+                    </div>
+                    <div class="infra-toolbar" aria-label="Фильтры серверов">
+                        <label class="infra-search">
+                            <i class="fas fa-magnifying-glass"></i>
+                            <input class="input" id="infra-search" type="search" placeholder="Поиск серверов…" autocomplete="off">
+                        </label>
+                        <select class="input infra-filter" id="infra-status-filter" aria-label="Фильтр по статусу">
+                            <option value="all">Все статусы</option>
+                            <option value="online">Онлайн</option>
+                            <option value="attention">Требуют внимания</option>
+                            <option value="offline">Оффлайн</option>
+                        </select>
+                        <label class="infra-archive-filter">
+                            <input type="checkbox" id="infra-show-archived"> Архивные
+                        </label>
+                        <button class="btn btn-secondary infra-settings-btn" type="button" id="infra-settings-open" aria-haspopup="dialog" aria-controls="infra-settings-modal">
+                            <i class="fas fa-sliders"></i><span>Настройки</span>
+                        </button>
+                        <button class="btn btn-secondary infra-refresh-btn" type="button" id="infra-refresh" title="Обновить данные" aria-label="Обновить данные">
+                            <i class="fas fa-rotate"></i>
+                        </button>
+                    </div>
+                </header>
+
                 <div class="infra-summary-grid" id="infra-summary"></div>
 
-                <section class="card" style="padding: 16px 18px; margin-bottom: 16px;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-                        <h3 style="margin:0;font-size:13px;font-weight:850;">Серверы с node-agent</h3>
-                        <label style="display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:11px;font-weight:650;cursor:pointer;">
-                            <input type="checkbox" id="infra-show-archived"> показывать архивные
-                        </label>
-                    </div>
-                    <p class="help-block" style="margin:0 0 10px;">Серверы появляются автоматически после установки node-agent (ip-guard). Клик по строке — карточка сервера. Данные обновляются каждые 5 секунд.</p>
-                    <div class="infra-table-wrap"><div id="infra-servers-table"><div class="help-block">Загрузка…</div></div></div>
-                </section>
+                <div class="infra-workspace">
+                    <section class="card infra-table-card">
+                        <div class="infra-table-heading">
+                            <h3>Парк серверов</h3>
+                            <span id="infra-server-count">Данные обновляются каждые 5 секунд</span>
+                        </div>
+                        <div class="infra-table-wrap"><div id="infra-servers-table"><div class="infra-empty">Загрузка серверов…</div></div></div>
+                    </section>
 
-                <div id="infra-server-detail" hidden></div>
+                </div>
 
-                <details class="card admin-collapse" style="margin-top:16px;">
-                    <summary><i class="fas fa-sliders"></i>Настройки мониторинга и автозамены<span class="admin-collapse-hint">пороги OFFLINE, нагрузки канала, аномалий, автозамена IP</span></summary>
-                    <div class="admin-collapse-body"><div id="infra-settings"><div class="help-block">Загрузка…</div></div></div>
-                </details>
             </div>
         </section>
         {% endif %}
@@ -4317,6 +4531,31 @@
             </section>
         </section>
     </main>
+
+    {% if support_admin_is_full_admin %}
+    <div class="modal-overlay infra-detail-modal" id="infra-detail-modal" aria-hidden="true">
+        <div class="infra-detail-modal-card" role="dialog" aria-modal="true" aria-label="Графики и полная карточка сервера">
+            <div id="infra-server-detail"></div>
+        </div>
+    </div>
+    <div class="modal-overlay infra-settings-modal" id="infra-settings-modal" aria-hidden="true">
+        <section class="infra-settings-dialog" role="dialog" aria-modal="true" aria-labelledby="infra-settings-title">
+            <header class="infra-settings-head">
+                <div class="infra-settings-title">
+                    <span class="infra-settings-title-icon"><i class="fas fa-sliders"></i></span>
+                    <div>
+                        <h2 id="infra-settings-title">Настройки мониторинга</h2>
+                        <p>OFFLINE-пороги, нагрузка, аномалии, кулдауны и автоматическая замена IP</p>
+                    </div>
+                </div>
+                <button type="button" class="infra-mini-btn" id="infra-settings-close" aria-label="Закрыть настройки"><i class="fas fa-xmark"></i></button>
+            </header>
+            <div class="infra-settings-body">
+                <div id="infra-settings"><div class="help-block">Загрузка…</div></div>
+            </div>
+        </section>
+    </div>
+    {% endif %}
 
     <div id="node-traffic-user-modal" class="modal-overlay" aria-hidden="true">
         <section class="modal-card node-traffic-user-modal-card" role="dialog" aria-modal="true" aria-labelledby="node-traffic-user-modal-title">
@@ -10925,9 +11164,13 @@
         // === Инфраструктура → Серверы =====================================
         let infraServersInited = false;
         let infraServersTimer = null;
+        let infraServersResult = null;
+        let infraSelectedServerId = null;
         let infraDetailId = null;
         let infraDetailPeriod = '24h';
         let infraLoadThreshold = 85;
+        let infraPreviewRequestSeq = 0;
+        const infraPreviewCache = new Map();
 
         function infraServersActive() {
             return activeAdminTab === 'infrastructure' && activeInfraSubtab() === 'inf-servers';
@@ -10970,6 +11213,11 @@
             return `${minutes} мин`;
         }
 
+        function infraCountryFlag(code) {
+            if (!code || code.length !== 2) return '';
+            return String.fromCodePoint(...[...code.toUpperCase()].map((ch) => 127397 + ch.charCodeAt(0)));
+        }
+
         function infraLoadClass(pct) {
             if (pct === null || pct === undefined) return '';
             if (pct >= 95) return 'infra-load-crit';
@@ -10977,10 +11225,51 @@
             return '';
         }
 
+        function openInfraSettings() {
+            const modal = document.getElementById('infra-settings-modal');
+            if (!modal || modal.classList.contains('open')) return;
+            lockBodyScroll();
+            modal.classList.add('open');
+            modal.setAttribute('aria-hidden', 'false');
+            loadInfraSettings();
+            document.getElementById('infra-settings-close')?.focus();
+        }
+
+        function closeInfraSettings() {
+            const modal = document.getElementById('infra-settings-modal');
+            if (!modal || !modal.classList.contains('open')) return;
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
+            unlockBodyScroll();
+            document.getElementById('infra-settings-open')?.focus();
+        }
+
         function initInfraServersTab() {
             if (!infraServersInited) {
                 infraServersInited = true;
-                document.getElementById('infra-show-archived')?.addEventListener('change', () => loadInfraServers(true));
+                document.getElementById('infra-show-archived')?.addEventListener('change', () => {
+                    infraSelectedServerId = null;
+                    infraPreviewCache.clear();
+                    loadInfraServers(true);
+                });
+                document.getElementById('infra-search')?.addEventListener('input', () => renderInfraServers(infraServersResult));
+                document.getElementById('infra-status-filter')?.addEventListener('change', () => renderInfraServers(infraServersResult));
+                document.getElementById('infra-refresh')?.addEventListener('click', () => loadInfraServers(true));
+                document.getElementById('infra-settings-open')?.addEventListener('click', openInfraSettings);
+                document.getElementById('infra-settings-close')?.addEventListener('click', closeInfraSettings);
+                const modal = document.getElementById('infra-detail-modal');
+                modal?.addEventListener('click', (event) => {
+                    if (event.target === modal) closeInfraServer();
+                });
+                const settingsModal = document.getElementById('infra-settings-modal');
+                settingsModal?.addEventListener('click', (event) => {
+                    if (event.target === settingsModal) closeInfraSettings();
+                });
+                document.addEventListener('keydown', (event) => {
+                    if (event.key !== 'Escape') return;
+                    if (document.getElementById('infra-settings-modal')?.classList.contains('open')) closeInfraSettings();
+                    else if (document.getElementById('infra-detail-modal')?.classList.contains('open')) closeInfraServer();
+                });
                 loadInfraSettings();
             }
             loadInfraServers(true);
@@ -10996,6 +11285,8 @@
         async function loadInfraServers(showErrors) {
             const container = document.getElementById('infra-servers-table');
             if (!container) return;
+            const refreshButton = document.getElementById('infra-refresh');
+            if (showErrors) refreshButton?.classList.add('is-loading');
             try {
                 const archived = document.getElementById('infra-show-archived')?.checked ? '1' : '0';
                 const response = await fetch(`${main.dataset.infraServersUrl}?archived=${archived}`, {
@@ -11004,11 +11295,20 @@
                 const payload = await response.json();
                 if (payload.status !== 'ok') throw new Error(payload.message || 'Ошибка загрузки');
                 infraLoadThreshold = payload.result.settings?.infra_load_threshold_pct || 85;
+                infraServersResult = payload.result;
                 renderInfraSummary(payload.result);
                 renderInfraServers(payload.result);
             } catch (error) {
-                if (showErrors) container.innerHTML = `<div class="help-block">Не удалось загрузить серверы: ${escapeHtml(String(error.message || error))}</div>`;
+                if (showErrors) container.innerHTML = `<div class="infra-empty">Не удалось загрузить серверы: ${escapeHtml(String(error.message || error))}</div>`;
+            } finally {
+                if (showErrors) refreshButton?.classList.remove('is-loading');
             }
+        }
+
+        function infraServerNeedsAttention(server) {
+            return !server.online || server.checking || server.replacing
+                || (server.utilization_pct !== null && server.utilization_pct !== undefined
+                    && server.utilization_pct >= infraLoadThreshold);
         }
 
         function renderInfraSummary(result) {
@@ -11017,36 +11317,70 @@
             const servers = result.servers || [];
             const totalRx = servers.reduce((acc, s) => acc + (s.rx_bps || 0), 0);
             const totalTx = servers.reduce((acc, s) => acc + (s.tx_bps || 0), 0);
-            const totalConn = servers.reduce((acc, s) => acc + (s.tcp_connections || 0), 0);
-            const problems = servers.filter((s) => s.checking || s.replacing).length;
-            const card = (label, value, sub, valueStyle = '') => `
-                <section class="card infra-summary-card">
-                    <div class="infra-metric-label">${label}</div>
-                    <div class="infra-metric-value" ${valueStyle ? `style="${valueStyle}"` : ''}>${value}</div>
+            const attention = servers.filter(infraServerNeedsAttention).length;
+            const card = (label, value, sub, icon, tone = '', filter = '') => `
+                <section class="card infra-summary-card ${tone}"${filter ? ` data-infra-filter="${filter}" role="button" tabindex="0" title="Показать в списке"` : ''}>
+                    <div class="infra-metric-head">
+                        <div class="infra-metric-label">${label}</div>
+                        <span class="infra-metric-icon"><i class="fas ${icon}"></i></span>
+                    </div>
+                    <div class="infra-metric-value">${value}</div>
                     ${sub ? `<div class="infra-metric-sub">${sub}</div>` : ''}
                 </section>`;
             summary.innerHTML =
-                card('Серверы', String(result.totals.count), `онлайн ${result.totals.online}`) +
-                card('Offline', String(result.totals.offline), result.totals.offline ? 'требует внимания' : 'всё в порядке',
-                    result.totals.offline ? 'color: var(--red);' : 'color: var(--green);') +
-                card('Суммарный трафик', `↓ ${infraFmtBps(totalRx)}`, `↑ ${infraFmtBps(totalTx)}`) +
-                card('TCP-соединения', totalConn.toLocaleString('ru-RU'), 'по всем нодам') +
-                card('Проверки/замены', String(problems), problems ? 'идёт проверка ТСПУ или замена IP' : 'аномалий нет',
-                    problems ? 'color: var(--brand-gold);' : '');
+                card('Всего серверов', String(result.totals.count), 'зарегистрировано node-agent', 'fa-server', '', 'all') +
+                card('Онлайн', String(result.totals.online), `${result.totals.count ? Math.round(result.totals.online / result.totals.count * 100) : 0}% инфраструктуры`, 'fa-signal', 'is-ok', 'online') +
+                card('Требуют внимания', String(attention), attention ? 'offline, высокая нагрузка или операция · показать' : 'всё работает штатно', 'fa-triangle-exclamation', attention ? 'is-warn' : 'is-ok', 'attention') +
+                card('Трафик сейчас', infraFmtBps(totalRx + totalTx), `↓ ${infraFmtBps(totalRx)} · ↑ ${infraFmtBps(totalTx)}`, 'fa-chart-area');
+            summary.querySelectorAll('[data-infra-filter]').forEach((cardEl) => {
+                const apply = () => {
+                    const select = document.getElementById('infra-status-filter');
+                    if (!select) return;
+                    select.value = cardEl.dataset.infraFilter;
+                    renderInfraServers(infraServersResult);
+                };
+                cardEl.addEventListener('click', apply);
+                cardEl.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); apply(); }
+                });
+            });
+        }
+
+        function infraFilteredServers(result) {
+            const servers = result?.servers || [];
+            const query = (document.getElementById('infra-search')?.value || '').trim().toLowerCase();
+            const status = document.getElementById('infra-status-filter')?.value || 'all';
+            return servers.filter((server) => {
+                const haystack = [server.name, server.node_name, server.hostname, ...(server.domains || [])]
+                    .filter(Boolean).join(' ').toLowerCase();
+                if (query && !haystack.includes(query)) return false;
+                if (status === 'online' && !server.online) return false;
+                if (status === 'offline' && server.online) return false;
+                if (status === 'attention' && !infraServerNeedsAttention(server)) return false;
+                return true;
+            });
         }
 
         function renderInfraServers(result) {
             const container = document.getElementById('infra-servers-table');
             if (!container) return;
-            const servers = result.servers || [];
+            const allServers = result?.servers || [];
+            const servers = infraFilteredServers(result);
+            const count = document.getElementById('infra-server-count');
+            if (count) count.textContent = `Показано ${servers.length} из ${allServers.length} · обновление каждые 5 секунд`;
+            closeInfraRowMenu();
+            if (!allServers.length) {
+                container.innerHTML = '<div class="infra-empty">Серверов пока нет. Установите node-agent (ip-guard) на ноду — она появится здесь автоматически.</div>';
+                return;
+            }
             if (!servers.length) {
-                container.innerHTML = '<div class="help-block">Серверов пока нет. Установите node-agent (ip-guard) на ноду — она появится здесь автоматически.</div>';
+                container.innerHTML = '<div class="infra-empty">По выбранным фильтрам серверы не найдены.</div>';
                 return;
             }
             const rows = servers.map((server) => {
                 const status = server.online
-                    ? '<span class="infra-badge infra-badge-online">ONLINE</span>'
-                    : '<span class="infra-badge infra-badge-offline">OFFLINE</span>';
+                    ? '<span class="infra-badge infra-badge-online">Онлайн</span>'
+                    : '<span class="infra-badge infra-badge-offline">Оффлайн</span>';
                 const flags = [
                     server.checking ? '<span class="infra-badge infra-badge-warn" title="Идёт проверка ТСПУ по аномалии">ТСПУ</span>' : '',
                     server.replacing ? '<span class="infra-badge infra-badge-warn" title="Идёт замена IP">IP</span>' : '',
@@ -11055,6 +11389,8 @@
                     server.is_archived ? '<span class="infra-badge infra-badge-muted">архив</span>' : '',
                 ].filter(Boolean).join(' ');
                 const util = server.utilization_pct;
+                const utilValue = util !== null && util !== undefined ? Math.max(0, Math.min(100, util)) : 0;
+                const utilTone = utilValue >= 95 ? 'crit' : utilValue >= infraLoadThreshold ? 'warn' : '';
                 const ips = server.ips || {};
                 const ipsLabel = `${ips.active || 0}${ips.reserve ? ` +${ips.reserve} рез` : ''}${ips.blocked ? ` / ${ips.blocked} блок` : ''}`;
                 const domains = (server.domains || []);
@@ -11062,29 +11398,195 @@
                     ? escapeHtml(domains[0]) + (domains.length > 1 ? ` +${domains.length - 1}` : '')
                     : '—';
                 return `
-                    <tr class="${server.online ? '' : 'infra-row-offline'}" data-infra-server="${server.id}">
-                        <td><b>${escapeHtml(server.name)}</b>${server.hostname ? `<div style="color:var(--muted);font-size:10.5px;">${escapeHtml(server.hostname)}</div>` : ''}</td>
-                        <td>${status} ${flags}</td>
-                        <td>${server.online ? '↓ ' + infraFmtBps(server.rx_bps) : '—'}</td>
-                        <td>${server.online ? '↑ ' + infraFmtBps(server.tx_bps) : '—'}</td>
-                        <td class="${infraLoadClass(util)}">${util !== null && util !== undefined ? util.toFixed(0) + '%' : '—'}</td>
-                        <td>${server.online && server.tcp_connections !== null ? server.tcp_connections.toLocaleString('ru-RU') : '—'}</td>
+                    <tr class="${server.online ? '' : 'infra-row-offline'}" data-infra-server="${server.id}" tabindex="0" title="Открыть карточку сервера">
+                        <td>
+                            <button type="button" class="infra-server-link" data-infra-open-detail="${server.id}" title="Открыть управление, графики и полную карточку">
+                                <span class="infra-server-icon"><i class="fas fa-server"></i></span>
+                                <span class="infra-server-copy"><span>${server.country_code ? infraCountryFlag(server.country_code) + ' ' : ''}${escapeHtml(server.name)}</span><span class="infra-server-host">${escapeHtml(server.hostname || server.node_name || '')}</span></span>
+                            </button>
+                        </td>
+                        <td><div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">${status} ${flags}</div></td>
+                        <td><div class="infra-network-cell"><span>↓ ${server.online ? infraFmtBps(server.rx_bps) : '—'}</span><small>↑ ${server.online ? infraFmtBps(server.tx_bps) : '—'}</small></div></td>
+                        <td class="infra-load-cell ${infraLoadClass(util)}">
+                            ${util !== null && util !== undefined
+                                ? `<div class="infra-load-value"><span>Канал</span><b>${util.toFixed(0)}%</b></div><div class="infra-load-track"><div class="infra-load-fill ${utilTone}" style="width:${utilValue}%"></div></div>`
+                                : server.online && !server.effective_limit_mbps
+                                    ? `<button type="button" class="infra-set-limit" data-infra-open-detail="${server.id}" title="Лимит канала не задан — проценты загрузки не считаются. Открыть параметры сервера">${server.detected_link_speed_mbps ? 'линк ' + server.detected_link_speed_mbps + ' M · задать' : 'задать лимит'}</button>`
+                                    : '<div class="infra-load-value"><span>Канал</span><b>—</b></div>'}
+                        </td>
+                        <td>${server.online && server.tcp_connections !== null && server.tcp_connections !== undefined ? server.tcp_connections.toLocaleString('ru-RU') : '—'}</td>
                         <td>${ipsLabel}</td>
                         <td title="${escapeHtml(domains.join(', '))}">${domainsLabel}</td>
-                        <td>${escapeHtml(server.agent_version || '—')}</td>
                         <td>${infraFmtAge(server.last_seen_age)}</td>
+                        <td><button type="button" class="infra-mini-btn infra-row-action" data-infra-menu="${server.id}" title="Быстрые действия" aria-haspopup="menu" aria-label="Быстрые действия ${escapeHtml(server.name)}"><i class="fas fa-ellipsis-vertical"></i></button></td>
                     </tr>`;
             }).join('');
             container.innerHTML = `
                 <table class="infra-table">
                     <thead><tr>
-                        <th>Сервер</th><th>Статус</th><th>RX</th><th>TX</th><th>Загрузка</th>
-                        <th>TCP</th><th>IP</th><th>Домены</th><th>Агент</th><th>Heartbeat</th>
+                        <th>Сервер</th><th>Статус</th><th>Трафик</th><th>Нагрузка</th>
+                        <th>TCP</th><th>IP-адреса</th><th>Домены</th><th>Heartbeat</th><th></th>
                     </tr></thead>
                     <tbody>${rows}</tbody>
                 </table>`;
+            const serversById = new Map(allServers.map((server) => [server.id, server]));
             container.querySelectorAll('[data-infra-server]').forEach((row) => {
                 row.addEventListener('click', () => openInfraServer(Number(row.dataset.infraServer)));
+                row.addEventListener('keydown', (event) => {
+                    if (event.key !== 'Enter' && event.key !== ' ') return;
+                    event.preventDefault();
+                    openInfraServer(Number(row.dataset.infraServer));
+                });
+            });
+            container.querySelectorAll('[data-infra-open-detail]').forEach((button) => {
+                button.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    openInfraServer(Number(button.dataset.infraOpenDetail));
+                });
+            });
+            container.querySelectorAll('[data-infra-menu]').forEach((button) => {
+                button.addEventListener('click', (event) => {
+                    event.stopPropagation();
+                    openInfraRowMenu(button, serversById.get(Number(button.dataset.infraMenu)));
+                });
+            });
+        }
+
+        function closeInfraRowMenu() {
+            document.getElementById('infra-row-menu')?.remove();
+        }
+
+        function openInfraRowMenu(button, server) {
+            if (!server) return;
+            const existing = document.getElementById('infra-row-menu');
+            const wasFor = existing?.dataset.serverId;
+            closeInfraRowMenu();
+            if (wasFor === String(server.id)) return; // повторный клик закрывает
+            const menu = document.createElement('div');
+            menu.id = 'infra-row-menu';
+            menu.className = 'infra-row-menu';
+            menu.dataset.serverId = String(server.id);
+            menu.innerHTML = `
+                <button type="button" data-menu-open><i class="fas fa-up-right-from-square"></i>Открыть карточку</button>
+                <button type="button" data-menu-check><i class="fas fa-shield-halved"></i>Проверить ТСПУ</button>
+                <button type="button" data-menu-snooze><i class="fas fa-bell-slash"></i>${server.anomaly_paused ? 'Снять паузу детектора' : 'Пауза детектора 24ч'}</button>
+                <button type="button" data-menu-archive><i class="fas fa-box-archive"></i>${server.is_archived ? 'Вернуть из архива' : 'В архив'}</button>`;
+            document.body.appendChild(menu);
+            const rect = button.getBoundingClientRect();
+            menu.style.top = `${rect.bottom + window.scrollY + 6}px`;
+            menu.style.left = `${Math.max(8, rect.right + window.scrollX - menu.offsetWidth)}px`;
+            menu.querySelector('[data-menu-open]').addEventListener('click', () => { closeInfraRowMenu(); openInfraServer(server.id); });
+            menu.querySelector('[data-menu-check]').addEventListener('click', () => { closeInfraRowMenu(); infraAction({action: 'force_check', id: server.id}, 'Замеры ТСПУ запущены'); });
+            menu.querySelector('[data-menu-snooze]').addEventListener('click', () => {
+                closeInfraRowMenu();
+                infraAction(
+                    server.anomaly_paused ? {action: 'unsnooze', id: server.id} : {action: 'snooze', id: server.id, hours: 24},
+                    server.anomaly_paused ? 'Пауза снята' : 'Детектор на паузе 24 часа',
+                );
+            });
+            menu.querySelector('[data-menu-archive]').addEventListener('click', () => { closeInfraRowMenu(); infraAction({action: server.is_archived ? 'unarchive' : 'archive', id: server.id}); });
+        }
+
+        document.addEventListener('click', (event) => {
+            if (!event.target.closest('#infra-row-menu') && !event.target.closest('[data-infra-menu]')) closeInfraRowMenu();
+        });
+        document.addEventListener('keydown', (event) => { if (event.key === 'Escape') closeInfraRowMenu(); });
+
+        function selectInfraServer(serverId) {
+            if (infraSelectedServerId === serverId) return;
+            infraSelectedServerId = serverId;
+            renderInfraServers(infraServersResult);
+        }
+
+        async function loadInfraPreview(serverId) {
+            const requestSeq = ++infraPreviewRequestSeq;
+            try {
+                const response = await fetch(`${main.dataset.infraServerDetailUrl}?id=${serverId}`, {
+                    headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store',
+                });
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error(payload.message || 'Ошибка');
+                if (requestSeq !== infraPreviewRequestSeq) return;
+                infraPreviewCache.set(serverId, payload.result);
+                const server = infraServersResult?.servers?.find((item) => item.id === infraSelectedServerId);
+                if (server && server.id === serverId) renderInfraPreview(server, payload.result);
+            } catch (error) {
+                if (requestSeq !== infraPreviewRequestSeq) return;
+                const server = infraServersResult?.servers?.find((item) => item.id === infraSelectedServerId);
+                if (server && server.id === serverId) renderInfraPreview(server, null, true);
+            }
+        }
+
+        function renderInfraPreview(server, detail = null, loadFailed = false) {
+            const container = document.getElementById('infra-server-preview');
+            if (!container) return;
+            if (!server) {
+                container.innerHTML = '<div class="infra-preview-placeholder"><div><i class="fas fa-server"></i>Выберите сервер, чтобы увидеть его состояние</div></div>';
+                return;
+            }
+            const serverDetail = detail?.server || {};
+            const ips = server.ips || {};
+            const activeIp = (detail?.ips || []).find((ip) => ip.on_interface && !ip.blocked_at);
+            const activeIpLabel = activeIp ? `${activeIp.ip}/${activeIp.prefix_len}` : `${ips.active || 0} активных`;
+            const domains = detail ? (detail.domains || []) : (server.domains || []);
+            const domainsHtml = domains.slice(0, 3).map((domain) => `
+                <div class="infra-domain-item"><i class="fas fa-link"></i><span>${escapeHtml(domain)}</span></div>`).join('')
+                || '<div class="infra-domain-item" style="color:var(--muted);"><i class="fas fa-link-slash"></i><span>Домены не привязаны</span></div>';
+            const activities = [
+                `<div class="infra-activity-item"><span class="infra-activity-dot"></span><span>Heartbeat получен · ${infraFmtAge(server.last_seen_age)}</span></div>`,
+                server.checking ? '<div class="infra-activity-item"><span class="infra-activity-dot warn"></span><span>Выполняется проверка ТСПУ</span></div>' : '',
+                server.replacing ? '<div class="infra-activity-item"><span class="infra-activity-dot warn"></span><span>Выполняется замена IP</span></div>' : '',
+                detail?.replacements?.[0] ? `<div class="infra-activity-item"><span class="infra-activity-dot warn"></span><span>Последняя замена IP · ${escapeHtml(detail.replacements[0].status || '—')}</span></div>` : '',
+            ].filter(Boolean).slice(0, 3).join('');
+            const util = server.utilization_pct;
+            const utilValue = util !== null && util !== undefined ? Math.max(0, Math.min(100, util)) : 0;
+            const utilTone = utilValue >= 95 ? 'crit' : utilValue >= infraLoadThreshold ? 'warn' : '';
+            container.innerHTML = `
+                <div class="infra-preview-head">
+                    <div class="infra-preview-server">
+                        <span class="infra-server-icon"><i class="fas fa-server"></i></span>
+                        <div><h3 class="infra-preview-name">${escapeHtml(server.name)}</h3>${server.online ? '<span class="infra-badge infra-badge-online">Онлайн</span>' : '<span class="infra-badge infra-badge-offline">Оффлайн</span>'}</div>
+                    </div>
+                    <button type="button" class="infra-mini-btn infra-row-action" data-infra-preview-open title="Открыть управление и графики"><i class="fas fa-arrow-up-right-from-square"></i></button>
+                </div>
+                <div class="infra-preview-body">
+                    <section class="infra-preview-section">
+                        <h4>Состояние</h4>
+                        <div class="infra-preview-metrics">
+                            <div class="infra-preview-metric"><span>RX</span><b>${server.online ? infraFmtBps(server.rx_bps) : '—'}</b></div>
+                            <div class="infra-preview-metric"><span>TX</span><b>${server.online ? infraFmtBps(server.tx_bps) : '—'}</b></div>
+                            <div class="infra-preview-metric"><span>TCP</span><b>${server.online && server.tcp_connections !== null && server.tcp_connections !== undefined ? server.tcp_connections.toLocaleString('ru-RU') : '—'}</b></div>
+                        </div>
+                        <div class="infra-load-value" style="margin-top:12px;"><span>Загрузка канала</span><b class="${infraLoadClass(util)}">${util !== null && util !== undefined ? util.toFixed(0) + '%' : '—'}</b></div>
+                        <div class="infra-load-track"><div class="infra-load-fill ${utilTone}" style="width:${utilValue}%"></div></div>
+                    </section>
+                    <section class="infra-preview-section">
+                        <h4>Сеть</h4>
+                        <div class="infra-preview-kv">
+                            <div class="infra-preview-kv-row"><span>IP-адрес</span>${detail ? `<code>${escapeHtml(activeIpLabel)}</code>` : '<span class="infra-skeleton" style="width:92px;height:13px;"></span>'}</div>
+                            <div class="infra-preview-kv-row"><span>Адреса</span><b>${ips.active || 0} активных · ${ips.reserve || 0} резерв</b></div>
+                            <div class="infra-preview-kv-row"><span>Интерфейс</span>${detail ? `<code>${escapeHtml(serverDetail.wan_interface || server.wan_interface || '—')}</code>` : '<span class="infra-skeleton" style="width:72px;height:13px;"></span>'}</div>
+                            <div class="infra-preview-kv-row"><span>Агент</span><b>v${escapeHtml(server.agent_version || '—')}</b></div>
+                        </div>
+                        ${loadFailed ? '<div style="margin-top:9px;color:var(--red);font-size:9.5px;">Подробности временно недоступны</div>' : ''}
+                    </section>
+                    <section class="infra-preview-section"><h4>Домены</h4><div class="infra-domain-list">${domainsHtml}</div></section>
+                    <section class="infra-preview-section"><h4>Активность</h4><div class="infra-activity-list">${activities}</div></section>
+                    <section class="infra-preview-section">
+                        <h4>В полной карточке</h4>
+                        <div class="infra-preview-capabilities">
+                            <div class="infra-preview-capability"><i class="fas fa-chart-line"></i><span>Графики</span></div>
+                            <div class="infra-preview-capability"><i class="fas fa-sliders"></i><span>Параметры</span></div>
+                            <div class="infra-preview-capability"><i class="fas fa-network-wired"></i><span>IP и резервы</span></div>
+                            <div class="infra-preview-capability"><i class="fas fa-link"></i><span>Домены</span></div>
+                            <div class="infra-preview-capability"><i class="fas fa-shield-halved"></i><span>ТСПУ и детектор</span></div>
+                            <div class="infra-preview-capability"><i class="fas fa-clock-rotate-left"></i><span>Журнал</span></div>
+                        </div>
+                    </section>
+                    <button class="btn infra-preview-open" type="button" data-infra-preview-open><i class="fas fa-sliders"></i>Управление и графики</button>
+                </div>`;
+            container.querySelectorAll('[data-infra-preview-open]').forEach((button) => {
+                button.addEventListener('click', () => openInfraServer(server.id));
             });
         }
 
@@ -11105,6 +11607,7 @@
             try {
                 await infraPost(main.dataset.infraServersUrl, data);
                 if (successMessage) showAdminToast(successMessage);
+                if (infraDetailId !== null) infraPreviewCache.delete(infraDetailId);
                 await loadInfraServers(true);
                 if (infraDetailId !== null) await refreshInfraDetail(true);
             } catch (error) {
@@ -11113,15 +11616,35 @@
         }
 
         async function openInfraServer(serverId) {
+            infraSelectedServerId = serverId;
             infraDetailId = serverId;
+            renderInfraServers(infraServersResult);
+            const modal = document.getElementById('infra-detail-modal');
+            const container = document.getElementById('infra-server-detail');
+            if (!modal || !container) return;
+            const wasOpen = modal.classList.contains('open');
+            if (!wasOpen) lockBodyScroll();
+            modal.classList.add('open');
+            modal.setAttribute('aria-hidden', 'false');
+            container.innerHTML = `
+                <div class="infra-detail-loading" aria-label="Загрузка карточки сервера">
+                    <div class="infra-skeleton infra-detail-loading-head"></div>
+                    <div class="infra-detail-loading-metrics">${Array.from({length: 5}, () => '<div class="infra-skeleton"></div>').join('')}</div>
+                    <div class="infra-skeleton infra-detail-loading-chart"></div>
+                </div>`;
             await refreshInfraDetail(true);
-            document.getElementById('infra-server-detail')?.scrollIntoView({behavior: 'smooth', block: 'start'});
         }
 
         function closeInfraServer() {
+            const modal = document.getElementById('infra-detail-modal');
+            if (!modal || !modal.classList.contains('open')) return;
+            infraDetailRequestSeq += 1;
             infraDetailId = null;
+            modal.classList.remove('open');
+            modal.setAttribute('aria-hidden', 'true');
             const container = document.getElementById('infra-server-detail');
-            if (container) { container.hidden = true; container.innerHTML = ''; }
+            if (container) { container.innerHTML = ''; container.scrollTop = 0; }
+            unlockBodyScroll();
         }
 
         let infraDetailRequestSeq = 0;
@@ -11172,15 +11695,20 @@
                 // в этом случае пропускаем (следующий тик догонит)
                 if (!full && container.contains(document.activeElement)
                     && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
-                // Несохранённый ввод переживает любую перерисовку
+                // Несохранённый ввод и позиция внутри модалки переживают
+                // фоновую перерисовку раз в 5 секунд.
                 const dirty = infraSnapshotDirtyFields(container);
+                const previousScrollTop = container.scrollTop;
+                infraPreviewCache.set(requestedId, detailPayload.result);
                 renderInfraDetail(container, detailPayload.result, telemetryPayload.result, full);
                 infraRestoreDirtyFields(container, dirty);
+                container.scrollTop = previousScrollTop;
+                const selected = infraServersResult?.servers?.find((server) => server.id === infraSelectedServerId);
+                if (selected && selected.id === requestedId) renderInfraPreview(selected, detailPayload.result);
             } catch (error) {
                 // Ошибку устаревшего запроса не рисуем поверх свежего контента
                 if (requestSeq !== infraDetailRequestSeq || infraDetailId !== requestedId) return;
                 if (full) {
-                    container.hidden = false;
                     container.innerHTML = `<section class="card" style="padding:16px;"><div class="help-block">Не удалось загрузить карточку: ${escapeHtml(String(error.message || error))}</div></section>`;
                 }
             }
@@ -11190,6 +11718,31 @@
             if (ip.blocked_at) return '<span class="infra-badge infra-badge-offline">BLOCKED</span>';
             if (ip.on_interface) return '<span class="infra-badge infra-badge-online">ACTIVE</span>';
             return '<span class="infra-badge infra-badge-muted">RESERVE</span>';
+        }
+
+        function infraGroupIpsByInterface(ips, wanInterface) {
+            const reserveKey = '__reserve__';
+            const groups = new Map();
+            (ips || []).forEach((ip) => {
+                const interfaceName = String(ip.interface || '').trim();
+                const key = interfaceName || reserveKey;
+                if (!groups.has(key)) {
+                    groups.set(key, {
+                        key,
+                        interfaceName,
+                        isReserve: key === reserveKey,
+                        ips: [],
+                    });
+                }
+                groups.get(key).ips.push(ip);
+            });
+            return Array.from(groups.values()).sort((left, right) => {
+                if (left.isReserve !== right.isReserve) return left.isReserve ? 1 : -1;
+                const leftIsWan = left.interfaceName === wanInterface;
+                const rightIsWan = right.interfaceName === wanInterface;
+                if (leftIsWan !== rightIsWan) return leftIsWan ? -1 : 1;
+                return left.interfaceName.localeCompare(right.interfaceName, 'ru');
+            });
         }
 
         function renderInfraDetail(container, detail, telemetry, full) {
@@ -11207,21 +11760,45 @@
                     ${sub ? `<div class="infra-metric-sub">${sub}</div>` : ''}
                 </section>`;
 
-            const ipsHtml = (detail.ips || []).map((ip) => `
-                <div class="infra-ip-row">
-                    <div>
-                        <code>${escapeHtml(ip.ip)}/${ip.prefix_len}</code> ${infraIpBadge(ip)}
-                        <span style="color:var(--muted);font-size:10.5px;">${ip.source === 'manual' ? 'резерв (вручную)' : escapeHtml(ip.interface || '')}${ip.comment ? ' · ' + escapeHtml(ip.comment) : ''}</span>
-                    </div>
-                    <div class="infra-ip-actions">
-                        ${!ip.on_interface && !ip.blocked_at ? `<button type="button" class="infra-mini-btn" data-infra-ensure-ip="${ip.id}" title="Поставить IP на интерфейс через node-agent">установить</button>` : ''}
-                        ${ip.on_interface && !ip.blocked_at ? `<button type="button" class="infra-mini-btn" data-infra-replace-ip="${escapeHtml(ip.ip)}" title="Заменить IP на резервный (как при подтверждённой блокировке)">заменить</button>` : ''}
-                        ${ip.blocked_at
-                            ? `<button type="button" class="infra-mini-btn" data-infra-unblock-ip="${ip.id}">разблокировать</button>`
-                            : `<button type="button" class="infra-mini-btn danger" data-infra-block-ip="${ip.id}" title="Пометить IP заблокированным (исключить из резервов)">пометить блок</button>`}
-                        ${!ip.on_interface ? `<button type="button" class="infra-mini-btn danger" data-infra-delete-ip="${ip.id}">удалить</button>` : ''}
-                    </div>
-                </div>`).join('') || '<div class="help-block">Адресов пока нет</div>';
+            const ipGroups = infraGroupIpsByInterface(detail.ips || [], server.wan_interface || '');
+            const ipsHtml = ipGroups.map((group) => {
+                const activeCount = group.ips.filter((ip) => ip.on_interface && !ip.blocked_at).length;
+                const blockedCount = group.ips.filter((ip) => Boolean(ip.blocked_at)).length;
+                const groupRows = group.ips.map((ip) => {
+                    const noteParts = [];
+                    if (ip.source === 'manual') noteParts.push('добавлен вручную');
+                    if (ip.comment) noteParts.push(escapeHtml(ip.comment));
+                    return `
+                        <div class="infra-ip-tile${ip.blocked_at ? ' is-blocked' : ''}">
+                            <div class="infra-ip-tile-head"><code>${escapeHtml(ip.ip)}/${ip.prefix_len}</code>${infraIpBadge(ip)}</div>
+                            ${noteParts.length ? `<span class="infra-ip-copy-note">${noteParts.join(' · ')}</span>` : ''}
+                            <div class="infra-ip-tile-actions">
+                                ${!ip.on_interface && !ip.blocked_at ? `<button type="button" class="infra-icon-btn" data-infra-ensure-ip="${ip.id}" title="Установить на интерфейс через node-agent" aria-label="Установить ${escapeHtml(ip.ip)} на интерфейс"><i class="fas fa-plug"></i></button>` : ''}
+                                ${ip.on_interface && !ip.blocked_at ? `<button type="button" class="infra-icon-btn" data-infra-replace-ip="${escapeHtml(ip.ip)}" title="Заменить на резервный (как при подтверждённой блокировке)" aria-label="Заменить ${escapeHtml(ip.ip)}"><i class="fas fa-rotate"></i></button>` : ''}
+                                ${ip.blocked_at
+                                    ? `<button type="button" class="infra-icon-btn" data-infra-unblock-ip="${ip.id}" title="Разблокировать (вернуть в резервы)" aria-label="Разблокировать ${escapeHtml(ip.ip)}"><i class="fas fa-unlock"></i></button>`
+                                    : `<button type="button" class="infra-icon-btn danger" data-infra-block-ip="${ip.id}" title="Пометить заблокированным (исключить из резервов и замеров)" aria-label="Пометить ${escapeHtml(ip.ip)} заблокированным"><i class="fas fa-ban"></i></button>`}
+                                ${!ip.on_interface ? `<button type="button" class="infra-icon-btn danger" data-infra-delete-ip="${ip.id}" title="Удалить из списка" aria-label="Удалить ${escapeHtml(ip.ip)}"><i class="fas fa-trash-can"></i></button>` : ''}
+                            </div>
+                        </div>`;
+                }).join('');
+                return `
+                    <section class="infra-ip-group" data-infra-interface="${escapeHtml(group.interfaceName || 'reserve')}">
+                        <header class="infra-ip-group-head">
+                            <div class="infra-ip-group-name">
+                                <i class="fas ${group.isReserve ? 'fa-box-archive' : 'fa-network-wired'}"></i>
+                                ${group.isReserve ? '<span>Резерв / не назначены</span>' : `<code>${escapeHtml(group.interfaceName)}</code>`}
+                                ${group.interfaceName === server.wan_interface ? '<span class="infra-badge infra-badge-warn">WAN</span>' : ''}
+                            </div>
+                            <div class="infra-ip-group-meta">
+                                ${activeCount ? `<span class="infra-badge infra-badge-online">${activeCount} active</span>` : ''}
+                                ${blockedCount ? `<span class="infra-badge infra-badge-offline">${blockedCount} blocked</span>` : ''}
+                                <span class="infra-ip-count">${group.ips.length} шт.</span>
+                            </div>
+                        </header>
+                        <div class="infra-ip-group-list">${groupRows}</div>
+                    </section>`;
+            }).join('') || '<div class="help-block">Адресов пока нет</div>';
 
             const domainsHtml = (detail.domains || []).map((domain) => `
                 <div class="infra-ip-row">
@@ -11259,12 +11836,14 @@
                     `<code>${escapeHtml((c.payload || {}).ip || '')}</code> → ${escapeHtml((c.payload || {}).interface || '')}${c.error ? ' · ' + escapeHtml(c.error) : ''}`));
             });
 
-            container.hidden = false;
             container.innerHTML = `
-                <section class="card" style="padding:18px;margin-bottom:16px;">
+                <section class="card" id="infra-detail-monitoring" style="padding:18px;margin-bottom:16px;">
                     <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
                         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                            <h3 style="margin:0;font-size:16px;font-weight:900;">${escapeHtml(server.name)}</h3>
+                            <div class="infra-detail-title-copy">
+                                <h3>${server.country_code ? infraCountryFlag(server.country_code) + ' ' : ''}${escapeHtml(server.name)}</h3>
+                                <p>Мониторинг · параметры · IP-адреса · домены · журнал</p>
+                            </div>
                             ${server.online ? '<span class="infra-badge infra-badge-online">ONLINE</span>' : '<span class="infra-badge infra-badge-offline">OFFLINE</span>'}
                             ${server.baseline_scale ? `<span class="infra-badge infra-badge-muted" title="После изменения DNS норма трафика временно ×${server.baseline_scale.toFixed(2)} (до ${escapeHtml(server.baseline_scale_until || '')}); детектор аномалий работает">DNS ×${server.baseline_scale.toFixed(2)}</span>` : ''}
                             ${server.is_archived ? '<span class="infra-badge infra-badge-muted">архив</span>' : ''}
@@ -11278,6 +11857,16 @@
                             <button type="button" class="infra-mini-btn" id="infra-detail-close">Закрыть</button>
                         </div>
                     </div>
+
+                    <nav class="infra-detail-nav" aria-label="Разделы карточки сервера">
+                        <button type="button" data-infra-detail-target="infra-detail-monitoring"><i class="fas fa-chart-line"></i>Графики</button>
+                        <button type="button" data-infra-detail-target="infra-detail-server-info"><i class="fas fa-server"></i>Сервер</button>
+                        <button type="button" data-infra-detail-target="infra-detail-parameters"><i class="fas fa-sliders"></i>Параметры</button>
+                        <button type="button" data-infra-detail-target="infra-detail-ips"><i class="fas fa-network-wired"></i>IP-адреса</button>
+                        <button type="button" data-infra-detail-target="infra-detail-domains"><i class="fas fa-link"></i>Домены</button>
+                        <button type="button" data-infra-detail-target="infra-detail-connections"><i class="fas fa-users"></i>Подключения</button>
+                        <button type="button" data-infra-detail-target="infra-detail-journal"><i class="fas fa-clock-rotate-left"></i>Журнал</button>
+                    </nav>
 
                     <div class="infra-summary-grid">
                         ${statCard('Сейчас', `↓ ${infraFmtBps(server.rx_bps)}`, `↑ ${infraFmtBps(server.tx_bps)} · ${server.tcp_connections !== null && server.tcp_connections !== undefined ? server.tcp_connections.toLocaleString('ru-RU') + ' соединений' : '—'}`)}
@@ -11302,8 +11891,8 @@
                     </div>
                 </section>
 
-                <div class="infra-detail-grid" style="margin-bottom:16px;">
-                    <section class="card infra-detail-card">
+                <div class="infra-detail-primary-grid">
+                    <section class="card infra-detail-card" id="infra-detail-server-info">
                         <h4>Сервер</h4>
                         <dl class="infra-kv">
                             <dt>Node</dt><dd><code>${escapeHtml(server.node_name)}</code></dd>
@@ -11320,41 +11909,93 @@
                         </dl>
                     </section>
 
-                    <section class="card infra-detail-card">
+                    <section class="card infra-detail-card" id="infra-detail-parameters">
                         <h4>Параметры</h4>
-                        <form id="infra-server-edit-form">
-                            <label style="display:block;color:var(--muted);font-size:10.5px;font-weight:750;margin-bottom:4px;">НАЗВАНИЕ</label>
-                            <input type="text" name="display_name" value="${escapeHtml(server.display_name || '')}" placeholder="${escapeHtml(server.node_name)}" style="width:100%;margin-bottom:10px;">
-                            <label style="display:block;color:var(--muted);font-size:10.5px;font-weight:750;margin-bottom:4px;">ЛИМИТ КАНАЛА, MBIT/S (override; пусто = определённый линк ${server.detected_link_speed_mbps || '—'})</label>
-                            <input type="text" name="bandwidth_limit_mbps" value="${server.bandwidth_limit_mbps || ''}" placeholder="например 400" style="width:100%;margin-bottom:10px;">
-                            <label style="display:block;color:var(--muted);font-size:10.5px;font-weight:750;margin-bottom:4px;">ЗАМЕТКИ</label>
-                            <textarea name="notes" rows="2" style="width:100%;margin-bottom:10px;">${escapeHtml(server.notes || '')}</textarea>
-                            <button class="btn" type="submit"><i class="fas fa-floppy-disk"></i>Сохранить</button>
+                        <form id="infra-server-edit-form" class="infra-form">
+                            <label class="infra-form-field">
+                                <span class="infra-form-label">Название</span>
+                                <span class="infra-control-wrap">
+                                    <i class="fas fa-server infra-control-icon"></i>
+                                    <input class="infra-control" type="text" name="display_name" value="${escapeHtml(server.display_name || '')}" placeholder="${escapeHtml(server.node_name)}" autocomplete="off">
+                                </span>
+                            </label>
+                            <label class="infra-form-field">
+                                <span class="infra-form-label">Страна · ISO-код</span>
+                                <span class="infra-form-hint">Пусто — определяется по имени ноды (de-1 → DE); флаг появляется рядом с названием</span>
+                                <span class="infra-control-wrap">
+                                    <i class="fas fa-flag infra-control-icon"></i>
+                                    <input class="infra-control" type="text" name="country_code" maxlength="2" value="${escapeHtml(server.country_code_explicit || '')}" placeholder="${server.country_code ? 'авто: ' + server.country_code : 'например, DE'}" autocomplete="off" style="text-transform:uppercase;">
+                                </span>
+                            </label>
+                            <label class="infra-form-field">
+                                <span class="infra-form-label">Лимит канала · Mbit/s</span>
+                                <span class="infra-form-hint">Пусто — использовать скорость линка ${server.detected_link_speed_mbps || '—'} Mbit/s</span>
+                                <span class="infra-control-wrap">
+                                    <i class="fas fa-gauge-high infra-control-icon"></i>
+                                    <input class="infra-control" type="text" inputmode="numeric" name="bandwidth_limit_mbps" value="${server.bandwidth_limit_mbps || ''}" placeholder="Например, 400" autocomplete="off">
+                                </span>
+                            </label>
+                            <label class="infra-form-field">
+                                <span class="infra-form-label">Заметки</span>
+                                <span class="infra-control-wrap textarea">
+                                    <i class="fas fa-note-sticky infra-control-icon"></i>
+                                    <textarea class="infra-control" name="notes" rows="3" placeholder="Контекст по серверу для команды">${escapeHtml(server.notes || '')}</textarea>
+                                </span>
+                            </label>
+                            <button class="btn infra-form-submit" type="submit"><i class="fas fa-floppy-disk"></i>Сохранить параметры</button>
                         </form>
                     </section>
 
-                    <section class="card infra-detail-card">
-                        <h4>IP-адреса</h4>
-                        <div>${ipsHtml}</div>
-                        <form id="infra-add-ip-form" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
-                            <input type="text" name="ip" placeholder="185.10.0.11" style="flex:1;min-width:130px;">
-                            <input type="text" name="prefix" placeholder="24" style="width:52px;">
-                            <input type="text" name="comment" placeholder="комментарий" style="flex:1;min-width:110px;">
-                            <button class="btn" type="submit"><i class="fas fa-plus"></i>Резерв</button>
-                        </form>
-                    </section>
-
-                    <section class="card infra-detail-card">
+                    <section class="card infra-detail-card" id="infra-detail-domains">
                         <h4>Домены (VPN entry points)</h4>
                         <div>${domainsHtml}</div>
-                        <form id="infra-add-domain-form" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
-                            <input type="text" name="domain" placeholder="de.example.xyz" style="flex:1;min-width:170px;">
-                            <button class="btn" type="submit"><i class="fas fa-plus"></i>Привязать</button>
+                        <form id="infra-add-domain-form" class="infra-form" style="margin-top:14px;">
+                            <label class="infra-form-field">
+                                <span class="infra-form-label">Новый домен</span>
+                                <span class="infra-form-hint">VPN entry point, который будет направлен на сервер</span>
+                                <span class="infra-control-wrap">
+                                    <i class="fas fa-link infra-control-icon"></i>
+                                    <input class="infra-control" type="text" name="domain" placeholder="de.example.xyz" inputmode="url" autocomplete="off" spellcheck="false">
+                                </span>
+                            </label>
+                            <button class="btn infra-form-submit" type="submit"><i class="fas fa-plus"></i>Привязать домен</button>
                         </form>
                         ${detail.cloudflare_enabled ? '' : '<div class="help-block" style="margin-top:8px;">⚠️ CLOUDFLARE_API_TOKEN не настроен — автозамена IP не сможет переключить DNS</div>'}
                     </section>
+                </div>
 
-                    <section class="card infra-detail-card">
+                <section class="card infra-detail-card infra-detail-ips-wide" id="infra-detail-ips">
+                        <h4>IP-адреса</h4>
+                        <div class="infra-ip-groups">${ipsHtml}</div>
+                        <form id="infra-add-ip-form" class="infra-form" style="margin-top:14px;">
+                            <div class="infra-form-label">Добавить резервный адрес</div>
+                            <div class="infra-address-fields">
+                                <label class="infra-form-field">
+                                    <span class="infra-form-label">IP-адрес</span>
+                                    <span class="infra-control-wrap">
+                                        <i class="fas fa-globe infra-control-icon"></i>
+                                        <input class="infra-control" type="text" name="ip" placeholder="185.10.0.11" autocomplete="off">
+                                    </span>
+                                </label>
+                                <label class="infra-form-field">
+                                    <span class="infra-form-label">Префикс</span>
+                                    <input class="infra-control infra-prefix-control" type="text" name="prefix" placeholder="24" inputmode="numeric" autocomplete="off">
+                                </label>
+                                <label class="infra-form-field">
+                                    <span class="infra-form-label">Комментарий</span>
+                                    <span class="infra-control-wrap">
+                                        <i class="fas fa-tag infra-control-icon"></i>
+                                        <input class="infra-control" type="text" name="comment" placeholder="Например, резерв для ротации" autocomplete="off">
+                                    </span>
+                                </label>
+                            </div>
+                            <button class="btn infra-form-submit" type="submit"><i class="fas fa-plus"></i>Добавить в резерв</button>
+                        </form>
+                    </section>
+
+
+                <div class="infra-detail-secondary-grid" style="margin-bottom:16px;">
+                    <section class="card infra-detail-card" id="infra-detail-connections">
                         <h4>Кто подключается · 24 ч</h4>
                         <dl class="infra-kv" style="margin-bottom:8px;">
                             <dt>Уникальных IP</dt><dd>${(who.unique_ips_24h || 0).toLocaleString('ru-RU')}</dd>
@@ -11363,7 +12004,7 @@
                         <div class="infra-log-list">${whoTop}</div>
                     </section>
 
-                    <section class="card infra-detail-card">
+                    <section class="card infra-detail-card" id="infra-detail-journal">
                         <h4>Журнал (аномалии · замены · команды)</h4>
                         <div class="infra-log-list">${journal.join('') || '<div class="help-block">Событий не было</div>'}</div>
                     </section>
@@ -11375,6 +12016,17 @@
 
         function wireInfraDetail(container, server) {
             container.querySelector('#infra-detail-close')?.addEventListener('click', closeInfraServer);
+            container.querySelectorAll('[data-infra-detail-target]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    const target = container.querySelector(`#${button.dataset.infraDetailTarget}`);
+                    if (!target) return;
+                    const nextTop = container.scrollTop
+                        + target.getBoundingClientRect().top
+                        - container.getBoundingClientRect().top
+                        - 12;
+                    container.scrollTop = Math.max(0, Math.round(nextTop));
+                });
+            });
             container.querySelector('#infra-force-check')?.addEventListener('click', () =>
                 infraAction({action: 'force_check', id: server.id}, 'Замеры ТСПУ запущены'));
             container.querySelector('#infra-archive-toggle')?.addEventListener('click', () =>
@@ -11399,6 +12051,7 @@
                     action: 'update', id: server.id,
                     display_name: form.display_name.value,
                     bandwidth_limit_mbps: form.bandwidth_limit_mbps.value,
+                    country_code: form.country_code.value,
                     notes: form.notes.value,
                 }, 'Сохранено');
             });
@@ -11457,7 +12110,14 @@
             return (time || '').slice(0, 5);
         }
 
-        function drawInfraCharts(telemetry) {
+        function drawInfraCharts(telemetry, attempt = 0) {
+            const trafficCanvas = document.getElementById('infra-traffic-chart');
+            if (!trafficCanvas || !trafficCanvas.isConnected) return;
+            // Модалка ещё раскрывается: канвас без ширины — рисуем кадром позже
+            if (trafficCanvas.clientWidth === 0 && attempt < 10) {
+                setTimeout(() => drawInfraCharts(telemetry, attempt + 1), 120);
+                return;
+            }
             const points = telemetry.points || [];
             const labels = points.map((p) => infraChartLabel(p.ts, telemetry.period));
             drawInfraLineChart(
@@ -11628,32 +12288,33 @@
         }
 
         function renderInfraSettings(container, settings) {
-            container.innerHTML = settings.map((setting) => {
+            const rows = settings.map((setting) => {
                 let control;
                 if (setting.type === 'bool') {
-                    control = `<select data-infra-setting="${setting.key}">
+                    control = `<select class="infra-setting-control" data-infra-setting="${setting.key}">
                         <option value="true" ${setting.value ? 'selected' : ''}>включено</option>
                         <option value="false" ${!setting.value ? 'selected' : ''}>выключено</option>
                     </select>`;
                 } else if ((setting.allowed_values || []).length) {
-                    control = `<select data-infra-setting="${setting.key}">` +
-                        setting.allowed_values.map((v) => `<option value="${v}" ${String(v) === String(setting.value) ? 'selected' : ''}>${v}</option>`).join('') +
+                    control = `<select class="infra-setting-control" data-infra-setting="${setting.key}">` +
+                        setting.allowed_values.map((v) => `<option value="${escapeHtml(String(v))}" ${String(v) === String(setting.value) ? 'selected' : ''}>${escapeHtml(String(v))}</option>`).join('') +
                         '</select>';
                 } else {
-                    control = `<input type="text" data-infra-setting="${setting.key}" value="${setting.value}" style="width:90px;">`;
+                    control = `<input class="infra-setting-control" type="text" data-infra-setting="${setting.key}" value="${escapeHtml(String(setting.value ?? ''))}">`;
                 }
                 return `
-                    <div class="infra-ip-row">
-                        <div>
-                            ${escapeHtml(setting.description)}
-                            <div style="color:var(--muted);font-size:10px;"><code>${setting.key}</code> · по умолчанию ${setting.default}</div>
+                    <div class="infra-setting-row">
+                        <div class="infra-setting-copy">
+                            <div class="infra-setting-description">${escapeHtml(setting.description)}</div>
+                            <div class="infra-setting-key"><code>${escapeHtml(setting.key)}</code> · по умолчанию ${escapeHtml(String(setting.default))}</div>
                         </div>
-                        <div class="infra-ip-actions">
+                        <div class="infra-setting-actions">
                             ${control}
-                            <button type="button" class="infra-mini-btn" data-infra-setting-save="${setting.key}">сохранить</button>
+                            <button type="button" class="infra-mini-btn" data-infra-setting-save="${setting.key}">Сохранить</button>
                         </div>
                     </div>`;
             }).join('');
+            container.innerHTML = `<div class="infra-settings-list">${rows || '<div class="help-block">Настройки не найдены</div>'}</div>`;
             container.querySelectorAll('[data-infra-setting-save]').forEach((button) => {
                 button.addEventListener('click', async () => {
                     const key = button.dataset.infraSettingSave;

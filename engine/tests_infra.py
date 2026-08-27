@@ -264,6 +264,42 @@ class MutationTests(InfraDbTestCase):
             infra.request_replacement(self.session, server.id, "9.9.9.9", "t")
 
 
+class CountryCodeTests(InfraDbTestCase):
+    def test_derived_from_node_name_prefix(self):
+        server = self.make_server(node_name="de-1")
+        self.assertEqual(infra.server_country_code(server), "DE")
+
+    def test_uk_alias_maps_to_gb(self):
+        server = self.make_server(node_name="uk-1")
+        self.assertEqual(infra.server_country_code(server), "GB")
+
+    def test_non_country_prefix_gives_no_flag(self):
+        server = self.make_server(node_name="wl-1")
+        self.assertIsNone(infra.server_country_code(server))
+        server2 = self.make_server(machine_uid="m-2", node_name="mi.fornex.nl")
+        self.assertIsNone(infra.server_country_code(server2))
+
+    def test_explicit_overrides_prefix(self):
+        server = self.make_server(node_name="wl-1", country_code="NL")
+        self.assertEqual(infra.server_country_code(server), "NL")
+
+    def test_update_server_validates_country(self):
+        server = self.make_server()
+        infra.update_server(self.session, server.id, {"country_code": "nl"})
+        self.assertEqual(server.country_code, "NL")
+        infra.update_server(self.session, server.id, {"country_code": "uk"})
+        self.assertEqual(server.country_code, "GB")
+        infra.update_server(self.session, server.id, {"country_code": ""})
+        self.assertIsNone(server.country_code)
+        with self.assertRaises(infra.InfraError):
+            infra.update_server(self.session, server.id, {"country_code": "XX"})
+
+    def test_payloads_expose_country(self):
+        self.make_server(node_name="de-1")
+        payload = infra.server_list_payload(self.session)
+        self.assertEqual(payload["servers"][0]["country_code"], "DE")
+
+
 class ForceTspuCheckTests(InfraDbTestCase):
     def test_creates_check_and_starts_run(self):
         server = self.make_server()

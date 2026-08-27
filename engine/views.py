@@ -13229,17 +13229,16 @@ def support_admin_api_infra_servers(request):
         actor = str(support_admin_actor(request))[:128]
         try:
             if action == "update":
-                server = infra.update_server(
-                    db_session,
-                    server_id,
-                    {
-                        "display_name": request.POST.get("display_name"),
-                        "bandwidth_limit_mbps": request.POST.get(
-                            "bandwidth_limit_mbps"
-                        ),
-                        "notes": request.POST.get("notes"),
-                    },
-                )
+                fields = {
+                    "display_name": request.POST.get("display_name"),
+                    "bandwidth_limit_mbps": request.POST.get(
+                        "bandwidth_limit_mbps"
+                    ),
+                    "notes": request.POST.get("notes"),
+                }
+                if "country_code" in request.POST:
+                    fields["country_code"] = request.POST.get("country_code")
+                server = infra.update_server(db_session, server_id, fields)
                 admin_audit_write(
                     db_session, request, "infra_server_update",
                     target=server.node_name,

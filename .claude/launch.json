@@ -8,15 +8,31 @@
       "port": 8124
     },
     {
+      "name": "website-infra-preview",
+      "runtimeExecutable": "/private/tmp/claude-501/-Users-apugachev-Work-projects-monkeyislandvpn-monkey-island-website/e02b407e-7f35-4d36-876f-0b023b56abd4/scratchpad/run_site_infra_preview.sh",
+      "runtimeArgs": [],
+      "port": 8125
+    },
+    {
       "name": "website",
       "runtimeExecutable": "./.venv/bin/python",
-      "runtimeArgs": ["manage.py", "runserver", "8123"],
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "8123"
+      ],
       "port": 8123
     },
     {
       "name": "concept-preview",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8899", "--directory", "/Users/apugachev/Desktop/monkey-island-vpn-assets"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8899",
+        "--directory",
+        "/Users/apugachev/Desktop/monkey-island-vpn-assets"
+      ],
       "port": 8899
     }
   ]

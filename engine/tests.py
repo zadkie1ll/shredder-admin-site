@@ -8094,3 +8094,200 @@ class PurchaseLinkAuthRequiresPaymentTests(SimpleTestCase):
 
         self.assertEqual(result, ("redirect", "dashboard"))
         self.assertEqual([u.id for u in authorized], [42])
+
+
+class InfraServersDashboardTemplateTests(SimpleTestCase):
+    """Регрессии нового UX «Инфраструктура → Серверы»."""
+
+    def setUp(self):
+        self.template = Path("engine/templates/admin_dashboard.html").read_text()
+
+    def test_servers_overview_has_filters_table_and_preview(self):
+        for marker in (
+            'class="infra-page-head"',
+            'id="infra-search"',
+            'id="infra-status-filter"',
+            'id="infra-summary"',
+            'class="infra-workspace"',
+            'id="infra-servers-table"',
+            'id="infra-server-preview"',
+            'data-infra-open-detail=',
+            'data-infra-preview-open',
+            "function selectInfraServer(serverId)",
+            "function renderInfraPreview(server, detail = null, loadFailed = false)",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        # Серверы регистрирует node-agent: UI не должен обещать ручное создание.
+        self.assertNotIn("+ Добавить сервер", self.template)
+
+    def test_full_server_card_keeps_charts_and_opens_without_page_scroll(self):
+        for marker in (
+            'id="infra-detail-modal"',
+            'aria-label="Графики и полная карточка сервера"',
+            'id="infra-traffic-chart"',
+            'id="infra-conn-chart"',
+            "['3h', '24h', '7d', '30d']",
+            "modal.classList.add('open')",
+            "lockBodyScroll();",
+            "unlockBodyScroll();",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        open_start = self.template.index("async function openInfraServer(serverId)")
+        open_end = self.template.index("function closeInfraServer()", open_start)
+        open_block = self.template[open_start:open_end]
+        self.assertNotIn("scrollIntoView", open_block)
+        self.assertIn("infra-detail-loading", open_block)
+        self.assertLess(
+            open_block.index("lockBodyScroll();"),
+            open_block.index("modal.classList.add('open')"),
+        )
+
+        # Модалка должна находиться вне <main>: иначе transform контейнера
+        # ограничивает fixed-overlay и под ним остаётся виден сайдбар.
+        self.assertGreater(
+            self.template.index('id="infra-detail-modal"'),
+            self.template.index("</main>"),
+        )
+
+    def test_background_refresh_preserves_modal_scroll_position(self):
+        self.assertIn("const previousScrollTop = container.scrollTop;", self.template)
+        self.assertIn("container.scrollTop = previousScrollTop;", self.template)
+        self.assertIn("if (!full && container.contains(document.activeElement)", self.template)
+
+    def test_server_ips_are_grouped_by_interface_without_losing_actions(self):
+        for marker in (
+            "function infraGroupIpsByInterface(ips, wanInterface)",
+            'class="infra-ip-groups"',
+            'class="infra-ip-group"',
+            'data-infra-interface=',
+            "Резерв / не назначены",
+            "left.isReserve ? 1 : -1",
+            "leftIsWan ? -1 : 1",
+            'data-infra-ensure-ip=',
+            'data-infra-replace-ip=',
+            'data-infra-unblock-ip=',
+            'data-infra-block-ip=',
+            'data-infra-delete-ip=',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+    def test_original_server_controls_remain_visible_and_discoverable(self):
+        for marker in (
+            'id="infra-force-check"',
+            'id="infra-snooze-toggle"',
+            'id="infra-archive-toggle"',
+            'id="infra-server-edit-form"',
+            'id="infra-add-ip-form"',
+            'id="infra-add-domain-form"',
+            'id="infra-traffic-chart"',
+            'id="infra-conn-chart"',
+            'data-infra-period=',
+            'data-infra-detail-target="infra-detail-parameters"',
+            'data-infra-detail-target="infra-detail-ips"',
+            'data-infra-detail-target="infra-detail-domains"',
+            'data-infra-detail-target="infra-detail-journal"',
+            "container.scrollTop = Math.max(0, Math.round(nextTop));",
+            "Управление и графики",
+            "ТСПУ и детектор",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+    def test_server_forms_use_styled_controls_and_keep_field_contracts(self):
+        for marker in (
+            'class="infra-form"',
+            'class="infra-form-field"',
+            'class="infra-control"',
+            'class="infra-control infra-prefix-control"',
+            'class="btn infra-form-submit"',
+            'name="display_name"',
+            'name="bandwidth_limit_mbps"',
+            'name="notes"',
+            'name="ip"',
+            'name="prefix"',
+            'name="comment"',
+            'name="domain"',
+            "form.display_name.value",
+            "form.bandwidth_limit_mbps.value",
+            "form.notes.value",
+            "form.ip.value",
+            "form.prefix.value",
+            "form.comment.value",
+            "form.domain.value",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+    def test_monitoring_presets_are_available_from_toolbar_modal(self):
+        for marker in (
+            'id="infra-settings-open"',
+            'aria-controls="infra-settings-modal"',
+            'id="infra-settings-modal"',
+            'id="infra-settings-close"',
+            'id="infra-settings"',
+            "function openInfraSettings()",
+            "function closeInfraSettings()",
+            "loadInfraSettings();",
+            'class="infra-setting-control"',
+            'data-infra-setting=',
+            'data-infra-setting-save=',
+            "infraPost(main.dataset.infraSettingsUrl",
+            "OFFLINE-пороги, нагрузка, аномалии, кулдауны",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        self.assertGreater(
+            self.template.index('id="infra-settings-modal"'),
+            self.template.index("</main>"),
+        )
+
+    def test_primary_server_sections_form_horizontal_desktop_row(self):
+        for marker in (
+            ".infra-detail-primary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));",
+            ".infra-detail-secondary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));",
+            ".infra-detail-primary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }",
+            ".infra-detail-primary-grid, .infra-detail-secondary-grid { grid-template-columns: 1fr; }",
+            'class="infra-detail-primary-grid"',
+            'class="infra-detail-secondary-grid"',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        primary_start = self.template.index('<div class="infra-detail-primary-grid">')
+        primary_end = self.template.index('<div class="infra-detail-secondary-grid"', primary_start)
+        primary = self.template[primary_start:primary_end]
+        expected_ids = (
+            'infra-detail-server-info',
+            'infra-detail-parameters',
+            'infra-detail-ips',
+            'infra-detail-domains',
+        )
+        positions = [primary.index(f'id="{section_id}"') for section_id in expected_ids]
+        self.assertEqual(positions, sorted(positions))
+
+    def test_compact_server_buttons_keep_contrast_in_light_theme(self):
+        for marker in (
+            'html[data-admin-theme="light"] .infra-mini-btn:hover',
+            'background: rgba(181,139,0,.07); color: #242a34;',
+            'html[data-admin-theme="light"] .infra-mini-btn.danger:hover',
+            'color: #b52f3e;',
+            'html[data-admin-theme="light"] .infra-mini-btn:focus-visible',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+    def test_server_rows_keep_visible_hover_in_light_theme(self):
+        for marker in (
+            'html[data-admin-theme="light"] .infra-table tbody tr:not(.is-selected):hover',
+            'background: rgba(181,139,0,.075); box-shadow: inset 3px 0 0 rgba(154,113,0,.42);',
+            'html[data-admin-theme="light"] .infra-table tbody tr.infra-row-offline:not(.is-selected):hover',
+            'background: rgba(211,65,78,.09); box-shadow: inset 3px 0 0 rgba(197,54,69,.46);',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
