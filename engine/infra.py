@@ -872,15 +872,13 @@ def create_ensure_ip_command(
     return command
 
 
-def server_is_in_dns(db_session, server: InfraServer) -> bool:
-    """Стоит ли сервер в DNS: хоть один его активный незаблокированный IP
-    присутствует в A-записях привязанных доменов (по слепкам DNS-вотчера).
+def fresh_dns_snapshot_ips(db_session, server: InfraServer) -> set | None:
+    """Объединение A-записей привязанных доменов по слепкам DNS-вотчера.
 
-    Нода, выведенная из DNS (слив трафика на другую, dns_cleanup после бана
-    без резерва), теряет клиентов «как при бане» — но это намеренно, и гонять
-    по ней anomaly detector с ТСПУ-замерами бессмысленно. Если слепков ещё
-    нет (вотчер не прошёл, Cloudflare выключен) — считаем, что в DNS:
-    консервативный fallback к старому поведению.
+    None — решение принимать нельзя: доменов нет, либо хоть один слепок
+    отсутствует/протух (вотчер умер, Cloudflare отвалился). Свежесть и
+    полнота обязательны — по устаревшим данным нельзя ни выключать
+    детектор, ни сужать цели замеров.
     """
     domains = (
         db_session.query(InfraServerDomain)
@@ -888,12 +886,7 @@ def server_is_in_dns(db_session, server: InfraServer) -> bool:
         .all()
     )
     if not domains:
-        return True
-    # Решение «нода вне DNS» принимаем только по ПОЛНЫМ и СВЕЖИМ слепкам:
-    # если хоть один домен не проверен или слепок протух (вотчер умер,
-    # Cloudflare отвалился) — консервативно считаем, что нода в DNS,
-    # иначе детектор мог бы остаться выключенным навсегда по устаревшим
-    # данным
+        return None
     fresh_cutoff = utcnow() - timedelta(hours=24)
     snapshots = [
         set(row.last_a_ips or [])
@@ -901,8 +894,22 @@ def server_is_in_dns(db_session, server: InfraServer) -> bool:
         if row.dns_checked_at is not None and row.dns_checked_at >= fresh_cutoff
     ]
     if len(snapshots) < len(domains):
+        return None
+    return set().union(*snapshots)
+
+
+def server_is_in_dns(db_session, server: InfraServer) -> bool:
+    """Стоит ли сервер в DNS: хоть один его активный незаблокированный IP
+    присутствует в A-записях привязанных доменов (по слепкам DNS-вотчера).
+
+    Нода, выведенная из DNS (слив трафика на другую, dns_cleanup после бана
+    без резерва), теряет клиентов «как при бане» — но это намеренно, и гонять
+    по ней anomaly detector с ТСПУ-замерами бессмысленно. Если слепков ещё
+    нет — считаем, что в DNS: консервативный fallback к старому поведению.
+    """
+    dns_ips = fresh_dns_snapshot_ips(db_session, server)
+    if dns_ips is None:
         return True
-    dns_ips = set().union(*snapshots)
     active_ips = {
         row.ip
         for row in db_session.query(InfraServerIp)
@@ -1053,6 +1060,24 @@ def force_tspu_check(db_session, server: InfraServer, reason: str) -> dict:
 
     if not target_ips:
         return {"run_ids": [], "errors": ["Нет активных IPv4-адресов на интерфейсе"]}
+
+    # Если есть свежие DNS-слепки — меряем только адреса, реально стоящие
+    # в A-записях: запасные IP на интерфейсе клиентов не обслуживают, их
+    # замер жёг бы кредиты и мог плодить бессмысленные замены
+    snapshot_ips = fresh_dns_snapshot_ips(db_session, server)
+    if snapshot_ips is not None:
+        in_dns = [ip for ip in target_ips if ip in snapshot_ips]
+        if in_dns:
+            target_ips = in_dns
+        else:
+            return {
+                "run_ids": [],
+                "errors": [
+                    "Активные IP сервера не находятся в A-записях "
+                    "привязанных доменов — точка входа не в DNS, замер "
+                    "не нужен"
+                ],
+            }
     if len(target_ips) > TSPU_MAX_TARGETS:
         errors.append(
             f"IP больше {TSPU_MAX_TARGETS} — проверяются только первые "

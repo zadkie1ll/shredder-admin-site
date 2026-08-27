@@ -754,6 +754,26 @@ def _replacement_step_pending(db_session, replacement, server, title) -> None:
         _rlog(replacement, "pending", f"Cloudflare недоступен: {e}")
         return  # retry на следующем тике; stuck-таймаут закроет при постоянном сбое
 
+    # Старого IP нет ни в одной A-записи — переключать нечего (§31 ТЗ):
+    # например, забаненный запасной адрес на интерфейсе, который клиентов
+    # не обслуживал. Помечаем блок и закрываем без DNS-операций — иначе
+    # замена съела бы резерв и дописала лишнюю запись в DNS.
+    old_in_dns = any(
+        replacement.old_ip in {r["content"] for r in records}
+        for records in records_by_domain.values()
+    )
+    if not old_in_dns:
+        replacement.status = "done"
+        replacement.finished_at = now
+        _rlog(
+            replacement,
+            "noop",
+            f"IP {replacement.old_ip} не используется в A-записях доменов — "
+            "переключать нечего, адрес помечен заблокированным",
+        )
+        _mark_old_ip_blocked(db_session, replacement)
+        return
+
     candidate = _pick_replacement_candidate(
         db_session, replacement, used_ips
     )

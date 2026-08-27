@@ -318,6 +318,48 @@ class ForceTspuCheckTests(InfraDbTestCase):
         self.assertEqual(result["run_ids"], [])
         self.assertEqual(len(result["errors"]), 1)
 
+    def test_targets_narrowed_to_dns_snapshot(self):
+        # Свежий слепок DNS есть: меряем только адреса из A-записей —
+        # запасные IP на интерфейсе кредиты не жгут
+        now = utcnow()
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.11", on_interface=True)  # запасной
+        domain = self.make_domain(server, "de.example.xyz")
+        domain.last_a_ips = ["185.10.0.10"]
+        domain.dns_checked_at = now
+        self.session.commit()
+
+        def fake_start_run(db, c, api_key, is_public, geo, light):
+            run = CensorCheckRun(check_id=c.id, status="pending")
+            db.add(run)
+            db.flush()
+            return run
+
+        with mock.patch(
+            "engine.ripe_atlas.start_run", side_effect=fake_start_run
+        ), mock.patch(
+            "engine.ripe_atlas.resolve_api_key", return_value="key"
+        ), mock.patch(
+            "engine.ripe_atlas.resolve_public_flag", return_value=False
+        ):
+            result = infra.force_tspu_check(self.session, server, "test")
+        self.assertEqual(len(result["run_ids"]), 1)
+        check = self.session.query(CensorCheck).one()
+        self.assertEqual(check.target_ip, "185.10.0.10")
+
+    def test_no_targets_when_actives_not_in_dns(self):
+        now = utcnow()
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.11", on_interface=True)
+        domain = self.make_domain(server, "de.example.xyz")
+        domain.last_a_ips = ["45.9.9.9"]  # нода выведена из DNS
+        domain.dns_checked_at = now
+        self.session.commit()
+        result = infra.force_tspu_check(self.session, server, "test")
+        self.assertEqual(result["run_ids"], [])
+        self.assertIn("не в DNS", result["errors"][0])
+
     def test_private_ips_are_not_tspu_targets(self):
         # docker0/warp-адреса недостижимы извне — замер по ним впустую
         # сжёг бы кредиты Atlas
@@ -969,6 +1011,38 @@ class ReplacementFlowTests(InfraDbTestCase):
         delete_mock.assert_not_called()
         alert.assert_called_once()
         self.assertIn("ручное вмешательство", alert.call_args[0][0].lower())
+
+    def test_old_ip_absent_from_dns_closes_without_switching(self):
+        # Забаненный запасной адрес, не стоящий в DNS: замена закрывается
+        # «переключать нечего», резерв не расходуется, DNS не трогается
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.11", on_interface=True)  # в DNS
+        self.make_ip(server, "185.10.0.12", source="manual", on_interface=False)
+        replacement = self.make_pending(server, old_ip="185.10.0.10")
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[{"id": "r1", "content": "185.10.0.11"}],
+        ), mock.patch(
+            "engine.cloudflare_dns.ensure_a_record"
+        ) as add_mock, mock.patch(
+            "engine.cloudflare_dns.delete_a_records"
+        ) as del_mock:
+            infra_worker.process_replacements(self.session)
+        self.session.commit()
+        self.session.refresh(replacement)
+        self.assertEqual(replacement.status, "done")
+        self.assertIsNone(replacement.new_ip)  # резерв не тронут
+        add_mock.assert_not_called()
+        del_mock.assert_not_called()
+        old_row = (
+            self.session.query(InfraServerIp)
+            .filter(InfraServerIp.ip == "185.10.0.10")
+            .one()
+        )
+        self.assertIsNotNone(old_row.blocked_at)
 
     def test_private_ip_is_never_a_candidate(self):
         # Приватные адреса (docker0/warp) из инвентаря не должны попасть
