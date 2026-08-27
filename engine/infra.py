@@ -744,6 +744,11 @@ def add_manual_ip(
         address = ipaddress.ip_address((ip_value or "").strip())
     except ValueError:
         raise InfraError("Некорректный IP-адрес")
+    if not address.is_global:
+        raise InfraError(
+            "Нужен публичный IP: приватный адрес не может быть резервом "
+            "для DNS"
+        )
     try:
         prefix = int(prefix_len or (32 if address.version == 4 else 128))
     except (TypeError, ValueError):
@@ -1023,11 +1028,16 @@ def force_tspu_check(db_session, server: InfraServer, reason: str) -> dict:
         )
         .all()
     )
-    target_ips = [
-        row.ip
-        for row in ip_rows
-        if ipaddress.ip_address(row.ip).version == 4
-    ]
+    # Только публичные v4-адреса: замер приватного (docker0/warp) — впустую
+    # сожжённые кредиты Atlas по заведомо недостижимой цели
+    target_ips = []
+    for row in ip_rows:
+        try:
+            address = ipaddress.ip_address(row.ip)
+        except ValueError:
+            continue
+        if address.version == 4 and address.is_global:
+            target_ips.append(row.ip)
     domains = [
         row.domain
         for row in db_session.query(InfraServerDomain)

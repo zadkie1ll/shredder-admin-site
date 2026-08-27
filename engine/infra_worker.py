@@ -831,9 +831,13 @@ def _pick_replacement_candidate(db_session, replacement, used_ips):
         if row.ip in used_ips:
             return False
         try:
-            return ipaddress_module.ip_address(row.ip).version == 4
+            address = ipaddress_module.ip_address(row.ip)
         except ValueError:
             return False
+        # Только публичные v4: приватные адреса docker/warp-интерфейсов
+        # попадают в инвентарь со старых версий коллектора и не должны
+        # оказаться в DNS ни при каких обстоятельствах
+        return address.version == 4 and address.is_global
 
     candidates = [row for row in rows if eligible(row)]
     candidates.sort(

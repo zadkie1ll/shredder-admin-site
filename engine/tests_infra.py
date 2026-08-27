@@ -206,6 +206,8 @@ class MutationTests(InfraDbTestCase):
             infra.add_manual_ip(self.session, server.id, "185.10.0.11", "24")
         with self.assertRaises(infra.InfraError):
             infra.add_manual_ip(self.session, server.id, "не-ip", "24")
+        with self.assertRaises(infra.InfraError):
+            infra.add_manual_ip(self.session, server.id, "172.17.0.1", "16")
 
     def test_delete_ip_on_interface_is_forbidden(self):
         server = self.make_server()
@@ -315,6 +317,15 @@ class ForceTspuCheckTests(InfraDbTestCase):
         result = infra.force_tspu_check(self.session, server, "test")
         self.assertEqual(result["run_ids"], [])
         self.assertEqual(len(result["errors"]), 1)
+
+    def test_private_ips_are_not_tspu_targets(self):
+        # docker0/warp-адреса недостижимы извне — замер по ним впустую
+        # сжёг бы кредиты Atlas
+        server = self.make_server()
+        self.make_ip(server, "172.17.0.1", on_interface=True, interface="docker0")
+        result = infra.force_tspu_check(self.session, server, "test")
+        self.assertEqual(result["run_ids"], [])
+        self.assertIn("Нет активных IPv4", result["errors"][0])
 
     def test_fresh_error_run_is_not_reused(self):
         # Свежий (< 5 мин) прогон со статусом error — не замер: запускаем
@@ -958,6 +969,25 @@ class ReplacementFlowTests(InfraDbTestCase):
         delete_mock.assert_not_called()
         alert.assert_called_once()
         self.assertIn("ручное вмешательство", alert.call_args[0][0].lower())
+
+    def test_private_ip_is_never_a_candidate(self):
+        # Приватные адреса (docker0/warp) из инвентаря не должны попасть
+        # в DNS как «резерв» ни при каких обстоятельствах
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "172.17.0.1", on_interface=True, interface="docker0")
+        replacement = self.make_pending(server)
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[{"id": "r1", "content": "185.10.0.10"}],
+        ), mock.patch.object(infra_worker, "_send_alert", return_value=True):
+            infra_worker.process_replacements(self.session)
+        self.session.commit()
+        self.session.refresh(replacement)
+        # Единственный «кандидат» приватный — значит, кандидатов нет
+        self.assertEqual(replacement.status, "manual_required")
 
     def test_blocked_ip_is_not_a_candidate(self):
         server = self.make_server()
