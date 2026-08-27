@@ -83,6 +83,55 @@
         .node-traffic-cell-num { text-align: right; font-variant-numeric: tabular-nums; }
         .node-traffic-share-hot { color: #ff6b6b; font-weight: 800; }
         .tab-btn[data-tab="censor-checks"] i { color: var(--brand-gold); }
+        .tab-btn[data-tab="infrastructure"] i { color: var(--brand-gold); }
+        /* Секции, перенесённые внутрь «Инфраструктуры» как вкладки: показ
+           управляет обёртка .subtab-panel, сама секция всегда видима */
+        .infra-legacy-panel { display: block; }
+        #panel-infrastructure .infra-legacy-panel .panel-header { margin-bottom: 14px; }
+        /* Вкладка «Серверы» */
+        .infra-summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; margin-bottom: 16px; }
+        .infra-summary-card { padding: 14px 16px; }
+        .infra-summary-card .infra-metric-label { color: var(--muted); font-size: 10.5px; font-weight: 750; text-transform: uppercase; letter-spacing: .06em; }
+        .infra-summary-card .infra-metric-value { margin-top: 6px; font-size: 20px; font-weight: 850; color: var(--text-main); }
+        .infra-summary-card .infra-metric-sub { margin-top: 3px; color: var(--muted); font-size: 11px; font-weight: 600; }
+        .infra-table-wrap { overflow-x: auto; }
+        .infra-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+        .infra-table th { padding: 9px 10px; border-bottom: 1px solid var(--panel-border); color: var(--muted); font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; text-align: left; white-space: nowrap; }
+        .infra-table td { padding: 9px 10px; border-bottom: 1px solid var(--panel-border); color: var(--text-main); font-weight: 600; white-space: nowrap; }
+        .infra-table tbody tr { cursor: pointer; transition: background .12s; }
+        .infra-table tbody tr:hover { background: rgba(255,255,255,.045); }
+        .infra-table tbody tr.infra-row-offline { background: rgba(255,92,103,.08); }
+        .infra-table tbody tr.infra-row-offline:hover { background: rgba(255,92,103,.14); }
+        .infra-badge { display: inline-flex; align-items: center; gap: 5px; padding: 2px 9px; border-radius: 999px; font-size: 10.5px; font-weight: 800; }
+        .infra-badge-online { background: rgba(56,217,150,.14); color: var(--green); border: 1px solid rgba(56,217,150,.35); }
+        .infra-badge-offline { background: rgba(255,92,103,.16); color: var(--red); border: 1px solid rgba(255,92,103,.4); }
+        .infra-badge-warn { background: rgba(255,199,0,.13); color: var(--brand-gold); border: 1px solid rgba(255,199,0,.35); }
+        .infra-badge-muted { background: rgba(255,255,255,.06); color: var(--muted); border: 1px solid var(--panel-border); }
+        .infra-load-warn { color: var(--brand-gold); font-weight: 850; }
+        .infra-load-crit { color: var(--red); font-weight: 850; }
+        .infra-detail-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+        .infra-detail-card { padding: 14px 16px; }
+        .infra-detail-card h4 { margin: 0 0 10px; color: var(--text-main); font-size: 12.5px; font-weight: 850; }
+        .infra-kv { display: grid; grid-template-columns: minmax(110px, auto) 1fr; gap: 4px 12px; font-size: 12px; }
+        .infra-kv dt { color: var(--muted); font-weight: 650; }
+        .infra-kv dd { margin: 0; color: var(--text-main); font-weight: 650; overflow-wrap: anywhere; }
+        .infra-ip-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--panel-border); font-size: 12px; }
+        .infra-ip-row:last-child { border-bottom: 0; }
+        .infra-ip-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+        .infra-mini-btn { padding: 3px 9px; border: 1px solid var(--panel-border); border-radius: 7px; background: transparent; color: var(--muted); font-size: 10.5px; font-weight: 750; cursor: pointer; }
+        .infra-mini-btn:hover { color: #fff; border-color: rgba(255,255,255,.3); }
+        .infra-mini-btn.danger:hover { color: var(--red); border-color: rgba(255,92,103,.5); }
+        .infra-chart-canvas { width: 100%; height: 260px; display: block; }
+        .infra-chart-canvas.small { height: 170px; }
+        .infra-period-btn.active { color: var(--brand-gold); border-color: rgba(255,199,0,.42); }
+        .infra-log-list { max-height: 260px; overflow-y: auto; font-size: 11.5px; }
+        .infra-log-row { padding: 6px 0; border-bottom: 1px solid var(--panel-border); }
+        .infra-log-row:last-child { border-bottom: 0; }
+        .infra-log-time { color: var(--muted); font-size: 10px; }
+        @media (max-width: 760px) {
+            .infra-detail-grid { grid-template-columns: 1fr; }
+            .infra-table td, .infra-table th { padding: 7px 6px; }
+        }
         .censor-check-form { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
         .censor-check-form .input[name="target_ip"] { flex: 1 1 130px; min-width: 120px; }
         .censor-check-form .input[name="sni"] { flex: 2 1 200px; min-width: 150px; }
@@ -1364,6 +1413,7 @@
         #panel-config-templates .panel-header::before { content: "\f1c9"; }
         #panel-node-traffic .panel-header::before { content: "\e522"; }
         #panel-node-provision .panel-header::before { content: "\f233"; }
+        #panel-infrastructure > .panel-header::before { content: "\f6ff"; }
         .admin-block-title { margin: 0 0 12px; display: flex; align-items: center; gap: 8px; font-size: 15px; }
         .admin-block-title i { color: var(--brand-gold); }
         .node-provision-readiness {
@@ -2522,10 +2572,7 @@
             {% if support_admin_is_full_admin %}
                 <button class="tab-btn" data-tab="bulk-actions"><i class="fas fa-layer-group"></i><span>Массовые операции</span></button>
                 <button class="tab-btn" data-tab="system"><i class="fas fa-sliders"></i><span>Система</span></button>
-                <button class="tab-btn" data-tab="config-templates"><i class="fas fa-file-code"></i><span>Конфиги</span></button>
-                <button class="tab-btn" data-tab="node-traffic"><i class="fas fa-tower-broadcast"></i><span>Трафик нод</span></button>
-                <button class="tab-btn" data-tab="node-provision"><i class="fas fa-server"></i><span>Установка нод</span></button>
-                <button class="tab-btn" data-tab="censor-checks"><i class="fas fa-satellite-dish"></i><span>Замеры ТСПУ</span></button>
+                <button class="tab-btn" data-tab="infrastructure"><i class="fas fa-network-wired"></i><span>Инфраструктура</span></button>
             {% endif %}
             <span class="nav-section-label">Поддержка</span>
             <button class="tab-btn" data-tab="reply-templates"><i class="fas fa-comments"></i><span>Шаблоны</span></button>
@@ -2558,6 +2605,10 @@
         data-node-scripts-url="{% url 'support_admin_api_node_scripts' %}"
         data-node-provision-url="{% url 'support_admin_api_node_provision' %}"
         data-node-provision-detail-url="{% url 'support_admin_api_node_provision_detail' %}"
+        data-infra-servers-url="{% url 'support_admin_api_infra_servers' %}"
+        data-infra-server-detail-url="{% url 'support_admin_api_infra_server_detail' %}"
+        data-infra-telemetry-url="{% url 'support_admin_api_infra_telemetry' %}"
+        data-infra-settings-url="{% url 'support_admin_api_infra_settings' %}"
         data-audit-log-url="{% url 'support_admin_api_audit_log' %}"
         data-segments-url="{% url 'support_admin_api_segments' %}"
         data-broadcasts-url="{% url 'support_admin_api_broadcasts' %}"
@@ -3845,185 +3896,22 @@
         {% endif %}
 
         {% if support_admin_is_full_admin %}
-        <section id="panel-config-templates" class="tab-panel">
-            <header class="panel-header config-panel-header">
-                <div>
-                    <h1 class="admin-title">Шаблоны конфигов</h1>
-                    <p class="admin-subtitle">Параметры CustomConfigTemplate и JSON шаблона</p>
-                </div>
-                <div class="config-panel-actions">
-                    <button class="btn" type="button" id="config-template-add"><i class="fas fa-plus"></i>Добавить конфиг</button>
-                </div>
-            </header>
-
-            <details class="card admin-collapse">
-                <summary><i class="fas fa-user-gear"></i>Персональные конфиги для пользователя<span class="admin-collapse-hint">закрепить конкретные конфиги вместо round-robin</span></summary>
-                <div class="admin-collapse-body">
-                    <div class="help-block">
-                        <p>Обычно активные конфиги выдаются по кругу (round-robin). Здесь можно закрепить за пользователем только выбранные — тогда выдаваться будут только они.</p>
-                        <p>Если ни один закреплённый конфиг не активен, снова включается round-robin.</p>
-                    </div>
-                    <form id="config-pins-form" class="config-pins-form">
-                        {% csrf_token %}
-                        <div class="form-grid-two">
-                            <input class="input" name="q" placeholder="username, email или telegram_id">
-                            <button class="btn btn-secondary" type="submit"><i class="fas fa-magnifying-glass"></i>Найти пользователя</button>
-                        </div>
-                    </form>
-                    <div id="config-pins-result"></div>
-                </div>
-            </details>
-
-            <details class="card admin-collapse">
-                <summary><i class="fas fa-fingerprint"></i>Правила User-Agent<span class="admin-collapse-hint">определение клиентского приложения при выдаче конфига</span></summary>
-                <div class="admin-collapse-body">
-                    <div class="help-block">
-                        <p>Если User-Agent запроса содержит подстроку (без учёта регистра), в Jinja-рендер шаблона передаётся переменная с указанным значением.</p>
-                        <ul>
-                            <li>Пример: подстрока <code>incy</code> → <code>CLIENT=incy</code>, и в шаблоне работает <code>{% templatetag openblock %} if CLIENT == "incy" {% templatetag closeblock %}</code></li>
-                            <li>Правила проверяются по возрастанию приоритета</li>
-                            <li>Для каждой переменной побеждает первое совпадение</li>
-                        </ul>
-                    </div>
-                    <form id="ua-rule-form" class="ua-rule-form">
-                    {% csrf_token %}
-                    <input type="hidden" name="rule_id">
-                    <div class="ua-rule-form-grid">
-                        <input class="input" name="match_substring" maxlength="160" placeholder="Подстрока в UA, например incy" required>
-                        <input class="input" name="variable_name" maxlength="64" placeholder="Переменная (CLIENT)" value="CLIENT">
-                        <input class="input" name="value" maxlength="160" placeholder="Значение, например incy" required>
-                        <input class="input" name="priority" type="number" step="1" placeholder="Приоритет (100)">
-                        <label class="reply-template-active">
-                            <input type="checkbox" name="is_active" checked>
-                            Активно
-                        </label>
-                        <div class="ua-rule-form-actions">
-                            <button class="btn" type="submit" data-ua-rule-submit><i class="fas fa-save"></i>Сохранить</button>
-                            <button class="btn btn-secondary" type="button" id="ua-rule-reset">Очистить</button>
-                        </div>
-                    </div>
-                    </form>
-                    <div id="ua-rules-result"></div>
-                </div>
-            </details>
-
-            <div id="config-templates-result" class="config-template-list"></div>
-        </section>
-
-        <section id="panel-node-traffic" class="tab-panel">
+        <section id="panel-infrastructure" class="tab-panel">
             <header class="panel-header">
-                <h1 class="admin-title">Трафик нод</h1>
-                <p class="admin-subtitle">Потребление трафика подписками — поиск расшаренных подписок по аномальному объёму</p>
-            </header>
-            <form id="node-traffic-form" class="card form-card node-traffic-form">
-                <select class="input" name="node" id="node-traffic-node">
-                    <option value="all">Все ноды</option>
-                </select>
-                <!-- Статистика панели посуточная по СУТКАМ UTC (03:00–03:00 МСК):
-                     начало периода выравнивается вниз до полуночи UTC, поэтому
-                     пресеты короче суток не имеют смысла, а «Сегодня» начинается
-                     в 03:00 по Москве -->
-                <select class="input" name="hours">
-                    <option value="1" selected>Сегодня (с 03:00 МСК)</option>
-                    <option value="24">Вчера + сегодня</option>
-                    <option value="168">7 дней</option>
-                    <option value="720">30 дней</option>
-                </select>
-                <input class="input" name="top" type="number" min="1" max="500" value="50" title="Сколько строк показать">
-                <input class="input" name="min_gib" type="number" min="0" step="0.1" placeholder="мин. GiB" title="Порог трафика в GiB">
-                <button class="btn" type="submit"><i class="fas fa-magnifying-glass-chart"></i>Показать</button>
-            </form>
-            <div id="node-traffic-result"></div>
-        </section>
-
-        <section id="panel-node-provision" class="tab-panel">
-            <header class="panel-header">
-                <h1 class="admin-title">Установка нод</h1>
-                <p class="admin-subtitle">Создание и контроль установки нод. Сертификаты разворачиваются отдельно после появления ноды в Remnawave.</p>
-                <span id="node-provision-readiness" class="node-provision-readiness"><i class="fas fa-spinner fa-spin"></i> Проверяем скрипты</span>
+                <h1 class="admin-title">Инфраструктура</h1>
+                <p class="admin-subtitle">Замеры ТСПУ, установка и трафик нод, конфиги и серверы с node-agent</p>
             </header>
 
-            <div class="node-provision-workspace-tabs" role="tablist" aria-label="Разделы установки нод">
-                <button class="node-provision-workspace-tab" type="button" role="tab" aria-selected="true" data-node-provision-view="installations"><i class="fas fa-list-check"></i>Установки</button>
-                <button class="node-provision-workspace-tab" type="button" role="tab" aria-selected="false" data-node-provision-view="scripts"><i class="fas fa-file-code"></i>Скрипты <span id="node-provision-scripts-count"></span></button>
+            <div class="subtabs" role="tablist" aria-label="Разделы инфраструктуры">
+                <button type="button" class="subtab active" data-subtab="inf-tspu" role="tab"><i class="fas fa-satellite-dish"></i>Замеры ТСПУ</button>
+                <button type="button" class="subtab" data-subtab="inf-provision" role="tab"><i class="fas fa-server"></i>Установка нод</button>
+                <button type="button" class="subtab" data-subtab="inf-traffic" role="tab"><i class="fas fa-tower-broadcast"></i>Трафик нод</button>
+                <button type="button" class="subtab" data-subtab="inf-configs" role="tab"><i class="fas fa-file-code"></i>Конфиги</button>
+                <button type="button" class="subtab" data-subtab="inf-servers" role="tab"><i class="fas fa-hard-drive"></i>Серверы</button>
             </div>
 
-            <section id="node-provision-installations-view" class="node-provision-view" data-node-provision-panel="installations">
-                <div id="node-provision-alert" class="node-provision-alerts"></div>
-
-                <div class="node-provision-flow" aria-label="Этапы установки ноды">
-                    <div class="node-provision-flow-step"><span class="node-provision-flow-number">1</span><span>Создать заявку</span></div>
-                    <div class="node-provision-flow-step"><span class="node-provision-flow-number">2</span><span>Запустить команду</span></div>
-                    <div class="node-provision-flow-step"><span class="node-provision-flow-number">3</span><span>Проверить установку</span></div>
-                    <div class="node-provision-flow-step"><span class="node-provision-flow-number">4</span><span>Добавить сертификат</span></div>
-                </div>
-
-                <section class="card node-provision-section" id="node-provision-create-card">
-                    <div class="node-provision-section-head">
-                        <div class="node-provision-section-title">
-                            <i class="fas fa-plus"></i>
-                            <div><h3>Новая установка</h3><p class="node-provision-section-copy">Выбери скрипт — его активная версия зафиксируется в заявке.</p></div>
-                        </div>
-                    </div>
-                    <form id="node-provision-create-form" class="node-provision-create-form">
-                        {% csrf_token %}
-                        <div class="node-provision-form-grid">
-                            <div class="node-provision-field">
-                                <label for="node-provision-name">Имя ноды</label>
-                                <input class="input" id="node-provision-name" name="node_name" maxlength="30" placeholder="Например: nl-ams-03" required>
-                            </div>
-                            <div class="node-provision-field">
-                                <label for="node-provision-type">Скрипт установки</label>
-                                <select class="input" name="script_name" id="node-provision-type" required></select>
-                            </div>
-                            <div class="node-provision-field">
-                                <label for="node-provision-source">Конфигурация ключей</label>
-                                <select class="input" name="source_node_uuid" id="node-provision-source" required title="С этой ноды копируется конфиг-профиль панели"></select>
-                            </div>
-                            <div class="node-provision-field">
-                                <label for="node-provision-country">Страна ноды</label>
-                                <input class="input" id="node-provision-country" name="country_code" maxlength="2" placeholder="Например: NL" title="Двухбуквенный код страны для панели">
-                            </div>
-                        </div>
-                        <div class="node-provision-form-actions">
-                            <p id="node-provision-create-summary" class="node-provision-create-summary">Выбери скрипт установки</p>
-                            <button class="btn" type="submit"><i class="fas fa-terminal"></i>Создать заявку</button>
-                        </div>
-                    </form>
-                    <div id="node-provision-oneliner"></div>
-                </section>
-
-                <section class="card node-provision-section">
-                    <div class="node-provision-section-head">
-                        <div class="node-provision-section-title">
-                            <i class="fas fa-list-check"></i>
-                            <div><h3>Последние установки</h3><p class="node-provision-section-copy">Статус, зафиксированная версия и следующее действие — в одной строке.</p></div>
-                        </div>
-                        <span id="node-provision-request-count" class="node-provision-request-count"></span>
-                    </div>
-                    <div id="node-provision-requests" class="node-provision-requests"></div>
-                </section>
-
-                <section class="card node-provision-section node-provision-detail" id="node-provision-detail" hidden>
-                    <div class="node-provision-detail-head">
-                        <h3 class="admin-block-title"><i class="fas fa-wave-square"></i> Заявка <span id="node-provision-detail-title"></span></h3>
-                        <button class="btn btn-secondary" type="button" id="node-provision-detail-close"><i class="fas fa-xmark"></i>Закрыть</button>
-                    </div>
-                    <div id="node-provision-stages"></div>
-                    <pre id="node-provision-log" class="node-provision-log"></pre>
-                    <div class="censor-form-actions">
-                        <button class="btn btn-secondary" type="button" id="node-provision-revoke"><i class="fas fa-ban"></i>Отозвать токен</button>
-                    </div>
-                </section>
-            </section>
-
-            <section id="node-provision-scripts-view" class="node-provision-view" data-node-provision-panel="scripts" hidden>
-                <div id="node-provision-scripts-health" class="node-provision-scripts-health"><span><i class="fas fa-spinner fa-spin"></i> Загружаем скрипты установки</span></div>
-                <div id="node-provision-scripts"></div>
-            </section>
-        </section>
-
-        <section id="panel-censor-checks" class="tab-panel">
+            <div id="subpanel-inf-tspu" class="subtab-panel active">
+<section id="panel-censor-checks" class="infra-legacy-panel">
             <header class="panel-header">
                 <h1 class="admin-title">Замеры ТСПУ</h1>
                 <p class="admin-subtitle">Доступность точек входа из сетей провайдеров РФ — зонды RIPE Atlas делают TLS-подключение к IP с клиентским SNI</p>
@@ -4156,6 +4044,210 @@
             </form>
 
             <div id="censor-checks-result"></div>
+        </section>
+            </div>
+            <div id="subpanel-inf-provision" class="subtab-panel">
+<section id="panel-node-provision" class="infra-legacy-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Установка нод</h1>
+                <p class="admin-subtitle">Создание и контроль установки нод. Сертификаты разворачиваются отдельно после появления ноды в Remnawave.</p>
+                <span id="node-provision-readiness" class="node-provision-readiness"><i class="fas fa-spinner fa-spin"></i> Проверяем скрипты</span>
+            </header>
+
+            <div class="node-provision-workspace-tabs" role="tablist" aria-label="Разделы установки нод">
+                <button class="node-provision-workspace-tab" type="button" role="tab" aria-selected="true" data-node-provision-view="installations"><i class="fas fa-list-check"></i>Установки</button>
+                <button class="node-provision-workspace-tab" type="button" role="tab" aria-selected="false" data-node-provision-view="scripts"><i class="fas fa-file-code"></i>Скрипты <span id="node-provision-scripts-count"></span></button>
+            </div>
+
+            <section id="node-provision-installations-view" class="node-provision-view" data-node-provision-panel="installations">
+                <div id="node-provision-alert" class="node-provision-alerts"></div>
+
+                <div class="node-provision-flow" aria-label="Этапы установки ноды">
+                    <div class="node-provision-flow-step"><span class="node-provision-flow-number">1</span><span>Создать заявку</span></div>
+                    <div class="node-provision-flow-step"><span class="node-provision-flow-number">2</span><span>Запустить команду</span></div>
+                    <div class="node-provision-flow-step"><span class="node-provision-flow-number">3</span><span>Проверить установку</span></div>
+                    <div class="node-provision-flow-step"><span class="node-provision-flow-number">4</span><span>Добавить сертификат</span></div>
+                </div>
+
+                <section class="card node-provision-section" id="node-provision-create-card">
+                    <div class="node-provision-section-head">
+                        <div class="node-provision-section-title">
+                            <i class="fas fa-plus"></i>
+                            <div><h3>Новая установка</h3><p class="node-provision-section-copy">Выбери скрипт — его активная версия зафиксируется в заявке.</p></div>
+                        </div>
+                    </div>
+                    <form id="node-provision-create-form" class="node-provision-create-form">
+                        {% csrf_token %}
+                        <div class="node-provision-form-grid">
+                            <div class="node-provision-field">
+                                <label for="node-provision-name">Имя ноды</label>
+                                <input class="input" id="node-provision-name" name="node_name" maxlength="30" placeholder="Например: nl-ams-03" required>
+                            </div>
+                            <div class="node-provision-field">
+                                <label for="node-provision-type">Скрипт установки</label>
+                                <select class="input" name="script_name" id="node-provision-type" required></select>
+                            </div>
+                            <div class="node-provision-field">
+                                <label for="node-provision-source">Конфигурация ключей</label>
+                                <select class="input" name="source_node_uuid" id="node-provision-source" required title="С этой ноды копируется конфиг-профиль панели"></select>
+                            </div>
+                            <div class="node-provision-field">
+                                <label for="node-provision-country">Страна ноды</label>
+                                <input class="input" id="node-provision-country" name="country_code" maxlength="2" placeholder="Например: NL" title="Двухбуквенный код страны для панели">
+                            </div>
+                        </div>
+                        <div class="node-provision-form-actions">
+                            <p id="node-provision-create-summary" class="node-provision-create-summary">Выбери скрипт установки</p>
+                            <button class="btn" type="submit"><i class="fas fa-terminal"></i>Создать заявку</button>
+                        </div>
+                    </form>
+                    <div id="node-provision-oneliner"></div>
+                </section>
+
+                <section class="card node-provision-section">
+                    <div class="node-provision-section-head">
+                        <div class="node-provision-section-title">
+                            <i class="fas fa-list-check"></i>
+                            <div><h3>Последние установки</h3><p class="node-provision-section-copy">Статус, зафиксированная версия и следующее действие — в одной строке.</p></div>
+                        </div>
+                        <span id="node-provision-request-count" class="node-provision-request-count"></span>
+                    </div>
+                    <div id="node-provision-requests" class="node-provision-requests"></div>
+                </section>
+
+                <section class="card node-provision-section node-provision-detail" id="node-provision-detail" hidden>
+                    <div class="node-provision-detail-head">
+                        <h3 class="admin-block-title"><i class="fas fa-wave-square"></i> Заявка <span id="node-provision-detail-title"></span></h3>
+                        <button class="btn btn-secondary" type="button" id="node-provision-detail-close"><i class="fas fa-xmark"></i>Закрыть</button>
+                    </div>
+                    <div id="node-provision-stages"></div>
+                    <pre id="node-provision-log" class="node-provision-log"></pre>
+                    <div class="censor-form-actions">
+                        <button class="btn btn-secondary" type="button" id="node-provision-revoke"><i class="fas fa-ban"></i>Отозвать токен</button>
+                    </div>
+                </section>
+            </section>
+
+            <section id="node-provision-scripts-view" class="node-provision-view" data-node-provision-panel="scripts" hidden>
+                <div id="node-provision-scripts-health" class="node-provision-scripts-health"><span><i class="fas fa-spinner fa-spin"></i> Загружаем скрипты установки</span></div>
+                <div id="node-provision-scripts"></div>
+            </section>
+        </section>
+            </div>
+            <div id="subpanel-inf-traffic" class="subtab-panel">
+<section id="panel-node-traffic" class="infra-legacy-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Трафик нод</h1>
+                <p class="admin-subtitle">Потребление трафика подписками — поиск расшаренных подписок по аномальному объёму</p>
+            </header>
+            <form id="node-traffic-form" class="card form-card node-traffic-form">
+                <select class="input" name="node" id="node-traffic-node">
+                    <option value="all">Все ноды</option>
+                </select>
+                <!-- Статистика панели посуточная по СУТКАМ UTC (03:00–03:00 МСК):
+                     начало периода выравнивается вниз до полуночи UTC, поэтому
+                     пресеты короче суток не имеют смысла, а «Сегодня» начинается
+                     в 03:00 по Москве -->
+                <select class="input" name="hours">
+                    <option value="1" selected>Сегодня (с 03:00 МСК)</option>
+                    <option value="24">Вчера + сегодня</option>
+                    <option value="168">7 дней</option>
+                    <option value="720">30 дней</option>
+                </select>
+                <input class="input" name="top" type="number" min="1" max="500" value="50" title="Сколько строк показать">
+                <input class="input" name="min_gib" type="number" min="0" step="0.1" placeholder="мин. GiB" title="Порог трафика в GiB">
+                <button class="btn" type="submit"><i class="fas fa-magnifying-glass-chart"></i>Показать</button>
+            </form>
+            <div id="node-traffic-result"></div>
+        </section>
+            </div>
+            <div id="subpanel-inf-configs" class="subtab-panel">
+<section id="panel-config-templates" class="infra-legacy-panel">
+            <header class="panel-header config-panel-header">
+                <div>
+                    <h1 class="admin-title">Шаблоны конфигов</h1>
+                    <p class="admin-subtitle">Параметры CustomConfigTemplate и JSON шаблона</p>
+                </div>
+                <div class="config-panel-actions">
+                    <button class="btn" type="button" id="config-template-add"><i class="fas fa-plus"></i>Добавить конфиг</button>
+                </div>
+            </header>
+
+            <details class="card admin-collapse">
+                <summary><i class="fas fa-user-gear"></i>Персональные конфиги для пользователя<span class="admin-collapse-hint">закрепить конкретные конфиги вместо round-robin</span></summary>
+                <div class="admin-collapse-body">
+                    <div class="help-block">
+                        <p>Обычно активные конфиги выдаются по кругу (round-robin). Здесь можно закрепить за пользователем только выбранные — тогда выдаваться будут только они.</p>
+                        <p>Если ни один закреплённый конфиг не активен, снова включается round-robin.</p>
+                    </div>
+                    <form id="config-pins-form" class="config-pins-form">
+                        {% csrf_token %}
+                        <div class="form-grid-two">
+                            <input class="input" name="q" placeholder="username, email или telegram_id">
+                            <button class="btn btn-secondary" type="submit"><i class="fas fa-magnifying-glass"></i>Найти пользователя</button>
+                        </div>
+                    </form>
+                    <div id="config-pins-result"></div>
+                </div>
+            </details>
+
+            <details class="card admin-collapse">
+                <summary><i class="fas fa-fingerprint"></i>Правила User-Agent<span class="admin-collapse-hint">определение клиентского приложения при выдаче конфига</span></summary>
+                <div class="admin-collapse-body">
+                    <div class="help-block">
+                        <p>Если User-Agent запроса содержит подстроку (без учёта регистра), в Jinja-рендер шаблона передаётся переменная с указанным значением.</p>
+                        <ul>
+                            <li>Пример: подстрока <code>incy</code> → <code>CLIENT=incy</code>, и в шаблоне работает <code>{% templatetag openblock %} if CLIENT == "incy" {% templatetag closeblock %}</code></li>
+                            <li>Правила проверяются по возрастанию приоритета</li>
+                            <li>Для каждой переменной побеждает первое совпадение</li>
+                        </ul>
+                    </div>
+                    <form id="ua-rule-form" class="ua-rule-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="rule_id">
+                    <div class="ua-rule-form-grid">
+                        <input class="input" name="match_substring" maxlength="160" placeholder="Подстрока в UA, например incy" required>
+                        <input class="input" name="variable_name" maxlength="64" placeholder="Переменная (CLIENT)" value="CLIENT">
+                        <input class="input" name="value" maxlength="160" placeholder="Значение, например incy" required>
+                        <input class="input" name="priority" type="number" step="1" placeholder="Приоритет (100)">
+                        <label class="reply-template-active">
+                            <input type="checkbox" name="is_active" checked>
+                            Активно
+                        </label>
+                        <div class="ua-rule-form-actions">
+                            <button class="btn" type="submit" data-ua-rule-submit><i class="fas fa-save"></i>Сохранить</button>
+                            <button class="btn btn-secondary" type="button" id="ua-rule-reset">Очистить</button>
+                        </div>
+                    </div>
+                    </form>
+                    <div id="ua-rules-result"></div>
+                </div>
+            </details>
+
+            <div id="config-templates-result" class="config-template-list"></div>
+        </section>
+            </div>
+            <div id="subpanel-inf-servers" class="subtab-panel">
+                <div class="infra-summary-grid" id="infra-summary"></div>
+
+                <section class="card" style="padding: 16px 18px; margin-bottom: 16px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                        <h3 style="margin:0;font-size:13px;font-weight:850;">Серверы с node-agent</h3>
+                        <label style="display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:11px;font-weight:650;cursor:pointer;">
+                            <input type="checkbox" id="infra-show-archived"> показывать архивные
+                        </label>
+                    </div>
+                    <p class="help-block" style="margin:0 0 10px;">Серверы появляются автоматически после установки node-agent (ip-guard). Клик по строке — карточка сервера. Данные обновляются каждые 5 секунд.</p>
+                    <div class="infra-table-wrap"><div id="infra-servers-table"><div class="help-block">Загрузка…</div></div></div>
+                </section>
+
+                <div id="infra-server-detail" hidden></div>
+
+                <details class="card admin-collapse" style="margin-top:16px;">
+                    <summary><i class="fas fa-sliders"></i>Настройки мониторинга и автозамены<span class="admin-collapse-hint">пороги OFFLINE, нагрузки канала, аномалий, автозамена IP</span></summary>
+                    <div class="admin-collapse-body"><div id="infra-settings"><div class="help-block">Загрузка…</div></div></div>
+                </details>
+            </div>
         </section>
         {% endif %}
 
@@ -4814,7 +4906,31 @@
             });
         }
 
+        // Прежние отдельные разделы, ставшие вкладками «Инфраструктуры»:
+        // старые якоря #censor-checks и т.п. продолжают работать
+        const LEGACY_INFRA_TABS = {
+            'censor-checks': 'inf-tspu',
+            'node-provision': 'inf-provision',
+            'node-traffic': 'inf-traffic',
+            'config-templates': 'inf-configs',
+        };
+
         function showAdminTab(tabId) {
+            if (LEGACY_INFRA_TABS[tabId]) {
+                // Раздел «Инфраструктура» есть только у полного админа:
+                // остальным по старому якорю показываем их первую вкладку,
+                // а не пустую страницу
+                if (!document.getElementById('panel-infrastructure')) {
+                    const fallback = document.querySelector('.tab-btn')?.dataset.tab;
+                    if (fallback) showAdminTab(fallback);
+                    return;
+                }
+                // Сначала переключаем вкладку, потом сам раздел: его init
+                // поднимет уже активную вкладку без двойной загрузки
+                showSubtab('panel-infrastructure', LEGACY_INFRA_TABS[tabId]);
+                showAdminTab('infrastructure');
+                return;
+            }
             activeAdminTab = tabId;
             document.querySelectorAll('.tab-panel').forEach((panel) => panel.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach((button) => button.classList.toggle('active', button.dataset.tab === tabId));
@@ -4824,22 +4940,40 @@
             if (tabId === 'payment-info') loadPaymentsList();
             if (tabId === 'broadcasts') { loadBroadcastSegments(); loadBroadcastPromos(); wireBroadcastComposer(); loadBroadcastsList(); }
             if (tabId === 'promocodes') loadPromocodes();
-            if (tabId === 'config-templates') {
-                loadConfigTemplates();
-                loadUaRules();
-            }
             if (tabId === 'system') {
                 loadRuntimeSettings();
                 loadReferralAntifraud();
             }
-            if (tabId === 'node-traffic') initNodeTrafficTab();
-            if (tabId === 'node-provision') initNodeProvisionTab();
-            if (tabId === 'censor-checks') loadCensorChecks();
+            if (tabId === 'infrastructure') initInfrastructureTab();
             history.replaceState(null, '', `#${tabId}`);
             const activeBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
             const titleEl = document.getElementById('mobile-topbar-title');
             if (activeBtn && titleEl) titleEl.textContent = activeBtn.querySelector('span')?.textContent || '';
             closeDrawer();
+        }
+
+        // Вкладки раздела «Инфраструктура»: показ через общий showSubtab +
+        // ленивые инициализаторы бывших самостоятельных разделов
+        const infraSubtabLoaders = {
+            'inf-tspu': () => loadCensorChecks(),
+            'inf-provision': () => initNodeProvisionTab(),
+            'inf-traffic': () => initNodeTrafficTab(),
+            'inf-configs': () => { loadConfigTemplates(); loadUaRules(); },
+            'inf-servers': () => initInfraServersTab(),
+        };
+
+        function activeInfraSubtab() {
+            return document.querySelector('#panel-infrastructure .subtab.active[data-subtab]')?.dataset.subtab || 'inf-tspu';
+        }
+
+        function showInfraSubtab(name) {
+            showSubtab('panel-infrastructure', name);
+            const loader = infraSubtabLoaders[name];
+            if (loader) loader();
+        }
+
+        function initInfrastructureTab() {
+            showInfraSubtab(activeInfraSubtab());
         }
 
         function openDrawer() { document.body.classList.add('drawer-open'); }
@@ -9436,7 +9570,7 @@
         }
 
         async function refreshNodeProvisionDetail() {
-            if (nodeProvisionDetailId === null || activeAdminTab !== 'node-provision') return;
+            if (nodeProvisionDetailId === null || activeAdminTab !== 'infrastructure' || activeInfraSubtab() !== 'inf-provision') return;
             try {
                 const response = await fetch(`${main.dataset.nodeProvisionDetailUrl}?id=${nodeProvisionDetailId}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
                 const payload = await response.json();
@@ -10176,7 +10310,7 @@
             // админ видел, как собираются ответы зондов.
             clearTimeout(censorRunRefreshTimer);
             const hasPending = censorChecksCache.some((check) => check.last_run && check.last_run.status === 'pending');
-            if (hasPending && activeAdminTab === 'censor-checks') {
+            if (hasPending && activeAdminTab === 'infrastructure' && activeInfraSubtab() === 'inf-tspu') {
                 censorRunRefreshTimer = setTimeout(loadCensorChecks, 7000);
             }
         }
@@ -10788,8 +10922,759 @@
             setStatsDateRange(addDays(today, -29), today, '30');
         }
 
+        // === Инфраструктура → Серверы =====================================
+        let infraServersInited = false;
+        let infraServersTimer = null;
+        let infraDetailId = null;
+        let infraDetailPeriod = '24h';
+        let infraLoadThreshold = 85;
+
+        function infraServersActive() {
+            return activeAdminTab === 'infrastructure' && activeInfraSubtab() === 'inf-servers';
+        }
+
+        function infraFmtBps(bps) {
+            if (bps === null || bps === undefined) return '—';
+            const mbit = bps / 1e6;
+            if (mbit >= 1000) return (mbit / 1000).toFixed(2) + ' Gbit/s';
+            if (mbit >= 10) return Math.round(mbit) + ' Mbit/s';
+            if (mbit >= 1) return mbit.toFixed(1) + ' Mbit/s';
+            return (bps / 1e3).toFixed(0) + ' Kbit/s';
+        }
+
+        function infraFmtBytes(bytes) {
+            if (!bytes) return '0 B';
+            const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB'];
+            let value = bytes, unit = 0;
+            while (value >= 1024 && unit < units.length - 1) { value /= 1024; unit++; }
+            return value.toFixed(value >= 100 ? 0 : value >= 10 ? 1 : 2) + ' ' + units[unit];
+        }
+
+        function infraFmtAge(seconds) {
+            if (seconds === null || seconds === undefined) return '—';
+            if (seconds < 60) return seconds + ' с назад';
+            const minutes = Math.floor(seconds / 60);
+            if (minutes < 60) return minutes + ' мин назад';
+            const hours = Math.floor(minutes / 60);
+            if (hours < 48) return hours + ' ч назад';
+            return Math.floor(hours / 24) + ' дн назад';
+        }
+
+        function infraFmtDuration(seconds) {
+            if (seconds === null || seconds === undefined) return '—';
+            const days = Math.floor(seconds / 86400);
+            const hours = Math.floor((seconds % 86400) / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            if (days > 0) return `${days} дн ${hours} ч`;
+            if (hours > 0) return `${hours} ч ${minutes} мин`;
+            return `${minutes} мин`;
+        }
+
+        function infraLoadClass(pct) {
+            if (pct === null || pct === undefined) return '';
+            if (pct >= 95) return 'infra-load-crit';
+            if (pct >= infraLoadThreshold) return 'infra-load-warn';
+            return '';
+        }
+
+        function initInfraServersTab() {
+            if (!infraServersInited) {
+                infraServersInited = true;
+                document.getElementById('infra-show-archived')?.addEventListener('change', () => loadInfraServers(true));
+                loadInfraSettings();
+            }
+            loadInfraServers(true);
+            if (!infraServersTimer) {
+                infraServersTimer = setInterval(() => {
+                    if (!infraServersActive() || document.hidden) return;
+                    loadInfraServers(false);
+                    if (infraDetailId !== null) refreshInfraDetail(false);
+                }, 5000);
+            }
+        }
+
+        async function loadInfraServers(showErrors) {
+            const container = document.getElementById('infra-servers-table');
+            if (!container) return;
+            try {
+                const archived = document.getElementById('infra-show-archived')?.checked ? '1' : '0';
+                const response = await fetch(`${main.dataset.infraServersUrl}?archived=${archived}`, {
+                    headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store',
+                });
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error(payload.message || 'Ошибка загрузки');
+                infraLoadThreshold = payload.result.settings?.infra_load_threshold_pct || 85;
+                renderInfraSummary(payload.result);
+                renderInfraServers(payload.result);
+            } catch (error) {
+                if (showErrors) container.innerHTML = `<div class="help-block">Не удалось загрузить серверы: ${escapeHtml(String(error.message || error))}</div>`;
+            }
+        }
+
+        function renderInfraSummary(result) {
+            const summary = document.getElementById('infra-summary');
+            if (!summary) return;
+            const servers = result.servers || [];
+            const totalRx = servers.reduce((acc, s) => acc + (s.rx_bps || 0), 0);
+            const totalTx = servers.reduce((acc, s) => acc + (s.tx_bps || 0), 0);
+            const totalConn = servers.reduce((acc, s) => acc + (s.tcp_connections || 0), 0);
+            const problems = servers.filter((s) => s.checking || s.replacing).length;
+            const card = (label, value, sub, valueStyle = '') => `
+                <section class="card infra-summary-card">
+                    <div class="infra-metric-label">${label}</div>
+                    <div class="infra-metric-value" ${valueStyle ? `style="${valueStyle}"` : ''}>${value}</div>
+                    ${sub ? `<div class="infra-metric-sub">${sub}</div>` : ''}
+                </section>`;
+            summary.innerHTML =
+                card('Серверы', String(result.totals.count), `онлайн ${result.totals.online}`) +
+                card('Offline', String(result.totals.offline), result.totals.offline ? 'требует внимания' : 'всё в порядке',
+                    result.totals.offline ? 'color: var(--red);' : 'color: var(--green);') +
+                card('Суммарный трафик', `↓ ${infraFmtBps(totalRx)}`, `↑ ${infraFmtBps(totalTx)}`) +
+                card('TCP-соединения', totalConn.toLocaleString('ru-RU'), 'по всем нодам') +
+                card('Проверки/замены', String(problems), problems ? 'идёт проверка ТСПУ или замена IP' : 'аномалий нет',
+                    problems ? 'color: var(--brand-gold);' : '');
+        }
+
+        function renderInfraServers(result) {
+            const container = document.getElementById('infra-servers-table');
+            if (!container) return;
+            const servers = result.servers || [];
+            if (!servers.length) {
+                container.innerHTML = '<div class="help-block">Серверов пока нет. Установите node-agent (ip-guard) на ноду — она появится здесь автоматически.</div>';
+                return;
+            }
+            const rows = servers.map((server) => {
+                const status = server.online
+                    ? '<span class="infra-badge infra-badge-online">ONLINE</span>'
+                    : '<span class="infra-badge infra-badge-offline">OFFLINE</span>';
+                const flags = [
+                    server.checking ? '<span class="infra-badge infra-badge-warn" title="Идёт проверка ТСПУ по аномалии">ТСПУ</span>' : '',
+                    server.replacing ? '<span class="infra-badge infra-badge-warn" title="Идёт замена IP">IP</span>' : '',
+                    server.anomaly_paused ? '<span class="infra-badge infra-badge-muted" title="Детектор аномалий на паузе (плановые работы)">пауза</span>' : '',
+                    server.baseline_scale ? `<span class="infra-badge infra-badge-muted" title="После изменения DNS ожидаемая норма трафика временно умножена на этот коэффициент; детектор работает">DNS ×${server.baseline_scale.toFixed(2)}</span>` : '',
+                    server.is_archived ? '<span class="infra-badge infra-badge-muted">архив</span>' : '',
+                ].filter(Boolean).join(' ');
+                const util = server.utilization_pct;
+                const ips = server.ips || {};
+                const ipsLabel = `${ips.active || 0}${ips.reserve ? ` +${ips.reserve} рез` : ''}${ips.blocked ? ` / ${ips.blocked} блок` : ''}`;
+                const domains = (server.domains || []);
+                const domainsLabel = domains.length
+                    ? escapeHtml(domains[0]) + (domains.length > 1 ? ` +${domains.length - 1}` : '')
+                    : '—';
+                return `
+                    <tr class="${server.online ? '' : 'infra-row-offline'}" data-infra-server="${server.id}">
+                        <td><b>${escapeHtml(server.name)}</b>${server.hostname ? `<div style="color:var(--muted);font-size:10.5px;">${escapeHtml(server.hostname)}</div>` : ''}</td>
+                        <td>${status} ${flags}</td>
+                        <td>${server.online ? '↓ ' + infraFmtBps(server.rx_bps) : '—'}</td>
+                        <td>${server.online ? '↑ ' + infraFmtBps(server.tx_bps) : '—'}</td>
+                        <td class="${infraLoadClass(util)}">${util !== null && util !== undefined ? util.toFixed(0) + '%' : '—'}</td>
+                        <td>${server.online && server.tcp_connections !== null ? server.tcp_connections.toLocaleString('ru-RU') : '—'}</td>
+                        <td>${ipsLabel}</td>
+                        <td title="${escapeHtml(domains.join(', '))}">${domainsLabel}</td>
+                        <td>${escapeHtml(server.agent_version || '—')}</td>
+                        <td>${infraFmtAge(server.last_seen_age)}</td>
+                    </tr>`;
+            }).join('');
+            container.innerHTML = `
+                <table class="infra-table">
+                    <thead><tr>
+                        <th>Сервер</th><th>Статус</th><th>RX</th><th>TX</th><th>Загрузка</th>
+                        <th>TCP</th><th>IP</th><th>Домены</th><th>Агент</th><th>Heartbeat</th>
+                    </tr></thead>
+                    <tbody>${rows}</tbody>
+                </table>`;
+            container.querySelectorAll('[data-infra-server]').forEach((row) => {
+                row.addEventListener('click', () => openInfraServer(Number(row.dataset.infraServer)));
+            });
+        }
+
+        async function infraPost(url, data) {
+            const body = new FormData();
+            Object.entries(data).forEach(([key, value]) => body.append(key, value));
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                body,
+            });
+            const payload = await response.json();
+            if (payload.status !== 'ok') throw new Error(payload.message || 'Ошибка');
+            return payload;
+        }
+
+        async function infraAction(data, successMessage) {
+            try {
+                await infraPost(main.dataset.infraServersUrl, data);
+                if (successMessage) showAdminToast(successMessage);
+                await loadInfraServers(true);
+                if (infraDetailId !== null) await refreshInfraDetail(true);
+            } catch (error) {
+                showAdminToast(String(error.message || error), 'error');
+            }
+        }
+
+        async function openInfraServer(serverId) {
+            infraDetailId = serverId;
+            await refreshInfraDetail(true);
+            document.getElementById('infra-server-detail')?.scrollIntoView({behavior: 'smooth', block: 'start'});
+        }
+
+        function closeInfraServer() {
+            infraDetailId = null;
+            const container = document.getElementById('infra-server-detail');
+            if (container) { container.hidden = true; container.innerHTML = ''; }
+        }
+
+        let infraDetailRequestSeq = 0;
+
+        function infraSnapshotDirtyFields(container) {
+            // Значения, изменённые админом, но не сохранённые — переживают
+            // перерисовку при автообновлении
+            const dirty = {};
+            container.querySelectorAll('input[name], textarea[name]').forEach((field) => {
+                if (field.type === 'checkbox') return;
+                if (field.value !== field.defaultValue) dirty[`${field.closest('form')?.id || ''}:${field.name}`] = field.value;
+            });
+            return dirty;
+        }
+
+        function infraRestoreDirtyFields(container, dirty) {
+            Object.entries(dirty).forEach(([key, value]) => {
+                const [formId, name] = key.split(':');
+                const form = formId ? container.querySelector(`#${formId}`) : container;
+                const field = form?.querySelector(`[name="${name}"]`);
+                if (field) field.value = value;
+            });
+        }
+
+        async function refreshInfraDetail(full) {
+            if (infraDetailId === null) return;
+            const container = document.getElementById('infra-server-detail');
+            if (!container) return;
+            // Автообновление не должно затирать формы, пока админ печатает
+            if (!full && container.contains(document.activeElement)
+                && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+            const requestSeq = ++infraDetailRequestSeq;
+            const requestedId = infraDetailId;
+            const requestedPeriod = infraDetailPeriod;
+            try {
+                const [detailResponse, telemetryResponse] = await Promise.all([
+                    fetch(`${main.dataset.infraServerDetailUrl}?id=${requestedId}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store'}),
+                    fetch(`${main.dataset.infraTelemetryUrl}?id=${requestedId}&period=${requestedPeriod}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store'}),
+                ]);
+                const detailPayload = await detailResponse.json();
+                const telemetryPayload = await telemetryResponse.json();
+                // Пришёл ответ устаревшего запроса (сменили период/сервер) —
+                // не рисуем поверх более свежего
+                if (requestSeq !== infraDetailRequestSeq || infraDetailId !== requestedId) return;
+                if (detailPayload.status !== 'ok') throw new Error(detailPayload.message || 'Ошибка');
+                if (telemetryPayload.status !== 'ok') throw new Error(telemetryPayload.message || 'Ошибка');
+                // Пока ждали ответ, админ мог начать печатать — авторефреш
+                // в этом случае пропускаем (следующий тик догонит)
+                if (!full && container.contains(document.activeElement)
+                    && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
+                // Несохранённый ввод переживает любую перерисовку
+                const dirty = infraSnapshotDirtyFields(container);
+                renderInfraDetail(container, detailPayload.result, telemetryPayload.result, full);
+                infraRestoreDirtyFields(container, dirty);
+            } catch (error) {
+                // Ошибку устаревшего запроса не рисуем поверх свежего контента
+                if (requestSeq !== infraDetailRequestSeq || infraDetailId !== requestedId) return;
+                if (full) {
+                    container.hidden = false;
+                    container.innerHTML = `<section class="card" style="padding:16px;"><div class="help-block">Не удалось загрузить карточку: ${escapeHtml(String(error.message || error))}</div></section>`;
+                }
+            }
+        }
+
+        function infraIpBadge(ip) {
+            if (ip.blocked_at) return '<span class="infra-badge infra-badge-offline">BLOCKED</span>';
+            if (ip.on_interface) return '<span class="infra-badge infra-badge-online">ACTIVE</span>';
+            return '<span class="infra-badge infra-badge-muted">RESERVE</span>';
+        }
+
+        function renderInfraDetail(container, detail, telemetry, full) {
+            const server = detail.server;
+            const summary = telemetry.summary || {};
+            const util = server.utilization_pct;
+            const periodButtons = ['3h', '24h', '7d', '30d'].map((period) =>
+                `<button type="button" class="subtab infra-period-btn ${period === infraDetailPeriod ? 'active' : ''}" style="border:1px solid var(--panel-border);border-radius:8px;" data-infra-period="${period}">${period}</button>`
+            ).join('');
+
+            const statCard = (label, value, sub) => `
+                <section class="card infra-summary-card">
+                    <div class="infra-metric-label">${label}</div>
+                    <div class="infra-metric-value">${value}</div>
+                    ${sub ? `<div class="infra-metric-sub">${sub}</div>` : ''}
+                </section>`;
+
+            const ipsHtml = (detail.ips || []).map((ip) => `
+                <div class="infra-ip-row">
+                    <div>
+                        <code>${escapeHtml(ip.ip)}/${ip.prefix_len}</code> ${infraIpBadge(ip)}
+                        <span style="color:var(--muted);font-size:10.5px;">${ip.source === 'manual' ? 'резерв (вручную)' : escapeHtml(ip.interface || '')}${ip.comment ? ' · ' + escapeHtml(ip.comment) : ''}</span>
+                    </div>
+                    <div class="infra-ip-actions">
+                        ${!ip.on_interface && !ip.blocked_at ? `<button type="button" class="infra-mini-btn" data-infra-ensure-ip="${ip.id}" title="Поставить IP на интерфейс через node-agent">установить</button>` : ''}
+                        ${ip.on_interface && !ip.blocked_at ? `<button type="button" class="infra-mini-btn" data-infra-replace-ip="${escapeHtml(ip.ip)}" title="Заменить IP на резервный (как при подтверждённой блокировке)">заменить</button>` : ''}
+                        ${ip.blocked_at
+                            ? `<button type="button" class="infra-mini-btn" data-infra-unblock-ip="${ip.id}">разблокировать</button>`
+                            : `<button type="button" class="infra-mini-btn danger" data-infra-block-ip="${ip.id}" title="Пометить IP заблокированным (исключить из резервов)">пометить блок</button>`}
+                        ${!ip.on_interface ? `<button type="button" class="infra-mini-btn danger" data-infra-delete-ip="${ip.id}">удалить</button>` : ''}
+                    </div>
+                </div>`).join('') || '<div class="help-block">Адресов пока нет</div>';
+
+            const domainsHtml = (detail.domains || []).map((domain) => `
+                <div class="infra-ip-row">
+                    <div><code>${escapeHtml(domain)}</code></div>
+                    <div class="infra-ip-actions"><button type="button" class="infra-mini-btn danger" data-infra-delete-domain="${escapeHtml(domain)}">удалить</button></div>
+                </div>`).join('') || '<div class="help-block">Домены не привязаны — автозамена IP не сможет переключить DNS</div>';
+
+            const who = detail.who_connects || {};
+            const whoTop = (who.top_addresses || []).slice(0, 10).map((row) => `
+                <div class="infra-ip-row">
+                    <div><code>${escapeHtml(row.ip)}</code></div>
+                    <div style="color:var(--muted);font-size:11px;">${row.hits.toLocaleString('ru-RU')} подкл · ${row.users} юз</div>
+                </div>`).join('') || '<div class="help-block">Нет данных ip-guard за 24 ч</div>';
+
+            const logEntry = (time, badge, text) => `
+                <div class="infra-log-row">
+                    <span class="infra-log-time">${escapeHtml(time || '')}</span> ${badge}
+                    <div>${text}</div>
+                </div>`;
+            const journal = [];
+            (detail.replacements || []).forEach((r) => {
+                const badgeClass = r.status === 'done' || r.status === 'dns_cleanup' ? 'infra-badge-online' : ['failed', 'manual_required'].includes(r.status) ? 'infra-badge-offline' : 'infra-badge-warn';
+                journal.push(logEntry(r.created_at, `<span class="infra-badge ${badgeClass}">замена ${escapeHtml(r.status)}</span>`,
+                    `<code>${escapeHtml(r.old_ip)}</code>${r.new_ip ? ' → <code>' + escapeHtml(r.new_ip) + '</code>' : ''}${r.error ? ' · ' + escapeHtml(r.error) : ''}` +
+                    ((r.log || []).slice(-3).map((entry) => `<div style="color:var(--muted);font-size:10.5px;">${escapeHtml(entry.ts)} — ${escapeHtml(entry.message)}</div>`).join(''))));
+            });
+            (detail.anomalies || []).forEach((a) => {
+                const badgeClass = a.status === 'confirmed' ? 'infra-badge-offline' : a.status === 'dismissed' ? 'infra-badge-online' : 'infra-badge-warn';
+                journal.push(logEntry(a.created_at, `<span class="infra-badge ${badgeClass}">аномалия ${escapeHtml(a.status)}</span>`,
+                    `трафик ${a.traffic_ratio !== null ? (a.traffic_ratio * 100).toFixed(0) + '%' : '—'} от baseline · соединения ${a.connection_ratio !== null ? (a.connection_ratio * 100).toFixed(0) + '%' : '—'}`));
+            });
+            (detail.commands || []).forEach((c) => {
+                const badgeClass = c.status === 'ok' ? 'infra-badge-online' : ['failed', 'expired'].includes(c.status) ? 'infra-badge-offline' : 'infra-badge-warn';
+                journal.push(logEntry(c.created_at, `<span class="infra-badge ${badgeClass}">${escapeHtml(c.kind)} ${escapeHtml(c.status)}</span>`,
+                    `<code>${escapeHtml((c.payload || {}).ip || '')}</code> → ${escapeHtml((c.payload || {}).interface || '')}${c.error ? ' · ' + escapeHtml(c.error) : ''}`));
+            });
+
+            container.hidden = false;
+            container.innerHTML = `
+                <section class="card" style="padding:18px;margin-bottom:16px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:14px;">
+                        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                            <h3 style="margin:0;font-size:16px;font-weight:900;">${escapeHtml(server.name)}</h3>
+                            ${server.online ? '<span class="infra-badge infra-badge-online">ONLINE</span>' : '<span class="infra-badge infra-badge-offline">OFFLINE</span>'}
+                            ${server.baseline_scale ? `<span class="infra-badge infra-badge-muted" title="После изменения DNS норма трафика временно ×${server.baseline_scale.toFixed(2)} (до ${escapeHtml(server.baseline_scale_until || '')}); детектор аномалий работает">DNS ×${server.baseline_scale.toFixed(2)}</span>` : ''}
+                            ${server.is_archived ? '<span class="infra-badge infra-badge-muted">архив</span>' : ''}
+                        </div>
+                        <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                            <button type="button" class="infra-mini-btn" id="infra-force-check" title="Принудительный замер ТСПУ по активным IP сервера">Проверить ТСПУ</button>
+                            ${server.anomaly_paused
+                                ? `<button type="button" class="infra-mini-btn" id="infra-snooze-toggle" title="Детектор на паузе до ${escapeHtml(server.anomaly_suppressed_until || '')}">Снять паузу детектора</button>`
+                                : '<button type="button" class="infra-mini-btn" id="infra-snooze-toggle" title="На время плановых работ (перебалансировка DNS и т.п.) аномалии по серверу не создаются">Пауза детектора 24ч</button>'}
+                            <button type="button" class="infra-mini-btn" id="infra-archive-toggle">${server.is_archived ? 'Вернуть из архива' : 'В архив'}</button>
+                            <button type="button" class="infra-mini-btn" id="infra-detail-close">Закрыть</button>
+                        </div>
+                    </div>
+
+                    <div class="infra-summary-grid">
+                        ${statCard('Сейчас', `↓ ${infraFmtBps(server.rx_bps)}`, `↑ ${infraFmtBps(server.tx_bps)} · ${server.tcp_connections !== null && server.tcp_connections !== undefined ? server.tcp_connections.toLocaleString('ru-RU') + ' соединений' : '—'}`)}
+                        ${statCard(`Объём · ${infraDetailPeriod}`, infraFmtBytes((summary.rx_volume_bytes || 0) + (summary.tx_volume_bytes || 0)), `↓ ${infraFmtBytes(summary.rx_volume_bytes || 0)} · ↑ ${infraFmtBytes(summary.tx_volume_bytes || 0)}`)}
+                        ${statCard(`Пики · ${infraDetailPeriod}`, `↓ ${infraFmtBps(summary.rx_peak_bps)}`, `↑ ${infraFmtBps(summary.tx_peak_bps)}${summary.peak_source === 'raw' ? ' · по сырым сэмплам' : ''}`)}
+                        ${statCard('Лимит канала', server.effective_limit_mbps ? server.effective_limit_mbps + ' M' : '—', `линк: ${server.detected_link_speed_mbps ? server.detected_link_speed_mbps + ' Mbit/s' : 'не определён'}${server.bandwidth_limit_mbps ? ' · override' : ''}`)}
+                        ${statCard('Загрузка', util !== null && util !== undefined ? `<span class="${infraLoadClass(util)}">${util.toFixed(0)}%</span>` : '—', `load avg: ${server.cpu_load !== null && server.cpu_load !== undefined ? server.cpu_load.toFixed(2) : '—'}`)}
+                    </div>
+
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin:14px 0 8px;">
+                        <h4 style="margin:0;font-size:13px;font-weight:850;">Трафик</h4>
+                        <div style="display:flex;gap:4px;">${periodButtons}</div>
+                    </div>
+                    <div style="position:relative;">
+                        <canvas id="infra-traffic-chart" class="infra-chart-canvas"></canvas>
+                        <div id="infra-traffic-tooltip" class="sales-chart-tooltip"></div>
+                    </div>
+                    <h4 style="margin:16px 0 8px;font-size:13px;font-weight:850;">Соединения</h4>
+                    <div style="position:relative;">
+                        <canvas id="infra-conn-chart" class="infra-chart-canvas small"></canvas>
+                        <div id="infra-conn-tooltip" class="sales-chart-tooltip"></div>
+                    </div>
+                </section>
+
+                <div class="infra-detail-grid" style="margin-bottom:16px;">
+                    <section class="card infra-detail-card">
+                        <h4>Сервер</h4>
+                        <dl class="infra-kv">
+                            <dt>Node</dt><dd><code>${escapeHtml(server.node_name)}</code></dd>
+                            <dt>Hostname</dt><dd>${escapeHtml(server.hostname || '—')}</dd>
+                            <dt>ОС</dt><dd>${escapeHtml(server.os || '—')}</dd>
+                            <dt>Ядро</dt><dd>${escapeHtml(server.kernel || '—')}</dd>
+                            <dt>Агент</dt><dd>v${escapeHtml(server.agent_version || '—')}</dd>
+                            <dt>Heartbeat</dt><dd>${infraFmtAge(server.last_seen_age)}</dd>
+                            <dt>Uptime</dt><dd>${infraFmtDuration(server.uptime_seconds)}</dd>
+                            <dt>WAN</dt><dd><code>${escapeHtml(server.wan_interface || '—')}</code></dd>
+                            <dt>IP агента</dt><dd><code>${escapeHtml(server.last_heartbeat_ip || '—')}</code></dd>
+                            <dt>TCP / conntrack</dt><dd>${server.tcp_connections !== null && server.tcp_connections !== undefined ? server.tcp_connections.toLocaleString('ru-RU') : '—'} / ${server.conntrack !== null && server.conntrack !== undefined ? server.conntrack.toLocaleString('ru-RU') : '—'}</dd>
+                            <dt>machine-id</dt><dd style="font-size:10px;"><code>${escapeHtml(server.machine_uid)}</code></dd>
+                        </dl>
+                    </section>
+
+                    <section class="card infra-detail-card">
+                        <h4>Параметры</h4>
+                        <form id="infra-server-edit-form">
+                            <label style="display:block;color:var(--muted);font-size:10.5px;font-weight:750;margin-bottom:4px;">НАЗВАНИЕ</label>
+                            <input type="text" name="display_name" value="${escapeHtml(server.display_name || '')}" placeholder="${escapeHtml(server.node_name)}" style="width:100%;margin-bottom:10px;">
+                            <label style="display:block;color:var(--muted);font-size:10.5px;font-weight:750;margin-bottom:4px;">ЛИМИТ КАНАЛА, MBIT/S (override; пусто = определённый линк ${server.detected_link_speed_mbps || '—'})</label>
+                            <input type="text" name="bandwidth_limit_mbps" value="${server.bandwidth_limit_mbps || ''}" placeholder="например 400" style="width:100%;margin-bottom:10px;">
+                            <label style="display:block;color:var(--muted);font-size:10.5px;font-weight:750;margin-bottom:4px;">ЗАМЕТКИ</label>
+                            <textarea name="notes" rows="2" style="width:100%;margin-bottom:10px;">${escapeHtml(server.notes || '')}</textarea>
+                            <button class="btn" type="submit"><i class="fas fa-floppy-disk"></i>Сохранить</button>
+                        </form>
+                    </section>
+
+                    <section class="card infra-detail-card">
+                        <h4>IP-адреса</h4>
+                        <div>${ipsHtml}</div>
+                        <form id="infra-add-ip-form" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+                            <input type="text" name="ip" placeholder="185.10.0.11" style="flex:1;min-width:130px;">
+                            <input type="text" name="prefix" placeholder="24" style="width:52px;">
+                            <input type="text" name="comment" placeholder="комментарий" style="flex:1;min-width:110px;">
+                            <button class="btn" type="submit"><i class="fas fa-plus"></i>Резерв</button>
+                        </form>
+                    </section>
+
+                    <section class="card infra-detail-card">
+                        <h4>Домены (VPN entry points)</h4>
+                        <div>${domainsHtml}</div>
+                        <form id="infra-add-domain-form" style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;">
+                            <input type="text" name="domain" placeholder="de.example.xyz" style="flex:1;min-width:170px;">
+                            <button class="btn" type="submit"><i class="fas fa-plus"></i>Привязать</button>
+                        </form>
+                        ${detail.cloudflare_enabled ? '' : '<div class="help-block" style="margin-top:8px;">⚠️ CLOUDFLARE_API_TOKEN не настроен — автозамена IP не сможет переключить DNS</div>'}
+                    </section>
+
+                    <section class="card infra-detail-card">
+                        <h4>Кто подключается · 24 ч</h4>
+                        <dl class="infra-kv" style="margin-bottom:8px;">
+                            <dt>Уникальных IP</dt><dd>${(who.unique_ips_24h || 0).toLocaleString('ru-RU')}</dd>
+                            <dt>За последний час</dt><dd>${(who.unique_ips_1h || 0).toLocaleString('ru-RU')}</dd>
+                        </dl>
+                        <div class="infra-log-list">${whoTop}</div>
+                    </section>
+
+                    <section class="card infra-detail-card">
+                        <h4>Журнал (аномалии · замены · команды)</h4>
+                        <div class="infra-log-list">${journal.join('') || '<div class="help-block">Событий не было</div>'}</div>
+                    </section>
+                </div>`;
+
+            drawInfraCharts(telemetry);
+            wireInfraDetail(container, server);
+        }
+
+        function wireInfraDetail(container, server) {
+            container.querySelector('#infra-detail-close')?.addEventListener('click', closeInfraServer);
+            container.querySelector('#infra-force-check')?.addEventListener('click', () =>
+                infraAction({action: 'force_check', id: server.id}, 'Замеры ТСПУ запущены'));
+            container.querySelector('#infra-archive-toggle')?.addEventListener('click', () =>
+                infraAction({action: server.is_archived ? 'unarchive' : 'archive', id: server.id}));
+            container.querySelector('#infra-snooze-toggle')?.addEventListener('click', () =>
+                infraAction(
+                    server.anomaly_paused
+                        ? {action: 'unsnooze', id: server.id}
+                        : {action: 'snooze', id: server.id, hours: 24},
+                    server.anomaly_paused ? 'Пауза снята' : 'Детектор на паузе 24 часа',
+                ));
+            container.querySelectorAll('[data-infra-period]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    infraDetailPeriod = button.dataset.infraPeriod;
+                    refreshInfraDetail(true);
+                });
+            });
+            container.querySelector('#infra-server-edit-form')?.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const form = event.target;
+                infraAction({
+                    action: 'update', id: server.id,
+                    display_name: form.display_name.value,
+                    bandwidth_limit_mbps: form.bandwidth_limit_mbps.value,
+                    notes: form.notes.value,
+                }, 'Сохранено');
+            });
+            container.querySelector('#infra-add-ip-form')?.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const form = event.target;
+                if (!form.ip.value.trim()) return;
+                infraAction({
+                    action: 'add_ip', id: server.id,
+                    ip: form.ip.value, prefix: form.prefix.value, comment: form.comment.value,
+                }, 'Резервный IP добавлен');
+            });
+            container.querySelector('#infra-add-domain-form')?.addEventListener('submit', (event) => {
+                event.preventDefault();
+                const form = event.target;
+                if (!form.domain.value.trim()) return;
+                infraAction({action: 'add_domain', id: server.id, domain: form.domain.value}, 'Домен привязан');
+            });
+            container.querySelectorAll('[data-infra-ensure-ip]').forEach((button) => {
+                button.addEventListener('click', () =>
+                    infraAction({action: 'ensure_ip', id: server.id, ip_id: button.dataset.infraEnsureIp}, 'Команда отправлена агенту'));
+            });
+            container.querySelectorAll('[data-infra-replace-ip]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    if (!confirm(`Заменить IP ${button.dataset.infraReplaceIp} на резервный? Агент установит новый адрес, Cloudflare переключит DNS.`)) return;
+                    infraAction({action: 'replace_ip', id: server.id, ip: button.dataset.infraReplaceIp}, 'Заявка на замену создана');
+                });
+            });
+            container.querySelectorAll('[data-infra-block-ip]').forEach((button) => {
+                button.addEventListener('click', () =>
+                    infraAction({action: 'block_ip', id: server.id, ip_id: button.dataset.infraBlockIp}));
+            });
+            container.querySelectorAll('[data-infra-unblock-ip]').forEach((button) => {
+                button.addEventListener('click', () =>
+                    infraAction({action: 'unblock_ip', id: server.id, ip_id: button.dataset.infraUnblockIp}));
+            });
+            container.querySelectorAll('[data-infra-delete-ip]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    if (!confirm('Удалить IP из списка сервера?')) return;
+                    infraAction({action: 'delete_ip', id: server.id, ip_id: button.dataset.infraDeleteIp});
+                });
+            });
+            container.querySelectorAll('[data-infra-delete-domain]').forEach((button) => {
+                button.addEventListener('click', () => {
+                    if (!confirm(`Отвязать домен ${button.dataset.infraDeleteDomain}?`)) return;
+                    infraAction({action: 'delete_domain', id: server.id, domain: button.dataset.infraDeleteDomain});
+                });
+            });
+        }
+
+        function infraChartLabel(ts, period) {
+            // '2026-08-27 10:00:00' -> короткая подпись по периоду
+            if (!ts) return '';
+            const [date, time] = ts.split(' ');
+            if (period === '7d' || period === '30d') return date.slice(5) + ' ' + (time || '').slice(0, 5);
+            return (time || '').slice(0, 5);
+        }
+
+        function drawInfraCharts(telemetry) {
+            const points = telemetry.points || [];
+            const labels = points.map((p) => infraChartLabel(p.ts, telemetry.period));
+            drawInfraLineChart(
+                document.getElementById('infra-traffic-chart'),
+                document.getElementById('infra-traffic-tooltip'),
+                labels,
+                [
+                    {label: 'DOWN', tone: 'indigo', data: points.map((p) => p.rx_bps), fill: true},
+                    {label: 'UP', tone: 'green', data: points.map((p) => p.tx_bps)},
+                ],
+                (value) => infraFmtBps(value),
+            );
+            drawInfraLineChart(
+                document.getElementById('infra-conn-chart'),
+                document.getElementById('infra-conn-tooltip'),
+                labels,
+                [
+                    {label: 'TCP', tone: 'indigo', data: points.map((p) => p.tcp), fill: true},
+                    {label: 'conntrack', tone: 'amber', data: points.map((p) => p.conntrack), dash: [4, 3]},
+                ],
+                (value) => Math.round(value).toLocaleString('ru-RU'),
+            );
+        }
+
+        function drawInfraLineChart(canvas, tooltip, labels, series, fmtValue) {
+            if (!canvas) return;
+            const dpr = window.devicePixelRatio || 1;
+            const render = (hi) => {
+                canvas.width = canvas.clientWidth * dpr;
+                canvas.height = canvas.clientHeight * dpr;
+                const ctx = canvas.getContext('2d');
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                const w = canvas.clientWidth, h = canvas.clientHeight;
+                const padL = 62, padR = 12, padT = 18, padB = 22;
+                const plotW = w - padL - padR, plotH = h - padT - padB;
+                const n = labels.length;
+                if (!n) {
+                    ctx.fillStyle = adminChartUiColor('empty');
+                    ctx.font = '12px sans-serif';
+                    ctx.fillText('Нет данных за период', padL, h / 2);
+                    return;
+                }
+                const maxValue = Math.max(1, ...series.flatMap((sr) => sr.data.filter((v) => v !== null && v !== undefined)));
+                const step = plotW / Math.max(1, n - 1);
+
+                ctx.font = '10px sans-serif';
+                for (let g = 0; g <= 4; g++) {
+                    const y = padT + plotH - (plotH * g) / 4;
+                    ctx.strokeStyle = adminChartUiColor(g === 0 ? 'gridStrong' : 'grid');
+                    ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
+                    ctx.fillStyle = adminChartUiColor('label');
+                    ctx.textAlign = 'right';
+                    ctx.fillText(fmtValue((maxValue * g) / 4), padL - 6, y + 3);
+                }
+                ctx.textAlign = 'center';
+                const tickEvery = Math.max(1, Math.floor(n / 6));
+                for (let i = 0; i < n; i += tickEvery) {
+                    ctx.fillStyle = adminChartUiColor('label');
+                    ctx.fillText(labels[i], padL + i * step, h - 6);
+                }
+
+                series.forEach((sr, index) => {
+                    const color = adminChartSeriesColor(sr);
+                    if (sr.fill && index === 0) {
+                        ctx.beginPath();
+                        let started = false, lastX = padL;
+                        sr.data.forEach((value, i) => {
+                            if (value === null || value === undefined) return;
+                            const x = padL + i * step;
+                            const y = padT + plotH - (value / maxValue) * plotH;
+                            if (!started) { ctx.moveTo(x, padT + plotH); ctx.lineTo(x, y); started = true; }
+                            else ctx.lineTo(x, y);
+                            lastX = x;
+                        });
+                        if (started) {
+                            ctx.lineTo(lastX, padT + plotH);
+                            ctx.closePath();
+                            ctx.globalAlpha = 0.14;
+                            ctx.fillStyle = color;
+                            ctx.fill();
+                            ctx.globalAlpha = 1;
+                        }
+                    }
+                    ctx.strokeStyle = color;
+                    ctx.lineWidth = sr.width || 1.6;
+                    if (sr.dash) ctx.setLineDash(sr.dash); else ctx.setLineDash([]);
+                    ctx.beginPath();
+                    let started = false;
+                    sr.data.forEach((value, i) => {
+                        if (value === null || value === undefined) return;
+                        const x = padL + i * step;
+                        const y = padT + plotH - (value / maxValue) * plotH;
+                        if (!started) { ctx.moveTo(x, y); started = true; } else ctx.lineTo(x, y);
+                    });
+                    ctx.stroke();
+                    ctx.setLineDash([]);
+                });
+
+                // легенда
+                ctx.textAlign = 'left';
+                let legendX = padL;
+                series.forEach((sr) => {
+                    if (!sr.label) return;
+                    ctx.fillStyle = adminChartSeriesColor(sr);
+                    ctx.fillRect(legendX, 4, 10, 3);
+                    ctx.fillStyle = adminChartUiColor('label');
+                    ctx.fillText(sr.label, legendX + 14, 9);
+                    legendX += 14 + ctx.measureText(sr.label).width + 16;
+                });
+
+                if (hi !== null && hi !== undefined && hi >= 0 && hi < n) {
+                    const x = padL + hi * step;
+                    ctx.strokeStyle = adminChartUiColor('guide');
+                    ctx.setLineDash([3, 3]);
+                    ctx.beginPath(); ctx.moveTo(x, padT); ctx.lineTo(x, padT + plotH); ctx.stroke();
+                    ctx.setLineDash([]);
+                    series.forEach((sr) => {
+                        const value = sr.data[hi];
+                        if (value === null || value === undefined) return;
+                        const y = padT + plotH - (value / maxValue) * plotH;
+                        ctx.beginPath();
+                        ctx.arc(x, y, 3, 0, Math.PI * 2);
+                        ctx.fillStyle = adminChartSeriesColor(sr);
+                        ctx.fill();
+                    });
+                }
+                return {padL, step, n};
+            };
+
+            render(null);
+            if (!tooltip) return;
+            canvas.onmousemove = (event) => {
+                const rect = canvas.getBoundingClientRect();
+                const padL = 62;
+                const plotW = canvas.clientWidth - padL - 12;
+                const n = labels.length;
+                if (!n) return;
+                const step = plotW / Math.max(1, n - 1);
+                const index = Math.max(0, Math.min(n - 1, Math.round((event.clientX - rect.left - padL) / step)));
+                render(index);
+                const lines = series
+                    .filter((sr) => sr.data[index] !== null && sr.data[index] !== undefined)
+                    .map((sr) => `<div><b>${sr.label}</b>: ${fmtValue(sr.data[index])}</div>`)
+                    .join('');
+                tooltip.innerHTML = `<div style="color:var(--muted);font-size:10px;">${labels[index]}</div>${lines}`;
+                tooltip.style.display = 'block';
+                const x = Math.min(canvas.clientWidth - 150, Math.max(0, event.clientX - rect.left + 12));
+                tooltip.style.left = x + 'px';
+                tooltip.style.top = '10px';
+            };
+            canvas.onmouseleave = () => {
+                render(null);
+                tooltip.style.display = 'none';
+            };
+        }
+
+        async function loadInfraSettings() {
+            const container = document.getElementById('infra-settings');
+            if (!container) return;
+            try {
+                const response = await fetch(main.dataset.infraSettingsUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store'});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error(payload.message || 'Ошибка');
+                renderInfraSettings(container, payload.settings || []);
+            } catch (error) {
+                container.innerHTML = `<div class="help-block">Не удалось загрузить настройки: ${escapeHtml(String(error.message || error))}</div>`;
+            }
+        }
+
+        function renderInfraSettings(container, settings) {
+            container.innerHTML = settings.map((setting) => {
+                let control;
+                if (setting.type === 'bool') {
+                    control = `<select data-infra-setting="${setting.key}">
+                        <option value="true" ${setting.value ? 'selected' : ''}>включено</option>
+                        <option value="false" ${!setting.value ? 'selected' : ''}>выключено</option>
+                    </select>`;
+                } else if ((setting.allowed_values || []).length) {
+                    control = `<select data-infra-setting="${setting.key}">` +
+                        setting.allowed_values.map((v) => `<option value="${v}" ${String(v) === String(setting.value) ? 'selected' : ''}>${v}</option>`).join('') +
+                        '</select>';
+                } else {
+                    control = `<input type="text" data-infra-setting="${setting.key}" value="${setting.value}" style="width:90px;">`;
+                }
+                return `
+                    <div class="infra-ip-row">
+                        <div>
+                            ${escapeHtml(setting.description)}
+                            <div style="color:var(--muted);font-size:10px;"><code>${setting.key}</code> · по умолчанию ${setting.default}</div>
+                        </div>
+                        <div class="infra-ip-actions">
+                            ${control}
+                            <button type="button" class="infra-mini-btn" data-infra-setting-save="${setting.key}">сохранить</button>
+                        </div>
+                    </div>`;
+            }).join('');
+            container.querySelectorAll('[data-infra-setting-save]').forEach((button) => {
+                button.addEventListener('click', async () => {
+                    const key = button.dataset.infraSettingSave;
+                    const control = container.querySelector(`[data-infra-setting="${key}"]`);
+                    try {
+                        await infraPost(main.dataset.infraSettingsUrl, {key, value: control.value});
+                        showAdminToast('Настройка сохранена');
+                    } catch (error) {
+                        showAdminToast(String(error.message || error), 'error');
+                    }
+                });
+            });
+        }
+
         setupSubtabs('panel-stats');
         setupSubtabs('panel-system');
+        // «Инфраструктура»: не setupSubtabs — клик должен ещё дёргать ленивый
+        // инициализатор вкладки (showInfraSubtab)
+        document.querySelectorAll('#panel-infrastructure .subtab[data-subtab]').forEach((button) => {
+            button.addEventListener('click', () => showInfraSubtab(button.dataset.subtab));
+        });
         const cohortForm = document.getElementById('cohort-form');
         if (cohortForm) {
             cohortForm.addEventListener('submit', loadCohortStats);
@@ -10801,8 +11686,10 @@
         }
 
         const defaultTab = document.querySelector('.tab-btn.active')?.dataset.tab || document.querySelector('.tab-btn')?.dataset.tab;
-        const requestedTab = (location.hash || '').slice(1);
-        const initialTab = document.querySelector(`[data-tab="${requestedTab}"]`) ? requestedTab : defaultTab;
+        // Хэш чистим до безопасного алфавита: кавычка в location.hash иначе
+        // роняла бы querySelector и обрывала инициализацию страницы
+        const requestedTab = (location.hash || '').slice(1).replace(/[^a-zA-Z0-9_-]/g, '');
+        const initialTab = (LEGACY_INFRA_TABS[requestedTab] || document.querySelector(`[data-tab="${requestedTab}"]`)) ? requestedTab : defaultTab;
         if (initialTab) showAdminTab(initialTab);
         if (statsForm) loadStats();
         rememberRenderedTickets();

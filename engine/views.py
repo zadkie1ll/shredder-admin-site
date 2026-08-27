@@ -58,6 +58,7 @@ from sqlalchemy import text
 from sqlalchemy import Text
 from sqlalchemy import TIMESTAMP
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import SQLAlchemyError
 from common.models.db import User
 from common.models.db import TemporarySquadBan
 from common.models.db import EventLog
@@ -103,6 +104,7 @@ from engine.bot_push import push_admin_temporary_ban
 from common.models.db import CensorCheck
 from common.models.db import CensorCheckRun
 from common.models.db import RipeApiKey
+from common.models.db import InfraServerIp
 from common.models.db import NodeInstallScript
 from common.models.db import NodeProvisionRequest
 from common.models.db import NodeProvisionStage
@@ -146,6 +148,7 @@ from common.rwms_client_sync import RwmsClientSync
 from . import node_traffic
 from . import node_provisioning
 from . import ripe_atlas
+from . import infra
 from .rwms_helpers import RwmsSubscriptionOwnershipError
 from .rwms_helpers import assert_subscription_owned_by_email
 from .rwms_helpers import assert_subscription_owned_by_telegram_id
@@ -13177,5 +13180,300 @@ def support_admin_api_node_provision_detail(request):
                 },
             }
         )
+    finally:
+        db_session.close()
+
+
+# --- Инфраструктура → Серверы ------------------------------------------------
+
+
+def _infra_error_response(db_session, error):
+    db_session.rollback()
+    return JsonResponse(
+        {"status": "error", "message": error.message}, status=error.http_status
+    )
+
+
+def support_admin_api_infra_servers(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "GET":
+            include_archived = request.GET.get("archived") == "1"
+            try:
+                payload = infra.server_list_payload(
+                    db_session, include_archived=include_archived
+                )
+            except SQLAlchemyError:
+                # Код мог приехать раньше alembic-миграции таблиц infra_*
+                db_session.rollback()
+                logging.exception("infra servers list failed")
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": "Таблицы инфраструктуры недоступны — "
+                        "применена ли миграция common?",
+                    },
+                    status=503,
+                )
+            return JsonResponse({"status": "ok", "result": payload})
+
+        if request.method != "POST":
+            return JsonResponse({"status": "error"}, status=405)
+
+        action = request.POST.get("action") or ""
+        server_id = request.POST.get("id")
+        actor = str(support_admin_actor(request))[:128]
+        try:
+            if action == "update":
+                server = infra.update_server(
+                    db_session,
+                    server_id,
+                    {
+                        "display_name": request.POST.get("display_name"),
+                        "bandwidth_limit_mbps": request.POST.get(
+                            "bandwidth_limit_mbps"
+                        ),
+                        "notes": request.POST.get("notes"),
+                    },
+                )
+                admin_audit_write(
+                    db_session, request, "infra_server_update",
+                    target=server.node_name,
+                    bandwidth_limit_mbps=server.bandwidth_limit_mbps,
+                )
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            if action in ("archive", "unarchive"):
+                server = infra.update_server(
+                    db_session, server_id, {"is_archived": action == "archive"}
+                )
+                admin_audit_write(
+                    db_session, request, f"infra_server_{action}",
+                    target=server.node_name,
+                )
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            if action == "add_ip":
+                row = infra.add_manual_ip(
+                    db_session,
+                    server_id,
+                    request.POST.get("ip") or "",
+                    request.POST.get("prefix"),
+                    request.POST.get("comment") or "",
+                )
+                admin_audit_write(
+                    db_session, request, "infra_ip_add",
+                    target=row.ip, server_id=int(server_id or 0),
+                )
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            if action == "delete_ip":
+                infra.delete_ip(db_session, server_id, request.POST.get("ip_id"))
+                admin_audit_write(
+                    db_session, request, "infra_ip_delete",
+                    target=request.POST.get("ip_id"),
+                    server_id=int(server_id or 0),
+                )
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            if action in ("block_ip", "unblock_ip"):
+                row = infra.set_ip_blocked(
+                    db_session,
+                    server_id,
+                    request.POST.get("ip_id"),
+                    action == "block_ip",
+                )
+                admin_audit_write(
+                    db_session, request, f"infra_{action}", target=row.ip,
+                    server_id=int(server_id or 0),
+                )
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            if action == "add_domain":
+                row = infra.add_domain(
+                    db_session, server_id, request.POST.get("domain") or ""
+                )
+                admin_audit_write(
+                    db_session, request, "infra_domain_add", target=row.domain,
+                    server_id=int(server_id or 0),
+                )
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            if action == "delete_domain":
+                infra.delete_domain(
+                    db_session, server_id, request.POST.get("domain") or ""
+                )
+                admin_audit_write(
+                    db_session, request, "infra_domain_delete",
+                    target=request.POST.get("domain"),
+                    server_id=int(server_id or 0),
+                )
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            if action == "ensure_ip":
+                server = infra.get_server(db_session, server_id)
+                ip_row = db_session.get(
+                    InfraServerIp, int(request.POST.get("ip_id") or 0)
+                )
+                if ip_row is None or ip_row.server_id != server.id:
+                    raise infra.InfraError("IP не найден", 404)
+                command = infra.create_ensure_ip_command(
+                    db_session, server, ip_row, created_by=actor
+                )
+                admin_audit_write(
+                    db_session, request, "infra_ensure_ip", target=ip_row.ip,
+                    command_id=command.id,
+                )
+                db_session.commit()
+                return JsonResponse(
+                    {"status": "ok", "result": {"command_id": command.id}}
+                )
+
+            if action == "replace_ip":
+                replacement = infra.request_replacement(
+                    db_session,
+                    server_id,
+                    request.POST.get("ip") or "",
+                    created_by=f"manual:{actor}",
+                )
+                admin_audit_write(
+                    db_session, request, "infra_replace_ip",
+                    target=request.POST.get("ip"),
+                    replacement_id=replacement.id,
+                )
+                db_session.commit()
+                return JsonResponse(
+                    {"status": "ok", "result": {"replacement_id": replacement.id}}
+                )
+
+            if action in ("snooze", "unsnooze"):
+                if action == "snooze":
+                    server = infra.snooze_anomaly_detector(
+                        db_session, server_id, request.POST.get("hours")
+                    )
+                else:
+                    server = infra.unsnooze_anomaly_detector(
+                        db_session, server_id
+                    )
+                admin_audit_write(
+                    db_session, request, f"infra_anomaly_{action}",
+                    target=server.node_name,
+                    until=str(server.anomaly_suppressed_until),
+                )
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
+            if action == "force_check":
+                server = infra.get_server(db_session, server_id)
+                result = infra.force_tspu_check(
+                    db_session, server, reason=f"manual:{actor}"
+                )
+                admin_audit_write(
+                    db_session, request, "infra_force_tspu_check",
+                    target=server.node_name, run_ids=result["run_ids"],
+                )
+                db_session.commit()
+                return JsonResponse({"status": "ok", "result": result})
+
+            return JsonResponse(
+                {"status": "error", "message": "Неизвестное действие"}, status=400
+            )
+        except infra.InfraError as error:
+            return _infra_error_response(db_session, error)
+    finally:
+        db_session.close()
+
+
+def support_admin_api_infra_server_detail(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        try:
+            payload = infra.server_detail_payload(
+                db_session, request.GET.get("id")
+            )
+        except infra.InfraError as error:
+            return _infra_error_response(db_session, error)
+        return JsonResponse({"status": "ok", "result": payload})
+    finally:
+        db_session.close()
+
+
+def support_admin_api_infra_telemetry(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        try:
+            payload = infra.telemetry_series_payload(
+                db_session,
+                request.GET.get("id"),
+                request.GET.get("period") or "24h",
+            )
+        except infra.InfraError as error:
+            return _infra_error_response(db_session, error)
+        return JsonResponse({"status": "ok", "result": payload})
+    finally:
+        db_session.close()
+
+
+def support_admin_api_infra_settings(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "GET":
+            values = infra.get_settings(db_session)
+            items = [
+                {
+                    "key": key,
+                    "value": values[key],
+                    "default": default,
+                    "description": description,
+                    "allowed_values": allowed or [],
+                    "type": (
+                        "bool" if cast is bool
+                        else "float" if cast is float
+                        else "int"
+                    ),
+                }
+                for key, (default, cast, description, allowed)
+                in infra.INFRA_SETTINGS.items()
+            ]
+            return JsonResponse({"status": "ok", "settings": items})
+
+        if request.method != "POST":
+            return JsonResponse({"status": "error"}, status=405)
+
+        key = (request.POST.get("key") or "").strip()
+        try:
+            normalized = infra.validate_setting(key, request.POST.get("value"))
+        except infra.InfraError as error:
+            return _infra_error_response(db_session, error)
+        admin_upsert_system_setting(db_session, key, normalized)
+        admin_audit_write(
+            db_session, request, "infra_setting_save", target=key,
+            value=normalized,
+        )
+        db_session.commit()
+        return JsonResponse({"status": "ok"})
     finally:
         db_session.close()

@@ -229,6 +229,14 @@ BOT_REDIS_QUEUES = config(
 # процесса сайта. Отключите, если крутите обслуживание отдельно (крон/воркер).
 CENSOR_WORKER_ENABLED = config("CENSOR_WORKER_ENABLED", default=True, cast=bool)
 CENSOR_WORKER_INTERVAL = config("CENSOR_WORKER_INTERVAL", default=60, cast=int)
+# Фоновый воркер «Инфраструктуры» (вкладка Инфраструктура → Серверы):
+# агрегация телеметрии node-agent'ов, ONLINE/OFFLINE и алерты, аномалии
+# нагрузки -> принудительные «Замеры ТСПУ» -> автозамена IP через Cloudflare.
+INFRA_WORKER_ENABLED = config("INFRA_WORKER_ENABLED", default=True, cast=bool)
+INFRA_WORKER_INTERVAL = config("INFRA_WORKER_INTERVAL", default=30, cast=int)
+# Токен Cloudflare API (права Zone:DNS:Edit + Zone:Zone:Read на зоны клиентских
+# доменов) для ротации A-записей. Пустой — автозамена IP выключена.
+CLOUDFLARE_API_TOKEN = config("CLOUDFLARE_API_TOKEN", default="")
 SUPPORT_ATTACHMENT_MAX_BYTES = config(
     "SUPPORT_ATTACHMENT_MAX_BYTES",
     default=50 * 1024 * 1024,

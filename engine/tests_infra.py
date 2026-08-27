@@ -1,0 +1,1550 @@
+"""Тесты раздела «Инфраструктура → Серверы» (engine/infra.py, infra_worker.py).
+
+БД — in-memory SQLite с реальными таблицами (паттерн tests_node_provisioning),
+Cloudflare/Telegram/RIPE Atlas — mock, HTTP — RequestFactory на view-функциях.
+"""
+
+from datetime import datetime
+from datetime import timedelta
+from datetime import timezone
+from unittest import mock
+
+from django.test import RequestFactory, SimpleTestCase
+
+from sqlalchemy import BigInteger, create_engine
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.ext.compiler import compiles
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
+
+from common.models.db import (
+    Base,
+    CensorCheck,
+    CensorCheckRun,
+    InfraAgentCommand,
+    InfraAnomaly,
+    InfraIpReplacement,
+    InfraServer,
+    InfraServerDomain,
+    InfraServerIp,
+    InfraTelemetry,
+    InfraTelemetryAgg,
+    SystemSetting,
+    UserIpObservation,
+)
+from engine import infra
+from engine import infra_worker
+
+
+@compiles(BigInteger, "sqlite")
+def _compile_bigint_as_integer_on_sqlite(type_, compiler, **kw):  # noqa: ANN001
+    return "INTEGER"
+
+
+@compiles(JSONB, "sqlite")
+def _compile_jsonb_as_json_on_sqlite(type_, compiler, **kw):  # noqa: ANN001
+    return "JSON"
+
+
+INFRA_TABLES = [
+    InfraServer.__table__,
+    InfraServerIp.__table__,
+    InfraServerDomain.__table__,
+    InfraTelemetry.__table__,
+    InfraTelemetryAgg.__table__,
+    InfraAgentCommand.__table__,
+    InfraAnomaly.__table__,
+    InfraIpReplacement.__table__,
+    SystemSetting.__table__,
+    CensorCheck.__table__,
+    CensorCheckRun.__table__,
+    UserIpObservation.__table__,
+]
+
+
+def utcnow():
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+class InfraDbTestCase(SimpleTestCase):
+    def setUp(self):
+        self.engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(self.engine, tables=INFRA_TABLES)
+        self.Session = sessionmaker(bind=self.engine)
+        self.session = self.Session()
+        self.addCleanup(self.engine.dispose)
+        self.addCleanup(self.session.close)
+
+    def make_server(self, **kwargs):
+        now = utcnow()
+        defaults = dict(
+            machine_uid=kwargs.pop("machine_uid", "m-1"),
+            node_name="de-1",
+            hostname="de-01",
+            wan_interface="ens3",
+            detected_link_speed_mbps=10000,
+            first_seen_at=now - timedelta(days=30),
+            last_seen_at=now,
+            agent_started_at=now - timedelta(hours=5),
+            boot_time=now - timedelta(days=3),
+        )
+        defaults.update(kwargs)
+        server = InfraServer(**defaults)
+        self.session.add(server)
+        self.session.commit()
+        return server
+
+    def make_ip(self, server, ip, **kwargs):
+        row = InfraServerIp(
+            server_id=server.id,
+            ip=ip,
+            prefix_len=kwargs.pop("prefix_len", 24),
+            source=kwargs.pop("source", "detected"),
+            on_interface=kwargs.pop("on_interface", True),
+            interface=kwargs.pop("interface", "ens3"),
+            **kwargs,
+        )
+        self.session.add(row)
+        self.session.commit()
+        return row
+
+    def make_domain(self, server, domain):
+        row = InfraServerDomain(server_id=server.id, domain=domain)
+        self.session.add(row)
+        self.session.commit()
+        return row
+
+    def add_samples(self, server, start, count, step_seconds=10, **values):
+        for i in range(count):
+            self.session.add(
+                InfraTelemetry(
+                    server_id=server.id,
+                    ts=start + timedelta(seconds=i * step_seconds),
+                    rx_bps=values.get("rx_bps", 100_000_000),
+                    tx_bps=values.get("tx_bps", 20_000_000),
+                    tcp_connections=values.get("tcp_connections", 4000),
+                    conntrack=values.get("conntrack"),
+                    cpu_load=values.get("cpu_load"),
+                )
+            )
+        self.session.commit()
+
+
+class SettingsTests(InfraDbTestCase):
+    def test_defaults_and_overrides(self):
+        cfg = infra.get_settings(self.session)
+        self.assertEqual(cfg["infra_load_threshold_pct"], 85)
+        self.assertTrue(cfg["infra_auto_replace_enabled"])
+
+        self.session.add(
+            SystemSetting(key="infra_load_threshold_pct", value="90")
+        )
+        self.session.add(
+            SystemSetting(key="infra_auto_replace_enabled", value="false")
+        )
+        self.session.commit()
+        cfg = infra.get_settings(self.session)
+        self.assertEqual(cfg["infra_load_threshold_pct"], 90)
+        self.assertFalse(cfg["infra_auto_replace_enabled"])
+
+    def test_bad_override_falls_back_to_default(self):
+        self.session.add(
+            SystemSetting(key="infra_anomaly_traffic_ratio", value="мусор")
+        )
+        self.session.commit()
+        cfg = infra.get_settings(self.session)
+        self.assertEqual(cfg["infra_anomaly_traffic_ratio"], 0.35)
+
+    def test_validate_setting(self):
+        self.assertEqual(
+            infra.validate_setting("infra_load_duration_minutes", "30"), "30"
+        )
+        with self.assertRaises(infra.InfraError):
+            infra.validate_setting("infra_load_duration_minutes", "20")
+        with self.assertRaises(infra.InfraError):
+            infra.validate_setting("infra_anomaly_traffic_ratio", "1.5")
+        with self.assertRaises(infra.InfraError):
+            infra.validate_setting("unknown_key", "1")
+        self.assertEqual(
+            infra.validate_setting("infra_auto_replace_enabled", "true"), "true"
+        )
+
+
+class ComputationTests(InfraDbTestCase):
+    def test_utilization_uses_max_of_rx_tx(self):
+        # RX=370M, TX=80M при лимите 400 Mbit → 92.5% (не (370+80)/400)
+        self.assertEqual(
+            infra.utilization_pct(370_000_000, 80_000_000, 400), 92.5
+        )
+        self.assertIsNone(infra.utilization_pct(1, 1, None))
+
+    def test_effective_bandwidth_prefers_override(self):
+        server = self.make_server(bandwidth_limit_mbps=400)
+        self.assertEqual(infra.effective_bandwidth_mbps(server), 400)
+        server.bandwidth_limit_mbps = None
+        self.assertEqual(infra.effective_bandwidth_mbps(server), 10000)
+
+    def test_is_online_threshold(self):
+        cfg = infra.get_settings(self.session)
+        server = self.make_server()
+        self.assertTrue(infra.is_online(server, cfg))
+        server.last_seen_at = utcnow() - timedelta(seconds=300)
+        self.assertFalse(infra.is_online(server, cfg))
+
+
+class MutationTests(InfraDbTestCase):
+    def test_add_manual_ip_and_duplicates(self):
+        server = self.make_server()
+        row = infra.add_manual_ip(self.session, server.id, "185.10.0.11", "24")
+        self.assertEqual(row.source, "manual")
+        self.assertFalse(row.on_interface)
+        with self.assertRaises(infra.InfraError):
+            infra.add_manual_ip(self.session, server.id, "185.10.0.11", "24")
+        with self.assertRaises(infra.InfraError):
+            infra.add_manual_ip(self.session, server.id, "не-ip", "24")
+
+    def test_delete_ip_on_interface_is_forbidden(self):
+        server = self.make_server()
+        active = self.make_ip(server, "185.10.0.10", on_interface=True)
+        reserve = self.make_ip(server, "185.10.0.11", on_interface=False)
+        with self.assertRaises(infra.InfraError):
+            infra.delete_ip(self.session, server.id, active.id)
+        infra.delete_ip(self.session, server.id, reserve.id)
+        self.session.commit()
+        rows = self.session.query(InfraServerIp).all()
+        self.assertEqual([r.ip for r in rows], ["185.10.0.10"])
+
+    def test_domain_validation_and_uniqueness(self):
+        server = self.make_server()
+        infra.add_domain(self.session, server.id, "De.Example.XYZ")
+        row = self.session.query(InfraServerDomain).one()
+        self.assertEqual(row.domain, "de.example.xyz")
+        # Round-robin: тот же домен можно привязать к другому серверу
+        other = self.make_server(machine_uid="m-2")
+        infra.add_domain(self.session, other.id, "de.example.xyz")
+        self.assertEqual(self.session.query(InfraServerDomain).count(), 2)
+        # Но не дважды к одному
+        with self.assertRaises(infra.InfraError):
+            infra.add_domain(self.session, server.id, "de.example.xyz")
+        with self.assertRaises(infra.InfraError):
+            infra.add_domain(self.session, server.id, "bad domain")
+
+    def test_ensure_ip_command_is_deduplicated(self):
+        server = self.make_server()
+        reserve = self.make_ip(server, "185.10.0.11", on_interface=False)
+        first = infra.create_ensure_ip_command(
+            self.session, server, reserve, "tester"
+        )
+        second = infra.create_ensure_ip_command(
+            self.session, server, reserve, "tester"
+        )
+        self.assertEqual(first.id, second.id)
+        self.assertEqual(first.payload["ip"], "185.10.0.11")
+        self.assertEqual(first.payload["interface"], "ens3")
+
+    def test_request_replacement_idempotent(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        first = infra.request_replacement(
+            self.session, server.id, "185.10.0.10", "tester"
+        )
+        second = infra.request_replacement(
+            self.session, server.id, "185.10.0.10", "tester"
+        )
+        self.assertEqual(first.id, second.id)
+        self.assertEqual(first.domains, ["de.example.xyz"])
+        with self.assertRaises(infra.InfraError):
+            infra.request_replacement(self.session, server.id, "9.9.9.9", "t")
+
+
+class ForceTspuCheckTests(InfraDbTestCase):
+    def test_creates_check_and_starts_run(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+
+        def fake_start_run(db, check, api_key, is_public, geo, light):
+            run = CensorCheckRun(check_id=check.id, status="pending")
+            db.add(run)
+            db.flush()
+            check.last_started_at = utcnow()
+            return run
+
+        with mock.patch(
+            "engine.ripe_atlas.start_run", side_effect=fake_start_run
+        ), mock.patch(
+            "engine.ripe_atlas.resolve_api_key", return_value="key"
+        ), mock.patch(
+            "engine.ripe_atlas.resolve_public_flag", return_value=False
+        ):
+            result = infra.force_tspu_check(self.session, server, "test")
+
+        self.assertEqual(len(result["run_ids"]), 1)
+        self.assertEqual(result["errors"], [])
+        check = self.session.query(CensorCheck).one()
+        self.assertEqual(check.target_ip, "185.10.0.10")
+        self.assertEqual(check.sni, "de.example.xyz")
+        self.assertTrue(check.light_mode)
+        self.assertIsNone(check.interval_minutes)
+
+    def test_pending_run_is_reused_without_new_start(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        check = CensorCheck(
+            name="n", target_ip="185.10.0.10", sni="x.example", port=443
+        )
+        self.session.add(check)
+        self.session.flush()
+        run = CensorCheckRun(check_id=check.id, status="pending")
+        self.session.add(run)
+        self.session.commit()
+
+        with mock.patch("engine.ripe_atlas.start_run") as start_run:
+            result = infra.force_tspu_check(self.session, server, "test")
+        start_run.assert_not_called()
+        self.assertEqual(result["run_ids"], [run.id])
+
+    def test_no_domains_and_no_checks_reports_error(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        result = infra.force_tspu_check(self.session, server, "test")
+        self.assertEqual(result["run_ids"], [])
+        self.assertEqual(len(result["errors"]), 1)
+
+    def test_fresh_error_run_is_not_reused(self):
+        # Свежий (< 5 мин) прогон со статусом error — не замер: запускаем
+        # новый. Старый complete недельной давности тоже не «свежее
+        # доказательство» — фильтр по created_at самого прогона.
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        check = CensorCheck(
+            name="n", target_ip="185.10.0.10", sni="x.example", port=443,
+            last_started_at=utcnow() - timedelta(minutes=1),
+        )
+        self.session.add(check)
+        self.session.flush()
+        self.session.add(
+            CensorCheckRun(
+                check_id=check.id,
+                status="complete",
+                created_at=utcnow() - timedelta(days=7),
+            )
+        )
+        self.session.add(CensorCheckRun(check_id=check.id, status="error"))
+        self.session.commit()
+
+        def fake_start_run(db, c, api_key, is_public, geo, light):
+            run = CensorCheckRun(check_id=c.id, status="pending")
+            db.add(run)
+            db.flush()
+            return run
+
+        with mock.patch(
+            "engine.ripe_atlas.start_run", side_effect=fake_start_run
+        ) as start_run, mock.patch(
+            "engine.ripe_atlas.resolve_api_key", return_value="key"
+        ), mock.patch(
+            "engine.ripe_atlas.resolve_public_flag", return_value=False
+        ):
+            result = infra.force_tspu_check(self.session, server, "test")
+        start_run.assert_called_once()
+        self.assertEqual(len(result["run_ids"]), 1)
+
+    def test_targets_capped(self):
+        server = self.make_server()
+        for i in range(infra.TSPU_MAX_TARGETS + 3):
+            self.make_ip(server, f"185.10.0.{10 + i}", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+
+        def fake_start_run(db, c, api_key, is_public, geo, light):
+            run = CensorCheckRun(check_id=c.id, status="pending")
+            db.add(run)
+            db.flush()
+            return run
+
+        with mock.patch(
+            "engine.ripe_atlas.start_run", side_effect=fake_start_run
+        ), mock.patch(
+            "engine.ripe_atlas.resolve_api_key", return_value="key"
+        ), mock.patch(
+            "engine.ripe_atlas.resolve_public_flag", return_value=False
+        ):
+            result = infra.force_tspu_check(self.session, server, "test")
+        self.assertEqual(len(result["run_ids"]), infra.TSPU_MAX_TARGETS)
+        self.assertTrue(any("защита кредитов" in e for e in result["errors"]))
+
+
+class AggregationTests(InfraDbTestCase):
+    def test_minute_and_quarter_aggregates_with_volume(self):
+        server = self.make_server()
+        start = infra._floor_dt(utcnow() - timedelta(minutes=40), 900)
+        self.add_samples(server, start, count=6 * 30, step_seconds=10)
+
+        infra.aggregate_telemetry(self.session)
+        self.session.commit()
+
+        minutes = (
+            self.session.query(InfraTelemetryAgg)
+            .filter(InfraTelemetryAgg.bucket_seconds == 60)
+            .all()
+        )
+        self.assertGreaterEqual(len(minutes), 28)
+        sample_minute = minutes[0]
+        self.assertEqual(sample_minute.rx_bps_avg, 100_000_000)
+        self.assertEqual(sample_minute.tx_bps_avg, 20_000_000)
+        self.assertEqual(sample_minute.sample_count, 6)
+        # Объём за минуту: 100 Mbit/s * 60 c / 8 = 750 MБ
+        self.assertEqual(sample_minute.rx_bytes, 750_000_000)
+
+        quarters = (
+            self.session.query(InfraTelemetryAgg)
+            .filter(InfraTelemetryAgg.bucket_seconds == 900)
+            .all()
+        )
+        self.assertGreaterEqual(len(quarters), 1)
+        self.assertEqual(quarters[0].rx_bps_avg, 100_000_000)
+
+    def test_aggregation_is_idempotent(self):
+        server = self.make_server()
+        start = infra._floor_dt(utcnow() - timedelta(minutes=10), 60)
+        self.add_samples(server, start, count=30, step_seconds=10)
+        infra.aggregate_telemetry(self.session)
+        self.session.commit()
+        count_before = self.session.query(InfraTelemetryAgg).count()
+        infra.aggregate_telemetry(self.session)
+        self.session.commit()
+        self.assertEqual(
+            self.session.query(InfraTelemetryAgg).count(), count_before
+        )
+
+    def test_prune_removes_old_rows(self):
+        server = self.make_server()
+        old = utcnow() - timedelta(hours=48)
+        self.session.add(
+            InfraTelemetry(server_id=server.id, ts=old, rx_bps=1, tx_bps=1)
+        )
+        self.session.add(
+            InfraTelemetryAgg(
+                server_id=server.id,
+                bucket_seconds=60,
+                bucket_start=utcnow() - timedelta(days=20),
+                sample_count=1,
+            )
+        )
+        self.session.commit()
+        infra.prune_telemetry(self.session)
+        self.session.commit()
+        self.assertEqual(self.session.query(InfraTelemetry).count(), 0)
+        self.assertEqual(self.session.query(InfraTelemetryAgg).count(), 0)
+
+
+class BaselineAnomalyTests(InfraDbTestCase):
+    def seed_baseline(self, server, now, days=7, traffic=600_000_000, conns=5000):
+        for day in range(1, days + 1):
+            center = now - timedelta(days=day)
+            for minute_offset in range(-30, 31, 5):
+                self.session.add(
+                    InfraTelemetryAgg(
+                        server_id=server.id,
+                        bucket_seconds=60,
+                        bucket_start=center + timedelta(minutes=minute_offset),
+                        rx_bps_avg=int(traffic * 0.85),
+                        tx_bps_avg=int(traffic * 0.15),
+                        tcp_avg=conns,
+                        sample_count=6,
+                    )
+                )
+        self.session.commit()
+
+    def test_baseline_median(self):
+        server = self.make_server()
+        now = utcnow()
+        self.seed_baseline(server, now)
+        cfg = infra.get_settings(self.session)
+        baseline = infra.compute_baseline(self.session, server.id, now, cfg)
+        self.assertIsNotNone(baseline)
+        self.assertAlmostEqual(
+            baseline["traffic_bps"], 600_000_000, delta=2_000_000
+        )
+        self.assertEqual(baseline["connections"], 5000)
+
+    def test_baseline_requires_history(self):
+        server = self.make_server()
+        now = utcnow()
+        self.seed_baseline(server, now, days=2)
+        cfg = infra.get_settings(self.session)
+        self.assertIsNone(
+            infra.compute_baseline(self.session, server.id, now, cfg)
+        )
+
+    def test_evaluate_network_drop(self):
+        cfg = infra.get_settings(self.session)
+        baseline = {"traffic_bps": 700_000_000, "connections": 6200}
+        minutes = [
+            {"minute": None, "traffic_bps": 180_000_000, "connections": 1450}
+            for _ in range(5)
+        ]
+        verdict = infra.evaluate_network_drop(minutes, baseline, cfg)
+        self.assertIsNotNone(verdict)
+        self.assertAlmostEqual(verdict["traffic_ratio"], 0.257, places=2)
+        self.assertAlmostEqual(verdict["connection_ratio"], 0.234, places=2)
+
+    def test_evaluate_requires_both_ratios_low(self):
+        cfg = infra.get_settings(self.session)
+        baseline = {"traffic_bps": 700_000_000, "connections": 6200}
+        # Трафик упал, но соединения в норме — не аномалия (например, ночь)
+        minutes = [
+            {"minute": None, "traffic_bps": 100_000_000, "connections": 6000}
+            for _ in range(5)
+        ]
+        self.assertIsNone(infra.evaluate_network_drop(minutes, baseline, cfg))
+
+    def test_min_baseline_floor_checked_against_unscaled(self):
+        cfg = infra.get_settings(self.session)
+        # Масштабированная норма 15 Mbit < порога 20, но НЕмасштабированная
+        # (floor) 45 Mbit — детекция обязана работать: бан ловится и после
+        # дробления DNS на мелком сервере
+        baseline = {
+            "traffic_bps": 15_000_000,
+            "connections": 500,
+            "floor_traffic_bps": 45_000_000,
+        }
+        minutes = [
+            {"minute": None, "traffic_bps": 1_000_000, "connections": 30}
+            for _ in range(5)
+        ]
+        verdict = infra.evaluate_network_drop(minutes, baseline, cfg)
+        self.assertIsNotNone(verdict)
+
+    def test_evaluate_skips_small_baseline_and_gaps(self):
+        cfg = infra.get_settings(self.session)
+        small = {"traffic_bps": 5_000_000, "connections": 100}
+        minutes = [
+            {"minute": None, "traffic_bps": 100, "connections": 1}
+            for _ in range(5)
+        ]
+        self.assertIsNone(infra.evaluate_network_drop(minutes, small, cfg))
+        baseline = {"traffic_bps": 700_000_000, "connections": 6200}
+        # Пропуски телеметрии: меньше точек, чем нужно окну
+        self.assertIsNone(
+            infra.evaluate_network_drop(minutes[:2], baseline, cfg)
+        )
+
+
+class DetectAnomalyWorkerTests(InfraDbTestCase):
+    def seed_drop(self, server, now):
+        # 5 минут сырых сэмплов с обвалом
+        start = infra._floor_dt(now - timedelta(minutes=5), 60)
+        self.add_samples(
+            server, start, count=30, step_seconds=10,
+            rx_bps=150_000_000, tx_bps=30_000_000, tcp_connections=1400,
+        )
+
+    def test_detects_and_forces_tspu(self):
+        now = utcnow()
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        BaselineAnomalyTests.seed_baseline(self, server, now)
+        self.seed_drop(server, now)
+
+        with mock.patch.object(
+            infra, "force_tspu_check", return_value={"run_ids": [7], "errors": []}
+        ) as forced, mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ):
+            infra_worker.detect_anomalies(self.session)
+        self.session.commit()
+
+        forced.assert_called_once()
+        anomaly = self.session.query(InfraAnomaly).one()
+        self.assertEqual(anomaly.status, "checking")
+        self.assertEqual(anomaly.censor_run_ids, [7])
+        self.assertLess(float(anomaly.traffic_ratio), 0.35)
+
+    def test_suppressed_after_agent_restart(self):
+        now = utcnow()
+        server = self.make_server(agent_started_at=now - timedelta(minutes=3))
+        BaselineAnomalyTests.seed_baseline(self, server, now)
+        self.seed_drop(server, now)
+        with mock.patch.object(infra, "force_tspu_check") as forced:
+            infra_worker.detect_anomalies(self.session)
+        forced.assert_not_called()
+        self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
+
+    def test_suppressed_during_warmup(self):
+        now = utcnow()
+        server = self.make_server(first_seen_at=now - timedelta(hours=10))
+        BaselineAnomalyTests.seed_baseline(self, server, now)
+        self.seed_drop(server, now)
+        with mock.patch.object(infra, "force_tspu_check") as forced:
+            infra_worker.detect_anomalies(self.session)
+        forced.assert_not_called()
+
+    def test_suppressed_while_snoozed(self):
+        # Пауза детектора (ручная или от DNS-вотчера) глушит срабатывание
+        now = utcnow()
+        server = self.make_server(
+            anomaly_suppressed_until=now + timedelta(hours=10)
+        )
+        BaselineAnomalyTests.seed_baseline(self, server, now)
+        self.seed_drop(server, now)
+        with mock.patch.object(infra, "force_tspu_check") as forced:
+            infra_worker.detect_anomalies(self.session)
+        forced.assert_not_called()
+        self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
+
+    def test_server_drained_from_dns_is_skipped(self):
+        # Ноду вывели из DNS (слепок доменов её IP не содержит): обвал
+        # трафика — намеренный слив, детектор молчит и замеры не жжёт
+        now = utcnow()
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        domain = self.make_domain(server, "de.example.xyz")
+        domain.last_a_ips = ["45.9.9.9"]  # трафик уехал на другую ноду
+        domain.dns_checked_at = now
+        self.session.commit()
+        BaselineAnomalyTests.seed_baseline(self, server, now)
+        self.seed_drop(server, now)
+        with mock.patch.object(infra, "force_tspu_check") as forced:
+            infra_worker.detect_anomalies(self.session)
+        forced.assert_not_called()
+        self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
+
+    def test_stale_dns_snapshot_falls_back_to_active(self):
+        # Слепок протух (вотчер умер/Cloudflare отключили) — по устаревшим
+        # данным детектор НЕ выключаем
+        now = utcnow()
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        domain = self.session.query(InfraServerDomain).one()
+        domain.last_a_ips = ["45.9.9.9"]  # IP сервера отсутствует
+        domain.dns_checked_at = now - timedelta(days=3)  # но слепок старый
+        self.session.commit()
+        self.assertTrue(infra.server_is_in_dns(self.session, server))
+        domain.dns_checked_at = now  # свежий слепок — решение принимается
+        self.session.commit()
+        self.assertFalse(infra.server_is_in_dns(self.session, server))
+
+    def test_server_present_in_dns_snapshot_fires(self):
+        now = utcnow()
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        domain = self.make_domain(server, "de.example.xyz")
+        domain.last_a_ips = ["185.10.0.10", "45.9.9.9"]
+        domain.dns_checked_at = now
+        self.session.commit()
+        BaselineAnomalyTests.seed_baseline(self, server, now)
+        self.seed_drop(server, now)
+        with mock.patch.object(
+            infra, "force_tspu_check", return_value={"run_ids": [7], "errors": []}
+        ) as forced, mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ):
+            infra_worker.detect_anomalies(self.session)
+        forced.assert_called_once()
+
+    def test_blocked_only_server_is_skipped(self):
+        # После dns_cleanup: единственный IP заблокирован и вычищен из DNS —
+        # детектор не спамит алертами «замер не запустился» каждый кулдаун
+        now = utcnow()
+        server = self.make_server()
+        self.make_ip(
+            server, "185.10.0.10", on_interface=True, blocked_at=now
+        )
+        domain = self.make_domain(server, "de.example.xyz")
+        domain.last_a_ips = ["45.9.9.9"]
+        domain.dns_checked_at = now
+        self.session.commit()
+        BaselineAnomalyTests.seed_baseline(self, server, now)
+        self.seed_drop(server, now)
+        with mock.patch.object(infra, "force_tspu_check") as forced:
+            infra_worker.detect_anomalies(self.session)
+        forced.assert_not_called()
+
+    def test_dns_rebalance_scale_prevents_false_positive(self):
+        # Разгрузка через вторую A-запись: трафик и соединения на ~25% от
+        # старой нормы (дробление на 4 ноды) — при scale 0.25 это 100% новой
+        # нормы, тревоги нет
+        now = utcnow()
+        server = self.make_server(
+            baseline_scale=0.25,
+            baseline_scale_until=now + timedelta(days=5),
+        )
+        BaselineAnomalyTests.seed_baseline(self, server, now)  # норма 600M/5000
+        start = infra._floor_dt(now - timedelta(minutes=5), 60)
+        self.add_samples(
+            server, start, count=30, step_seconds=10,
+            rx_bps=130_000_000, tx_bps=25_000_000, tcp_connections=1250,
+        )
+        with mock.patch.object(infra, "force_tspu_check") as forced:
+            infra_worker.detect_anomalies(self.session)
+        forced.assert_not_called()
+        self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
+
+    def test_real_ban_detected_even_with_scale(self):
+        # Даже при активной перекалибровке (x0.5) реальный бан — обвал почти
+        # к нулю — детектируется: защита не отключается
+        now = utcnow()
+        server = self.make_server(
+            baseline_scale=0.5,
+            baseline_scale_until=now + timedelta(days=5),
+        )
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        BaselineAnomalyTests.seed_baseline(self, server, now)
+        start = infra._floor_dt(now - timedelta(minutes=5), 60)
+        self.add_samples(
+            server, start, count=30, step_seconds=10,
+            rx_bps=25_000_000, tx_bps=5_000_000, tcp_connections=250,
+        )
+        with mock.patch.object(
+            infra, "force_tspu_check", return_value={"run_ids": [7], "errors": []}
+        ) as forced, mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ):
+            infra_worker.detect_anomalies(self.session)
+        self.session.commit()
+        forced.assert_called_once()
+        self.assertEqual(self.session.query(InfraAnomaly).count(), 1)
+
+    def test_no_anomaly_without_drop(self):
+        now = utcnow()
+        server = self.make_server()
+        BaselineAnomalyTests.seed_baseline(self, server, now)
+        start = infra._floor_dt(now - timedelta(minutes=5), 60)
+        self.add_samples(
+            server, start, count=30, step_seconds=10,
+            rx_bps=550_000_000, tx_bps=90_000_000, tcp_connections=4900,
+        )
+        with mock.patch.object(infra, "force_tspu_check") as forced:
+            infra_worker.detect_anomalies(self.session)
+        forced.assert_not_called()
+
+
+class ProcessAnomalyTests(InfraDbTestCase):
+    def make_anomaly(self, server, run_ids):
+        anomaly = InfraAnomaly(
+            server_id=server.id,
+            status="checking",
+            censor_run_ids=run_ids,
+            created_at=utcnow(),
+        )
+        self.session.add(anomaly)
+        self.session.commit()
+        return anomaly
+
+    def make_run(self, target_ip, ok_probes, blocked_probes, status="complete"):
+        check = CensorCheck(
+            name="c", target_ip=target_ip, sni="s.example", port=443
+        )
+        self.session.add(check)
+        self.session.flush()
+        run = CensorCheckRun(
+            check_id=check.id,
+            status=status,
+            total_probes=ok_probes + blocked_probes,
+            ok_probes=ok_probes,
+            blocked_probes=blocked_probes,
+        )
+        self.session.add(run)
+        self.session.commit()
+        return run
+
+    def test_confirmed_block_creates_replacement(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        run = self.make_run("185.10.0.10", ok_probes=2, blocked_probes=18)
+        anomaly = self.make_anomaly(server, [run.id])
+
+        with mock.patch.object(infra_worker, "_send_alert", return_value=True):
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+
+        self.session.refresh(anomaly)
+        self.assertEqual(anomaly.status, "confirmed")
+        replacement = self.session.query(InfraIpReplacement).one()
+        self.assertEqual(replacement.old_ip, "185.10.0.10")
+        self.assertEqual(replacement.status, "pending")
+        self.assertEqual(replacement.anomaly_id, anomaly.id)
+
+    def test_tspu_ok_dismisses_anomaly(self):
+        server = self.make_server()
+        run = self.make_run("185.10.0.10", ok_probes=20, blocked_probes=0)
+        anomaly = self.make_anomaly(server, [run.id])
+        with mock.patch.object(infra_worker, "_send_alert") as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+        self.assertEqual(anomaly.status, "dismissed")
+        alert.assert_not_called()
+        self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
+
+    def test_auto_replace_disabled_only_alerts(self):
+        self.session.add(
+            SystemSetting(key="infra_auto_replace_enabled", value="false")
+        )
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        run = self.make_run("185.10.0.10", ok_probes=0, blocked_probes=20)
+        self.make_anomaly(server, [run.id])
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        alert.assert_called_once()
+        self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
+
+
+class ReplacementFlowTests(InfraDbTestCase):
+    def make_pending(self, server, old_ip="185.10.0.10", domains=None):
+        replacement = InfraIpReplacement(
+            server_id=server.id,
+            old_ip=old_ip,
+            domains=domains if domains is not None else ["de.example.xyz"],
+            status="pending",
+            created_at=utcnow(),
+            updated_at=utcnow(),
+        )
+        self.session.add(replacement)
+        self.session.commit()
+        return replacement
+
+    def test_full_happy_path(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(
+            server, "185.10.0.11", source="manual", on_interface=False,
+            interface=None,
+        )
+        replacement = self.make_pending(server)
+
+        cf_records = {"de.example.xyz": [{"id": "r1", "content": "185.10.0.10"}]}
+        added, removed = [], []
+
+        def fake_list(domain):
+            return cf_records[domain]
+
+        def fake_ensure(domain, ip, ttl=60):
+            added.append((domain, ip))
+            return True
+
+        def fake_delete(domain, ip):
+            removed.append((domain, ip))
+            return 1
+
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records", side_effect=fake_list
+        ), mock.patch(
+            "engine.cloudflare_dns.ensure_a_record", side_effect=fake_ensure
+        ), mock.patch(
+            "engine.cloudflare_dns.delete_a_records", side_effect=fake_delete
+        ), mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            # pending -> installing (команда агенту)
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+            self.assertEqual(replacement.status, "installing")
+            self.assertEqual(replacement.new_ip, "185.10.0.11")
+            command = self.session.query(InfraAgentCommand).one()
+            self.assertEqual(command.payload["ip"], "185.10.0.11")
+            self.assertEqual(command.payload["interface"], "ens3")
+
+            # агент выполнил команду
+            command.status = "ok"
+            self.session.commit()
+
+            # installing -> dns_add -> (следующий тик) dns_remove -> done
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+            self.assertEqual(replacement.status, "dns_add")
+
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+            self.assertEqual(replacement.status, "dns_remove")
+            self.assertEqual(added, [("de.example.xyz", "185.10.0.11")])
+            self.assertEqual(removed, [])  # старую запись ещё не трогали
+
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+            self.assertEqual(replacement.status, "done")
+            self.assertEqual(removed, [("de.example.xyz", "185.10.0.10")])
+
+        alert.assert_called_once()
+        old_row = (
+            self.session.query(InfraServerIp)
+            .filter(InfraServerIp.ip == "185.10.0.10")
+            .one()
+        )
+        self.assertIsNotNone(old_row.blocked_at)
+
+    def test_candidate_already_on_interface_skips_install(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.11", on_interface=True)
+        replacement = self.make_pending(server)
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[{"id": "r1", "content": "185.10.0.10"}],
+        ):
+            infra_worker.process_replacements(self.session)
+        self.session.commit()
+        self.session.refresh(replacement)
+        self.assertEqual(replacement.status, "dns_add")
+        self.assertEqual(replacement.new_ip, "185.10.0.11")
+        self.assertEqual(self.session.query(InfraAgentCommand).count(), 0)
+
+    def test_no_reserve_with_multiple_a_records_cleans_dns(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        replacement = self.make_pending(server)
+        deleted = []
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[
+                {"id": "r1", "content": "185.10.0.10"},
+                {"id": "r2", "content": "185.10.0.99"},
+            ],
+        ), mock.patch(
+            "engine.cloudflare_dns.delete_a_records",
+            side_effect=lambda d, ip: deleted.append((d, ip)) or 1,
+        ), mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_replacements(self.session)
+        self.session.commit()
+        self.session.refresh(replacement)
+        self.assertEqual(replacement.status, "dns_cleanup")
+        self.assertEqual(deleted, [("de.example.xyz", "185.10.0.10")])
+        alert.assert_called_once()
+
+    def test_no_reserve_single_a_record_requires_manual(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        replacement = self.make_pending(server)
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[{"id": "r1", "content": "185.10.0.10"}],
+        ), mock.patch(
+            "engine.cloudflare_dns.delete_a_records"
+        ) as delete_mock, mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_replacements(self.session)
+        self.session.commit()
+        self.session.refresh(replacement)
+        self.assertEqual(replacement.status, "manual_required")
+        delete_mock.assert_not_called()
+        alert.assert_called_once()
+        self.assertIn("ручное вмешательство", alert.call_args[0][0].lower())
+
+    def test_blocked_ip_is_not_a_candidate(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(
+            server, "185.10.0.11", on_interface=False, blocked_at=utcnow()
+        )
+        replacement = self.make_pending(server)
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[{"id": "r1", "content": "185.10.0.10"}],
+        ), mock.patch.object(infra_worker, "_send_alert", return_value=True):
+            infra_worker.process_replacements(self.session)
+        self.session.commit()
+        self.session.refresh(replacement)
+        self.assertEqual(replacement.status, "manual_required")
+
+    def test_concurrent_replacements_pick_different_reserves(self):
+        # ТСПУ подтвердил бан двух IP сразу: замены не должны выбрать один
+        # и тот же резерв (в DNS новый IP первой замены появится позже)
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.20", on_interface=True)
+        self.make_ip(
+            server, "185.10.0.11", source="manual", on_interface=False
+        )
+        self.make_ip(
+            server, "185.10.0.12", source="manual", on_interface=False
+        )
+        first = self.make_pending(server, old_ip="185.10.0.10")
+        second = self.make_pending(server, old_ip="185.10.0.20")
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[
+                {"id": "r1", "content": "185.10.0.10"},
+                {"id": "r2", "content": "185.10.0.20"},
+            ],
+        ):
+            infra_worker.process_replacements(self.session)
+        self.session.commit()
+        self.session.refresh(first)
+        self.session.refresh(second)
+        self.assertIsNotNone(first.new_ip)
+        self.assertIsNotNone(second.new_ip)
+        self.assertNotEqual(first.new_ip, second.new_ip)
+
+    def test_agent_failure_fails_replacement(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.11", on_interface=False)
+        replacement = self.make_pending(server)
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[{"id": "r1", "content": "185.10.0.10"}],
+        ), mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            command = self.session.query(InfraAgentCommand).one()
+            command.status = "failed"
+            command.error = "RTNETLINK: permission denied"
+            self.session.commit()
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+        self.session.refresh(replacement)
+        self.assertEqual(replacement.status, "failed")
+        alert.assert_called_once()
+
+
+class DnsWatchTests(InfraDbTestCase):
+    def test_new_a_record_rescales_baseline(self):
+        server = self.make_server()
+        domain = self.make_domain(server, "de.example.xyz")
+        # Первый снимок: только запоминаем, перекалибровки нет
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[{"id": "r1", "content": "185.10.0.10"}],
+        ):
+            infra_worker.watch_dns_changes(self.session)
+        self.session.commit()
+        self.session.refresh(server)
+        self.session.refresh(domain)
+        self.assertIsNone(server.baseline_scale)
+        self.assertEqual(domain.last_a_ips, ["185.10.0.10"])
+
+        # Появилась вторая A-запись (перебалансировка): норма x0.5,
+        # детектор НЕ отключается (anomaly_suppressed_until не трогается)
+        domain.dns_checked_at = utcnow() - timedelta(minutes=30)
+        self.session.commit()
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[
+                {"id": "r1", "content": "185.10.0.10"},
+                {"id": "r2", "content": "45.9.9.9"},
+            ],
+        ):
+            infra_worker.watch_dns_changes(self.session)
+        self.session.commit()
+        self.session.refresh(server)
+        self.assertEqual(float(server.baseline_scale), 0.5)
+        self.assertGreater(
+            server.baseline_scale_until, utcnow() + timedelta(hours=100)
+        )
+        self.assertIsNone(server.anomaly_suppressed_until)
+
+    def test_shared_domain_rescales_all_linked_servers(self):
+        # Сценарий «вернул ноду в ротацию»: домен привязан к A и C, у обоих
+        # свой слепок; новая A-запись перекалибрует норму обоим (A пережил
+        # период удвоенного трафика — без ×0.5 его baseline дал бы ложняк)
+        server_a = self.make_server(machine_uid="m-a", node_name="nl-a")
+        server_c = self.make_server(machine_uid="m-c", node_name="nl-c")
+        domain_a = self.make_domain(server_a, "nl.example.xyz")
+        domain_c = self.make_domain(server_c, "nl.example.xyz")
+        for row in (domain_a, domain_c):
+            row.last_a_ips = ["185.10.0.10"]
+            row.dns_checked_at = utcnow() - timedelta(minutes=30)
+        self.session.commit()
+
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[
+                {"id": "r1", "content": "185.10.0.10"},
+                {"id": "r2", "content": "185.10.0.20"},
+            ],
+        ) as list_mock:
+            infra_worker.watch_dns_changes(self.session)
+        self.session.commit()
+        # Cloudflare спрошен один раз на домен, несмотря на две привязки
+        self.assertEqual(list_mock.call_count, 1)
+        for server in (server_a, server_c):
+            self.session.refresh(server)
+            self.assertEqual(float(server.baseline_scale), 0.5)
+
+    def test_server_with_two_domains_rescales_once_per_pass(self):
+        # Одна перебалансировка видна в строках обоих доменов сервера —
+        # фактор применяется один раз (x0.5), не перемножается в x0.25
+        server = self.make_server()
+        d1 = self.make_domain(server, "de.example.xyz")
+        d2 = self.make_domain(server, "de2.example.xyz")
+        for row in (d1, d2):
+            row.last_a_ips = ["185.10.0.10"]
+            row.dns_checked_at = utcnow() - timedelta(minutes=30)
+        self.session.commit()
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[
+                {"id": "r1", "content": "185.10.0.10"},
+                {"id": "r2", "content": "185.10.0.20"},
+            ],
+        ):
+            infra_worker.watch_dns_changes(self.session)
+        self.session.commit()
+        self.session.refresh(server)
+        self.assertEqual(float(server.baseline_scale), 0.5)
+
+    def test_no_rescale_during_active_replacement(self):
+        # Промежуточное состояние нашей же ротации (ADD нового, REMOVE
+        # старого ещё не прошёл) не считается перебалансировкой
+        server = self.make_server()
+        domain = self.make_domain(server, "de.example.xyz")
+        domain.last_a_ips = ["185.10.0.10"]
+        domain.dns_checked_at = utcnow() - timedelta(minutes=30)
+        self.session.add(
+            InfraIpReplacement(
+                server_id=server.id,
+                old_ip="185.10.0.10",
+                new_ip="185.10.0.11",
+                domains=["de.example.xyz"],
+                status="dns_remove",
+            )
+        )
+        self.session.commit()
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[
+                {"id": "r1", "content": "185.10.0.10"},
+                {"id": "r2", "content": "185.10.0.11"},
+            ],
+        ):
+            infra_worker.watch_dns_changes(self.session)
+        self.session.commit()
+        self.session.refresh(server)
+        self.assertIsNone(server.baseline_scale)
+        self.session.refresh(domain)
+        # Слепок при этом обновлён
+        self.assertIn("185.10.0.11", domain.last_a_ips)
+
+    def test_readded_recent_ip_does_not_rescale(self):
+        # Слив на время работ и возврат записи: адрес есть в памяти
+        # recent_a_ips — повторная перекалибровка не нужна (иначе каждый
+        # цикл работ раскручивал бы scale вниз)
+        server = self.make_server()
+        domain = self.make_domain(server, "de.example.xyz")
+        domain.last_a_ips = ["185.10.0.10"]
+        domain.recent_a_ips = {
+            "185.10.0.10": utcnow().isoformat(sep=" ", timespec="seconds"),
+            "45.9.9.9": (utcnow() - timedelta(days=2)).isoformat(
+                sep=" ", timespec="seconds"
+            ),
+        }
+        domain.dns_checked_at = utcnow() - timedelta(minutes=30)
+        self.session.commit()
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[
+                {"id": "r1", "content": "185.10.0.10"},
+                {"id": "r2", "content": "45.9.9.9"},
+            ],
+        ):
+            infra_worker.watch_dns_changes(self.session)
+        self.session.commit()
+        self.session.refresh(server)
+        self.assertIsNone(server.baseline_scale)
+
+    def test_neighbor_rotation_does_not_rescale_shared_domain(self):
+        # Ротация сервера B на общем домене (промежуточное состояние
+        # ADD-до-REMOVE) не должна перекалибровать соседа A
+        server_a = self.make_server(machine_uid="m-a", node_name="nl-a")
+        server_b = self.make_server(machine_uid="m-b", node_name="nl-b")
+        domain_a = self.make_domain(server_a, "nl.example.xyz")
+        domain_a.last_a_ips = ["185.10.0.10", "185.10.0.20"]
+        domain_a.dns_checked_at = utcnow() - timedelta(minutes=30)
+        self.session.add(
+            InfraIpReplacement(
+                server_id=server_b.id,
+                old_ip="185.10.0.20",
+                new_ip="185.10.0.21",
+                domains=["nl.example.xyz"],
+                status="dns_remove",
+            )
+        )
+        self.session.commit()
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[
+                {"id": "r1", "content": "185.10.0.10"},
+                {"id": "r2", "content": "185.10.0.20"},
+                {"id": "r3", "content": "185.10.0.21"},
+            ],
+        ):
+            infra_worker.watch_dns_changes(self.session)
+        self.session.commit()
+        self.session.refresh(server_a)
+        self.assertIsNone(server_a.baseline_scale)
+
+    def test_record_removal_does_not_rescale(self):
+        server = self.make_server()
+        domain = self.make_domain(server, "de.example.xyz")
+        domain.last_a_ips = ["185.10.0.10", "45.9.9.9"]
+        domain.dns_checked_at = utcnow() - timedelta(minutes=30)
+        self.session.commit()
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[{"id": "r1", "content": "185.10.0.10"}],
+        ):
+            infra_worker.watch_dns_changes(self.session)
+        self.session.commit()
+        self.session.refresh(server)
+        self.assertIsNone(server.baseline_scale)
+
+    def test_recently_checked_domain_is_skipped(self):
+        server = self.make_server()
+        domain = self.make_domain(server, "de.example.xyz")
+        domain.dns_checked_at = utcnow() - timedelta(minutes=2)
+        self.session.commit()
+        with mock.patch(
+            "engine.cloudflare_dns.is_enabled", return_value=True
+        ), mock.patch(
+            "engine.cloudflare_dns.list_a_records"
+        ) as list_mock:
+            infra_worker.watch_dns_changes(self.session)
+        list_mock.assert_not_called()
+
+    def test_snooze_helpers(self):
+        server = self.make_server()
+        infra.snooze_anomaly_detector(self.session, server.id, 24)
+        self.session.commit()
+        self.session.refresh(server)
+        self.assertIsNotNone(server.anomaly_suppressed_until)
+        infra.unsnooze_anomaly_detector(self.session, server.id)
+        self.session.commit()
+        self.session.refresh(server)
+        self.assertIsNone(server.anomaly_suppressed_until)
+        with self.assertRaises(infra.InfraError):
+            infra.snooze_anomaly_detector(self.session, server.id, "999999")
+
+
+class OfflineAlertTests(InfraDbTestCase):
+    def test_offline_alert_and_recovery(self):
+        server = self.make_server(
+            last_seen_at=utcnow() - timedelta(minutes=15)
+        )
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_offline(self.session)
+        self.session.commit()
+        alert.assert_called_once()
+        self.assertIn("недоступен", alert.call_args[0][0].lower())
+        self.session.refresh(server)
+        self.assertIsNotNone(server.offline_alerted_at)
+
+        # Повторный тик — без дублирующего алерта
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_offline(self.session)
+        alert.assert_not_called()
+
+        # Восстановление
+        server.offline_alerted_at = utcnow() - timedelta(minutes=10)
+        server.last_seen_at = utcnow()
+        self.session.commit()
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_offline(self.session)
+        self.session.commit()
+        alert.assert_called_once()
+        self.assertIn("онлайн", alert.call_args[0][0].lower())
+        self.session.refresh(server)
+        # Времена не сбрасываются: recovery позже offline = инцидент закрыт
+        self.assertIsNotNone(server.offline_alerted_at)
+        self.assertIsNotNone(server.recovered_alerted_at)
+        self.assertGreater(
+            server.recovered_alerted_at, server.offline_alerted_at
+        )
+
+        # Повторный онлайн-тик recovery не дублирует
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_offline(self.session)
+        alert.assert_not_called()
+
+    def test_flapping_pairs_rate_limited_by_cooldown(self):
+        # Сервер снова офлайн через 5 минут после прошлой пары алертов:
+        # новый 🔴 подавляется кулдауном (60 мин по умолчанию)
+        server = self.make_server(
+            last_seen_at=utcnow() - timedelta(minutes=15),
+            offline_alerted_at=utcnow() - timedelta(minutes=5),
+            recovered_alerted_at=utcnow() - timedelta(minutes=3),
+        )
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_offline(self.session)
+        alert.assert_not_called()
+
+        # А после истечения кулдауна новый инцидент алертится
+        server.offline_alerted_at = utcnow() - timedelta(minutes=90)
+        server.recovered_alerted_at = utcnow() - timedelta(minutes=80)
+        self.session.commit()
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_offline(self.session)
+        alert.assert_called_once()
+
+    def test_archived_servers_are_ignored(self):
+        self.make_server(
+            last_seen_at=utcnow() - timedelta(hours=5), is_archived=True
+        )
+        with mock.patch.object(infra_worker, "_send_alert") as alert:
+            infra_worker.check_offline(self.session)
+        alert.assert_not_called()
+
+
+class LoadAlertTests(InfraDbTestCase):
+    def seed_load(self, server, rx_bps):
+        start = utcnow() - timedelta(minutes=4)
+        self.add_samples(
+            server, start, count=24, step_seconds=10, rx_bps=rx_bps,
+            tx_bps=int(rx_bps * 0.2),
+        )
+
+    def test_alert_after_sustained_high_load(self):
+        server = self.make_server(bandwidth_limit_mbps=400)
+        self.seed_load(server, rx_bps=370_000_000)  # 92.5%
+        server.load_high_since = utcnow() - timedelta(minutes=20)
+        self.session.commit()
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_load(self.session)
+        self.session.commit()
+        alert.assert_called_once()
+        message = alert.call_args[0][0]
+        self.assertIn("Высокая нагрузка", message)
+        self.assertIn("400 Mbit/s", message)
+        self.session.refresh(server)
+        self.assertIsNotNone(server.load_alerted_at)
+
+    def test_no_alert_before_duration(self):
+        server = self.make_server(bandwidth_limit_mbps=400)
+        self.seed_load(server, rx_bps=370_000_000)
+        with mock.patch.object(infra_worker, "_send_alert") as alert:
+            infra_worker.check_load(self.session)
+        self.session.commit()
+        alert.assert_not_called()
+        self.session.refresh(server)
+        self.assertIsNotNone(server.load_high_since)
+
+    def test_recovery_alert(self):
+        server = self.make_server(bandwidth_limit_mbps=400)
+        self.seed_load(server, rx_bps=100_000_000)  # 25%
+        server.load_alerted_at = utcnow() - timedelta(minutes=30)
+        server.load_high_since = utcnow() - timedelta(minutes=60)
+        self.session.commit()
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_load(self.session)
+        self.session.commit()
+        alert.assert_called_once()
+        self.assertIn("нормализовалась", alert.call_args[0][0])
+        self.session.refresh(server)
+        self.assertIsNone(server.load_alerted_at)
+        self.assertIsNone(server.load_high_since)
+
+    def test_recovery_alert_retried_when_delivery_fails(self):
+        server = self.make_server(bandwidth_limit_mbps=400)
+        self.seed_load(server, rx_bps=100_000_000)
+        server.load_alerted_at = utcnow() - timedelta(minutes=30)
+        self.session.commit()
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=False
+        ):
+            infra_worker.check_load(self.session)
+        self.session.commit()
+        self.session.refresh(server)
+        # Не доставили — состояние не снимаем, recovery уйдёт следующим тиком
+        self.assertIsNotNone(server.load_alerted_at)
+
+
+class PayloadTests(InfraDbTestCase):
+    def test_server_list_payload(self):
+        server = self.make_server(
+            cur_rx_bps=100_000_000, cur_tx_bps=10_000_000,
+            cur_tcp_connections=4218, bandwidth_limit_mbps=400,
+        )
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.11", on_interface=False)
+        self.make_domain(server, "de.example.xyz")
+        payload = infra.server_list_payload(self.session)
+        self.assertEqual(payload["totals"]["count"], 1)
+        self.assertEqual(payload["totals"]["online"], 1)
+        item = payload["servers"][0]
+        self.assertEqual(item["utilization_pct"], 25.0)
+        self.assertEqual(item["ips"], {"active": 1, "reserve": 1, "blocked": 0})
+        self.assertEqual(item["domains"], ["de.example.xyz"])
+
+    def test_detail_and_series_payload(self):
+        server = self.make_server()
+        start = infra._floor_dt(utcnow() - timedelta(minutes=30), 60)
+        self.add_samples(server, start, count=60, step_seconds=10)
+        infra.aggregate_telemetry(self.session)
+        self.session.commit()
+
+        detail = infra.server_detail_payload(self.session, server.id)
+        self.assertEqual(detail["server"]["node_name"], "de-1")
+        self.assertIn("who_connects", detail)
+
+        series = infra.telemetry_series_payload(self.session, server.id, "3h")
+        self.assertGreaterEqual(len(series["points"]), 55)
+        self.assertEqual(series["summary"]["rx_peak_bps"], 100_000_000)
+
+        series24 = infra.telemetry_series_payload(self.session, server.id, "24h")
+        self.assertGreater(len(series24["points"]), 0)
+        with self.assertRaises(infra.InfraError):
+            infra.telemetry_series_payload(self.session, server.id, "1y")
+
+
+class InfraViewTests(InfraDbTestCase):
+    def setUp(self):
+        super().setUp()
+        self.factory = RequestFactory()
+        from engine import views as views_module
+
+        self.views = views_module
+        patchers = [
+            mock.patch.object(
+                self.views, "require_support_admin_role", return_value=None
+            ),
+            mock.patch.object(
+                self.views, "support_admin_actor", return_value="tester"
+            ),
+            mock.patch.object(self.views, "admin_audit_write"),
+            mock.patch.object(
+                self.views, "session_factory", side_effect=self.Session
+            ),
+        ]
+        for patcher in patchers:
+            patcher.start()
+            self.addCleanup(patcher.stop)
+
+    def test_servers_list_and_update(self):
+        server = self.make_server()
+        response = self.views.support_admin_api_infra_servers(
+            self.factory.get("/support-admin/api/infra-servers/")
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b'"node_name": "de-1"', response.content)
+
+        response = self.views.support_admin_api_infra_servers(
+            self.factory.post(
+                "/support-admin/api/infra-servers/",
+                {
+                    "action": "update",
+                    "id": server.id,
+                    "display_name": "Germany-01",
+                    "bandwidth_limit_mbps": "400",
+                    "notes": "",
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        check_session = self.Session()
+        try:
+            stored = check_session.get(InfraServer, server.id)
+            self.assertEqual(stored.display_name, "Germany-01")
+            self.assertEqual(stored.bandwidth_limit_mbps, 400)
+        finally:
+            check_session.close()
+
+    def test_add_ip_error_returns_message(self):
+        server = self.make_server()
+        response = self.views.support_admin_api_infra_servers(
+            self.factory.post(
+                "/support-admin/api/infra-servers/",
+                {"action": "add_ip", "id": server.id, "ip": "мусор"},
+            )
+        )
+        self.assertEqual(response.status_code, 400)
+        import json as json_module
+
+        payload = json_module.loads(response.content)
+        self.assertIn("Некорректный IP", payload["message"])
+
+    def test_settings_view(self):
+        response = self.views.support_admin_api_infra_settings(
+            self.factory.get("/support-admin/api/infra-settings/")
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(b"infra_load_threshold_pct", response.content)
+
+        response = self.views.support_admin_api_infra_settings(
+            self.factory.post(
+                "/support-admin/api/infra-settings/",
+                {"key": "infra_load_duration_minutes", "value": "30"},
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        check_session = self.Session()
+        try:
+            stored = check_session.get(
+                SystemSetting, "infra_load_duration_minutes"
+            )
+            self.assertEqual(stored.value, "30")
+        finally:
+            check_session.close()
+
+    def test_detail_view_404(self):
+        response = self.views.support_admin_api_infra_server_detail(
+            self.factory.get("/support-admin/api/infra-server-detail/?id=999")
+        )
+        self.assertEqual(response.status_code, 404)

@@ -4664,17 +4664,20 @@ class NodeTrafficTemplateTests(SimpleTestCase):
         self.assertNotIn('class="card info-card" style="margin-bottom:10px;"', template)
 
     def test_admin_dashboard_has_node_traffic_tab(self):
+        # «Трафик нод» — теперь вкладка раздела «Инфраструктура»
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
-        self.assertIn('data-tab="node-traffic"', template)
+        self.assertIn('data-tab="infrastructure"', template)
+        self.assertIn('data-subtab="inf-traffic"', template)
+        self.assertIn('id="subpanel-inf-traffic"', template)
         self.assertIn('id="panel-node-traffic"', template)
         self.assertIn('id="node-traffic-form"', template)
         self.assertIn("data-traffic-nodes-url", template)
         self.assertIn("data-node-traffic-url", template)
-        # вкладка доступна только полному админу
+        # раздел доступен только полному админу
         admin_only_block = template.split('{% if support_admin_is_full_admin %}')
         self.assertTrue(
-            any('data-tab="node-traffic"' in part.split("{% endif %}")[0] for part in admin_only_block[1:])
+            any('data-tab="infrastructure"' in part.split("{% endif %}")[0] for part in admin_only_block[1:])
         )
 
     def test_node_traffic_icons_exist_in_bundled_font_awesome(self):

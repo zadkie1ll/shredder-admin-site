@@ -243,6 +243,26 @@ urlpatterns = [
         views.support_admin_api_node_provision_detail,
         name="support_admin_api_node_provision_detail",
     ),
+    path(
+        "support-admin/api/infra-servers/",
+        views.support_admin_api_infra_servers,
+        name="support_admin_api_infra_servers",
+    ),
+    path(
+        "support-admin/api/infra-server-detail/",
+        views.support_admin_api_infra_server_detail,
+        name="support_admin_api_infra_server_detail",
+    ),
+    path(
+        "support-admin/api/infra-telemetry/",
+        views.support_admin_api_infra_telemetry,
+        name="support_admin_api_infra_telemetry",
+    ),
+    path(
+        "support-admin/api/infra-settings/",
+        views.support_admin_api_infra_settings,
+        name="support_admin_api_infra_settings",
+    ),
     # Bootstrap-API установки нод: публичные ручки для обёртки на сервере,
     # отвечают только на доменах из NODE_BOOTSTRAP_DOMAINS
     path(

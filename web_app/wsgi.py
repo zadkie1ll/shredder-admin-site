@@ -25,3 +25,14 @@ except Exception:  # старт воркера не должен ронять в
     import logging
 
     logging.exception("censor worker: failed to start")
+
+# Фоновый воркер «Инфраструктуры» (телеметрия нод, аномалии, автозамена IP) —
+# те же правила, что и у censor_worker: только gunicorn, свой advisory lock.
+try:
+    from engine import infra_worker
+
+    infra_worker.start()
+except Exception:  # старт воркера не должен ронять веб-приложение
+    import logging
+
+    logging.exception("infra worker: failed to start")

@@ -1908,6 +1908,135 @@ Admin-эндпоинты (`engine/views.py`, логика в `engine/node_provis
 `NodeProvisionTemplateTests` в `engine/tests.py` (структура режимов,
 Bash-редактор и мобильная раскладка).
 
+## Админка: Инфраструктура (единый раздел + вкладка «Серверы»)
+
+Разделы «Замеры ТСПУ», «Установка нод», «Трафик нод» и «Конфиги» объединены в
+один пункт sidebar **«Инфраструктура»** с вкладками (механизм subtabs — тот же,
+что в «Привлечении»; порядок: Замеры ТСПУ → Установка нод → Трафик нод →
+Конфиги → Серверы). Функциональность существующих страниц не менялась, старые
+якоря `#censor-checks`/`#node-provision`/`#node-traffic`/`#config-templates`
+продолжают работать (маппинг `LEGACY_INFRA_TABS` в `admin_dashboard.html`).
+
+### Вкладка «Серверы»
+
+Центральная точка наблюдения за VPN-нодами. Серверы появляются автоматически:
+node-agent (репозиторий `monkey-island-ip-guard`, начиная с v0.2) раз в
+`HEARTBEAT_SECONDS` шлёт коллектору ip-guard heartbeat с телеметрией
+(machine-id, hostname, ОС, интерфейсы и IP, rx/tx счётчики WAN, TCP-соединения
+из `/proc/net/sockstat`, conntrack, loadavg), коллектор пишет её в общие
+таблицы `infra_*`, сайт читает и отображает. Идентификация — по стабильному
+`machine_uid` (`/etc/machine-id`), поэтому переустановка агента не создаёт
+дубликат. Ручного создания серверов нет.
+
+В карточке сервера: статус ONLINE/OFFLINE, hostname/ОС/ядро/агент/uptime,
+WAN-интерфейс и определённая скорость линка, ручной override лимита канала
+(`bandwidth_limit_mbps` — от него считается загрузка `max(rx,tx)/limit`),
+IP-адреса (ACTIVE на интерфейсе / RESERVE / BLOCKED; резерв добавляется
+вручную и ставится на интерфейс командой агенту `ensure_ip`), привязанные
+клиентские домены (хранятся явно в `infra_server_domains`; один домен можно
+привязать к нескольким серверам — round-robin из нескольких A-записей,
+ротация каждого сервера трогает только записи его IP — их переключает
+автозамена IP), графики трафика и соединений (периоды 3h/24h/7d/30d,
+объём/пики/лимит), «кто подключается» (из `ipguard_user_ips`), журнал
+аномалий/замен/команд. Список обновляется поллингом каждые 5 секунд.
+
+### Фоновый воркер `engine/infra_worker.py`
+
+Второй лидер-поток внутри gunicorn (стартует из `web_app/wsgi.py`, advisory
+lock `4820257002`, по образцу `censor_worker`). Раз в `INFRA_WORKER_INTERVAL`
+(30 c) выполняет:
+
+- агрегацию телеметрии: сырые сэмплы (~10 c) → 1-мин бакеты (14 дней) →
+  15-мин бакеты (90 дней); retention сырых — 26 часов (`engine/infra.py`);
+- OFFLINE-детект (нет heartbeat дольше `infra_offline_after_seconds`) с
+  Telegram-алертом 🔴 и recovery 🟢 (дедуп через пару
+  `offline_alerted_at`/`recovered_alerted_at`; пары алертов при флаппинге
+  ограничены `infra_offline_alert_cooldown_minutes`);
+- алерт высокой нагрузки канала 🟠: загрузка ≥ `infra_load_threshold_pct`
+  (85%) дольше `infra_load_duration_minutes` (10/15/30), гистерезис
+  восстановления `infra_load_recover_pct`, кулдаун повторов;
+- **anomaly detection**: baseline = медиана 1-мин агрегатов того же времени
+  суток (±30 мин) за `infra_anomaly_baseline_days`; если и трафик, и
+  TCP-соединения одновременно ниже `infra_anomaly_*_ratio` (0.35) от baseline
+  непрерывно `infra_anomaly_duration_minutes` (5 мин) — создаётся
+  `InfraAnomaly` и **принудительно запускаются существующие «Замеры ТСПУ»**
+  (`infra.force_tspu_check` → `ripe_atlas.start_run`; строка `CensorCheck`
+  ищется по `target_ip`, при отсутствии создаётся с SNI = привязанный домен,
+  light-режим). Подавление ложных срабатываний: warm-up новых серверов,
+  рестарт агента/ребут сервера, пропуски телеметрии, малый baseline, кулдаун,
+  уже идущая проверка/замена, ручная пауза детектора
+  (`anomaly_suppressed_until`, кнопка «Пауза детектора» в карточке).
+  Перебалансировка DNS обрабатывается БЕЗ отключения детектора: воркер раз в
+  ~15 минут снимает слепок A-записей привязанных доменов, и появление НОВОЙ
+  записи (1→2 записи ⇒ трафик закономерно ×0.5) перекалибрует норму —
+  `baseline_scale`/`baseline_scale_until` умножают baseline на отношение
+  числа записей на `infra_dns_rebalance_window_hours` (168 ч, пока медиана
+  не перестроится). Разгрузка попадает в новую норму и тревоги не даёт,
+  реальный бан (обвал почти к нулю) детектируется по-прежнему; удаление
+  записи чувствительность не снижает. Нода, ВЫВЕДЕННАЯ из DNS (ни один её
+  активный незаблокированный IP не присутствует в слепках A-записей
+  привязанных доменов — ручной слив трафика или dns_cleanup после бана без
+  резерва), детектором пропускается (`infra.server_is_in_dns`): обвал
+  трафика на ней намеренный, холостые ТСПУ-замеры по кулдауну не жгутся;
+  вернули запись — детектор проснулся со следующего прохода вотчера. Без
+  слепков (Cloudflare выключен) — консервативный fallback к старому
+  поведению. Аномалия сама НИКОГДА не меняет DNS/IP;
+- обработку аномалий: все прогоны завершились → доступность ≤ 50%
+  (`ripe_atlas.ALERT_BLOCKED_MAX`) подтверждает бан → заявка на замену IP
+  (`InfraIpReplacement`); замеры в порядке → dismissed (только журнал);
+- state machine замены IP (строго в этом порядке): выбор резервного IP того
+  же сервера → команда агенту `ensure_ip` (через ответ на heartbeat) →
+  Cloudflare **ADD** новой A-записи → Cloudflare **REMOVE** старой → алерт 🟡.
+  Если резерва нет: при ≥2 A-записях у домена удаляется только
+  заблокированная (алерт 🟡 + предупреждение), при единственной — только
+  алерт 🔴 о ручном вмешательстве, DNS не трогается. Идемпотентность: одна
+  активная замена на (server, old_ip); закрытая замена помечает старый IP
+  `blocked_at`, и повторный `replaceFailedIp` не выбирает следующий резерв.
+  Выключатель: настройка `infra_auto_replace_enabled`.
+
+Все пороги — в `system_settings` (ключи `infra_*`, дефолты в
+`engine/infra.py:INFRA_SETTINGS`), редактируются на вкладке «Серверы» →
+«Настройки мониторинга и автозамены». Алерты — `engine/notify.py`
+(`TELEGRAM_ALERT_BOT_TOKEN`/`TELEGRAM_ALERT_CHAT_ID`), стиль и кулдауны — как
+у алертов ТСПУ.
+
+### Cloudflare DNS (`engine/cloudflare_dns.py`)
+
+Первый программный клиент Cloudflare в проекте (раньше был только certbot
+DNS-01). Env `CLOUDFLARE_API_TOKEN` — токен с правами Zone:DNS:Edit +
+Zone:Zone:Read на зоны клиентских доменов (тот же скоуп, что CF_DNS_API_TOKEN
+edge-хоста). Пустой токен = автозамена IP выключена (алерт при попытке).
+A-записи создаются DNS-only (`proxied=false`), операции идемпотентны.
+
+### API (все — только полный админ)
+
+- `support-admin/api/infra-servers/` — GET список; POST `action=`
+  `update|archive|unarchive|add_ip|delete_ip|block_ip|unblock_ip|add_domain|`
+  `delete_domain|ensure_ip|replace_ip|force_check`;
+- `support-admin/api/infra-server-detail/?id=` — карточка;
+- `support-admin/api/infra-telemetry/?id=&period=3h|24h|7d|30d` — серии;
+- `support-admin/api/infra-settings/` — GET/POST порогов.
+
+### Env-переменные
+
+- `INFRA_WORKER_ENABLED` (default true), `INFRA_WORKER_INTERVAL` (30);
+- `CLOUDFLARE_API_TOKEN` (пусто = ротация DNS выключена).
+
+⚠️ **Требуется миграция common** (новые таблицы `infra_servers`,
+`infra_server_ips`, `infra_server_domains`, `infra_telemetry`,
+`infra_telemetry_agg`, `infra_agent_commands`, `infra_anomalies`,
+`infra_ip_replacements`) — генерируется штатным `./common/alembic-revision.sh`;
+существующие таблицы не меняются. Смежные сервисы: `monkey-island-ip-guard`
+(коллектор принимает heartbeat и раздаёт команды, агент v0.2 собирает
+телеметрию — деплой ip-guard раньше или вместе с сайтом; старый агент v0.1
+просто не шлёт heartbeat, ничего не ломается), бот/user-notify/payment не
+затронуты.
+
+Покрыто тестами `engine/tests_infra.py` (настройки, загрузка/OFFLINE-алерты,
+baseline и детектор аномалий с подавлениями, подтверждение ТСПУ → замена,
+полный happy-path ротации и сценарии без резерва, идемпотентность, агрегация,
+payload'ы, admin-API).
+
 ## Полная блокировка пользователя (user_blocks)
 
 Пользователи с записью в таблице `user_blocks` (ставится ботом командой
