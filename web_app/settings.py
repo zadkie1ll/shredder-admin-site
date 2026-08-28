@@ -234,6 +234,14 @@ CENSOR_WORKER_INTERVAL = config("CENSOR_WORKER_INTERVAL", default=60, cast=int)
 # нагрузки -> принудительные «Замеры ТСПУ» -> автозамена IP через Cloudflare.
 INFRA_WORKER_ENABLED = config("INFRA_WORKER_ENABLED", default=True, cast=bool)
 INFRA_WORKER_INTERVAL = config("INFRA_WORKER_INTERVAL", default=30, cast=int)
+# Локальная DB-IP City Lite MMDB для аналитики клиентских IP. Лидер-поток
+# infra_worker скачивает её без аккаунта и ключей в persistent volume.
+# Пустой путь безопасно отключает географию, не скрывая базовую статистику.
+GEOIP_CITY_DB_PATH = config("GEOIP_CITY_DB_PATH", default="")
+GEOIPUPDATE_INTERVAL_HOURS = config(
+    "GEOIPUPDATE_INTERVAL_HOURS", default=168, cast=int
+)
+INFRA_GEOIP_CACHE_SECONDS = config("INFRA_GEOIP_CACHE_SECONDS", default=60, cast=int)
 # Токен Cloudflare API (права Zone:DNS:Edit + Zone:Zone:Read на зоны клиентских
 # доменов) для ротации A-записей. Пустой — автозамена IP выключена.
 CLOUDFLARE_API_TOKEN = config("CLOUDFLARE_API_TOKEN", default="")

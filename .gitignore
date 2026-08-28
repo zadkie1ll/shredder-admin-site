@@ -4,6 +4,7 @@ __pycache__
 *.log
 *.sqlite3
 *.tar
+.firecrawl/
 # MTS IP Hunter secrets/results
 tools/mts-ip-hunter/token.txt
 tools/mts-ip-hunter/caught_ip.txt

@@ -31,6 +31,7 @@ Origin обслуживает только backend-трафик от edge и о�
 - `docker/website/Dockerfile` - образ Django-приложения
 - `docker/website/entrypoint.sh` - миграции, `collectstatic`, `gunicorn`
 - `docker/website/docker-compose.yml` - origin стек
+- `engine/geoip_updater.py` внутри Django - автоматическая загрузка и обновление DB-IP City Lite
 - `docker/website/nginx.conf.template` - backend-only nginx для origin
 - `docker/website/update-origin-allowlist.sh` - генерация allowlist для edge IP
 - `docker/website/issue-certs.sh` - первичный выпуск origin-сертификата по standalone HTTP-01
@@ -108,6 +109,10 @@ TELEGRAM_AUTH_BOT_TOKEN=replace-me
 # Формат: domain|bot_username|bot_token,domain2|bot_username2|bot_token2
 TELEGRAM_AUTH_BOTS=monkey-island-vps.com|monkeyislandvpsauthbot|replace-me,monkey-island-vpn.com|monkeyislandvpnauthbot|replace-me
 
+# DB-IP City Lite скачивается автоматически без аккаунта и ключей.
+GEOIPUPDATE_INTERVAL_HOURS=168
+INFRA_GEOIP_CACHE_SECONDS=60
+
 ORIGIN_CERT_NAME=origin.teaworld.uk
 ORIGIN_CERTBOT_DOMAINS=origin.teaworld.uk
 ORIGIN_ALLOWED_PROXY_CIDRS=203.0.113.10/32,203.0.113.11/32
@@ -115,6 +120,9 @@ LETSENCRYPT_EMAIL=admin@example.com
 ```
 
 `ORIGIN_ALLOWED_PROXY_CIDRS` — список edge IP/CIDR, которым разрешено ходить на origin по HTTPS.
+
+Для DB-IP City Lite не нужны аккаунт, ключи или ручная загрузка. Сам файл
+`.mmdb` скачивать, копировать на сервер и монтировать с host FS не нужно.
 
 Для удобства рядом с этим каталогом можно держать шаблон и собирать итоговый `.env` по нему:
 
@@ -150,7 +158,38 @@ cd docker/website
 - выпускает сертификат на `ORIGIN_CERTBOT_DOMAINS` через standalone HTTP-01;
 - ставит cron на renew;
 - делает `docker load`;
+- подключает к Django постоянный volume `geoipdata`, куда фоновый infra-worker скачивает DB-IP City Lite;
 - пересоздает stack через `docker compose -f docker-compose.yml up -d --no-build --force-recreate` без предварительного `down`.
+
+## DB-IP City Lite: автоматическая загрузка и обновление
+
+Отдельного сервиса обновления нет. Лидер-поток `infra_worker` внутри Django
+скачивает `DBIP-City-Lite.mmdb` при первом запуске и проверяет обновление раз в
+168 часов. База хранится в именованном Docker volume `geoipdata`, поэтому
+переживает пересоздание контейнера `app`. Рабочий путь внутри приложения:
+`/var/lib/monkey-island/geoip/DBIP-City-Lite.mmdb`.
+
+На host не нужны `geoipupdate`, cron, отдельный каталог для `.mmdb`, `scp` или
+ручное обновление. Аккаунт, Account ID и license key не нужны.
+
+Загрузчик получает ежемесячную
+[DB-IP City Lite](https://db-ip.com/db/download/ip-to-city-lite) в
+[MMDB-формате](https://db-ip.com/db/format/ip-to-city-lite/mmdb.html): сначала
+пробует выпуск текущего месяца, а при HTTP 404 — предыдущего. После загрузки
+gzip распаковывается, MMDB валидируется и атомарно заменяет рабочий файл. Если
+DB-IP временно недоступен или файл повреждён, origin продолжит работать без
+географической аналитики либо со старой рабочей базой. Повтор после ошибки
+выполняется не чаще раза в час.
+Проверка после деплоя:
+
+```bash
+cd /root/website/website
+docker compose -f docker-compose.yml logs --tail=200 app | grep -i DB-IP
+docker compose -f docker-compose.yml exec app python manage.py shell -c \
+  "from engine.geoip_lookup import configured_database; print(configured_database())"
+```
+
+Последняя команда должна вывести объект `GeoIpDatabase`, а не `None`.
 
 ## Origin сертификат
 
@@ -215,4 +254,5 @@ docker compose -f docker-compose.yml ps -a
 2. что `ORIGIN_CERT_NAME` и `ORIGIN_CERTBOT_DOMAINS` совпадают с техническим доменом;
 3. что `ORIGIN_ALLOWED_PROXY_CIDRS` содержит все edge IP;
 4. что пользовательские домены смотрят только на edge, а не на origin;
-5. что `WEB_DATABASE_SSL_REQUIRE=False` для локального self-hosted Postgres без TLS.
+5. что `WEB_DATABASE_SSL_REQUIRE=False` для локального self-hosted Postgres без TLS;
+6. что в логах `app` нет ошибок DB-IP, а Django видит `DBIP-City-Lite.mmdb`.

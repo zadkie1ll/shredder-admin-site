@@ -6,12 +6,16 @@ services:
     image: monkey-island-website:prod
     env_file:
       - .env
+    environment:
+      # Лидер-поток infra_worker сам скачивает MMDB в persistent volume.
+      GEOIP_CITY_DB_PATH: /var/lib/monkey-island/geoip/DBIP-City-Lite.mmdb
     restart: unless-stopped
     expose:
       - "8000"
     volumes:
       - staticfiles:/app/staticfiles
       - mediafiles:/app/mediafiles
+      - geoipdata:/var/lib/monkey-island/geoip
     networks:
       - monkey-island-network
 
@@ -37,6 +41,7 @@ services:
 volumes:
   staticfiles:
   mediafiles:
+  geoipdata:
 
 networks:
   monkey-island-network:

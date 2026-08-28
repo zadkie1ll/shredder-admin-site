@@ -22,6 +22,7 @@ infra_servers/infra_telemetry/infra_server_ips. Здесь живёт всё о�
 import ipaddress
 import logging
 import statistics
+import threading
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
@@ -43,9 +44,13 @@ from common.models.db import InfraTelemetry
 from common.models.db import InfraTelemetryAgg
 from common.models.db import SystemSetting
 from common.models.db import UserIpObservation
+from engine import geoip_lookup
 from engine import ripe_atlas
 
 log = logging.getLogger("infra")
+
+_geo_analytics_cache: dict[tuple, dict] = {}
+_geo_analytics_lock = threading.Lock()
 
 
 class InfraError(Exception):
@@ -443,6 +448,61 @@ def get_server(db_session, server_id) -> InfraServer:
     return server
 
 
+def server_entry_payload(db_session, server, ip_rows, domain_rows) -> dict:
+    """Точка входа сервера для карточки админки.
+
+    Точкой входа считаются IP, которые стоят на интерфейсе, не
+    заблокированы, публичные IPv4 и присутствуют в свежих A-записях
+    привязанных доменов — те же критерии, по которым force_tspu_check
+    выбирает цели замеров. domains — только домены, чьи A-записи реально
+    указывают на эти IP (а не весь привязанный список).
+
+    status:
+      ok         — активные IP подтверждены свежими слепками DNS;
+      not_in_dns — слепки свежие, но ни один активный IP в DNS не стоит
+                   (нода выведена из DNS: dns_cleanup, слив трафика);
+      dns_stale  — домены привязаны, но слепки отсутствуют/протухли:
+                   показываем активные IP без подтверждения DNS;
+      no_domains — доменов нет, показываем активные IP интерфейса;
+      none       — активных публичных IPv4 нет вовсе.
+    """
+    active_rows = []
+    for row in ip_rows:
+        if not row.on_interface or row.blocked_at is not None:
+            continue
+        try:
+            address = ipaddress.ip_address(row.ip)
+        except ValueError:
+            continue
+        if address.version != 4 or not address.is_global:
+            continue
+        active_rows.append(row)
+    # WAN-интерфейс вперёд: при fallback без DNS-данных точка входа — он
+    active_rows.sort(
+        key=lambda row: (row.interface != server.wan_interface, row.ip)
+    )
+    active_ips = [row.ip for row in active_rows]
+
+    if not active_ips:
+        return {"status": "none", "ips": [], "domains": []}
+
+    snapshot_ips = fresh_dns_snapshot_ips(db_session, server)
+    if snapshot_ips is None:
+        status = "dns_stale" if domain_rows else "no_domains"
+        return {"status": status, "ips": active_ips, "domains": []}
+
+    in_dns = [ip for ip in active_ips if ip in snapshot_ips]
+    if not in_dns:
+        return {"status": "not_in_dns", "ips": active_ips, "domains": []}
+    entry_set = set(in_dns)
+    entry_domains = [
+        row.domain
+        for row in domain_rows
+        if entry_set & set(row.last_a_ips or [])
+    ]
+    return {"status": "ok", "ips": in_dns, "domains": entry_domains}
+
+
 def server_detail_payload(db_session, server_id) -> dict:
     cfg = get_settings(db_session)
     now = utcnow()
@@ -546,6 +606,7 @@ def server_detail_payload(db_session, server_id) -> dict:
         },
         "ips": [_ip_payload(row) for row in ips],
         "domains": [row.domain for row in domains],
+        "entry": server_entry_payload(db_session, server, ips, domains),
         "commands": [_command_payload(row) for row in commands],
         "anomalies": [_anomaly_payload(row) for row in anomalies],
         "replacements": [_replacement_payload(row) for row in replacements],
@@ -599,7 +660,162 @@ def who_connects_payload(db_session, node_name: str, now: datetime) -> dict:
             {"ip": row.ip, "hits": int(row.hits or 0), "users": int(row.users or 0)}
             for row in top_rows
         ],
+        "geo": _who_connects_geo_payload(db_session, node_name, day_ago, now),
     }
+
+
+def _who_connects_geo_payload(
+    db_session,
+    node_name: str,
+    day_ago: datetime,
+    now: datetime,
+) -> dict:
+    """Агрегирует страны и субъекты РФ по всем IP ноды за 24 часа.
+
+    Lookup выполняется только по локальной MMDB. Результат кэшируется на
+    короткое окно, чтобы пятиисекундный refresh карточки не повторял GROUP BY
+    по тысячам адресов и тысячи GeoIP lookup'ов.
+    """
+
+    database = geoip_lookup.configured_database()
+    if database is None:
+        return {
+            "enabled": False,
+            "reason": "not_configured",
+            "countries": [],
+            "russian_regions": [],
+        }
+
+    try:
+        cache_seconds = max(
+            10,
+            min(
+                3600,
+                int(getattr(django_settings, "INFRA_GEOIP_CACHE_SECONDS", 60)),
+            ),
+        )
+    except (TypeError, ValueError):
+        cache_seconds = 60
+    epoch_seconds = int(now.replace(tzinfo=timezone.utc).timestamp())
+    cache_key = (
+        node_name,
+        epoch_seconds // cache_seconds,
+        database.path,
+        database.mtime_ns,
+    )
+    with _geo_analytics_lock:
+        cached = _geo_analytics_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    rows = (
+        db_session.query(
+            UserIpObservation.ip,
+            func.sum(UserIpObservation.hits).label("hits"),
+        )
+        .filter(
+            UserIpObservation.node == node_name,
+            UserIpObservation.last_seen >= day_ago,
+        )
+        .group_by(UserIpObservation.ip)
+        .all()
+    )
+    total_hits = sum(int(row.hits or 0) for row in rows)
+    countries: dict[str, dict] = {}
+    russian_regions: dict[str, dict] = {}
+    located_ips = 0
+    russia_hits = 0
+
+    def add(
+        bucket: dict[str, dict],
+        key: str,
+        name: str,
+        code: str | None,
+        hits: int,
+    ):
+        item = bucket.setdefault(
+            key,
+            {"name": name, "code": code, "hits": 0, "addresses": 0},
+        )
+        item["hits"] += hits
+        item["addresses"] += 1
+
+    for row in rows:
+        hits = int(row.hits or 0)
+        location = geoip_lookup.lookup_ip(row.ip, database)
+        if location is None:
+            add(countries, "__unknown__", "Не определилось", None, hits)
+            continue
+
+        located_ips += 1
+        add(
+            countries,
+            location.country_code,
+            location.country_name,
+            location.country_code,
+            hits,
+        )
+        if location.country_code != "RU":
+            continue
+
+        russia_hits += hits
+        # DB-IP City Lite определяет subdivision по имени, но обычно не
+        # заполняет iso_code. Имя остаётся полноценным ключом и не должно
+        # сливаться с другими субъектами в общий __unknown__ bucket.
+        region_key = location.region_code or (
+            f"name:{location.region_name.casefold()}"
+            if location.region_name
+            else "__unknown__"
+        )
+        add(
+            russian_regions,
+            region_key,
+            location.region_name or "Регион не определился",
+            location.region_code,
+            hits,
+        )
+
+    def ranking(bucket: dict[str, dict]) -> list[dict]:
+        result = []
+        for item in bucket.values():
+            result.append(
+                {
+                    **item,
+                    "share_pct": (
+                        round(item["hits"] * 100 / total_hits, 1) if total_hits else 0.0
+                    ),
+                }
+            )
+        return sorted(result, key=lambda item: (-item["hits"], item["name"]))
+
+    payload = {
+        "enabled": True,
+        "source": "DB-IP City Lite",
+        "total_ips": len(rows),
+        "located_ips": located_ips,
+        "unlocated_ips": len(rows) - located_ips,
+        "total_hits": total_hits,
+        "russia_share_pct": (
+            round(russia_hits * 100 / total_hits, 1) if total_hits else 0.0
+        ),
+        "countries": ranking(countries),
+        "russian_regions": ranking(russian_regions),
+    }
+    with _geo_analytics_lock:
+        # Храним только свежий bucket каждой ноды, иначе process-local кэш рос
+        # бы на один элемент каждую минуту.
+        stale_keys = [key for key in _geo_analytics_cache if key[0] == node_name]
+        for stale_key in stale_keys:
+            _geo_analytics_cache.pop(stale_key, None)
+        _geo_analytics_cache[cache_key] = payload
+    return payload
+
+
+def reset_geo_analytics_cache() -> None:
+    """Сбрасывает короткий process-local кэш (тесты/обслуживание)."""
+
+    with _geo_analytics_lock:
+        _geo_analytics_cache.clear()
 
 
 # --- серии телеметрии для графиков ------------------------------------------

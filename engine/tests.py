@@ -3611,14 +3611,37 @@ class WataActiveStatusTests(SimpleTestCase):
 
     def test_active_status_ignores_non_wata_token(self):
         token = SimpleNamespace(payment_gateway="yookassa", payment_reference="x")
-        with mock.patch(
-            "engine.views.fetch_wata_transaction_status"
-        ) as fetch:
+        with mock.patch("engine.views.fetch_wata_transaction_status") as fetch:
             self.assertIsNone(active_wata_status_for_token(token))
         fetch.assert_not_called()
 
 
 class WebsiteDockerRuntimeTests(SimpleTestCase):
+    def test_geoip_database_is_downloaded_by_app_into_persistent_volume(self):
+        compose = Path("docker/website/docker-compose.yml").read_text()
+        env_example = Path("docker/website/.env.example").read_text()
+
+        app_section = compose[compose.index("  app:") : compose.index("  nginx:")]
+
+        self.assertIn(
+            "GEOIP_CITY_DB_PATH: "
+            "/var/lib/monkey-island/geoip/DBIP-City-Lite.mmdb",
+            app_section,
+        )
+        self.assertIn(
+            "geoipdata:/var/lib/monkey-island/geoip",
+            app_section,
+        )
+        self.assertNotIn("geoipupdate:", compose)
+        self.assertNotIn("ghcr.io/maxmind/geoipupdate", compose)
+
+        self.assertNotIn("GEOIPUPDATE_ACCOUNT_ID", env_example)
+        self.assertNotIn("GEOIPUPDATE_LICENSE_KEY", env_example)
+        self.assertIn("GEOIPUPDATE_INTERVAL_HOURS=168", env_example)
+        self.assertIn("DB-IP City Lite скачивается без аккаунта и ключей", env_example)
+        self.assertIn("INFRA_GEOIP_CACHE_SECONDS=60", env_example)
+        self.assertIn("\n  geoipdata:\n", compose)
+
     def test_origin_renew_keeps_compose_stack_running(self):
         renew_script = Path("docker/website/renew-certs.sh").read_text()
 
@@ -8110,9 +8133,8 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
             'id="infra-summary"',
             'class="infra-workspace"',
             'id="infra-servers-table"',
-            'id="infra-server-preview"',
-            'data-infra-open-detail=',
-            'data-infra-preview-open',
+            "data-infra-open-detail=",
+            "data-infra-preview-open",
             "function selectInfraServer(serverId)",
             "function renderInfraPreview(server, detail = null, loadFailed = false)",
         ):
@@ -8122,16 +8144,75 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
         # Серверы регистрирует node-agent: UI не должен обещать ручное создание.
         self.assertNotIn("+ Добавить сервер", self.template)
 
-    def test_full_server_card_keeps_charts_and_opens_without_page_scroll(self):
+    def test_server_cards_are_primary_and_table_view_remains_available(self):
         for marker in (
-            'id="infra-detail-modal"',
-            'aria-label="Графики и полная карточка сервера"',
+            'data-infra-view="cards"',
+            'data-infra-view="table"',
+            'class="infra-server-grid"',
+            'class="infra-server-card${cardTone}"',
+            'class="infra-server-card-traffic"',
+            'class="infra-server-card-stats"',
+            'class="infra-server-card-open"',
+            "function infraServerPresentation(server)",
+            "function renderInfraServerCards(servers)",
+            "function renderInfraServerTable(servers)",
+            "let infraServersView = 'cards';",
+            "infraServersView === 'table'",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        # Карточки не подменяют реальные метрики декоративными данными.
+        for metric in (
+            "infraFmtBps(server.rx_bps)",
+            "infraFmtBps(server.tx_bps)",
+            "server.tcp_connections.toLocaleString('ru-RU')",
+            "server.effective_limit_mbps",
+            "infraFmtAge(server.last_seen_age)",
+        ):
+            with self.subTest(metric=metric):
+                self.assertIn(metric, self.template)
+
+    def test_server_view_preference_and_card_interactions_are_preserved(self):
+        for marker in (
+            "const INFRA_SERVERS_VIEW_STORAGE_KEY",
+            "localStorage.getItem(INFRA_SERVERS_VIEW_STORAGE_KEY)",
+            "localStorage.setItem(INFRA_SERVERS_VIEW_STORAGE_KEY, nextView)",
+            "button.setAttribute('aria-pressed', active ? 'true' : 'false')",
+            "event.target !== serverElement",
+            "focus({preventScroll: true})",
+            'data-infra-menu="${server.id}"',
+            'data-infra-open-detail="${server.id}"',
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        for css_marker in (
+            ".infra-server-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));",
+            ".infra-server-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }",
+            ".infra-server-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }",
+            ".infra-server-card:hover",
+            'html[data-admin-theme="light"] .infra-server-card',
+            ".infra-server-grid { grid-template-columns: 1fr; padding: 10px; }",
+        ):
+            with self.subTest(css_marker=css_marker):
+                self.assertIn(css_marker, self.template)
+
+    def test_server_opens_as_nested_screen_without_covering_admin_navigation(self):
+        for marker in (
+            'id="infra-servers-overview"',
+            'class="infra-server-screen" id="infra-server-screen"',
+            'id="infra-server-detail"',
+            'class="infra-server-screen-head"',
+            '<i class="fas fa-arrow-left"></i>Назад',
+            "document.getElementById('infra-detail-close')?.addEventListener('click', closeInfraServer);",
             'id="infra-traffic-chart"',
             'id="infra-conn-chart"',
             "['3h', '24h', '7d', '30d']",
-            "modal.classList.add('open')",
-            "lockBodyScroll();",
-            "unlockBodyScroll();",
+            "overview.hidden = true;",
+            "screen.hidden = false;",
+            "screen.setAttribute('aria-hidden', 'false');",
+            "window.scrollTo({top: infraOverviewScrollTop, behavior: 'auto'});",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)
@@ -8141,37 +8222,61 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
         open_block = self.template[open_start:open_end]
         self.assertNotIn("scrollIntoView", open_block)
         self.assertIn("infra-detail-loading", open_block)
+        self.assertNotIn("lockBodyScroll", open_block)
+        self.assertNotIn('id="infra-detail-modal"', self.template)
+        screen_markup = self.template[
+            self.template.index('<section class="infra-server-screen"') :
+            self.template.index("</section>", self.template.index('<section class="infra-server-screen"'))
+        ]
+        self.assertLess(screen_markup.index('id="infra-detail-close"'), screen_markup.index('id="infra-server-detail"'))
         self.assertLess(
-            open_block.index("lockBodyScroll();"),
-            open_block.index("modal.classList.add('open')"),
-        )
-
-        # Модалка должна находиться вне <main>: иначе transform контейнера
-        # ограничивает fixed-overlay и под ним остаётся виден сайдбар.
-        self.assertGreater(
-            self.template.index('id="infra-detail-modal"'),
+            self.template.index('id="infra-server-screen"'),
             self.template.index("</main>"),
         )
 
-    def test_background_refresh_preserves_modal_scroll_position(self):
-        self.assertIn("const previousScrollTop = container.scrollTop;", self.template)
-        self.assertIn("container.scrollTop = previousScrollTop;", self.template)
-        self.assertIn("if (!full && container.contains(document.activeElement)", self.template)
+    def test_servers_use_centered_canvas_and_readable_card_spacing(self):
+        for marker in (
+            "#subpanel-inf-servers { width: 100%; max-width: 1520px; margin-inline: auto; }",
+            ".infra-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }",
+            ".infra-server-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 16px; }",
+            ".infra-detail-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }",
+            ".infra-detail-stat-sub { margin-top: 8px; color: var(--muted); font-size: 10.5px; line-height: 1.35; font-weight: 700; overflow-wrap: anywhere; }",
+            ".infra-detail-chart-card { margin-bottom: 20px;",
+            ".infra-detail-who { margin-bottom: 20px;",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        stat_rule_start = self.template.index(".infra-detail-stat-value {")
+        stat_rule_end = self.template.index("}", stat_rule_start)
+        stat_rule = self.template[stat_rule_start:stat_rule_end]
+        self.assertNotIn("text-overflow: ellipsis", stat_rule)
+        self.assertNotIn("overflow: hidden", stat_rule)
+
+    def test_background_refresh_preserves_nested_screen_scroll_position(self):
+        self.assertIn("const previousScrollTop = window.scrollY;", self.template)
+        self.assertIn(
+            "window.scrollTo({top: previousScrollTop, behavior: 'auto'});",
+            self.template,
+        )
+        self.assertIn(
+            "if (!full && container.contains(document.activeElement)", self.template
+        )
 
     def test_server_ips_are_grouped_by_interface_without_losing_actions(self):
         for marker in (
             "function infraGroupIpsByInterface(ips, wanInterface)",
             'class="infra-ip-groups"',
-            'class="infra-ip-group"',
-            'data-infra-interface=',
+            'class="infra-ip-group${group.ips.length > 2',
+            "data-infra-interface=",
             "Резерв / не назначены",
             "left.isReserve ? 1 : -1",
             "leftIsWan ? -1 : 1",
-            'data-infra-ensure-ip=',
-            'data-infra-replace-ip=',
-            'data-infra-unblock-ip=',
-            'data-infra-block-ip=',
-            'data-infra-delete-ip=',
+            "data-infra-ensure-ip=",
+            "data-infra-replace-ip=",
+            "data-infra-unblock-ip=",
+            "data-infra-block-ip=",
+            "data-infra-delete-ip=",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)
@@ -8186,12 +8291,12 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
             'id="infra-add-domain-form"',
             'id="infra-traffic-chart"',
             'id="infra-conn-chart"',
-            'data-infra-period=',
+            "data-infra-period=",
             'data-infra-detail-target="infra-detail-parameters"',
             'data-infra-detail-target="infra-detail-ips"',
             'data-infra-detail-target="infra-detail-domains"',
             'data-infra-detail-target="infra-detail-journal"',
-            "container.scrollTop = Math.max(0, Math.round(nextTop));",
+            "window.scrollTo({top: Math.max(0, Math.round(nextTop)), behavior: 'auto'});",
             "Управление и графики",
             "ТСПУ и детектор",
         ):
@@ -8215,13 +8320,30 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
             "form.display_name.value",
             "form.bandwidth_limit_mbps.value",
             "form.notes.value",
-            "form.ip.value",
+            "const input = form.ip;",
             "form.prefix.value",
             "form.comment.value",
-            "form.domain.value",
+            "const input = form.domain;",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)
+
+    def test_reserve_ip_form_uses_compact_fields_and_content_width_button(self):
+        for marker in (
+            ".infra-address-fields { display: grid; grid-template-columns: minmax(220px, 330px) 76px minmax(220px, 360px) auto;",
+            "#infra-add-ip-form { max-width: 1040px; }",
+            "#infra-add-ip-form .infra-form-submit { width: auto; min-width: 190px;",
+            ".infra-address-fields { grid-template-columns: minmax(0, 1fr) 68px; }",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        form_start = self.template.index('id="infra-add-ip-form"')
+        form_end = self.template.index("</form>", form_start)
+        form = self.template[form_start:form_end]
+        self.assertLess(form.index('name="ip"'), form.index('name="prefix"'))
+        self.assertLess(form.index('name="prefix"'), form.index('name="comment"'))
+        self.assertLess(form.index('name="comment"'), form.index("Добавить в резерв"))
 
     def test_monitoring_presets_are_available_from_toolbar_modal(self):
         for marker in (
@@ -8234,8 +8356,8 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
             "function closeInfraSettings()",
             "loadInfraSettings();",
             'class="infra-setting-control"',
-            'data-infra-setting=',
-            'data-infra-setting-save=',
+            "data-infra-setting=",
+            "data-infra-setting-save=",
             "infraPost(main.dataset.infraSettingsUrl",
             "OFFLINE-пороги, нагрузка, аномалии, кулдауны",
         ):
@@ -8247,36 +8369,262 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
             self.template.index("</main>"),
         )
 
-    def test_primary_server_sections_form_horizontal_desktop_row(self):
+    def test_open_server_uses_observability_page_and_tabbed_management(self):
         for marker in (
-            ".infra-detail-primary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));",
-            ".infra-detail-secondary-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));",
-            ".infra-detail-primary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }",
-            ".infra-detail-primary-grid, .infra-detail-secondary-grid { grid-template-columns: 1fr; }",
-            'class="infra-detail-primary-grid"',
-            'class="infra-detail-secondary-grid"',
+            'class="infra-detail-hero"',
+            'class="infra-detail-stats"',
+            "'is-purple', 'fa-wave-square'",
+            "'is-blue', 'fa-arrow-down'",
+            "'is-copper', 'fa-bolt'",
+            "'is-olive', 'fa-gauge-high'",
+            'class="infra-detail-route"',
+            'class="card infra-detail-chart-card"',
+            'class="card infra-detail-who"',
+            'class="infra-detail-who-bar"',
+            ".infra-detail-management-workspace { overflow: hidden;",
+            ".infra-detail-management-tabs { display: flex;",
+            ".infra-detail-management-panel[hidden] { display: none; }",
+            'class="infra-detail-management-workspace"',
+            'class="infra-detail-management-tabs" role="tablist"',
+            'role="tab" aria-controls="infra-detail-server-info"',
+            'data-infra-management-tab="server"',
+            'data-infra-management-tab="parameters"',
+            'data-infra-management-tab="ips"',
+            'data-infra-management-tab="domains"',
+            'role="tabpanel" aria-labelledby="infra-management-tab-ips"',
+            'data-infra-management-panel="ips"',
+            "function infraSetManagementTab(container, tab, options = {})",
+            "infraDetailManagementTab = tab;",
+            "button.setAttribute('aria-selected', selected ? 'true' : 'false');",
+            "panel.hidden = panel.dataset.infraManagementPanel !== tab;",
+            "if (event.key === 'ArrowRight')",
+            'class="card infra-detail-card infra-detail-management-panel" id="infra-detail-ips"',
+            'class="card infra-detail-card infra-detail-journal-wide"',
+            "const activeWanIp = (detail.ips || []).find",
+            "const entry = detail.entry || null;",
+            "const legacyEntry = (detail.domains || [])[0]",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)
 
-        primary_start = self.template.index('<div class="infra-detail-primary-grid">')
-        primary_end = self.template.index('<div class="infra-detail-secondary-grid"', primary_start)
-        primary = self.template[primary_start:primary_end]
-        expected_ids = (
-            'infra-detail-server-info',
-            'infra-detail-parameters',
-            'infra-detail-ips',
-            'infra-detail-domains',
+        management_start = self.template.index(
+            '<div class="infra-detail-management-workspace"'
         )
-        positions = [primary.index(f'id="{section_id}"') for section_id in expected_ids]
-        self.assertEqual(positions, sorted(positions))
+        management_end = self.template.index(
+            'class="card infra-detail-card infra-detail-journal-wide"', management_start
+        )
+        management = self.template[management_start:management_end]
+        expected_ids = (
+            "infra-detail-server-info",
+            "infra-detail-parameters",
+            "infra-detail-ips",
+            "infra-detail-domains",
+        )
+        for section_id in expected_ids:
+            with self.subTest(section_id=section_id):
+                self.assertIn(f'id="{section_id}"', management)
+
+        self.assertNotIn(".infra-detail-management-grid", self.template)
+
+        # География приходит с backend и дополняет, а не заменяет реальные IP.
+        for marker in (
+            "const whoRows = (who.top_addresses || []).slice(0, 20);",
+            "const geo = who.geo || {};",
+            "const whoTotalHits = Math.max(",
+            "const barWidth = Math.max(2, Math.round(hits / whoMaxHits * 100));",
+            'class="infra-detail-who-share">${share.toFixed(1)}%</div>',
+            "geoPanelHtml('Регионы России'",
+            "geoPanelHtml('Страны'",
+            "items.slice(0, 8)",
+            "items.slice(8)",
+            'class="infra-geo-grid"',
+            'class="infra-detail-who-analytics"',
+            'class="infra-detail-who-columns"',
+            'class="infra-detail-who-list">${whoTop}',
+            "IP Geolocation by DB-IP",
+            "География появится после первой автоматической загрузки DB-IP City Lite",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        self.assertIn(
+            ".infra-geo-grid { grid-template-columns: 1fr;",
+            self.template,
+        )
+        self.assertIn(
+            ".infra-geo-label { grid-column: 1 / -1; grid-row: 1; }",
+            self.template,
+        )
+        self.assertIn(
+            ".infra-geo-bar { grid-column: 1; grid-row: 2; }",
+            self.template,
+        )
+        for marker in (
+            ".infra-detail-who { margin-bottom: 20px; padding: 19px 21px 17px; }",
+            ".infra-geo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: start;",
+            "column-gap: clamp(28px, 4vw, 62px); row-gap: 0;",
+            "min-height: 27px;",
+            ".infra-detail-who-row { display: grid; align-items: center; gap: 13px; min-height: 29px;",
+            ".infra-detail-who-columns { display: none; }",
+        ):
+            with self.subTest(compact_marker=marker):
+                self.assertIn(marker, self.template)
+
+        self.assertNotIn(
+            ".infra-detail-who-row { display: grid; grid-template-columns: minmax(150px, 1.2fr)",
+            self.template,
+        )
+
+    def test_server_actions_are_responsive_and_preserve_field_focus(self):
+        for marker in (
+            "function infraSetActionBusy(target, busy, label = 'Выполняем…')",
+            'class="infra-action-spinner"',
+            "status.className = 'infra-pending-operation';",
+            "function infraSnapshotInteraction(container)",
+            "function infraRestoreInteraction(container, interaction)",
+            "infraRestoreInteraction(container, interaction);",
+            "await Promise.all(refreshes);",
+            "busyTarget: form",
+            "pendingLabel: 'Добавляем…'",
+            "input.focus({preventScroll: true});",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+    def test_domain_changes_update_in_place_without_redrawing_charts(self):
+        for marker in (
+            'id="infra-domains-list"',
+            "function infraAppendPendingDomain(container, domain)",
+            "function infraConfirmPendingDomain(container, pendingRow, domain, server)",
+            "function infraWireDomainDeleteButton(button, server)",
+            "pendingLabel: 'Привязываем…'",
+            "refreshDetail: false",
+            "infraSyncDomainEmptyState(list);",
+            'data-infra-management-count="domains"',
+            "count.textContent = String(domainCount);",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+    def test_domain_management_uses_compact_tiles_and_inline_form(self):
+        for marker in (
+            ".infra-domain-manage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 420px)); align-content: start; align-items: start; gap: 10px; }",
+            ".infra-domain-manage-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px;",
+            ".infra-detail-management-panel#infra-detail-domains { display: block; min-height: 0; }",
+            'id="infra-add-domain-form" class="infra-form infra-domain-add-form"',
+            ".infra-domain-add-form { grid-template-columns: minmax(260px, 520px) auto;",
+            ".infra-domain-add-form .infra-form-submit { width: auto; min-width: 180px;",
+            ".infra-domain-manage-list { grid-template-columns: 1fr; }",
+            ".infra-domain-add-form { grid-template-columns: 1fr; max-width: none; }",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        domains_panel_start = self.template.index(
+            '<section class="card infra-detail-card infra-detail-management-panel" id="infra-detail-domains"'
+        )
+        domains_panel_end = self.template.index("</section>", domains_panel_start)
+        domains_panel = self.template[domains_panel_start:domains_panel_end]
+        self.assertLess(domains_panel.index('id="infra-domains-list"'), domains_panel.index('id="infra-add-domain-form"'))
+        self.assertNotIn('style="margin-top:14px;"', domains_panel)
+
+    def test_server_journal_is_a_readable_timeline_with_collapsible_details(self):
+        for marker in (
+            'class="infra-journal-head"',
+            'class="infra-log-rail"',
+            'class="infra-log-card"',
+            ".infra-log-row { display: grid; grid-template-columns: 108px 30px minmax(0, 1fr);",
+            ".infra-log-rail i { position: relative; z-index: 1; width: 28px; min-width: 28px; height: 28px; flex: 0 0 28px; aspect-ratio: 1 / 1;",
+            ".infra-log-row { grid-template-columns: 30px minmax(0, 1fr); gap: 4px 10px; }",
+            'class="infra-log-details"',
+            '<summary>Технические детали</summary>',
+            "const replacementStatusLabels = {",
+            "const anomalyStatusLabels = {",
+            "const commandStatusLabels = {",
+            "const commandKindLabels = {ensure_ip: 'Установить IP на интерфейс'};",
+            "journal.sort((left, right)",
+            "const journalCountLabel = (count) => {",
+            "journal.map((entry) => entry.html).join('')",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        self.assertNotIn("journal.join('')", self.template)
+
+    def test_open_journal_details_survive_five_second_auto_refresh(self):
+        for marker in (
+            "function infraSnapshotOpenDetails(container)",
+            "details[data-infra-persistent-details][open]",
+            "function infraRestoreOpenDetails(container, openDetails)",
+            "const openDetails = infraSnapshotOpenDetails(container);",
+            "infraRestoreOpenDetails(container, openDetails);",
+            'data-infra-persistent-details="${escapeHtml(detailsKey)}"',
+            "detailsKey: `journal-replacement-${r.id}`",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+        snapshot_index = self.template.index(
+            "const openDetails = infraSnapshotOpenDetails(container);"
+        )
+        render_index = self.template.index(
+            "renderInfraDetail(container, detailPayload.result, telemetryPayload.result, full);",
+            snapshot_index,
+        )
+        restore_index = self.template.index(
+            "infraRestoreOpenDetails(container, openDetails);",
+            render_index,
+        )
+        self.assertLess(snapshot_index, render_index)
+        self.assertLess(render_index, restore_index)
+
+    def test_open_geo_rankings_survive_five_second_auto_refresh(self):
+        for marker in (
+            "const geoPanelHtml = (title, rows, isCountry, emptyText, detailsKey) => {",
+            '<details class="infra-geo-more" data-infra-persistent-details="${escapeHtml(detailsKey)}">',
+            "'infra-geo-regions-' + server.id",
+            "'infra-geo-countries-' + server.id",
+            "const openDetails = infraSnapshotOpenDetails(container);",
+            "infraRestoreOpenDetails(container, openDetails);",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+    def test_expanded_geo_rankings_put_collapse_control_after_extra_rows(self):
+        for marker in (
+            ".infra-geo-more[open] { display: flex; flex-direction: column; }",
+            ".infra-geo-more[open] > .infra-geo-list { order: 1; }",
+            ".infra-geo-more[open] > summary { order: 2; margin-top: 5px; }",
+            '<span class="infra-geo-more-collapsed">ещё ${items.length - 8}</span>',
+            '<span class="infra-geo-more-expanded">свернуть</span>',
+            ".infra-geo-more[open] .infra-geo-more-collapsed { display: none; }",
+            ".infra-geo-more[open] .infra-geo-more-expanded { display: inline; }",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+    def test_ip_groups_use_compact_responsive_grid(self):
+        for marker in (
+            ".infra-ip-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));",
+            ".infra-ip-group.is-wide { grid-column: 1 / -1; }",
+            ".infra-ip-groups { grid-template-columns: repeat(2, minmax(0, 1fr)); }",
+            ".infra-ip-groups { grid-template-columns: 1fr; }",
+            "group.ips.length > 2 ? ' is-wide' : ''",
+            "const collapsibleReserve = group.isReserve && group.ips.length > 6;",
+            'class="infra-ip-reserve-details"',
+            'aria-label="Показать или скрыть резервные IP-адреса"',
+            "infraReserveExpanded = event.currentTarget.open;",
+            ".infra-ip-reserve-details[open] .infra-ip-reserve-chevron",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
 
     def test_compact_server_buttons_keep_contrast_in_light_theme(self):
         for marker in (
             'html[data-admin-theme="light"] .infra-mini-btn:hover',
-            'background: rgba(181,139,0,.07); color: #242a34;',
+            "background: rgba(181,139,0,.07); color: #242a34;",
             'html[data-admin-theme="light"] .infra-mini-btn.danger:hover',
-            'color: #b52f3e;',
+            "color: #b52f3e;",
             'html[data-admin-theme="light"] .infra-mini-btn:focus-visible',
         ):
             with self.subTest(marker=marker):
@@ -8285,9 +8633,45 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
     def test_server_rows_keep_visible_hover_in_light_theme(self):
         for marker in (
             'html[data-admin-theme="light"] .infra-table tbody tr:not(.is-selected):hover',
-            'background: rgba(181,139,0,.075); box-shadow: inset 3px 0 0 rgba(154,113,0,.42);',
+            "background: rgba(181,139,0,.075); box-shadow: inset 3px 0 0 rgba(154,113,0,.42);",
             'html[data-admin-theme="light"] .infra-table tbody tr.infra-row-offline:not(.is-selected):hover',
-            'background: rgba(211,65,78,.09); box-shadow: inset 3px 0 0 rgba(197,54,69,.46);',
+            "background: rgba(211,65,78,.09); box-shadow: inset 3px 0 0 rgba(197,54,69,.46);",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+    def test_server_list_uses_readable_typography(self):
+        for marker in (
+            "#subpanel-inf-servers { font-family: 'Manrope'",
+            "#infra-server-detail, .infra-server-screen-head { font-family: 'Inter'",
+            "font-optical-sizing: auto; font-synthesis: none;",
+            "#subpanel-inf-servers .infra-server-card-name { font-size: 19px; font-weight: 800;",
+            "#subpanel-inf-servers .infra-server-card-host { font-size: 13px; font-weight: 600; }",
+            ".infra-detail-stat-label { font-size: 12px; font-weight: 700; }",
+            ".infra-detail-stat-value { font-size: clamp(25px, 1.7vw, 34px); font-weight: 800; }",
+            "#infra-server-detail .infra-detail-card h4 { font-size: 17px; line-height: 1.2; font-weight: 700;",
+            "#infra-server-detail .infra-kv { font-size: 13.5px; line-height: 1.4; }",
+            '#infra-server-detail .infra-kv code { font-family: "SFMono-Regular"',
+            'class="infra-machine-id"',
+            "#infra-server-detail .infra-control { font-size: 12.5px; font-weight: 600; }",
+            ".infra-table-heading h3 { margin: 0; color: var(--text-main); font-size: 16px;",
+            ".infra-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }",
+            "font-size: 13.5px; line-height: 1.25; font-weight: 850;",
+            ".infra-server-host { color: rgba(255,255,255,.67); font-size: 11.5px;",
+            'html[data-admin-theme="light"] .infra-server-host { color: rgba(34,39,47,.68); }',
+            ".infra-table td, .infra-table th { padding: 10px 8px; }",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+    def test_management_tabs_and_panel_share_one_seamless_surface(self):
+        for marker in (
+            ".infra-detail-management-workspace { overflow: hidden; border: 1px solid var(--panel-border); border-radius: 12px; background: var(--card-bg); }",
+            ".infra-detail-management-panels { min-width: 0; background: var(--card-bg); }",
+            "#infra-server-detail .infra-detail-management-panels > .infra-detail-management-panel { min-width: 0; min-height: 220px; margin: 0;",
+            "border: 0; border-radius: 0; background: var(--card-bg); box-shadow: none; backdrop-filter: none;",
+            'html[data-admin-theme="light"] #infra-server-detail .infra-detail-management-workspace,',
+            'html[data-admin-theme="light"] #infra-server-detail .infra-detail-management-panels > .infra-detail-management-panel { background: #fff; }',
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)

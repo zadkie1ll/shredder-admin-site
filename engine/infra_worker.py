@@ -12,6 +12,7 @@ INFRA_WORKER_INTERVAL секунд выполняет обслуживание:
 - обработка аномалий: ТСПУ подтвердил блокировку -> заявка на замену IP;
 - state machine замены IP: node-agent ensure_ip -> Cloudflare ADD new ->
   Cloudflare REMOVE old -> Telegram (порядок принципиален).
+- загрузка и атомарное обновление DB-IP City Lite для аналитики подключений.
 
 Лидерство между gunicorn-воркерами — Postgres advisory lock (свой ключ,
 отличный от censor_worker). Аномалия никогда не меняет DNS сама: только
@@ -1087,9 +1088,18 @@ def _infra_tables_ready() -> bool:
 def run_maintenance() -> None:
     """Один тик обслуживания; каждая подзадача — своя сессия и commit."""
     from engine import infra
+    from engine import geoip_updater
 
     global _tick_counter
     _tick_counter += 1
+    # Выполняется уже после захвата advisory lock лидером. Загрузка не зависит
+    # от infra_* таблиц: новая установка сможет получить MMDB до миграции.
+    try:
+        geoip_updater.update_if_due()
+    except Exception:
+        # GeoIP — необязательное обогащение и никогда не должно останавливать
+        # алерты, агрегацию телеметрии или автозамену IP.
+        log.exception("infra worker: DB-IP City Lite update failed")
     if not _infra_tables_ready():
         return
 

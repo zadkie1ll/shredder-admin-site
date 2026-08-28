@@ -7,9 +7,15 @@ Cloudflare/Telegram/RIPE Atlas — mock, HTTP — RequestFactory на view-фу�
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
+import gzip
+import os
+from pathlib import Path
+import tempfile
 from unittest import mock
 
+import httpx
 from django.test import RequestFactory, SimpleTestCase
+from django.test import override_settings
 
 from sqlalchemy import BigInteger, create_engine
 from sqlalchemy.dialects.postgresql import JSONB
@@ -34,6 +40,8 @@ from common.models.db import (
 )
 from engine import infra
 from engine import infra_worker
+from engine import geoip_lookup
+from engine import geoip_updater
 
 
 @compiles(BigInteger, "sqlite")
@@ -132,6 +140,374 @@ class InfraDbTestCase(SimpleTestCase):
                 )
             )
         self.session.commit()
+
+
+class GeoIpLookupTests(SimpleTestCase):
+    def tearDown(self):
+        geoip_lookup.reset_caches()
+        super().tearDown()
+
+    def test_local_city_record_uses_russian_country_and_top_level_region(self):
+        reader = mock.Mock()
+        reader.get.return_value = {
+            "country": {
+                "iso_code": "RU",
+                "names": {"ru": "Россия", "en": "Russia"},
+            },
+            "subdivisions": [
+                {
+                    "iso_code": "MOW",
+                    "names": {"ru": "Москва", "en": "Moscow"},
+                },
+                {
+                    "iso_code": "C",
+                    "names": {"ru": "Центральный округ"},
+                },
+            ],
+        }
+        database = geoip_lookup.GeoIpDatabase("/tmp/test.mmdb", 1)
+
+        with mock.patch.object(geoip_lookup, "_reader_for", return_value=reader):
+            location = geoip_lookup.lookup_ip("8.8.8.8", database)
+
+        self.assertEqual(
+            location,
+            geoip_lookup.GeoLocation("RU", "Россия", "MOW", "Москва"),
+        )
+
+    def test_dbip_region_without_iso_code_is_not_discarded(self):
+        reader = mock.Mock()
+        reader.get.return_value = {
+            "country": {"iso_code": "RU", "names": {"ru": "Россия"}},
+            "subdivisions": [{"names": {"en": "Leningradskaya Oblast'"}}],
+        }
+        database = geoip_lookup.GeoIpDatabase("/tmp/test.mmdb", 1)
+
+        with mock.patch.object(geoip_lookup, "_reader_for", return_value=reader):
+            location = geoip_lookup.lookup_ip("77.105.170.88", database)
+
+        self.assertEqual(
+            location,
+            geoip_lookup.GeoLocation(
+                "RU", "Россия", "LEN", "Ленинградская область"
+            ),
+        )
+
+    def test_dbip_common_russian_region_aliases_are_localized(self):
+        database = geoip_lookup.GeoIpDatabase("/tmp/test.mmdb", 1)
+        cases = (
+            ("Moscow", "MOW", "Москва"),
+            ("St.-Petersburg", "SPE", "Санкт-Петербург"),
+            ("Kuzbass", "KEM", "Кемеровская область — Кузбасс"),
+            ("Rostov", "ROS", "Ростовская область"),
+        )
+
+        for index, (source_name, expected_code, expected_name) in enumerate(cases):
+            reader = mock.Mock()
+            reader.get.return_value = {
+                "country": {"iso_code": "RU", "names": {"ru": "Россия"}},
+                "subdivisions": [{"names": {"en": source_name}}],
+            }
+            with self.subTest(source_name=source_name), mock.patch.object(
+                geoip_lookup, "_reader_for", return_value=reader
+            ):
+                location = geoip_lookup.lookup_ip(
+                    f"77.105.170.{88 + index}", database
+                )
+                self.assertEqual(location.region_code, expected_code)
+                self.assertEqual(location.region_name, expected_name)
+
+    def test_private_or_invalid_addresses_never_reach_database(self):
+        database = geoip_lookup.GeoIpDatabase("/tmp/test.mmdb", 1)
+        with mock.patch.object(geoip_lookup, "_reader_for") as reader:
+            self.assertIsNone(geoip_lookup.lookup_ip("192.168.1.1", database))
+            self.assertIsNone(geoip_lookup.lookup_ip("не-ip", database))
+        reader.assert_not_called()
+
+    def test_corrupt_database_is_treated_as_not_configured(self):
+        with tempfile.NamedTemporaryFile(suffix=".mmdb") as database_file:
+            database_file.write(b"not-an-mmdb")
+            database_file.flush()
+            with override_settings(GEOIP_CITY_DB_PATH=database_file.name):
+                self.assertIsNone(geoip_lookup.configured_database())
+
+
+class GeoIpUpdaterTests(SimpleTestCase):
+    NOW = datetime(2026, 8, 28, tzinfo=timezone.utc).timestamp()
+
+    def setUp(self):
+        self.temp_dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp_dir.cleanup)
+        geoip_updater.reset_state_for_tests()
+
+    def database_path(self):
+        return Path(self.temp_dir.name) / "DBIP-City-Lite.mmdb"
+
+    @staticmethod
+    def archive_bytes(database_content=b"test-mmdb"):
+        return gzip.compress(database_content)
+
+    def settings_override(self, **kwargs):
+        values = {
+            "GEOIP_CITY_DB_PATH": str(self.database_path()),
+            "GEOIPUPDATE_INTERVAL_HOURS": 168,
+        }
+        values.update(kwargs)
+        return override_settings(**values)
+
+    def test_missing_database_path_disables_download_without_touching_disk(self):
+        with override_settings(GEOIP_CITY_DB_PATH=""), mock.patch.object(
+            geoip_updater.httpx, "Client"
+        ) as client:
+            result = geoip_updater.update_if_due(now=self.NOW)
+
+        self.assertEqual(result, "disabled")
+        self.assertFalse(self.database_path().exists())
+        self.assertFalse(
+            self.database_path().with_suffix(".mmdb.lock").exists()
+        )
+        client.assert_not_called()
+
+    def test_download_extract_validate_and_atomic_replace(self):
+        archive = self.archive_bytes(b"new-database")
+
+        def handler(request):
+            self.assertEqual(
+                str(request.url),
+                geoip_updater.download_url(2026, 8),
+            )
+            self.assertNotIn("Authorization", request.headers)
+            return httpx.Response(200, content=archive, request=request)
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        with self.settings_override(), mock.patch.object(
+            geoip_updater.httpx, "Client", return_value=client
+        ) as client_factory, mock.patch.object(
+            geoip_updater, "_validate_database"
+        ) as validate:
+            result = geoip_updater.update_if_due(now=self.NOW)
+            second = geoip_updater.update_if_due(now=self.NOW + 60)
+
+        self.assertEqual(result, "updated")
+        self.assertEqual(second, "current")
+        self.assertEqual(self.database_path().read_bytes(), b"new-database")
+        self.assertTrue(
+            self.database_path().with_suffix(".mmdb.checked").exists()
+        )
+        validate.assert_called_once()
+        client_factory.assert_called_once()
+        self.assertTrue(client_factory.call_args.kwargs["follow_redirects"])
+
+    def test_current_month_404_falls_back_to_previous_release(self):
+        archive = self.archive_bytes(b"previous-month-database")
+        requested_urls = []
+
+        def handler(request):
+            requested_urls.append(str(request.url))
+            if str(request.url) == geoip_updater.download_url(2026, 8):
+                return httpx.Response(404, request=request)
+            return httpx.Response(200, content=archive, request=request)
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        with self.settings_override(), mock.patch.object(
+            geoip_updater.httpx, "Client", return_value=client
+        ), mock.patch.object(geoip_updater, "_validate_database"):
+            result = geoip_updater.update_if_due(now=self.NOW)
+
+        self.assertEqual(result, "updated")
+        self.assertEqual(
+            requested_urls,
+            [
+                geoip_updater.download_url(2026, 8),
+                geoip_updater.download_url(2026, 7),
+            ],
+        )
+        self.assertEqual(
+            self.database_path().read_bytes(), b"previous-month-database"
+        )
+
+    def test_bad_archive_keeps_previous_database_and_throttles_retry(self):
+        self.database_path().parent.mkdir(parents=True, exist_ok=True)
+        self.database_path().write_bytes(b"previous-database")
+        os_time = self.NOW - (169 * 60 * 60)
+        self.database_path().touch()
+        os.utime(self.database_path(), (os_time, os_time))
+
+        def handler(request):
+            return httpx.Response(200, content=b"not-a-tar", request=request)
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        with self.settings_override(), mock.patch.object(
+            geoip_updater.httpx, "Client", return_value=client
+        ) as client_factory, self.assertLogs("infra.geoip-updater", level="ERROR"):
+            first = geoip_updater.update_if_due(now=self.NOW)
+            second = geoip_updater.update_if_due(now=self.NOW + 30)
+
+        self.assertEqual(first, "error")
+        self.assertEqual(second, "current")
+        self.assertEqual(self.database_path().read_bytes(), b"previous-database")
+        client_factory.assert_called_once()
+
+    def test_mmdb_validation_failure_never_replaces_previous_database(self):
+        self.database_path().write_bytes(b"previous-database")
+        os_time = self.NOW - (169 * 60 * 60)
+        os.utime(self.database_path(), (os_time, os_time))
+        archive = self.archive_bytes(b"invalid-mmdb")
+
+        def handler(request):
+            return httpx.Response(200, content=archive, request=request)
+
+        client = httpx.Client(transport=httpx.MockTransport(handler))
+        with self.settings_override(), mock.patch.object(
+            geoip_updater.httpx, "Client", return_value=client
+        ), mock.patch.object(
+            geoip_updater,
+            "_validate_database",
+            side_effect=ValueError("invalid MMDB"),
+        ), self.assertLogs("infra.geoip-updater", level="ERROR"):
+            result = geoip_updater.update_if_due(now=self.NOW)
+
+        self.assertEqual(result, "error")
+        self.assertEqual(self.database_path().read_bytes(), b"previous-database")
+
+    def test_infra_leader_runs_geo_updater_before_table_check(self):
+        with mock.patch.object(
+            geoip_updater, "update_if_due", return_value="current"
+        ) as update, mock.patch.object(
+            infra_worker, "_infra_tables_ready", return_value=False
+        ):
+            infra_worker.run_maintenance()
+
+        update.assert_called_once_with()
+
+    def test_geo_update_failure_does_not_stop_other_infra_maintenance(self):
+        with mock.patch.object(
+            geoip_updater, "update_if_due", side_effect=OSError("read-only")
+        ), mock.patch.object(
+            infra_worker, "_infra_tables_ready", return_value=False
+        ) as tables_ready, self.assertLogs("infra-worker", level="ERROR"):
+            infra_worker.run_maintenance()
+
+        tables_ready.assert_called_once_with()
+
+
+class WhoConnectsGeoTests(InfraDbTestCase):
+    def setUp(self):
+        super().setUp()
+        infra.reset_geo_analytics_cache()
+
+    def tearDown(self):
+        infra.reset_geo_analytics_cache()
+        super().tearDown()
+
+    def add_observation(self, username, ip, hits, node="de-1"):
+        now = utcnow()
+        self.session.add(
+            UserIpObservation(
+                username=username,
+                ip=ip,
+                subnet=f"{ip}/32",
+                node=node,
+                hits=hits,
+                first_seen=now - timedelta(hours=2),
+                last_seen=now,
+            )
+        )
+        self.session.commit()
+
+    def test_payload_aggregates_all_countries_and_russian_regions(self):
+        self.add_observation("a", "8.8.8.8", 20)
+        self.add_observation("b", "1.1.1.1", 10)
+        self.add_observation("c", "9.9.9.9", 5)
+        locations = {
+            "8.8.8.8": geoip_lookup.GeoLocation("RU", "Россия", "MOW", "Москва"),
+            "1.1.1.1": geoip_lookup.GeoLocation(
+                "RU", "Россия", "SAM", "Самарская область"
+            ),
+            "9.9.9.9": geoip_lookup.GeoLocation("DE", "Германия"),
+        }
+        database = geoip_lookup.GeoIpDatabase("/tmp/test.mmdb", 1)
+
+        with mock.patch.object(
+            geoip_lookup, "configured_database", return_value=database
+        ), mock.patch.object(
+            geoip_lookup,
+            "lookup_ip",
+            side_effect=lambda ip, _: locations[ip],
+        ):
+            payload = infra.who_connects_payload(self.session, "de-1", utcnow())
+
+        geo = payload["geo"]
+        self.assertTrue(geo["enabled"])
+        self.assertEqual(geo["source"], "DB-IP City Lite")
+        self.assertEqual(geo["located_ips"], 3)
+        self.assertEqual(geo["total_hits"], 35)
+        self.assertEqual(geo["russia_share_pct"], 85.7)
+        self.assertEqual(
+            [(row["name"], row["hits"], row["addresses"]) for row in geo["countries"]],
+            [("Россия", 30, 2), ("Германия", 5, 1)],
+        )
+        self.assertEqual(
+            [(row["name"], row["share_pct"]) for row in geo["russian_regions"]],
+            [("Москва", 57.1), ("Самарская область", 28.6)],
+        )
+
+    def test_regions_without_iso_codes_do_not_merge_into_unknown(self):
+        self.add_observation("a", "8.8.8.8", 20)
+        self.add_observation("b", "1.1.1.1", 10)
+        locations = {
+            "8.8.8.8": geoip_lookup.GeoLocation("RU", "Россия", None, "Москва"),
+            "1.1.1.1": geoip_lookup.GeoLocation(
+                "RU", "Россия", None, "Самарская область"
+            ),
+        }
+        database = geoip_lookup.GeoIpDatabase("/tmp/test.mmdb", 1)
+
+        with mock.patch.object(
+            geoip_lookup, "configured_database", return_value=database
+        ), mock.patch.object(
+            geoip_lookup,
+            "lookup_ip",
+            side_effect=lambda ip, _: locations[ip],
+        ):
+            geo = infra.who_connects_payload(
+                self.session, "de-1", utcnow()
+            )["geo"]
+
+        self.assertEqual(
+            [(row["name"], row["hits"]) for row in geo["russian_regions"]],
+            [("Москва", 20), ("Самарская область", 10)],
+        )
+
+    def test_missing_database_preserves_existing_ip_payload(self):
+        self.add_observation("a", "8.8.8.8", 20)
+        with mock.patch.object(
+            geoip_lookup, "configured_database", return_value=None
+        ), mock.patch.object(geoip_lookup, "lookup_ip") as lookup:
+            payload = infra.who_connects_payload(self.session, "de-1", utcnow())
+
+        self.assertFalse(payload["geo"]["enabled"])
+        self.assertEqual(payload["top_addresses"][0]["ip"], "8.8.8.8")
+        lookup.assert_not_called()
+
+    def test_geo_aggregation_is_reused_within_cache_window(self):
+        self.add_observation("a", "8.8.8.8", 20)
+        database = geoip_lookup.GeoIpDatabase("/tmp/test.mmdb", 1)
+        location = geoip_lookup.GeoLocation("RU", "Россия", "MOW", "Москва")
+        now = utcnow()
+
+        with mock.patch.object(
+            geoip_lookup, "configured_database", return_value=database
+        ), mock.patch.object(
+            geoip_lookup,
+            "lookup_ip",
+            return_value=location,
+        ) as lookup:
+            first = infra.who_connects_payload(self.session, "de-1", now)
+            second = infra.who_connects_payload(self.session, "de-1", now)
+
+        self.assertIs(first["geo"], second["geo"])
+        lookup.assert_called_once_with("8.8.8.8", database)
 
 
 class SettingsTests(InfraDbTestCase):
@@ -1572,6 +1948,85 @@ class PayloadTests(InfraDbTestCase):
         self.assertEqual(item["utilization_pct"], 25.0)
         self.assertEqual(item["ips"], {"active": 1, "reserve": 1, "blocked": 0})
         self.assertEqual(item["domains"], ["de.example.xyz"])
+
+    def test_entry_payload_ok_in_dns(self):
+        # Показываются только IP, реально стоящие в A-записях, и только
+        # домены, чьи записи на них указывают
+        now = utcnow()
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.11", on_interface=True)  # запасной
+        self.make_ip(server, "10.0.0.5", on_interface=True)  # приватный
+        branded = self.make_domain(server, "uk.monkeyisland.space")
+        branded.last_a_ips = ["185.10.0.10"]
+        branded.dns_checked_at = now
+        other = self.make_domain(server, "uk.easyemploy.org")
+        other.last_a_ips = ["45.9.9.9"]  # смотрит в другое место
+        other.dns_checked_at = now
+        self.session.commit()
+
+        entry = infra.server_detail_payload(self.session, server.id)["entry"]
+        self.assertEqual(entry["status"], "ok")
+        self.assertEqual(entry["ips"], ["185.10.0.10"])
+        self.assertEqual(entry["domains"], ["uk.monkeyisland.space"])
+
+    def test_entry_payload_multiple_ips_during_rotation(self):
+        # Переходный период ротации: старый и новый IP оба в DNS
+        now = utcnow()
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.11", on_interface=True)
+        domain = self.make_domain(server, "uk.monkeyisland.space")
+        domain.last_a_ips = ["185.10.0.10", "185.10.0.11"]
+        domain.dns_checked_at = now
+        self.session.commit()
+
+        entry = infra.server_detail_payload(self.session, server.id)["entry"]
+        self.assertEqual(entry["status"], "ok")
+        self.assertEqual(
+            sorted(entry["ips"]), ["185.10.0.10", "185.10.0.11"]
+        )
+
+    def test_entry_payload_not_in_dns(self):
+        now = utcnow()
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        domain = self.make_domain(server, "uk.monkeyisland.space")
+        domain.last_a_ips = ["45.9.9.9"]  # нода выведена из DNS
+        domain.dns_checked_at = now
+        self.session.commit()
+
+        entry = infra.server_detail_payload(self.session, server.id)["entry"]
+        self.assertEqual(entry["status"], "not_in_dns")
+        self.assertEqual(entry["ips"], ["185.10.0.10"])
+        self.assertEqual(entry["domains"], [])
+
+    def test_entry_payload_dns_stale_and_no_domains(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        entry = infra.server_detail_payload(self.session, server.id)["entry"]
+        self.assertEqual(entry["status"], "no_domains")
+        self.assertEqual(entry["ips"], ["185.10.0.10"])
+
+        domain = self.make_domain(server, "uk.monkeyisland.space")
+        domain.last_a_ips = ["185.10.0.10"]
+        domain.dns_checked_at = utcnow() - timedelta(hours=48)  # протух
+        self.session.commit()
+        entry = infra.server_detail_payload(self.session, server.id)["entry"]
+        self.assertEqual(entry["status"], "dns_stale")
+        self.assertEqual(entry["ips"], ["185.10.0.10"])
+        self.assertEqual(entry["domains"], [])
+
+    def test_entry_payload_none_without_active_public_ips(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=False)  # резерв
+        blocked = self.make_ip(server, "185.10.0.11", on_interface=True)
+        blocked.blocked_at = utcnow()
+        self.session.commit()
+
+        entry = infra.server_detail_payload(self.session, server.id)["entry"]
+        self.assertEqual(entry["status"], "none")
+        self.assertEqual(entry["ips"], [])
 
     def test_detail_and_series_payload(self):
         server = self.make_server()
