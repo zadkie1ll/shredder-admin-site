@@ -122,6 +122,96 @@ def check_offline(db_session) -> None:
                 log.info("infra: server %s back ONLINE", title)
 
 
+# --- health xray (rw-core) --------------------------------------------------
+
+
+def check_xray(db_session) -> None:
+    """Алерты «xray умер / crash-loop» по health от node-agent v0.3+.
+
+    Диагноз только по процессу rw-core: xray_process_running is False или
+    crash_loop (access.log — не признак поломки, он может быть выключен;
+    None — агент не сообщает, старая версия или нет pid: host — молчим).
+    Падение подтверждается infra_xray_down_confirm_minutes, чтобы штатный
+    рестарт при деплое конфига не алертил. Дедуп и recovery — по образцу
+    check_offline: пара timestamps + кулдаун при флаппинге.
+    """
+    from engine import infra
+
+    cfg = infra.get_settings(db_session)
+    now = infra.utcnow()
+    confirm = timedelta(minutes=cfg["infra_xray_down_confirm_minutes"])
+    cooldown = timedelta(minutes=cfg["infra_xray_alert_cooldown_minutes"])
+    servers = (
+        db_session.query(infra.InfraServer)
+        .filter(infra.InfraServer.is_archived.is_(False))
+        .all()
+    )
+    for server in servers:
+        if not infra.is_online(server, cfg, now):
+            # Оффлайн покрывается своим алертом; протухший health не судим
+            server.xray_down_since = None
+            continue
+        title = infra.server_title(server)
+        down = (
+            server.xray_process_running is False
+            or server.xray_crash_loop is True
+        )
+        incident_alerted = server.xray_down_alerted_at is not None and (
+            server.xray_recovered_alerted_at is None
+            or server.xray_recovered_alerted_at < server.xray_down_alerted_at
+        )
+        if down:
+            if server.xray_down_since is None:
+                server.xray_down_since = now
+            if incident_alerted:
+                continue
+            if now - server.xray_down_since < confirm:
+                continue
+            if (
+                server.xray_down_alerted_at is not None
+                and now - server.xray_down_alerted_at < cooldown
+            ):
+                continue
+            reason = (
+                "процесс постоянно перезапускается (crash-loop)"
+                if server.xray_crash_loop
+                else "процесс rw-core не найден"
+            )
+            delivered = _send_alert(
+                "🟥 <b>XRAY не работает</b>\n\n"
+                f"Сервер: <b>{title}</b>\n"
+                f"Причина: {reason}.\n\n"
+                "Клиенты не обслуживаются, хотя сервер и node-agent живы.\n"
+                "Похоже на сломанный конфиг xray — проверьте:\n"
+                "<code>docker exec remnanode tail -n 50 "
+                "/var/log/supervisor/xray.err.log</code>\n\n"
+                "Замеры ТСПУ и ротация IP по этому серверу приостановлены "
+                "до восстановления xray."
+            )
+            if delivered:
+                server.xray_down_alerted_at = now
+                log.warning("infra: xray DOWN on %s, alert sent", title)
+        else:
+            server.xray_down_since = None
+            if not incident_alerted:
+                continue
+            if now - server.xray_down_alerted_at < timedelta(minutes=1):
+                # Мгновенный флап: даём состоянию устаканиться
+                continue
+            uptime = server.xray_process_uptime_seconds
+            uptime_text = (
+                f"{int(uptime // 60)} мин" if uptime is not None else "—"
+            )
+            delivered = _send_alert(
+                "🟩 <b>XRAY снова работает</b>\n\n"
+                f"Сервер: <b>{title}</b>\n"
+                f"Процесс rw-core запущен, uptime {uptime_text}."
+            )
+            if delivered:
+                server.xray_recovered_alerted_at = now
+                log.info("infra: xray RECOVERED on %s", title)
+
+
 # --- высокая нагрузка канала ------------------------------------------------
 
 
@@ -409,6 +499,14 @@ def detect_anomalies(db_session) -> None:
         # детектор гонял бы холостые ТСПУ-замеры каждый кулдаун, пока
         # baseline неделю не перестроится к нулю
         if not infra.server_is_in_dns(db_session, server):
+            continue
+        # Мёртвый xray роняет трафик так же, как бан ТСПУ, но замер тут
+        # бессмысленен (IP-то жив и отвечает) — check_xray алертит об этой
+        # поломке отдельно, а детектор молчит до восстановления процесса
+        if (
+            server.xray_process_running is False
+            or server.xray_crash_loop is True
+        ):
             continue
         open_anomaly = (
             db_session.query(infra.InfraAnomaly)
@@ -1116,6 +1214,7 @@ def run_maintenance() -> None:
 
     _run("aggregate", lambda db: infra.aggregate_telemetry(db))
     _run("offline", check_offline)
+    _run("xray", check_xray)
     _run("load", check_load)
     if _tick_counter % _ANOMALY_EVERY_TICKS == 0:
         _run("anomaly-detect", detect_anomalies)

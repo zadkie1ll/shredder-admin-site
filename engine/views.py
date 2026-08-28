@@ -3002,6 +3002,26 @@ def auth_by_telegram_webapp(request):
         db_session.close()
 
 
+def landing_client_ip_context(request):
+    """IP посетителя и страна (локальная MMDB) для топ-бара VPS-лендингов.
+
+    Внешние geo-API не используются: страна берётся из той же локальной базы,
+    что и в админке (engine.geoip_lookup); без базы показывается только IP.
+    """
+    client_ip = admin_client_ip(request)
+    country = None
+    if client_ip:
+        try:
+            from engine.geoip_lookup import lookup_ip
+
+            location = lookup_ip(client_ip)
+            if location is not None:
+                country = location.country_name
+        except Exception:
+            logging.exception("landing geoip lookup failed")
+    return {"client_ip": client_ip, "client_ip_country": country}
+
+
 def index(request):
     captured_tracking_params = capture_tracking_params(request)
     site_role = get_site_role(request)
@@ -3021,6 +3041,7 @@ def index(request):
                 "tracking_params": get_tracking_params(request),
                 "trial_period_days_label": format_days_ru(trial_period_days),
                 "payment_gateway": settings.PAYMENT_GATEWAY.lower(),
+                **landing_client_ip_context(request),
             },
         )
         return set_tracking_cookies(request, response, captured_tracking_params)
@@ -3058,6 +3079,7 @@ def render_vps_direct_sale(request):
             "tariffs": tariffs,
             "min_tariff_price": min(tariff.price for tariff in tariffs),
             "tracking_params": get_tracking_params(request),
+            **landing_client_ip_context(request),
         },
     )
 

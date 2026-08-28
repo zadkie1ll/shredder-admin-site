@@ -11677,6 +11677,7 @@
 
         function infraServerNeedsAttention(server) {
             return !server.online || server.checking || server.replacing
+                || server.xray_down
                 || (server.utilization_pct !== null && server.utilization_pct !== undefined
                     && server.utilization_pct >= infraLoadThreshold);
         }
@@ -11736,6 +11737,7 @@
                 ? '<span class="infra-badge infra-badge-online">Онлайн</span>'
                 : '<span class="infra-badge infra-badge-offline">Оффлайн</span>';
             const flags = [
+                server.xray_down ? '<span class="infra-badge infra-badge-offline" title="Процесс rw-core не найден или в crash-loop: клиенты не обслуживаются, детектор аномалий приостановлен">XRAY DOWN</span>' : '',
                 server.checking ? '<span class="infra-badge infra-badge-warn" title="Идёт проверка ТСПУ по аномалии">ТСПУ</span>' : '',
                 server.replacing ? '<span class="infra-badge infra-badge-warn" title="Идёт замена IP">IP</span>' : '',
                 server.anomaly_paused ? '<span class="infra-badge infra-badge-muted" title="Детектор аномалий на паузе (плановые работы)">пауза</span>' : '',
@@ -12646,6 +12648,7 @@
                                     <p>${escapeHtml(server.hostname || server.node_name)} · ${escapeHtml(server.os || 'ОС не определена')} · агент v${escapeHtml(server.agent_version || '—')}</p>
                                 </div>
                                 ${server.online ? '<span class="infra-badge infra-badge-online">ONLINE</span>' : '<span class="infra-badge infra-badge-offline">OFFLINE</span>'}
+                                ${server.online && (server.xray_process_running === false || server.xray_crash_loop === true) ? `<span class="infra-badge infra-badge-offline" title="${server.xray_crash_loop ? 'Процесс rw-core постоянно перезапускается (crash-loop)' : 'Процесс rw-core не найден'}: клиенты не обслуживаются, похоже на сломанный конфиг xray. Замеры ТСПУ и детектор приостановлены.">XRAY DOWN</span>` : ''}
                                 ${server.baseline_scale ? `<span class="infra-badge infra-badge-muted" title="После изменения DNS норма трафика временно ×${server.baseline_scale.toFixed(2)} (до ${escapeHtml(server.baseline_scale_until || '')}); детектор аномалий работает">DNS ×${server.baseline_scale.toFixed(2)}</span>` : ''}
                                 ${server.is_archived ? '<span class="infra-badge infra-badge-muted">АРХИВ</span>' : ''}
                             </div>
@@ -12755,6 +12758,13 @@
                             <dt>Агент</dt><dd>v${escapeHtml(server.agent_version || '—')}</dd>
                             <dt>Heartbeat</dt><dd>${infraFmtAge(server.last_seen_age)}</dd>
                             <dt>Uptime</dt><dd>${infraFmtDuration(server.uptime_seconds)}</dd>
+                            <dt>XRAY</dt><dd>${
+                                server.xray_process_running === true
+                                    ? `работает${server.xray_crash_loop ? ' · <b style="color:var(--red)">crash-loop</b>' : ''} · uptime ${infraFmtDuration(server.xray_process_uptime_seconds)}${server.xray_access_log_age_seconds !== null && server.xray_access_log_age_seconds !== undefined ? ` · лог ${infraFmtAge(server.xray_access_log_age_seconds)}` : ''}`
+                                    : server.xray_process_running === false
+                                        ? '<b style="color:var(--red)">не запущен</b> — процесс rw-core не найден'
+                                        : 'нет данных (агент < v0.3 или без pid: host)'
+                            }</dd>
                             <dt>WAN</dt><dd><code>${escapeHtml(server.wan_interface || '—')}</code></dd>
                             <dt>IP агента</dt><dd><code>${escapeHtml(server.last_heartbeat_ip || '—')}</code></dd>
                             <dt>TCP / conntrack</dt><dd>${server.tcp_connections !== null && server.tcp_connections !== undefined ? server.tcp_connections.toLocaleString('ru-RU') : '—'} / ${server.conntrack !== null && server.conntrack !== undefined ? server.conntrack.toLocaleString('ru-RU') : '—'}</dd>

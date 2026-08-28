@@ -98,6 +98,10 @@ INFRA_SETTINGS = {
         20, int, "Аномалия: минимальный baseline-трафик, Mbit/s", None),
     "infra_auto_replace_enabled": (
         True, bool, "Автозамена IP после подтверждения ТСПУ", None),
+    "infra_xray_down_confirm_minutes": (
+        3, int, "XRAY: подтверждение падения перед алертом, мин", None),
+    "infra_xray_alert_cooldown_minutes": (
+        60, int, "XRAY: кулдаун повторного алерта, мин", None),
     "infra_dns_rebalance_window_hours": (
         168, int,
         "Окно перекалибровки baseline после новой A-записи у домена, часов",
@@ -346,6 +350,13 @@ def server_list_payload(db_session, include_archived: bool = False) -> dict:
                 "domains": domains.get(server.id, []),
                 "checking": server.id in checking,
                 "replacing": server.id in replacing,
+                "xray_down": (
+                    online
+                    and (
+                        server.xray_process_running is False
+                        or server.xray_crash_loop is True
+                    )
+                ),
                 "anomaly_paused": (
                     server.anomaly_suppressed_until is not None
                     and server.anomaly_suppressed_until > now
@@ -578,6 +589,16 @@ def server_detail_payload(db_session, server_id) -> dict:
             "tx_bps": server.cur_tx_bps if online else None,
             "tcp_connections": server.cur_tcp_connections if online else None,
             "conntrack": server.cur_conntrack if online else None,
+            "xray_process_running": (
+                server.xray_process_running if online else None
+            ),
+            "xray_crash_loop": server.xray_crash_loop if online else None,
+            "xray_process_uptime_seconds": (
+                server.xray_process_uptime_seconds if online else None
+            ),
+            "xray_access_log_age_seconds": (
+                server.xray_access_log_age_seconds if online else None
+            ),
             "cpu_load": (
                 float(server.cur_cpu_load)
                 if server.cur_cpu_load is not None

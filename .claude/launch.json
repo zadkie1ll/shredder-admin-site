@@ -34,6 +34,12 @@
         "/Users/apugachev/Desktop/monkey-island-vpn-assets"
       ],
       "port": 8899
+    },
+    {
+      "name": "website-vps-preview",
+      "runtimeExecutable": "/private/tmp/claude-501/-Users-apugachev-Work-projects-monkeyislandvpn-monkey-island-website/492d0cc9-f35c-4ad5-b1ad-ea6915503fbc/scratchpad/run_site_vps_preview.sh",
+      "runtimeArgs": [],
+      "port": 8126
     }
   ]
 }

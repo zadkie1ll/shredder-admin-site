@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#090a0f">
+    <meta name="theme-color" content="#0a0b10">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Monkey Island VPS — Мощный VPS для интернета и игр</title>
+    <title>Monkey Island VPS — Личный сервер для интернета и игр</title>
     <link rel="manifest" href="/manifest.json">
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
@@ -14,62 +14,86 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
     <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
     <noscript>
-        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap">
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
     </noscript>
     <style>
-        
         :root {
-            --island-bg: #090a0f;
-            --island-panel: rgba(17, 18, 23, 0.86);
-            --island-panel-strong: rgba(20, 21, 27, 0.94);
-            --island-border: rgba(255, 255, 255, 0.08);
-            --island-muted: rgba(255, 255, 255, 0.58);
-            --island-yellow: #ffc700;
+            --island-navy: #0a0b10;
+            --island-navy-2: #0d0e14;
+            --island-ink: #f2f3f6;
+            --island-muted: #9aa1ad;
+            --island-soft: #15171f;
+            --island-accent: #ffc700;
+            --island-accent-dark: #e6b400;
+            --island-green: #22c55e;
         }
 
         html {
             min-height: 100%;
-            background: var(--island-bg);
+            background: #08090d;
+            scroll-behavior: smooth;
         }
 
         body {
-            font-family: 'Montserrat', sans-serif;
-            background:
-                radial-gradient(circle at 50% 20%, rgba(255, 199, 0, 0.08), transparent 26rem),
-                linear-gradient(180deg, #0b0c12 0%, var(--island-bg) 100%);
-            color: #ffffff;
+            font-family: 'Golos Text', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+            background: #08090d;
+            color: var(--island-ink);
             overflow-x: hidden;
             min-height: 100%;
         }
 
+        /* ---------- Топ-бар с IP посетителя ---------- */
+        .ip-topbar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 9px 16px;
+            background: #060709;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 13px;
+            font-weight: 500;
+            text-align: center;
+        }
+
+        .ip-topbar b {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .ip-topbar .ip-alert {
+            color: var(--island-accent);
+            font-weight: 600;
+        }
+
+        .ip-topbar a {
+            color: var(--island-accent);
+            font-weight: 600;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .ip-topbar a:hover { color: #ffe066; }
+
+        @media (max-width: 380px) {
+            .ip-topbar { font-size: 11.5px; padding: 8px 10px; }
+        }
+
+        /* ---------- Hero (тёмная зона) ---------- */
         .hero-bg {
             background:
-                radial-gradient(circle at 72% 50%, rgba(255, 199, 0, 0.13), transparent 28rem),
-                radial-gradient(circle at 20% 20%, rgba(255, 255, 255, 0.04), transparent 20rem),
-                linear-gradient(180deg, #0b0c12 0%, #090a0f 100%);
-            min-height: 100svh;
-            display: flex;
-            flex-direction: column;
+                radial-gradient(circle at 78% 18%, rgba(255, 199, 0, 0.09), transparent 30rem),
+                radial-gradient(circle at 12% 82%, rgba(255, 199, 0, 0.05), transparent 24rem),
+                var(--island-navy);
+            color: #fff;
             position: relative;
             overflow: hidden;
-        }
-
-        .hero-bg::after {
-            content: "";
-            position: absolute;
-            inset: auto 0 0;
-            height: 34%;
-            background: linear-gradient(180deg, transparent 0%, var(--island-bg) 100%);
-            pointer-events: none;
-        }
-
-        /* Добавим тень для всей навигации, чтобы буквы не сливались с небом */
-        nav {
-            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
         }
 
         .landing-brand {
@@ -83,151 +107,137 @@
             width: 42px;
             height: 42px;
             flex: 0 0 auto;
-            border: 1px solid rgba(255, 199, 0, 0.2);
+            border: 1px solid rgba(255, 199, 0, 0.35);
             border-radius: 12px;
-            background: rgba(255, 199, 0, 0.06);
+            background: rgba(255, 199, 0, 0.10);
             object-fit: cover;
             box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
         }
 
         .landing-brand-text {
             display: block;
-            font-size: 20px;
+            font-size: 19px;
             line-height: 1;
-            font-weight: 800;
-            text-transform: uppercase;
-            letter-spacing: 0;
-            white-space: nowrap;
-        }
-
-        .benefit-card {
-            background: var(--island-panel);
-            backdrop-filter: blur(18px);
-            border: 1px solid var(--island-border);
-            border-radius: 12px;
-            padding: 20px;
-            transition: all 0.3s ease;
-        }
-
-        .benefit-card:hover {
-            background: rgba(255, 255, 255, 0.07);
-            border-color: #ffc700;
-        }
-
-        .benefit-card-title {
-            letter-spacing: 0.08em;
-            line-height: 1.15;
-            white-space: nowrap;
-        }
-
-        .tilda-yellow {
-            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%);
-            color: #08090d;
-            box-shadow: 0 18px 48px rgba(255, 199, 0, 0.24), inset 0 -4px 0 rgba(0,0,0,0.16);
-        }
-        .tilda-yellow:hover { background-color: #e6b400; }
-        
-        .tariff-card {
-            background: var(--island-panel-strong);
-            border: 1px solid var(--island-border);
-            border-radius: 18px;
-            transition: all 0.3s ease;
-            position: relative;
-        }
-        
-        .tariff-card:hover {
-            transform: translateY(-10px);
-            border-color: #ffc700;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.5);
-        }
-
-        .input-field {
-            background-color: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.12);
-            color: white;
-            border-radius: 12px;
-        }
-
-        .hero-title {
             font-weight: 700;
-            letter-spacing: 0;
-            text-shadow: none;
+            letter-spacing: 0.01em;
+            white-space: nowrap;
         }
 
-        .drop-shadow-custom {
-            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
-        }
-
-        .discount-badge {
-            position: absolute;
-            top: -15px;
-            right: 20px;
-            background: #ffc700;
-            color: #000;
-            padding: 5px 15px;
-            border-radius: 50px;
-            font-size: 14px;
-            font-weight: 900;
-            text-transform: uppercase;
-            box-shadow: 0 10px 20px rgba(255, 199, 0, 0.3);
-            z-index: 10;
-        }
-
-        .tariff-popular {
-            border-color: #ffc700;
-            box-shadow: 0 0 0 1px #ffc700, 0 24px 60px rgba(255, 199, 0, 0.14);
-        }
-
-        .popular-pill {
-            display: inline-block;
-            background: #ffc700;
-            color: #08090d;
-            font-size: 11px;
-            font-weight: 900;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            padding: 4px 12px;
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
             border-radius: 999px;
-            margin-bottom: 12px;
+            padding: 8px 16px;
+            font-size: 14px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.92);
         }
 
-        .mobile-buybar {
-            position: fixed;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 40;
-            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-            background: rgba(9, 10, 15, 0.94);
-            backdrop-filter: blur(14px);
-            border-top: 1px solid rgba(255, 255, 255, 0.08);
-            transform: translateY(130%);
-            transition: transform 0.25s ease;
+        .hero-badge::before {
+            content: "";
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--island-green);
+            box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
         }
 
-        .mobile-buybar.is-visible {
-            transform: translateY(0);
+        .hero-check {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: rgba(255, 255, 255, 0.92);
+            font-size: 16px;
+            font-weight: 400;
         }
 
-        @media (min-width: 768px) {
-            .mobile-buybar { display: none !important; }
+        .hero-check i {
+            color: var(--island-accent);
+            margin-top: 3px;
+            font-size: 14px;
         }
 
-        .pay-cta {
-            background: linear-gradient(180deg, #ffd21a 0%, #ffc700 58%, #f0ae00 100%);
-            color: #08090d;
+        .discount-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 10px 14px;
+            font-size: 15px;
+            font-weight: 500;
+            color: #fff;
+        }
+
+        .discount-chip i { color: var(--island-green); }
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: linear-gradient(180deg, #ffd21a 0%, var(--island-accent) 58%, #f0ae00 100%);
+            color: #0a0b10;
             border: 0;
-            box-shadow: 0 18px 38px rgba(255, 199, 0, .24), inset 0 -3px 0 rgba(0,0,0,.16);
+            border-radius: 32px;
+            min-height: 56px;
+            padding: 0 32px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+            box-shadow: 0 14px 34px rgba(255, 199, 0, 0.22);
         }
 
-        .pay-cta:hover {
-            background: linear-gradient(180deg, #ffdb3d 0%, #ffc700 58%, #f0ae00 100%);
-            box-shadow: 0 22px 48px rgba(255, 199, 0, .32), inset 0 -3px 0 rgba(0,0,0,.16);
+        .btn-primary:hover { background: linear-gradient(180deg, #ffdb3d 0%, var(--island-accent) 58%, #f0ae00 100%); }
+        .btn-primary:active { transform: scale(0.97); }
+
+        .btn-ghost-light {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            border-radius: 32px;
+            min-height: 44px;
+            padding: 0 22px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            transition: border-color 0.2s ease, background 0.2s ease;
         }
 
+        .btn-ghost-light:hover {
+            border-color: var(--island-accent);
+            background: rgba(255, 199, 0, 0.10);
+        }
+
+        .hero-mini-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 18px;
+            padding: 16px 18px;
+            font-size: 14px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.92);
+        }
+
+        .hero-mini-card i {
+            color: var(--island-accent);
+            font-size: 18px;
+            flex: 0 0 auto;
+        }
+
+        /* ---------- Иллюстрация hero: макет карточки сервера ---------- */
         .hero-art {
-            width: min(92vw, 560px);
-            filter: drop-shadow(0 46px 80px rgba(0,0,0,0.55));
+            width: min(88vw, 460px);
         }
 
         .hero-art-scene {
@@ -235,39 +245,191 @@
             display: inline-grid;
             place-items: center;
             isolation: isolate;
-            width: min(92vw, 560px);
+            width: min(88vw, 460px);
             max-width: 100%;
         }
 
-        .hero-art-scene::before,
-        .hero-art-scene::after {
+        .server-mock {
+            position: relative;
+            width: 100%;
+            padding: 26px 0 30px;
+        }
+
+        .mock-card {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 24px;
+            padding: 24px;
+            background: linear-gradient(160deg, rgba(34, 35, 44, 0.94) 0%, rgba(13, 14, 19, 0.97) 100%);
+            box-shadow: 0 44px 90px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(14px);
+        }
+
+        .mock-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .mock-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .mock-title i {
+            color: var(--island-accent);
+        }
+
+        .mock-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            border-radius: 999px;
+            padding: 6px 12px;
+            background: rgba(34, 197, 94, 0.14);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #4ade80;
+            font-size: 12px;
+            font-weight: 600;
+        }
+
+        .mock-status::before {
             content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: var(--island-green);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.22);
+        }
+
+        .mock-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 11px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .mock-row:last-of-type { border-bottom: 0; }
+
+        .mock-label {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .mock-value {
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .mock-value .up { color: #4ade80; }
+
+        .mock-bar {
+            height: 7px;
+            margin: 8px 0 2px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.09);
+            overflow: hidden;
+        }
+
+        .mock-bar i {
+            display: block;
+            height: 100%;
+            width: 86%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #ffc700, #ffe066);
+            animation: mock-bar-load 2.6s ease-in-out infinite alternate;
+        }
+
+        @keyframes mock-bar-load {
+            0% { width: 62%; }
+            100% { width: 92%; }
+        }
+
+        .mock-devices {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .mock-device {
+            width: 38px;
+            height: 38px;
+            flex: 0 0 auto;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 199, 0, 0.12);
+            border: 1px solid rgba(255, 199, 0, 0.26);
+            color: #ffd84d;
+            font-size: 15px;
+        }
+
+        .mock-devices span {
+            margin-left: 4px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12.5px;
+            font-weight: 500;
+        }
+
+        .mock-chip {
             position: absolute;
-            inset: 8%;
-            pointer-events: none;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 14px;
+            padding: 10px 14px;
+            background: rgba(23, 32, 56, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+        }
+
+        .mock-chip i { color: var(--island-green); }
+        .mock-chip.chip-speed i { color: var(--island-accent); }
+
+        .mock-chip.chip-key {
+            top: 0;
+            right: -6px;
+            animation: island-art-float 6.4s ease-in-out infinite;
+        }
+
+        .mock-chip.chip-speed {
+            bottom: 2px;
+            left: -6px;
+            animation: island-art-float 7.2s ease-in-out infinite reverse;
         }
 
         .hero-art-scene::before {
+            content: "";
+            position: absolute;
+            inset: 8%;
             z-index: -1;
             border-radius: 999px;
             background:
-                radial-gradient(circle at 50% 45%, rgba(255, 199, 0, 0.33), transparent 34%),
-                radial-gradient(circle at 28% 62%, rgba(255, 199, 0, 0.2), transparent 26%),
-                radial-gradient(circle at 72% 60%, rgba(255, 232, 130, 0.18), transparent 28%);
-            filter: blur(18px);
-            opacity: 0.72;
+                radial-gradient(circle at 50% 45%, rgba(255, 199, 0, 0.30), transparent 40%),
+                radial-gradient(circle at 28% 62%, rgba(255, 199, 0, 0.16), transparent 30%);
+            filter: blur(20px);
+            opacity: 0.8;
+            pointer-events: none;
             animation: island-art-glow 4.8s ease-in-out infinite;
-        }
-
-        .hero-art-scene::after {
-            z-index: 2;
-            background:
-                radial-gradient(circle, rgba(255, 232, 130, 0.95) 0 2px, transparent 3px) 18% 32% / 86px 86px,
-                radial-gradient(circle, rgba(255, 199, 0, 0.9) 0 1.5px, transparent 3px) 72% 40% / 112px 112px,
-                radial-gradient(circle, rgba(255, 255, 255, 0.72) 0 1px, transparent 2.5px) 58% 74% / 96px 96px;
-            mix-blend-mode: screen;
-            opacity: 0.38;
-            animation: island-art-sparks 7.2s linear infinite;
         }
 
         .hero-art-scene .hero-art,
@@ -280,78 +442,341 @@
             will-change: transform;
         }
 
-        .hero-art-scene-mobile {
-            display: none;
-        }
-
-        .hero-art-mobile {
-            display: none;
-        }
+        .hero-art-scene-mobile { display: none; }
+        .hero-art-mobile { display: none; }
 
         @keyframes island-art-float {
-            0%, 100% {
-                transform: translate3d(0, 0, 0) scale(1) rotate(-0.35deg);
-            }
-
-            50% {
-                transform: translate3d(0, -12px, 0) scale(1.015) rotate(0.35deg);
-            }
+            0%, 100% { transform: translate3d(0, 0, 0) scale(1) rotate(-0.35deg); }
+            50% { transform: translate3d(0, -12px, 0) scale(1.015) rotate(0.35deg); }
         }
 
         @keyframes island-art-glow {
-            0%, 100% {
-                opacity: 0.56;
-                transform: scale(0.96);
-            }
-
-            50% {
-                opacity: 0.9;
-                transform: scale(1.04);
-            }
+            0%, 100% { opacity: 0.6; transform: scale(0.96); }
+            50% { opacity: 0.92; transform: scale(1.04); }
         }
 
-        @keyframes island-art-sparks {
-            0% {
-                opacity: 0.22;
-                transform: translate3d(-8px, 8px, 0);
-            }
-
-            45% {
-                opacity: 0.48;
-            }
-
-            100% {
-                opacity: 0.22;
-                transform: translate3d(10px, -12px, 0);
-            }
+        /* ---------- Светлые группы секций ---------- */
+        .light-group {
+            background: var(--island-soft);
+            border-radius: 30px;
+            margin: 16px;
         }
 
-        body > section,
-        footer {
+        .eyebrow {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 30px;
+            padding: 5px 14px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--island-ink);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .dark-group .eyebrow {
+            border-color: rgba(255, 255, 255, 0.18);
+            color: #fff;
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .section-title {
+            font-size: clamp(28px, 4.4vw, 40px);
+            font-weight: 600;
+            line-height: 1.15;
+            letter-spacing: -0.01em;
+        }
+
+        .light-card {
+            background: #171922;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.24);
+        }
+
+        .platform-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 999px;
+            padding: 8px 16px;
+            font-size: 13px;
+            font-weight: 500;
+            color: var(--island-ink);
+        }
+
+        .platform-chip i { color: var(--island-accent); }
+
+        .icon-bubble {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 199, 0, 0.12);
+            color: var(--island-accent);
+            font-size: 20px;
+        }
+
+        /* ---------- Тёмная группа ---------- */
+        .dark-group {
             background:
-                radial-gradient(circle at 50% 0%, rgba(255, 199, 0, 0.045), transparent 28rem),
-                var(--island-bg) !important;
-            border-color: var(--island-border) !important;
+                radial-gradient(circle at 82% 8%, rgba(255, 199, 0, 0.07), transparent 26rem),
+                var(--island-navy-2);
+            border-radius: 30px;
+            margin: 16px;
+            color: #fff;
         }
 
-        .font-black {
-            font-weight: 700 !important;
+        .dark-card {
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.07);
+            border-radius: 24px;
+            padding: 28px;
+            transition: background 0.25s ease, transform 0.25s ease;
         }
 
-        .tilda-yellow,
-        .pay-cta,
+        .dark-card:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: translateY(-4px);
+        }
+
+        .dark-card .icon-bubble {
+            background: rgba(255, 199, 0, 0.14);
+            color: #ffd84d;
+        }
+
+        /* ---------- Синий CTA-баннер ---------- */
+        .cta-banner {
+            background:
+                radial-gradient(circle at 50% 160%, rgba(255, 255, 255, 0.22) 0%, transparent 62%),
+                linear-gradient(135deg, #ffd21a 0%, #f0ae00 100%);
+            border-radius: 30px;
+            color: #141000;
+        }
+
+        .btn-white {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: #14161d;
+            color: #ffffff;
+            border-radius: 32px;
+            min-height: 56px;
+            padding: 0 34px;
+            font-size: 16px;
+            font-weight: 600;
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.3);
+        }
+
+        .btn-white:hover { transform: translateY(-2px); }
+        .btn-white:active { transform: scale(0.97); }
+
+        /* ---------- Тарифы ---------- */
+        .tariff-card {
+            background: #14161d;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            box-shadow: 0 12px 44px rgba(0, 0, 0, 0.28);
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+            position: relative;
+        }
+
+        .tariff-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .tariff-popular {
+            border-color: var(--island-accent);
+            box-shadow: 0 0 0 2px var(--island-accent), 0 24px 60px rgba(255, 199, 0, 0.14);
+        }
+
         .discount-badge {
-            font-weight: 800 !important;
+            position: absolute;
+            top: -14px;
+            right: 22px;
+            background: var(--island-green);
+            color: #fff;
+            padding: 5px 14px;
+            border-radius: 50px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3);
+            z-index: 10;
         }
 
-        @media (max-width: 768px) {
-            nav {
-                padding-top: max(18px, env(safe-area-inset-top)) !important;
-            }
+        .popular-pill {
+            display: inline-block;
+            background: var(--island-accent);
+            color: #0a0b10;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 14px;
+            border-radius: 999px;
+            margin-bottom: 12px;
+        }
 
-            .landing-brand {
-                gap: 10px;
-            }
+        .tariff-feature {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: var(--island-muted);
+            font-size: 14px;
+            font-weight: 400;
+        }
+
+        .tariff-feature i {
+            color: var(--island-accent);
+            margin-top: 3px;
+            font-size: 13px;
+        }
+
+        .input-field {
+            width: 100%;
+            background: var(--island-soft);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--island-ink);
+            border-radius: 16px;
+            padding: 15px 18px;
+            /* 16px, иначе iOS Safari зумит страницу при фокусе на поле */
+            font-size: 16px;
+            font-weight: 500;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .input-field::placeholder { color: var(--island-muted); }
+
+        .input-field:focus {
+            border-color: var(--island-accent);
+            box-shadow: 0 0 0 3px rgba(255, 199, 0, 0.18);
+        }
+
+        .pay-cta {
+            width: 100%;
+            background: linear-gradient(180deg, #ffd21a 0%, var(--island-accent) 58%, #f0ae00 100%);
+            color: #0a0b10;
+            border: 0;
+            border-radius: 16px;
+            min-height: 54px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.15s ease;
+            box-shadow: 0 12px 28px rgba(255, 199, 0, 0.2);
+        }
+
+        .pay-cta:hover { background: linear-gradient(180deg, #ffdb3d 0%, var(--island-accent) 58%, #f0ae00 100%); }
+        .pay-cta:active { transform: scale(0.98); }
+
+        /* ---------- Сравнение ---------- */
+        .vs-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 13px 0;
+            font-size: 14px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .vs-row:last-child { border-bottom: 0; }
+
+        .vs-col-ours .vs-row i { color: var(--island-green); margin-top: 3px; }
+        .vs-col-other .vs-row i { color: #4a4f5a; margin-top: 3px; }
+        .vs-col-other { color: var(--island-muted); }
+
+        /* ---------- Шаги ---------- */
+        .step-num {
+            width: 56px;
+            height: 56px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #ffd21a 0%, var(--island-accent) 58%, #f0ae00 100%);
+            color: #0a0b10;
+            font-size: 22px;
+            font-weight: 600;
+            box-shadow: 0 14px 30px rgba(255, 199, 0, 0.22);
+        }
+
+        /* ---------- FAQ ---------- */
+        details summary::-webkit-details-marker { display: none; }
+        details summary { list-style: none; }
+
+        .faq-card {
+            background: #14161d;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            overflow: hidden;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .faq-card[open] {
+            border-color: rgba(255, 199, 0, 0.4);
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .faq-toggle {
+            width: 32px;
+            height: 32px;
+            flex: 0 0 auto;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--island-soft);
+            color: var(--island-ink);
+            transition: transform 0.3s ease, background 0.3s ease, color 0.3s ease;
+        }
+
+        details[open] .faq-toggle {
+            transform: rotate(180deg);
+            background: var(--island-accent);
+            color: #0a0b10;
+        }
+
+        details[open] summary ~ * { animation: sweep 0.3s ease-in-out; }
+
+        @keyframes sweep {
+            0% { opacity: 0; transform: translateY(-10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ---------- Мобильный buybar ---------- */
+        .mobile-buybar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 40;
+            padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+            background: rgba(10, 11, 16, 0.94);
+            backdrop-filter: blur(14px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            transform: translateY(130%);
+            transition: transform 0.25s ease;
+        }
+
+        .mobile-buybar.is-visible { transform: translateY(0); }
+
+        @media (min-width: 768px) {
+            .mobile-buybar { display: none !important; }
+        }
+
+        /* ---------- Мобильная вёрстка ---------- */
+        @media (max-width: 768px) {
+            nav { padding-top: max(18px, env(safe-area-inset-top)) !important; }
+
+            .landing-brand { gap: 10px; }
 
             .landing-brand-mark {
                 width: 36px;
@@ -359,206 +784,198 @@
                 border-radius: 11px;
             }
 
-            .landing-brand-text {
-                font-size: 15px;
+            .landing-brand-text { font-size: 15px; }
+
+            .light-group,
+            .dark-group {
+                margin: 10px;
+                border-radius: 22px;
             }
 
             .hero-title {
-                font-size: clamp(2rem, 8vw, 3rem) !important;
-                line-height: 1.06 !important;
-                text-align: left;
+                font-size: clamp(1.9rem, 8vw, 2.6rem) !important;
+                line-height: 1.12 !important;
             }
 
-            .hero-copy {
-                align-items: flex-start !important;
-                text-align: left !important;
-            }
-
-            .hero-art {
-                display: none;
-            }
-
-            .hero-art-scene-desktop {
-                display: none;
-            }
+            .hero-art,
+            .hero-art-scene-desktop { display: none; }
 
             .hero-art-scene-mobile {
                 display: inline-grid;
-                width: min(96vw, 430px);
-                margin: -8px auto 6px;
+                width: min(88vw, 380px);
+                margin: 4px auto 10px;
             }
 
             .hero-art-mobile {
                 display: block;
                 width: 100%;
                 margin: 0;
-                filter: drop-shadow(0 38px 70px rgba(0,0,0,0.52));
+                filter: drop-shadow(0 38px 70px rgba(0, 0, 0, 0.52));
             }
 
-            .tariff-card {
-                border-radius: 16px;
-            }
+            .tariff-card { border-radius: 20px; }
+
+            .footer-safe-bottom { padding-bottom: 96px; }
         }
 
         @media (max-width: 380px) {
-            .landing-brand {
-                gap: 9px;
-            }
+            .landing-brand { gap: 9px; }
 
             .landing-brand-mark {
                 width: 34px;
                 height: 34px;
             }
 
-            .landing-brand-text {
-                font-size: 13px;
-            }
+            .landing-brand-text { font-size: 13px; }
+
+            .hero-badge { font-size: 12px; }
         }
 
         @media (prefers-reduced-motion: reduce) {
             .hero-art-scene::before,
-            .hero-art-scene::after,
             .hero-art-scene .hero-art,
-            .hero-art-scene .hero-art-mobile {
+            .hero-art-scene .hero-art-mobile,
+            .mock-chip,
+            .mock-bar i {
                 animation: none;
             }
         }
-
-        /* Убираем стандартный маркер списка у details */
-        details summary::-webkit-details-marker {
-            display: none;
-        }
-        details summary {
-            list-style: none;
-        }
-
-        /* Плавный поворот стрелки при открытии */
-        details[open] .faq-icon {
-            transform: rotate(180deg);
-            color: #ffc700;
-        }
-
-        /* Плавное появление текста */
-        details[open] summary ~ * {
-            animation: sweep .3s ease-in-out;
-        }
-
-        @keyframes sweep {
-            0%    {opacity: 0; transform: translateY(-10px)}
-            100%  {opacity: 1; transform: translateY(0)}
-        }
     </style>
     {% include "includes/yandex_metrika.html" %}
-    <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
+    <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=2">
 </head>
 <body class="antialiased">
 
     <div class="hero-bg">
-        <nav class="container mx-auto px-6 py-7 flex justify-between items-center relative z-10">
+    {% if client_ip %}
+    <div class="ip-topbar">
+        <span>Ваш IP: <b>{{ client_ip }}</b>{% if client_ip_country %} ({{ client_ip_country }}){% endif %}</span>
+        <span class="ip-alert">— личный сервер не подключён</span>
+        <a href="#prices" data-conversion-goal="tariff_cta_click">Подключить</a>
+    </div>
+    {% endif %}
+        <nav class="container mx-auto px-5 md:px-6 py-6 flex justify-between items-center relative z-10">
             <div class="landing-brand" aria-label="Monkey Island VPS">
                 <img class="landing-brand-mark" src="{% static 'icons/monkey-island-logo-animated.webp' %}" alt="" width="42" height="42" decoding="async">
                 <span class="landing-brand-text">
-                    MONKEY ISLAND<span class="text-[#ffc700]"> VPS</span>
+                    Monkey Island <span class="text-[#ffc700]">VPS</span>
                 </span>
             </div>
-            <div class="flex items-center space-x-4 md:space-x-10 font-bold text-xs md:text-sm uppercase">
-                <a href="#prices" class="hover:text-[#ffc700] transition hidden sm:inline">Тарифы</a>
-                <a href="/login/" class="px-5 py-2 border border-[#ffc700] text-[#ffc700] rounded-full hover:bg-[#ffc700] hover:text-black transition">
-                    Личный кабинет
-                </a>
+            <div class="flex items-center gap-3 md:gap-6 text-sm font-medium">
+                <a href="#prices" class="hidden sm:inline text-white/80 hover:text-white transition">Тарифы</a>
+                <a href="#faq" class="hidden md:inline text-white/80 hover:text-white transition">Вопросы</a>
+                <a href="/login/" class="btn-ghost-light">Личный кабинет</a>
             </div>
         </nav>
 
-        <section class="container mx-auto px-6 py-8 md:py-16 flex-grow grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(360px,560px)] items-center gap-8 lg:gap-12 relative z-10">
-            <div class="hero-copy flex flex-col items-center text-center lg:items-start lg:text-left max-w-3xl">
-                <h1 class="hero-title text-4xl sm:text-5xl md:text-6xl mb-7 leading-[1.02]">
-                    Личный сервер для игр, интернета и работы
+        <section class="container mx-auto px-5 md:px-6 pt-6 pb-14 md:py-16 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(340px,520px)] items-center gap-8 lg:gap-12 relative z-10">
+            <div class="hero-copy flex flex-col items-start text-left max-w-3xl">
+                <div class="hero-badge mb-6">Серверы онлайн — аптайм 99,9%</div>
+
+                <h1 class="hero-title text-4xl md:text-5xl lg:text-[52px] font-semibold leading-[1.1] mb-6 tracking-tight">
+                    Личный сервер, который просто работает
                 </h1>
 
-                <p class="text-white/60 text-xl md:text-3xl mb-10 font-medium max-w-2xl leading-snug">
-                    Стриминг, игры и комфортная работа в интернете. Безлимитный трафик, до 10 Гбит/с и до 15 устройств на одной подписке.
-                </p>
-
-                <div class="hero-art-scene hero-art-scene-mobile">
-                    <img class="hero-art-mobile" src="{% static 'img/onboarding/personal-server-hub.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
+                <div class="space-y-3 mb-7">
+                    <div class="hero-check"><i class="fas fa-check"></i><span>Готов через минуту после оплаты — ничего настраивать руками не нужно</span></div>
+                    <div class="hero-check"><i class="fas fa-check"></i><span>Безлимитный трафик и канал до 10 Гбит/с — видео, игры и работа без тормозов</span></div>
+                    <div class="hero-check"><i class="fas fa-check"></i><span>До 15 устройств на одной подписке — хватит на всю семью</span></div>
                 </div>
 
-                <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-center lg:justify-start gap-4 mb-4 w-full sm:w-auto">
-                    <a href="#prices" data-conversion-goal="tariff_cta_click" class="tilda-yellow w-full sm:w-auto px-10 md:px-14 py-4 md:py-6 rounded-full font-black uppercase text-base md:text-xl shadow-2xl transition transform hover:scale-105 active:scale-95">
-                        ВЫБРАТЬ ТАРИФ ОТ {{ tariffs.0.price }} ₽
+                <div class="hero-art-scene hero-art-scene-mobile">
+                    <div class="server-mock hero-art-mobile" aria-hidden="true">
+                        <div class="mock-chip chip-key"><i class="fas fa-circle-check"></i> Ключ активирован</div>
+                        <div class="mock-card">
+                            <div class="mock-head">
+                                <div class="mock-title"><i class="fas fa-server"></i> Ваш сервер</div>
+                                <div class="mock-status">Онлайн</div>
+                            </div>
+                            <div class="mock-row"><span class="mock-label">Скорость канала</span><span class="mock-value">до 10 Гбит/с</span></div>
+                            <div class="mock-bar"><i></i></div>
+                            <div class="mock-row"><span class="mock-label">Пинг</span><span class="mock-value"><span class="up">12 мс</span> · стабильно</span></div>
+                            <div class="mock-row"><span class="mock-label">Трафик</span><span class="mock-value">Безлимит</span></div>
+                            <div class="mock-devices">
+                                <div class="mock-device"><i class="fas fa-mobile-screen-button"></i></div>
+                                <div class="mock-device"><i class="fas fa-laptop"></i></div>
+                                <div class="mock-device"><i class="fas fa-tablet-screen-button"></i></div>
+                                <div class="mock-device"><i class="fas fa-tv"></i></div>
+                                <span>4 из 15 устройств</span>
+                            </div>
+                        </div>
+                        <div class="mock-chip chip-speed"><i class="fas fa-bolt"></i> Готов за 60 секунд</div>
+                    </div>
+                </div>
+
+                <a href="#prices" class="discount-chip mb-5">
+                    <i class="fas fa-circle-check"></i> Скидка до 40% на длинных тарифах
+                </a>
+
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-3 w-full sm:w-auto">
+                    <a href="#prices" data-conversion-goal="tariff_cta_click" class="btn-primary w-full sm:w-auto">
+                        Выбрать тариф от {{ tariffs.0.price }} ₽
                     </a>
                     {% if user.is_authenticated %}
-                    <a href="/dashboard/" class="w-full sm:w-auto px-8 md:px-10 py-4 md:py-5 rounded-full border border-white/10 bg-white/5 text-white/70 font-black uppercase text-sm md:text-base transition hover:border-[#ffc700]/40 hover:text-[#ffc700] active:scale-95">
-                        МОЙ КАБИНЕТ
+                    <a href="/dashboard/" class="btn-ghost-light w-full sm:w-auto !min-h-[56px]">
+                        Мой кабинет
                     </a>
                     {% endif %}
                 </div>
+                <p class="text-white/60 text-sm mb-4 flex items-center gap-2">
+                    <i class="fas fa-rotate-left text-[#22c55e]"></i> Не подойдёт — вернём деньги в течение 3 дней
+                </p>
                 {% if not user.is_authenticated %}
-                <p class="text-white/45 text-sm md:text-base mb-10 text-center lg:text-left">
+                <p class="text-white/50 text-sm mb-2">
                     Уже покупали?
-                    <a href="/login/" data-known-user-cta class="text-white/75 underline underline-offset-4 hover:text-[#ffc700] transition font-semibold">Войти в кабинет</a>
+                    <a href="/login/" data-known-user-cta class="text-white/85 underline underline-offset-4 hover:text-[#ffc700] transition font-medium">Войти в кабинет</a>
                 </p>
                 {% endif %}
-
-                <div class="w-full grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-5 pt-8 border-t border-white/10">
-                    <div class="benefit-card flex flex-col items-center">
-                        <div class="text-[#ffc700] mb-3 text-2xl">
-                            <i class="fas fa-rocket"></i>
-                        </div>
-                        <h4 class="benefit-card-title font-bold uppercase text-xs md:text-sm mb-2">Ускорение сети</h4>
-                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Прямой пиринг с крупнейшими провайдерами для максимальной скорости загрузки.
-                        </p>
-                    </div>
-
-                    <div class="benefit-card flex flex-col items-center">
-                        <div class="text-[#ffc700] mb-3 text-2xl">
-                            <i class="fas fa-gamepad"></i>
-                        </div>
-                        <h4 class="benefit-card-title font-bold uppercase text-xs md:text-sm mb-2">Минимальный пинг</h4>
-                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Оптимизированные маршруты до игровых серверов. Играй без лагов и задержек.
-                        </p>
-                    </div>
-
-                    <div class="benefit-card flex flex-col items-center">
-                        <div class="text-[#ffc700] mb-3 text-2xl">
-                            <i class="fas fa-server"></i>
-                        </div>
-                        <h4 class="benefit-card-title font-bold uppercase text-xs md:text-sm mb-2">Личный сервер</h4>
-                        <p class="text-gray-400 text-xs md:text-sm leading-relaxed text-center">
-                            Вся мощность выделенного IP только для вас. Никаких «соседей», забивающих канал.
-                        </p>
-                    </div>
-                </div>
             </div>
             <div class="flex justify-center lg:justify-end">
                 <div class="hero-art-scene hero-art-scene-desktop">
-                    <img class="hero-art" src="{% static 'img/onboarding/personal-server-hub.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
+                    <div class="server-mock hero-art" aria-hidden="true">
+                        <div class="mock-chip chip-key"><i class="fas fa-circle-check"></i> Ключ активирован</div>
+                        <div class="mock-card">
+                            <div class="mock-head">
+                                <div class="mock-title"><i class="fas fa-server"></i> Ваш сервер</div>
+                                <div class="mock-status">Онлайн</div>
+                            </div>
+                            <div class="mock-row"><span class="mock-label">Скорость канала</span><span class="mock-value">до 10 Гбит/с</span></div>
+                            <div class="mock-bar"><i></i></div>
+                            <div class="mock-row"><span class="mock-label">Пинг</span><span class="mock-value"><span class="up">12 мс</span> · стабильно</span></div>
+                            <div class="mock-row"><span class="mock-label">Трафик</span><span class="mock-value">Безлимит</span></div>
+                            <div class="mock-devices">
+                                <div class="mock-device"><i class="fas fa-mobile-screen-button"></i></div>
+                                <div class="mock-device"><i class="fas fa-laptop"></i></div>
+                                <div class="mock-device"><i class="fas fa-tablet-screen-button"></i></div>
+                                <div class="mock-device"><i class="fas fa-tv"></i></div>
+                                <span>4 из 15 устройств</span>
+                            </div>
+                        </div>
+                        <div class="mock-chip chip-speed"><i class="fas fa-bolt"></i> Готов за 60 секунд</div>
+                    </div>
                 </div>
+            </div>
+        </section>
+
+        <section class="container mx-auto px-5 md:px-6 pb-10 md:pb-14 relative z-10">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                <div class="hero-mini-card"><i class="fas fa-users"></i><span>Одна подписка — до 15 устройств</span></div>
+                <div class="hero-mini-card"><i class="fas fa-gauge-high"></i><span>Безлимитный трафик до 10 Гбит/с</span></div>
+                <div class="hero-mini-card"><i class="fas fa-mobile-screen-button"></i><span>Телефон, компьютер, планшет и TV</span></div>
+                <div class="hero-mini-card"><i class="fas fa-headset"></i><span>Поддержка поможет с настройкой</span></div>
             </div>
         </section>
     </div>
 
-    <section class="py-12 bg-[#0d0d0d] border-y border-white/5">
-        <div class="container mx-auto px-6 flex flex-wrap justify-center items-center gap-8 md:gap-16 opacity-50 grayscale hover:grayscale-0 transition duration-500">
-            <div class="flex items-center gap-2"><i class="fab fa-apple text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">iOS / macOS</span></div>
-            <div class="flex items-center gap-2"><i class="fab fa-android text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Android</span></div>
-            <div class="flex items-center gap-2"><i class="fab fa-windows text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Windows</span></div>
-            <div class="flex items-center gap-2"><i class="fab fa-linux text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Linux</span></div>
-            <div class="flex items-center gap-2"><i class="fas fa-tv text-2xl"></i> <span class="text-xs font-bold uppercase tracking-widest">Smart TV</span></div>
-        </div>
-    </section>
-
     {% if not user.is_authenticated %}
-    <section class="py-10 bg-[#0d0d0d] border-b border-white/5">
-        <div class="container mx-auto px-6">
-            <div class="rounded-2xl border border-white/10 bg-white/[0.03] px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-                <p class="text-white/70 text-sm md:text-base font-medium">
+    <section class="py-4 md:py-6">
+        <div class="container mx-auto px-5 md:px-6">
+            <div class="rounded-2xl border border-white/10 bg-white/[0.04] px-6 py-5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <p class="text-white/80 text-sm md:text-base font-medium">
                     <i class="fas fa-user-shield text-[#ffc700] mr-2"></i>
                     Уже оплачивали доступ или есть подписка из Telegram-бота?
                 </p>
-                <a href="/login/" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-white/15 text-white/80 font-bold text-sm hover:border-[#ffc700]/50 hover:text-[#ffc700] transition whitespace-nowrap">
+                <a href="/login/" class="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-full border border-white/15 text-white/90 font-semibold text-sm hover:border-[#ffc700] hover:text-[#ffc700] transition whitespace-nowrap">
                     <i class="fas fa-right-to-bracket"></i> Войти в кабинет
                 </a>
             </div>
@@ -566,67 +983,122 @@
     </section>
     {% endif %}
 
-    <section class="py-24 relative overflow-hidden bg-[#111111]">
-        <div class="container mx-auto px-6 relative z-10">
-            <div class="text-center mb-20">
-                <h2 class="text-3xl md:text-5xl font-black uppercase mb-4 text-white">Инфраструктура <span class="text-[#ffc700]">нового поколения</span></h2>
-                <p class="text-white text-sm md:text-lg max-w-2xl mx-auto leading-relaxed opacity-90">Мы построили сеть, которая идеально подходит для геймеров, разработчиков и тех, кому важна каждая миллисекунда.</p>
+    <div class="light-group">
+        <section class="container mx-auto px-5 md:px-6 py-16 md:py-24">
+            <div class="text-center mb-12 md:mb-16">
+                <div class="eyebrow mb-4">Всё-в-одном</div>
+                <h2 class="section-title mb-4">Всё нужное — в одном тарифе</h2>
+                <p class="text-white/60 text-base md:text-lg max-w-2xl mx-auto">
+                    Мы собрали в одной подписке всё, что нужно от личного сервера: высокую скорость, безлимитный трафик и подключение всех ваших устройств
+                </p>
             </div>
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
-                        <i class="fas fa-gauge-high text-black text-xl"></i>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6 mb-4 md:mb-6">
+                <div class="light-card">
+                    <div class="icon-bubble mb-5"><i class="fas fa-laptop"></i></div>
+                    <h3 class="text-xl md:text-2xl font-semibold mb-3">Сервер для всех ваших устройств</h3>
+                    <p class="text-white/60 text-sm md:text-base mb-6">
+                        Подключайтесь с любого устройства — готовые профили и приложения есть для всех популярных платформ
+                    </p>
+                    <div class="flex flex-wrap gap-2">
+                        <span class="platform-chip"><i class="fab fa-windows"></i> Windows</span>
+                        <span class="platform-chip"><i class="fab fa-apple"></i> macOS</span>
+                        <span class="platform-chip"><i class="fab fa-apple"></i> iOS</span>
+                        <span class="platform-chip"><i class="fab fa-android"></i> Android</span>
+                        <span class="platform-chip"><i class="fab fa-linux"></i> Linux</span>
+                        <span class="platform-chip"><i class="fas fa-tv"></i> Smart TV</span>
                     </div>
-                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Канал 10 Гбит/с</h3>
-                    <p class="text-white text-sm leading-relaxed opacity-80">Забудьте о буферизации. Смотрите видео в 4K/8K, скачивайте тяжелые обновления игр за считанные минуты.</p>
                 </div>
 
-                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
-                        <i class="fas fa-network-wired text-black text-xl"></i>
-                    </div>
-                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Low Latency routing</h3>
-                    <p class="text-white text-sm leading-relaxed opacity-80">Умная маршрутизация трафика мимо загруженных узлов снижает пинг в соревновательных играх на 20-50%.</p>
-                </div>
-
-                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
-                        <i class="fas fa-shield-alt text-black text-xl"></i>
-                    </div>
-                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">DDoS Защита L3/L4/L7</h3>
-                    <p class="text-white text-sm leading-relaxed opacity-80">Аппаратная фильтрация мусорного трафика. Ваш сервер останется доступным даже под массированной атакой.</p>
-                </div>
-
-                <div class="bg-[#161616] p-8 rounded-[32px] border border-white/5 hover:border-[#ffc700]/50 transition-all duration-300 group">
-                    <div class="w-12 h-12 bg-[#ffc700] rounded-2xl flex items-center justify-center mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110">
-                        <i class="fas fa-laptop-code text-black text-xl"></i>
-                    </div>
-                    <h3 class="font-black uppercase text-sm mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Все устройства</h3>
-                    <p class="text-white text-sm leading-relaxed opacity-80">Удобные клиенты и конфиги для Windows, macOS, Linux, iOS и Android.</p>
+                <div class="light-card">
+                    <div class="icon-bubble mb-5"><i class="fas fa-people-roof"></i></div>
+                    <h3 class="text-xl md:text-2xl font-semibold mb-3">Один сервер — для вас и близких</h3>
+                    <p class="text-white/60 text-sm md:text-base">
+                        Одна подписка покрывает до 15 устройств. Подключите телефон, ноутбук, планшет и телевизор — и поделитесь доступом с семьёй. Каждому не нужен отдельный тариф
+                    </p>
                 </div>
             </div>
+
+            <div class="light-card">
+                <div class="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_auto] items-center gap-6">
+                    <div>
+                        <div class="icon-bubble mb-5"><i class="fas fa-bolt"></i></div>
+                        <h3 class="text-xl md:text-2xl font-semibold mb-3">Безлимитный трафик и максимальная скорость</h3>
+                        <p class="text-white/60 text-sm md:text-base max-w-2xl">
+                            Никаких ограничений по трафику на всех тарифах. Канал до 10 Гбит/с: смотрите 4K-видео, скачивайте тяжёлые файлы за минуты и играйте со стабильно низким пингом
+                        </p>
+                    </div>
+                    <div class="flex lg:flex-col gap-3">
+                        <div class="text-center bg-white rounded-2xl px-6 py-4 border border-white/10">
+                            <div class="text-2xl md:text-3xl font-semibold text-[#ffc700]">10 Гбит/с</div>
+                            <div class="text-xs text-white/60 mt-1">скорость канала</div>
+                        </div>
+                        <div class="text-center bg-white rounded-2xl px-6 py-4 border border-white/10">
+                            <div class="text-2xl md:text-3xl font-semibold text-[#ffc700]">∞</div>
+                            <div class="text-xs text-white/60 mt-1">трафик без лимита</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="container mx-auto px-5 md:px-6 pb-16 md:pb-24">
+            <div class="text-center mb-12 md:mb-16">
+                <div class="eyebrow mb-4">24/7</div>
+                <h2 class="section-title mb-4">Поддержка, которая помогает</h2>
+                <p class="text-white/60 text-base md:text-lg max-w-2xl mx-auto">
+                    Обращайтесь с любым вопросом — от оплаты до подключения телевизора. Мы найдём решение
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                <div class="light-card text-center">
+                    <div class="icon-bubble mx-auto mb-5"><i class="fas fa-clock"></i></div>
+                    <h3 class="text-lg font-semibold mb-2">Отвечаем 24/7</h3>
+                    <p class="text-white/60 text-sm">Всегда на связи в Telegram — и днём, и ночью</p>
+                </div>
+                <div class="light-card text-center">
+                    <div class="icon-bubble mx-auto mb-5"><i class="fas fa-comments"></i></div>
+                    <h3 class="text-lg font-semibold mb-2">Говорим понятным языком</h3>
+                    <p class="text-white/60 text-sm">Объясняем просто, без технических терминов</p>
+                </div>
+                <div class="light-card text-center">
+                    <div class="icon-bubble mx-auto mb-5"><i class="fas fa-sliders"></i></div>
+                    <h3 class="text-lg font-semibold mb-2">Помогаем подключиться</h3>
+                    <p class="text-white/60 text-sm">От смартфона до телевизора — доведём до результата</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <section class="container mx-auto px-5 md:px-6 py-4 md:py-6">
+        <div class="cta-banner px-6 md:px-14 py-10 md:py-14 text-center">
+            <h2 class="section-title mb-3">Подключите личный сервер сейчас</h2>
+            <p class="text-black/70 text-base md:text-lg mb-7">От {{ tariffs.0.price }} ₽ в месяц — доступ откроется сразу после оплаты</p>
+            <a href="#prices" data-conversion-goal="tariff_cta_click" class="btn-white">Выбрать тариф</a>
         </div>
     </section>
 
-    <section id="prices" class="py-24 bg-[#0a0a0a] rounded-t-[60px] border-t border-white/5">
-        <div class="container mx-auto px-6">
-            <div class="text-center mb-16">
-                <h2 class="text-4xl md:text-6xl font-black uppercase mb-4 tracking-tighter">ТАРИФЫ</h2>
-                <p class="text-white/60 text-base md:text-xl font-bold max-w-2xl mx-auto mb-8">
-                    Выберите период, укажите email и оплатите картой. После подтверждения мы автоматически откроем личный кабинет с ключами.
+    <section id="prices" class="py-16 md:py-24">
+        <div class="container mx-auto px-5 md:px-6">
+            <div class="text-center mb-10 md:mb-14">
+                <div class="eyebrow mb-4">Тарифы</div>
+                <h2 class="section-title mb-4">Чем дольше — тем выгоднее</h2>
+                <p class="text-white/60 text-base md:text-lg max-w-2xl mx-auto">
+                    Выберите период, укажите email и оплатите картой. После оплаты мы автоматически откроем личный кабинет с доступами
                 </p>
-                <div class="w-20 h-1.5 bg-[#ffc700] mx-auto"></div>
             </div>
-            <div class="max-w-5xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-3 mb-12">
-                <div class="benefit-card text-center"><i class="fas fa-credit-card text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Оплата картой</p><span class="text-white/50 text-xs">Visa · MC · Mir · СБП</span></div>
-                <div class="benefit-card text-center"><i class="fas fa-bolt text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Доступ сразу</p><span class="text-white/50 text-xs">после оплаты</span></div>
-                <div class="benefit-card text-center"><i class="fas fa-envelope text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Ссылка на email</p><span class="text-white/50 text-xs">и вход в ЛК</span></div>
-                <div class="benefit-card text-center"><i class="fab fa-telegram-plane text-[#ffc700] mb-3"></i><p class="text-xs font-black uppercase">Поддержка</p><span class="text-white/50 text-xs">поможем подключить</span></div>
+
+            <div class="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-3 mb-10 md:mb-14">
+                <div class="light-card !p-4 text-center !bg-white/[0.04] !shadow-none"><i class="fas fa-credit-card text-[#ffc700] mb-2"></i><p class="text-xs font-semibold">Оплата картой</p><span class="text-white/60 text-[11px]">Visa · MC · Mir · СБП</span></div>
+                <div class="light-card !p-4 text-center !bg-white/[0.04] !shadow-none"><i class="fas fa-bolt text-[#ffc700] mb-2"></i><p class="text-xs font-semibold">Доступ сразу</p><span class="text-white/60 text-[11px]">после оплаты</span></div>
+                <div class="light-card !p-4 text-center !bg-white/[0.04] !shadow-none"><i class="fas fa-envelope text-[#ffc700] mb-2"></i><p class="text-xs font-semibold">Ссылка на email</p><span class="text-white/60 text-[11px]">и вход в кабинет</span></div>
+                <div class="light-card !p-4 text-center !bg-white/[0.04] !shadow-none"><i class="fab fa-telegram-plane text-[#ffc700] mb-2"></i><p class="text-xs font-semibold">Поддержка</p><span class="text-white/60 text-[11px]">поможем подключить</span></div>
             </div>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-6xl mx-auto">
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-6 lg:gap-8 max-w-6xl mx-auto items-stretch">
                 {% for tariff in tariffs %}
-                <div class="tariff-card p-10 flex flex-col justify-between{% if "3 месяца" in tariff.description %} tariff-popular{% endif %}">
+                <div class="tariff-card p-7 md:p-8 flex flex-col justify-between{% if "3 месяца" in tariff.description %} tariff-popular{% endif %}">
 
                     {% if "3 месяца" in tariff.description %}
                         <div class="discount-badge">Скидка 20%</div>
@@ -638,21 +1110,21 @@
                         {% if "3 месяца" in tariff.description %}
                             <div class="popular-pill">Выбирают чаще всего</div>
                         {% endif %}
-                        <h3 class="text-[#ffc700] font-black text-xl uppercase mb-2">
+                        <h3 class="text-[#ffc700] font-semibold text-lg mb-2">
                             {% if tariff.db_tariff_id == "month" %}1 месяц{% elif tariff.db_tariff_id == "threemonths" %}3 месяца{% elif tariff.db_tariff_id == "year" %}12 месяцев{% else %}{{ tariff.description }}{% endif %}
                         </h3>
-                        <div class="mb-8">
-                            <div class="text-5xl font-black">{{ tariff.price }} ₽</div>
-                            <div class="text-white/45 text-sm font-bold mt-1">
+                        <div class="mb-7">
+                            <div class="text-4xl md:text-5xl font-semibold tracking-tight">{{ tariff.price }} ₽</div>
+                            <div class="text-white/60 text-sm mt-1">
                                 {% if tariff.db_tariff_id == "threemonths" %}≈ {{ tariff.price|floor_div:3 }} ₽ в месяц{% elif tariff.db_tariff_id == "year" %}≈ {{ tariff.price|floor_div:12 }} ₽ в месяц{% else %}за месяц доступа{% endif %}
                             </div>
                         </div>
 
-                        <ul class="text-gray-400 space-y-4 mb-10 text-sm font-medium">
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Для игр, видео и работы</li>
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Низкий пинг для игр и стримов</li>
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> Безлимитный трафик, канал до 10 Гбит/с</li>
-                            <li class="flex items-center"><i class="fas fa-check text-[#ffc700] mr-3"></i> До 15 устройств на подписке</li>
+                        <ul class="space-y-3 mb-8">
+                            <li class="tariff-feature"><i class="fas fa-check"></i> Для игр, видео и работы</li>
+                            <li class="tariff-feature"><i class="fas fa-check"></i> Низкий пинг для игр и стримов</li>
+                            <li class="tariff-feature"><i class="fas fa-check"></i> Безлимитный трафик, канал до 10 Гбит/с</li>
+                            <li class="tariff-feature"><i class="fas fa-check"></i> До 15 устройств на подписке</li>
                         </ul>
                     </div>
 
@@ -663,22 +1135,21 @@
                         {% for key, value in tracking_params.items %}
                             <input type="hidden" name="{{ key }}" value="{{ value }}">
                         {% endfor %}
-                        <input type="email" name="email" placeholder="Ваш email" required autocomplete="email" inputmode="email"
-                            class="w-full input-field px-4 py-4 font-bold text-base focus:border-[#ffc700] outline-none transition">
-                        <button type="submit" class="w-full pay-cta py-4 rounded-xl font-black uppercase text-sm tracking-widest transition shadow-lg">
+                        <input type="email" name="email" placeholder="Ваш email" required autocomplete="email" inputmode="email" class="input-field">
+                        <button type="submit" class="pay-cta">
                             Оплатить и подключиться
                         </button>
-                        <p class="flex items-center justify-center gap-2 text-[11px] font-bold text-[#00ff88]">
+                        <p class="flex items-center justify-center gap-2 text-xs font-medium text-[#22c55e]">
                             <i class="fas fa-rotate-left"></i> Не подойдёт — вернём деньги в течение 3 дней
                         </p>
-                        <div class="flex items-center justify-center gap-3 text-white/55">
+                        <div class="flex items-center justify-center gap-3 text-white/60">
                             <i class="fas fa-lock text-[#ffc700] text-xs"></i>
                             <i class="fab fa-cc-visa text-lg"></i>
                             <i class="fab fa-cc-mastercard text-lg"></i>
-                            <span class="text-[10px] font-black uppercase tracking-wider">Mir · СБП</span>
+                            <span class="text-[10px] font-semibold uppercase tracking-wider">Mir · СБП</span>
                         </div>
-                        <p class="text-center text-gray-500 text-[10px] leading-relaxed">
-                            Безопасная оплата картой, данные карты не храним. Нажимая «Оплатить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-bold hover:text-white transition">условия оферты</a>. После оплаты сразу откроется личный кабинет.
+                        <p class="text-center text-white/45 text-[11px] leading-relaxed">
+                            Безопасная оплата картой, данные карты не храним. Нажимая «Оплатить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-medium hover:underline">условия оферты</a>. После оплаты сразу откроется личный кабинет.
                         </p>
                     </form>
                 </div>
@@ -687,186 +1158,232 @@
         </div>
     </section>
 
-    <section id="how-it-works" class="py-24 bg-[#111111] relative">
-        <div class="container mx-auto px-6 relative z-10">
-            <h2 class="text-4xl md:text-6xl font-black uppercase text-center mb-20 text-white">
-                КАК ЭТО <span class="text-[#ffc700]">РАБОТАЕТ</span>
-            </h2>
-            <div class="grid grid-cols-1 md:grid-cols-3 gap-12">
-                <div class="text-center group">
-                    <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110 group-hover:shadow-[#ffc700]/50">1</div>
-                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Выбери тариф</h3>
-                    <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                        Оформи подписку на нужный срок. Ты сразу получишь доступ в личный кабинет со всеми настройками.
+    <div class="dark-group">
+        <section class="container mx-auto px-5 md:px-6 py-16 md:py-24">
+            <div class="text-center mb-12 md:mb-16">
+                <div class="eyebrow mb-4">Технологии</div>
+                <h2 class="section-title mb-4">Инфраструктура нового поколения</h2>
+                <p class="text-white/70 text-base md:text-lg max-w-2xl mx-auto">
+                    Мы построили сеть для геймеров, стримеров и всех, кому важна каждая миллисекунда
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                <div class="dark-card">
+                    <div class="icon-bubble mb-5"><i class="fas fa-gauge-high"></i></div>
+                    <h3 class="font-semibold text-base mb-3">Канал 10 Гбит/с</h3>
+                    <p class="text-white/70 text-sm leading-relaxed">Забудьте о буферизации: 4K/8K-видео и тяжёлые обновления игр загружаются за минуты.</p>
+                </div>
+                <div class="dark-card">
+                    <div class="icon-bubble mb-5"><i class="fas fa-network-wired"></i></div>
+                    <h3 class="font-semibold text-base mb-3">Умная маршрутизация</h3>
+                    <p class="text-white/70 text-sm leading-relaxed">Трафик идёт мимо загруженных узлов — пинг в соревновательных играх ниже на 20–50%.</p>
+                </div>
+                <div class="dark-card">
+                    <div class="icon-bubble mb-5"><i class="fas fa-shield-halved"></i></div>
+                    <h3 class="font-semibold text-base mb-3">DDoS-защита L3/L4/L7</h3>
+                    <p class="text-white/70 text-sm leading-relaxed">Аппаратная фильтрация мусорного трафика: сервер доступен даже под массированной атакой.</p>
+                </div>
+                <div class="dark-card">
+                    <div class="icon-bubble mb-5"><i class="fas fa-laptop-code"></i></div>
+                    <h3 class="font-semibold text-base mb-3">Готовые конфигурации</h3>
+                    <p class="text-white/70 text-sm leading-relaxed">Удобные клиенты и профили для Windows, macOS, Linux, iOS и Android — без ручной настройки.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="light-group">
+        <section class="container mx-auto px-5 md:px-6 py-16 md:py-24">
+            <div class="text-center mb-12 md:mb-16">
+                <div class="eyebrow mb-4">Сравнение</div>
+                <h2 class="section-title mb-4">Monkey Island VPS против обычного VPS</h2>
+                <p class="text-white/60 text-base md:text-lg max-w-2xl mx-auto">
+                    Обычный VPS придётся администрировать самому. У нас всё уже развёрнуто и работает
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 max-w-4xl mx-auto">
+                <div class="light-card vs-col-ours !border-2 !border-[#ffc700] relative">
+                    <div class="popular-pill absolute -top-3.5 left-6">Monkey Island VPS</div>
+                    <div class="pt-4">
+                        <div class="vs-row"><i class="fas fa-circle-check"></i><span>Готов через минуту после оплаты</span></div>
+                        <div class="vs-row"><i class="fas fa-circle-check"></i><span>До 15 устройств на одной подписке</span></div>
+                        <div class="vs-row"><i class="fas fa-circle-check"></i><span>Безлимитный трафик, канал до 10 Гбит/с</span></div>
+                        <div class="vs-row"><i class="fas fa-circle-check"></i><span>Живая поддержка 24/7 — поможем с настройкой</span></div>
+                        <div class="vs-row"><i class="fas fa-circle-check"></i><span>DDoS-защита уже включена в тариф</span></div>
+                        <div class="vs-row"><i class="fas fa-circle-check"></i><span>Продление и оплата в пару кликов</span></div>
+                    </div>
+                </div>
+                <div class="light-card vs-col-other">
+                    <div class="text-sm font-semibold text-white/60 mb-1 pt-1">Обычный VPS-хостинг</div>
+                    <div class="pt-3">
+                        <div class="vs-row"><i class="fas fa-circle-xmark"></i><span>Часы ручной настройки через консоль</span></div>
+                        <div class="vs-row"><i class="fas fa-circle-xmark"></i><span>Каждое устройство настраивается отдельно</span></div>
+                        <div class="vs-row"><i class="fas fa-circle-xmark"></i><span>Лимиты трафика и урезание скорости в час пик</span></div>
+                        <div class="vs-row"><i class="fas fa-circle-xmark"></i><span>Поддержка отвечает днями и «по регламенту»</span></div>
+                        <div class="vs-row"><i class="fas fa-circle-xmark"></i><span>Защита от атак — за отдельную плату</span></div>
+                        <div class="vs-row"><i class="fas fa-circle-xmark"></i><span>Обновления и мониторинг — ваша забота</span></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="how-it-works" class="container mx-auto px-5 md:px-6 pb-16 md:pb-24">
+            <div class="text-center mb-12 md:mb-16">
+                <div class="eyebrow mb-4">3 шага</div>
+                <h2 class="section-title mb-4">Как это работает</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10 max-w-5xl mx-auto">
+                <div class="text-center">
+                    <div class="step-num mx-auto mb-5">1</div>
+                    <h3 class="font-semibold text-lg mb-3">Выберите тариф</h3>
+                    <p class="text-white/60 text-sm md:text-base leading-relaxed">
+                        Оплатите подписку на нужный срок — и сразу получите доступ в личный кабинет со всеми настройками
                     </p>
                 </div>
-
-                <div class="text-center group">
-                    <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110 group-hover:shadow-[#ffc700]/50">2</div>
-                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Установи приложение</h3>
-                    <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                        Мы используем надежные современные клиенты. Просто скачай рекомендованное приложение по ссылке из кабинета.
+                <div class="text-center">
+                    <div class="step-num mx-auto mb-5">2</div>
+                    <h3 class="font-semibold text-lg mb-3">Установите приложение</h3>
+                    <p class="text-white/60 text-sm md:text-base leading-relaxed">
+                        Скачайте рекомендованное приложение по ссылке из кабинета — для любой платформы
                     </p>
                 </div>
-
-                <div class="text-center group">
-                    <div class="w-16 h-16 bg-[#ffc700] rounded-full flex items-center justify-center text-black font-black text-2xl mx-auto mb-6 shadow-[0_0_20px_rgba(255,199,0,0.3)] transition group-hover:scale-110 group-hover:shadow-[#ffc700]/50">3</div>
-                    <h3 class="font-black uppercase mb-4 tracking-widest text-white transition group-hover:text-[#ffc700]">Начни использовать</h3>
-                    <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                        Добавь свой персональный ключ в один клик. Наслаждайся высокой скоростью и низким пингом на всех девайсах.
+                <div class="text-center">
+                    <div class="step-num mx-auto mb-5">3</div>
+                    <h3 class="font-semibold text-lg mb-3">Пользуйтесь</h3>
+                    <p class="text-white/60 text-sm md:text-base leading-relaxed">
+                        Добавьте персональный ключ в один клик — и наслаждайтесь скоростью на всех устройствах
                     </p>
                 </div>
             </div>
-        </div>
+        </section>
+    </div>
 
-        <div class="absolute bottom-0 left-0 w-full overflow-hidden leading-[0] transform rotate-180">
-            <svg class="relative block w-[calc(100%+1.3px)] h-[60px]" data-name="Layer 1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none">
-                <path d="M321.39,56.44c58-10.79,114.16-30.13,172-41.86,82.39-16.72,168.19-17.73,250.45-.39C823.78,31,906.67,72,985.66,92.83c70.05,18.48,146.53,26.09,214.34,3V0H0V27.35A600.21,600.21,0,0,0,321.39,56.44Z" fill="#0a0a0a"></path>
-            </svg>
+    <section class="container mx-auto px-5 md:px-6 py-4 md:py-6">
+        <div class="cta-banner px-6 md:px-14 py-10 md:py-14 text-center">
+            <h2 class="section-title mb-3">Попробуйте без риска</h2>
+            <p class="text-black/70 text-base md:text-lg mb-7">Если сервис не подойдёт — вернём деньги в течение 3 дней после оплаты</p>
+            <a href="#prices" data-conversion-goal="tariff_cta_click" class="btn-white">Попробовать</a>
         </div>
     </section>
 
-    <section class="py-24 bg-[#0a0a0a]">
-        <div class="container mx-auto px-6 max-w-4xl">
-            <h2 class="text-4xl md:text-6xl font-black uppercase text-center mb-20 text-white">
-                ВОПРОСЫ <span class="text-[#ffc700]">И ОТВЕТЫ</span>
-            </h2>
-            
-            <div class="space-y-4 max-w-4xl mx-auto">
-                
-                <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
-                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
-                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
-                            Как начать пользоваться сервисом?
-                        </h4>
-                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
-                            <i class="fas fa-chevron-down text-xs"></i>
-                        </span>
+    <section id="faq" class="py-16 md:py-24">
+        <div class="container mx-auto px-5 md:px-6 max-w-3xl">
+            <div class="text-center mb-10 md:mb-14">
+                <div class="eyebrow mb-4">FAQ</div>
+                <h2 class="section-title mb-4">Часто спрашивают</h2>
+            </div>
+
+            <div class="space-y-3">
+
+                <details class="faq-card">
+                    <summary class="p-5 md:p-6 cursor-pointer flex justify-between items-center gap-4 outline-none">
+                        <h4 class="font-semibold text-sm md:text-base">Как начать пользоваться сервисом?</h4>
+                        <span class="faq-toggle"><i class="fas fa-chevron-down text-xs"></i></span>
                     </summary>
-                    <div class="px-6 md:px-8 pb-8">
-                        <div class="border-t border-white/10 pt-8">
-                            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                                <div class="bg-white/[0.03] p-6 rounded-[20px] border border-white/5 flex flex-col h-full hover:border-white/10 transition">
-                                    <h5 class="text-[#ffc700] font-black text-[11px] uppercase tracking-widest mb-5 flex items-center gap-2">
-                                        <i class="fas fa-bolt text-[12px]"></i> Прямая покупка
+                    <div class="px-5 md:px-6 pb-6">
+                        <div class="border-t border-white/10 pt-5 space-y-4">
+                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <div class="bg-white/[0.04] p-5 rounded-2xl">
+                                    <h5 class="text-[#ffc700] font-semibold text-xs uppercase tracking-wide mb-4 flex items-center gap-2">
+                                        <i class="fas fa-bolt"></i> Прямая покупка
                                     </h5>
-                                    <ul class="space-y-4 text-sm text-white opacity-90">
-                                        <li class="flex items-start gap-3"><span class="text-[#00ff88] font-bold">✓</span><span>Оплатите тариф на главной странице.</span></li>
-                                        <li class="flex items-start gap-3"><span class="text-[#00ff88] font-bold">✓</span><span>Получите ссылку на вход в ЛК на <b class="text-[#ffc700]">email</b>.</span></li>
-                                        <li class="flex items-start gap-3"><span class="text-[#00ff88] font-bold">✓</span><span>В кабинете вас уже ждет оплаченная инфраструктура.</span></li>
+                                    <ul class="space-y-3 text-sm text-white/85">
+                                        <li class="flex items-start gap-2"><span class="text-[#22c55e] font-semibold">✓</span><span>Оплатите тариф на этой странице.</span></li>
+                                        <li class="flex items-start gap-2"><span class="text-[#22c55e] font-semibold">✓</span><span>Получите ссылку на вход в кабинет на email.</span></li>
+                                        <li class="flex items-start gap-2"><span class="text-[#22c55e] font-semibold">✓</span><span>В кабинете вас уже ждёт оплаченный доступ.</span></li>
                                     </ul>
                                 </div>
-                                <div class="bg-white/[0.03] p-6 rounded-[20px] border border-white/5 flex flex-col h-full hover:border-white/10 transition">
-                                    <h5 class="text-[#ffc700] font-black text-[11px] uppercase tracking-widest mb-5 flex items-center gap-2">
-                                        <i class="fab fa-telegram-plane text-[12px]"></i> Через Telegram
+                                <div class="bg-white/[0.04] p-5 rounded-2xl">
+                                    <h5 class="text-[#ffc700] font-semibold text-xs uppercase tracking-wide mb-4 flex items-center gap-2">
+                                        <i class="fab fa-telegram-plane"></i> Через Telegram
                                     </h5>
-                                    <ul class="space-y-4 text-sm text-white opacity-90">
-                                        <li class="flex items-start gap-3"><span class="text-[#00ff88] font-bold">✓</span><span>Перейдите в Telegram-бота и создайте подписку.</span></li>
-                                        <li class="flex items-start gap-3"><span class="text-[#00ff88] font-bold">✓</span><span>Бот пришлет ссылку на личный кабинет.</span></li>
-                                        <li class="flex items-start gap-3"><span class="text-[#00ff88] font-bold">✓</span><span>Удобно получать уведомления и продлевать доступ.</span></li>
+                                    <ul class="space-y-3 text-sm text-white/85">
+                                        <li class="flex items-start gap-2"><span class="text-[#22c55e] font-semibold">✓</span><span>Перейдите в Telegram-бота и создайте подписку.</span></li>
+                                        <li class="flex items-start gap-2"><span class="text-[#22c55e] font-semibold">✓</span><span>Бот пришлёт ссылку на личный кабинет.</span></li>
+                                        <li class="flex items-start gap-2"><span class="text-[#22c55e] font-semibold">✓</span><span>Удобно получать уведомления и продлевать доступ.</span></li>
                                     </ul>
                                 </div>
                             </div>
-                            <div class="mt-8 p-4 bg-[#ffc700]/5 rounded-xl border border-[#ffc700]/10 flex flex-col sm:flex-row items-center gap-3 text-center sm:text-left">
-                                <span class="text-[#ffc700] font-black uppercase text-[10px] tracking-wider flex items-center gap-2">🚀 Универсальность:</span>
-                                <span class="text-white text-[11px] opacity-80">Инструкции доступны для iOS, Android, Windows и macOS.</span>
-                            </div>
+                            <p class="text-white/60 text-xs">Инструкции доступны для iOS, Android, Windows, macOS, Linux и Smart TV.</p>
                         </div>
                     </div>
                 </details>
 
-<details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
-                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
-                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
-                            Как подключение поможет уменьшить пинг в играх?
-                        </h4>
-                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
-                            <i class="fas fa-chevron-down text-xs"></i>
-                        </span>
+                <details class="faq-card">
+                    <summary class="p-5 md:p-6 cursor-pointer flex justify-between items-center gap-4 outline-none">
+                        <h4 class="font-semibold text-sm md:text-base">Как подключение поможет уменьшить пинг в играх?</h4>
+                        <span class="faq-toggle"><i class="fas fa-chevron-down text-xs"></i></span>
                     </summary>
-                    <div class="px-6 md:px-8 pb-8">
-                        <div class="border-t border-white/10 pt-8">
-                            <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                                Часто локальный интернет-провайдер пускает трафик по дешевым, но длинным и загруженным маршрутам. Подключаясь к нашему VPS, вы перенаправляете свой трафик через <span class="text-[#ffc700] font-bold">магистральные каналы премиум-класса</span>. Это позволяет сократить количество промежуточных узлов (хопов) до серверов игры и сделать задержку стабильной, устраняя "скачки" пинга и потерю пакетов.
+                    <div class="px-5 md:px-6 pb-6">
+                        <div class="border-t border-white/10 pt-5">
+                            <p class="text-white/85 text-sm md:text-base leading-relaxed">
+                                Часто локальный интернет-провайдер пускает трафик по дешёвым, но длинным и загруженным маршрутам. Подключаясь к нашему VPS, вы перенаправляете свой трафик через <span class="text-[#ffc700] font-semibold">магистральные каналы премиум-класса</span>. Это сокращает количество промежуточных узлов до серверов игры и делает задержку стабильной, устраняя «скачки» пинга и потерю пакетов.
                             </p>
                         </div>
                     </div>
                 </details>
 
-                <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
-                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
-                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
-                            Потянет ли сервер 4K-видео и тяжелые стримы?
-                        </h4>
-                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
-                            <i class="fas fa-chevron-down text-xs"></i>
-                        </span>
+                <details class="faq-card">
+                    <summary class="p-5 md:p-6 cursor-pointer flex justify-between items-center gap-4 outline-none">
+                        <h4 class="font-semibold text-sm md:text-base">Потянет ли сервер 4K-видео и тяжёлые стримы?</h4>
+                        <span class="faq-toggle"><i class="fas fa-chevron-down text-xs"></i></span>
                     </summary>
-                    <div class="px-6 md:px-8 pb-8">
-                        <div class="border-t border-white/10 pt-8">
-                            <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                                Полный вперед! Наши серверы подключены к портам <span class="text-[#ffc700] font-bold">1 Гбит/с и 10 Гбит/с</span>. Этого с запасом хватает для комфортного просмотра видео в сверхвысоком разрешении, стриминга без потери кадров и мгновенной загрузки объемных файлов. Пропускная способность не режется в часы пик.
+                    <div class="px-5 md:px-6 pb-6">
+                        <div class="border-t border-white/10 pt-5">
+                            <p class="text-white/85 text-sm md:text-base leading-relaxed">
+                                Полный вперёд! Наши серверы подключены к портам <span class="text-[#ffc700] font-semibold">1 Гбит/с и 10 Гбит/с</span>. Этого с запасом хватает для видео в сверхвысоком разрешении, стриминга без потери кадров и мгновенной загрузки объёмных файлов. Пропускная способность не режется в часы пик.
                             </p>
                         </div>
                     </div>
                 </details>
 
-                <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
-                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
-                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
-                            Сколько устройств можно подключить?
-                        </h4>
-                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
-                            <i class="fas fa-chevron-down text-xs"></i>
-                        </span>
+                <details class="faq-card">
+                    <summary class="p-5 md:p-6 cursor-pointer flex justify-between items-center gap-4 outline-none">
+                        <h4 class="font-semibold text-sm md:text-base">Сколько устройств можно подключить?</h4>
+                        <span class="faq-toggle"><i class="fas fa-chevron-down text-xs"></i></span>
                     </summary>
-                    <div class="px-6 md:px-8 pb-8">
-                        <div class="border-t border-white/10 pt-8">
-                            <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                                По одной подписке можно подключить <span class="text-[#ffc700] font-bold">до 15 устройств</span>: телефон, планшет, ноутбук и компьютер. Этого хватает для всей семьи. Используйте персональный ключ только на своих устройствах, чтобы сохранить максимальный приоритет скорости.
+                    <div class="px-5 md:px-6 pb-6">
+                        <div class="border-t border-white/10 pt-5">
+                            <p class="text-white/85 text-sm md:text-base leading-relaxed">
+                                По одной подписке можно подключить <span class="text-[#ffc700] font-semibold">до 15 устройств</span>: телефон, планшет, ноутбук и компьютер. Этого хватает для всей семьи. Используйте персональный ключ только на своих устройствах, чтобы сохранить максимальный приоритет скорости.
                             </p>
                         </div>
                     </div>
                 </details>
 
-                <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
-                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
-                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
-                            Условия оплаты
-                        </h4>
-                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
-                            <i class="fas fa-chevron-down text-xs"></i>
-                        </span>
+                <details class="faq-card">
+                    <summary class="p-5 md:p-6 cursor-pointer flex justify-between items-center gap-4 outline-none">
+                        <h4 class="font-semibold text-sm md:text-base">Условия оплаты</h4>
+                        <span class="faq-toggle"><i class="fas fa-chevron-down text-xs"></i></span>
                     </summary>
-                    <div class="px-6 md:px-8 pb-8">
-                        <div class="border-t border-white/10 pt-8">
-                            <div class="space-y-4 text-white text-sm md:text-base leading-relaxed opacity-90">
+                    <div class="px-5 md:px-6 pb-6">
+                        <div class="border-t border-white/10 pt-5">
+                            <div class="space-y-4 text-white/85 text-sm md:text-base leading-relaxed">
                                 <p>Перед оплатой выберите подходящий период доступа и укажите email для ссылки в личный кабинет:</p>
-                                <div class="bg-white/5 p-4 rounded-xl space-y-2">
-                                    <p>1. <span class="text-[#ffc700] font-bold">Оплата на сайте:</span> Доступ открывается после успешной оплаты выбранного тарифа.</p>
+                                <div class="bg-white/[0.04] p-4 rounded-2xl space-y-2">
+                                    <p>1. <span class="text-[#ffc700] font-semibold">Оплата на сайте:</span> доступ открывается после успешной оплаты выбранного тарифа.</p>
                                     {% if payment_gateway != "yookassa" %}
-                                    <p>2. <span class="text-[#ffc700] font-bold">Без автоплатежей:</span> После окончания оплаченного периода продление не списывается автоматически.</p>
+                                    <p>2. <span class="text-[#ffc700] font-semibold">Без автоплатежей:</span> после окончания оплаченного периода продление не списывается автоматически.</p>
                                     {% endif %}
-                                    <p>{% if payment_gateway != "yookassa" %}3{% else %}2{% endif %}. <span class="text-[#ffc700] font-bold">Возврат средств:</span> Если сервис не подошел, вернем деньги в течение 3 дней после оплаты. Подробные условия — в <a href="/offer/" class="text-[#ffc700] font-bold hover:text-white transition">оферте</a>.</p>
+                                    <p>{% if payment_gateway != "yookassa" %}3{% else %}2{% endif %}. <span class="text-[#ffc700] font-semibold">Возврат средств:</span> если сервис не подошёл, вернём деньги в течение 3 дней после оплаты. Подробные условия — в <a href="/offer/" class="text-[#ffc700] font-semibold hover:underline">оферте</a>.</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </details>
 
-                <details class="faq-card group border border-white/5 bg-white/[0.03] rounded-[24px] overflow-hidden transition-all duration-500 open:bg-white/[0.07] open:border-[#ffc700]/30 shadow-xl">
-                    <summary class="p-6 md:p-8 cursor-pointer flex justify-between items-center list-none outline-none">
-                        <h4 class="font-black uppercase text-sm md:text-base tracking-widest text-white group-open:text-[#ffc700] transition-colors">
-                            Сложно ли всё это настроить?
-                        </h4>
-                        <span class="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white transition-all duration-300 group-open:rotate-180 group-open:bg-[#ffc700] group-open:text-black">
-                            <i class="fas fa-chevron-down text-xs"></i>
-                        </span>
+                <details class="faq-card">
+                    <summary class="p-5 md:p-6 cursor-pointer flex justify-between items-center gap-4 outline-none">
+                        <h4 class="font-semibold text-sm md:text-base">Сложно ли всё это настроить?</h4>
+                        <span class="faq-toggle"><i class="fas fa-chevron-down text-xs"></i></span>
                     </summary>
-                    <div class="px-6 md:px-8 pb-8">
-                        <div class="border-t border-white/10 pt-8">
-                            <p class="text-white text-sm md:text-base leading-relaxed opacity-90">
-                                Вам не нужно быть системным администратором. Мы уже развернули серверную часть и подготовили профили. В личном кабинете вас ждут <span class="text-[#ffc700] font-bold">готовые конфигурации и QR-коды</span>. Установите клиент на свое устройство, отсканируйте код или скопируйте ключ — и всё готово за одну минуту.
+                    <div class="px-5 md:px-6 pb-6">
+                        <div class="border-t border-white/10 pt-5">
+                            <p class="text-white/85 text-sm md:text-base leading-relaxed">
+                                Вам не нужно быть системным администратором. Мы уже развернули серверную часть и подготовили профили. В личном кабинете вас ждут <span class="text-[#ffc700] font-semibold">готовые конфигурации и QR-коды</span>. Установите приложение, отсканируйте код или скопируйте ключ — и всё готово за одну минуту.
                             </p>
                         </div>
                     </div>
@@ -876,40 +1393,43 @@
         </div>
     </section>
 
-    <footer class="bg-[#0a0a0a] border-t border-white/5 pt-20 pb-10">
-        <div class="container mx-auto px-6">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-12 mb-16">
+    <footer class="bg-[#0a0b10] border-t border-white/10 text-white pt-16 pb-10 footer-safe-bottom">
+        <div class="container mx-auto px-5 md:px-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-12 mb-12">
                 <div class="col-span-1 md:col-span-2">
-                    <div class="text-2xl font-black uppercase mb-6">MONKEY ISLAND<span class="text-[#ffc700]"> VPS</span></div>
-                    <p class="text-gray-500 text-sm max-w-xs leading-relaxed">Инфраструктура для быстрого и стабильного доступа с телефона, компьютера и планшета.</p>
+                    <div class="landing-brand mb-5" aria-label="Monkey Island VPS">
+                        <img class="landing-brand-mark" src="{% static 'icons/monkey-island-logo-animated.webp' %}" alt="" width="42" height="42" decoding="async" loading="lazy">
+                        <span class="landing-brand-text">Monkey Island <span class="text-[#ffc700]">VPS</span></span>
+                    </div>
+                    <p class="text-white/55 text-sm max-w-xs leading-relaxed">Инфраструктура для быстрого и стабильного доступа с телефона, компьютера и планшета.</p>
                 </div>
                 <div>
-                    <h4 class="font-bold uppercase text-xs tracking-widest mb-6 text-white">Навигация</h4>
-                    <ul class="text-gray-500 text-sm space-y-4 font-medium">
-                        <li><a href="#how-it-works" class="hover:text-[#ffc700] transition">Как работает</a></li>
-                        <li><a href="#prices" class="hover:text-[#ffc700] transition">Тарифы</a></li>
-                        <li><a href="/login/" class="hover:text-[#ffc700] transition">Личный кабинет</a></li>
-                        <li><a href="/offer/" class="hover:text-[#ffc700] transition">Оферта</a></li>
-                        <li><a href="/terms/" class="hover:text-[#ffc700] transition">Пользовательское соглашение</a></li>
+                    <h4 class="font-semibold text-sm mb-5 text-white/90">Навигация</h4>
+                    <ul class="text-white/55 text-sm space-y-3">
+                        <li><a href="#how-it-works" class="hover:text-white transition">Как работает</a></li>
+                        <li><a href="#prices" class="hover:text-white transition">Тарифы</a></li>
+                        <li><a href="/login/" class="hover:text-white transition">Личный кабинет</a></li>
+                        <li><a href="/offer/" class="hover:text-white transition">Оферта</a></li>
+                        <li><a href="/terms/" class="hover:text-white transition">Пользовательское соглашение</a></li>
                     </ul>
                 </div>
                 <div>
-                    <h4 class="font-bold uppercase text-xs tracking-widest mb-6 text-white">Поддержка</h4>
-                    <div class="flex space-x-4">
-                        <a href="https://t.me/monkeyislandsupportbot" class="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center hover:bg-[#ffc700] transition group"><i class="fab fa-telegram-plane group-hover:text-black"></i></a>
-                        <a href="#" class="w-10 h-10 bg-white/5 rounded-full flex items-center justify-center hover:bg-[#ffc700] transition group"><i class="fas fa-envelope group-hover:text-black"></i></a>
+                    <h4 class="font-semibold text-sm mb-5 text-white/90">Поддержка</h4>
+                    <div class="flex space-x-3">
+                        <a href="https://t.me/monkeyislandsupportbot" class="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-[#ffc700] hover:text-black transition"><i class="fab fa-telegram-plane"></i></a>
+                        <a href="#" class="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center hover:bg-[#ffc700] hover:text-black transition"><i class="fas fa-envelope"></i></a>
                     </div>
                 </div>
             </div>
-            <div class="border-t border-white/5 pt-10 text-center text-gray-600 text-[10px] uppercase tracking-[0.3em]">
-                &copy; 2026 MONKEY ISLAND VPS | ИНН 616617872421 | Инфраструктура для быстрых подключений
+            <div class="border-t border-white/10 pt-8 text-center text-white/40 text-xs">
+                &copy; 2026 Monkey Island VPS · ИНН 616617872421 · Инфраструктура для быстрых подключений
             </div>
         </div>
     </footer>
 
     {% if not user.is_authenticated %}
     <div class="mobile-buybar" id="mobileBuybar" aria-hidden="true">
-        <a href="#prices" data-conversion-goal="tariff_cta_click" class="tilda-yellow w-full flex items-center justify-center gap-2 py-4 rounded-full font-black uppercase text-base shadow-2xl active:scale-95">
+        <a href="#prices" data-conversion-goal="tariff_cta_click" class="btn-primary w-full !min-h-[52px]">
             Купить от {{ tariffs.0.price }} ₽
         </a>
     </div>
@@ -919,7 +1439,7 @@
         (function setupStickyBuyBar() {
             const bar = document.getElementById('mobileBuybar');
             if (!bar || !('IntersectionObserver' in window)) return;
-            const heroCta = document.querySelector('.hero-bg a[href="#prices"]');
+            const heroCta = document.querySelector('.hero-bg a[href="#prices"].btn-primary');
             const prices = document.getElementById('prices');
             let heroOut = false;
             let pricesIn = false;
@@ -979,7 +1499,7 @@
                     const paymentWindow = window.open('', '_blank');
                     if (paymentWindow) {
                         paymentWindow.opener = null;
-                        paymentWindow.document.write('<!doctype html><title>Оплата</title><body style="margin:0;background:#111;color:#fff;font-family:system-ui;display:grid;place-items:center;min-height:100vh">Открываем форму оплаты...</body>');
+                        paymentWindow.document.write('<!doctype html><title>Оплата</title><body style="margin:0;background:#0a0b10;color:#fff;font-family:system-ui;display:grid;place-items:center;min-height:100vh">Открываем форму оплаты...</body>');
                     }
 
                     const submitButton = form.querySelector('button[type="submit"]');
@@ -1022,7 +1542,7 @@
             }
 
             document.querySelectorAll('[data-known-user-cta]').forEach((button) => {
-                button.textContent = 'ЛИЧНЫЙ КАБИНЕТ';
+                button.textContent = 'Личный кабинет';
                 button.setAttribute('aria-label', 'Личный кабинет');
             });
         })();

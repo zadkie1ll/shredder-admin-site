@@ -1001,6 +1001,81 @@ class BaselineAnomalyTests(InfraDbTestCase):
         )
 
 
+class CheckXrayWorkerTests(InfraDbTestCase):
+    def test_unknown_health_is_silent(self):
+        # Старый агент / нет pid: host — все поля NULL, никаких алертов
+        self.make_server()
+        with mock.patch.object(infra_worker, "_send_alert") as alert:
+            infra_worker.check_xray(self.session)
+        alert.assert_not_called()
+
+    def test_down_needs_confirmation_before_alert(self):
+        server = self.make_server(xray_process_running=False)
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_xray(self.session)
+        # Первый тик только фиксирует начало инцидента
+        alert.assert_not_called()
+        self.assertIsNotNone(server.xray_down_since)
+
+        server.xray_down_since = utcnow() - timedelta(minutes=5)
+        self.session.commit()
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_xray(self.session)
+        alert.assert_called_once()
+        self.assertIn("XRAY не работает", alert.call_args[0][0])
+        self.assertIsNotNone(server.xray_down_alerted_at)
+
+        # Инцидент уже заалерчен — повторов нет
+        with mock.patch.object(infra_worker, "_send_alert") as alert:
+            infra_worker.check_xray(self.session)
+        alert.assert_not_called()
+
+    def test_crash_loop_alerts_even_with_running_process(self):
+        server = self.make_server(
+            xray_process_running=True,
+            xray_crash_loop=True,
+            xray_down_since=utcnow() - timedelta(minutes=5),
+        )
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_xray(self.session)
+        alert.assert_called_once()
+        self.assertIn("crash-loop", alert.call_args[0][0])
+        self.assertIsNotNone(server.xray_down_alerted_at)
+
+    def test_recovery_alert(self):
+        server = self.make_server(
+            xray_process_running=True,
+            xray_process_uptime_seconds=300,
+            xray_down_alerted_at=utcnow() - timedelta(minutes=10),
+        )
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_xray(self.session)
+        alert.assert_called_once()
+        self.assertIn("снова работает", alert.call_args[0][0])
+        self.assertIsNotNone(server.xray_recovered_alerted_at)
+        self.assertIsNone(server.xray_down_since)
+
+    def test_offline_server_is_ignored(self):
+        server = self.make_server(
+            last_seen_at=utcnow() - timedelta(hours=2),
+            xray_process_running=False,
+            xray_down_since=utcnow() - timedelta(minutes=30),
+        )
+        with mock.patch.object(infra_worker, "_send_alert") as alert:
+            infra_worker.check_xray(self.session)
+        alert.assert_not_called()
+        # Оффлайн покрывается своим алертом; xray-инцидент сбрасывается
+        self.assertIsNone(server.xray_down_since)
+
+
 class DetectAnomalyWorkerTests(InfraDbTestCase):
     def seed_drop(self, server, now):
         # 5 минут сырых сэмплов с обвалом
@@ -1056,6 +1131,30 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
         now = utcnow()
         server = self.make_server(
             anomaly_suppressed_until=now + timedelta(hours=10)
+        )
+        BaselineAnomalyTests.seed_baseline(self, server, now)
+        self.seed_drop(server, now)
+        with mock.patch.object(infra, "force_tspu_check") as forced:
+            infra_worker.detect_anomalies(self.session)
+        forced.assert_not_called()
+        self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
+
+    def test_suppressed_while_xray_down(self):
+        # Мёртвый xray роняет трафик так же, как бан, но замер бессмысленен:
+        # об этом алертит check_xray, детектор молчит до восстановления
+        now = utcnow()
+        server = self.make_server(xray_process_running=False)
+        BaselineAnomalyTests.seed_baseline(self, server, now)
+        self.seed_drop(server, now)
+        with mock.patch.object(infra, "force_tspu_check") as forced:
+            infra_worker.detect_anomalies(self.session)
+        forced.assert_not_called()
+        self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
+
+    def test_suppressed_while_xray_crash_loop(self):
+        now = utcnow()
+        server = self.make_server(
+            xray_process_running=True, xray_crash_loop=True
         )
         BaselineAnomalyTests.seed_baseline(self, server, now)
         self.seed_drop(server, now)
@@ -1948,6 +2047,25 @@ class PayloadTests(InfraDbTestCase):
         self.assertEqual(item["utilization_pct"], 25.0)
         self.assertEqual(item["ips"], {"active": 1, "reserve": 1, "blocked": 0})
         self.assertEqual(item["domains"], ["de.example.xyz"])
+
+    def test_xray_health_in_payloads(self):
+        server = self.make_server(
+            xray_process_running=False, xray_crash_loop=False
+        )
+        item = infra.server_list_payload(self.session)["servers"][0]
+        self.assertTrue(item["xray_down"])
+        detail = infra.server_detail_payload(self.session, server.id)
+        self.assertIs(detail["server"]["xray_process_running"], False)
+
+        server.xray_process_running = True
+        server.xray_process_uptime_seconds = 3600
+        self.session.commit()
+        item = infra.server_list_payload(self.session)["servers"][0]
+        self.assertFalse(item["xray_down"])
+        detail = infra.server_detail_payload(self.session, server.id)
+        self.assertEqual(
+            detail["server"]["xray_process_uptime_seconds"], 3600
+        )
 
     def test_entry_payload_ok_in_dns(self):
         # Показываются только IP, реально стоящие в A-записях, и только

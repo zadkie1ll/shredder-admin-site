@@ -1155,7 +1155,7 @@ class OfferTemplateTests(SimpleTestCase):
 
 class WataPaymentFlowTests(SimpleTestCase):
     def test_public_landing_headers_use_animated_brand_logo(self):
-        animated_logo = "icons/monkey-island-logo-animated.gif"
+        animated_logo = "icons/monkey-island-logo-animated.webp"
         self.assertTrue(Path(f"engine/static/{animated_logo}").is_file())
 
         for template_name in (
@@ -1167,18 +1167,19 @@ class WataPaymentFlowTests(SimpleTestCase):
                 template = Path(template_name).read_text()
                 self.assertIn(animated_logo, template)
 
-        for template_name in (
-            "engine/templates/index_vpn.html",
-            "engine/templates/index_vps.html",
-        ):
-            with self.subTest(template=template_name):
-                template = Path(template_name).read_text()
-                self.assertIn(".landing-brand-mark", template)
-                self.assertIn("@media (max-width: 380px)", template)
+        # У каждого лендинга свой класс логотипа: index_vpn после редизайна
+        # использует .mi-logo-mark, index_vps — .landing-brand-mark с
+        # уменьшением на узких экранах.
+        vpn_template = Path("engine/templates/index_vpn.html").read_text()
+        self.assertIn(".mi-logo-mark", vpn_template)
+
+        vps_template = Path("engine/templates/index_vps.html").read_text()
+        self.assertIn(".landing-brand-mark", vps_template)
+        self.assertIn("@media (max-width: 380px)", vps_template)
 
     def test_public_landing_hero_art_has_lightweight_animation(self):
+        # index_vpn.html переехал на собственный hero без плавающей иллюстрации.
         for template_name in (
-            "engine/templates/index_vpn.html",
             "engine/templates/index_vps.html",
             "engine/templates/index_vps_direct_sale.html",
         ):
@@ -1187,6 +1188,88 @@ class WataPaymentFlowTests(SimpleTestCase):
                 self.assertIn("hero-art-scene", template)
                 self.assertIn("island-art-float", template)
                 self.assertIn("prefers-reduced-motion: reduce", template)
+
+    def test_neutral_vps_landings_avoid_forbidden_wording(self):
+        # Нейтральные VPS-домены существуют ради рекламы, которой нельзя
+        # упоминать VPN, обход блокировок, шифрование и т.п. (см. README,
+        # раздел «Лендинги и платный flow»).
+        forbidden = (
+            "vpn",
+            "обход",
+            "блокир",
+            "заблокир",
+            "цензур",
+            "шифрован",
+            "приватн",
+            "любые сайты",
+            "роутер",
+        )
+        for template_name in (
+            "engine/templates/index_vps.html",
+            "engine/templates/index_vps_direct_sale.html",
+        ):
+            template = Path(template_name).read_text().lower()
+            for word in forbidden:
+                with self.subTest(template=template_name, word=word):
+                    self.assertNotIn(word, template)
+
+    def test_vps_landing_uses_redesigned_theme(self):
+        # Редизайн 2026-08-28: структура подписочного лендинга (группы секций,
+        # карточки, Golos Text), фирменная чёрно-жёлтая палитра.
+        template = Path("engine/templates/index_vps.html").read_text()
+
+        self.assertIn("Golos+Text", template)
+        self.assertIn("--island-accent: #ffc700;", template)
+        self.assertNotIn("#3183ff", template)
+        self.assertIn('class="light-group"', template)
+        self.assertIn('class="dark-group"', template)
+        self.assertIn("cta-banner", template)
+        # Email-поля обязаны быть 16px, иначе iOS Safari зумит при фокусе.
+        self.assertIn("font-size: 16px;", template)
+        # Ключевые механики покупки сохранены после редизайна.
+        self.assertIn("data-payment-form", template)
+        self.assertIn('name="login_link_kind" value="purchase_permanent"', template)
+        self.assertIn("data-known-user-cta", template)
+        self.assertIn("mobile-buybar", template)
+
+    def test_vps_landings_show_client_ip_topbar_with_neutral_wording(self):
+        # Топ-бар с IP посетителя (как у конкурентов), но формулировка строго
+        # нейтральная: «личный сервер не подключён», без слов про защиту.
+        for template_name in (
+            "engine/templates/index_vps.html",
+            "engine/templates/index_vps_direct_sale.html",
+        ):
+            with self.subTest(template=template_name):
+                template = Path(template_name).read_text()
+                self.assertIn('{% if client_ip %}', template)
+                self.assertIn("ip-topbar", template)
+                self.assertIn("Ваш IP:", template)
+                self.assertIn("личный сервер не подключён", template)
+                self.assertIn("{{ client_ip_country }}", template)
+                self.assertNotIn("не защищ", template)
+
+    def test_direct_sale_landing_sells_immediately_after_hero(self):
+        # Смысл direct-sale-лендинга — сразу продавать: блок тарифов идёт
+        # первым после hero, до всех остальных секций.
+        template = Path("engine/templates/index_vps_direct_sale.html").read_text()
+
+        prices = template.index('<section id="prices"')
+        self.assertLess(prices, template.index('<section id="features"'))
+        self.assertLess(prices, template.index('<section id="how"'))
+        self.assertLess(prices, template.index('<section id="faq"'))
+
+    def test_vps_landings_hero_art_is_palette_native_server_mock(self):
+        # Вместо растровой золотой иллюстрации hero использует собранный в
+        # вёрстке макет карточки сервера — он не конфликтует с синей палитрой.
+        for template_name in (
+            "engine/templates/index_vps.html",
+            "engine/templates/index_vps_direct_sale.html",
+        ):
+            with self.subTest(template=template_name):
+                template = Path(template_name).read_text()
+                self.assertIn("server-mock", template)
+                self.assertIn("mock-card", template)
+                self.assertNotIn("personal-server-hub", template)
 
     def test_wata_views_do_not_embed_hosted_payment_page_in_iframe(self):
         views = Path("engine/views.py").read_text()

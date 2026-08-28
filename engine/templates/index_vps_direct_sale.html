@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#090a0f">
+    <meta name="theme-color" content="#0a0b10">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Monkey Island VPS — личный сервер без сложной настройки</title>
     <link rel="manifest" href="/manifest.json">
@@ -13,222 +13,231 @@
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap" onload="this.onload=null;this.rel='stylesheet'">
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;900&display=swap"></noscript>
+    <link rel="preconnect" href="https://cdnjs.cloudflare.com" crossorigin>
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap" onload="this.onload=null;this.rel='stylesheet'">
+    <link rel="preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" onload="this.onload=null;this.rel='stylesheet'">
+    <noscript>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Golos+Text:wght@400;500;600;700&display=swap">
+        <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+    </noscript>
     <style>
-
         :root {
-            --bg: #090a0f;
-            --bg-soft: #101116;
-            --ink: #f8f8fa;
-            --muted: rgba(248, 248, 250, 0.56);
-            --muted-strong: rgba(248, 248, 250, 0.72);
-            --line: rgba(248, 248, 250, 0.1);
-            --gold: #ffc700;
-            --gold-dark: #b18a00;
-            --panel: rgba(17, 18, 23, 0.86);
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        img {
-            max-width: 100%;
-            height: auto;
+            --island-navy: #0a0b10;
+            --island-navy-2: #0d0e14;
+            --island-ink: #f2f3f6;
+            --island-muted: #9aa1ad;
+            --island-soft: #15171f;
+            --island-accent: #ffc700;
+            --island-accent-dark: #e6b400;
+            --island-green: #22c55e;
         }
 
         html {
             min-height: 100%;
-            background: var(--bg);
+            background: #08090d;
             scroll-behavior: smooth;
         }
 
         body {
-            margin: 0;
-            min-height: 100%;
-            background: var(--bg);
-            color: var(--ink);
-            font-family: 'Montserrat', ui-sans-serif, system-ui, -apple-system, sans-serif;
+            font-family: 'Golos Text', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+            background: #08090d;
+            color: var(--island-ink);
             overflow-x: hidden;
+            min-height: 100%;
         }
 
-        a {
-            color: inherit;
-            text-decoration: none;
-        }
-
-        button,
-        input {
-            font: inherit;
-        }
-
-        .shell {
-            min-height: 100vh;
-            min-height: 100svh;
-            background:
-                radial-gradient(circle at 73% 18%, rgba(255, 199, 0, 0.12), transparent 29rem),
-                radial-gradient(circle at 17% 22%, rgba(255, 255, 255, 0.05), transparent 24rem),
-                radial-gradient(circle at 50% 80%, rgba(255, 199, 0, 0.08), transparent 35rem),
-                linear-gradient(180deg, #0b0c12 0%, #090a0f 68%, #07080c 100%);
-        }
-
-        .wrap {
-            width: min(1160px, calc(100% - 40px));
-            margin: 0 auto;
-        }
-
-        .nav {
+        /* ---------- Топ-бар с IP посетителя ---------- */
+        .ip-topbar {
             display: flex;
             align-items: center;
-            justify-content: space-between;
-            gap: 24px;
-            padding: 28px 0;
+            justify-content: center;
+            gap: 8px;
+            flex-wrap: wrap;
+            padding: 9px 16px;
+            background: #060709;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+            color: rgba(255, 255, 255, 0.65);
+            font-size: 13px;
+            font-weight: 500;
+            text-align: center;
         }
 
-        .brand {
+        .ip-topbar b {
+            color: #fff;
+            font-weight: 600;
+        }
+
+        .ip-topbar .ip-alert {
+            color: var(--island-accent);
+            font-weight: 600;
+        }
+
+        .ip-topbar a {
+            color: var(--island-accent);
+            font-weight: 600;
+            text-decoration: underline;
+            text-underline-offset: 3px;
+        }
+
+        .ip-topbar a:hover { color: #ffe066; }
+
+        @media (max-width: 380px) {
+            .ip-topbar { font-size: 11.5px; padding: 8px 10px; }
+        }
+
+        /* ---------- Hero (тёмная зона) ---------- */
+        .hero-bg {
+            background:
+                radial-gradient(circle at 78% 18%, rgba(255, 199, 0, 0.09), transparent 30rem),
+                radial-gradient(circle at 12% 82%, rgba(255, 199, 0, 0.05), transparent 24rem),
+                var(--island-navy);
+            color: #fff;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .landing-brand {
             display: flex;
             align-items: center;
             gap: 12px;
             min-width: 0;
         }
 
-        .brand-mark {
-            width: 40px;
-            height: 40px;
-            border: 1px solid rgba(255, 199, 0, 0.18);
+        .landing-brand-mark {
+            width: 42px;
+            height: 42px;
+            flex: 0 0 auto;
+            border: 1px solid rgba(255, 199, 0, 0.35);
             border-radius: 12px;
-            background: rgba(255, 199, 0, 0.06);
+            background: rgba(255, 199, 0, 0.10);
             object-fit: cover;
-            box-shadow: 0 10px 26px rgba(0, 0, 0, 0.22);
+            box-shadow: 0 12px 28px rgba(0, 0, 0, 0.28);
         }
 
-        .brand-title {
+        .landing-brand-text {
             display: block;
             font-size: 19px;
-            line-height: 1.05;
+            line-height: 1;
             font-weight: 700;
+            letter-spacing: 0.01em;
             white-space: nowrap;
         }
 
-        .brand-subtitle {
-            display: block;
-            margin-top: 4px;
-            color: var(--muted);
-            font-size: 13px;
+        .hero-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 999px;
+            padding: 8px 16px;
+            font-size: 14px;
             font-weight: 500;
+            color: rgba(255, 255, 255, 0.92);
         }
 
-        .nav-links {
-            display: flex;
-            align-items: center;
-            gap: 28px;
-            color: var(--muted-strong);
-            font-size: 15px;
-            font-weight: 600;
-        }
-
-        .nav-links a:hover {
-            color: var(--ink);
-        }
-
-        .btn {
-            display: inline-flex;
-            min-height: 48px;
-            align-items: center;
-            justify-content: center;
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            padding: 0 24px;
-            background: rgba(248, 248, 250, 0.06);
-            color: var(--ink);
-            font-weight: 800;
-            cursor: pointer;
-            transition: transform 160ms ease, border-color 160ms ease, background 160ms ease;
-        }
-
-        .btn:hover {
-            transform: translateY(-1px);
-            border-color: rgba(255, 199, 0, 0.5);
-            background: rgba(248, 248, 250, 0.1);
-        }
-
-        .btn-primary {
-            border-color: transparent;
-            background: linear-gradient(180deg, #ffd43b 0%, var(--gold) 62%, #e5ad00 100%);
-            color: #07080c;
-            box-shadow: 0 22px 52px rgba(255, 199, 0, 0.2), inset 0 -5px 0 rgba(118, 88, 0, 0.24);
-        }
-
-        .btn-primary:hover {
-            background: linear-gradient(180deg, #ffe26d 0%, #ffd21c 62%, #e8b000 100%);
-        }
-
-        .hero {
-            display: grid;
-            grid-template-columns: minmax(0, 1.06fr) minmax(340px, 0.94fr);
-            gap: 46px;
-            align-items: stretch;
-            padding: 74px 0 86px;
-        }
-
-        .hero-copy {
-            align-self: center;
-            max-width: 690px;
-        }
-
-        .eyebrow {
-            display: inline-flex;
-            align-items: center;
-            gap: 10px;
-            min-height: 34px;
-            margin-bottom: 20px;
-            border: 1px solid rgba(255, 199, 0, 0.28);
-            border-radius: 999px;
-            padding: 0 13px;
-            background: rgba(16, 22, 19, 0.74);
-            color: #ffe78a;
-            font-size: 13px;
-            font-weight: 700;
-        }
-
-        .eyebrow::before {
+        .hero-badge::before {
             content: "";
             width: 8px;
             height: 8px;
             border-radius: 999px;
-            background: var(--gold);
-            box-shadow: 0 0 0 5px rgba(255, 199, 0, 0.14);
+            background: var(--island-green);
+            box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.18);
         }
 
-        h1,
-        h2,
-        h3,
-        p {
-            margin-top: 0;
+        .hero-check {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: rgba(255, 255, 255, 0.92);
+            font-size: 16px;
+            font-weight: 400;
         }
 
-        h1 {
-            margin-bottom: 22px;
-            font-size: clamp(30px, 4.2vw, 50px);
-            line-height: 1.06;
-            letter-spacing: 0;
-            font-weight: 700;
-            overflow-wrap: break-word;
+        .hero-check i {
+            color: var(--island-accent);
+            margin-top: 3px;
+            font-size: 14px;
         }
 
-        .lead {
-            max-width: 650px;
-            margin-bottom: 28px;
-            color: var(--muted-strong);
-            font-size: clamp(18px, 2vw, 23px);
-            line-height: 1.34;
+        .discount-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 10px 14px;
+            font-size: 15px;
             font-weight: 500;
-            overflow-wrap: break-word;
+            color: #fff;
         }
 
-        .hero-art-mobile {
-            display: none;
+        .discount-chip i { color: var(--island-green); }
+
+        .btn-primary {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            background: linear-gradient(180deg, #ffd21a 0%, var(--island-accent) 58%, #f0ae00 100%);
+            color: #0a0b10;
+            border: 0;
+            border-radius: 32px;
+            min-height: 56px;
+            padding: 0 32px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+            box-shadow: 0 14px 34px rgba(255, 199, 0, 0.22);
+        }
+
+        .btn-primary:hover { background: linear-gradient(180deg, #ffdb3d 0%, var(--island-accent) 58%, #f0ae00 100%); }
+        .btn-primary:active { transform: scale(0.97); }
+
+        .btn-ghost-light {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            border-radius: 32px;
+            min-height: 44px;
+            padding: 0 22px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #fff;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+
+        .btn-ghost-light:hover {
+            border-color: var(--island-accent);
+            background: rgba(255, 199, 0, 0.10);
+        }
+
+        .hero-mini-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid rgba(255, 255, 255, 0.09);
+            border-radius: 18px;
+            padding: 16px 18px;
+            font-size: 14px;
+            font-weight: 500;
+            color: rgba(255, 255, 255, 0.92);
+        }
+
+        .hero-mini-card i {
+            color: var(--island-accent);
+            font-size: 18px;
+            flex: 0 0 auto;
+        }
+
+        /* ---------- Иллюстрация hero: макет карточки сервера ---------- */
+        .hero-art {
+            width: min(88vw, 460px);
         }
 
         .hero-art-scene {
@@ -236,112 +245,191 @@
             display: inline-grid;
             place-items: center;
             isolation: isolate;
+            width: min(88vw, 460px);
             max-width: 100%;
         }
 
-        .hero-art-scene::before,
-        .hero-art-scene::after {
-            content: "";
-            position: absolute;
-            inset: 8%;
-            pointer-events: none;
+        .server-mock {
+            position: relative;
+            width: 100%;
+            padding: 26px 0 30px;
         }
 
-        .hero-art-scene::before {
-            z-index: -1;
-            border-radius: 999px;
-            background:
-                radial-gradient(circle at 50% 45%, rgba(255, 199, 0, 0.33), transparent 34%),
-                radial-gradient(circle at 28% 62%, rgba(255, 199, 0, 0.2), transparent 26%),
-                radial-gradient(circle at 72% 60%, rgba(255, 232, 130, 0.18), transparent 28%);
-            filter: blur(18px);
-            opacity: 0.72;
-            animation: island-art-glow 4.8s ease-in-out infinite;
+        .mock-card {
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 24px;
+            padding: 24px;
+            background: linear-gradient(160deg, rgba(34, 35, 44, 0.94) 0%, rgba(13, 14, 19, 0.97) 100%);
+            box-shadow: 0 44px 90px rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(14px);
         }
 
-        .hero-art-scene::after {
-            z-index: 2;
-            background:
-                radial-gradient(circle, rgba(255, 232, 130, 0.95) 0 2px, transparent 3px) 18% 32% / 86px 86px,
-                radial-gradient(circle, rgba(255, 199, 0, 0.9) 0 1.5px, transparent 3px) 72% 40% / 112px 112px,
-                radial-gradient(circle, rgba(255, 255, 255, 0.72) 0 1px, transparent 2.5px) 58% 74% / 96px 96px;
-            mix-blend-mode: screen;
-            opacity: 0.38;
-            animation: island-art-sparks 7.2s linear infinite;
-        }
-
-        .hero-art-scene-mobile {
-            display: none;
-        }
-
-        .hero-actions {
+        .mock-head {
             display: flex;
-            flex-wrap: wrap;
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-
-        .trust-row {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .trust {
-            display: inline-flex;
-            min-height: 36px;
             align-items: center;
-            border: 1px solid var(--line);
-            border-radius: 8px;
-            padding: 0 11px;
-            background: rgba(8, 11, 11, 0.48);
-            color: var(--muted-strong);
-            font-size: 13px;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .mock-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 16px;
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .mock-title i {
+            color: var(--island-accent);
+        }
+
+        .mock-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 7px;
+            border-radius: 999px;
+            padding: 6px 12px;
+            background: rgba(34, 197, 94, 0.14);
+            border: 1px solid rgba(34, 197, 94, 0.3);
+            color: #4ade80;
+            font-size: 12px;
             font-weight: 600;
         }
 
-        .hero-board {
-            position: relative;
+        .mock-status::before {
+            content: "";
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: var(--island-green);
+            box-shadow: 0 0 0 3px rgba(34, 197, 94, 0.22);
+        }
+
+        .mock-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            padding: 11px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .mock-row:last-of-type { border-bottom: 0; }
+
+        .mock-label {
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        .mock-value {
+            color: #fff;
+            font-size: 14px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .mock-value .up { color: #4ade80; }
+
+        .mock-bar {
+            height: 7px;
+            margin: 8px 0 2px;
+            border-radius: 999px;
+            background: rgba(255, 255, 255, 0.09);
+            overflow: hidden;
+        }
+
+        .mock-bar i {
+            display: block;
+            height: 100%;
+            width: 86%;
+            border-radius: 999px;
+            background: linear-gradient(90deg, #ffc700, #ffe066);
+            animation: mock-bar-load 2.6s ease-in-out infinite alternate;
+        }
+
+        @keyframes mock-bar-load {
+            0% { width: 62%; }
+            100% { width: 92%; }
+        }
+
+        .mock-devices {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid rgba(255, 255, 255, 0.07);
+        }
+
+        .mock-device {
+            width: 38px;
+            height: 38px;
+            flex: 0 0 auto;
+            border-radius: 12px;
             display: flex;
             align-items: center;
             justify-content: center;
-            min-height: 560px;
-            border: 1px solid var(--line);
-            border-radius: 22px;
-            background:
-                radial-gradient(circle at 50% 45%, rgba(255, 199, 0, 0.16), transparent 21rem),
-                linear-gradient(180deg, rgba(20, 21, 27, 0.76), rgba(9, 10, 15, 0.92));
-            overflow: hidden;
-            box-shadow: 0 30px 90px rgba(0, 0, 0, 0.34);
+            background: rgba(255, 199, 0, 0.12);
+            border: 1px solid rgba(255, 199, 0, 0.26);
+            color: #ffd84d;
+            font-size: 15px;
         }
 
-        .hero-board::before {
+        .mock-devices span {
+            margin-left: 4px;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 12.5px;
+            font-weight: 500;
+        }
+
+        .mock-chip {
+            position: absolute;
+            z-index: 2;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            border-radius: 14px;
+            padding: 10px 14px;
+            background: rgba(23, 32, 56, 0.92);
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+        }
+
+        .mock-chip i { color: var(--island-green); }
+        .mock-chip.chip-speed i { color: var(--island-accent); }
+
+        .mock-chip.chip-key {
+            top: 0;
+            right: -6px;
+            animation: island-art-float 6.4s ease-in-out infinite;
+        }
+
+        .mock-chip.chip-speed {
+            bottom: 2px;
+            left: -6px;
+            animation: island-art-float 7.2s ease-in-out infinite reverse;
+        }
+
+        .hero-art-scene::before {
             content: "";
             position: absolute;
-            inset: 22px;
-            border: 1px solid rgba(255, 199, 0, 0.18);
-            border-radius: 18px;
-        }
-
-        .map-lines {
-            position: absolute;
-            inset: 0;
+            inset: 8%;
+            z-index: -1;
+            border-radius: 999px;
             background:
-                radial-gradient(circle at 50% 42%, rgba(255, 199, 0, 0.08), transparent 28rem),
-                linear-gradient(180deg, transparent, rgba(9, 10, 15, 0.42));
+                radial-gradient(circle at 50% 45%, rgba(255, 199, 0, 0.30), transparent 40%),
+                radial-gradient(circle at 28% 62%, rgba(255, 199, 0, 0.16), transparent 30%);
+            filter: blur(20px);
+            opacity: 0.8;
             pointer-events: none;
-        }
-
-        .hero-art {
-            position: relative;
-            z-index: 1;
-            width: min(88%, 520px);
-            filter: drop-shadow(0 34px 55px rgba(0, 0, 0, 0.52));
-        }
-
-        .hero-art-scene-desktop {
-            z-index: 1;
-            width: min(88%, 520px);
+            animation: island-art-glow 4.8s ease-in-out infinite;
         }
 
         .hero-art-scene .hero-art,
@@ -354,884 +442,748 @@
             will-change: transform;
         }
 
-        .island-card {
-            position: absolute;
-            right: 38px;
-            bottom: 38px;
-            left: 38px;
-            z-index: 2;
-            border: 1px solid rgba(248, 248, 250, 0.12);
-            border-radius: 16px;
-            padding: 22px;
-            background: rgba(9, 10, 15, 0.74);
-            backdrop-filter: blur(12px);
-        }
-
-        .route {
-            position: absolute;
-            width: 12px;
-            height: 12px;
-            border-radius: 999px;
-            background: var(--gold);
-            box-shadow: 0 0 0 7px rgba(255, 199, 0, 0.14);
-            display: none;
-        }
-
-        .route-one {
-            top: 102px;
-            left: 92px;
-        }
-
-        .route-two {
-            top: 210px;
-            right: 98px;
-            background: var(--gold);
-            box-shadow: 0 0 0 7px rgba(255, 199, 0, 0.14);
-        }
-
-        .route-three {
-            top: 318px;
-            left: 190px;
-        }
-
-        .route-line {
-            position: absolute;
-            top: 152px;
-            left: 102px;
-            width: 330px;
-            height: 190px;
-            border-top: 2px dashed rgba(255, 199, 0, 0.4);
-            border-right: 2px dashed rgba(255, 199, 0, 0.34);
-            border-radius: 0 120px 0 0;
-            transform: rotate(-7deg);
-            display: none;
-        }
+        .hero-art-scene-mobile { display: none; }
+        .hero-art-mobile { display: none; }
 
         @keyframes island-art-float {
-            0%, 100% {
-                transform: translate3d(0, 0, 0) scale(1) rotate(-0.35deg);
-            }
-
-            50% {
-                transform: translate3d(0, -12px, 0) scale(1.015) rotate(0.35deg);
-            }
+            0%, 100% { transform: translate3d(0, 0, 0) scale(1) rotate(-0.35deg); }
+            50% { transform: translate3d(0, -12px, 0) scale(1.015) rotate(0.35deg); }
         }
 
         @keyframes island-art-glow {
-            0%, 100% {
-                opacity: 0.56;
-                transform: scale(0.96);
-            }
-
-            50% {
-                opacity: 0.9;
-                transform: scale(1.04);
-            }
+            0%, 100% { opacity: 0.6; transform: scale(0.96); }
+            50% { opacity: 0.92; transform: scale(1.04); }
         }
 
-        @keyframes island-art-sparks {
-            0% {
-                opacity: 0.22;
-                transform: translate3d(-8px, 8px, 0);
-            }
-
-            45% {
-                opacity: 0.48;
-            }
-
-            100% {
-                opacity: 0.22;
-                transform: translate3d(10px, -12px, 0);
-            }
+        /* ---------- Светлые группы секций ---------- */
+        .light-group {
+            background: var(--island-soft);
+            border-radius: 30px;
+            margin: 16px;
         }
 
-        .board-title {
-            margin-bottom: 10px;
-            font-size: 23px;
-            line-height: 1.15;
-            font-weight: 700;
-        }
-
-        .board-text {
-            margin-bottom: 16px;
-            color: var(--muted);
-            font-size: 16px;
-            line-height: 1.36;
-            font-weight: 500;
-        }
-
-        .mini-stats {
-            display: grid;
-            grid-template-columns: repeat(3, 1fr);
-            gap: 10px;
-        }
-
-        .mini-stat {
-            min-height: 70px;
-            border: 1px solid var(--line);
-            border-radius: 14px;
-            padding: 11px;
-            background: rgba(248, 248, 250, 0.05);
-        }
-
-        .mini-stat strong {
-            display: block;
-            margin-bottom: 4px;
-            color: var(--gold);
-            font-size: 20px;
-            line-height: 1;
-        }
-
-        .mini-stat span {
-            color: var(--muted);
-            font-size: 12px;
-            line-height: 1.2;
-            font-weight: 600;
-        }
-
-        .section {
-            padding: 0 0 74px;
-        }
-
-        .section-head {
-            display: flex;
-            align-items: end;
-            justify-content: space-between;
-            gap: 24px;
-            margin-bottom: 22px;
-        }
-
-        .section h2 {
-            margin-bottom: 0;
-            font-size: clamp(30px, 4vw, 46px);
-            line-height: 1.08;
-            font-weight: 700;
-        }
-
-        .section-note {
-            max-width: 390px;
-            margin: 0;
-            color: var(--muted);
-            font-size: 16px;
-            line-height: 1.34;
-            font-weight: 500;
-        }
-
-        .grid-3,
-        .tariffs,
-        .steps,
-        .faq-grid {
-            display: grid;
-            gap: 16px;
-        }
-
-        .grid-3,
-        .tariffs {
-            grid-template-columns: repeat(3, minmax(0, 1fr));
-        }
-
-        .checkout-trust {
-            display: grid;
-            grid-template-columns: repeat(4, minmax(0, 1fr));
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
-        .checkout-trust .card {
-            padding: 16px;
-        }
-
-        .checkout-trust strong {
-            display: block;
-            margin-bottom: 5px;
-            color: var(--ink);
-            font-size: 14px;
-            line-height: 1.2;
-            font-weight: 800;
-        }
-
-        .checkout-trust span {
-            color: var(--muted);
-            font-size: 13px;
-            line-height: 1.25;
-            font-weight: 600;
-        }
-
-        .steps,
-        .faq-grid {
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-
-        .card {
-            border: 1px solid var(--line);
-            border-radius: 18px;
-            background: var(--panel);
-            box-shadow: 0 22px 64px rgba(0, 0, 0, 0.16);
-        }
-
-        .feature {
-            min-height: 180px;
-            padding: 22px;
-        }
-
-        .feature-kicker {
-            display: block;
-            margin-bottom: 22px;
-            color: var(--gold);
-            font-size: 13px;
-            font-weight: 700;
-            text-transform: uppercase;
-        }
-
-        .feature h3,
-        .step h3,
-        .faq-card h3 {
-            margin-bottom: 10px;
-            font-size: 22px;
-            line-height: 1.16;
-            font-weight: 700;
-        }
-
-        .feature p,
-        .step p,
-        .faq-card p,
-        .cta p {
-            margin-bottom: 0;
-            color: var(--muted);
-            font-size: 16px;
-            line-height: 1.36;
-            font-weight: 500;
-        }
-
-        .tariff {
-            position: relative;
-            display: flex;
-            min-height: 356px;
-            flex-direction: column;
-            justify-content: space-between;
-            overflow: hidden;
-            padding: 22px;
-        }
-
-        .tariff::before {
-            content: "";
-            position: absolute;
-            inset: 0;
-            opacity: 0.56;
-            pointer-events: none;
-        }
-
-        .tariff:nth-child(1)::before {
-            background: linear-gradient(150deg, rgba(255, 199, 0, 0.14), transparent 58%);
-        }
-
-        .tariff:nth-child(2)::before {
-            background: linear-gradient(150deg, rgba(255, 199, 0, 0.22), transparent 58%);
-        }
-
-        .tariff:nth-child(3)::before {
-            background: linear-gradient(150deg, rgba(255, 199, 0, 0.1), transparent 58%);
-        }
-
-        .tariff > * {
-            position: relative;
-        }
-
-        .badge {
+        .eyebrow {
             display: inline-flex;
-            width: fit-content;
-            min-height: 32px;
             align-items: center;
-            border: 1px solid rgba(255, 199, 0, 0.28);
-            border-radius: 999px;
-            padding: 0 12px;
-            background: rgba(255, 199, 0, 0.08);
-            color: #ffe58a;
+            gap: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 30px;
+            padding: 5px 14px;
             font-size: 13px;
-            font-weight: 700;
+            font-weight: 500;
+            color: var(--island-ink);
+            background: rgba(255, 255, 255, 0.05);
         }
 
-        .tariff h3 {
-            margin: 18px 0 10px;
-            font-size: 25px;
-            line-height: 1.1;
-            font-weight: 700;
-        }
-
-        .price {
-            margin-bottom: 18px;
-        }
-
-        .price strong {
-            font-size: 42px;
-            line-height: 1;
-            font-weight: 700;
-        }
-
-        .price > span {
-            display: block;
-            margin-top: 8px;
-            color: var(--muted);
+        .section-title {
+            font-size: clamp(28px, 4.4vw, 40px);
             font-weight: 600;
+            line-height: 1.15;
+            letter-spacing: -0.01em;
         }
 
-        .pay-form {
-            display: grid;
+        .light-card {
+            background: #171922;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 20px;
+            padding: 28px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.24);
+        }
+
+        .icon-bubble {
+            width: 52px;
+            height: 52px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255, 199, 0, 0.12);
+            color: var(--island-accent);
+            font-size: 20px;
+        }
+
+        /* ---------- Синий CTA-баннер ---------- */
+        .cta-banner {
+            background:
+                radial-gradient(circle at 50% 160%, rgba(255, 255, 255, 0.22) 0%, transparent 62%),
+                linear-gradient(135deg, #ffd21a 0%, #f0ae00 100%);
+            border-radius: 30px;
+            color: #141000;
+        }
+
+        .btn-white {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
             gap: 10px;
-        }
-
-        .pay-form .btn-primary {
-            background: linear-gradient(180deg, #ffd43b 0%, var(--gold) 62%, #e5ad00 100%);
-            color: #07080c;
-            border-color: transparent;
-            box-shadow: 0 18px 38px rgba(255, 199, 0, .24), inset 0 -5px 0 rgba(118, 88, 0, .24);
-        }
-
-        .pay-form .btn-primary:hover {
-            background: linear-gradient(180deg, #ffe26d 0%, #ffd21c 62%, #e8b000 100%);
-            box-shadow: 0 22px 48px rgba(255, 199, 0, .34), inset 0 -5px 0 rgba(118, 88, 0, .24);
-        }
-
-        .email {
-            width: 100%;
-            min-height: 48px;
-            border: 1px solid var(--line);
-            border-radius: 999px;
-            padding: 0 16px;
-            outline: none;
-            background: rgba(9, 10, 15, 0.72);
-            color: var(--ink);
+            background: #14161d;
+            color: #ffffff;
+            border-radius: 32px;
+            min-height: 56px;
+            padding: 0 34px;
             font-size: 16px;
             font-weight: 600;
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+            box-shadow: 0 16px 36px rgba(0, 0, 0, 0.3);
         }
 
-        .tariff-points {
-            list-style: none;
-            margin: 0 0 16px;
-            padding: 0;
-            display: grid;
-            gap: 9px;
-        }
+        .btn-white:hover { transform: translateY(-2px); }
+        .btn-white:active { transform: scale(0.97); }
 
-        .tariff-points li {
+        /* ---------- Тарифы ---------- */
+        .tariff-card {
+            background: #14161d;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 24px;
+            box-shadow: 0 12px 44px rgba(0, 0, 0, 0.28);
+            transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
             position: relative;
-            padding-left: 24px;
-            color: var(--muted-strong);
-            font-size: 14px;
-            font-weight: 600;
-            line-height: 1.3;
         }
 
-        .tariff-points li::before {
-            content: "✓";
+        .tariff-card:hover {
+            transform: translateY(-8px);
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .tariff-popular {
+            border-color: var(--island-accent);
+            box-shadow: 0 0 0 2px var(--island-accent), 0 24px 60px rgba(255, 199, 0, 0.14);
+        }
+
+        .discount-badge {
             position: absolute;
-            left: 0;
-            top: 0;
-            color: var(--gold);
-            font-weight: 900;
+            top: -14px;
+            right: 22px;
+            background: var(--island-green);
+            color: #fff;
+            padding: 5px 14px;
+            border-radius: 50px;
+            font-size: 13px;
+            font-weight: 600;
+            box-shadow: 0 10px 20px rgba(34, 197, 94, 0.3);
+            z-index: 10;
         }
 
-        .tariff.popular {
-            border-color: rgba(255, 199, 0, 0.55);
-            box-shadow: 0 0 0 1px var(--gold), 0 24px 60px rgba(255, 199, 0, 0.12);
+        .popular-pill {
+            display: inline-block;
+            background: var(--island-accent);
+            color: #0a0b10;
+            font-size: 12px;
+            font-weight: 600;
+            padding: 5px 14px;
+            border-radius: 999px;
+            margin-bottom: 12px;
         }
 
-        .guarantee-note {
-            margin: 0;
-            color: #57e39b;
-            font-size: 12.5px;
-            font-weight: 700;
-            text-align: center;
+        .tariff-feature {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            color: var(--island-muted);
+            font-size: 14px;
+            font-weight: 400;
         }
 
+        .tariff-feature i {
+            color: var(--island-accent);
+            margin-top: 3px;
+            font-size: 13px;
+        }
+
+        .input-field {
+            width: 100%;
+            background: var(--island-soft);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: var(--island-ink);
+            border-radius: 16px;
+            padding: 15px 18px;
+            /* 16px, иначе iOS Safari зумит страницу при фокусе на поле */
+            font-size: 16px;
+            font-weight: 500;
+            outline: none;
+            transition: border-color 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .input-field::placeholder { color: var(--island-muted); }
+
+        .input-field:focus {
+            border-color: var(--island-accent);
+            box-shadow: 0 0 0 3px rgba(255, 199, 0, 0.18);
+        }
+
+        .pay-cta {
+            width: 100%;
+            background: linear-gradient(180deg, #ffd21a 0%, var(--island-accent) 58%, #f0ae00 100%);
+            color: #0a0b10;
+            border: 0;
+            border-radius: 16px;
+            min-height: 54px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s ease, transform 0.15s ease;
+            box-shadow: 0 12px 28px rgba(255, 199, 0, 0.2);
+        }
+
+        .pay-cta:hover { background: linear-gradient(180deg, #ffdb3d 0%, var(--island-accent) 58%, #f0ae00 100%); }
+        .pay-cta:active { transform: scale(0.98); }
+
+        /* ---------- FAQ ---------- */
+        details summary::-webkit-details-marker { display: none; }
+        details summary { list-style: none; }
+
+        .faq-card {
+            background: #14161d;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            overflow: hidden;
+            transition: border-color 0.3s ease, box-shadow 0.3s ease;
+        }
+
+        .faq-card[open] {
+            border-color: rgba(255, 199, 0, 0.4);
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .faq-toggle {
+            width: 32px;
+            height: 32px;
+            flex: 0 0 auto;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: var(--island-soft);
+            color: var(--island-ink);
+            transition: transform 0.3s ease, background 0.3s ease, color 0.3s ease;
+        }
+
+        details[open] .faq-toggle {
+            transform: rotate(180deg);
+            background: var(--island-accent);
+            color: #0a0b10;
+        }
+
+        details[open] summary ~ * { animation: sweep 0.3s ease-in-out; }
+
+        @keyframes sweep {
+            0% { opacity: 0; transform: translateY(-10px); }
+            100% { opacity: 1; transform: translateY(0); }
+        }
+
+        /* ---------- Шаги ---------- */
+        .step-num {
+            width: 56px;
+            height: 56px;
+            border-radius: 999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(180deg, #ffd21a 0%, var(--island-accent) 58%, #f0ae00 100%);
+            color: #0a0b10;
+            font-size: 22px;
+            font-weight: 600;
+            box-shadow: 0 14px 30px rgba(255, 199, 0, 0.22);
+        }
+
+        /* ---------- Мобильный buybar ---------- */
         .mobile-buybar {
             position: fixed;
             left: 0;
             right: 0;
             bottom: 0;
-            z-index: 60;
-            display: none;
+            z-index: 40;
             padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
-            background: rgba(9, 10, 15, 0.94);
+            background: rgba(10, 11, 16, 0.94);
             backdrop-filter: blur(14px);
-            border-top: 1px solid var(--line);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
             transform: translateY(130%);
-            transition: transform .25s ease;
+            transition: transform 0.25s ease;
         }
 
-        .mobile-buybar.is-visible {
-            transform: translateY(0);
+        .mobile-buybar.is-visible { transform: translateY(0); }
+
+        @media (min-width: 768px) {
+            .mobile-buybar { display: none !important; }
         }
 
-        .mobile-buybar .btn {
-            width: 100%;
-        }
+        /* ---------- Мобильная вёрстка ---------- */
+        @media (max-width: 768px) {
+            nav { padding-top: max(18px, env(safe-area-inset-top)) !important; }
 
-        @media (max-width: 700px) {
-            .mobile-buybar {
-                display: block;
-            }
-        }
+            .landing-brand { gap: 10px; }
 
-        .email:focus {
-            border-color: rgba(255, 199, 0, 0.62);
-        }
-
-        .form-note {
-            color: rgba(245, 240, 223, 0.66);
-            font-size: 12px;
-            line-height: 1.35;
-            font-weight: 500;
-        }
-
-        .form-note a {
-            color: #fff0a7;
-            text-decoration: underline;
-            text-underline-offset: 3px;
-        }
-
-        .step,
-        .faq-card {
-            padding: 20px;
-        }
-
-        .code-box {
-            margin-top: 18px;
-            border: 1px solid rgba(255, 199, 0, 0.2);
-            border-radius: 14px;
-            background: rgba(9, 10, 15, 0.72);
-            color: #ffe58a;
-            padding: 15px;
-            font: 600 16px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-            overflow-wrap: anywhere;
-        }
-
-        .locations {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 8px;
-            margin-top: 18px;
-        }
-
-        .location {
-            display: inline-flex;
-            min-height: 38px;
-            align-items: center;
-            border: 1px solid rgba(255, 199, 0, 0.26);
-            border-radius: 999px;
-            padding: 0 12px;
-            background: rgba(255, 199, 0, 0.08);
-            color: #ffe58a;
-            font-size: 14px;
-            font-weight: 600;
-        }
-
-        .cta {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 22px;
-            padding: 26px;
-            background:
-                linear-gradient(100deg, rgba(255, 199, 0, 0.1), transparent 48%),
-                var(--panel);
-        }
-
-        .cta h2 {
-            margin-bottom: 8px;
-        }
-
-        .footer {
-            display: flex;
-            justify-content: space-between;
-            gap: 22px;
-            padding: 0 0 42px;
-            color: var(--muted);
-            font-size: 14px;
-            font-weight: 500;
-        }
-
-        .footer-links {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 14px;
-            color: var(--muted-strong);
-        }
-
-        @media (max-width: 960px) {
-            .nav {
-                align-items: flex-start;
+            .landing-brand-mark {
+                width: 36px;
+                height: 36px;
+                border-radius: 11px;
             }
 
-            .nav-links {
-                gap: 14px;
-                font-size: 14px;
+            .landing-brand-text { font-size: 15px; }
+
+            .light-group { margin: 10px; border-radius: 22px; }
+
+            .hero-title {
+                font-size: clamp(1.9rem, 8vw, 2.6rem) !important;
+                line-height: 1.12 !important;
             }
 
-            .hero,
-            .grid-3,
-            .tariffs,
-            .checkout-trust,
-            .steps,
-            .faq-grid {
-                grid-template-columns: 1fr;
-            }
+            .hero-art,
+            .hero-art-scene-desktop { display: none; }
 
-            .hero-board {
-                min-height: 460px;
-            }
-
-            .section-head,
-            .cta,
-            .footer {
-                align-items: flex-start;
-                flex-direction: column;
-            }
-        }
-
-        @media (max-width: 700px) {
-            .wrap {
-                width: min(100% - 24px, 1160px);
-            }
-
-            .nav {
-                padding: 20px 0;
-            }
-
-            .brand-subtitle,
-            .nav-links a:not(.btn-primary) {
-                display: none;
-            }
-
-            .brand-title {
-                font-size: 14px;
-            }
-
-            .hero {
-                gap: 28px;
-                padding: 34px 0 58px;
-            }
-
-            .hero-copy {
-                max-width: none;
-            }
-
-            .eyebrow {
-                display: none;
-            }
-
-            h1 {
-                margin-bottom: 24px;
-                font-size: clamp(26px, 7.2vw, 40px);
-                line-height: 1.08;
-            }
-
-            .lead {
-                margin-bottom: 18px;
-                font-size: clamp(18px, 5.2vw, 28px);
-                line-height: 1.3;
-            }
-
-            .nav {
-                gap: 10px;
-            }
-
-            .brand-mark {
-                width: 32px;
-                height: 32px;
-            }
-
-            .nav-links {
-                gap: 12px;
-            }
-
-            .nav-links .btn-primary {
-                white-space: nowrap;
-                padding: 0 14px;
-                min-height: 42px;
-                font-size: 13px;
+            .hero-art-scene-mobile {
+                display: inline-grid;
+                width: min(88vw, 380px);
+                margin: 4px auto 10px;
             }
 
             .hero-art-mobile {
                 display: block;
                 width: 100%;
                 margin: 0;
-                filter: drop-shadow(0 28px 42px rgba(0, 0, 0, 0.5));
+                filter: drop-shadow(0 38px 70px rgba(0, 0, 0, 0.52));
             }
 
-            .hero-art-scene-mobile {
-                display: inline-grid;
-                width: min(100%, 520px);
-                margin: 0 auto 24px;
+            .tariff-card { border-radius: 20px; }
+
+            .footer-safe-bottom { padding-bottom: 96px; }
+        }
+
+        @media (max-width: 380px) {
+            .landing-brand { gap: 9px; }
+
+            .landing-brand-mark {
+                width: 34px;
+                height: 34px;
             }
 
-            .hero-actions,
-            .hero-actions .btn,
-            .cta .btn {
-                width: 100%;
-            }
+            .landing-brand-text { font-size: 13px; }
 
-            .hero-board {
-                display: none;
-            }
-
-            .island-card {
-                right: 16px;
-                bottom: 16px;
-                left: 16px;
-                padding: 16px;
-            }
-
-            .mini-stats {
-                grid-template-columns: 1fr;
-            }
-
-            .section {
-                padding-bottom: 54px;
-            }
+            .hero-badge { font-size: 12px; }
         }
 
         @media (prefers-reduced-motion: reduce) {
             .hero-art-scene::before,
-            .hero-art-scene::after,
             .hero-art-scene .hero-art,
-            .hero-art-scene .hero-art-mobile {
+            .hero-art-scene .hero-art-mobile,
+            .mock-chip,
+            .mock-bar i {
                 animation: none;
             }
         }
     </style>
     {% include "includes/yandex_metrika.html" %}
+    <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=2">
 </head>
-<body>
-    <main class="shell">
-        <div class="wrap">
-            <nav class="nav" aria-label="Главная навигация">
-                <a class="brand" href="#top" aria-label="Monkey Island VPS">
-                    <img class="brand-mark" src="{% static 'icons/monkey-island-logo-animated.webp' %}" alt="" width="40" height="40" decoding="async">
-                    <span>
-                        <span class="brand-title">Monkey Island VPS</span>
-                        <span class="brand-subtitle">Персональный виртуальный сервер</span>
-                    </span>
+<body class="antialiased">
+
+    <div class="hero-bg">
+    {% if client_ip %}
+    <div class="ip-topbar">
+        <span>Ваш IP: <b>{{ client_ip }}</b>{% if client_ip_country %} ({{ client_ip_country }}){% endif %}</span>
+        <span class="ip-alert">— личный сервер не подключён</span>
+        <a href="#prices" data-conversion-goal="tariff_cta_click">Подключить</a>
+    </div>
+    {% endif %}
+        <nav class="container mx-auto px-5 md:px-6 py-6 flex justify-between items-center relative z-10">
+            <div class="landing-brand" aria-label="Monkey Island VPS">
+                <img class="landing-brand-mark" src="{% static 'icons/monkey-island-logo-animated.webp' %}" alt="" width="42" height="42" decoding="async">
+                <span class="landing-brand-text">
+                    Monkey Island <span class="text-[#ffc700]">VPS</span>
+                </span>
+            </div>
+            <div class="flex items-center gap-3 md:gap-6 text-sm font-medium">
+                <a href="#prices" class="hidden sm:inline text-white/80 hover:text-white transition">Тарифы</a>
+                <a href="#faq" class="hidden md:inline text-white/80 hover:text-white transition">Вопросы</a>
+                <a href="/login/" class="btn-ghost-light">Личный кабинет</a>
+            </div>
+        </nav>
+
+        <section class="container mx-auto px-5 md:px-6 pt-6 pb-14 md:py-16 grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_minmax(340px,520px)] items-center gap-8 lg:gap-12 relative z-10">
+            <div class="hero-copy flex flex-col items-start text-left max-w-3xl">
+                <div class="hero-badge mb-6">Доступ готов через несколько минут</div>
+
+                <h1 class="hero-title text-4xl md:text-5xl lg:text-[52px] font-semibold leading-[1.1] mb-6 tracking-tight">
+                    Личный сервер без сложной настройки
+                </h1>
+
+                <div class="space-y-3 mb-7">
+                    <div class="hero-check"><i class="fas fa-check"></i><span>Подключайте телефон, компьютер и планшет по одному ключу</span></div>
+                    <div class="hero-check"><i class="fas fa-check"></i><span>Безлимитный трафик и канал до 10 Гбит/с — видео, игры и работа без тормозов</span></div>
+                    <div class="hero-check"><i class="fas fa-check"></i><span>До 15 устройств на одной подписке — хватит на всю семью</span></div>
+                </div>
+
+                <div class="hero-art-scene hero-art-scene-mobile">
+                    <div class="server-mock hero-art-mobile" aria-hidden="true">
+                        <div class="mock-chip chip-key"><i class="fas fa-circle-check"></i> Ключ активирован</div>
+                        <div class="mock-card">
+                            <div class="mock-head">
+                                <div class="mock-title"><i class="fas fa-server"></i> Ваш сервер</div>
+                                <div class="mock-status">Онлайн</div>
+                            </div>
+                            <div class="mock-row"><span class="mock-label">Скорость канала</span><span class="mock-value">до 10 Гбит/с</span></div>
+                            <div class="mock-bar"><i></i></div>
+                            <div class="mock-row"><span class="mock-label">Пинг</span><span class="mock-value"><span class="up">12 мс</span> · стабильно</span></div>
+                            <div class="mock-row"><span class="mock-label">Трафик</span><span class="mock-value">Безлимит</span></div>
+                            <div class="mock-devices">
+                                <div class="mock-device"><i class="fas fa-mobile-screen-button"></i></div>
+                                <div class="mock-device"><i class="fas fa-laptop"></i></div>
+                                <div class="mock-device"><i class="fas fa-tablet-screen-button"></i></div>
+                                <div class="mock-device"><i class="fas fa-tv"></i></div>
+                                <span>4 из 15 устройств</span>
+                            </div>
+                        </div>
+                        <div class="mock-chip chip-speed"><i class="fas fa-bolt"></i> Готов за 60 секунд</div>
+                    </div>
+                </div>
+
+                <a href="#prices" class="discount-chip mb-5">
+                    <i class="fas fa-circle-check"></i> Скидка до 40% на длинных тарифах
                 </a>
-                <div class="nav-links">
-                    <a href="#features">Возможности</a>
-                    <a href="#prices">Тарифы</a>
-                    <a href="#how">Как работает</a>
-                    <a href="#faq">FAQ</a>
-                    <a href="/login/">Личный кабинет</a>
-                    <a class="btn btn-primary" href="#prices">Купить от {{ min_tariff_price }} ₽</a>
-                </div>
-            </nav>
 
-            <section id="top" class="hero">
-                <div class="hero-copy">
-                    <div class="eyebrow">доступ готов через несколько минут</div>
-                    <h1>Личный сервер для игр, интернета и работы</h1>
-                    <p class="lead">
-                        Подключайте телефон, компьютер и планшет по одному ключу. Скорость до 10 Гбит/с, безлимитный трафик и до 15 устройств — на одной подписке.
-                    </p>
-                    <div class="hero-art-scene hero-art-scene-mobile">
-                        <img class="hero-art-mobile" src="{% static 'img/onboarding/personal-server-hub.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
-                    </div>
-                    <div class="hero-actions">
-                        <a class="btn btn-primary" href="#prices">Купить от {{ min_tariff_price }} ₽</a>
-                        <a class="btn" href="#how">Посмотреть подключение</a>
-                    </div>
-                    <div class="trust-row">
-                        <span class="trust">стриминг и игры</span>
-                        <span class="trust">до 10 Гбит/с</span>
-                        <span class="trust">до 15 устройств</span>
-                        <span class="trust">без автосписаний</span>
-                    </div>
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 mb-3 w-full sm:w-auto">
+                    <a href="#prices" data-conversion-goal="tariff_cta_click" class="btn-primary w-full sm:w-auto">
+                        Купить от {{ min_tariff_price }} ₽
+                    </a>
                 </div>
-
-                <div class="hero-board" aria-label="Карта подключений Monkey Island">
-                    <div class="map-lines"></div>
-                    <div class="hero-art-scene hero-art-scene-desktop">
-                        <img class="hero-art" src="{% static 'img/onboarding/personal-server-hub.webp' %}" alt="" width="720" height="720" decoding="async" fetchpriority="high">
-                    </div>
-                    <div class="route route-one"></div>
-                    <div class="route route-two"></div>
-                    <div class="route route-three"></div>
-                    <div class="route-line"></div>
-                    <div class="island-card">
-                        <div class="board-title">Ваш маршрут уже проложен</div>
-                        <p class="board-text">После оплаты мы создаем страницу доступа, выдаем ключ и показываем готовые инструкции для всех популярных устройств.</p>
-                        <div class="mini-stats">
-                            <div class="mini-stat"><strong>1 клик</strong><span>импорт профиля</span></div>
-                            <div class="mini-stat"><strong>24/7</strong><span>доступ к настройкам</span></div>
-                            <div class="mini-stat"><strong>0 ₽</strong><span>скрытых списаний</span></div>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <section id="features" class="section">
-                <div class="section-head">
-                    <h2>Что входит в доступ</h2>
-                </div>
-                <div class="grid-3">
-                    <article class="card feature">
-                        <span class="feature-kicker">локации</span>
-                        <h3>Личный сервер с выбором локации</h3>
-                        <p>Персональный сервер с возможностью менять локацию в любой момент — под вашу задачу.</p>
-                    </article>
-                    <article class="card feature">
-                        <span class="feature-kicker">скорость</span>
-                        <h3>Канал до 10 Гбит/с без лимита трафика</h3>
-                        <p>Скорости хватает для видео, звонков, игр и работы — без лимита по объёму.</p>
-                    </article>
-                    <article class="card feature">
-                        <span class="feature-kicker">устройства</span>
-                        <h3>До 15 устройств на одной подписке</h3>
-                        <p>Подключайте телефон, ноутбук и планшет по одному ключу — для всей семьи.</p>
-                    </article>
-                </div>
-            </section>
-
-            <section id="prices" class="section">
-                <div class="section-head">
-                    <h2>Тарифы</h2>
-                    <p class="section-note">Выберите срок, укажите email и оплатите картой. После подтверждения мы откроем личный кабинет с ключом и инструкциями.</p>
-                </div>
-                <div class="checkout-trust">
-                    <article class="card"><strong>Оплата картой</strong><span>Visa · Mastercard · Mir · СБП</span></article>
-                    <article class="card"><strong>Доступ сразу</strong><span>после оплаты</span></article>
-                    <article class="card"><strong>Вернём деньги</strong><span>в течение 3 дней</span></article>
-                    <article class="card"><strong>Поддержка</strong><span>поможем подключить</span></article>
-                </div>
-                <div class="tariffs">
-                    {% for tariff in tariffs %}
-                    <article class="card tariff{% if "3 месяца" in tariff.description %} popular{% endif %}">
-                        <div>
-                            {% if "1 месяц" in tariff.description %}
-                                <span class="badge">Старт</span>
-                                <h3>1 месяц</h3>
-                            {% elif "3 месяца" in tariff.description %}
-                                <span class="badge">Скидка 20%</span>
-                                <h3>3 месяца</h3>
-                            {% elif "1 год" in tariff.description %}
-                                <span class="badge">Скидка 40%</span>
-                                <h3>12 месяцев</h3>
-                            {% else %}
-                                <span class="badge">Тариф</span>
-                                <h3>{{ tariff.description }}</h3>
-                            {% endif %}
-                            <div class="price">
-                                <strong>{{ tariff.price }} ₽</strong>
-                                {% if tariff.db_tariff_id == "threemonths" %}
-                                    <span>≈ {{ tariff.price|floor_div:3 }} ₽ в месяц</span>
-                                {% elif tariff.db_tariff_id == "year" %}
-                                    <span>≈ {{ tariff.price|floor_div:12 }} ₽ в месяц</span>
-                                {% else %}
-                                    <span>без автоматического продления</span>
-                                {% endif %}
+                <p class="text-white/60 text-sm mb-4 flex items-center gap-2">
+                    <i class="fas fa-rotate-left text-[#22c55e]"></i> Не подойдёт — вернём деньги в течение 3 дней
+                </p>
+            </div>
+            <div class="flex justify-center lg:justify-end">
+                <div class="hero-art-scene hero-art-scene-desktop">
+                    <div class="server-mock hero-art" aria-hidden="true">
+                        <div class="mock-chip chip-key"><i class="fas fa-circle-check"></i> Ключ активирован</div>
+                        <div class="mock-card">
+                            <div class="mock-head">
+                                <div class="mock-title"><i class="fas fa-server"></i> Ваш сервер</div>
+                                <div class="mock-status">Онлайн</div>
+                            </div>
+                            <div class="mock-row"><span class="mock-label">Скорость канала</span><span class="mock-value">до 10 Гбит/с</span></div>
+                            <div class="mock-bar"><i></i></div>
+                            <div class="mock-row"><span class="mock-label">Пинг</span><span class="mock-value"><span class="up">12 мс</span> · стабильно</span></div>
+                            <div class="mock-row"><span class="mock-label">Трафик</span><span class="mock-value">Безлимит</span></div>
+                            <div class="mock-devices">
+                                <div class="mock-device"><i class="fas fa-mobile-screen-button"></i></div>
+                                <div class="mock-device"><i class="fas fa-laptop"></i></div>
+                                <div class="mock-device"><i class="fas fa-tablet-screen-button"></i></div>
+                                <div class="mock-device"><i class="fas fa-tv"></i></div>
+                                <span>4 из 15 устройств</span>
                             </div>
                         </div>
-                        <ul class="tariff-points">
-                            <li>Для игр, видео и работы</li>
-                            <li>Канал до 10 Гбит/с</li>
-                            <li>Безлимитный трафик</li>
-                            <li>До 15 устройств</li>
-                        </ul>
-                        <form action="/pay/" method="POST" class="pay-form" data-payment-form data-tariff-id="{{ tariff.db_tariff_id }}" data-tariff-price="{{ tariff.price }}">
-                            {% csrf_token %}
-                            <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
-                            <input type="hidden" name="login_link_kind" value="purchase_permanent">
-                            {% for key, value in tracking_params.items %}
-                                <input type="hidden" name="{{ key }}" value="{{ value }}">
-                            {% endfor %}
-                            <input class="email" type="email" name="email" placeholder="Ваш email" required autocomplete="email" inputmode="email">
-                            <button class="btn btn-primary" type="submit">Купить и подключиться</button>
-                            <p class="guarantee-note">Не подойдёт — вернём деньги в течение 3 дней</p>
-                            <div class="form-note">
-                                Безопасная оплата картой, данные карты не храним. Нажимая «Купить», вы принимаете <a href="/offer/" target="_blank">условия оферты</a>. После оплаты откроется личный кабинет, ссылка доступа также придет на email.
-                            </div>
-                        </form>
-                    </article>
-                    {% endfor %}
+                        <div class="mock-chip chip-speed"><i class="fas fa-bolt"></i> Готов за 60 секунд</div>
+                    </div>
                 </div>
-            </section>
+            </div>
+        </section>
 
-            <section id="how" class="section">
-                <div class="section-head">
-                    <h2>Как это работает</h2>
-                </div>
-                <article class="card step">
-                    <h3>Всё просто</h3>
-                    <p>После оплаты вы сразу получаете доступ в личный кабинет с простой пошаговой инструкцией по настройке — ключ и понятные шаги уже готовы для вашего устройства.</p>
-                </article>
-            </section>
+        <section class="container mx-auto px-5 md:px-6 pb-10 md:pb-14 relative z-10">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                <div class="hero-mini-card"><i class="fas fa-users"></i><span>Одна подписка — до 15 устройств</span></div>
+                <div class="hero-mini-card"><i class="fas fa-gauge-high"></i><span>Безлимитный трафик до 10 Гбит/с</span></div>
+                <div class="hero-mini-card"><i class="fas fa-mobile-screen-button"></i><span>Телефон, компьютер, планшет и TV</span></div>
+                <div class="hero-mini-card"><i class="fas fa-hand-holding-dollar"></i><span>Без автосписаний и скрытых платежей</span></div>
+            </div>
+        </section>
+    </div>
 
-            <section id="faq" class="section">
-                <div class="section-head">
-                    <h2>Частые вопросы</h2>
-                </div>
-                <div class="faq-grid">
-                    <article class="card faq-card">
-                        <h3>Это полноценный VPS?</h3>
-                        <p>Это готовый персональный серверный доступ на нашей инфраструктуре. Администрировать железо вручную не нужно.</p>
-                    </article>
-                    <article class="card faq-card">
-                        <h3>Есть ли автосписания?</h3>
-                        <p>Нет. Сейчас вы покупаете выбранный период, а продление делаете вручную, когда доступ понадобится снова.</p>
-                    </article>
-                    <article class="card faq-card">
-                        <h3>Можно вернуть деньги?</h3>
-                        <p>Да. Если сервис не подошел, вернем деньги в течение 3 дней после оплаты — напишите в поддержку. Условия описаны в оферте.</p>
-                    </article>
-                    <article class="card faq-card">
-                        <h3>Какие устройства поддерживаются?</h3>
-                        <p>iOS, Android, Windows, macOS и Linux. Для каждой платформы — готовые инструкции.</p>
-                    </article>
-                    <article class="card faq-card">
-                        <h3>Когда придет доступ?</h3>
-                        <p>После успешной оплаты мы откроем личный кабинет со страницей доступа и отправим постоянную ссылку на указанный email.</p>
-                    </article>
-                    <article class="card faq-card">
-                        <h3>Работает ли на мобильной сети?</h3>
-                        <p>Да. Доступ работает как через домашний интернет, так и через мобильную сеть вашего оператора.</p>
-                    </article>
-                    <article class="card faq-card">
-                        <h3>Можно менять локации?</h3>
-                        <p>Да. Доступные профили можно переключать на странице доступа, чтобы подобрать лучший маршрут под вашу задачу.</p>
-                    </article>
-                    <article class="card faq-card">
-                        <h3>Можно оплатить картой?</h3>
-                        <p>Да. Форма оплаты открывается после выбора тарифа. Условия оплаты и сервиса описаны в оферте.</p>
-                    </article>
-                </div>
-            </section>
+    <section id="prices" class="py-16 md:py-24">
+        <div class="container mx-auto px-5 md:px-6">
+            <div class="text-center mb-10 md:mb-14">
+                <div class="eyebrow mb-4">Тарифы</div>
+                <h2 class="section-title mb-4">Чем дольше — тем выгоднее</h2>
+                <p class="text-white/60 text-base md:text-lg max-w-2xl mx-auto">
+                    Выберите срок, укажите email и оплатите картой. После подтверждения мы откроем личный кабинет с ключом и инструкциями
+                </p>
+            </div>
 
-            <section class="section">
-                <div class="card cta">
+            <div class="max-w-5xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-3 mb-10 md:mb-14">
+                <div class="light-card !p-4 text-center !bg-white/[0.04] !shadow-none"><i class="fas fa-credit-card text-[#ffc700] mb-2"></i><p class="text-xs font-semibold">Оплата картой</p><span class="text-white/60 text-[11px]">Visa · MC · Mir · СБП</span></div>
+                <div class="light-card !p-4 text-center !bg-white/[0.04] !shadow-none"><i class="fas fa-bolt text-[#ffc700] mb-2"></i><p class="text-xs font-semibold">Доступ сразу</p><span class="text-white/60 text-[11px]">после оплаты</span></div>
+                <div class="light-card !p-4 text-center !bg-white/[0.04] !shadow-none"><i class="fas fa-rotate-left text-[#ffc700] mb-2"></i><p class="text-xs font-semibold">Вернём деньги</p><span class="text-white/60 text-[11px]">в течение 3 дней</span></div>
+                <div class="light-card !p-4 text-center !bg-white/[0.04] !shadow-none"><i class="fab fa-telegram-plane text-[#ffc700] mb-2"></i><p class="text-xs font-semibold">Поддержка</p><span class="text-white/60 text-[11px]">поможем подключить</span></div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-6 lg:gap-8 max-w-6xl mx-auto items-stretch">
+                {% for tariff in tariffs %}
+                <div class="tariff-card p-7 md:p-8 flex flex-col justify-between{% if "3 месяца" in tariff.description %} tariff-popular{% endif %}">
+
+                    {% if "3 месяца" in tariff.description %}
+                        <div class="discount-badge">Скидка 20%</div>
+                    {% elif "1 год" in tariff.description %}
+                        <div class="discount-badge">Скидка 40%</div>
+                    {% endif %}
+
                     <div>
-                        <h2>Готовы подключиться?</h2>
-                        <p>Выберите тариф, оплатите доступ и сразу откройте личный кабинет с ключом и инструкциями.</p>
-                    </div>
-                    <a class="btn btn-primary" href="#prices">Перейти к тарифам</a>
-                </div>
-            </section>
+                        {% if "3 месяца" in tariff.description %}
+                            <div class="popular-pill">Выбирают чаще всего</div>
+                        {% endif %}
+                        <h3 class="text-[#ffc700] font-semibold text-lg mb-2">
+                            {% if tariff.db_tariff_id == "month" %}1 месяц{% elif tariff.db_tariff_id == "threemonths" %}3 месяца{% elif tariff.db_tariff_id == "year" %}12 месяцев{% else %}{{ tariff.description }}{% endif %}
+                        </h3>
+                        <div class="mb-7">
+                            <div class="text-4xl md:text-5xl font-semibold tracking-tight">{{ tariff.price }} ₽</div>
+                            <div class="text-white/60 text-sm mt-1">
+                                {% if tariff.db_tariff_id == "threemonths" %}≈ {{ tariff.price|floor_div:3 }} ₽ в месяц{% elif tariff.db_tariff_id == "year" %}≈ {{ tariff.price|floor_div:12 }} ₽ в месяц{% else %}без автоматического продления{% endif %}
+                            </div>
+                        </div>
 
-            <footer class="footer">
-                <div>© Monkey Island VPS. Персональный виртуальный сервер для быстрого и стабильного подключения.</div>
-                <div class="footer-links">
-                    <a href="/offer/">Оферта</a>
-                    <a href="/terms/">Пользовательское соглашение</a>
+                        <ul class="space-y-3 mb-8">
+                            <li class="tariff-feature"><i class="fas fa-check"></i> Для игр, видео и работы</li>
+                            <li class="tariff-feature"><i class="fas fa-check"></i> Канал до 10 Гбит/с</li>
+                            <li class="tariff-feature"><i class="fas fa-check"></i> Безлимитный трафик</li>
+                            <li class="tariff-feature"><i class="fas fa-check"></i> До 15 устройств на подписке</li>
+                        </ul>
+                    </div>
+
+                    <form action="/pay/" method="POST" class="space-y-4" data-payment-form data-tariff-id="{{ tariff.db_tariff_id }}" data-tariff-price="{{ tariff.price }}">
+                        {% csrf_token %}
+                        <input type="hidden" name="tariff_id" value="{{ tariff.db_tariff_id }}">
+                        <input type="hidden" name="login_link_kind" value="purchase_permanent">
+                        {% for key, value in tracking_params.items %}
+                            <input type="hidden" name="{{ key }}" value="{{ value }}">
+                        {% endfor %}
+                        <input type="email" name="email" placeholder="Ваш email" required autocomplete="email" inputmode="email" class="input-field">
+                        <button type="submit" class="pay-cta">
+                            Купить и подключиться
+                        </button>
+                        <p class="flex items-center justify-center gap-2 text-xs font-medium text-[#22c55e]">
+                            <i class="fas fa-rotate-left"></i> Не подойдёт — вернём деньги в течение 3 дней
+                        </p>
+                        <div class="flex items-center justify-center gap-3 text-white/60">
+                            <i class="fas fa-lock text-[#ffc700] text-xs"></i>
+                            <i class="fab fa-cc-visa text-lg"></i>
+                            <i class="fab fa-cc-mastercard text-lg"></i>
+                            <span class="text-[10px] font-semibold uppercase tracking-wider">Mir · СБП</span>
+                        </div>
+                        <p class="text-center text-white/45 text-[11px] leading-relaxed">
+                            Безопасная оплата картой, данные карты не храним. Нажимая «Купить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-medium hover:underline">условия оферты</a>. После оплаты откроется личный кабинет, ссылка доступа также придёт на email.
+                        </p>
+                    </form>
                 </div>
-            </footer>
+                {% endfor %}
+            </div>
         </div>
-    </main>
+    </section>
+
+    <div class="light-group">
+        <section id="features" class="container mx-auto px-5 md:px-6 py-16 md:py-24">
+            <div class="text-center mb-12 md:mb-16">
+                <div class="eyebrow mb-4">Всё включено</div>
+                <h2 class="section-title mb-4">Что входит в доступ</h2>
+                <p class="text-white/60 text-base md:text-lg max-w-2xl mx-auto">
+                    Готовый личный сервер: ничего администрировать не нужно, всё уже развёрнуто и работает
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
+                <div class="light-card">
+                    <div class="icon-bubble mb-5"><i class="fas fa-location-dot"></i></div>
+                    <h3 class="text-lg md:text-xl font-semibold mb-3">Личный сервер с выбором локации</h3>
+                    <p class="text-white/60 text-sm md:text-base">
+                        Персональный сервер с возможностью менять локацию в любой момент — под вашу задачу
+                    </p>
+                </div>
+                <div class="light-card">
+                    <div class="icon-bubble mb-5"><i class="fas fa-bolt"></i></div>
+                    <h3 class="text-lg md:text-xl font-semibold mb-3">Канал до 10 Гбит/с без лимита</h3>
+                    <p class="text-white/60 text-sm md:text-base">
+                        Скорости хватает для видео, звонков, игр и работы — без лимита по объёму трафика
+                    </p>
+                </div>
+                <div class="light-card">
+                    <div class="icon-bubble mb-5"><i class="fas fa-people-roof"></i></div>
+                    <h3 class="text-lg md:text-xl font-semibold mb-3">До 15 устройств на подписке</h3>
+                    <p class="text-white/60 text-sm md:text-base">
+                        Подключайте телефон, ноутбук и планшет по одному ключу — хватит для всей семьи
+                    </p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <div class="light-group">
+        <section id="how" class="container mx-auto px-5 md:px-6 py-16 md:py-24">
+            <div class="text-center mb-12 md:mb-16">
+                <div class="eyebrow mb-4">3 шага</div>
+                <h2 class="section-title mb-4">Как это работает</h2>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8 md:gap-10 max-w-5xl mx-auto">
+                <div class="text-center">
+                    <div class="step-num mx-auto mb-5">1</div>
+                    <h3 class="font-semibold text-lg mb-3">Выберите тариф</h3>
+                    <p class="text-white/60 text-sm md:text-base leading-relaxed">
+                        Укажите email и оплатите картой — доступ откроется сразу после подтверждения
+                    </p>
+                </div>
+                <div class="text-center">
+                    <div class="step-num mx-auto mb-5">2</div>
+                    <h3 class="font-semibold text-lg mb-3">Откройте кабинет</h3>
+                    <p class="text-white/60 text-sm md:text-base leading-relaxed">
+                        В личном кабинете вас ждёт ключ и простая пошаговая инструкция для вашего устройства
+                    </p>
+                </div>
+                <div class="text-center">
+                    <div class="step-num mx-auto mb-5">3</div>
+                    <h3 class="font-semibold text-lg mb-3">Пользуйтесь</h3>
+                    <p class="text-white/60 text-sm md:text-base leading-relaxed">
+                        Импортируйте профиль в один клик — и наслаждайтесь скоростью на всех устройствах
+                    </p>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <section id="faq" class="py-16 md:py-24">
+        <div class="container mx-auto px-5 md:px-6 max-w-3xl">
+            <div class="text-center mb-10 md:mb-14">
+                <div class="eyebrow mb-4">FAQ</div>
+                <h2 class="section-title mb-4">Частые вопросы</h2>
+            </div>
+
+            <div class="space-y-3">
+
+                <details class="faq-card">
+                    <summary class="p-5 md:p-6 cursor-pointer flex justify-between items-center gap-4 outline-none">
+                        <h4 class="font-semibold text-sm md:text-base">Это полноценный VPS?</h4>
+                        <span class="faq-toggle"><i class="fas fa-chevron-down text-xs"></i></span>
+                    </summary>
+                    <div class="px-5 md:px-6 pb-6">
+                        <div class="border-t border-white/10 pt-5">
+                            <p class="text-white/85 text-sm md:text-base leading-relaxed">
+                                Это готовый персональный серверный доступ на нашей инфраструктуре. Администрировать железо вручную не нужно — всё уже развёрнуто и настроено.
+                            </p>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="faq-card">
+                    <summary class="p-5 md:p-6 cursor-pointer flex justify-between items-center gap-4 outline-none">
+                        <h4 class="font-semibold text-sm md:text-base">Есть ли автосписания?</h4>
+                        <span class="faq-toggle"><i class="fas fa-chevron-down text-xs"></i></span>
+                    </summary>
+                    <div class="px-5 md:px-6 pb-6">
+                        <div class="border-t border-white/10 pt-5">
+                            <p class="text-white/85 text-sm md:text-base leading-relaxed">
+                                Нет. Вы покупаете выбранный период, а продление делаете вручную, когда доступ понадобится снова. Никаких скрытых платежей.
+                            </p>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="faq-card">
+                    <summary class="p-5 md:p-6 cursor-pointer flex justify-between items-center gap-4 outline-none">
+                        <h4 class="font-semibold text-sm md:text-base">Можно вернуть деньги?</h4>
+                        <span class="faq-toggle"><i class="fas fa-chevron-down text-xs"></i></span>
+                    </summary>
+                    <div class="px-5 md:px-6 pb-6">
+                        <div class="border-t border-white/10 pt-5">
+                            <p class="text-white/85 text-sm md:text-base leading-relaxed">
+                                Да. Если сервис не подошёл, вернём деньги в течение <span class="text-[#ffc700] font-semibold">3 дней после оплаты</span> — просто напишите в поддержку. Условия описаны в <a href="/offer/" class="text-[#ffc700] font-semibold hover:underline">оферте</a>.
+                            </p>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="faq-card">
+                    <summary class="p-5 md:p-6 cursor-pointer flex justify-between items-center gap-4 outline-none">
+                        <h4 class="font-semibold text-sm md:text-base">Какие устройства поддерживаются?</h4>
+                        <span class="faq-toggle"><i class="fas fa-chevron-down text-xs"></i></span>
+                    </summary>
+                    <div class="px-5 md:px-6 pb-6">
+                        <div class="border-t border-white/10 pt-5">
+                            <p class="text-white/85 text-sm md:text-base leading-relaxed">
+                                iOS, Android, Windows, macOS и Linux. Для каждой платформы в кабинете — <span class="text-[#ffc700] font-semibold">готовые инструкции</span>. Работает и через домашний интернет, и через мобильную сеть.
+                            </p>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="faq-card">
+                    <summary class="p-5 md:p-6 cursor-pointer flex justify-between items-center gap-4 outline-none">
+                        <h4 class="font-semibold text-sm md:text-base">Когда придёт доступ?</h4>
+                        <span class="faq-toggle"><i class="fas fa-chevron-down text-xs"></i></span>
+                    </summary>
+                    <div class="px-5 md:px-6 pb-6">
+                        <div class="border-t border-white/10 pt-5">
+                            <p class="text-white/85 text-sm md:text-base leading-relaxed">
+                                Сразу после успешной оплаты мы откроем личный кабинет со страницей доступа и отправим постоянную ссылку на указанный email.
+                            </p>
+                        </div>
+                    </div>
+                </details>
+
+                <details class="faq-card">
+                    <summary class="p-5 md:p-6 cursor-pointer flex justify-between items-center gap-4 outline-none">
+                        <h4 class="font-semibold text-sm md:text-base">Можно менять локации?</h4>
+                        <span class="faq-toggle"><i class="fas fa-chevron-down text-xs"></i></span>
+                    </summary>
+                    <div class="px-5 md:px-6 pb-6">
+                        <div class="border-t border-white/10 pt-5">
+                            <p class="text-white/85 text-sm md:text-base leading-relaxed">
+                                Да. Доступные профили можно переключать на странице доступа, чтобы подобрать лучший маршрут под вашу задачу.
+                            </p>
+                        </div>
+                    </div>
+                </details>
+
+            </div>
+        </div>
+    </section>
+
+    <section class="container mx-auto px-5 md:px-6 py-4 md:py-6">
+        <div class="cta-banner px-6 md:px-14 py-10 md:py-14 text-center">
+            <h2 class="section-title mb-3">Готовы подключиться?</h2>
+            <p class="text-black/70 text-base md:text-lg mb-7">Выберите тариф, оплатите доступ и сразу откройте личный кабинет с ключом и инструкциями</p>
+            <a href="#prices" data-conversion-goal="tariff_cta_click" class="btn-white">Перейти к тарифам</a>
+        </div>
+    </section>
+
+    <footer class="bg-[#0a0b10] border-t border-white/10 text-white pt-16 pb-10 mt-8 footer-safe-bottom">
+        <div class="container mx-auto px-5 md:px-6">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-10 md:gap-12 mb-12">
+                <div class="col-span-1 md:col-span-2">
+                    <div class="landing-brand mb-5" aria-label="Monkey Island VPS">
+                        <img class="landing-brand-mark" src="{% static 'icons/monkey-island-logo-animated.webp' %}" alt="" width="42" height="42" decoding="async" loading="lazy">
+                        <span class="landing-brand-text">Monkey Island <span class="text-[#ffc700]">VPS</span></span>
+                    </div>
+                    <p class="text-white/55 text-sm max-w-xs leading-relaxed">Персональный виртуальный сервер для быстрого и стабильного подключения.</p>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-sm mb-5 text-white/90">Навигация</h4>
+                    <ul class="text-white/55 text-sm space-y-3">
+                        <li><a href="#features" class="hover:text-white transition">Возможности</a></li>
+                        <li><a href="#prices" class="hover:text-white transition">Тарифы</a></li>
+                        <li><a href="#how" class="hover:text-white transition">Как работает</a></li>
+                        <li><a href="/login/" class="hover:text-white transition">Личный кабинет</a></li>
+                    </ul>
+                </div>
+                <div>
+                    <h4 class="font-semibold text-sm mb-5 text-white/90">Документы</h4>
+                    <ul class="text-white/55 text-sm space-y-3">
+                        <li><a href="/offer/" class="hover:text-white transition">Оферта</a></li>
+                        <li><a href="/terms/" class="hover:text-white transition">Пользовательское соглашение</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="border-t border-white/10 pt-8 text-center text-white/40 text-xs">
+                © Monkey Island VPS · Персональный виртуальный сервер для быстрого и стабильного подключения
+            </div>
+        </div>
+    </footer>
 
     <div class="mobile-buybar" id="mobileBuybar" aria-hidden="true">
-        <a class="btn btn-primary" href="#prices" data-conversion-goal="tariff_cta_click">Купить от {{ min_tariff_price }} ₽</a>
+        <a href="#prices" data-conversion-goal="tariff_cta_click" class="btn-primary w-full !min-h-[52px]">
+            Купить от {{ min_tariff_price }} ₽
+        </a>
     </div>
 
     <script>
         (function setupStickyBuyBar() {
             const bar = document.getElementById('mobileBuybar');
             if (!bar || !('IntersectionObserver' in window)) return;
-            const heroCta = document.querySelector('.hero-actions .btn-primary') || document.querySelector('.hero');
+            const heroCta = document.querySelector('.hero-bg a[href="#prices"].btn-primary');
             const prices = document.getElementById('prices');
             let heroOut = false;
             let pricesIn = false;
@@ -1261,8 +1213,8 @@
 
             sendGoal('landing_view');
 
-            document.querySelectorAll('a[href="#prices"]').forEach((node) => {
-                node.addEventListener('click', () => sendGoal('tariff_cta_click'));
+            document.querySelectorAll('[data-conversion-goal], a[href="#prices"]').forEach((node) => {
+                node.addEventListener('click', () => sendGoal(node.dataset.conversionGoal || 'tariff_cta_click'));
             });
 
             const prices = document.getElementById('prices');
@@ -1291,7 +1243,7 @@
                     const paymentWindow = window.open('', '_blank');
                     if (paymentWindow) {
                         paymentWindow.opener = null;
-                        paymentWindow.document.write('<!doctype html><title>Оплата</title><body style="margin:0;background:#111;color:#fff;font-family:system-ui;display:grid;place-items:center;min-height:100vh">Открываем форму оплаты...</body>');
+                        paymentWindow.document.write('<!doctype html><title>Оплата</title><body style="margin:0;background:#0a0b10;color:#fff;font-family:system-ui;display:grid;place-items:center;min-height:100vh">Открываем форму оплаты...</body>');
                     }
 
                     const submitButton = form.querySelector('button[type="submit"]');
