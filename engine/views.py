@@ -3059,6 +3059,7 @@ def index(request):
             "tracking_params": get_tracking_params(request),
             "trial_period_days_label": format_days_ru(trial_period_days),
             "payment_gateway": settings.PAYMENT_GATEWAY.lower(),
+            **landing_client_ip_context(request),
         },
     )
     return set_tracking_cookies(request, response, captured_tracking_params)

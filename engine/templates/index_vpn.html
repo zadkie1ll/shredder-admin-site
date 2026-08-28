@@ -58,8 +58,30 @@
         .wrap { position: relative; z-index: 2; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
 
         /* навигация */
+        /* Топ-бар с IP посетителя */
+        .ip-topbar {
+            position: relative; z-index: 51;
+            display: flex; align-items: center; justify-content: center;
+            gap: 8px; flex-wrap: wrap;
+            padding: 9px 16px;
+            background: #060709;
+            border-bottom: 1px solid rgba(233, 237, 243, .07);
+            color: rgba(233, 237, 243, .65);
+            font-size: 13px; font-weight: 500; text-align: center;
+        }
+        .ip-topbar b { color: #fff; font-weight: 600; }
+        .ip-topbar .ip-alert { color: var(--gold); font-weight: 700; }
+        .ip-topbar a {
+            color: var(--gold); font-weight: 600;
+            text-decoration: underline; text-underline-offset: 3px;
+        }
+        .ip-topbar a:hover { color: #ffe066; }
+        @media (max-width: 380px) {
+            .ip-topbar { font-size: 11.5px; padding: 8px 10px; }
+        }
+
         .mi-nav {
-            position: fixed; top: 0; left: 0; right: 0; z-index: 50;
+            position: sticky; top: 0; z-index: 50;
             display: flex; align-items: center; justify-content: space-between;
             padding: 14px 32px;
             background: rgba(9, 10, 15, .75); backdrop-filter: blur(12px);
@@ -351,6 +373,13 @@
 <div class="grid-bg"></div>
 <div id="cursor-glow"></div>
 
+{% if client_ip %}
+<div class="ip-topbar">
+    <span>Ваш IP: <b>{{ client_ip }}</b>{% if client_ip_country %} ({{ client_ip_country }}){% endif %}</span>
+    <span class="ip-alert">— Вы не защищены!</span>
+    <a href="#prices" data-conversion-goal="tariff_cta_click">Подключить VPN</a>
+</div>
+{% endif %}
 <nav class="mi-nav">
     <a class="mi-logo" href="/" aria-label="Monkey Island VPN">
         <img class="mi-logo-mark" src="{% static 'icons/monkey-island-logo-animated.webp' %}" alt="" width="42" height="42" decoding="async">

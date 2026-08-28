@@ -1248,6 +1248,17 @@ class WataPaymentFlowTests(SimpleTestCase):
                 self.assertIn("{{ client_ip_country }}", template)
                 self.assertNotIn("не защищ", template)
 
+    def test_vpn_landing_shows_client_ip_topbar_with_direct_wording(self):
+        # На VPN-доменах подача прямая, поэтому топ-бар говорит «Вы не
+        # защищены» — в отличие от нейтральных VPS-доменов.
+        template = Path("engine/templates/index_vpn.html").read_text()
+
+        self.assertIn('{% if client_ip %}', template)
+        self.assertIn("ip-topbar", template)
+        self.assertIn("Ваш IP:", template)
+        self.assertIn("Вы не защищены!", template)
+        self.assertIn("{{ client_ip_country }}", template)
+
     def test_direct_sale_landing_sells_immediately_after_hero(self):
         # Смысл direct-sale-лендинга — сразу продавать: блок тарифов идёт
         # первым после hero, до всех остальных секций.
@@ -3950,7 +3961,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         dashboard_source = inspect.getsource(views.dashboard)
 
         self.assertIn("@media (min-width: 1025px)", template)
-        self.assertIn("font-family: 'Inter'", template)
+        self.assertIn("font-family: 'Golos Text'", template)
         self.assertIn(".sidebar-desktop .nav-btn.active::before", template)
         self.assertIn("background: rgba(255, 255, 255, 0.065);", template)
         self.assertIn("background: #ffc700;", template)
@@ -4055,7 +4066,12 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         template = Path("engine/templates/dashboard.html").read_text()
 
         self.assertIn("body.tg-webapp {", template)
-        self.assertIn('font-family: -apple-system, BlinkMacSystemFont, "Segoe UI"', template)
+        # Кабинет и Mini App используют фирменный Golos Text (как лендинги);
+        # системный стек остаётся фолбэком.
+        self.assertIn(
+            "font-family: 'Golos Text', -apple-system, BlinkMacSystemFont, \"Segoe UI\"",
+            template,
+        )
         self.assertIn(".tg-mini-expiry h1", template)
         self.assertIn("font-size: 27px !important;", template)
         self.assertIn(".tg-mini-primary", template)
