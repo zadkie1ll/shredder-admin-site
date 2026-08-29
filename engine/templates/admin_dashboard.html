@@ -401,11 +401,53 @@
         .infra-diag-line.is-pass b { color: var(--green); }
         .infra-diag-line.is-fail b { color: var(--red); }
         .infra-diag-line.is-warn b { color: var(--mint); }
-        .infra-cap-list { display: grid; gap: 6px; }
-        .infra-cap-problem { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; font-size: 11.5px; line-height: 1.45; }
-        .infra-cap-problem.is-crit { color: var(--red); }
-        .infra-cap-problem.is-warn { color: var(--mint); }
-        .infra-cap-metrics { margin-top: 8px; color: var(--muted); font-size: 10.5px; line-height: 1.5; }
+        .infra-capacity { --capacity-tone: var(--green); margin-top: 16px; padding: 20px; overflow: hidden; }
+        .infra-capacity.is-warn { --capacity-tone: var(--brand-gold); }
+        .infra-capacity.is-crit { --capacity-tone: var(--red); }
+        .infra-capacity-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; margin-bottom: 16px; }
+        .infra-capacity-title { display: flex; align-items: flex-start; gap: 12px; min-width: 0; }
+        .infra-capacity-title-icon { width: 38px; height: 38px; display: grid; flex: 0 0 auto; place-items: center; border: 1px solid color-mix(in srgb, var(--capacity-tone) 32%, transparent); border-radius: 11px; background: color-mix(in srgb, var(--capacity-tone) 9%, transparent); color: var(--capacity-tone); font-size: 13px; }
+        .infra-capacity-title h4 { margin: 0; }
+        .infra-capacity-title p { margin: 5px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.4; }
+        .infra-capacity-state { display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto; padding: 7px 10px; border: 1px solid color-mix(in srgb, var(--capacity-tone) 38%, transparent); border-radius: 999px; background: color-mix(in srgb, var(--capacity-tone) 9%, transparent); color: var(--capacity-tone); font-size: 9.5px; font-weight: 850; letter-spacing: .035em; text-transform: uppercase; white-space: nowrap; }
+        .infra-capacity-state::before { width: 6px; height: 6px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 4px color-mix(in srgb, currentColor 12%, transparent); content: ""; }
+        .infra-capacity-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+        .infra-capacity-metric { --metric-tone: var(--green); min-width: 0; padding: 13px 14px; border: 1px solid var(--panel-border); border-radius: 12px; background: rgba(255,255,255,.018); }
+        .infra-capacity-metric.is-warn { --metric-tone: var(--brand-gold); }
+        .infra-capacity-metric.is-crit { --metric-tone: var(--red); }
+        .infra-capacity-metric-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 9.5px; font-weight: 800; letter-spacing: .045em; text-transform: uppercase; }
+        .infra-capacity-metric-head i { color: var(--metric-tone); font-size: 10px; }
+        .infra-capacity-metric-value { margin-top: 8px; overflow: hidden; color: var(--text-main); font-size: 17px; line-height: 1.1; font-weight: 750; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .infra-capacity-metric-note { margin-top: 5px; color: var(--muted); font-size: 9.5px; line-height: 1.35; }
+        .infra-capacity-progress { height: 4px; margin-top: 10px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.055); }
+        .infra-capacity-progress span { display: block; height: 100%; min-width: 2px; border-radius: inherit; background: var(--metric-tone); }
+        html[data-admin-theme="light"] .infra-capacity-metric { background: rgba(34,39,47,.018); }
+        html[data-admin-theme="light"] .infra-capacity-progress { background: rgba(34,39,47,.08); }
+        .infra-capacity-section-label { display: flex; align-items: center; gap: 8px; margin: 17px 0 9px; color: var(--muted); font-size: 9.5px; font-weight: 850; letter-spacing: .055em; text-transform: uppercase; }
+        .infra-capacity-section-label::after { height: 1px; flex: 1 1 auto; background: var(--panel-border); content: ""; }
+        .infra-capacity-issues { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+        .infra-capacity-issue { display: grid; grid-template-columns: 34px minmax(0, 1fr); align-items: start; gap: 11px; min-width: 0; padding: 13px 14px; border: 1px solid color-mix(in srgb, var(--capacity-tone) 22%, var(--panel-border)); border-radius: 12px; background: color-mix(in srgb, var(--capacity-tone) 4%, rgba(255,255,255,.012)); }
+        .infra-capacity-issue-icon { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 9px; background: color-mix(in srgb, var(--capacity-tone) 10%, transparent); color: var(--capacity-tone); font-size: 11px; }
+        .infra-capacity-issue-type { color: var(--capacity-tone); font-size: 8.5px; font-weight: 850; letter-spacing: .055em; text-transform: uppercase; }
+        .infra-capacity-issue h5 { margin: 4px 0 0; color: var(--text-main); font-size: 12.5px; line-height: 1.3; font-weight: 750; }
+        .infra-capacity-issue p { margin: 5px 0 0; color: var(--muted); font-size: 10px; line-height: 1.45; }
+        .infra-capacity-action { display: flex; align-items: flex-start; gap: 7px; margin-top: 8px; color: var(--text-main); font-size: 9.5px; line-height: 1.4; font-weight: 650; }
+        .infra-capacity-action i { margin-top: 2px; color: var(--capacity-tone); font-size: 8px; }
+        .infra-capacity-workers { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 9px; }
+        .infra-capacity-worker { display: inline-flex; align-items: baseline; gap: 5px; padding: 5px 7px; border: 1px solid var(--panel-border); border-radius: 7px; background: rgba(0,0,0,.13); color: var(--text-main); font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; font-size: 8.5px; font-weight: 650; white-space: nowrap; }
+        .infra-capacity-worker small { color: var(--muted); font: inherit; font-size: 8px; }
+        html[data-admin-theme="light"] .infra-capacity-worker { background: rgba(34,39,47,.035); }
+        .infra-capacity-ok { display: flex; align-items: center; gap: 9px; margin-top: 14px; padding: 11px 12px; border: 1px solid rgba(56,217,150,.2); border-radius: 10px; background: rgba(56,217,150,.045); color: var(--muted); font-size: 10.5px; }
+        .infra-capacity-ok i { color: var(--green); }
+        .infra-capacity-stop { display: flex; align-items: flex-start; gap: 9px; margin-top: 12px; padding: 10px 12px; border-radius: 10px; background: rgba(255,92,103,.075); color: var(--red); font-size: 10px; line-height: 1.45; }
+        .infra-capacity-stop i { margin-top: 2px; }
+        .infra-capacity-technical { margin-top: 11px; color: var(--muted); font-size: 9.5px; }
+        .infra-capacity-technical summary { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-weight: 700; cursor: pointer; list-style: none; }
+        .infra-capacity-technical summary::-webkit-details-marker { display: none; }
+        .infra-capacity-technical summary::before { color: var(--capacity-tone); content: "+"; font-size: 12px; font-weight: 500; }
+        .infra-capacity-technical[open] summary::before { content: "−"; }
+        .infra-capacity-technical ul { display: grid; gap: 5px; margin: 9px 0 0; padding: 10px 12px 10px 26px; border: 1px solid var(--panel-border); border-radius: 9px; background: rgba(0,0,0,.1); line-height: 1.45; }
+        html[data-admin-theme="light"] .infra-capacity-technical ul { background: rgba(34,39,47,.025); }
         .infra-detail-route-sub.is-warn { color: var(--mint); }
         .infra-detail-route-sub.is-crit { color: var(--red); }
         .infra-detail-chart-card { margin-bottom: 20px; padding: clamp(17px, 1.8vw, 26px); }
@@ -627,6 +669,13 @@
             .infra-detail-route-arrow span { display: none; }
             .infra-detail-route-arrow i { transform: rotate(90deg); }
             .infra-detail-route-arrow small { display: none; }
+            .infra-capacity { padding: 15px 13px; }
+            .infra-capacity-head { flex-direction: column; gap: 12px; }
+            .infra-capacity-state { margin-left: 50px; }
+            .infra-capacity-metrics, .infra-capacity-issues { grid-template-columns: 1fr; }
+            .infra-capacity-issue { grid-template-columns: 30px minmax(0, 1fr); padding: 12px; }
+            .infra-capacity-issue-icon { width: 30px; height: 30px; }
+            .infra-capacity-worker { max-width: 100%; white-space: normal; }
             .infra-chart-canvas { height: 260px; }
             .infra-chart-canvas.small { height: 210px; }
             .infra-detail-who-head { flex-direction: column; }
@@ -12632,20 +12681,161 @@
             // Лимиты ноды: перегруженная нода снаружи выглядит так же, как
             // заблокированная, поэтому её потолки показываем отдельно
             const capacity = detail.capacity || null;
+            const capacityRaw = (capacity && capacity.raw) || {};
+            const capacityConntrack = capacityRaw.conntrack || {};
+            const capacityNginx = capacityRaw.nginx || {};
+            const capacityXray = capacityRaw.xray || {};
+            const capacityHasNumber = (value) => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value));
+            const capacityNumber = (value) => capacityHasNumber(value) ? Number(value).toLocaleString('ru-RU') : '—';
+            const capacityPercent = (value, max) => capacityHasNumber(value) && Number(max) > 0
+                ? Math.max(0, Math.min(100, Number(value) / Number(max) * 100))
+                : null;
+            const capacityTone = (pct) => pct === null ? '' : pct >= 90 ? 'is-crit' : pct >= 70 ? 'is-warn' : '';
+            const capacityMetricHtml = ({label, icon, value, note, pct = null, tone = ''}) => `
+                <article class="infra-capacity-metric ${tone || capacityTone(pct)}">
+                    <div class="infra-capacity-metric-head"><span>${escapeHtml(label)}</span><i class="fas ${icon}" aria-hidden="true"></i></div>
+                    <div class="infra-capacity-metric-value">${escapeHtml(value)}</div>
+                    <div class="infra-capacity-metric-note">${escapeHtml(note)}</div>
+                    ${pct === null ? '' : `<div class="infra-capacity-progress" aria-label="Использовано ${pct.toFixed(1)}%"><span style="width:${Math.max(2, pct)}%"></span></div>`}
+                </article>`;
+            const conntrackPct = capacityHasNumber(capacityConntrack.usage_pct)
+                ? Math.max(0, Math.min(100, Number(capacityConntrack.usage_pct)))
+                : capacityPercent(capacityConntrack.count, capacityConntrack.max);
+            const xrayPct = capacityPercent(capacityXray.fd, capacityXray.nofile_soft);
+            const workerConnections = capacityNginx.worker_connections;
+            const capacityMetricsHtml = [
+                (capacityHasNumber(capacityConntrack.count) || capacityHasNumber(capacityConntrack.max))
+                    ? capacityMetricHtml({
+                        label: 'Conntrack',
+                        icon: 'fa-route',
+                        value: `${capacityNumber(capacityConntrack.count)} / ${capacityNumber(capacityConntrack.max)}`,
+                        note: conntrackPct === null ? 'Лимит таблицы соединений' : `${conntrackPct.toFixed(1)}% таблицы занято`,
+                        pct: conntrackPct,
+                    }) : '',
+                capacityHasNumber(workerConnections)
+                    ? capacityMetricHtml({
+                        label: 'Nginx · соединения',
+                        icon: 'fa-diagram-project',
+                        value: capacityNumber(workerConnections),
+                        note: Number(workerConnections) <= 1024 ? 'Низкий потолок на один worker' : 'worker_connections на процесс',
+                        tone: Number(workerConnections) <= 1024 ? 'is-warn' : '',
+                    }) : '',
+                (capacityHasNumber(capacityXray.fd) || capacityHasNumber(capacityXray.nofile_soft))
+                    ? capacityMetricHtml({
+                        label: 'Xray · файлы',
+                        icon: 'fa-file-waveform',
+                        value: `${capacityNumber(capacityXray.fd)} / ${capacityNumber(capacityXray.nofile_soft)}`,
+                        note: xrayPct === null ? 'Файловые дескрипторы' : `${xrayPct.toFixed(1)}% лимита занято`,
+                        pct: xrayPct,
+                    }) : '',
+            ].filter(Boolean).join('');
+            const staleCapacityWorkers = (capacityNginx.workers || []).filter((worker) =>
+                capacityHasNumber(worker.nofile_soft)
+                && capacityHasNumber(worker.nofile_hard)
+                && Number(worker.nofile_soft) < Number(worker.nofile_hard)
+                && Number(worker.nofile_soft) <= 1024
+            ).slice(0, 5);
+            const tightCapacityWorkers = [...(capacityNginx.workers || [])]
+                .filter((worker) => capacityHasNumber(worker.fd) && Number(worker.nofile_soft) > 0)
+                .sort((left, right) => Number(right.fd) / Number(right.nofile_soft) - Number(left.fd) / Number(left.nofile_soft))
+                .slice(0, 5);
+            const capacityProblemView = (message) => {
+                const text = String(message || '');
+                if (text.includes('worker_connections=')) return {
+                    icon: 'fa-diagram-project', type: 'Nginx · конфигурация',
+                    title: 'Слишком низкий worker_connections',
+                    copy: `Сейчас ${capacityNumber(workerConnections)} соединений на worker — для VPN-ноды этого мало.`,
+                    action: 'Увеличьте worker_connections и примените конфигурацию nginx.', workers: [],
+                };
+                if (text.includes('старым лимитом дескрипторов')) return {
+                    icon: 'fa-file-circle-exclamation', type: 'Nginx · nofile',
+                    title: 'Workers не применили новый лимит файлов',
+                    copy: 'После graceful reload старые процессы сохранили прежний низкий soft-limit.',
+                    action: 'Нужен полный перезапуск nginx, а не очередной graceful reload.', workers: staleCapacityWorkers,
+                };
+                if (text.includes('близки к своему лимиту дескрипторов')) return {
+                    icon: 'fa-file-circle-exclamation', type: 'Nginx · nofile',
+                    title: 'Workers близки к лимиту файлов',
+                    copy: 'У живых процессов почти закончился запас файловых дескрипторов.',
+                    action: 'Поднимите LimitNOFILE и перезапустите nginx.', workers: tightCapacityWorkers,
+                };
+                if (text.startsWith('conntrack переполнен')) return {
+                    icon: 'fa-triangle-exclamation', type: 'Conntrack · критично',
+                    title: 'Ядро уже отбрасывает новые соединения',
+                    copy: text.split('—')[0].trim(),
+                    action: 'Увеличьте nf_conntrack_max и проверьте память ноды.', workers: [],
+                };
+                if (text.startsWith('conntrack заполнен')) return {
+                    icon: 'fa-route', type: 'Conntrack · запас заканчивается',
+                    title: 'Таблица соединений приближается к потолку',
+                    copy: text.split('—')[0].trim(),
+                    action: 'Поднимите nf_conntrack_max до роста нагрузки.', workers: [],
+                };
+                if (text.startsWith('nginx:')) return {
+                    icon: 'fa-triangle-exclamation', type: 'Nginx · ошибки',
+                    title: 'Nginx уже отказывает в соединениях',
+                    copy: text.slice(6).trim(),
+                    action: 'Проверьте лимиты worker_connections и файлов, затем перезапустите nginx.', workers: [],
+                };
+                if (text.startsWith('xray занял')) return {
+                    icon: 'fa-file-waveform', type: 'Xray · nofile',
+                    title: 'Xray близок к лимиту файлов', copy: text,
+                    action: 'Увеличьте LimitNOFILE для процесса Xray.', workers: [],
+                };
+                if (text.startsWith('очередь принятия соединений')) return {
+                    icon: 'fa-list-ol', type: 'TCP · очередь',
+                    title: 'Очередь входящих соединений переполняется', copy: text,
+                    action: 'Проверьте backlog и скорость обработки новых соединений.', workers: [],
+                };
+                if (text.includes('нехватки памяти') || text.includes('OOM-killer')) return {
+                    icon: 'fa-memory', type: 'Система · память',
+                    title: 'Ноде не хватает памяти', copy: text,
+                    action: 'Проверьте потребление RAM и системные лимиты до перезапуска сервисов.', workers: [],
+                };
+                return {
+                    icon: 'fa-circle-exclamation', type: capacity.level === 'crit' ? 'Критическая проблема' : 'Требует внимания',
+                    title: 'Обнаружено ограничение ноды', copy: text,
+                    action: '', workers: [],
+                };
+            };
+            const capacityWorkerHtml = (worker) => `
+                <span class="infra-capacity-worker"><b>PID ${escapeHtml(worker.pid ?? '—')}</b><small>${capacityHasNumber(worker.fd) ? `${capacityNumber(worker.fd)} fd · ` : ''}${capacityNumber(worker.nofile_soft)} / ${capacityNumber(worker.nofile_hard)}</small></span>`;
+            const capacityProblems = (capacity && capacity.problems) || [];
+            const capacityIssuesHtml = capacityProblems.map((problem) => {
+                const view = capacityProblemView(problem);
+                return `
+                    <article class="infra-capacity-issue" title="${escapeHtml(problem)}">
+                        <span class="infra-capacity-issue-icon"><i class="fas ${view.icon}" aria-hidden="true"></i></span>
+                        <div>
+                            <div class="infra-capacity-issue-type">${escapeHtml(view.type)}</div>
+                            <h5>${escapeHtml(view.title)}</h5>
+                            <p>${escapeHtml(view.copy)}</p>
+                            ${view.workers.length ? `<div class="infra-capacity-workers">${view.workers.map(capacityWorkerHtml).join('')}</div>` : ''}
+                            ${view.action ? `<div class="infra-capacity-action"><i class="fas fa-arrow-right" aria-hidden="true"></i><span>${escapeHtml(view.action)}</span></div>` : ''}
+                        </div>
+                    </article>`;
+            }).join('');
+            const capacityStatus = capacity && capacity.level === 'crit'
+                ? {label: 'Лимит исчерпан', copy: 'Нода уже теряет новые соединения — требуется вмешательство.'}
+                : capacity && capacity.level === 'warn'
+                    ? {label: 'Нужна настройка', copy: 'Клиенты обслуживаются, но запас конфигурации слишком мал.'}
+                    : {label: 'Запас есть', copy: 'Текущих лимитов достаточно для наблюдаемой нагрузки.'};
             const capacityHtml = !capacity ? '' : `
-                <section class="card infra-detail-card infra-diag" id="infra-detail-capacity">
-                    <div class="infra-diag-head">
-                        <h4>Лимиты ноды</h4>
-                        <span class="infra-diag-when">${capacity.level === 'crit' ? '<span class="infra-badge infra-badge-offline">ИСЧЕРПАНЫ</span>' : capacity.level === 'warn' ? '<span class="infra-badge infra-badge-warn">ПОРА ПОДНЯТЬ</span>' : '<span class="infra-badge infra-badge-online">ЗАПАС ЕСТЬ</span>'}</span>
-                    </div>
-                    ${(capacity.problems || []).length ? `
-                        <div class="infra-cap-list">
-                            ${(capacity.problems || []).map((item) => `
-                                <div class="infra-cap-problem is-${capacity.level}"><b>!</b><span>${escapeHtml(item)}</span></div>
-                            `).join('')}
-                        </div>` : '<div class="help-block">Потолки не достигнуты</div>'}
-                    ${(capacity.details || []).length ? `<div class="infra-cap-metrics">${(capacity.details || []).map((d) => escapeHtml(d)).join(' · ')}</div>` : ''}
-                    ${capacity.level === 'crit' ? '<div class="infra-cap-metrics">Пока потолок исчерпан, изменения DNS по этому серверу остановлены: причина внутренняя, ТСПУ здесь ни при чём.</div>' : ''}
+                <section class="card infra-detail-card infra-capacity is-${escapeHtml(capacity.level || 'ok')}" id="infra-detail-capacity">
+                    <header class="infra-capacity-head">
+                        <div class="infra-capacity-title">
+                            <span class="infra-capacity-title-icon"><i class="fas fa-gauge-high" aria-hidden="true"></i></span>
+                            <div><h4>Лимиты ноды</h4><p>${escapeHtml(capacityStatus.copy)}</p></div>
+                        </div>
+                        <span class="infra-capacity-state">${escapeHtml(capacityStatus.label)}</span>
+                    </header>
+                    ${capacityMetricsHtml ? `<div class="infra-capacity-metrics">${capacityMetricsHtml}</div>` : ''}
+                    ${capacityIssuesHtml ? `
+                        <div class="infra-capacity-section-label">Что требует внимания</div>
+                        <div class="infra-capacity-issues">${capacityIssuesHtml}</div>
+                    ` : '<div class="infra-capacity-ok"><i class="fas fa-circle-check" aria-hidden="true"></i><span>Потолки не достигнуты, активных предупреждений нет.</span></div>'}
+                    ${capacity.level === 'crit' ? '<div class="infra-capacity-stop"><i class="fas fa-shield-halved" aria-hidden="true"></i><span>Пока внутренний потолок исчерпан, изменения DNS для этой ноды остановлены. Это защита от ложной диагностики ТСПУ.</span></div>' : ''}
+                    ${capacityProblems.length ? `<details class="infra-capacity-technical" data-infra-persistent-details="capacity-technical-${server.id}"><summary>Технические формулировки</summary><ul>${capacityProblems.map((problem) => `<li>${escapeHtml(problem)}</li>`).join('')}</ul></details>` : ''}
                 </section>`;
 
             const journalTimeParts = (value) => {

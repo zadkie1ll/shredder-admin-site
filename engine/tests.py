@@ -8715,6 +8715,22 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)
 
+    def test_node_capacity_uses_structured_metrics_and_action_cards(self):
+        for marker in (
+            'class="card infra-detail-card infra-capacity is-${escapeHtml(capacity.level || \'ok\')}"',
+            'class="infra-capacity-metrics"',
+            'class="infra-capacity-issues"',
+            "const capacityProblemView = (message) => {",
+            "title: 'Слишком низкий worker_connections'",
+            "title: 'Workers не применили новый лимит файлов'",
+            'class="infra-capacity-worker"',
+            'data-infra-persistent-details="capacity-technical-${server.id}"',
+            ".infra-capacity-metrics, .infra-capacity-issues { grid-template-columns: 1fr; }",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+        self.assertNotIn("infra-cap-problem", self.template)
+
     def test_ip_groups_use_compact_responsive_grid(self):
         for marker in (
             ".infra-ip-groups { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));",
