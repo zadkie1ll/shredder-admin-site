@@ -8717,6 +8717,7 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
 
     def test_node_capacity_uses_structured_metrics_and_action_cards(self):
         for marker in (
+            ".infra-capacity { --capacity-tone: var(--green); margin: 16px 0 20px;",
             'class="card infra-detail-card infra-capacity is-${escapeHtml(capacity.level || \'ok\')}"',
             'class="infra-capacity-metrics"',
             'class="infra-capacity-issues"',
