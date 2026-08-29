@@ -1252,6 +1252,66 @@ class CapacityTests(InfraDbTestCase):
         )
         self.assertIn("нужен перезапуск", " ".join(stale["problems"]))
 
+    def test_master_process_limit_is_ignored(self):
+        # worker_rlimit_nofile поднимает лимит только worker-процессам;
+        # master сохраняет системный, и это норма — соединения обслуживает
+        # не он. Реальный случай с боевой ноды после поднятия лимитов.
+        verdict = infra.evaluate_capacity(
+            {
+                "nginx": {
+                    "worker_connections": 65535,
+                    "worker_rlimit_nofile": 262144,
+                    "recent_errors": [],
+                    "workers": [
+                        {"pid": 1, "role": "master", "fd": 30,
+                         "nofile_soft": 1024, "nofile_hard": 524288},
+                        {"pid": 2, "role": "worker", "fd": 900,
+                         "nofile_soft": 262144, "nofile_hard": 524288},
+                    ],
+                },
+            },
+            70,
+        )
+        self.assertEqual(verdict["level"], "ok")
+        self.assertEqual(verdict["problems"], [])
+
+    def test_low_limit_on_real_worker_still_reported(self):
+        verdict = infra.evaluate_capacity(
+            {
+                "nginx": {
+                    "worker_connections": 65535,
+                    "worker_rlimit_nofile": 262144,
+                    "recent_errors": [],
+                    "workers": [
+                        {"pid": 1, "role": "master", "fd": 30,
+                         "nofile_soft": 1024, "nofile_hard": 524288},
+                        {"pid": 2, "role": "worker", "fd": 100,
+                         "nofile_soft": 1024, "nofile_hard": 524288},
+                    ],
+                },
+            },
+            70,
+        )
+        self.assertEqual(verdict["level"], "warn")
+        self.assertIn("нужен перезапуск", " ".join(verdict["problems"]))
+
+    def test_agent_without_roles_behaves_as_before(self):
+        # Агент до v0.4.1 роли не присылает — судим по всем процессам
+        verdict = infra.evaluate_capacity(
+            {
+                "nginx": {
+                    "worker_connections": 65535,
+                    "recent_errors": [],
+                    "workers": [
+                        {"pid": 1, "fd": 30, "nofile_soft": 1024,
+                         "nofile_hard": 524288},
+                    ],
+                },
+            },
+            70,
+        )
+        self.assertEqual(verdict["level"], "warn")
+
     def test_crit_capacity_alerts_once_per_cooldown(self):
         server = self.make_server(capacity=self.CRIT)
         with mock.patch.object(

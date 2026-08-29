@@ -1492,6 +1492,12 @@ def evaluate_capacity(capacity: dict, warn_pct: int) -> dict:
     low_workers = []
     tight_workers = []
     for worker in nginx.get("workers") or []:
+        # Лимит master'а не важен: worker_rlimit_nofile поднимает его только
+        # worker-процессам, а клиентские соединения обслуживают именно они.
+        # Роль присылает агент v0.4.1+; без неё судим по всем процессам,
+        # как раньше.
+        if worker.get("role") == "master":
+            continue
         soft = worker.get("nofile_soft")
         hard = worker.get("nofile_hard")
         fd = worker.get("fd")
