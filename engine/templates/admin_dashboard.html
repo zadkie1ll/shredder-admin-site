@@ -384,6 +384,28 @@
         .infra-detail-route-arrow { display: grid; grid-template-columns: auto auto; align-items: center; gap: 9px; color: var(--muted); font-size: 18px; }
         .infra-detail-route-arrow small { grid-column: 1 / -1; color: var(--muted); font-size: 8.5px; font-weight: 800; letter-spacing: .06em; text-align: center; text-transform: uppercase; }
         .infra-detail-route-sep { margin: 0 5px; color: var(--muted); font-size: 13px; font-weight: 600; }
+        .infra-diag { margin-top: 16px; }
+        .infra-diag-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; }
+        .infra-diag-head h4 { margin: 0; font-size: 14px; font-weight: 850; }
+        .infra-diag-when { color: var(--muted); font-size: 10.5px; }
+        .infra-diag-verdicts { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; margin-bottom: 12px; }
+        .infra-diag-card { padding: 12px 14px; border: 1px solid var(--panel-border); border-left: 3px solid var(--tone, var(--muted)); border-radius: 9px; background: rgba(0,0,0,.14); }
+        .infra-diag-card.is-bad { --tone: var(--red); }
+        .infra-diag-card.is-good { --tone: var(--green); }
+        .infra-diag-card-label { color: var(--muted); font-size: 9.5px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
+        .infra-diag-card-value { margin-top: 6px; font-size: 13px; font-weight: 800; line-height: 1.4; word-break: break-all; }
+        .infra-diag-card-note { margin-top: 5px; color: var(--muted); font-size: 10.5px; line-height: 1.4; }
+        .infra-diag-evidence { display: grid; gap: 5px; margin-top: 4px; }
+        .infra-diag-line { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; font-size: 11.5px; line-height: 1.45; color: var(--muted); }
+        .infra-diag-line b { flex: 0 0 auto; font-weight: 800; }
+        .infra-diag-line.is-pass b { color: var(--green); }
+        .infra-diag-line.is-fail b { color: var(--red); }
+        .infra-diag-line.is-warn b { color: var(--mint); }
+        .infra-cap-list { display: grid; gap: 6px; }
+        .infra-cap-problem { display: grid; grid-template-columns: 16px minmax(0, 1fr); gap: 8px; font-size: 11.5px; line-height: 1.45; }
+        .infra-cap-problem.is-crit { color: var(--red); }
+        .infra-cap-problem.is-warn { color: var(--mint); }
+        .infra-cap-metrics { margin-top: 8px; color: var(--muted); font-size: 10.5px; line-height: 1.5; }
         .infra-detail-route-sub.is-warn { color: var(--mint); }
         .infra-detail-route-sub.is-crit { color: var(--red); }
         .infra-detail-chart-card { margin-bottom: 20px; padding: clamp(17px, 1.8vw, 26px); }
@@ -9632,6 +9654,7 @@
                 enum: 'список',
                 csv: 'список',
                 csv_int: 'список ID',
+                str: 'текст',
                 string: 'текст',
             }[setting.type] || setting.type;
         }
@@ -12259,10 +12282,15 @@
             }
         }
 
-        function infraIpBadge(ip) {
+        function infraIpBadge(ip, blockedByDiagnosis) {
             if (ip.blocked_at) return '<span class="infra-badge infra-badge-offline">BLOCKED</span>';
-            if (ip.on_interface) return '<span class="infra-badge infra-badge-online">ACTIVE</span>';
-            return '<span class="infra-badge infra-badge-muted">RESERVE</span>';
+            // Диагноз появляется раньше, чем адрес будет помечен заблокированным
+            // (пометка ставится только после замены), поэтому показываем отдельно
+            const diag = blockedByDiagnosis
+                ? '<span class="infra-badge infra-badge-offline" title="Последняя диагностика: контрольное имя на этом адресе не проходит">ТСПУ</span>'
+                : '';
+            if (ip.on_interface) return '<span class="infra-badge infra-badge-online">ACTIVE</span>' + diag;
+            return '<span class="infra-badge infra-badge-muted">RESERVE</span>' + diag;
         }
 
         function infraGroupIpsByInterface(ips, wanInterface) {
@@ -12290,11 +12318,14 @@
             });
         }
 
-        function infraDomainRowHtml(domain, pending = false) {
+        function infraDomainRowHtml(domain, pending = false, blockedSni = false) {
             const safeDomain = escapeHtml(domain);
+            const blockedBadge = blockedSni
+                ? '<span class="infra-badge infra-badge-offline" title="Имя под фильтром ТСПУ: A-запись не меняется намеренно — новый адрес под фильтруемым именем рискует уйти в бан следом">ИМЯ В БАНЕ</span>'
+                : '';
             return `
                 <div class="infra-domain-manage-item${pending ? ' is-pending' : ''}" data-infra-domain-item="${safeDomain}">
-                    <div class="infra-domain-manage-copy"><i class="fas fa-link"></i><code>${safeDomain}</code></div>
+                    <div class="infra-domain-manage-copy"><i class="fas fa-link"></i><code>${safeDomain}</code>${blockedBadge}</div>
                     ${pending
                         ? '<span class="infra-inline-state"><span class="infra-action-spinner" aria-hidden="true"></span>Привязываем</span>'
                         : `<button type="button" class="infra-mini-btn danger" data-infra-delete-domain="${safeDomain}">Удалить</button>`}
@@ -12390,6 +12421,13 @@
 
         function renderInfraDetail(container, detail, telemetry, full) {
             const server = detail.server;
+            // Вердикты последней диагностики: адреса и имена помечаются в
+            // своих списках, чтобы не приходилось сверяться с алертами
+            const diagnosis = detail.diagnosis || null;
+            const blockedIps = diagnosis ? (diagnosis.blocked_ips || []) : [];
+            const blockedSnis = diagnosis ? (diagnosis.blocked_snis || []) : [];
+            const diagBlockedIps = new Set(blockedIps);
+            const diagBlockedSnis = new Set(blockedSnis);
             const summary = telemetry.summary || {};
             const util = server.utilization_pct;
             const periodButtons = ['3h', '24h', '7d', '30d'].map((period) =>
@@ -12416,7 +12454,7 @@
                     if (ip.comment) noteParts.push(escapeHtml(ip.comment));
                     return `
                         <div class="infra-ip-tile${ip.blocked_at ? ' is-blocked' : ''}">
-                            <div class="infra-ip-tile-head"><code>${escapeHtml(ip.ip)}/${ip.prefix_len}</code>${infraIpBadge(ip)}</div>
+                            <div class="infra-ip-tile-head"><code>${escapeHtml(ip.ip)}/${ip.prefix_len}</code>${infraIpBadge(ip, diagBlockedIps.has(ip.ip))}</div>
                             ${noteParts.length ? `<span class="infra-ip-copy-note">${noteParts.join(' · ')}</span>` : ''}
                             <div class="infra-ip-tile-actions">
                                 ${!ip.on_interface && !ip.blocked_at ? `<button type="button" class="infra-icon-btn" data-infra-ensure-ip="${ip.id}" title="Установить на интерфейс через node-agent" aria-label="Установить ${escapeHtml(ip.ip)} на интерфейс"><i class="fas fa-plug"></i></button>` : ''}
@@ -12453,7 +12491,7 @@
                     </section>`;
             }).join('') || '<div class="help-block">Адресов пока нет</div>';
 
-            const domainsHtml = (detail.domains || []).map((domain) => infraDomainRowHtml(domain)).join('')
+            const domainsHtml = (detail.domains || []).map((domain) => infraDomainRowHtml(domain, false, diagBlockedSnis.has(domain))).join('')
                 || '<div class="help-block" data-infra-domains-empty>Домены не привязаны — автозамена IP не сможет переключить DNS</div>';
 
             const who = detail.who_connects || {};
@@ -12554,6 +12592,62 @@
             }
             const routeServer = server.hostname || server.node_name || server.name;
 
+            // Диагностика ТСПУ: вердикты по адресам и именам раздельно.
+            // Состояния не хранятся отдельными полями — источником истины
+            // остаётся сам диагноз, привязанный ко времени.
+            const confidenceLabels = {high: 'высокая', medium: 'средняя', low: 'низкая'};
+            const evidenceMark = {pass: '✓', fail: '✗', skipped: '–', inconclusive: '?', warn: '!'};
+            const evidenceTone = {pass: 'is-pass', fail: 'is-fail', warn: 'is-warn', inconclusive: 'is-warn'};
+            const diagHtml = !diagnosis ? '' : `
+                <section class="card infra-detail-card infra-diag" id="infra-detail-diagnosis">
+                    <div class="infra-diag-head">
+                        <h4>Диагностика ТСПУ</h4>
+                        <span class="infra-diag-when">${escapeHtml(diagnosis.at || '—')} · уверенность: ${escapeHtml(confidenceLabels[diagnosis.confidence] || diagnosis.confidence || '—')}${diagnosis.control_name ? ` · контрольное имя ${escapeHtml(diagnosis.control_name)}` : ''}</span>
+                    </div>
+                    <div class="infra-diag-verdicts">
+                        <div class="infra-diag-card ${blockedIps.length ? 'is-bad' : 'is-good'}">
+                            <div class="infra-diag-card-label">Адреса</div>
+                            <div class="infra-diag-card-value">${blockedIps.length ? blockedIps.map((ip) => escapeHtml(ip)).join('<br>') : 'заблокированных нет'}</div>
+                            <div class="infra-diag-card-note">${blockedIps.length ? 'Заменяются автоматически — но только в доменах с чистым именем' : 'Все проверенные адреса отвечают'}</div>
+                        </div>
+                        <div class="infra-diag-card ${blockedSnis.length ? 'is-bad' : 'is-good'}">
+                            <div class="infra-diag-card-label">Имена</div>
+                            <div class="infra-diag-card-value">${blockedSnis.length ? blockedSnis.map((sni) => escapeHtml(sni)).join('<br>') : 'заблокированных нет'}</div>
+                            <div class="infra-diag-card-note">${blockedSnis.length ? 'A-записи не меняются намеренно: новый адрес под фильтруемым именем рискует уйти в бан следом. Нужен новый домен и правка хостов в Remnawave' : 'Все проверенные имена проходят'}</div>
+                        </div>
+                        <div class="infra-diag-card ${diagnosis.actionable ? 'is-good' : 'is-bad'}">
+                            <div class="infra-diag-card-label">Автоматика</div>
+                            <div class="infra-diag-card-value">${diagnosis.actionable ? 'разрешена' : 'запрещена'}</div>
+                            <div class="infra-diag-card-note">${diagnosis.actionable ? 'Уверенности достаточно для замены адреса' : 'Уверенности мало или вердикт неоднозначен — только алерт'}</div>
+                        </div>
+                    </div>
+                    ${(diagnosis.evidence || []).length ? `
+                        <div class="infra-diag-evidence">
+                            ${(diagnosis.evidence || []).map((item) => `
+                                <div class="infra-diag-line ${evidenceTone[item.result] || ''}"><b>${evidenceMark[item.result] || '·'}</b><span>${escapeHtml(item.text || '')}</span></div>
+                            `).join('')}
+                        </div>` : ''}
+                </section>`;
+
+            // Лимиты ноды: перегруженная нода снаружи выглядит так же, как
+            // заблокированная, поэтому её потолки показываем отдельно
+            const capacity = detail.capacity || null;
+            const capacityHtml = !capacity ? '' : `
+                <section class="card infra-detail-card infra-diag" id="infra-detail-capacity">
+                    <div class="infra-diag-head">
+                        <h4>Лимиты ноды</h4>
+                        <span class="infra-diag-when">${capacity.level === 'crit' ? '<span class="infra-badge infra-badge-offline">ИСЧЕРПАНЫ</span>' : capacity.level === 'warn' ? '<span class="infra-badge infra-badge-warn">ПОРА ПОДНЯТЬ</span>' : '<span class="infra-badge infra-badge-online">ЗАПАС ЕСТЬ</span>'}</span>
+                    </div>
+                    ${(capacity.problems || []).length ? `
+                        <div class="infra-cap-list">
+                            ${(capacity.problems || []).map((item) => `
+                                <div class="infra-cap-problem is-${capacity.level}"><b>!</b><span>${escapeHtml(item)}</span></div>
+                            `).join('')}
+                        </div>` : '<div class="help-block">Потолки не достигнуты</div>'}
+                    ${(capacity.details || []).length ? `<div class="infra-cap-metrics">${(capacity.details || []).map((d) => escapeHtml(d)).join(' · ')}</div>` : ''}
+                    ${capacity.level === 'crit' ? '<div class="infra-cap-metrics">Пока потолок исчерпан, изменения DNS по этому серверу остановлены: причина внутренняя, ТСПУ здесь ни при чём.</div>' : ''}
+                </section>`;
+
             const journalTimeParts = (value) => {
                 const raw = String(value || '').trim();
                 const match = raw.match(/^(\d{4}-\d{2}-\d{2})[ T](\d{2}:\d{2}(?::\d{2})?)/);
@@ -12579,8 +12673,10 @@
                 manual_required: 'Нужна проверка', failed: 'Ошибка',
             };
             const anomalyStatusLabels = {
-                pending: 'Проверяется', confirmed: 'Подтверждена', dismissed: 'Не подтвердилась',
-                failed: 'Ошибка проверки',
+                pending: 'Проверяется', checking: 'Проверяем адреса',
+                checking_sni: 'Проверяем имена', confirmed: 'Подтверждена',
+                dismissed: 'Не подтвердилась', failed: 'Ошибка проверки',
+                error: 'Ошибка проверки',
             };
             const commandStatusLabels = {
                 pending: 'В очереди', sent: 'Отправлена', ok: 'Выполнена',
@@ -12608,11 +12704,26 @@
             });
             (detail.anomalies || []).forEach((a) => {
                 const badgeClass = a.status === 'confirmed' ? 'infra-badge-offline' : a.status === 'dismissed' ? 'infra-badge-online' : 'infra-badge-warn';
+                const verdict = (a.details || {}).verdict || null;
+                const manual = a.kind === 'manual_check';
+                // Итог диагностики раздельно по адресам и именам: без этого
+                // в журнале осталось бы только «аномалия подтверждена»
+                const verdictLine = verdict
+                    ? ` Заблокированы адреса: ${(verdict.blocked_ips || []).length ? escapeHtml((verdict.blocked_ips || []).join(', ')) : '—'}; имена: ${(verdict.blocked_snis || []).length ? escapeHtml((verdict.blocked_snis || []).join(', ')) : '—'}.`
+                    : '';
+                const evidence = ((a.details || {}).evidence || [])
+                    .map((item) => `<div class="infra-log-detail-line"><span>${escapeHtml(evidenceMark[item.result] || '·')}</span><span>${escapeHtml(item.text || '')}</span></div>`)
+                    .join('');
                 journal.push({time: a.created_at, html: logEntry({
                     time: a.created_at,
-                    badge: `<span class="infra-badge ${badgeClass}">Аномалия · ${escapeHtml(journalLabel(anomalyStatusLabels, a.status))}</span>`,
-                    title: 'Отклонение трафика и соединений',
-                    summary: `Трафик ${a.traffic_ratio !== null ? (a.traffic_ratio * 100).toFixed(0) + '%' : '—'} от baseline · соединения ${a.connection_ratio !== null ? (a.connection_ratio * 100).toFixed(0) + '%' : '—'}.`,
+                    badge: `<span class="infra-badge ${badgeClass}">${manual ? 'Проверка ТСПУ' : 'Аномалия'} · ${escapeHtml(journalLabel(anomalyStatusLabels, a.status))}</span>`,
+                    title: manual ? 'Диагностика запущена вручную' : 'Отклонение трафика и соединений',
+                    summary: (manual
+                        ? 'Полная проверка адресов и имён.'
+                        : `Трафик ${a.traffic_ratio !== null ? (a.traffic_ratio * 100).toFixed(0) + '%' : '—'} от baseline · соединения ${a.connection_ratio !== null ? (a.connection_ratio * 100).toFixed(0) + '%' : '—'}.`
+                    ) + verdictLine,
+                    details: evidence,
+                    detailsKey: `anomaly-${a.id}`,
                     icon: 'fa-wave-square',
                 })});
             });
@@ -12665,6 +12776,8 @@
 
                     <nav class="infra-detail-nav" aria-label="Разделы экрана сервера">
                         <button type="button" data-infra-detail-target="infra-detail-monitoring"><i class="fas fa-chart-line"></i>Обзор</button>
+                        ${diagnosis ? '<button type="button" data-infra-detail-target="infra-detail-diagnosis"><i class="fas fa-shield-halved"></i>Диагностика</button>' : ''}
+                        ${capacity ? '<button type="button" data-infra-detail-target="infra-detail-capacity"><i class="fas fa-gauge-high"></i>Лимиты</button>' : ''}
                         <button type="button" data-infra-detail-target="infra-detail-connections"><i class="fas fa-users"></i>Подключения</button>
                         <button type="button" data-infra-detail-target="infra-detail-server-info"><i class="fas fa-server"></i>Сервер</button>
                         <button type="button" data-infra-detail-target="infra-detail-parameters"><i class="fas fa-sliders"></i>Параметры</button>
@@ -12694,6 +12807,9 @@
                         </div>
                     </div>
                 </section>
+
+                ${diagHtml}
+                ${capacityHtml}
 
                 <section class="card infra-detail-chart-card">
                     <header class="infra-detail-chart-head">

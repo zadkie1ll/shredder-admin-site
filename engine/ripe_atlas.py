@@ -235,7 +235,27 @@ def _explicit_probes_spec(probe_ids: list) -> list:
     ]
 
 
-def _probes_spec(geo: bool, light: bool = False) -> list:
+def resolve_probe_ids(geo: bool, light: bool = False) -> list:
+    """Список id подключённых зондов для одной диагностики.
+
+    Нужен, чтобы несколько проб (адресов и имён) шли по ОДНОМУ набору
+    зондов: иначе разница между пробами объяснялась бы разным составом
+    зондов, а не разным именем или адресом. Пустой список означает, что
+    выбрать зонды не удалось — Atlas назначит их сам.
+    """
+    if geo:
+        wanted = GEO_PROBE_COUNT_LIGHT if light else GEO_PROBE_COUNT
+        return fetch_connected_probe_ids({"country_code": "RU"}, wanted)
+    spec = LIGHT_ASN_PROBE_SPEC if light else ASN_PROBE_SPEC
+    probe_ids = []
+    for asn, count, _ in spec:
+        probe_ids.extend(fetch_connected_probe_ids({"asn_v4": asn}, count))
+    return probe_ids
+
+
+def _probes_spec(
+    geo: bool, light: bool = False, probe_ids: list = None
+) -> list:
     """Выбор зондов: гео-режим — по всей РФ; иначе — по сетям операторов.
 
     Зонды выбираются ЯВНО (по id тех, что подключены сейчас) — выбор силами
@@ -243,8 +263,12 @@ def _probes_spec(geo: bool, light: bool = False) -> list:
     лишь пятая часть. Если список получить не удалось, откатываемся на
     прежний выбор по asn/country, чтобы замер всё равно состоялся.
 
+    probe_ids — готовый общий набор для сравнимых проб одной диагностики.
+
     light=True — уменьшенный набор для дешёвого частого мониторинга.
     """
+    if probe_ids:
+        return _explicit_probes_spec(list(probe_ids))
     if geo:
         wanted = GEO_PROBE_COUNT_LIGHT if light else GEO_PROBE_COUNT
         probe_ids = fetch_connected_probe_ids({"country_code": "RU"}, wanted)
@@ -292,6 +316,7 @@ def create_measurement(
     is_public: bool = False,
     geo: bool = False,
     light: bool = False,
+    probe_ids: list = None,
 ) -> tuple:
     """Создаёт one-off sslcert-измерение; возвращает (msm_id, error_message).
 
@@ -316,7 +341,7 @@ def create_measurement(
                 "is_public": is_public,
             }
         ],
-        "probes": _probes_spec(geo, light),
+        "probes": _probes_spec(geo, light, probe_ids),
         "is_oneoff": True,
     }
     try:
@@ -436,21 +461,67 @@ def fetch_probe_geo(prb_ids: list[int]) -> dict:
     return info
 
 
+# Стадии, на которых обрывается соединение зонда. Разница между ними —
+# доказательство разной природы отказа (см. classify_stage).
+STAGE_TLS_OK = "tls_ok"
+STAGE_TLS_FAIL = "tls_fail"
+STAGE_TCP_FAIL = "tcp_fail"
+STAGE_TCP_REFUSED = "tcp_refused"
+STAGE_UNKNOWN = "unknown"
+
+
+def classify_stage(row: dict, ok: bool) -> str:
+    """Стадия, на которой оборвалось соединение зонда.
+
+    Асимметричное доказательство. Если TCP не установился, ClientHello не
+    отправлялся, значит SNI в эфир не уходил и фильтрация по имени
+    исключена — остаётся адрес или маршрут. Если же TCP установился, а
+    рукопожатие оборвано, картина одинакова и при фильтрации имени, и при
+    мягкой фильтрации адреса: различить их может только сравнение проб.
+
+    Признак установленного TCP — наличие ttc (time to connect): Atlas
+    заполняет его только после успешного соединения.
+    """
+    if ok:
+        return STAGE_TLS_OK
+    err = str(row.get("err", "") or "").lower()
+    # Немедленный отказ — за портом никого нет; это не блокировка
+    if "refused" in err:
+        return STAGE_TCP_REFUSED
+    # Ошибка на стадии соединения: до отправки ClientHello дело не дошло
+    if "connect" in err:
+        return STAGE_TCP_FAIL
+    # ttc (time to connect) Atlas заполняет только после установленного TCP;
+    # поле есть не во всех прошивках, поэтому оно вторично после текста ошибки
+    if row.get("ttc") is not None:
+        return STAGE_TLS_FAIL
+    # Обрыв уже внутри рукопожатия
+    if any(word in err for word in ("read", "hello", "tls", "ssl", "handshake")):
+        return STAGE_TLS_FAIL
+    # Голый таймаут без уточнения стадии: сказать нечего, гадать нельзя
+    return STAGE_UNKNOWN
+
+
 def summarize_results(results: list, geo: bool = False) -> dict:
     """Сводка по зондам: пробился/заблокирован + разбивка по группам.
 
     geo=True — группировка по федеральным округам, иначе по провайдерам.
-    В карточку каждого зонда кладутся и провайдер, и округ.
+    В карточку каждого зонда кладутся и провайдер, и округ, а также стадия
+    обрыва (classify_stage) — по ней отличается жёсткая фильтрация адреса
+    от мягкой и от неработающей ноды.
     """
     probe_info = fetch_probe_geo(
         [row.get("prb_id") for row in results if row.get("prb_id")]
     )
     probes = []
     blocked_by_group: dict[str, int] = {}
+    stages: dict[str, int] = {}
     ok_count = 0
     for row in results:
         # TLS-обмен состоялся (пусть даже alert'ом) — значит пакеты дошли.
         ok = any(key in row for key in ("cert", "method", "alert"))
+        stage = classify_stage(row, ok)
+        stages[stage] = stages.get(stage, 0) + 1
         prb_id = row.get("prb_id")
         info = probe_info.get(prb_id) or {}
         asn = info.get("asn")
@@ -468,6 +539,7 @@ def summarize_results(results: list, geo: bool = False) -> dict:
                 "provider": provider,
                 "district": district,
                 "ok": ok,
+                "stage": stage,
                 "err": str(row.get("err", ""))[:200] if not ok else "",
                 "rt_ms": row.get("rt"),
             }
@@ -481,6 +553,8 @@ def summarize_results(results: list, geo: bool = False) -> dict:
         # Ключ исторически называется blocked_by_provider; в гео-режиме здесь
         # округа. Фронт рендерит его как «Блокируют: <label> N» независимо.
         "blocked_by_provider": blocked_by_group,
+        # {stage: сколько зондов}; в БД не сохраняется — считается из probes
+        "stages": stages,
     }
 
 
@@ -594,16 +668,27 @@ def start_run(
     is_public: bool = False,
     geo: bool = False,
     light: bool = False,
+    probe_ids: list = None,
 ) -> CensorCheckRun:
-    """Создаёт измерение и запись прогона (при ошибке — прогон со статусом error)."""
+    """Создаёт измерение и запись прогона (при ошибке — прогон со статусом error).
+
+    probe_ids — общий набор зондов диагностики: несколько проб по разным
+    парам «адрес + имя» должны идти по одним и тем же зондам, иначе разницу
+    между ними нельзя приписать проверяемому параметру.
+    """
     msm_id, error = create_measurement(
-        api_key, check.target_ip, check.sni, check.port, is_public, geo, light
+        api_key, check.target_ip, check.sni, check.port, is_public, geo, light,
+        probe_ids,
     )
     run = CensorCheckRun(
         check_id=check.id,
         msm_id=msm_id,
         status=RUN_STATUS_PENDING if msm_id else RUN_STATUS_ERROR,
         error_message=error,
+        # Ожидаемое число ответов: при явном наборе оно меньше статической
+        # константы, и без этого прогон не закрывался бы досрочно, вися
+        # pending до дедлайна сбора
+        scheduled_probes=len(probe_ids) if probe_ids else None,
     )
     check.last_started_at = datetime.utcnow()
     db_session.add(run)
@@ -656,7 +741,9 @@ def finalize_run(db_session, run: CensorCheckRun, api_key: str) -> bool:
     run.results = summary["probes"]
     run.blocked_asns = summary["blocked_by_provider"]
 
-    if summary["total"] >= expected_probe_total(geo, light) or deadline_passed:
+    # scheduled_probes уже задан, если диагностика шла по явному набору зондов
+    expected = run.scheduled_probes or expected_probe_total(geo, light)
+    if summary["total"] >= expected or deadline_passed:
         # Один запрос на завершение прогона: сколько зондов Atlas реально назначил.
         run.scheduled_probes = fetch_scheduled_probes(api_key, run.msm_id)
         if summary["total"] == 0:

@@ -13397,13 +13397,17 @@ def support_admin_api_infra_servers(request):
                 return JsonResponse({"status": "ok"})
 
             if action == "force_check":
+                # Полная диагностика: сначала адреса контрольным именем,
+                # затем имена на живом адресе. Вердикт и алерт с журналом
+                # проверок выдаст обычный конвейер обработки аномалий.
                 server = infra.get_server(db_session, server_id)
-                result = infra.force_tspu_check(
-                    db_session, server, reason=f"manual:{actor}"
+                result = infra.start_manual_diagnosis(
+                    db_session, server, actor=actor
                 )
                 admin_audit_write(
                     db_session, request, "infra_force_tspu_check",
-                    target=server.node_name, run_ids=result["run_ids"],
+                    target=server.node_name,
+                    run_ids=list(result.get("runs", {}).values()),
                 )
                 db_session.commit()
                 return JsonResponse({"status": "ok", "result": result})
@@ -13474,6 +13478,7 @@ def support_admin_api_infra_settings(request):
                     "type": (
                         "bool" if cast is bool
                         else "float" if cast is float
+                        else "str" if cast is str
                         else "int"
                     ),
                 }

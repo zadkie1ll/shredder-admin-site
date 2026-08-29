@@ -212,6 +212,76 @@ def check_xray(db_session) -> None:
                 log.info("infra: xray RECOVERED on %s", title)
 
 
+# --- лимиты ноды ------------------------------------------------------------
+
+
+def check_capacity(db_session) -> None:
+    """Надзор за потолками ноды: conntrack, nginx, дескрипторы, память.
+
+    Два уровня. «Предупреждение» — профилактика: нода работает, но пора
+    поднимать лимит. «Критично» — потолок исчерпан, клиенты уже теряются;
+    этот же уровень запрещает изменения DNS, потому что перегруженная нода
+    снаружи выглядит точно так же, как заблокированная.
+    """
+    from engine import infra
+
+    cfg = infra.get_settings(db_session)
+    now = infra.utcnow()
+    warn_pct = cfg["infra_capacity_warn_pct"]
+    cooldown = timedelta(minutes=cfg["infra_capacity_alert_cooldown_minutes"])
+    servers = (
+        db_session.query(infra.InfraServer)
+        .filter(infra.InfraServer.is_archived.is_(False))
+        .all()
+    )
+    for server in servers:
+        if not infra.is_online(server, cfg, now):
+            continue
+        if not server.capacity:
+            continue  # агент старой версии или надзор выключен
+        verdict = infra.evaluate_capacity(server.capacity, warn_pct)
+        level = verdict["level"]
+        title = infra.server_title(server)
+
+        if level == "ok":
+            server.capacity_warn_alerted_at = None
+            server.capacity_crit_alerted_at = None
+            continue
+
+        field = (
+            "capacity_crit_alerted_at" if level == "crit"
+            else "capacity_warn_alerted_at"
+        )
+        last = getattr(server, field)
+        if last is not None and now - last < cooldown:
+            continue
+
+        problems = "\n".join(f"· {item}" for item in verdict["problems"])
+        details = "\n".join(verdict["details"])
+        if level == "crit":
+            delivered = _send_alert(
+                "🟥 <b>Нода упёрлась в лимиты</b>\n\n"
+                f"Сервер: <b>{title}</b>\n\n"
+                f"{problems}\n\n"
+                + (f"<b>Показатели:</b>\n{details}\n\n" if details else "")
+                + "ТСПУ здесь ни при чём: клиенты теряются из-за исчерпанных "
+                "потолков самой ноды. Изменения DNS по этому серверу "
+                "остановлены."
+            )
+        else:
+            delivered = _send_alert(
+                "🟠 <b>Пора поднять лимиты ноды</b>\n\n"
+                f"Сервер: <b>{title}</b>\n\n"
+                f"{problems}\n\n"
+                + (f"<b>Показатели:</b>\n{details}\n\n" if details else "")
+                + "Нода работает штатно, клиенты не затронуты — это "
+                "профилактика."
+            )
+        if delivered:
+            setattr(server, field, now)
+            log.warning("infra: capacity %s on %s", level, title)
+
+
 # --- высокая нагрузка канала ------------------------------------------------
 
 
@@ -578,20 +648,29 @@ def detect_anomalies(db_session) -> None:
         server.last_anomaly_at = now
         db_session.flush()
 
-        result = infra.force_tspu_check(
+        # Фаза 1 диагностики: пробы АДРЕСОВ контрольным посторонним именем.
+        # Имена проверяются потом и только на адресе, признанном живым —
+        # на мёртвом адресе падает всё, и вывод об имени был бы ложным.
+        result = infra.start_ip_diagnosis(
             db_session, server, reason="NETWORK_TRAFFIC_ANOMALY"
         )
-        anomaly.censor_run_ids = result["run_ids"]
+        anomaly.censor_run_ids = list(result["runs"].values())
+        anomaly.details = dict(
+            anomaly.details or {},
+            control_name=result.get("control_name") or "",
+            ip_runs=result["runs"],
+            diagnosis_errors=result.get("errors") or [],
+        )
         log.warning(
             "infra: anomaly detected server=%s traffic_ratio=%s conn_ratio=%s "
-            "runs=%s errors=%s",
+            "ip_probes=%s errors=%s",
             title,
             verdict["traffic_ratio"],
             verdict["connection_ratio"],
-            result["run_ids"],
+            list(result["runs"].keys()),
             result["errors"],
         )
-        if not result["run_ids"]:
+        if not result["runs"]:
             anomaly.status = "error"
             anomaly.resolved_at = now
             _send_alert(
@@ -604,107 +683,238 @@ def detect_anomalies(db_session) -> None:
             )
 
 
-def process_anomalies(db_session) -> None:
+def _anomaly_probe_maps(db_session, details: dict) -> tuple:
+    """Пробы аномалии из БД: (по адресам, по именам, есть_незавершённые)."""
     from engine import infra
-    from engine import ripe_atlas
+
+    ip_probes_raw, ip_pending = infra.collect_probes(
+        db_session, details.get("ip_runs") or {}
+    )
+    sni_probes_raw, sni_pending = infra.collect_probes(
+        db_session, details.get("sni_runs") or {}
+    )
+    # Ключи в JSONB хранятся строкой "адрес|имя"; классификатору нужны
+    # адрес отдельно и пара отдельно
+    ip_probes = {}
+    for key, probe in ip_probes_raw.items():
+        ip_probes[key.split("|", 1)[0]] = probe
+    sni_probes = {}
+    for key, probe in sni_probes_raw.items():
+        ip, _, sni = key.partition("|")
+        sni_probes[(ip, sni)] = probe
+    return ip_probes, sni_probes, ip_pending or sni_pending
+
+
+def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
+    """Классификация проб и действия по её итогам.
+
+    Вердикты по адресам и по именам независимы: адрес меняется только в
+    доменах с чистым именем, а бан имени автоматике не поддаётся — он
+    требует правки хостов в панели и обновления подписок у клиентов.
+    """
+    from engine import infra
+    from engine import infra_diagnosis as diag
 
     cfg = infra.get_settings(db_session)
     now = infra.utcnow()
+    ip_probes, sni_probes, _pending = _anomaly_probe_maps(db_session, details)
+
+    verdict = diag.classify(
+        ip_probes=ip_probes,
+        sni_probes=sni_probes,
+        node_healthy=not (
+            server is not None
+            and (
+                server.xray_process_running is False
+                or server.xray_crash_loop is True
+            )
+        ),
+        control_name=details.get("control_name") or "",
+    )
+    evidence_text = diag.evidence_text(verdict["evidence"])
+    details["evidence"] = verdict["evidence"]
+    details["verdict"] = {
+        "blocked_ips": verdict["blocked_ips"],
+        "blocked_snis": verdict["blocked_snis"],
+        "confidence": verdict["confidence"],
+        "actionable": verdict["actionable"],
+    }
+    anomaly.details = dict(details)
+    anomaly.resolved_at = now
+
+    blocked_ips = verdict["blocked_ips"]
+    blocked_snis = verdict["blocked_snis"]
+
+    if not blocked_ips and not blocked_snis:
+        anomaly.status = "dismissed"
+        log.info(
+            "infra: anomaly dismissed server=%s (адреса и имена чисты)", title
+        )
+        return
+
+    anomaly.status = "confirmed"
+    log.warning(
+        "infra: anomaly confirmed server=%s blocked_ips=%s blocked_snis=%s "
+        "confidence=%s",
+        title, blocked_ips, blocked_snis, verdict["confidence"],
+    )
+
+    # Домены, которые можно переводить на новый адрес: имя должно быть чистым
+    all_domains = [
+        {"domain": row.domain}
+        for row in db_session.query(infra.InfraServerDomain)
+        .filter(infra.InfraServerDomain.server_id == anomaly.server_id)
+        .order_by(infra.InfraServerDomain.domain)
+        .all()
+    ]
+    safe, unsafe = diag.domains_safe_to_repoint(all_domains, blocked_snis)
+    safe_names = [item["domain"] for item in safe]
+    unsafe_names = [item["domain"] for item in unsafe]
+
+    if blocked_snis:
+        _send_alert(
+            "🟥 <b>ТСПУ: заблокировано имя</b>\n\n"
+            f"Сервер: <b>{title}</b>\n"
+            "Имена: "
+            + ", ".join(f"<code>{name}</code>" for name in blocked_snis)
+            + "\n\n<b>A-записи этих доменов не менялись намеренно:</b> новый "
+            "адрес под фильтруемым именем рискует уйти в бан следом, а само "
+            "имя от смены адреса не заработает.\n\n"
+            "<b>Требуется ручное вмешательство:</b> клиентов нужно перевести "
+            "на другое имя, а это правка хостов в Remnawave и обновление "
+            "подписок.\n"
+            + (
+                "Чистые имена этого сервера: "
+                + ", ".join(f"<code>{n}</code>" for n in safe_names)
+                if safe_names
+                else "⚠️ Чистых имён у сервера не осталось — нужен новый домен."
+            )
+            + "\n\n<b>Как это выяснено:</b>\n" + evidence_text
+        )
+
+    if not blocked_ips:
+        return
+
+    if not verdict["actionable"]:
+        _send_alert(
+            "🟠 <b>ТСПУ: похоже на бан адреса, но уверенности мало</b>\n\n"
+            f"Сервер: <b>{title}</b>\n"
+            "Адреса: "
+            + ", ".join(f"<code>{ip}</code>" for ip in blocked_ips)
+            + "\n\nАвтозамена не выполнена.\n\n"
+            "<b>Проверки:</b>\n" + evidence_text
+        )
+        return
+
+    if not cfg["infra_auto_replace_enabled"]:
+        _send_alert(
+            "🔴 <b>ТСПУ подтвердил блокировку адреса, автозамена выключена</b>"
+            f"\n\nСервер: <b>{title}</b>\n"
+            "Адреса: "
+            + ", ".join(f"<code>{ip}</code>" for ip in blocked_ips)
+            + "\n\nЗамените адрес вручную "
+            "(настройка infra_auto_replace_enabled).\n\n"
+            "<b>Проверки:</b>\n" + evidence_text
+        )
+        return
+
+    if not safe_names:
+        # Все имена сервера под фильтром: менять адрес некуда и незачем
+        _send_alert(
+            "🟥 <b>ТСПУ: заблокированы и адрес, и все имена сервера</b>\n\n"
+            f"Сервер: <b>{title}</b>\n"
+            "Адреса: "
+            + ", ".join(f"<code>{ip}</code>" for ip in blocked_ips)
+            + "\nИмена: "
+            + ", ".join(f"<code>{n}</code>" for n in unsafe_names)
+            + "\n\nЗамена адреса не выполнялась: переводить клиентов внутри "
+            "этого сервера некуда, нужен новый домен.\n\n"
+            "<b>Проверки:</b>\n" + evidence_text
+        )
+        return
+
+    for blocked_ip in blocked_ips:
+        try:
+            infra.request_replacement(
+                db_session,
+                anomaly.server_id,
+                blocked_ip,
+                created_by="auto:anomaly",
+                anomaly_id=anomaly.id,
+                domains=safe_names,
+            )
+        except infra.InfraError as e:
+            log.warning(
+                "infra: cannot create replacement for %s: %s",
+                blocked_ip, e.message,
+            )
+
+
+def process_anomalies(db_session) -> None:
+    from engine import infra
+    from engine import infra_diagnosis as diag
+
+    now = infra.utcnow()
     anomalies = (
         db_session.query(infra.InfraAnomaly)
-        .filter(infra.InfraAnomaly.status == "checking")
+        .filter(infra.InfraAnomaly.status.in_(("checking", "checking_sni")))
         .all()
     )
     for anomaly in anomalies:
-        run_ids = [int(run_id) for run_id in anomaly.censor_run_ids or []]
-        runs = (
-            db_session.query(infra.CensorCheckRun)
-            .filter(infra.CensorCheckRun.id.in_(run_ids))
-            .all()
-            if run_ids
-            else []
-        )
         server = db_session.get(infra.InfraServer, anomaly.server_id)
         title = infra.server_title(server) if server else f"#{anomaly.server_id}"
+        details = dict(anomaly.details or {})
+        timed_out = bool(
+            anomaly.created_at
+            and now - anomaly.created_at
+            > timedelta(minutes=infra.ANOMALY_CHECK_TIMEOUT_MINUTES)
+        )
 
-        pending = [run for run in runs if run.status == "pending"]
-        if pending:
-            if anomaly.created_at and now - anomaly.created_at > timedelta(
-                minutes=infra.ANOMALY_CHECK_TIMEOUT_MINUTES
-            ):
-                anomaly.status = "error"
-                anomaly.resolved_at = now
-                _send_alert(
-                    "🟠 <b>Аномалия нагрузки: замеры ТСПУ не завершились</b>\n\n"
-                    f"Сервер: <b>{title}</b>\n"
-                    "Проверьте сервер и замеры вручную."
-                )
-            continue
-
-        blocked_ips = []
-        completed = 0
-        for run in runs:
-            if run.status != "complete":
-                continue
-            completed += 1
-            availability = ripe_atlas.run_availability_percent(run)
-            if (
-                availability is not None
-                and availability <= ripe_atlas.ALERT_BLOCKED_MAX
-            ):
-                check = db_session.get(infra.CensorCheck, run.check_id)
-                if check is not None and check.target_ip not in blocked_ips:
-                    blocked_ips.append(check.target_ip)
-
-        if blocked_ips:
-            anomaly.status = "confirmed"
-            anomaly.resolved_at = now
-            log.warning(
-                "infra: anomaly confirmed server=%s blocked_ips=%s",
-                title,
-                blocked_ips,
-            )
-            if not cfg["infra_auto_replace_enabled"]:
-                _send_alert(
-                    "🔴 <b>ТСПУ подтвердил блокировку, автозамена выключена</b>\n\n"
-                    f"Сервер: <b>{title}</b>\n"
-                    "IP: " + ", ".join(f"<code>{ip}</code>" for ip in blocked_ips)
-                    + "\n\nЗамените IP вручную "
-                    "(настройка infra_auto_replace_enabled)."
-                )
-                continue
-            for blocked_ip in blocked_ips:
-                try:
-                    infra.request_replacement(
-                        db_session,
-                        anomaly.server_id,
-                        blocked_ip,
-                        created_by="auto:anomaly",
-                        anomaly_id=anomaly.id,
-                    )
-                except infra.InfraError as e:
-                    log.warning(
-                        "infra: cannot create replacement for %s: %s",
-                        blocked_ip,
-                        e.message,
-                    )
-        elif completed:
-            anomaly.status = "dismissed"
-            anomaly.resolved_at = now
-            log.info(
-                "infra: anomaly dismissed server=%s (TSPU ok, traffic drop "
-                "is not a block)",
-                title,
-            )
-        else:
+        if "ip_runs" not in details:
+            # Аномалия создана прежней версией: закрываем, не гадая по
+            # старым данным — новая диагностика запустится следующей
             anomaly.status = "error"
             anomaly.resolved_at = now
-            _send_alert(
-                "🟠 <b>Аномалия нагрузки: замеры ТСПУ завершились ошибкой</b>\n\n"
-                f"Сервер: <b>{title}</b>\n"
-                "Проверьте сервер и замеры вручную."
+            log.info(
+                "infra: anomaly #%s in legacy format, closed without verdict",
+                anomaly.id,
             )
+            continue
 
+        _ip_probes, _sni_probes, pending = _anomaly_probe_maps(
+            db_session, details
+        )
+        if pending and not timed_out:
+            continue
+
+        if anomaly.status == "checking":
+            ip_probes, _s, _p = _anomaly_probe_maps(db_session, details)
+            live_ips = [
+                ip for ip, probe in ip_probes.items()
+                if diag.probe_passed(probe)
+            ]
+            burned = diag.control_name_burned(ip_probes)
+            if live_ips and not burned:
+                # Фаза 2: имена проверяются на доказанно живом адресе
+                started = infra.start_sni_diagnosis(
+                    db_session, server, live_ips[0],
+                    reason="ANOMALY_SNI_DIAGNOSIS",
+                )
+                if started["runs"]:
+                    details["sni_runs"] = started["runs"]
+                    details["sni_probe_ip"] = live_ips[0]
+                    anomaly.details = dict(details)
+                    anomaly.censor_run_ids = list(
+                        (details.get("ip_runs") or {}).values()
+                    ) + list(started["runs"].values())
+                    anomaly.status = "checking_sni"
+                    continue
+            # Живых адресов нет либо имена проверить не на чем: вердикт
+            # выносится по тому, что уже известно
+            _finalize_anomaly(db_session, anomaly, server, title, details)
+            continue
+
+        _finalize_anomaly(db_session, anomaly, server, title, details)
 
 # --- замена IP --------------------------------------------------------------
 
@@ -804,10 +1014,14 @@ def _process_replacement(db_session, replacement) -> None:
         _replacement_step_pending(db_session, replacement, server, title)
     elif replacement.status == "installing":
         _replacement_step_installing(db_session, replacement, server)
+    elif replacement.status == "verifying":
+        _replacement_step_verifying(db_session, replacement, server)
     elif replacement.status == "dns_add":
         _replacement_step_dns_add(db_session, replacement, server)
     elif replacement.status == "dns_remove":
         _replacement_step_dns_remove(db_session, replacement, server, title)
+    elif replacement.status == "confirming":
+        _replacement_step_confirming(db_session, replacement, server, title)
 
 
 def _replacement_step_pending(db_session, replacement, server, title) -> None:
@@ -1077,7 +1291,7 @@ def _replacement_step_installing(db_session, replacement, server) -> None:
             f"IP {replacement.new_ip} установлен на интерфейс "
             f"(agent: {command.result or {}})",
         )
-        replacement.status = "dns_add"
+        _start_candidate_verification(db_session, replacement, server)
         return
     _fail_replacement(
         db_session,
@@ -1086,6 +1300,129 @@ def _replacement_step_installing(db_session, replacement, server) -> None:
         f"Агент не смог установить IP {replacement.new_ip}: "
         f"{command.error or command.status}",
     )
+
+
+def _start_candidate_verification(db_session, replacement, server) -> None:
+    """Проверка кандидата контрольным именем ДО публикации в DNS.
+
+    Адрес уже поднят на интерфейсе, но клиентам ещё не отдан: измерение
+    целится в адрес напрямую и несёт имя в рукопожатии, поэтому DNS для
+    проверки не нужен. Публиковать адрес вслепую нельзя — именно так в
+    аварии в DNS попал уже заблокированный адрес, и понять это было нечем.
+    """
+    from engine import infra
+
+    cfg = infra.get_settings(db_session)
+    control_names = infra.parse_control_names(cfg["infra_control_names"])
+    if not control_names:
+        # Проверять нечем: не блокируем замену, но говорим об этом в журнале
+        _rlog(
+            replacement,
+            "verify_skipped",
+            "Контрольное имя не задано — кандидат публикуется без проверки",
+        )
+        replacement.status = "dns_add"
+        return
+
+    try:
+        started = infra.start_diagnosis_probes(
+            db_session,
+            [(replacement.new_ip, control_names[0])],
+            reason="CANDIDATE_VERIFY",
+        )
+    except Exception as e:
+        # Проверка — усиление, а не обязательное условие: если её нельзя
+        # провести (нет ключа Atlas, недоступна сеть), замена продолжается
+        # по прежнему сценарию, но след в журнале остаётся
+        log.exception("infra: candidate verification could not start")
+        _rlog(
+            replacement,
+            "verify_skipped",
+            f"Проверку кандидата запустить не удалось ({e!r}) — публикуем "
+            "без неё",
+        )
+        replacement.status = "dns_add"
+        return
+    run_ids = list(started["runs"].values())
+    if not run_ids:
+        _rlog(
+            replacement,
+            "verify_skipped",
+            "Проверку кандидата запустить не удалось ("
+            + "; ".join(started["errors"])
+            + ") — публикуем без неё",
+        )
+        replacement.status = "dns_add"
+        return
+
+    replacement.verify_run_id = run_ids[0]
+    replacement.status = "verifying"
+    _rlog(
+        replacement,
+        "verifying",
+        f"Проверяем кандидата {replacement.new_ip} контрольным именем "
+        f"{control_names[0]} до публикации в DNS",
+    )
+
+
+def _replacement_step_verifying(db_session, replacement, server) -> None:
+    """Итог проверки кандидата: публиковать или перебирать дальше."""
+    from engine import infra
+    from engine import infra_diagnosis as diag
+
+    run = (
+        db_session.get(infra.CensorCheckRun, replacement.verify_run_id)
+        if replacement.verify_run_id
+        else None
+    )
+    if run is None:
+        _rlog(
+            replacement,
+            "verify_skipped",
+            "Прогон проверки кандидата потерян — публикуем без него",
+        )
+        replacement.status = "dns_add"
+        return
+    if run.status == "pending":
+        return  # ждём зонды
+    probe = infra.probe_from_run(run)
+    if probe is None:
+        _rlog(
+            replacement,
+            "verify_skipped",
+            f"Проверка кандидата не дала результата ({run.error_message or run.status})"
+            " — публикуем без неё",
+        )
+        replacement.status = "dns_add"
+        return
+
+    if diag.probe_passed(probe):
+        _rlog(
+            replacement,
+            "verified",
+            f"Кандидат {replacement.new_ip} чист: контрольное имя проходит "
+            f"({diag.availability_pct(probe)}% зондов, "
+            f"{probe['ok_probes']}/{probe['total_probes']}) — публикуем",
+        )
+        replacement.status = "dns_add"
+        return
+
+    # Кандидат сам под фильтром: в DNS он не попадает, помечаем и берём
+    # следующий резерв — алгоритм перебирает варианты, а не сдаётся с первого
+    stage = diag.dominant_stage(probe) or "нет ответа"
+    _rlog(
+        replacement,
+        "candidate_blocked",
+        f"Кандидат {replacement.new_ip} ЗАБЛОКИРОВАН: контрольное имя не "
+        f"проходит ({diag.availability_pct(probe)}% зондов, "
+        f"{probe['ok_probes']}/{probe['total_probes']}, стадия {stage}). "
+        "В DNS не публикуется, пробуем следующий резерв",
+    )
+    _mark_ip_blocked(db_session, replacement.server_id, replacement.new_ip)
+    replacement.new_ip = None
+    replacement.command_id = None
+    replacement.verify_run_id = None
+    replacement.status = "pending"
 
 
 def _replacement_step_dns_add(db_session, replacement, server) -> None:
@@ -1125,9 +1462,144 @@ def _replacement_step_dns_remove(db_session, replacement, server, title) -> None
         _rlog(replacement, "dns_remove", f"Cloudflare недоступен: {e}")
         return  # retry
 
+    _mark_old_ip_blocked(db_session, replacement)
+    _start_replacement_confirmation(db_session, replacement, title)
+
+
+def _start_replacement_confirmation(db_session, replacement, title) -> None:
+    """Постпроверка: заработала ли связка «новый адрес + клиентское имя».
+
+    Проверять контрольным именем здесь нельзя — оно доказывало чистоту
+    адреса, а теперь важна работоспособность именно того сочетания, которым
+    будут пользоваться клиенты. Без этого шага механизм рапортует об успехе,
+    ни разу не убедившись, что стало лучше.
+    """
+    from engine import infra
+
+    client_name = (replacement.domains or [None])[0]
+    if not client_name:
+        _finish_replacement(db_session, replacement, title, confirmed=None)
+        return
+    try:
+        started = infra.start_diagnosis_probes(
+            db_session,
+            [(replacement.new_ip, client_name)],
+            reason="REPLACEMENT_CONFIRM",
+        )
+    except Exception as e:
+        log.exception("infra: replacement confirmation could not start")
+        _rlog(
+            replacement,
+            "confirm_skipped",
+            f"Постпроверку запустить не удалось ({e!r})",
+        )
+        _finish_replacement(db_session, replacement, title, confirmed=None)
+        return
+
+    run_ids = list(started["runs"].values())
+    if not run_ids:
+        _rlog(
+            replacement,
+            "confirm_skipped",
+            "Постпроверку запустить не удалось ("
+            + "; ".join(started["errors"]) + ")",
+        )
+        _finish_replacement(db_session, replacement, title, confirmed=None)
+        return
+
+    replacement.verify_run_id = run_ids[0]
+    replacement.status = "confirming"
+    _rlog(
+        replacement,
+        "confirming",
+        f"Проверяем, что связка {replacement.new_ip} + {client_name} "
+        "действительно работает",
+    )
+
+
+def _replacement_step_confirming(db_session, replacement, server, title) -> None:
+    """Итог постпроверки: успех подтверждён или замена не помогла."""
+    from engine import infra
+    from engine import infra_diagnosis as diag
+
+    run = (
+        db_session.get(infra.CensorCheckRun, replacement.verify_run_id)
+        if replacement.verify_run_id
+        else None
+    )
+    if run is None:
+        _finish_replacement(db_session, replacement, title, confirmed=None)
+        return
+    if run.status == "pending":
+        return
+    probe = infra.probe_from_run(run)
+    if probe is None:
+        _rlog(
+            replacement,
+            "confirm_skipped",
+            f"Постпроверка не дала результата ({run.error_message or run.status})",
+        )
+        _finish_replacement(db_session, replacement, title, confirmed=None)
+        return
+
+    client_name = (replacement.domains or [""])[0]
+    if diag.probe_passed(probe):
+        _rlog(
+            replacement,
+            "confirmed",
+            f"Связка {replacement.new_ip} + {client_name} работает "
+            f"({diag.availability_pct(probe)}% зондов, "
+            f"{probe['ok_probes']}/{probe['total_probes']})",
+        )
+        _finish_replacement(db_session, replacement, title, confirmed=True)
+        return
+
+    stage = diag.dominant_stage(probe) or "нет ответа"
+    _rlog(
+        replacement,
+        "not_confirmed",
+        f"Связка {replacement.new_ip} + {client_name} НЕ работает "
+        f"({diag.availability_pct(probe)}% зондов, "
+        f"{probe['ok_probes']}/{probe['total_probes']}, стадия {stage}) — "
+        "замена адреса проблему не решила",
+    )
+    _finish_replacement(db_session, replacement, title, confirmed=False)
+
+
+def _finish_replacement(db_session, replacement, title, confirmed) -> None:
+    """Закрывает замену и шлёт итоговый алерт.
+
+    confirmed: True — связка проверена и работает; False — замена выполнена,
+    но клиентам не помогла (значит причина не только в адресе); None —
+    проверить не удалось.
+    """
+    from engine import infra
+
     replacement.status = "done"
     replacement.finished_at = infra.utcnow()
-    _mark_old_ip_blocked(db_session, replacement)
+
+    journal = "\n".join(
+        f"· {item.get('message', '')}" for item in (replacement.log or [])[-8:]
+    )
+
+    if confirmed is False:
+        _send_alert(
+            "🟠 <b>IP заменён, но проблема не решена</b>\n\n"
+            f"Сервер: <b>{title}</b>\n"
+            f"<code>{replacement.old_ip}</code> → "
+            f"<code>{replacement.new_ip}</code>\n\n"
+            "Новый адрес чист, но клиентская связка «адрес + имя» всё равно "
+            "не проходит. Значит дело не только в адресе: проверьте имя, "
+            "конфигурацию ноды и клиентские конфиги.\n\n"
+            "<b>Что было сделано:</b>\n" + journal
+        )
+        return
+
+    tail = (
+        "Связка «новый адрес + клиентское имя» проверена и работает.\n"
+        if confirmed
+        else "⚠️ Постпроверку провести не удалось — убедитесь вручную.\n"
+    )
     _send_alert(
         "🟡 <b>IP автоматически заменён</b>\n\n"
         f"Сервер: <b>{title}</b>\n"
@@ -1135,28 +1607,33 @@ def _replacement_step_dns_remove(db_session, replacement, server, title) -> None
         + "\n".join(f"<code>{d}</code>" for d in replacement.domains or [])
         + f"\n\n<code>{replacement.old_ip}</code> → "
         f"<code>{replacement.new_ip}</code>\n\n"
-        "Причина: блокировка подтверждена ТСПУ-зондами.\n"
-        "Новый IP установлен на сервер.\n"
-        "Cloudflare DNS успешно обновлён.\n\n"
+        "Причина: блокировка адреса подтверждена ТСПУ-зондами.\n"
+        + tail
+        + "\n<b>Что было сделано:</b>\n" + journal + "\n\n"
         "⚠️ Адрес добавлен через <code>ip addr add</code> и НЕ переживёт "
         "ребут сервера — пропишите его в постоянную сетевую конфигурацию "
         "(netplan/interfaces)."
     )
 
 
-def _mark_old_ip_blocked(db_session, replacement) -> None:
+def _mark_ip_blocked(db_session, server_id, ip: str) -> None:
+    """Помечает адрес заблокированным: он больше не выбирается кандидатом."""
     from engine import infra
 
     row = (
         db_session.query(infra.InfraServerIp)
         .filter(
-            infra.InfraServerIp.server_id == replacement.server_id,
-            infra.InfraServerIp.ip == replacement.old_ip,
+            infra.InfraServerIp.server_id == server_id,
+            infra.InfraServerIp.ip == ip,
         )
         .one_or_none()
     )
     if row is not None and row.blocked_at is None:
         row.blocked_at = infra.utcnow()
+
+
+def _mark_old_ip_blocked(db_session, replacement) -> None:
+    _mark_ip_blocked(db_session, replacement.server_id, replacement.old_ip)
 
 
 # --- обслуживание -----------------------------------------------------------
@@ -1215,6 +1692,7 @@ def run_maintenance() -> None:
     _run("aggregate", lambda db: infra.aggregate_telemetry(db))
     _run("offline", check_offline)
     _run("xray", check_xray)
+    _run("capacity", check_capacity)
     _run("load", check_load)
     if _tick_counter % _ANOMALY_EVERY_TICKS == 0:
         _run("anomaly-detect", detect_anomalies)

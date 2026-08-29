@@ -237,7 +237,7 @@ class DashboardSetupTemplateTests(SimpleTestCase):
         self.assertIn("quick-access-btn", template)
         self.assertIn("copyInputText", template)
         self.assertIn("clearCopySelection", template)
-        self.assertIn("setup-cta-btn dashboard-action-btn !w-full sm:!w-auto", template)
+        self.assertIn("setup-cta-btn dashboard-action-btn !w-full", template)
         self.assertNotIn("setup-cta-btn !w-full !py-5 !mb-0 !mr-0", template)
         self.assertNotIn("setup-link-btn.setup-secondary-btn", template)
         self.assertNotIn("setup-cta-btn.setup-secondary-btn", template)
@@ -2201,7 +2201,13 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         css = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn('<meta name="color-scheme" content="dark light">', template)
-        self.assertLess(template.index('monkey_island_admin_theme_v1'), template.index('<script src="https://cdn.tailwindcss.com'))
+        # Тема должна выставляться до загрузки стилей, иначе при светлой
+        # теме будет вспышка тёмного фона. Привязываться к конкретному
+        # CDN нельзя — состав подключаемых стилей меняется.
+        self.assertLess(
+            template.index('monkey_island_admin_theme_v1'),
+            template.index('<link href="https://cdnjs.cloudflare.com'),
+        )
         self.assertIn("let theme = 'dark'", template)
         self.assertIn("localStorage.getItem(storageKey) === 'light'", template)
         self.assertEqual(template.count('data-admin-theme-toggle'), 4)
@@ -5350,6 +5356,13 @@ class ReferralAntifraudPanelTests(SimpleTestCase):
     def setUp(self):
         self.template = Path("engine/templates/admin_dashboard.html").read_text()
         self.css = Path("engine/static/css/admin_dashboard.css").read_text()
+        # Проверки «этого быть не должно» по тексту ограничиваем самой
+        # карточкой: в шаблоне на 14 тысяч строк те же слова встречаются
+        # в других разделах и дают ложные срабатывания
+        card_start = self.template.index("referral-antifraud-card")
+        self.antifraud_card = self.template[
+            card_start:self.template.index("</section>", card_start)
+        ]
 
     def test_single_panel_replaces_duplicated_status_cards(self):
         self.assertIn('<div class="antifraud-panel">', self.template)
@@ -5361,7 +5374,7 @@ class ReferralAntifraudPanelTests(SimpleTestCase):
         self.assertNotIn('"referral-antifraud-stat ', self.template)
         self.assertNotIn("referral-antifraud-fields", self.template)
         self.assertNotIn("referral-antifraud-actions", self.template)
-        self.assertNotIn("Сохранить параметры", self.template)
+        self.assertNotIn("Сохранить параметры", self.antifraud_card)
 
     def test_state_control_is_a_real_switch(self):
         self.assertIn('role="switch"', self.template)

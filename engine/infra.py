@@ -98,6 +98,13 @@ INFRA_SETTINGS = {
         20, int, "Аномалия: минимальный baseline-трафик, Mbit/s", None),
     "infra_auto_replace_enabled": (
         True, bool, "Автозамена IP после подтверждения ТСПУ", None),
+    "infra_control_names": (
+        "ya.ru,www.microsoft.com", str,
+        "Диагностика: контрольные посторонние имена (через запятую)", None),
+    "infra_capacity_warn_pct": (
+        70, int, "Лимиты ноды: порог предупреждения, %", None),
+    "infra_capacity_alert_cooldown_minutes": (
+        180, int, "Лимиты ноды: кулдаун повторного алерта, мин", None),
     "infra_xray_down_confirm_minutes": (
         3, int, "XRAY: подтверждение падения перед алертом, мин", None),
     "infra_xray_alert_cooldown_minutes": (
@@ -132,7 +139,9 @@ REPLACEMENT_STUCK_MINUTES = 45
 # TTL команды ensure_ip
 COMMAND_TTL_MINUTES = 15
 
-REPLACEMENT_ACTIVE_STATUSES = ("pending", "installing", "dns_add", "dns_remove")
+REPLACEMENT_ACTIVE_STATUSES = (
+    "pending", "installing", "verifying", "dns_add", "dns_remove",
+    "confirming")
 REPLACEMENT_TERMINAL_STATUSES = (
     "done", "dns_cleanup", "manual_required", "failed")
 
@@ -186,7 +195,31 @@ def validate_setting(key: str, raw_value: str) -> str:
         raise InfraError(
             "Допустимые значения: " + ", ".join(str(v) for v in allowed)
         )
+    if key == "infra_control_names" and not parse_control_names(value):
+        raise InfraError(
+            "Нужно хотя бы одно контрольное имя (домены через запятую)"
+        )
     return str(value)
+
+
+def parse_control_names(raw: str) -> list[str]:
+    """Контрольные имена из настройки: строка через запятую -> список.
+
+    Контрольное имя — посторонний домен, заведомо не находящийся под
+    фильтром; проба им по нашему адресу проверяет сам адрес, потому что имя
+    вне подозрений. Список нужен на случай, если контрольное имя всё же
+    выгорит: тогда берётся следующее (см. control_name_burned).
+    """
+    seen = set()
+    names = []
+    for item in str(raw or "").split(","):
+        name = item.strip().strip(".").lower()
+        # Пробел внутри — не домен; защищаемся от мусора в настройке
+        if not name or " " in name or name in seen:
+            continue
+        seen.add(name)
+        names.append(name)
+    return names
 
 
 # --- вычисления -------------------------------------------------------------
@@ -459,6 +492,48 @@ def get_server(db_session, server_id) -> InfraServer:
     return server
 
 
+def diagnosis_payload(anomaly_rows) -> dict | None:
+    """Последний вынесенный диагноз для карточки сервера.
+
+    Состояния адресов и имён отдельными полями не хранятся: источником
+    истины остаётся сам диагноз, привязанный ко времени. Иначе пришлось бы
+    поддерживать копию, которая рано или поздно разойдётся с фактом.
+    """
+    for row in anomaly_rows:
+        verdict = (row.details or {}).get("verdict")
+        if not verdict:
+            continue
+        return {
+            "anomaly_id": row.id,
+            "status": row.status,
+            "at": _dt(row.resolved_at or row.created_at),
+            "control_name": (row.details or {}).get("control_name") or "",
+            "blocked_ips": verdict.get("blocked_ips") or [],
+            "blocked_snis": verdict.get("blocked_snis") or [],
+            "confidence": verdict.get("confidence") or "",
+            "actionable": bool(verdict.get("actionable")),
+            "evidence": (row.details or {}).get("evidence") or [],
+        }
+    return None
+
+
+def capacity_payload(server, cfg: dict) -> dict | None:
+    """Снимок лимитов ноды с готовой оценкой.
+
+    Пороговую логику держим на сервере, чтобы карточка и алерты не разошлись
+    в трактовке одних и тех же чисел.
+    """
+    if not server.capacity:
+        return None
+    verdict = evaluate_capacity(server.capacity, cfg["infra_capacity_warn_pct"])
+    return {
+        "level": verdict["level"],
+        "problems": verdict["problems"],
+        "details": verdict["details"],
+        "raw": server.capacity,
+    }
+
+
 def server_entry_payload(db_session, server, ip_rows, domain_rows) -> dict:
     """Точка входа сервера для карточки админки.
 
@@ -630,6 +705,8 @@ def server_detail_payload(db_session, server_id) -> dict:
         "entry": server_entry_payload(db_session, server, ips, domains),
         "commands": [_command_payload(row) for row in commands],
         "anomalies": [_anomaly_payload(row) for row in anomalies],
+        "diagnosis": diagnosis_payload(anomalies),
+        "capacity": capacity_payload(server, cfg),
         "replacements": [_replacement_payload(row) for row in replacements],
         "who_connects": who_connects_payload(db_session, server.node_name, now),
         "cloudflare_enabled": _cloudflare_enabled(),
@@ -1228,11 +1305,18 @@ def unsnooze_anomaly_detector(db_session, server_id) -> InfraServer:
 
 
 def request_replacement(
-    db_session, server_id, old_ip: str, created_by: str, anomaly_id=None
+    db_session, server_id, old_ip: str, created_by: str, anomaly_id=None,
+    domains: list = None,
 ) -> InfraIpReplacement:
     """replaceFailedIp: заявка на замену IP (идемпотентная).
 
     Вызывается воркером после подтверждения ТСПУ или админом вручную.
+
+    domains — какие домены переводить на новый адрес. None означает «все
+    домены сервера» (прежнее поведение). Диагностика передаёт сюда только
+    домены с чистым именем: публиковать новый адрес под именем, которое
+    само под фильтром, нельзя — имя всё равно не работает, а связывать с
+    ним чистый адрес незачем.
     """
     server = get_server(db_session, server_id)
     old_ip = (old_ip or "").strip()
@@ -1273,13 +1357,14 @@ def request_replacement(
     if done is not None and ip_row.blocked_at is not None:
         return done
 
-    domains = [
-        row.domain
-        for row in db_session.query(InfraServerDomain)
-        .filter(InfraServerDomain.server_id == server.id)
-        .order_by(InfraServerDomain.domain)
-        .all()
-    ]
+    if domains is None:
+        domains = [
+            row.domain
+            for row in db_session.query(InfraServerDomain)
+            .filter(InfraServerDomain.server_id == server.id)
+            .order_by(InfraServerDomain.domain)
+            .all()
+        ]
     replacement = InfraIpReplacement(
         server_id=server.id,
         anomaly_id=anomaly_id,
@@ -1298,6 +1383,394 @@ def request_replacement(
     db_session.add(replacement)
     db_session.flush()
     return replacement
+
+
+# --- лимиты ноды (conntrack, nginx, дескрипторы) ----------------------------
+
+
+def evaluate_capacity(capacity: dict, warn_pct: int) -> dict:
+    """Оценка снимка лимитов: {"level", "problems", "details"}.
+
+    level: "crit" — потолок исчерпан и нода теряет клиентов (изменения DNS
+    запрещаются, диагноз NODE_CAPACITY); "warn" — пора поднимать потолок,
+    но клиенты ещё обслуживаются; "ok" — запас есть.
+
+    Приближение к порогу НЕ отключает диагностику блокировок: нагруженная,
+    но исправная нода должна по-прежнему проверяться на баны.
+    """
+    if not capacity:
+        return {"level": "ok", "problems": [], "details": []}
+
+    problems: list[str] = []
+    details: list[str] = []
+    level = "ok"
+
+    def escalate(new_level):
+        nonlocal level
+        order = {"ok": 0, "warn": 1, "crit": 2}
+        if order[new_level] > order[level]:
+            level = new_level
+
+    conntrack = capacity.get("conntrack") or {}
+    usage = conntrack.get("usage_pct")
+    insert_failed = conntrack.get("insert_failed_delta") or 0
+    if usage is not None:
+        details.append(
+            f"conntrack: {conntrack.get('count')} / {conntrack.get('max')} "
+            f"({usage}%)"
+        )
+        if insert_failed > 0:
+            escalate("crit")
+            problems.append(
+                f"conntrack переполнен: не удалось создать {insert_failed} "
+                "записей за последний интервал — ядро отбрасывает пакеты "
+                "новых соединений"
+            )
+        elif usage >= warn_pct:
+            escalate("warn")
+            problems.append(
+                f"conntrack заполнен на {usage}% — пора поднимать "
+                "nf_conntrack_max"
+            )
+
+    nginx = capacity.get("nginx") or {}
+    recent = nginx.get("recent_errors") or []
+    if recent:
+        escalate("crit")
+        problems.append("nginx: " + "; ".join(recent))
+    worker_connections = nginx.get("worker_connections")
+    if worker_connections is not None:
+        details.append(f"nginx worker_connections: {worker_connections}")
+        if worker_connections <= 1024:
+            escalate("warn")
+            problems.append(
+                f"nginx worker_connections={worker_connections} — значение по "
+                "умолчанию, для VPN-ноды мало"
+            )
+
+    # Фактические лимиты живых worker-процессов: unit может декларировать
+    # большой hard, а процессы, поднятые до его применения, работают со
+    # старым soft — расхождение и есть диагноз
+    stale_workers = []
+    tight_workers = []
+    for worker in nginx.get("workers") or []:
+        soft = worker.get("nofile_soft")
+        hard = worker.get("nofile_hard")
+        fd = worker.get("fd")
+        if soft and hard and soft < hard and soft <= 1024:
+            stale_workers.append(f"{worker.get('pid')} (soft={soft}, hard={hard})")
+        if soft and soft > 0 and fd and fd >= soft * warn_pct / 100:
+            tight_workers.append(f"{worker.get('pid')} ({fd}/{soft})")
+    if stale_workers:
+        escalate("warn")
+        problems.append(
+            "nginx-worker'ы работают со старым лимитом дескрипторов: "
+            + ", ".join(stale_workers[:5])
+            + " — после graceful reload старые процессы сохраняют прежний "
+            "soft-лимит, нужен перезапуск"
+        )
+    if tight_workers:
+        escalate("warn")
+        problems.append(
+            "nginx-worker'ы близки к своему лимиту дескрипторов: "
+            + ", ".join(tight_workers[:5])
+        )
+
+    xray = capacity.get("xray") or {}
+    xray_fd = xray.get("fd")
+    xray_soft = xray.get("nofile_soft")
+    if xray_fd and xray_soft and xray_soft > 0:
+        details.append(f"xray дескрипторы: {xray_fd} / {xray_soft}")
+        if xray_fd >= xray_soft * warn_pct / 100:
+            escalate("warn")
+            problems.append(
+                f"xray занял {xray_fd} дескрипторов из {xray_soft}"
+            )
+
+    tcp = capacity.get("tcp") or {}
+    overflows = tcp.get("listen_overflows_delta") or 0
+    if overflows > 0:
+        escalate("warn")
+        problems.append(
+            f"очередь принятия соединений переполнялась {overflows} раз за "
+            "последний интервал"
+        )
+    if (tcp.get("abort_on_memory_delta") or 0) > 0:
+        escalate("crit")
+        problems.append("соединения обрываются из-за нехватки памяти")
+
+    system = capacity.get("system") or {}
+    if (system.get("oom_kills_delta") or 0) > 0:
+        escalate("crit")
+        problems.append("сработал OOM-killer")
+
+    return {"level": level, "problems": problems, "details": details}
+
+
+# --- диагностические пробы (адреса и имена отдельно) -------------------------
+
+# Служебные строки замеров создаются с этим префиксом в имени: они не ходят
+# по расписанию (interval_minutes=None) и не шлют собственных алертов —
+# вердикт выносит классификатор по совокупности проб, а не каждая проба.
+DIAG_CHECK_PREFIX = "DIAG"
+
+
+def ensure_probe_check(db_session, target_ip: str, sni: str) -> CensorCheck:
+    """Строка замера для конкретной пары «адрес + имя» (найти или создать).
+
+    Ищем именно по паре: одна и та же пара переиспользуется между
+    диагностиками, а разные пары — это разные проверки, потому что вся суть
+    схемы в сравнении «тот же адрес, другое имя» и наоборот.
+    """
+    check = (
+        db_session.query(CensorCheck)
+        .filter(CensorCheck.target_ip == target_ip, CensorCheck.sni == sni)
+        .order_by(CensorCheck.is_enabled.desc(), CensorCheck.id)
+        .first()
+    )
+    if check is not None:
+        return check
+    check = CensorCheck(
+        name=f"{DIAG_CHECK_PREFIX} {target_ip} / {sni}"[:160],
+        target_ip=target_ip,
+        sni=sni,
+        port=443,
+        interval_minutes=None,
+        is_enabled=True,
+        light_mode=True,
+        alerts_enabled=False,
+    )
+    db_session.add(check)
+    db_session.flush()
+    return check
+
+
+def probe_key(target_ip: str, sni: str) -> str:
+    """Ключ пробы в JSONB: кортежи в JSON не сохранить."""
+    return f"{target_ip}|{sni}"
+
+
+def start_diagnosis_probes(
+    db_session, pairs: list, probe_ids: list = None, reason: str = ""
+) -> dict:
+    """Запускает пробы по парам (адрес, имя) ОДНИМ набором зондов.
+
+    Общий набор принципиален: если пробы пойдут по разным зондам, разницу
+    между ними нельзя будет приписать проверяемому параметру — она может
+    объясняться разным составом зондов.
+
+    Возвращает {"runs": {ключ: run_id}, "errors": [...]}.
+    """
+    runs: dict[str, int] = {}
+    errors: list[str] = []
+    if not pairs:
+        return {"runs": runs, "errors": ["Нечего проверять"]}
+
+    if probe_ids is None:
+        probe_ids = ripe_atlas.resolve_probe_ids(geo=False, light=True)
+
+    for target_ip, sni in pairs:
+        check = ensure_probe_check(db_session, target_ip, sni)
+        api_key = ripe_atlas.resolve_api_key(
+            db_session, check, django_settings.RIPE_ATLAS_API_KEY
+        )
+        if not api_key:
+            errors.append(f"{target_ip} / {sni}: нет API-ключа RIPE Atlas")
+            continue
+        run = ripe_atlas.start_run(
+            db_session,
+            check,
+            api_key,
+            ripe_atlas.resolve_public_flag(db_session, check),
+            bool(check.geo_mode),
+            True,
+            probe_ids,
+        )
+        if run.status == ripe_atlas.RUN_STATUS_ERROR:
+            errors.append(
+                f"{target_ip} / {sni}: замер не запустился "
+                f"({run.error_message})"
+            )
+        runs[probe_key(target_ip, sni)] = run.id
+        log.info(
+            "infra: diagnosis probe ip=%s sni=%s run=%s reason=%s",
+            target_ip, sni, run.id, reason,
+        )
+    return {"runs": runs, "errors": errors}
+
+
+def probe_from_run(run) -> dict | None:
+    """Прогон -> проба для классификатора; None пока прогон не завершён."""
+    if run is None or run.status != ripe_atlas.RUN_STATUS_COMPLETE:
+        return None
+    stages: dict[str, int] = {}
+    for item in run.results or []:
+        stage = item.get("stage") or "unknown"
+        stages[stage] = stages.get(stage, 0) + 1
+    return {
+        "ok_probes": run.ok_probes or 0,
+        "total_probes": run.total_probes or 0,
+        "stages": stages,
+    }
+
+
+def collect_probes(db_session, runs_map: dict) -> tuple:
+    """{ключ: run_id} -> ({ключ: проба}, есть_ли_незавершённые)."""
+    run_ids = [int(v) for v in (runs_map or {}).values()]
+    if not run_ids:
+        return {}, False
+    rows = (
+        db_session.query(CensorCheckRun)
+        .filter(CensorCheckRun.id.in_(run_ids))
+        .all()
+    )
+    by_id = {row.id: row for row in rows}
+    probes: dict[str, dict] = {}
+    pending = False
+    for key, run_id in (runs_map or {}).items():
+        run = by_id.get(int(run_id))
+        if run is not None and run.status == ripe_atlas.RUN_STATUS_PENDING:
+            pending = True
+            continue
+        probe = probe_from_run(run)
+        if probe is not None:
+            probes[key] = probe
+    return probes, pending
+
+
+def server_probe_targets(db_session, server) -> tuple:
+    """Что проверять у сервера: (адреса, имена).
+
+    Адреса — активные публичные IPv4 на интерфейсе: приватные (docker/warp)
+    точками входа не являются, а не поднятый на интерфейсе адрес дал бы
+    такой же таймаут, как заблокированный, и был бы ошибочно объявлен
+    забаненным.
+
+    Имена — то, что клиенты реально шлют в рукопожатии. Пока это домены
+    A-записей; когда у ноды маскировочное имя отличается от домена, оно
+    будет храниться отдельно и подставляться здесь.
+    """
+    ips = []
+    for row in (
+        db_session.query(InfraServerIp)
+        .filter(
+            InfraServerIp.server_id == server.id,
+            InfraServerIp.on_interface.is_(True),
+            InfraServerIp.blocked_at.is_(None),
+        )
+        .order_by(InfraServerIp.ip)
+        .all()
+    ):
+        try:
+            address = ipaddress.ip_address(row.ip)
+        except ValueError:
+            continue
+        if address.version == 4 and address.is_global:
+            ips.append(row.ip)
+
+    names = [
+        row.domain
+        for row in db_session.query(InfraServerDomain)
+        .filter(InfraServerDomain.server_id == server.id)
+        .order_by(InfraServerDomain.domain)
+        .all()
+    ]
+    return ips[:TSPU_MAX_TARGETS], names[:TSPU_MAX_TARGETS]
+
+
+def start_ip_diagnosis(db_session, server, reason: str = "") -> dict:
+    """Фаза 1: проверка АДРЕСОВ сервера контрольным посторонним именем.
+
+    Контрольное имя заведомо вне фильтра, поэтому его отказ на адресе
+    указывает на сам адрес. Пробы имён запускаются потом и только на
+    адресах, признанных живыми: на мёртвом адресе падает всё, и вывод об
+    имени был бы ложным.
+    """
+    cfg = get_settings(db_session)
+    control_names = parse_control_names(cfg["infra_control_names"])
+    if not control_names:
+        return {"runs": {}, "errors": ["Не задано контрольное имя"],
+                "control_name": ""}
+    control_name = control_names[0]
+
+    ips, _names = server_probe_targets(db_session, server)
+    if not ips:
+        return {"runs": {}, "errors": ["Нет активных публичных IPv4"],
+                "control_name": control_name}
+
+    started = start_diagnosis_probes(
+        db_session,
+        [(ip, control_name) for ip in ips],
+        reason=reason or "IP_DIAGNOSIS",
+    )
+    started["control_name"] = control_name
+    return started
+
+
+def start_manual_diagnosis(db_session, server, actor: str = "") -> dict:
+    """Полная диагностика по кнопке в карточке.
+
+    Создаёт аномалию, чтобы дальше сработал обычный конвейер: фаза 1
+    (адреса), фаза 2 (имена на живом адресе), классификация и алерт с
+    журналом проверок. Ручной запуск отличается от автоматического только
+    поводом — вердикт и действия те же.
+    """
+    running = (
+        db_session.query(InfraAnomaly)
+        .filter(
+            InfraAnomaly.server_id == server.id,
+            InfraAnomaly.status.in_(("checking", "checking_sni")),
+        )
+        .first()
+    )
+    if running is not None:
+        # Параллельные диагностики одного сервера только жгли бы кредиты
+        return {
+            "runs": {}, "errors": ["Диагностика уже идёт"],
+            "anomaly_id": running.id, "control_name": "",
+        }
+
+    result = start_ip_diagnosis(db_session, server, reason=f"manual:{actor}")
+    if not result["runs"]:
+        return dict(result, anomaly_id=None)
+
+    anomaly = InfraAnomaly(
+        server_id=server.id,
+        kind="manual_check",
+        status="checking",
+        details={
+            "control_name": result.get("control_name") or "",
+            "ip_runs": result["runs"],
+            "diagnosis_errors": result.get("errors") or [],
+            "started_by": actor or "manual",
+        },
+        censor_run_ids=list(result["runs"].values()),
+    )
+    db_session.add(anomaly)
+    db_session.flush()
+    log.info(
+        "infra: manual diagnosis server=%s anomaly=%s probes=%s",
+        server.node_name, anomaly.id, list(result["runs"].keys()),
+    )
+    return dict(result, anomaly_id=anomaly.id)
+
+
+def start_sni_diagnosis(
+    db_session, server, live_ip: str, reason: str = ""
+) -> dict:
+    """Фаза 2: проверка ИМЁН на адресе, признанном живым.
+
+    Адрес доказанно жив, значит отказ имени на нём — доказательство бана
+    этого имени. Проверяются именно те пары, которые потом окажутся в DNS.
+    """
+    _ips, names = server_probe_targets(db_session, server)
+    if not names:
+        return {"runs": {}, "errors": ["У сервера нет привязанных доменов"]}
+    return start_diagnosis_probes(
+        db_session,
+        [(live_ip, name) for name in names],
+        reason=reason or "SNI_DIAGNOSIS",
+    )
 
 
 # --- принудительный запуск «Замеров ТСПУ» -----------------------------------

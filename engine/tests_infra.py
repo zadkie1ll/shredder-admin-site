@@ -1076,6 +1076,151 @@ class CheckXrayWorkerTests(InfraDbTestCase):
         self.assertIsNone(server.xray_down_since)
 
 
+class ManualDiagnosisTests(InfraDbTestCase):
+    def test_manual_diagnosis_creates_anomaly(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        with mock.patch.object(
+            infra, "start_ip_diagnosis",
+            return_value={"runs": {"185.10.0.10|ya.ru": 7}, "errors": [],
+                          "control_name": "ya.ru"},
+        ):
+            result = infra.start_manual_diagnosis(
+                self.session, server, actor="tester"
+            )
+        self.session.commit()
+
+        self.assertIsNotNone(result["anomaly_id"])
+        anomaly = self.session.query(InfraAnomaly).one()
+        self.assertEqual(anomaly.kind, "manual_check")
+        self.assertEqual(anomaly.status, "checking")
+        # Дальше сработает обычный конвейер: фаза имён и классификация
+        self.assertEqual(anomaly.details["ip_runs"], {"185.10.0.10|ya.ru": 7})
+        self.assertEqual(anomaly.details["control_name"], "ya.ru")
+
+    def test_manual_diagnosis_does_not_duplicate_running_one(self):
+        server = self.make_server()
+        self.session.add(
+            InfraAnomaly(
+                server_id=server.id, status="checking",
+                details={"ip_runs": {"a|b": 1}}, created_at=utcnow(),
+            )
+        )
+        self.session.commit()
+
+        with mock.patch.object(infra, "start_ip_diagnosis") as started:
+            result = infra.start_manual_diagnosis(self.session, server)
+        # Параллельные диагностики одного сервера только жгли бы кредиты
+        started.assert_not_called()
+        self.assertEqual(result["runs"], {})
+        self.assertEqual(self.session.query(InfraAnomaly).count(), 1)
+
+    def test_manual_diagnosis_without_probes_creates_nothing(self):
+        server = self.make_server()
+        with mock.patch.object(
+            infra, "start_ip_diagnosis",
+            return_value={"runs": {}, "errors": ["Нет активных публичных IPv4"],
+                          "control_name": "ya.ru"},
+        ):
+            result = infra.start_manual_diagnosis(self.session, server)
+        self.assertIsNone(result["anomaly_id"])
+        self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
+
+
+class CapacityTests(InfraDbTestCase):
+    CRIT = {
+        "conntrack": {
+            "count": 65536, "max": 65536, "usage_pct": 100,
+            "insert_failed_delta": 42,
+        },
+        "nginx": {
+            "worker_connections": 1024,
+            "recent_errors": ["accept4() failed"],
+            "workers": [
+                {"pid": 1, "fd": 1000, "nofile_soft": 1024,
+                 "nofile_hard": 524288},
+            ],
+        },
+    }
+    WARN = {
+        "conntrack": {
+            "count": 180000, "max": 262144, "usage_pct": 69,
+            "insert_failed_delta": 0,
+        },
+        "nginx": {"worker_connections": 65535, "recent_errors": [],
+                  "workers": []},
+    }
+
+    def test_evaluate_capacity_levels(self):
+        crit = infra.evaluate_capacity(self.CRIT, 70)
+        self.assertEqual(crit["level"], "crit")
+        joined = " ".join(crit["problems"])
+        self.assertIn("conntrack переполнен", joined)
+        self.assertIn("accept4() failed", joined)
+        # Расхождение фактического лимита процесса с unit — отдельный диагноз
+        self.assertIn("старым лимитом дескрипторов", joined)
+
+        warn = infra.evaluate_capacity(
+            dict(self.WARN, conntrack=dict(self.WARN["conntrack"],
+                                           usage_pct=85)),
+            70,
+        )
+        self.assertEqual(warn["level"], "warn")
+
+        self.assertEqual(infra.evaluate_capacity(self.WARN, 70)["level"], "ok")
+        # Нет данных (агент старой версии) — не выдумываем проблем
+        self.assertEqual(infra.evaluate_capacity(None, 70)["level"], "ok")
+
+    def test_crit_capacity_alerts_once_per_cooldown(self):
+        server = self.make_server(capacity=self.CRIT)
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_capacity(self.session)
+        alert.assert_called_once()
+        self.assertIn("упёрлась в лимиты", alert.call_args[0][0])
+        self.assertIsNotNone(server.capacity_crit_alerted_at)
+
+        # Повтор в пределах кулдауна не шлётся
+        with mock.patch.object(infra_worker, "_send_alert") as alert:
+            infra_worker.check_capacity(self.session)
+        alert.assert_not_called()
+
+    def test_warn_capacity_is_preventive(self):
+        capacity = dict(
+            self.WARN,
+            conntrack=dict(self.WARN["conntrack"], usage_pct=85),
+        )
+        server = self.make_server(capacity=capacity)
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_capacity(self.session)
+        alert.assert_called_once()
+        text = alert.call_args[0][0]
+        self.assertIn("Пора поднять лимиты", text)
+        self.assertIn("клиенты не затронуты", text)
+        self.assertIsNotNone(server.capacity_warn_alerted_at)
+
+    def test_recovery_clears_alert_state(self):
+        server = self.make_server(
+            capacity=self.WARN,
+            capacity_warn_alerted_at=utcnow() - timedelta(hours=1),
+        )
+        with mock.patch.object(infra_worker, "_send_alert") as alert:
+            infra_worker.check_capacity(self.session)
+        alert.assert_not_called()
+        self.assertIsNone(server.capacity_warn_alerted_at)
+
+    def test_offline_server_is_skipped(self):
+        self.make_server(
+            last_seen_at=utcnow() - timedelta(hours=2), capacity=self.CRIT
+        )
+        with mock.patch.object(infra_worker, "_send_alert") as alert:
+            infra_worker.check_capacity(self.session)
+        alert.assert_not_called()
+
+
 class DetectAnomalyWorkerTests(InfraDbTestCase):
     def seed_drop(self, server, now):
         # 5 минут сырых сэмплов с обвалом
@@ -1094,7 +1239,9 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
         self.seed_drop(server, now)
 
         with mock.patch.object(
-            infra, "force_tspu_check", return_value={"run_ids": [7], "errors": []}
+            infra, "start_ip_diagnosis",
+            return_value={"runs": {"185.10.0.10|ya.ru": 7}, "errors": [],
+                          "control_name": "ya.ru"},
         ) as forced, mock.patch.object(
             infra_worker, "_send_alert", return_value=True
         ):
@@ -1112,7 +1259,7 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
         server = self.make_server(agent_started_at=now - timedelta(minutes=3))
         BaselineAnomalyTests.seed_baseline(self, server, now)
         self.seed_drop(server, now)
-        with mock.patch.object(infra, "force_tspu_check") as forced:
+        with mock.patch.object(infra, "start_ip_diagnosis") as forced:
             infra_worker.detect_anomalies(self.session)
         forced.assert_not_called()
         self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
@@ -1122,7 +1269,7 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
         server = self.make_server(first_seen_at=now - timedelta(hours=10))
         BaselineAnomalyTests.seed_baseline(self, server, now)
         self.seed_drop(server, now)
-        with mock.patch.object(infra, "force_tspu_check") as forced:
+        with mock.patch.object(infra, "start_ip_diagnosis") as forced:
             infra_worker.detect_anomalies(self.session)
         forced.assert_not_called()
 
@@ -1134,7 +1281,7 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
         )
         BaselineAnomalyTests.seed_baseline(self, server, now)
         self.seed_drop(server, now)
-        with mock.patch.object(infra, "force_tspu_check") as forced:
+        with mock.patch.object(infra, "start_ip_diagnosis") as forced:
             infra_worker.detect_anomalies(self.session)
         forced.assert_not_called()
         self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
@@ -1146,7 +1293,7 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
         server = self.make_server(xray_process_running=False)
         BaselineAnomalyTests.seed_baseline(self, server, now)
         self.seed_drop(server, now)
-        with mock.patch.object(infra, "force_tspu_check") as forced:
+        with mock.patch.object(infra, "start_ip_diagnosis") as forced:
             infra_worker.detect_anomalies(self.session)
         forced.assert_not_called()
         self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
@@ -1158,7 +1305,7 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
         )
         BaselineAnomalyTests.seed_baseline(self, server, now)
         self.seed_drop(server, now)
-        with mock.patch.object(infra, "force_tspu_check") as forced:
+        with mock.patch.object(infra, "start_ip_diagnosis") as forced:
             infra_worker.detect_anomalies(self.session)
         forced.assert_not_called()
         self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
@@ -1175,7 +1322,7 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
         self.session.commit()
         BaselineAnomalyTests.seed_baseline(self, server, now)
         self.seed_drop(server, now)
-        with mock.patch.object(infra, "force_tspu_check") as forced:
+        with mock.patch.object(infra, "start_ip_diagnosis") as forced:
             infra_worker.detect_anomalies(self.session)
         forced.assert_not_called()
         self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
@@ -1207,7 +1354,9 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
         BaselineAnomalyTests.seed_baseline(self, server, now)
         self.seed_drop(server, now)
         with mock.patch.object(
-            infra, "force_tspu_check", return_value={"run_ids": [7], "errors": []}
+            infra, "start_ip_diagnosis",
+            return_value={"runs": {"185.10.0.10|ya.ru": 7}, "errors": [],
+                          "control_name": "ya.ru"},
         ) as forced, mock.patch.object(
             infra_worker, "_send_alert", return_value=True
         ):
@@ -1228,7 +1377,7 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
         self.session.commit()
         BaselineAnomalyTests.seed_baseline(self, server, now)
         self.seed_drop(server, now)
-        with mock.patch.object(infra, "force_tspu_check") as forced:
+        with mock.patch.object(infra, "start_ip_diagnosis") as forced:
             infra_worker.detect_anomalies(self.session)
         forced.assert_not_called()
 
@@ -1247,7 +1396,7 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
             server, start, count=30, step_seconds=10,
             rx_bps=130_000_000, tx_bps=25_000_000, tcp_connections=1250,
         )
-        with mock.patch.object(infra, "force_tspu_check") as forced:
+        with mock.patch.object(infra, "start_ip_diagnosis") as forced:
             infra_worker.detect_anomalies(self.session)
         forced.assert_not_called()
         self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
@@ -1269,7 +1418,9 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
             rx_bps=25_000_000, tx_bps=5_000_000, tcp_connections=250,
         )
         with mock.patch.object(
-            infra, "force_tspu_check", return_value={"run_ids": [7], "errors": []}
+            infra, "start_ip_diagnosis",
+            return_value={"runs": {"185.10.0.10|ya.ru": 7}, "errors": [],
+                          "control_name": "ya.ru"},
         ) as forced, mock.patch.object(
             infra_worker, "_send_alert", return_value=True
         ):
@@ -1287,46 +1438,79 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
             server, start, count=30, step_seconds=10,
             rx_bps=550_000_000, tx_bps=90_000_000, tcp_connections=4900,
         )
-        with mock.patch.object(infra, "force_tspu_check") as forced:
+        with mock.patch.object(infra, "start_ip_diagnosis") as forced:
             infra_worker.detect_anomalies(self.session)
         forced.assert_not_called()
 
 
 class ProcessAnomalyTests(InfraDbTestCase):
-    def make_anomaly(self, server, run_ids):
+    CONTROL = "ya.ru"
+
+    def make_anomaly(self, server, ip_runs, sni_runs=None, status="checking"):
+        """Аномалия в формате двухфазной диагностики.
+
+        ip_runs/sni_runs — {"адрес|имя": run_id}: по ним классификатор
+        отличает пробы адресов (контрольным именем) от проб имён.
+        """
+        details = {
+            "control_name": self.CONTROL,
+            "ip_runs": ip_runs,
+        }
+        if sni_runs:
+            details["sni_runs"] = sni_runs
+        run_ids = list(ip_runs.values()) + list((sni_runs or {}).values())
         anomaly = InfraAnomaly(
             server_id=server.id,
-            status="checking",
+            status=status,
             censor_run_ids=run_ids,
+            details=details,
             created_at=utcnow(),
         )
         self.session.add(anomaly)
         self.session.commit()
         return anomaly
 
-    def make_run(self, target_ip, ok_probes, blocked_probes, status="complete"):
+    def make_run(
+        self, target_ip, ok_probes, blocked_probes, status="complete",
+        sni=None, stage="tls_fail",
+    ):
         check = CensorCheck(
-            name="c", target_ip=target_ip, sni="s.example", port=443
+            name="c", target_ip=target_ip, sni=sni or self.CONTROL, port=443
         )
         self.session.add(check)
         self.session.flush()
+        results = [{"prb_id": i, "ok": True, "stage": "tls_ok"}
+                   for i in range(ok_probes)]
+        results += [{"prb_id": 1000 + i, "ok": False, "stage": stage}
+                    for i in range(blocked_probes)]
         run = CensorCheckRun(
             check_id=check.id,
             status=status,
             total_probes=ok_probes + blocked_probes,
             ok_probes=ok_probes,
             blocked_probes=blocked_probes,
+            results=results,
         )
         self.session.add(run)
         self.session.commit()
         return run
 
     def test_confirmed_block_creates_replacement(self):
+        # Адрес не проходит с контрольным именем — забанен именно адрес
         server = self.make_server()
         self.make_ip(server, "185.10.0.10", on_interface=True)
         self.make_domain(server, "de.example.xyz")
-        run = self.make_run("185.10.0.10", ok_probes=2, blocked_probes=18)
-        anomaly = self.make_anomaly(server, [run.id])
+        ip_run = self.make_run("185.10.0.10", ok_probes=2, blocked_probes=18)
+        sni_run = self.make_run(
+            "185.10.0.11", ok_probes=18, blocked_probes=2,
+            sni="de.example.xyz",
+        )
+        anomaly = self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": ip_run.id},
+            {"185.10.0.11|de.example.xyz": sni_run.id},
+            status="checking_sni",
+        )
 
         with mock.patch.object(infra_worker, "_send_alert", return_value=True):
             infra_worker.process_anomalies(self.session)
@@ -1339,10 +1523,152 @@ class ProcessAnomalyTests(InfraDbTestCase):
         self.assertEqual(replacement.status, "pending")
         self.assertEqual(replacement.anomaly_id, anomaly.id)
 
+    def test_sni_block_does_not_touch_dns(self):
+        # Адрес жив, имя под фильтром: замена адреса запрещена, уходит алерт
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        ip_run = self.make_run("185.10.0.10", ok_probes=18, blocked_probes=2)
+        sni_run = self.make_run(
+            "185.10.0.10", ok_probes=1, blocked_probes=19,
+            sni="de.example.xyz",
+        )
+        anomaly = self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": ip_run.id},
+            {"185.10.0.10|de.example.xyz": sni_run.id},
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        self.assertEqual(anomaly.status, "confirmed")
+        self.assertEqual(anomaly.details["verdict"]["blocked_snis"],
+                         ["de.example.xyz"])
+        self.assertEqual(anomaly.details["verdict"]["blocked_ips"], [])
+        # Замена НЕ создана: менять адрес при бане имени бессмысленно
+        self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
+        text = alert.call_args[0][0]
+        self.assertIn("заблокировано имя", text)
+        self.assertIn("не менялись намеренно", text)
+        # Алерт объясняет, какими проверками это установлено
+        self.assertIn("Как это выяснено", text)
+
+    def test_both_bans_replace_only_clean_domains(self):
+        # Сценарий инцидента: забанены и адрес, и одно из имён
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.20", on_interface=True)
+        self.make_domain(server, "clean.example.xyz")
+        self.make_domain(server, "burned.example.xyz")
+        dead_run = self.make_run(
+            "185.10.0.10", ok_probes=0, blocked_probes=20, stage="tcp_fail"
+        )
+        live_run = self.make_run("185.10.0.20", ok_probes=19, blocked_probes=1)
+        clean_run = self.make_run(
+            "185.10.0.20", ok_probes=18, blocked_probes=2,
+            sni="clean.example.xyz",
+        )
+        burned_run = self.make_run(
+            "185.10.0.20", ok_probes=0, blocked_probes=20,
+            sni="burned.example.xyz",
+        )
+        anomaly = self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": dead_run.id, "185.10.0.20|ya.ru": live_run.id},
+            {
+                "185.10.0.20|clean.example.xyz": clean_run.id,
+                "185.10.0.20|burned.example.xyz": burned_run.id,
+            },
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        verdict = anomaly.details["verdict"]
+        self.assertEqual(verdict["blocked_ips"], ["185.10.0.10"])
+        self.assertEqual(verdict["blocked_snis"], ["burned.example.xyz"])
+        # Адрес меняется, но ТОЛЬКО в домене с чистым именем
+        replacement = self.session.query(InfraIpReplacement).one()
+        self.assertEqual(replacement.old_ip, "185.10.0.10")
+        self.assertEqual(replacement.domains, ["clean.example.xyz"])
+        # И отдельно предупреждение про имя
+        self.assertTrue(
+            any("заблокировано имя" in call[0][0]
+                for call in alert.call_args_list)
+        )
+
+    def test_all_names_blocked_skips_replacement(self):
+        # Все имена сервера под фильтром: переводить клиентов некуда
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.20", on_interface=True)
+        self.make_domain(server, "one.example.xyz")
+        dead_run = self.make_run(
+            "185.10.0.10", ok_probes=0, blocked_probes=20, stage="tcp_fail"
+        )
+        live_run = self.make_run("185.10.0.20", ok_probes=19, blocked_probes=1)
+        burned_run = self.make_run(
+            "185.10.0.20", ok_probes=0, blocked_probes=20,
+            sni="one.example.xyz",
+        )
+        self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": dead_run.id, "185.10.0.20|ya.ru": live_run.id},
+            {"185.10.0.20|one.example.xyz": burned_run.id},
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+
+        self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
+        self.assertTrue(
+            any("все имена сервера" in call[0][0]
+                for call in alert.call_args_list)
+        )
+
+    def test_control_name_burned_blocks_all_actions(self):
+        # Контроль не проходит нигде — виновато контрольное имя, не адреса
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.20", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        run_a = self.make_run("185.10.0.10", ok_probes=0, blocked_probes=20)
+        run_b = self.make_run("185.10.0.20", ok_probes=1, blocked_probes=19)
+        anomaly = self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": run_a.id, "185.10.0.20|ya.ru": run_b.id},
+        )
+
+        with mock.patch.object(infra_worker, "_send_alert", return_value=True):
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        # Ни одной замены: сначала нужно сменить контрольное имя
+        self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
+        self.assertEqual(anomaly.details["verdict"]["blocked_ips"], [])
+
     def test_tspu_ok_dismisses_anomaly(self):
         server = self.make_server()
         run = self.make_run("185.10.0.10", ok_probes=20, blocked_probes=0)
-        anomaly = self.make_anomaly(server, [run.id])
+        anomaly = self.make_anomaly(
+            server, {"185.10.0.10|ya.ru": run.id}, status="checking_sni"
+        )
         with mock.patch.object(infra_worker, "_send_alert") as alert:
             infra_worker.process_anomalies(self.session)
         self.session.commit()
@@ -1357,8 +1683,11 @@ class ProcessAnomalyTests(InfraDbTestCase):
         )
         server = self.make_server()
         self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
         run = self.make_run("185.10.0.10", ok_probes=0, blocked_probes=20)
-        self.make_anomaly(server, [run.id])
+        self.make_anomaly(
+            server, {"185.10.0.10|ya.ru": run.id}, status="checking_sni"
+        )
         with mock.patch.object(
             infra_worker, "_send_alert", return_value=True
         ) as alert:
@@ -1369,6 +1698,190 @@ class ProcessAnomalyTests(InfraDbTestCase):
 
 
 class ReplacementFlowTests(InfraDbTestCase):
+    def setUp(self):
+        super().setUp()
+        # Проверка кандидата ходит в RIPE Atlas; в тестах подменяем её
+        # созданием прогона, чтобы гонять state machine без сети
+        def fake_probes(db, pairs, probe_ids=None, reason=""):
+            runs = {}
+            for target_ip, sni in pairs:
+                check = CensorCheck(
+                    name="verify", target_ip=target_ip, sni=sni, port=443
+                )
+                db.add(check)
+                db.flush()
+                run = CensorCheckRun(check_id=check.id, status="pending")
+                db.add(run)
+                db.flush()
+                runs[f"{target_ip}|{sni}"] = run.id
+            return {"runs": runs, "errors": []}
+
+        patcher = mock.patch.object(
+            infra, "start_diagnosis_probes", side_effect=fake_probes
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    def complete_verification(self, replacement, ok=True):
+        """Отмечает проверку кандидата завершённой с нужным исходом."""
+        run = self.session.get(CensorCheckRun, replacement.verify_run_id)
+        run.status = "complete"
+        run.total_probes = 12
+        run.ok_probes = 11 if ok else 1
+        run.results = [
+            {"prb_id": 1, "ok": ok, "stage": "tls_ok" if ok else "tcp_fail"}
+        ]
+        self.session.commit()
+
+    def cloudflare_mocks(self, old_ip="185.10.0.10"):
+        """Контекст с подменённым Cloudflare: DNS в тестах не трогаем."""
+        records = {"de.example.xyz": [{"id": "r1", "content": old_ip}]}
+        return (
+            mock.patch("engine.cloudflare_dns.is_enabled", return_value=True),
+            mock.patch(
+                "engine.cloudflare_dns.list_a_records",
+                side_effect=lambda domain: records.get(domain, []),
+            ),
+            mock.patch(
+                "engine.cloudflare_dns.ensure_a_record", return_value=True
+            ),
+            mock.patch("engine.cloudflare_dns.delete_a_records", return_value=1),
+        )
+
+    def test_blocked_candidate_is_skipped_and_next_one_tried(self):
+        # Кандидат сам оказался под фильтром: в DNS он не публикуется,
+        # помечается заблокированным, и перебирается следующий резерв
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(
+            server, "185.10.0.11", on_interface=False, source="manual",
+            interface=None,
+        )
+        self.make_ip(
+            server, "185.10.0.12", on_interface=False, source="manual",
+            interface=None,
+        )
+        replacement = self.make_pending(server)
+
+        cf1, cf2, cf3, cf4 = self.cloudflare_mocks()
+        with cf1, cf2, cf3, cf4, mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ):
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+            first_candidate = replacement.new_ip
+            self.assertIn(first_candidate, ("185.10.0.11", "185.10.0.12"))
+
+            # агент поднял адрес на интерфейсе
+            command = self.session.query(InfraAgentCommand).first()
+            command.status = "ok"
+            self.session.commit()
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+            self.assertEqual(replacement.status, "verifying")
+
+            # проверка показала, что кандидат заблокирован
+            self.complete_verification(replacement, ok=False)
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+
+        # Заблокированный кандидат не попал в DNS и помечен
+        blocked_row = (
+            self.session.query(InfraServerIp)
+            .filter(InfraServerIp.ip == first_candidate)
+            .one()
+        )
+        self.assertIsNotNone(blocked_row.blocked_at)
+        # Замена продолжается со следующим резервом, а не падает
+        self.assertIn(replacement.status, ("pending", "installing"))
+        self.assertNotEqual(replacement.new_ip, first_candidate)
+        # В журнале объяснено, почему кандидат забракован
+        journal = " ".join(item["message"] for item in replacement.log or [])
+        self.assertIn("ЗАБЛОКИРОВАН", journal)
+        self.assertIn("пробуем следующий резерв", journal)
+
+    def test_replacement_not_confirmed_reports_failure(self):
+        # Адрес заменён, но клиентская связка всё равно не работает —
+        # это не успех, и алерт обязан это сказать
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(
+            server, "185.10.0.11", on_interface=False, source="manual",
+            interface=None,
+        )
+        replacement = self.make_pending(server)
+
+        cf1, cf2, cf3, cf4 = self.cloudflare_mocks()
+        with cf1, cf2, cf3, cf4, mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            command = self.session.query(InfraAgentCommand).one()
+            command.status = "ok"
+            self.session.commit()
+
+            infra_worker.process_replacements(self.session)   # -> verifying
+            self.session.commit()
+            self.session.refresh(replacement)
+            self.complete_verification(replacement, ok=True)
+
+            infra_worker.process_replacements(self.session)   # -> dns_add
+            self.session.commit()
+            infra_worker.process_replacements(self.session)   # -> dns_remove
+            self.session.commit()
+            infra_worker.process_replacements(self.session)   # -> confirming
+            self.session.commit()
+            self.session.refresh(replacement)
+            self.assertEqual(replacement.status, "confirming")
+
+            # постпроверка показала, что связка не работает
+            self.complete_verification(replacement, ok=False)
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+
+        self.assertEqual(replacement.status, "done")
+        text = alert.call_args[0][0]
+        self.assertIn("проблема не решена", text)
+        self.assertIn("не только в адресе", text)
+        journal = " ".join(item["message"] for item in replacement.log or [])
+        self.assertIn("НЕ работает", journal)
+
+    def test_verification_failure_does_not_block_replacement(self):
+        # Проверку провести нечем (нет контрольного имени) — замена идёт
+        # прежним путём, но в журнале остаётся след
+        self.session.add(
+            SystemSetting(key="infra_control_names", value="")
+        )
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(
+            server, "185.10.0.11", on_interface=False, source="manual",
+            interface=None,
+        )
+        replacement = self.make_pending(server)
+
+        cf1, cf2, cf3, cf4 = self.cloudflare_mocks()
+        with cf1, cf2, cf3, cf4, mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ):
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            command = self.session.query(InfraAgentCommand).one()
+            command.status = "ok"
+            self.session.commit()
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+
+        self.assertEqual(replacement.status, "dns_add")
+        journal = " ".join(item["message"] for item in replacement.log or [])
+        self.assertIn("без проверки", journal)
+
     def make_pending(self, server, old_ip="185.10.0.10", domains=None):
         replacement = InfraIpReplacement(
             server_id=server.id,
@@ -1430,7 +1943,14 @@ class ReplacementFlowTests(InfraDbTestCase):
             command.status = "ok"
             self.session.commit()
 
-            # installing -> dns_add -> (следующий тик) dns_remove -> done
+            # installing -> verifying: кандидат проверяется ДО публикации
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+            self.assertEqual(replacement.status, "verifying")
+
+            # проверка показала, что кандидат чист -> dns_add
+            self.complete_verification(replacement, ok=True)
             infra_worker.process_replacements(self.session)
             self.session.commit()
             self.session.refresh(replacement)
@@ -1443,11 +1963,19 @@ class ReplacementFlowTests(InfraDbTestCase):
             self.assertEqual(added, [("de.example.xyz", "185.10.0.11")])
             self.assertEqual(removed, [])  # старую запись ещё не трогали
 
+            # dns_remove -> confirming: проверяем, что связка работает
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+            self.assertEqual(replacement.status, "confirming")
+            self.assertEqual(removed, [("de.example.xyz", "185.10.0.10")])
+
+            # постпроверка прошла -> done
+            self.complete_verification(replacement, ok=True)
             infra_worker.process_replacements(self.session)
             self.session.commit()
             self.session.refresh(replacement)
             self.assertEqual(replacement.status, "done")
-            self.assertEqual(removed, [("de.example.xyz", "185.10.0.10")])
 
         alert.assert_called_once()
         old_row = (
@@ -2047,6 +2575,68 @@ class PayloadTests(InfraDbTestCase):
         self.assertEqual(item["utilization_pct"], 25.0)
         self.assertEqual(item["ips"], {"active": 1, "reserve": 1, "blocked": 0})
         self.assertEqual(item["domains"], ["de.example.xyz"])
+
+    def test_diagnosis_payload_exposes_verdict_and_evidence(self):
+        server = self.make_server()
+        anomaly = InfraAnomaly(
+            server_id=server.id,
+            status="confirmed",
+            details={
+                "control_name": "ya.ru",
+                "verdict": {
+                    "blocked_ips": ["185.10.0.10"],
+                    "blocked_snis": ["burned.example.xyz"],
+                    "confidence": "high",
+                    "actionable": True,
+                },
+                "evidence": [
+                    {"step": "ip_probe", "result": "fail", "text": "адрес мёртв"}
+                ],
+            },
+            created_at=utcnow(),
+        )
+        self.session.add(anomaly)
+        self.session.commit()
+
+        detail = infra.server_detail_payload(self.session, server.id)
+        diagnosis = detail["diagnosis"]
+        self.assertEqual(diagnosis["blocked_ips"], ["185.10.0.10"])
+        self.assertEqual(diagnosis["blocked_snis"], ["burned.example.xyz"])
+        self.assertEqual(diagnosis["confidence"], "high")
+        self.assertTrue(diagnosis["actionable"])
+        self.assertEqual(len(diagnosis["evidence"]), 1)
+
+    def test_diagnosis_payload_skips_anomalies_without_verdict(self):
+        # Аномалия ещё проверяется — вердикта нет, показывать нечего
+        server = self.make_server()
+        self.session.add(
+            InfraAnomaly(
+                server_id=server.id, status="checking",
+                details={"ip_runs": {}}, created_at=utcnow(),
+            )
+        )
+        self.session.commit()
+        detail = infra.server_detail_payload(self.session, server.id)
+        self.assertIsNone(detail["diagnosis"])
+
+    def test_capacity_payload_carries_verdict(self):
+        server = self.make_server(
+            capacity={
+                "conntrack": {
+                    "count": 65536, "max": 65536, "usage_pct": 100,
+                    "insert_failed_delta": 5,
+                },
+            }
+        )
+        detail = infra.server_detail_payload(self.session, server.id)
+        self.assertEqual(detail["capacity"]["level"], "crit")
+        self.assertTrue(detail["capacity"]["problems"])
+        # Сырой снимок тоже доступен — для подробностей в карточке
+        self.assertIn("conntrack", detail["capacity"]["raw"])
+
+        plain = self.make_server(machine_uid="m-2")
+        detail = infra.server_detail_payload(self.session, plain.id)
+        self.assertIsNone(detail["capacity"])
 
     def test_xray_health_in_payloads(self):
         server = self.make_server(
