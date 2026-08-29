@@ -1157,8 +1157,8 @@ class CapacityTests(InfraDbTestCase):
         joined = " ".join(crit["problems"])
         self.assertIn("conntrack переполнен", joined)
         self.assertIn("accept4() failed", joined)
-        # Расхождение фактического лимита процесса с unit — отдельный диагноз
-        self.assertIn("старым лимитом дескрипторов", joined)
+        # Фактический лимит процесса ниже возможного — отдельный диагноз
+        self.assertIn("лимитом дескрипторов", joined)
 
         warn = infra.evaluate_capacity(
             dict(self.WARN, conntrack=dict(self.WARN["conntrack"],
@@ -1170,6 +1170,87 @@ class CapacityTests(InfraDbTestCase):
         self.assertEqual(infra.evaluate_capacity(self.WARN, 70)["level"], "ok")
         # Нет данных (агент старой версии) — не выдумываем проблем
         self.assertEqual(infra.evaluate_capacity(None, 70)["level"], "ok")
+
+    def test_single_insert_failure_is_not_overflow(self):
+        # Реальный случай с ноды: таблица заполнена на 19%, одна неудавшаяся
+        # вставка за интервал. Это гонка при создании записи, а не
+        # переполнение — тревожить нельзя, иначе ложный crit заблокирует
+        # изменения DNS и реальный бан останется необработанным
+        verdict = infra.evaluate_capacity(
+            {
+                "conntrack": {
+                    "count": 49711, "max": 262144, "usage_pct": 19,
+                    "insert_failed_delta": 1,
+                },
+            },
+            70,
+        )
+        self.assertEqual(verdict["level"], "ok")
+        self.assertEqual(verdict["problems"], [])
+
+    def test_overflow_requires_full_table(self):
+        # Отказы вставки считаются переполнением только у заполненной таблицы
+        full = infra.evaluate_capacity(
+            {
+                "conntrack": {
+                    "count": 260000, "max": 262144, "usage_pct": 99,
+                    "insert_failed_delta": 3,
+                },
+            },
+            70,
+        )
+        self.assertEqual(full["level"], "crit")
+        self.assertIn("переполнен", " ".join(full["problems"]))
+
+        # Много отказов при свободной таблице — это тоже повод посмотреть,
+        # но причина не в размере, и уровень другой
+        noisy = infra.evaluate_capacity(
+            {
+                "conntrack": {
+                    "count": 1000, "max": 262144, "usage_pct": 1,
+                    "insert_failed_delta": 500,
+                },
+            },
+            70,
+        )
+        self.assertEqual(noisy["level"], "warn")
+        self.assertIn("переполнением это не объясняется",
+                      " ".join(noisy["problems"]))
+
+    def test_record_pluralization(self):
+        # «не удалось создать 1 записей» режет глаз в алерте
+        for count, expected in ((1, "1 запись"), (3, "3 записи"),
+                                (11, "11 записей"), (25, "25 записей")):
+            verdict = infra.evaluate_capacity(
+                {
+                    "conntrack": {
+                        "count": 260000, "max": 262144, "usage_pct": 99,
+                        "insert_failed_delta": count,
+                    },
+                },
+                70,
+            )
+            self.assertIn(expected, " ".join(verdict["problems"]))
+
+    def test_descriptor_advice_depends_on_config(self):
+        workers = [{"pid": 1, "fd": 50, "nofile_soft": 1024,
+                    "nofile_hard": 524288}]
+        # Директива не задана: перезапуск не поможет, нужно задать её
+        missing = infra.evaluate_capacity(
+            {"nginx": {"worker_connections": 65535, "recent_errors": [],
+                       "workers": workers}},
+            70,
+        )
+        self.assertIn("не задана", " ".join(missing["problems"]))
+
+        # Директива задана, но процессы её не подхватили — вот тут перезапуск
+        stale = infra.evaluate_capacity(
+            {"nginx": {"worker_connections": 65535,
+                       "worker_rlimit_nofile": 262144,
+                       "recent_errors": [], "workers": workers}},
+            70,
+        )
+        self.assertIn("нужен перезапуск", " ".join(stale["problems"]))
 
     def test_crit_capacity_alerts_once_per_cooldown(self):
         server = self.make_server(capacity=self.CRIT)

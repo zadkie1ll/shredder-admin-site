@@ -1388,6 +1388,28 @@ def request_replacement(
 # --- лимиты ноды (conntrack, nginx, дескрипторы) ----------------------------
 
 
+# Заполнение conntrack, выше которого таблица реально близка к пределу.
+# Ниже него отказы вставки объясняются не переполнением, а чем-то другим.
+CONNTRACK_CRIT_USAGE_PCT = 90
+# Единичные insert_failed — обычный фоновый шум: два пакета одного потока
+# одновременно создают запись, один проигрывает гонку. Переполнением это не
+# является, и поднимать по нему тревогу нельзя.
+CONNTRACK_INSERT_FAILED_NOISE = 50
+
+
+def _plural_records(count: int) -> str:
+    """«N записей» с правильным окончанием: «1 записей» режет глаз."""
+    tail = count % 100
+    if 11 <= tail <= 14:
+        return f"{count} записей"
+    last = count % 10
+    if last == 1:
+        return f"{count} запись"
+    if last in (2, 3, 4):
+        return f"{count} записи"
+    return f"{count} записей"
+
+
 def evaluate_capacity(capacity: dict, warn_pct: int) -> dict:
     """Оценка снимка лимитов: {"level", "problems", "details"}.
 
@@ -1419,12 +1441,25 @@ def evaluate_capacity(capacity: dict, warn_pct: int) -> dict:
             f"conntrack: {conntrack.get('count')} / {conntrack.get('max')} "
             f"({usage}%)"
         )
-        if insert_failed > 0:
+        table_full = (
+            insert_failed > 0 and usage >= CONNTRACK_CRIT_USAGE_PCT
+        )
+        many_failures = insert_failed >= CONNTRACK_INSERT_FAILED_NOISE
+        if table_full:
             escalate("crit")
             problems.append(
-                f"conntrack переполнен: не удалось создать {insert_failed} "
-                "записей за последний интервал — ядро отбрасывает пакеты "
-                "новых соединений"
+                f"conntrack переполнен: заполнен на {usage}%, за последний "
+                f"интервал не удалось создать {_plural_records(insert_failed)}"
+                " — ядро отбрасывает пакеты новых соединений"
+            )
+        elif many_failures:
+            # Таблица не забита, но отказов много — причина не в размере
+            escalate("warn")
+            problems.append(
+                f"conntrack: за последний интервал не удалось создать "
+                f"{_plural_records(insert_failed)} при заполнении {usage}% — "
+                "переполнением это не объясняется, стоит посмотреть таблицу "
+                "и правила"
             )
         elif usage >= warn_pct:
             escalate("warn")
@@ -1451,24 +1486,39 @@ def evaluate_capacity(capacity: dict, warn_pct: int) -> dict:
     # Фактические лимиты живых worker-процессов: unit может декларировать
     # большой hard, а процессы, поднятые до его применения, работают со
     # старым soft — расхождение и есть диагноз
-    stale_workers = []
+    configured_nofile = nginx.get("worker_rlimit_nofile")
+    if configured_nofile:
+        details.append(f"nginx worker_rlimit_nofile: {configured_nofile}")
+    low_workers = []
     tight_workers = []
     for worker in nginx.get("workers") or []:
         soft = worker.get("nofile_soft")
         hard = worker.get("nofile_hard")
         fd = worker.get("fd")
         if soft and hard and soft < hard and soft <= 1024:
-            stale_workers.append(f"{worker.get('pid')} (soft={soft}, hard={hard})")
+            low_workers.append(f"{worker.get('pid')} (soft={soft}, hard={hard})")
         if soft and soft > 0 and fd and fd >= soft * warn_pct / 100:
             tight_workers.append(f"{worker.get('pid')} ({fd}/{soft})")
-    if stale_workers:
+    if low_workers:
         escalate("warn")
-        problems.append(
-            "nginx-worker'ы работают со старым лимитом дескрипторов: "
-            + ", ".join(stale_workers[:5])
-            + " — после graceful reload старые процессы сохраняют прежний "
-            "soft-лимит, нужен перезапуск"
-        )
+        # Один и тот же симптом — два разных диагноза. Совет «перезапустить»
+        # бесполезен, если директива вообще не задана: новые процессы
+        # поднимутся с тем же системным дефолтом.
+        if configured_nofile and configured_nofile > 1024:
+            problems.append(
+                "nginx-worker'ы не подхватили заданный лимит дескрипторов "
+                f"({configured_nofile}): "
+                + ", ".join(low_workers[:5])
+                + " — после graceful reload старые процессы сохраняют прежний "
+                "soft-лимит, нужен перезапуск nginx"
+            )
+        else:
+            problems.append(
+                "nginx-worker'ы работают с системным лимитом дескрипторов: "
+                + ", ".join(low_workers[:5])
+                + " — директива worker_rlimit_nofile не задана, перезапуск "
+                "сам по себе не поможет"
+            )
     if tight_workers:
         escalate("warn")
         problems.append(
