@@ -51,6 +51,12 @@ log = logging.getLogger("infra")
 
 _geo_analytics_cache: dict[tuple, dict] = {}
 _geo_analytics_lock = threading.Lock()
+# Кэш всего блока «кто подключается» карточки сервера. Четыре агрегатных
+# запроса по ipguard_user_ips — самое дорогое место карточки: без кэша
+# 5-секундный автообновляющий поллинг админки выполнял их заново на каждый
+# тик и при большой таблице занимал всех gunicorn-воркеров (сайт отвечал 504).
+_who_connects_cache: dict[tuple, dict] = {}
+_who_connects_lock = threading.Lock()
 
 
 class InfraError(Exception):
@@ -394,6 +400,7 @@ def server_list_payload(db_session, include_archived: bool = False) -> dict:
                     server.anomaly_suppressed_until is not None
                     and server.anomaly_suppressed_until > now
                 ),
+                "tspu_checks_enabled": bool(server.tspu_checks_enabled),
                 "baseline_scale": (
                     float(server.baseline_scale)
                     if server.baseline_scale is not None
@@ -689,6 +696,7 @@ def server_detail_payload(db_session, server_id) -> dict:
                 server.anomaly_suppressed_until is not None
                 and server.anomaly_suppressed_until > now
             ),
+            "tspu_checks_enabled": bool(server.tspu_checks_enabled),
             "baseline_scale": (
                 float(server.baseline_scale)
                 if server.baseline_scale is not None
@@ -713,8 +721,48 @@ def server_detail_payload(db_session, server_id) -> dict:
     }
 
 
+def _analytics_cache_seconds() -> int:
+    """TTL кэшей аналитики карточки (60с по умолчанию, см. settings)."""
+    try:
+        return max(
+            10,
+            min(
+                3600,
+                int(getattr(django_settings, "INFRA_GEOIP_CACHE_SECONDS", 60)),
+            ),
+        )
+    except (TypeError, ValueError):
+        return 60
+
+
 def who_connects_payload(db_session, node_name: str, now: datetime) -> dict:
-    """«Кто подключается» по данным ip-guard (ipguard_user_ips) этой ноды."""
+    """«Кто подключается» по данным ip-guard (ipguard_user_ips) этой ноды.
+
+    Результат кэшируется на короткое окно целиком: это сводка за 24 часа,
+    и пересчитывать её на каждый 5-секундный тик автообновления карточки
+    незачем — а по стоимости именно она определяет время ответа карточки.
+    """
+    cache_seconds = _analytics_cache_seconds()
+    epoch_seconds = int(now.replace(tzinfo=timezone.utc).timestamp())
+    cache_key = (node_name, epoch_seconds // cache_seconds)
+    with _who_connects_lock:
+        cached = _who_connects_cache.get(cache_key)
+    if cached is not None:
+        return cached
+
+    payload = _who_connects_payload_uncached(db_session, node_name, now)
+    with _who_connects_lock:
+        # Храним только свежий bucket каждой ноды (как в geo-кэше)
+        stale_keys = [key for key in _who_connects_cache if key[0] == node_name]
+        for stale_key in stale_keys:
+            _who_connects_cache.pop(stale_key, None)
+        _who_connects_cache[cache_key] = payload
+    return payload
+
+
+def _who_connects_payload_uncached(
+    db_session, node_name: str, now: datetime
+) -> dict:
     day_ago = now - timedelta(hours=24)
     hour_ago = now - timedelta(hours=1)
 
@@ -784,16 +832,7 @@ def _who_connects_geo_payload(
             "russian_regions": [],
         }
 
-    try:
-        cache_seconds = max(
-            10,
-            min(
-                3600,
-                int(getattr(django_settings, "INFRA_GEOIP_CACHE_SECONDS", 60)),
-            ),
-        )
-    except (TypeError, ValueError):
-        cache_seconds = 60
+    cache_seconds = _analytics_cache_seconds()
     epoch_seconds = int(now.replace(tzinfo=timezone.utc).timestamp())
     cache_key = (
         node_name,
@@ -910,10 +949,12 @@ def _who_connects_geo_payload(
 
 
 def reset_geo_analytics_cache() -> None:
-    """Сбрасывает короткий process-local кэш (тесты/обслуживание)."""
+    """Сбрасывает короткие process-local кэши карточки (тесты/обслуживание)."""
 
     with _geo_analytics_lock:
         _geo_analytics_cache.clear()
+    with _who_connects_lock:
+        _who_connects_cache.clear()
 
 
 # --- серии телеметрии для графиков ------------------------------------------
@@ -1301,6 +1342,19 @@ def snooze_anomaly_detector(db_session, server_id, hours) -> InfraServer:
 def unsnooze_anomaly_detector(db_session, server_id) -> InfraServer:
     server = get_server(db_session, server_id)
     server.anomaly_suppressed_until = None
+    return server
+
+
+def set_tspu_checks_enabled(db_session, server_id, enabled: bool) -> InfraServer:
+    """Постоянное включение/выключение слежки за ТСПУ по серверу.
+
+    Выключенный сервер не порождает аномалий и автоматических RIPE
+    Atlas-замеров (кредиты не расходуются). Телеметрия, графики, алерты
+    offline/нагрузки/лимитов продолжают работать. Ручной запуск диагностики
+    кнопкой в карточке остаётся доступен — это явное действие админа.
+    """
+    server = get_server(db_session, server_id)
+    server.tspu_checks_enabled = bool(enabled)
     return server
 
 

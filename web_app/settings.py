@@ -305,6 +305,9 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    # Сжатие ответов: HTML админки (>1 МБ) и JSON телеметрии ужимаются в
+    # разы. BREACH смягчается штатной маскировкой CSRF-токенов Django.
+    "django.middleware.gzip.GZipMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -471,6 +474,18 @@ LOGGING = {
         "engine": {  # или название вашего приложения
             "handlers": ["console", "file"],
             "level": "DEBUG",
+            "propagate": False,
+        },
+        # httpx на INFO пишет полный URL запроса, а URL Telegram Bot API
+        # содержит токен бота — токены в логах запрещены
+        "httpx": {
+            "handlers": ["console", "file"],
+            "level": "WARNING",
+            "propagate": False,
+        },
+        "httpcore": {
+            "handlers": ["console", "file"],
+            "level": "WARNING",
             "propagate": False,
         },
     },

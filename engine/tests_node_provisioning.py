@@ -592,6 +592,24 @@ class BootstrapViewsTests(NodeProvisioningDbTestCase):
         )
         self.assertEqual(node_bootstrap_runner(foreign).status_code, 404)
 
+    def test_runner_fails_fast_and_reports_real_claim_error(self):
+        """Инцидент 2026-08-31: DPI хостера дропал TLS-коннект к панельному
+        домену — curl без таймаутов висел 300 секунд, а раннер валился с
+        ложным «токен истёк/использован». Раннер обязан задавать сетевые
+        таймауты/ретраи и различать «нет связи» и отказ сервера."""
+        from engine.views import node_bootstrap_runner
+
+        request = self.factory.get("/node-bootstrap/runner/", HTTP_HOST="panel.test")
+        content = node_bootstrap_runner(request).content.decode()
+        # Сетевые дефолты для каждого вызова curl
+        self.assertIn("--connect-timeout", content)
+        self.assertIn("--max-time", content)
+        self.assertIn("--retry", content)
+        # Claim различает сетевую недоступность и отказ сервера
+        self.assertIn("нет связи с ${BASE_URL}", content)
+        self.assertIn("claim отклонён сервером", content)
+        self.assertNotIn("токен истёк/использован", content)
+
 
 @override_settings(NODE_BOOTSTRAP_DOMAINS=["panel.test"])
 class AdminNodeProvisionApiTests(NodeProvisioningDbTestCase):

@@ -11599,6 +11599,16 @@
             return activeAdminTab === 'infrastructure' && activeInfraSubtab() === 'inf-servers';
         }
 
+        // Все запросы вкладки живут не дольше таймаута: зависший бэкенд не
+        // должен навсегда блокировать in-flight-флаги автообновления
+        function infraFetchJson(url, timeoutMs = 20000) {
+            const options = {headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store'};
+            if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function') {
+                options.signal = AbortSignal.timeout(timeoutMs);
+            }
+            return fetch(url, options).then((response) => response.json());
+        }
+
         function infraFmtBps(bps) {
             if (bps === null || bps === undefined) return '—';
             const mbit = bps / 1e6;
@@ -11724,17 +11734,21 @@
             }
         }
 
+        let infraServersInFlight = false;
+
         async function loadInfraServers(showErrors) {
             const container = document.getElementById('infra-servers-table');
             if (!container) return;
+            // Предыдущий запрос ещё не ответил — новый не шлём: наслаивание
+            // 5-секундных тиков при медленном бэкенде занимало всех
+            // gunicorn-воркеров и укладывало сайт целиком
+            if (infraServersInFlight) return;
+            infraServersInFlight = true;
             const refreshButton = document.getElementById('infra-refresh');
             if (showErrors) refreshButton?.classList.add('is-loading');
             try {
                 const archived = document.getElementById('infra-show-archived')?.checked ? '1' : '0';
-                const response = await fetch(`${main.dataset.infraServersUrl}?archived=${archived}`, {
-                    headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store',
-                });
-                const payload = await response.json();
+                const payload = await infraFetchJson(`${main.dataset.infraServersUrl}?archived=${archived}`);
                 if (payload.status !== 'ok') throw new Error(payload.message || 'Ошибка загрузки');
                 infraLoadThreshold = payload.result.settings?.infra_load_threshold_pct || 85;
                 infraServersResult = payload.result;
@@ -11743,6 +11757,7 @@
             } catch (error) {
                 if (showErrors) container.innerHTML = `<div class="infra-empty">Не удалось загрузить серверы: ${escapeHtml(String(error.message || error))}</div>`;
             } finally {
+                infraServersInFlight = false;
                 if (showErrors) refreshButton?.classList.remove('is-loading');
             }
         }
@@ -11813,6 +11828,7 @@
                 server.checking ? '<span class="infra-badge infra-badge-warn" title="Идёт проверка ТСПУ по аномалии">ТСПУ</span>' : '',
                 server.replacing ? '<span class="infra-badge infra-badge-warn" title="Идёт замена IP">IP</span>' : '',
                 server.anomaly_paused ? '<span class="infra-badge infra-badge-muted" title="Детектор аномалий на паузе (плановые работы)">пауза</span>' : '',
+                server.tspu_checks_enabled === false ? '<span class="infra-badge infra-badge-muted" title="Слежка за ТСПУ выключена: аномалии не создаются, автоматические RIPE Atlas-замеры не запускаются и кредиты не расходуются. Телеметрия и остальные алерты работают">ТСПУ выкл</span>' : '',
                 server.baseline_scale ? `<span class="infra-badge infra-badge-muted" title="После изменения DNS ожидаемая норма трафика временно умножена на этот коэффициент; детектор работает">DNS ×${server.baseline_scale.toFixed(2)}</span>` : '',
                 server.is_archived ? '<span class="infra-badge infra-badge-muted">архив</span>' : '',
             ].filter(Boolean).join(' ');
@@ -11983,6 +11999,7 @@
                 <button type="button" data-menu-open><i class="fas fa-up-right-from-square"></i>Открыть карточку</button>
                 <button type="button" data-menu-check><i class="fas fa-shield-halved"></i>Проверить ТСПУ</button>
                 <button type="button" data-menu-snooze><i class="fas fa-bell-slash"></i>${server.anomaly_paused ? 'Снять паузу детектора' : 'Пауза детектора 24ч'}</button>
+                <button type="button" data-menu-tspu><i class="fas fa-satellite-dish"></i>${server.tspu_checks_enabled === false ? 'Включить слежку ТСПУ' : 'Выключить слежку ТСПУ'}</button>
                 <button type="button" data-menu-archive><i class="fas fa-box-archive"></i>${server.is_archived ? 'Вернуть из архива' : 'В архив'}</button>`;
             document.body.appendChild(menu);
             const rect = button.getBoundingClientRect();
@@ -11995,6 +12012,15 @@
                 infraAction(
                     server.anomaly_paused ? {action: 'unsnooze', id: server.id} : {action: 'snooze', id: server.id, hours: 24},
                     server.anomaly_paused ? 'Пауза снята' : 'Детектор на паузе 24 часа',
+                );
+            });
+            menu.querySelector('[data-menu-tspu]').addEventListener('click', () => {
+                closeInfraRowMenu();
+                infraAction(
+                    {action: server.tspu_checks_enabled === false ? 'tspu_enable' : 'tspu_disable', id: server.id},
+                    server.tspu_checks_enabled === false
+                        ? 'Слежка ТСПУ по серверу включена'
+                        : 'Слежка ТСПУ выключена: аномалии и RIPE-замеры по серверу не запускаются',
                 );
             });
             menu.querySelector('[data-menu-archive]').addEventListener('click', () => { closeInfraRowMenu(); infraAction({action: server.is_archived ? 'unarchive' : 'archive', id: server.id}); });
@@ -12014,10 +12040,7 @@
         async function loadInfraPreview(serverId) {
             const requestSeq = ++infraPreviewRequestSeq;
             try {
-                const response = await fetch(`${main.dataset.infraServerDetailUrl}?id=${serverId}`, {
-                    headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store',
-                });
-                const payload = await response.json();
+                const payload = await infraFetchJson(`${main.dataset.infraServerDetailUrl}?id=${serverId}`);
                 if (payload.status !== 'ok') throw new Error(payload.message || 'Ошибка');
                 if (requestSeq !== infraPreviewRequestSeq) return;
                 infraPreviewCache.set(serverId, payload.result);
@@ -12177,6 +12200,7 @@
             if (infraDetailId !== serverId) {
                 infraDetailManagementTab = 'server';
                 infraReserveExpanded = false;
+                infraDetailTelemetryCache = null;
             }
             if (openingFromOverview) infraOverviewScrollTop = window.scrollY;
             infraSelectedServerId = serverId;
@@ -12210,6 +12234,8 @@
             const screen = document.getElementById('infra-server-screen');
             if (!overview || !screen || screen.hidden) return;
             infraDetailRequestSeq += 1;
+            infraDetailRenderedSeq = infraDetailRequestSeq;
+            infraDetailTelemetryCache = null;
             infraDetailId = null;
             screen.hidden = true;
             screen.setAttribute('aria-hidden', 'true');
@@ -12282,28 +12308,60 @@
             });
         }
 
+        // Телеметрия длинных периодов (24h/7d/30d) построена на минутных и
+        // 15-минутных агрегатах — перезапрашивать её каждый 5-секундный тик
+        // бессмысленно. Кэш последней серии позволяет обновлять её раз в
+        // INFRA_TELEMETRY_SLOW_REFRESH_MS, а карточку (текущие цифры) —
+        // по-прежнему каждые 5 секунд. Период 3h (сырые сэмплы) остаётся
+        // «живым» и обновляется каждый тик.
+        const INFRA_TELEMETRY_SLOW_REFRESH_MS = 30000;
+        let infraDetailTelemetryCache = null; // {serverId, period, payload, fetchedAt}
+        let infraDetailInFlight = false;
+        let infraDetailRenderedSeq = 0;
+
         async function refreshInfraDetail(full) {
             if (infraDetailId === null) return;
             const container = document.getElementById('infra-server-detail');
             if (!container) return;
+            // Автообновление не наслаивается на незавершённый запрос:
+            // пропущенный тик догонит следующий. Явные действия (full) идут
+            // всегда — устаревшие ответы отсеет infraDetailRenderedSeq.
+            if (!full && infraDetailInFlight) return;
             // Автообновление не должно затирать формы, пока админ печатает
             if (!full && container.contains(document.activeElement)
                 && ['INPUT', 'TEXTAREA', 'SELECT'].includes(document.activeElement.tagName)) return;
             const requestSeq = ++infraDetailRequestSeq;
             const requestedId = infraDetailId;
             const requestedPeriod = infraDetailPeriod;
+            const cachedTelemetry = infraDetailTelemetryCache;
+            const telemetryFresh = !full
+                && cachedTelemetry
+                && cachedTelemetry.serverId === requestedId
+                && cachedTelemetry.period === requestedPeriod
+                && requestedPeriod !== '3h'
+                && (Date.now() - cachedTelemetry.fetchedAt) < INFRA_TELEMETRY_SLOW_REFRESH_MS;
+            infraDetailInFlight = true;
             try {
-                const [detailResponse, telemetryResponse] = await Promise.all([
-                    fetch(`${main.dataset.infraServerDetailUrl}?id=${requestedId}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store'}),
-                    fetch(`${main.dataset.infraTelemetryUrl}?id=${requestedId}&period=${requestedPeriod}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store'}),
+                const [detailPayload, telemetryPayload] = await Promise.all([
+                    infraFetchJson(`${main.dataset.infraServerDetailUrl}?id=${requestedId}`),
+                    telemetryFresh
+                        ? Promise.resolve({status: 'ok', result: cachedTelemetry.payload})
+                        : infraFetchJson(`${main.dataset.infraTelemetryUrl}?id=${requestedId}&period=${requestedPeriod}`),
                 ]);
-                const detailPayload = await detailResponse.json();
-                const telemetryPayload = await telemetryResponse.json();
-                // Пришёл ответ устаревшего запроса (сменили период/сервер) —
-                // не рисуем поверх более свежего
-                if (requestSeq !== infraDetailRequestSeq || infraDetailId !== requestedId) return;
+                // Сервер или период сменились, пока ждали ответ — не рисуем
+                if (infraDetailId !== requestedId || infraDetailPeriod !== requestedPeriod) return;
+                // Более свежий ответ уже нарисован — этот опоздал
+                if (requestSeq <= infraDetailRenderedSeq) return;
                 if (detailPayload.status !== 'ok') throw new Error(detailPayload.message || 'Ошибка');
                 if (telemetryPayload.status !== 'ok') throw new Error(telemetryPayload.message || 'Ошибка');
+                if (!telemetryFresh) {
+                    infraDetailTelemetryCache = {
+                        serverId: requestedId,
+                        period: requestedPeriod,
+                        payload: telemetryPayload.result,
+                        fetchedAt: Date.now(),
+                    };
+                }
                 // Пока ждали ответ, админ мог начать печатать — авторефреш
                 // в этом случае пропускаем (следующий тик догонит)
                 if (!full && container.contains(document.activeElement)
@@ -12314,6 +12372,7 @@
                 const interaction = infraSnapshotInteraction(container);
                 const openDetails = infraSnapshotOpenDetails(container);
                 const previousScrollTop = window.scrollY;
+                infraDetailRenderedSeq = requestSeq;
                 infraPreviewCache.set(requestedId, detailPayload.result);
                 renderInfraDetail(container, detailPayload.result, telemetryPayload.result, full);
                 infraRestoreDirtyFields(container, dirty);
@@ -12324,10 +12383,13 @@
                 if (selected && selected.id === requestedId) renderInfraPreview(selected, detailPayload.result);
             } catch (error) {
                 // Ошибку устаревшего запроса не рисуем поверх свежего контента
-                if (requestSeq !== infraDetailRequestSeq || infraDetailId !== requestedId) return;
+                if (infraDetailId !== requestedId || infraDetailPeriod !== requestedPeriod) return;
+                if (requestSeq <= infraDetailRenderedSeq) return;
                 if (full) {
-                    container.innerHTML = `<section class="card" style="padding:16px;"><div class="help-block">Не удалось загрузить карточку: ${escapeHtml(String(error.message || error))}</div></section>`;
+                    container.innerHTML = `<section class="card" style="padding:16px;"><div class="help-block">Не удалось загрузить карточку: ${escapeHtml(String(error.message || error))} <button type="button" class="infra-mini-btn" onclick="refreshInfraDetail(true)">Повторить</button></div></section>`;
                 }
+            } finally {
+                infraDetailInFlight = false;
             }
         }
 
@@ -12951,6 +13013,7 @@
                                 ${server.online ? '<span class="infra-badge infra-badge-online">ONLINE</span>' : '<span class="infra-badge infra-badge-offline">OFFLINE</span>'}
                                 ${server.online && (server.xray_process_running === false || server.xray_crash_loop === true) ? `<span class="infra-badge infra-badge-offline" title="${server.xray_crash_loop ? 'Процесс rw-core постоянно перезапускается (crash-loop)' : 'Процесс rw-core не найден'}: клиенты не обслуживаются, похоже на сломанный конфиг xray. Замеры ТСПУ и детектор приостановлены.">XRAY DOWN</span>` : ''}
                                 ${server.baseline_scale ? `<span class="infra-badge infra-badge-muted" title="После изменения DNS норма трафика временно ×${server.baseline_scale.toFixed(2)} (до ${escapeHtml(server.baseline_scale_until || '')}); детектор аномалий работает">DNS ×${server.baseline_scale.toFixed(2)}</span>` : ''}
+                                ${server.tspu_checks_enabled === false ? '<span class="infra-badge infra-badge-muted" title="Слежка за ТСПУ выключена: аномалии не создаются, автоматические RIPE Atlas-замеры не запускаются. Телеметрия, графики и остальные алерты работают">ТСПУ ВЫКЛ</span>' : ''}
                                 ${server.is_archived ? '<span class="infra-badge infra-badge-muted">АРХИВ</span>' : ''}
                             </div>
                         </div>
@@ -12959,6 +13022,9 @@
                             ${server.anomaly_paused
                                 ? `<button type="button" class="infra-detail-action" id="infra-snooze-toggle" title="Детектор на паузе до ${escapeHtml(server.anomaly_suppressed_until || '')}">Снять паузу детектора</button>`
                                 : '<button type="button" class="infra-detail-action" id="infra-snooze-toggle" title="На время плановых работ аномалии по серверу не создаются">Пауза детектора 24ч</button>'}
+                            ${server.tspu_checks_enabled === false
+                                ? '<button type="button" class="infra-detail-action" id="infra-tspu-toggle" title="Слежка выключена: аномалии не создаются, автоматические RIPE Atlas-замеры не запускаются и кредиты не расходуются. Ручной запуск кнопкой «Проверить ТСПУ» остаётся доступен">Включить слежку ТСПУ</button>'
+                                : '<button type="button" class="infra-detail-action" id="infra-tspu-toggle" title="Постоянно исключить сервер из слежки за ТСПУ: без аномалий и автоматических RIPE Atlas-замеров (кредиты не расходуются). Телеметрия, графики и остальные алерты продолжают работать — для внутренних серверов, добавленных ради графиков">Выключить слежку ТСПУ</button>'}
                             <button type="button" class="infra-detail-action" id="infra-archive-toggle">${server.is_archived ? 'Вернуть из архива' : 'В архив'}</button>
                             <div class="infra-period-switch" aria-label="Период телеметрии">${periodButtons}</div>
                         </div>
@@ -13233,6 +13299,15 @@
                         : {action: 'snooze', id: server.id, hours: 24},
                     server.anomaly_paused ? 'Пауза снята' : 'Детектор на паузе 24 часа',
                     {busyTarget: snoozeButton, pendingLabel: 'Обновляем…'},
+                ));
+            const tspuToggleButton = container.querySelector('#infra-tspu-toggle');
+            tspuToggleButton?.addEventListener('click', () =>
+                infraAction(
+                    {action: server.tspu_checks_enabled === false ? 'tspu_enable' : 'tspu_disable', id: server.id},
+                    server.tspu_checks_enabled === false
+                        ? 'Слежка ТСПУ по серверу включена'
+                        : 'Слежка ТСПУ выключена: аномалии и RIPE-замеры по серверу не запускаются',
+                    {busyTarget: tspuToggleButton, pendingLabel: 'Обновляем…'},
                 ));
             container.querySelectorAll('[data-infra-period]').forEach((button) => {
                 button.addEventListener('click', () => {

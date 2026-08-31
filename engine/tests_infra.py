@@ -86,6 +86,10 @@ class InfraDbTestCase(SimpleTestCase):
         self.session = self.Session()
         self.addCleanup(self.engine.dispose)
         self.addCleanup(self.session.close)
+        # Кэш «кто подключается» — module-global с ключом (node, окно):
+        # без сброса тест видел бы payload соседнего теста той же ноды
+        infra.reset_geo_analytics_cache()
+        self.addCleanup(infra.reset_geo_analytics_cache)
 
     def make_server(self, **kwargs):
         now = utcnow()
@@ -508,6 +512,25 @@ class WhoConnectsGeoTests(InfraDbTestCase):
 
         self.assertIs(first["geo"], second["geo"])
         lookup.assert_called_once_with("8.8.8.8", database)
+
+    def test_whole_payload_is_reused_within_cache_window(self):
+        # Кэшируется весь блок «кто подключается», а не только гео: четыре
+        # агрегатных запроса по ipguard_user_ips — самое дорогое место
+        # карточки, и 5-секундный поллинг не должен выполнять их каждый тик
+        self.add_observation("a", "8.8.8.8", 20)
+        now = utcnow()
+        with mock.patch.object(
+            geoip_lookup, "configured_database", return_value=None
+        ):
+            first = infra.who_connects_payload(self.session, "de-1", now)
+            self.add_observation("b", "1.1.1.1", 50)
+            second = infra.who_connects_payload(self.session, "de-1", now)
+            other_node = infra.who_connects_payload(self.session, "wl-1", now)
+
+        self.assertIs(first, second)
+        self.assertEqual(second["unique_ips_24h"], 1)
+        # Кэш пер-нодовый: чужая нода не получает данные соседа
+        self.assertEqual(other_node["unique_ips_24h"], 0)
 
 
 class SettingsTests(InfraDbTestCase):
@@ -1420,6 +1443,19 @@ class DetectAnomalyWorkerTests(InfraDbTestCase):
         server = self.make_server(
             anomaly_suppressed_until=now + timedelta(hours=10)
         )
+        BaselineAnomalyTests.seed_baseline(self, server, now)
+        self.seed_drop(server, now)
+        with mock.patch.object(infra, "start_ip_diagnosis") as forced:
+            infra_worker.detect_anomalies(self.session)
+        forced.assert_not_called()
+        self.assertEqual(self.session.query(InfraAnomaly).count(), 0)
+
+    def test_suppressed_when_tspu_checks_disabled(self):
+        # Постоянное исключение из слежки за ТСПУ: внутренний сервер,
+        # добавленный ради графиков, не жжёт кредиты RIPE Atlas даже при
+        # обвале трафика (например, его IP давно забанен)
+        now = utcnow()
+        server = self.make_server(tspu_checks_enabled=False)
         BaselineAnomalyTests.seed_baseline(self, server, now)
         self.seed_drop(server, now)
         with mock.patch.object(infra, "start_ip_diagnosis") as forced:
@@ -2551,6 +2587,18 @@ class DnsWatchTests(InfraDbTestCase):
         with self.assertRaises(infra.InfraError):
             infra.snooze_anomaly_detector(self.session, server.id, "999999")
 
+    def test_tspu_checks_toggle(self):
+        server = self.make_server()
+        self.assertTrue(server.tspu_checks_enabled)
+        infra.set_tspu_checks_enabled(self.session, server.id, False)
+        self.session.commit()
+        self.session.refresh(server)
+        self.assertFalse(server.tspu_checks_enabled)
+        infra.set_tspu_checks_enabled(self.session, server.id, True)
+        self.session.commit()
+        self.session.refresh(server)
+        self.assertTrue(server.tspu_checks_enabled)
+
 
 class OfflineAlertTests(InfraDbTestCase):
     def test_offline_alert_and_recovery(self):
@@ -2716,6 +2764,14 @@ class PayloadTests(InfraDbTestCase):
         self.assertEqual(item["utilization_pct"], 25.0)
         self.assertEqual(item["ips"], {"active": 1, "reserve": 1, "blocked": 0})
         self.assertEqual(item["domains"], ["de.example.xyz"])
+        self.assertTrue(item["tspu_checks_enabled"])
+
+    def test_payloads_expose_tspu_flag(self):
+        server = self.make_server(tspu_checks_enabled=False)
+        listed = infra.server_list_payload(self.session)["servers"][0]
+        self.assertFalse(listed["tspu_checks_enabled"])
+        detail = infra.server_detail_payload(self.session, server.id)
+        self.assertFalse(detail["server"]["tspu_checks_enabled"])
 
     def test_diagnosis_payload_exposes_verdict_and_evidence(self):
         server = self.make_server()

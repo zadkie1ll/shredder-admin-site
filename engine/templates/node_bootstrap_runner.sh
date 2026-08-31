@@ -24,10 +24,20 @@ LOG_FILE="$WORKDIR/install.log"
 mkdir -p "$WORKDIR"
 chmod 700 "$WORKDIR"
 
+# Без явных таймаутов curl ждёт коннекта до 300 секунд на каждый вызов и
+# установка выглядит намертво зависшей. Все bootstrap-эндпоинты идемпотентны,
+# поэтому ретраи безопасны; они же сглаживают флапающий до панельного домена
+# коннект (DPI у некоторых хостеров дропает TLS выборочно).
+CURL_OPTS=(--connect-timeout 10 --max-time 120 --retry 4 --retry-connrefused)
+# --retry-all-errors появился в curl 7.71 (ретраит и обрывы TLS-хендшейка).
+if curl --help all 2>/dev/null | grep -q -- --retry-all-errors; then
+    CURL_OPTS+=(--retry-all-errors)
+fi
+
 api() { # api <method> <path> [curl args...]
     local method="$1" path="$2"
     shift 2
-    curl -fsS -X "$method" \
+    curl -fsS "${CURL_OPTS[@]}" -X "$method" \
         -H "Authorization: Bearer $TOKEN" \
         "$@" \
         "${BASE_URL}/node-bootstrap/${path}/"
@@ -64,9 +74,33 @@ PYEOF
 }
 
 echo "== Monkey Island node bootstrap =="
+echo "-> claim через ${BASE_URL} ..."
 
-# 1. Claim: представляемся, получаем конфиг и SECRET_KEY.
-CLAIM_JSON=$(api POST claim) || { echo "ОШИБКА: claim не прошёл (токен истёк/использован?)"; exit 1; }
+# 1. Claim: представляемся, получаем конфиг и SECRET_KEY. Ответ разбираем
+# сами (без -f): «нет связи с сайтом» и «сервер отклонил токен» — разные
+# проблемы, и в ошибке должен быть настоящий ответ сервера, а не догадка.
+CLAIM_RESPONSE=$(curl -sS "${CURL_OPTS[@]}" -X POST \
+    -H "Authorization: Bearer $TOKEN" \
+    -w $'\n%{http_code}' \
+    "${BASE_URL}/node-bootstrap/claim/") || {
+    CURL_EXIT=$?
+    echo "ОШИБКА: нет связи с ${BASE_URL} (curl exit ${CURL_EXIT})."
+    echo "Проверь с этого сервера: curl -v ${BASE_URL}/node-bootstrap/claim/"
+    echo "Если хостер/провайдер режет домен (DPI, RU-хостинг) — создай заявку" \
+         "на другом bootstrap-домене и запусти one-liner с него."
+    exit 1
+}
+CLAIM_CODE="${CLAIM_RESPONSE##*$'\n'}"
+CLAIM_JSON="${CLAIM_RESPONSE%$'\n'*}"
+if [[ "$CLAIM_CODE" != "200" ]]; then
+    CLAIM_ERROR=$(python3 -c 'import json, sys
+try:
+    print(json.load(sys.stdin).get("message") or "")
+except Exception:
+    pass' <<<"$CLAIM_JSON")
+    echo "ОШИБКА: claim отклонён сервером (HTTP ${CLAIM_CODE}): ${CLAIM_ERROR:-$CLAIM_JSON}"
+    exit 1
+fi
 
 SECRET_KEY=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["secret_key"])' <<<"$CLAIM_JSON")
 NODE_TYPE=$(python3 -c 'import json,sys; print(json.load(sys.stdin)["result"]["node_type"])' <<<"$CLAIM_JSON")

@@ -13396,6 +13396,17 @@ def support_admin_api_infra_servers(request):
                 db_session.commit()
                 return JsonResponse({"status": "ok"})
 
+            if action in ("tspu_enable", "tspu_disable"):
+                server = infra.set_tspu_checks_enabled(
+                    db_session, server_id, action == "tspu_enable"
+                )
+                admin_audit_write(
+                    db_session, request, f"infra_{action}",
+                    target=server.node_name,
+                )
+                db_session.commit()
+                return JsonResponse({"status": "ok"})
+
             if action == "force_check":
                 # Полная диагностика: сначала адреса контрольным именем,
                 # затем имена на живом адресе. Вердикт и алерт с журналом

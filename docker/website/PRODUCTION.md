@@ -30,6 +30,9 @@ Origin обслуживает только backend-трафик от edge и о�
 
 - `docker/website/Dockerfile` - образ Django-приложения
 - `docker/website/entrypoint.sh` - миграции, `collectstatic`, `gunicorn`
+  (переменные: `GUNICORN_WORKERS` default 3, `GUNICORN_THREADS` default 4 —
+  threads > 1 включает worker-class gthread, чтобы один медленный запрос
+  занимал поток, а не целый процесс; `GUNICORN_TIMEOUT` default 60)
 - `docker/website/docker-compose.yml` - origin стек
 - `engine/geoip_updater.py` внутри Django - автоматическая загрузка и обновление DB-IP City Lite
 - `docker/website/nginx.conf.template` - backend-only nginx для origin

@@ -14,6 +14,12 @@
       "port": 8125
     },
     {
+      "name": "website-infra-check",
+      "runtimeExecutable": "/private/tmp/claude-501/-Users-apugachev-Work-projects-monkeyislandvpn-monkey-island-website/6f92a736-b3a6-4a2c-9911-dcf95804a00e/scratchpad/run_site_infra_check.sh",
+      "runtimeArgs": [],
+      "port": 8127
+    },
+    {
       "name": "website",
       "runtimeExecutable": "./.venv/bin/python",
       "runtimeArgs": [

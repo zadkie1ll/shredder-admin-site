@@ -536,6 +536,10 @@ def detect_anomalies(db_session) -> None:
     for server in servers:
         if not infra.is_online(server, cfg, now):
             continue
+        # Постоянное исключение из слежки за ТСПУ (внутренние серверы,
+        # добавленные только ради графиков): ни аномалий, ни RIPE-замеров
+        if not server.tspu_checks_enabled:
+            continue
         # Warm-up нового сервера: baseline ещё не накоплен
         if server.first_seen_at is None or now - server.first_seen_at < timedelta(
             hours=cfg["infra_anomaly_warmup_hours"]
