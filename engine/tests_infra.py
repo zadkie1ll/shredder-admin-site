@@ -1239,6 +1239,23 @@ class CapacityTests(InfraDbTestCase):
         self.assertEqual(noisy["level"], "warn")
         self.assertIn("переполнением это не объясняется",
                       " ".join(noisy["problems"]))
+        # Единственная проблема — гонки: алерт не шлётся, оценка живёт
+        # только в карточке сервера
+        self.assertTrue(noisy["collision_only"])
+
+        # Фоновые гонки (десятки за интервал — транзитный клиентский DNS)
+        # тревоги не поднимают; сотни — поднимают
+        for delta, expected in ((199, "ok"), (200, "warn")):
+            verdict = infra.evaluate_capacity(
+                {
+                    "conntrack": {
+                        "count": 1000, "max": 262144, "usage_pct": 1,
+                        "insert_failed_delta": delta,
+                    },
+                },
+                70,
+            )
+            self.assertEqual(verdict["level"], expected)
 
     def test_record_pluralization(self):
         # «не удалось создать 1 записей» режет глаз в алерте
@@ -1365,6 +1382,21 @@ class CapacityTests(InfraDbTestCase):
         self.assertIn("Пора поднять лимиты", text)
         self.assertIn("клиенты не затронуты", text)
         self.assertIsNotNone(server.capacity_warn_alerted_at)
+
+    def test_collision_only_warn_stays_in_card(self):
+        # Гонки вставки при свободной таблице — фон, не событие: телеграм
+        # молчит, оценка видна в карточке (capacity_payload). Совет
+        # «поднять лимиты» для этого случая вреден.
+        server = self.make_server(capacity={
+            "conntrack": {
+                "count": 1000, "max": 262144, "usage_pct": 1,
+                "insert_failed_delta": 500,
+            },
+        })
+        with mock.patch.object(infra_worker, "_send_alert") as alert:
+            infra_worker.check_capacity(self.session)
+        alert.assert_not_called()
+        self.assertIsNone(server.capacity_warn_alerted_at)
 
     def test_recovery_clears_alert_state(self):
         server = self.make_server(

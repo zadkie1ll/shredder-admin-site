@@ -537,6 +537,7 @@ def capacity_payload(server, cfg: dict) -> dict | None:
         "level": verdict["level"],
         "problems": verdict["problems"],
         "details": verdict["details"],
+        "collision_only": verdict.get("collision_only", False),
         "raw": server.capacity,
     }
 
@@ -1445,10 +1446,12 @@ def request_replacement(
 # Заполнение conntrack, выше которого таблица реально близка к пределу.
 # Ниже него отказы вставки объясняются не переполнением, а чем-то другим.
 CONNTRACK_CRIT_USAGE_PCT = 90
-# Единичные insert_failed — обычный фоновый шум: два пакета одного потока
-# одновременно создают запись, один проигрывает гонку. Переполнением это не
-# является, и поднимать по нему тревогу нельзя.
-CONNTRACK_INSERT_FAILED_NOISE = 50
+# Отказы вставки при свободной таблице — гонки однотипных потоков: два пакета
+# одновременно создают запись, один проигрывает. После раскатки NOTRACK на
+# loopback и локального DNS-кэша на нодах (сентябрь 2026) фон таких гонок —
+# десятки за интервал, в основном транзитный клиентский DNS. Тревога — только
+# когда счёт идёт на сотни: это регресс одного из слоёв защиты, а не шум.
+CONNTRACK_INSERT_FAILED_NOISE = 200
 
 
 def _plural_records(count: int) -> str:
@@ -1480,6 +1483,7 @@ def evaluate_capacity(capacity: dict, warn_pct: int) -> dict:
     problems: list[str] = []
     details: list[str] = []
     level = "ok"
+    collision_warn = False
 
     def escalate(new_level):
         nonlocal level
@@ -1509,11 +1513,12 @@ def evaluate_capacity(capacity: dict, warn_pct: int) -> dict:
         elif many_failures:
             # Таблица не забита, но отказов много — причина не в размере
             escalate("warn")
+            collision_warn = True
             problems.append(
                 f"conntrack: за последний интервал не удалось создать "
                 f"{_plural_records(insert_failed)} при заполнении {usage}% — "
-                "переполнением это не объясняется, стоит посмотреть таблицу "
-                "и правила"
+                "переполнением это не объясняется: это гонки вставки, "
+                "поднимать лимиты бесполезно"
             )
         elif usage >= warn_pct:
             escalate("warn")
@@ -1614,7 +1619,16 @@ def evaluate_capacity(capacity: dict, warn_pct: int) -> dict:
         escalate("crit")
         problems.append("сработал OOM-killer")
 
-    return {"level": level, "problems": problems, "details": details}
+    return {
+        "level": level,
+        "problems": problems,
+        "details": details,
+        # Единственная проблема — гонки вставки: алерту нужен чек-лист
+        # NOTRACK/DNS-кэша, а не совет поднимать лимиты.
+        "collision_only": (
+            level == "warn" and collision_warn and len(problems) == 1
+        ),
+    }
 
 
 # --- диагностические пробы (адреса и имена отдельно) -------------------------
