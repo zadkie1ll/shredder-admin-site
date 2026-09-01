@@ -4528,6 +4528,55 @@ class ConfigModalScrollLockTests(SimpleTestCase):
 
 
 class ConfigTemplatesAdminUiTests(SimpleTestCase):
+    def test_config_delivery_rules_share_one_responsive_workspace(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        # Пиннинг и UA-правила — два равноправных сценария одной логики выдачи,
+        # а не два визуально оторванных полноширинных accordion-блока.
+        self.assertIn('class="config-delivery-section"', template)
+        self.assertIn('data-config-delivery-panel="pins"', template)
+        self.assertIn('data-config-delivery-panel="ua"', template)
+        self.assertIn('<h2 id="config-delivery-title">Логика выдачи</h2>', template)
+        delivery_markup = template.split('<section class="config-delivery-section"', 1)[1].split(
+            '<div id="config-templates-result"', 1
+        )[0]
+        self.assertNotIn('class="card admin-collapse"', delivery_markup)
+
+        # Шапки обоих сценариев остаются рядом, а их доступные кнопки управляют
+        # отдельными полноширинными панелями под сеткой. Так раскрытие справа не
+        # оставляет пустую левую половину рабочей области.
+        self.assertIn('class="config-delivery-panels"', template)
+        self.assertIn('aria-controls="config-delivery-pins-body"', delivery_markup)
+        self.assertIn('aria-controls="config-delivery-ua-body"', delivery_markup)
+        self.assertIn('id="config-delivery-pins-body"', delivery_markup)
+        self.assertIn('id="config-delivery-ua-body"', delivery_markup)
+        self.assertIn('.config-delivery-panels { display: grid;', template)
+        self.assertIn('.config-delivery-body[hidden] { display: none; }', template)
+        self.assertIn('.config-delivery-card[aria-expanded="true"]', template)
+        self.assertIn('.config-delivery-grid { grid-template-columns: 1fr;', template)
+        self.assertIn('function toggleConfigDeliveryPanel(button)', template)
+        self.assertIn("button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');", template)
+        self.assertIn('panel.hidden = !shouldOpen;', template)
+        self.assertNotIn('<details class="config-delivery-card"', delivery_markup)
+        self.assertIn('grid-template-columns: minmax(260px, 460px) max-content', template)
+        self.assertIn('.ua-rule-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));', template)
+        self.assertNotIn('Не изменяет подписки и серверные профили', delivery_markup)
+        self.assertIn('id="config-pins-form"', delivery_markup)
+        self.assertIn('id="ua-rule-form"', delivery_markup)
+        for field_name in ("match_substring", "variable_name", "value", "priority", "is_active"):
+            self.assertIn(f'name="{field_name}"', delivery_markup)
+
+    def test_ua_rules_render_as_readable_condition_flow(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        self.assertIn('class="ua-rule-item', template)
+        self.assertIn('<small>Если UA содержит</small>', template)
+        self.assertIn('<small>Передать в шаблон</small>', template)
+        self.assertIn('class="ua-rules-list"', template)
+        self.assertNotIn('class="admin-table-row ua-rule-row', template)
+        self.assertIn('data-ua-rule-edit=', template)
+        self.assertIn('data-ua-rule-delete=', template)
+
     def test_json_editor_selection_is_visible(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
         # Выделение текста в CodeMirror перекрывает блеклый фон темы material-darker,
@@ -8411,6 +8460,22 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
             "window.scrollTo({top: Math.max(0, Math.round(nextTop)), behavior: 'auto'});",
             "Управление и графики",
             "ТСПУ и детектор",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, self.template)
+
+    def test_server_header_actions_keep_stable_geometry_while_tspu_action_runs(self):
+        # Длина pending-подписи не должна переносить период и
+        # перестраивать всю hero-шапку во время POST-запроса.
+        for marker in (
+            ".infra-detail-hero-actions { display: grid; grid-template-columns: repeat(4, max-content);",
+            ".infra-period-switch { grid-column: 1 / -1; justify-self: end;",
+            ".infra-detail-hero-actions { width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr));",
+            ".infra-period-switch { grid-column: 1 / -1; grid-row: 1; width: 100%;",
+            "button.classList.contains('infra-detail-action')",
+            "button.style.inlineSize = `${stableWidth}px`;",
+            "button.style.minInlineSize = `${stableWidth}px`;",
+            "button.style.inlineSize = button.dataset.infraIdleInlineSize;",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)

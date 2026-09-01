@@ -348,10 +348,10 @@
         .infra-detail-title-copy { min-width: 0; }
         .infra-detail-title-copy h2 { margin: 0; color: var(--text-main); font-size: clamp(27px, 2.3vw, 42px); line-height: 1; font-weight: 950; letter-spacing: -.035em; }
         .infra-detail-title-copy p { margin: 9px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; font-weight: 650; }
-        .infra-detail-hero-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; flex-wrap: wrap; max-width: 720px; }
+        .infra-detail-hero-actions { display: grid; grid-template-columns: repeat(4, max-content); align-items: center; justify-content: end; gap: 8px; max-width: 720px; }
         .infra-detail-action { min-height: 38px; padding: 0 13px; border: 1px solid var(--panel-border); border-radius: 10px; background: rgba(255,255,255,.025); color: var(--muted); font: inherit; font-size: 10.5px; font-weight: 800; cursor: pointer; transition: color .14s, border-color .14s, background .14s; }
         .infra-detail-action:hover { border-color: rgba(255,199,0,.36); background: rgba(255,199,0,.07); color: var(--text-main); }
-        .infra-period-switch { display: inline-flex; align-items: center; gap: 3px; padding: 4px; border: 1px solid var(--panel-border); border-radius: 12px; background: rgba(0,0,0,.18); }
+        .infra-period-switch { grid-column: 1 / -1; justify-self: end; display: inline-flex; align-items: center; gap: 3px; padding: 4px; border: 1px solid var(--panel-border); border-radius: 12px; background: rgba(0,0,0,.18); }
         .infra-period-switch .infra-period-btn { min-width: 45px; min-height: 31px; padding: 0 10px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font: inherit; font-size: 10.5px; font-weight: 850; cursor: pointer; }
         .infra-period-switch .infra-period-btn.active { border: 0; background: rgba(255,199,0,.11); color: var(--brand-gold); }
         html[data-admin-theme="light"] .infra-period-switch { background: rgba(34,39,47,.04); }
@@ -497,6 +497,10 @@
         html[data-admin-theme="light"] .infra-detail-who-analytics { background: rgba(34,39,47,.018); }
         html[data-admin-theme="light"] .infra-geo-bar, html[data-admin-theme="light"] .infra-detail-who-bar { background: rgba(34,39,47,.08); }
         .infra-detail-who-list { padding: 0 15px 6px; }
+        .infra-detail-who-empty { display: grid; justify-items: center; gap: 7px; padding: 36px 20px 40px; text-align: center; }
+        .infra-detail-who-empty i { color: var(--muted); font-size: 19px; opacity: .65; }
+        .infra-detail-who-empty b { color: var(--text-main); font-size: 13px; font-weight: 800; }
+        .infra-detail-who-empty span { max-width: 460px; color: var(--muted); font-size: 10.5px; line-height: 1.5; }
         .infra-detail-who-row { display: grid; align-items: center; gap: 13px; min-height: 29px; border-bottom: 1px solid var(--panel-border); }
         .infra-detail-who-row:last-child { border-bottom: 0; }
         .infra-detail-who-row code { overflow: hidden; color: var(--text-main); font-size: 11.5px; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
@@ -656,9 +660,9 @@
             .infra-detail-hero-head { gap: 17px; margin-bottom: 14px; }
             .infra-detail-title-row { align-items: flex-start; margin-top: 11px; }
             .infra-detail-title-copy h2 { font-size: 28px; }
-            .infra-detail-hero-actions { width: 100%; gap: 6px; }
-            .infra-detail-action { flex: 1 1 130px; }
-            .infra-period-switch { order: -1; width: 100%; justify-content: stretch; }
+            .infra-detail-hero-actions { width: 100%; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+            .infra-detail-action { width: 100%; min-width: 0; }
+            .infra-period-switch { grid-column: 1 / -1; grid-row: 1; width: 100%; justify-self: stretch; justify-content: stretch; }
             .infra-period-switch .infra-period-btn { flex: 1 1 0; min-width: 0; }
             .infra-detail-nav { margin-bottom: 13px; }
             .infra-detail-stats { gap: 8px; }
@@ -1726,7 +1730,7 @@
         .reply-template-active input { width: 16px; height: 16px; accent-color: var(--brand-gold); }
         .reply-template-actions { display: flex; flex-wrap: wrap; gap: 8px; }
         .reply-template-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
-        .reply-template-card { display: grid; gap: 12px; padding: 16px; border-color: rgba(255,199,0,.16); background: radial-gradient(circle at 86% 10%, rgba(255,199,0,.08), transparent 10rem), var(--card-bg); }
+        .reply-template-card { display: grid; gap: 12px; min-width: 0; overflow: hidden; padding: 16px; border-color: rgba(255,199,0,.16); background: radial-gradient(circle at 86% 10%, rgba(255,199,0,.08), transparent 10rem), var(--card-bg); }
         .reply-template-card.inactive { opacity: .56; border-color: rgba(148,163,184,.13); background: var(--card-bg); }
         .reply-template-head { display: block; min-width: 0; }
         .reply-template-title { min-width: 0; margin: 0; color: #fff; font-size: 17px; line-height: 1.3; font-weight: 800; overflow-wrap: anywhere; letter-spacing: -.01em; }
@@ -1786,8 +1790,60 @@
         .config-pins-inactive .config-pins-list { margin: 10px 0 0; }
         .config-pins-actions { display: flex; flex-wrap: wrap; gap: 10px; }
         .config-pins-status { margin-top: 8px; }
+        .config-delivery-section { margin-bottom: 24px; }
+        .config-delivery-head,
+        .config-library-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; margin-bottom: 12px; padding: 0 2px; }
+        .config-delivery-heading { display: flex; align-items: center; gap: 12px; min-width: 0; }
+        .config-delivery-heading-icon { width: 38px; height: 38px; flex: 0 0 38px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(var(--accent-rgb), .28); border-radius: 11px; background: rgba(var(--accent-rgb), .08); color: var(--brand-gold); font-size: 14px; }
+        .config-delivery-head h2,
+        .config-library-head h2 { margin: 0; color: var(--text-main); font-size: 18px; line-height: 1.2; font-weight: 900; letter-spacing: -.01em; }
+        .config-delivery-head p,
+        .config-library-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; font-weight: 600; }
+        .config-delivery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
+        .config-delivery-card { width: 100%; min-width: 0; min-height: 82px; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto 18px; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid rgba(127,143,163,.22); border-radius: var(--admin-radius); background: linear-gradient(145deg, rgba(28,34,44,.96), rgba(19,24,32,.94)); box-shadow: inset 0 1px 0 rgba(255,255,255,.03); color: inherit; font: inherit; text-align: left; appearance: none; cursor: pointer; user-select: none; transition: border-color .16s, background .16s, box-shadow .16s; }
+        .config-delivery-card:hover { border-color: rgba(var(--accent-rgb), .3); }
+        .config-delivery-card:focus-visible { outline: 0; border-color: rgba(var(--accent-rgb), .58); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .12); }
+        .config-delivery-card[aria-expanded="true"] { border-color: rgba(var(--accent-rgb), .3); background: rgba(var(--accent-rgb), .055); box-shadow: inset 0 1px 0 rgba(255,255,255,.035); }
+        .config-delivery-icon { width: 42px; height: 42px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(var(--accent-rgb), .28); border-radius: 11px; background: rgba(var(--accent-rgb), .08); color: var(--brand-gold); font-size: 15px; }
+        .config-delivery-summary-copy { min-width: 0; display: grid; gap: 4px; }
+        .config-delivery-summary-copy strong { color: var(--text-main); font-size: 15px; line-height: 1.25; font-weight: 850; }
+        .config-delivery-summary-copy small { overflow: hidden; color: var(--muted); font-size: 11.5px; line-height: 1.35; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+        .config-delivery-mode { min-height: 26px; display: inline-flex; align-items: center; justify-content: center; padding: 0 9px; border: 1px solid rgba(127,143,163,.2); border-radius: 999px; background: rgba(255,255,255,.035); color: var(--muted); font-size: 10px; font-weight: 850; white-space: nowrap; }
+        .config-delivery-chevron { color: var(--muted); font-size: 11px; transition: transform .16s; }
+        .config-delivery-card[aria-expanded="true"] .config-delivery-chevron { transform: rotate(180deg); }
+        .config-delivery-panels { display: grid; gap: 12px; margin-top: 12px; }
+        .config-delivery-body { min-width: 0; display: grid; gap: 14px; padding: 16px; border: 1px solid rgba(var(--accent-rgb), .24); border-radius: var(--admin-radius); background: linear-gradient(145deg, rgba(28,34,44,.96), rgba(19,24,32,.94)); box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 18px 46px rgba(0,0,0,.13); }
+        .config-delivery-body[hidden] { display: none; }
+        .config-delivery-intro { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 11px; align-items: start; max-width: 920px; padding: 11px 13px; border: 1px solid rgba(127,143,163,.16); border-radius: 10px; background: rgba(255,255,255,.025); }
+        .config-delivery-intro > i { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; background: rgba(var(--accent-rgb), .08); color: var(--brand-gold); font-size: 12px; }
+        .config-delivery-intro strong { display: block; margin-bottom: 3px; color: var(--text-main); font-size: 12.5px; line-height: 1.35; font-weight: 800; }
+        .config-delivery-intro p { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.55; font-weight: 600; }
+        .config-delivery-intro code { padding: 1px 5px; border: 1px solid rgba(127,143,163,.18); border-radius: 5px; background: rgba(0,0,0,.16); color: var(--text-main); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10.5px; }
+        .config-pins-search { display: grid; grid-template-columns: minmax(260px, 460px) max-content; gap: 9px; align-items: end; justify-content: start; }
+        .config-pins-search .btn { width: auto; justify-self: start; }
+        .config-rule-field { min-width: 0; display: grid; gap: 6px; }
+        .config-rule-field-label { color: var(--muted); font-size: 10px; line-height: 1.2; font-weight: 850; letter-spacing: .055em; text-transform: uppercase; }
+        .config-rule-input { position: relative; }
+        .config-rule-input > i { position: absolute; left: 13px; top: 50%; z-index: 1; transform: translateY(-50%); color: var(--muted); font-size: 11px; pointer-events: none; }
+        .config-rule-input .input { padding-left: 34px; }
+        #config-pins-result { min-width: 0; }
+        .config-pins-result-stack { display: grid; gap: 10px; }
+        .config-pins-user { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid rgba(127,143,163,.18); border-radius: 10px; background: rgba(255,255,255,.025); }
+        .config-pins-user-main { min-width: 0; display: flex; align-items: center; gap: 11px; }
+        .config-pins-user-avatar { width: 38px; height: 38px; flex: 0 0 38px; display: inline-flex; align-items: center; justify-content: center; border-radius: 11px; background: rgba(var(--accent-rgb), .1); color: var(--brand-gold); font-size: 13px; font-weight: 900; }
+        .config-pins-user-copy { min-width: 0; }
+        .config-pins-user-copy strong { display: block; overflow: hidden; color: var(--text-main); font-size: 13px; line-height: 1.25; font-weight: 850; text-overflow: ellipsis; white-space: nowrap; }
+        .config-pins-user-copy span { display: block; margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 10.5px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+        .config-pins-user-meta { display: flex; align-items: center; justify-content: flex-end; gap: 7px; flex-wrap: wrap; }
+        .config-pins-user-pill { min-height: 25px; display: inline-flex; align-items: center; padding: 0 9px; border: 1px solid rgba(127,143,163,.18); border-radius: 999px; background: rgba(255,255,255,.035); color: var(--muted); font-size: 10px; font-weight: 800; white-space: nowrap; }
+        .config-pins-user-pill.is-active { border-color: rgba(var(--green-rgb), .28); background: rgba(var(--green-rgb), .08); color: var(--green); }
+        .config-pins-user-pill.is-expired { border-color: rgba(255,92,103,.28); background: rgba(255,92,103,.08); color: var(--red); }
+        .config-pins-picker { padding: 14px; border: 1px solid rgba(127,143,163,.18); border-radius: 10px; background: rgba(255,255,255,.018); }
+        .config-pins-picker .config-pins-toolbar { margin-bottom: 10px; }
+        .config-pins-picker .config-pins-actions { padding-top: 2px; }
+        .config-library-head { margin-top: 4px; }
         .config-template-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 12px; align-items: stretch; }
-        .config-template-card { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 12px; padding: 16px; border-color: rgba(255,199,0,.16); background: radial-gradient(circle at 86% 10%, rgba(255,199,0,.08), transparent 10rem), var(--card-bg); }
+        .config-template-card { display: grid; grid-template-rows: minmax(0, 1fr) auto; gap: 12px; min-width: 0; overflow: hidden; padding: 16px; border-color: rgba(255,199,0,.16); background: radial-gradient(circle at 86% 10%, rgba(255,199,0,.08), transparent 10rem), var(--card-bg); }
         .config-template-card:has(.config-template-badge.active) { border-color: rgba(56,217,150,.24); background: linear-gradient(135deg, rgba(56,217,150,.07) 0%, var(--card-bg) 44%); }
         .config-template-card.inactive { opacity: .56; border-color: rgba(148,163,184,.13); background: var(--card-bg); }
         .config-template-head { display: grid; gap: 10px; min-width: 0; }
@@ -1797,16 +1853,54 @@
         .config-template-badge.active { color: var(--green); border-color: rgba(52,211,153,.20); background: rgba(52,211,153,.07); }
         .config-template-card-actions { display: flex; flex-wrap: wrap; gap: 7px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.07); align-self: end; }
         .config-template-card-actions .mini-btn { background: rgba(255,255,255,.065); border-color: rgba(255,255,255,.12); }
-        .ua-rule-form { display: grid; gap: 8px; margin-bottom: 12px; }
-        .ua-rule-form-grid { display: grid; grid-template-columns: 1.3fr 1fr 1fr 110px auto auto; gap: 8px; align-items: center; }
+        .ua-rule-form { display: grid; gap: 10px; }
+        .ua-rule-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; align-items: end; }
+        .ua-rule-active { min-height: 40px; display: inline-flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid rgba(127,143,163,.18); border-radius: 9px; background: rgba(255,255,255,.025); color: var(--text-main); font-size: 11px; font-weight: 750; cursor: pointer; white-space: nowrap; }
+        .ua-rule-active input { width: 16px; height: 16px; flex: 0 0 16px; accent-color: var(--brand-gold); }
         .ua-rule-form-actions { display: flex; gap: 7px; }
-        .ua-rule-row { grid-template-columns: 1.3fr 1fr 1fr 110px 110px auto; }
-        .ua-rule-row .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 11px; overflow-wrap: anywhere; }
-        .ua-rule-row.inactive { opacity: .5; }
+        .ua-rules-list { display: grid; gap: 8px; margin-top: 2px; }
+        .ua-rule-item { min-width: 0; display: grid; grid-template-columns: minmax(160px, 1.1fr) 24px minmax(190px, 1.1fr) auto auto; gap: 12px; align-items: center; min-height: 62px; padding: 10px 12px; border: 1px solid rgba(127,143,163,.17); border-radius: 10px; background: rgba(255,255,255,.025); transition: border-color .14s, background .14s; }
+        .ua-rule-item:hover { border-color: rgba(var(--accent-rgb), .26); background: rgba(var(--accent-rgb), .025); }
+        .ua-rule-item.inactive { opacity: .58; }
+        .ua-rule-step { min-width: 0; display: grid; gap: 4px; }
+        .ua-rule-step small { color: var(--muted); font-size: 9.5px; line-height: 1.2; font-weight: 850; letter-spacing: .055em; text-transform: uppercase; }
+        .ua-rule-step code { overflow: hidden; color: var(--text-main); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.35; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+        .ua-rule-flow-arrow { color: var(--brand-gold); font-size: 11px; text-align: center; }
+        .ua-rule-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+        .ua-rule-pill { min-height: 24px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border: 1px solid rgba(127,143,163,.18); border-radius: 999px; background: rgba(255,255,255,.03); color: var(--muted); font-size: 9.5px; font-weight: 800; white-space: nowrap; }
+        .ua-rule-pill.is-active { border-color: rgba(var(--green-rgb), .27); background: rgba(var(--green-rgb), .08); color: var(--green); }
         .ua-rule-actions { display: flex; gap: 6px; justify-content: flex-end; }
-        @media (max-width: 900px) {
-            .ua-rule-form-grid { grid-template-columns: 1fr 1fr; }
-            .ua-rule-row { grid-template-columns: 1fr 1fr; }
+        .ua-rule-actions .mini-btn { width: 32px; min-width: 32px; padding: 0; }
+        .ua-rules-empty { padding: 18px; border: 1px dashed rgba(127,143,163,.2); border-radius: 10px; color: var(--muted); font-size: 12px; line-height: 1.5; text-align: center; }
+        html[data-admin-theme="light"] .config-delivery-card,
+        html[data-admin-theme="light"] .config-delivery-body { border-color: rgba(26,31,42,.12); background: rgba(255,255,255,.88); box-shadow: 0 10px 26px rgba(34,39,52,.045); }
+        html[data-admin-theme="light"] .config-delivery-card[aria-expanded="true"],
+        html[data-admin-theme="light"] .config-delivery-intro,
+        html[data-admin-theme="light"] .config-pins-user,
+        html[data-admin-theme="light"] .config-pins-picker,
+        html[data-admin-theme="light"] .ua-rule-item,
+        html[data-admin-theme="light"] .ua-rule-active { border-color: rgba(26,31,42,.1); background: rgba(26,31,42,.025); }
+        html[data-admin-theme="light"] .config-delivery-intro code { border-color: rgba(26,31,42,.12); background: rgba(26,31,42,.045); }
+        .ua-rule-form-actions { justify-content: flex-start; }
+        @media (max-width: 760px) {
+            .config-delivery-head,
+            .config-library-head { align-items: stretch; flex-direction: column; }
+            .config-delivery-grid { grid-template-columns: 1fr; }
+            .config-delivery-card { grid-template-columns: 38px minmax(0, 1fr) 16px; min-height: 74px; padding: 12px; }
+            .config-delivery-icon { width: 38px; height: 38px; }
+            .config-delivery-mode { display: none; }
+            .config-delivery-summary-copy small { white-space: normal; }
+            .config-delivery-body { padding: 12px; }
+            .config-pins-search,
+            .ua-rule-form-grid { grid-template-columns: 1fr; }
+            .config-pins-search .btn { width: 100%; }
+            .config-pins-user { align-items: flex-start; flex-direction: column; }
+            .config-pins-user-meta { justify-content: flex-start; }
+            .ua-rule-item { grid-template-columns: 1fr auto; gap: 8px 10px; }
+            .ua-rule-flow-arrow { display: none; }
+            .ua-rule-step:nth-of-type(2) { grid-column: 1; }
+            .ua-rule-meta { grid-column: 1; }
+            .ua-rule-actions { grid-column: 2; grid-row: 1 / span 3; align-self: center; flex-direction: column; }
         }
 
         /* Remnawave-inspired admin skin */
@@ -4759,65 +4853,119 @@
 <section id="panel-config-templates" class="infra-legacy-panel">
             <header class="panel-header config-panel-header">
                 <div>
-                    <h1 class="admin-title">Шаблоны конфигов</h1>
-                    <p class="admin-subtitle">Параметры CustomConfigTemplate и JSON шаблона</p>
+                    <h1 class="admin-title">Конфиги</h1>
+                    <p class="admin-subtitle">Шаблоны, персональная выдача и определение клиентского приложения</p>
+                </div>
+            </header>
+
+            <section class="config-delivery-section" aria-labelledby="config-delivery-title">
+                <header class="config-delivery-head">
+                    <div class="config-delivery-heading">
+                        <span class="config-delivery-heading-icon"><i class="fas fa-code-branch"></i></span>
+                        <div>
+                            <h2 id="config-delivery-title">Логика выдачи</h2>
+                            <p>Определите, кому и какой вариант конфига должен достаться</p>
+                        </div>
+                    </div>
+                </header>
+
+                <div class="config-delivery-grid">
+                    <button type="button" class="config-delivery-card" data-config-delivery-panel="pins" aria-expanded="false" aria-controls="config-delivery-pins-body">
+                        <span class="config-delivery-icon"><i class="fas fa-user-gear"></i></span>
+                        <span class="config-delivery-summary-copy">
+                            <strong>Персональные конфиги для пользователя</strong>
+                            <small>Закрепить выбранные шаблоны вместо общего round-robin</small>
+                        </span>
+                        <span class="config-delivery-mode">По пользователю</span>
+                        <i class="fas fa-chevron-down config-delivery-chevron"></i>
+                    </button>
+
+                    <button type="button" class="config-delivery-card" data-config-delivery-panel="ua" aria-expanded="false" aria-controls="config-delivery-ua-body">
+                        <span class="config-delivery-icon"><i class="fas fa-fingerprint"></i></span>
+                        <span class="config-delivery-summary-copy">
+                            <strong>Правила User-Agent</strong>
+                            <small>Определить приложение и передать переменную в Jinja-шаблон</small>
+                        </span>
+                        <span class="config-delivery-mode">По приложению</span>
+                        <i class="fas fa-chevron-down config-delivery-chevron"></i>
+                    </button>
+                </div>
+
+                <div class="config-delivery-panels">
+                    <section class="config-delivery-body" id="config-delivery-pins-body" aria-label="Персональные конфиги для пользователя" hidden>
+                        <div class="config-delivery-intro">
+                            <i class="fas fa-arrows-spin"></i>
+                            <div>
+                                <strong>По умолчанию работают все активные шаблоны по кругу</strong>
+                                <p>Найдите пользователя и отметьте только нужные конфиги. Если закреплённые шаблоны станут неактивными, выдача безопасно вернётся к общему round-robin.</p>
+                            </div>
+                        </div>
+                        <form id="config-pins-form" class="config-pins-form config-pins-search">
+                            {% csrf_token %}
+                            <label class="config-rule-field">
+                                <span class="config-rule-field-label">Пользователь</span>
+                                <span class="config-rule-input">
+                                    <i class="fas fa-magnifying-glass"></i>
+                                    <input class="input" name="q" placeholder="username, email или telegram_id" autocomplete="off">
+                                </span>
+                            </label>
+                            <button class="btn btn-secondary" type="submit"><i class="fas fa-magnifying-glass"></i>Найти пользователя</button>
+                        </form>
+                        <div id="config-pins-result"></div>
+                    </section>
+
+                    <section class="config-delivery-body" id="config-delivery-ua-body" aria-label="Правила User-Agent" hidden>
+                        <div class="config-delivery-intro">
+                            <i class="fas fa-wand-magic-sparkles"></i>
+                            <div>
+                                <strong>Совпадение User-Agent превращается в переменную шаблона</strong>
+                                <p>Например, <code>incy</code> → <code>CLIENT=incy</code>. Правила идут по возрастанию приоритета; для каждой переменной применяется первое совпадение без учёта регистра.</p>
+                            </div>
+                        </div>
+                        <form id="ua-rule-form" class="ua-rule-form">
+                            {% csrf_token %}
+                            <input type="hidden" name="rule_id">
+                            <div class="ua-rule-form-grid">
+                                <label class="config-rule-field">
+                                    <span class="config-rule-field-label">Если UA содержит</span>
+                                    <input class="input" name="match_substring" maxlength="160" placeholder="Например, incy" required>
+                                </label>
+                                <label class="config-rule-field">
+                                    <span class="config-rule-field-label">Переменная</span>
+                                    <input class="input" name="variable_name" maxlength="64" placeholder="CLIENT" value="CLIENT">
+                                </label>
+                                <label class="config-rule-field">
+                                    <span class="config-rule-field-label">Значение</span>
+                                    <input class="input" name="value" maxlength="160" placeholder="Например, incy" required>
+                                </label>
+                                <label class="config-rule-field">
+                                    <span class="config-rule-field-label">Приоритет</span>
+                                    <input class="input" name="priority" type="number" step="1" placeholder="100">
+                                </label>
+                                <label class="ua-rule-active">
+                                    <input type="checkbox" name="is_active" checked>
+                                    Активно
+                                </label>
+                                <div class="ua-rule-form-actions">
+                                    <button class="btn" type="submit" data-ua-rule-submit><i class="fas fa-save"></i>Сохранить</button>
+                                    <button class="btn btn-secondary" type="button" id="ua-rule-reset">Очистить</button>
+                                </div>
+                            </div>
+                        </form>
+                        <div id="ua-rules-result"></div>
+                    </section>
+                </div>
+            </section>
+
+            <header class="config-library-head">
+                <div>
+                    <h2>Шаблоны</h2>
+                    <p>Активные варианты участвуют в выдаче и персональных назначениях</p>
                 </div>
                 <div class="config-panel-actions">
                     <button class="btn" type="button" id="config-template-add"><i class="fas fa-plus"></i>Добавить конфиг</button>
                 </div>
             </header>
-
-            <details class="card admin-collapse">
-                <summary><i class="fas fa-user-gear"></i>Персональные конфиги для пользователя<span class="admin-collapse-hint">закрепить конкретные конфиги вместо round-robin</span></summary>
-                <div class="admin-collapse-body">
-                    <div class="help-block">
-                        <p>Обычно активные конфиги выдаются по кругу (round-robin). Здесь можно закрепить за пользователем только выбранные — тогда выдаваться будут только они.</p>
-                        <p>Если ни один закреплённый конфиг не активен, снова включается round-robin.</p>
-                    </div>
-                    <form id="config-pins-form" class="config-pins-form">
-                        {% csrf_token %}
-                        <div class="form-grid-two">
-                            <input class="input" name="q" placeholder="username, email или telegram_id">
-                            <button class="btn btn-secondary" type="submit"><i class="fas fa-magnifying-glass"></i>Найти пользователя</button>
-                        </div>
-                    </form>
-                    <div id="config-pins-result"></div>
-                </div>
-            </details>
-
-            <details class="card admin-collapse">
-                <summary><i class="fas fa-fingerprint"></i>Правила User-Agent<span class="admin-collapse-hint">определение клиентского приложения при выдаче конфига</span></summary>
-                <div class="admin-collapse-body">
-                    <div class="help-block">
-                        <p>Если User-Agent запроса содержит подстроку (без учёта регистра), в Jinja-рендер шаблона передаётся переменная с указанным значением.</p>
-                        <ul>
-                            <li>Пример: подстрока <code>incy</code> → <code>CLIENT=incy</code>, и в шаблоне работает <code>{% templatetag openblock %} if CLIENT == "incy" {% templatetag closeblock %}</code></li>
-                            <li>Правила проверяются по возрастанию приоритета</li>
-                            <li>Для каждой переменной побеждает первое совпадение</li>
-                        </ul>
-                    </div>
-                    <form id="ua-rule-form" class="ua-rule-form">
-                    {% csrf_token %}
-                    <input type="hidden" name="rule_id">
-                    <div class="ua-rule-form-grid">
-                        <input class="input" name="match_substring" maxlength="160" placeholder="Подстрока в UA, например incy" required>
-                        <input class="input" name="variable_name" maxlength="64" placeholder="Переменная (CLIENT)" value="CLIENT">
-                        <input class="input" name="value" maxlength="160" placeholder="Значение, например incy" required>
-                        <input class="input" name="priority" type="number" step="1" placeholder="Приоритет (100)">
-                        <label class="reply-template-active">
-                            <input type="checkbox" name="is_active" checked>
-                            Активно
-                        </label>
-                        <div class="ua-rule-form-actions">
-                            <button class="btn" type="submit" data-ua-rule-submit><i class="fas fa-save"></i>Сохранить</button>
-                            <button class="btn btn-secondary" type="button" id="ua-rule-reset">Очистить</button>
-                        </div>
-                    </div>
-                    </form>
-                    <div id="ua-rules-result"></div>
-                </div>
-            </details>
-
             <div id="config-templates-result" class="config-template-list"></div>
         </section>
             </div>
@@ -6141,17 +6289,25 @@
 
         function uaRuleRow(rule) {
             return `
-                <div class="admin-table-row ua-rule-row ${rule.is_active ? '' : 'inactive'}" data-ua-rule-id="${rule.id}">
-                    <span class="mono">${escapeHtml(rule.match_substring)}</span>
-                    <span class="mono">${escapeHtml(rule.variable_name)}</span>
-                    <span class="mono">${escapeHtml(rule.value)}</span>
-                    <span>${rule.priority}</span>
-                    <span>${rule.is_active ? 'активно' : 'выключено'}</span>
-                    <div class="ua-rule-actions">
-                        <button type="button" class="mini-btn" data-ua-rule-edit="${rule.id}"><i class="fas fa-pen"></i></button>
-                        <button type="button" class="mini-btn danger" data-ua-rule-delete="${rule.id}"><i class="fas fa-trash"></i></button>
+                <article class="ua-rule-item ${rule.is_active ? '' : 'inactive'}" data-ua-rule-id="${rule.id}">
+                    <div class="ua-rule-step">
+                        <small>Если UA содержит</small>
+                        <code>${escapeHtml(rule.match_substring)}</code>
                     </div>
-                </div>
+                    <i class="fas fa-arrow-right ua-rule-flow-arrow" aria-hidden="true"></i>
+                    <div class="ua-rule-step">
+                        <small>Передать в шаблон</small>
+                        <code>${escapeHtml(rule.variable_name)}=${escapeHtml(rule.value)}</code>
+                    </div>
+                    <div class="ua-rule-meta">
+                        <span class="ua-rule-pill"><i class="fas fa-arrow-down-1-9"></i>${rule.priority}</span>
+                        <span class="ua-rule-pill ${rule.is_active ? 'is-active' : ''}">${rule.is_active ? '<i class="fas fa-circle-check"></i>Активно' : '<i class="fas fa-circle-pause"></i>Выключено'}</span>
+                    </div>
+                    <div class="ua-rule-actions">
+                        <button type="button" class="mini-btn" data-ua-rule-edit="${rule.id}" aria-label="Редактировать правило" title="Редактировать"><i class="fas fa-pen"></i></button>
+                        <button type="button" class="mini-btn danger" data-ua-rule-delete="${rule.id}" aria-label="Удалить правило" title="Удалить"><i class="fas fa-trash"></i></button>
+                    </div>
+                </article>
             `;
         }
 
@@ -6170,13 +6326,8 @@
             const payload = await response.json();
             uaRulesCache = payload.rules || [];
             target.innerHTML = uaRulesCache.length
-                ? `
-                    <div class="admin-table-row ua-rule-row table-head">
-                        <span>Подстрока UA</span><span>Переменная</span><span>Значение</span><span>Приоритет</span><span>Статус</span><span></span>
-                    </div>
-                    ${uaRulesCache.map(uaRuleRow).join('')}
-                `
-                : '<div class="card info-card muted">Правил пока нет. Например: подстрока «incy» → CLIENT=incy.</div>';
+                ? `<div class="ua-rules-list">${uaRulesCache.map(uaRuleRow).join('')}</div>`
+                : '<div class="ua-rules-empty"><i class="fas fa-fingerprint"></i> Правил пока нет. Добавьте первое соответствие User-Agent и переменной шаблона.</div>';
         }
 
         function resetUaRuleForm() {
@@ -6260,9 +6411,21 @@
             const inactiveTemplates = templates.filter((template) => !template.is_active);
             const pinnedCount = (result.pinned_ids || []).length;
             target.innerHTML = `
-                <div class="result-stack">
-                    ${userCard(result.user)}
-                    <section class="card info-card">
+                <div class="config-pins-result-stack">
+                    <section class="config-pins-user">
+                        <div class="config-pins-user-main">
+                            <span class="config-pins-user-avatar"><i class="fas fa-user"></i></span>
+                            <div class="config-pins-user-copy">
+                                <strong>@${escapeHtml(result.user.username)}</strong>
+                                <span>${escapeHtml(result.user.email || 'email не указан')} · Telegram ${escapeHtml(result.user.telegram_id || 'не привязан')}</span>
+                            </div>
+                        </div>
+                        <div class="config-pins-user-meta">
+                            <span class="config-pins-user-pill ${result.user.is_active ? 'is-active' : 'is-expired'}">${result.user.is_active ? 'Подписка активна' : 'Подписка истекла'}</span>
+                            <span class="config-pins-user-pill">до ${escapeHtml(result.user.expire_at || '—')}</span>
+                        </div>
+                    </section>
+                    <section class="config-pins-picker">
                         <div class="config-pins-toolbar">
                             <input type="search" class="input config-pins-filter" placeholder="Фильтр по названию конфига..." data-config-pins-filter>
                             <span class="config-pins-counter" data-config-pins-counter></span>
@@ -11544,6 +11707,17 @@
         if (referralAntifraudForm) referralAntifraudForm.addEventListener('submit', submitReferralAntifraud);
         if (replyTemplateForm) replyTemplateForm.addEventListener('submit', submitReplyTemplate);
         if (configTemplateForm) configTemplateForm.addEventListener('submit', submitConfigTemplate);
+        function toggleConfigDeliveryPanel(button) {
+            const panelId = button.getAttribute('aria-controls');
+            const panel = panelId ? document.getElementById(panelId) : null;
+            if (!panel) return;
+            const shouldOpen = button.getAttribute('aria-expanded') !== 'true';
+            button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+            panel.hidden = !shouldOpen;
+        }
+        document.querySelectorAll('[data-config-delivery-panel][aria-controls]').forEach((button) => {
+            button.addEventListener('click', () => toggleConfigDeliveryPanel(button));
+        });
         document.getElementById('node-traffic-form')?.addEventListener('submit', loadNodeTraffic);
         document.getElementById('censor-check-form')?.addEventListener('submit', submitCensorCheck);
         document.getElementById('censor-check-reset')?.addEventListener('click', resetCensorCheckForm);
@@ -12148,6 +12322,13 @@
                 if (!button) return;
                 button.dataset.infraIdleHtml = button.innerHTML;
                 button.dataset.infraIdleDisabled = button.disabled ? 'true' : 'false';
+                if (button.classList.contains('infra-detail-action')) {
+                    button.dataset.infraIdleInlineSize = button.style.inlineSize;
+                    button.dataset.infraIdleMinInlineSize = button.style.minInlineSize;
+                    const stableWidth = Math.ceil(button.getBoundingClientRect().width);
+                    button.style.inlineSize = `${stableWidth}px`;
+                    button.style.minInlineSize = `${stableWidth}px`;
+                }
                 button.disabled = true;
                 const copy = button.classList.contains('infra-icon-btn') ? '' : escapeHtml(label);
                 button.innerHTML = `<span class="infra-action-spinner" aria-hidden="true"></span>${copy}`;
@@ -12157,6 +12338,12 @@
             if (!button) return;
             if (button.dataset.infraIdleHtml !== undefined) button.innerHTML = button.dataset.infraIdleHtml;
             button.disabled = button.dataset.infraIdleDisabled === 'true';
+            if (button.dataset.infraIdleInlineSize !== undefined) {
+                button.style.inlineSize = button.dataset.infraIdleInlineSize;
+                button.style.minInlineSize = button.dataset.infraIdleMinInlineSize;
+                delete button.dataset.infraIdleInlineSize;
+                delete button.dataset.infraIdleMinInlineSize;
+            }
             delete button.dataset.infraIdleHtml;
             delete button.dataset.infraIdleDisabled;
         }
@@ -12607,6 +12794,9 @@
 
             const who = detail.who_connects || {};
             const whoRows = (who.top_addresses || []).slice(0, 20);
+            // Нет наблюдений — не рисуем заголовки колонок и гео-панели над
+            // пустотой, вместо них один общий empty state
+            const whoHasData = whoRows.length > 0;
             const whoMaxHits = Math.max(1, ...whoRows.map((row) => Number(row.hits || 0)));
             const geo = who.geo || {};
             const whoTotalHits = Math.max(
@@ -13098,14 +13288,20 @@
                         <div class="infra-detail-who-totals">
                             <span class="infra-detail-who-pill">уникальных IP ${(who.unique_ips_24h || 0).toLocaleString('ru-RU')}</span>
                             <span class="infra-detail-who-pill">за час ${(who.unique_ips_1h || 0).toLocaleString('ru-RU')}</span>
-                            ${geo.enabled ? `<span class="infra-detail-who-pill">определено ${(geo.located_ips || 0).toLocaleString('ru-RU')} из ${(geo.total_ips || 0).toLocaleString('ru-RU')}</span><span class="infra-detail-who-pill">из России ${Number(geo.russia_share_pct || 0).toFixed(1)}%</span>` : ''}
+                            ${geo.enabled && whoHasData ? `<span class="infra-detail-who-pill">определено ${(geo.located_ips || 0).toLocaleString('ru-RU')} из ${(geo.total_ips || 0).toLocaleString('ru-RU')}</span><span class="infra-detail-who-pill">из России ${Number(geo.russia_share_pct || 0).toFixed(1)}%</span>` : ''}
                         </div>
                     </header>
                     <div class="infra-detail-who-analytics">
+                        ${whoHasData ? `
                         ${geoHtml}
                         <div class="infra-detail-who-addresses"><h4>Адреса</h4><span>по числу подключений</span></div>
                         <div class="infra-detail-who-columns" aria-hidden="true"><span>Адрес</span><span>Активность</span><span>Подключений</span><span>Пользователей</span><span>Доля</span></div>
-                        <div class="infra-detail-who-list">${whoTop}</div>
+                        <div class="infra-detail-who-list">${whoTop}</div>` : `
+                        <div class="infra-detail-who-empty">
+                            <i class="fas fa-satellite-dish" aria-hidden="true"></i>
+                            <b>Данных ip-guard за 24 часа нет</b>
+                            <span>Список адресов и география появятся, когда ip-guard передаст первые наблюдения подключений по этой ноде</span>
+                        </div>`}
                     </div>
                 </section>
 
