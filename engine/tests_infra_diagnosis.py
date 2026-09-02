@@ -205,6 +205,106 @@ class ClassifyTests(SimpleTestCase):
         self.assertEqual(result["blocked_snis"], [])
 
 
+class PairBlockTests(SimpleTestCase):
+    """Бан пары «адрес + имя» (инцидент 2026-09-02): имя падает на одном
+    живом адресе и проходит на другом. Это не бан имени."""
+
+    def test_name_failing_on_one_live_address_but_passing_on_another(self):
+        result = diag.classify(
+            ip_probes={
+                "2.58.66.198": probe(6, 6),
+                "2.58.66.203": probe(6, 6),
+            },
+            sni_probes={
+                ("2.58.66.198", "de.monkora.org"): probe(0, 6),
+                ("2.58.66.203", "de.monkora.org"): probe(6, 6),
+                ("2.58.66.198", "de.easyemploy.org"): probe(6, 6),
+                ("2.58.66.203", "de.easyemploy.org"): probe(6, 6),
+            },
+            control_name="google.ru",
+        )
+        self.assertEqual(result["blocked_snis"], [])
+        self.assertEqual(result["snis"]["de.monkora.org"], diag.SNI_OK)
+        self.assertEqual(
+            result["pair_blocked"],
+            [{"ip": "2.58.66.198", "sni": "de.monkora.org"}],
+        )
+        text = diag.evidence_text(result["evidence"])
+        self.assertIn("бан пары", text)
+        self.assertIn("≠", text)
+        self.assertTrue(result["actionable"])
+
+    def test_name_failing_on_all_live_addresses_is_banned(self):
+        result = diag.classify(
+            ip_probes={
+                "2.58.66.198": probe(6, 6),
+                "2.58.66.143": probe(6, 6),
+            },
+            sni_probes={
+                ("2.58.66.198", "de.monkeyisland.xyz"): probe(0, 6),
+                ("2.58.66.143", "de.monkeyisland.xyz"): probe(0, 7),
+            },
+            control_name="google.ru",
+        )
+        self.assertEqual(result["blocked_snis"], ["de.monkeyisland.xyz"])
+        self.assertEqual(result["pair_blocked"], [])
+        self.assertIn(
+            "ни на одном из 2 живых адресов",
+            diag.evidence_text(result["evidence"]),
+        )
+
+    def test_neighbour_pass_turns_name_ban_into_pair_block(self):
+        # Здесь имя проверено на единственном живом адресе и упало, но у
+        # соседнего сервера волны оно на живом адресе прошло
+        result = diag.classify(
+            ip_probes={"2.58.66.198": probe(6, 6)},
+            sni_probes={("2.58.66.198", "de.monkora.org"): probe(0, 6)},
+            control_name="google.ru",
+            external_sni_results={
+                ("2.58.66.143", "de.monkora.org"): {
+                    "result": "pass", "server": "de-3", "at": "16:40",
+                },
+            },
+        )
+        self.assertEqual(result["blocked_snis"], [])
+        self.assertEqual(
+            result["pair_blocked"],
+            [{"ip": "2.58.66.198", "sni": "de.monkora.org"}],
+        )
+        text = diag.evidence_text(result["evidence"])
+        self.assertIn("de-3", text)
+        self.assertIn("2.58.66.143", text)
+
+    def test_neighbour_fail_does_not_change_verdicts(self):
+        # Чужой провал имя не банит: здесь оно на живом адресе проходит
+        result = diag.classify(
+            ip_probes={"2.58.66.143": probe(6, 6)},
+            sni_probes={("2.58.66.143", "de.monkora.org"): probe(6, 6)},
+            control_name="google.ru",
+            external_sni_results={
+                ("2.58.66.198", "de.monkora.org"): {
+                    "result": "fail", "server": "de-1", "at": "16:37",
+                },
+            },
+        )
+        self.assertEqual(result["blocked_snis"], [])
+        self.assertEqual(result["pair_blocked"], [])
+        self.assertEqual(result["snis"]["de.monkora.org"], diag.SNI_OK)
+
+    def test_untested_name_is_absent_from_verdicts(self):
+        # Живого адреса нет — имена не проверялись: их нет ни среди чистых,
+        # ни среди забаненных (вызывающий код считает их неизвестными)
+        result = diag.classify(
+            ip_probes={"62.192.153.131": probe(0, 6)},
+            sni_probes={},
+            control_name="google.ru",
+        )
+        self.assertEqual(result["blocked_ips"], ["62.192.153.131"])
+        self.assertEqual(result["snis"], {})
+        self.assertEqual(result["blocked_snis"], [])
+        self.assertEqual(result["pair_blocked"], [])
+
+
 class DomainSplitTests(SimpleTestCase):
     def test_only_clean_domains_are_repointed(self):
         domains = [

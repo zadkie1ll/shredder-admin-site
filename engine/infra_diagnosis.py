@@ -42,6 +42,12 @@ IP_UNKNOWN = "unknown"
 SNI_OK = "ok"
 SNI_BLOCKED = "blocked"
 SNI_UNKNOWN = "unknown"
+# Бан пары «адрес + имя»: имя падает на одном живом адресе, но проходит на
+# другом. Это не бан имени (имя рабочее) и не бан адреса (контроль на нём
+# проходит) — третий тип правила ТСПУ, замеченный 2026-09-02: monkora и
+# space падали на .198 и проходили на .143 из той же /24, а через два часа
+# бан пары снялся сам. Прежний классификатор называл это баном имени.
+SNI_PAIR_BLOCKED = "pair_blocked"
 
 # Уверенность вердикта
 CONFIDENCE_HIGH = "high"
@@ -128,19 +134,31 @@ def classify(
     outside_probes: dict | None = None,
     node_healthy: bool = True,
     control_name: str = "",
+    external_sni_results: dict | None = None,
 ) -> dict:
     """Раздельные вердикты по адресам и именам.
 
     ip_probes:      {ip: проба контрольным именем с зондов РФ}
     sni_probes:     {(ip, sni): проба этим именем на этом адресе}
     outside_probes: {ip: проба контрольным именем с зондов вне РФ}
+    external_sni_results: {(ip, sni): {"result": "pass"|"fail",
+                    "server": имя сервера, "at": время}} — результаты проб
+                    того же имени на живых адресах ДРУГИХ серверов той же
+                    волны. Имя общее для нескольких нод, и вердикт по нему
+                    обязан учитывать всё, что известно о нём в парке.
 
     Проба — словарь {"ok_probes", "total_probes", "stages"}; None означает,
     что проба не проводилась.
 
-    Возвращает {"ips", "snis", "blocked_ips", "blocked_snis", "confidence",
-    "evidence", "control_burned", "actionable"}. actionable=False означает,
-    что автоматические действия запрещены: причина — в evidence.
+    Имя считается забаненным, только если оно не проходит НИ НА ОДНОМ живом
+    адресе, где проверялось (включая чужие серверы волны). Падает на одних
+    живых адресах и проходит на других — это бан пары «адрес + имя»
+    (pair_blocked), само имя чистое.
+
+    Возвращает {"ips", "snis", "blocked_ips", "blocked_snis", "pair_blocked",
+    "confidence", "evidence", "control_burned", "actionable"}.
+    actionable=False означает, что автоматические действия запрещены:
+    причина — в evidence.
     """
     sni_probes = sni_probes or {}
     outside_probes = outside_probes or {}
@@ -161,8 +179,9 @@ def classify(
         )
         return {
             "ips": {}, "snis": {}, "blocked_ips": [], "blocked_snis": [],
-            "confidence": CONFIDENCE_HIGH, "evidence": evidence,
-            "control_burned": False, "actionable": False,
+            "pair_blocked": [], "confidence": CONFIDENCE_HIGH,
+            "evidence": evidence, "control_burned": False,
+            "actionable": False,
         }
 
     burned = control_name_burned(ip_probes)
@@ -182,8 +201,9 @@ def classify(
         )
         return {
             "ips": {}, "snis": {}, "blocked_ips": [], "blocked_snis": [],
-            "confidence": CONFIDENCE_LOW, "evidence": evidence,
-            "control_burned": True, "actionable": False,
+            "pair_blocked": [], "confidence": CONFIDENCE_LOW,
+            "evidence": evidence, "control_burned": True,
+            "actionable": False,
         }
 
     # --- статус адресов -----------------------------------------------------
@@ -255,6 +275,29 @@ def classify(
         )
 
     # --- статус имён (только на живых адресах) ------------------------------
+    # Сначала собираем по каждому имени, где оно прошло и где упало, и
+    # только потом выносим вердикт: одна и та же проба «имя не проходит на
+    # живом адресе» означает бан имени, если имя не проходит нигде, и бан
+    # пары «адрес + имя», если на другом живом адресе оно проходит.
+    external_sni_results = external_sni_results or {}
+    passes: dict[str, list[str]] = {}
+    fails: dict[str, list[str]] = {}
+    for (ip, sni), probe in sni_probes.items():
+        if ips.get(ip) != IP_OK or probe is None:
+            continue
+        total = probe.get("total_probes") or 0
+        if total and total < MIN_PROBES_HIGH_CONFIDENCE:
+            weak_sample = True
+        if probe_passed(probe):
+            passes.setdefault(sni, []).append(ip)
+        else:
+            fails.setdefault(sni, []).append(ip)
+    external_passes: dict[str, list[dict]] = {}
+    for (ip, sni), item in external_sni_results.items():
+        if (item or {}).get("result") == "pass":
+            external_passes.setdefault(sni, []).append(dict(item, ip=ip))
+
+    pair_blocked: list[dict] = []
     for (ip, sni), probe in sni_probes.items():
         if ips.get(ip) != IP_OK:
             # На мёртвом адресе падает всё; вывод об имени был бы ложным
@@ -271,13 +314,9 @@ def classify(
             continue
         if probe is None:
             continue
-        total = probe.get("total_probes") or 0
-        if total and total < MIN_PROBES_HIGH_CONFIDENCE:
-            weak_sample = True
         if probe_passed(probe):
             # Одного успеха достаточно: имя работает хотя бы где-то
-            if snis.get(sni) != SNI_BLOCKED:
-                snis[sni] = SNI_OK
+            snis[sni] = SNI_OK
             evidence.append(
                 {
                     "step": "sni_probe", "ip": ip, "sni": sni, "result": "pass",
@@ -288,16 +327,55 @@ def classify(
                 }
             )
             continue
-        snis[sni] = SNI_BLOCKED
         note = _stage_note(probe)
+        label = _probe_label(probe) + (f", {note}" if note else "")
+        if passes.get(sni):
+            # Здесь падает, на другом живом адресе этого же сервера проходит
+            snis[sni] = SNI_OK
+            pair_blocked.append({"ip": ip, "sni": sni})
+            evidence.append(
+                {
+                    "step": "sni_probe", "ip": ip, "sni": sni,
+                    "result": "pair", "pair_blocked": True,
+                    "text": (
+                        f"Имя {sni} на живом адресе {ip}: не проходит ({label}), "
+                        f"но на живом адресе {', '.join(passes[sni])} проходит — "
+                        "бан пары «адрес + имя», само имя чистое"
+                    ),
+                }
+            )
+            continue
+        if external_passes.get(sni):
+            # У соседнего сервера той же волны имя на живом адресе прошло:
+            # имя рабочее, а здесь бан пары
+            ext = external_passes[sni][-1]
+            snis[sni] = SNI_OK
+            pair_blocked.append({"ip": ip, "sni": sni})
+            evidence.append(
+                {
+                    "step": "sni_probe", "ip": ip, "sni": sni,
+                    "result": "pair", "pair_blocked": True,
+                    "text": (
+                        f"Имя {sni} на живом адресе {ip}: не проходит ({label}), "
+                        f"но на сервере {ext.get('server') or '?'} на адресе "
+                        f"{ext.get('ip')} ({ext.get('at') or '—'}) проходит — "
+                        "бан пары «адрес + имя», само имя чистое"
+                    ),
+                }
+            )
+            continue
+        snis[sni] = SNI_BLOCKED
+        where = (
+            f" ни на одном из {len(fails[sni])} живых адресов"
+            if len(fails.get(sni, [])) > 1
+            else ""
+        )
         evidence.append(
             {
                 "step": "sni_probe", "ip": ip, "sni": sni, "result": "fail",
                 "text": (
-                    f"Имя {sni} на живом адресе {ip}: не проходит "
-                    f"({_probe_label(probe)}"
-                    + (f", {note}" if note else "")
-                    + ") — адрес доказанно жив, значит заблокировано имя"
+                    f"Имя {sni} на живом адресе {ip}: не проходит ({label}) — "
+                    f"адрес доказанно жив{where}, значит заблокировано имя"
                 ),
             }
         )
@@ -324,6 +402,7 @@ def classify(
         "snis": snis,
         "blocked_ips": blocked_ips,
         "blocked_snis": blocked_snis,
+        "pair_blocked": pair_blocked,
         "confidence": confidence,
         "evidence": evidence,
         "control_burned": False,
@@ -350,7 +429,7 @@ def evidence_text(evidence: list) -> str:
     for item in evidence or []:
         mark = {
             "pass": "✓", "fail": "✗", "skipped": "–",
-            "inconclusive": "?", "warn": "!",
+            "inconclusive": "?", "warn": "!", "pair": "≠",
         }.get(item.get("result"), "·")
         lines.append(f"{mark} {item.get('text', '')}")
     return "\n".join(lines)

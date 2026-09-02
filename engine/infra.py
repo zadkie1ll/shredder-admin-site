@@ -153,8 +153,14 @@ REPLACEMENT_STUCK_MINUTES = 45
 COMMAND_TTL_MINUTES = 15
 
 REPLACEMENT_ACTIVE_STATUSES = (
-    "pending", "installing", "verifying", "dns_add", "dns_remove",
-    "confirming")
+    "pending", "installing", "verifying", "verifying_names", "dns_add",
+    "dns_remove", "confirming")
+# Фаза имён идёт на нескольких живых адресах сразу (не больше стольких):
+# только так бан имени отличим от бана пары «адрес + имя»
+SNI_PROBE_MAX_IPS = 2
+# Волна диагностик: результаты проб имени на живых адресах соседних
+# серверов не старше этого окна входят в вердикт по имени
+NAME_WAVE_WINDOW_MINUTES = 90
 REPLACEMENT_TERMINAL_STATUSES = (
     "done", "dns_cleanup", "manual_required", "failed")
 
@@ -1370,17 +1376,18 @@ def set_tspu_checks_enabled(db_session, server_id, enabled: bool) -> InfraServer
 
 def request_replacement(
     db_session, server_id, old_ip: str, created_by: str, anomaly_id=None,
-    domains: list = None,
+    domains: list = None, banned_names: list = None,
 ) -> InfraIpReplacement:
     """replaceFailedIp: заявка на замену IP (идемпотентная).
 
     Вызывается воркером после подтверждения ТСПУ или админом вручную.
 
-    domains — какие домены переводить на новый адрес. None означает «все
-    домены сервера» (прежнее поведение). Диагностика передаёт сюда только
-    домены с чистым именем: публиковать новый адрес под именем, которое
-    само под фильтром, нельзя — имя всё равно не работает, а связывать с
-    ним чистый адрес незачем.
+    domains — из каких доменов убирать старый адрес. None означает «все
+    домены сервера». banned_names — имена, забаненные по вердикту
+    диагностики: под них новый адрес не публикуется (имя всё равно не
+    работает, а чистый адрес под ним рискует уйти в бан следом), но мёртвый
+    старый адрес из их A-записей убирается. Остальные имена перед
+    публикацией проверяются на кандидате по одному.
     """
     server = get_server(db_session, server_id)
     old_ip = (old_ip or "").strip()
@@ -1440,7 +1447,14 @@ def request_replacement(
             {
                 "ts": _dt(utcnow()),
                 "step": "created",
-                "message": f"Заявка на замену {old_ip} ({created_by})",
+                "message": f"Заявка на замену {old_ip} ({created_by})"
+                + (
+                    "; имена под баном, не публикуются: "
+                    + ", ".join(sorted(set(banned_names)))
+                    if banned_names
+                    else ""
+                ),
+                "banned_names": sorted(set(banned_names or [])),
             }
         ],
     )
@@ -1684,13 +1698,21 @@ def probe_key(target_ip: str, sni: str) -> str:
 
 
 def start_diagnosis_probes(
-    db_session, pairs: list, probe_ids: list = None, reason: str = ""
+    db_session, pairs: list, probe_ids: list = None, reason: str = "",
+    light: bool = True,
 ) -> dict:
     """Запускает пробы по парам (адрес, имя) ОДНИМ набором зондов.
 
     Общий набор принципиален: если пробы пойдут по разным зондам, разницу
     между ними нельзя будет приписать проверяемому параметру — она может
     объясняться разным составом зондов.
+
+    light=True — лёгкий набор (10 зондов у семи операторов, отвечают ~6):
+    годится для адресов, где вердикт дублируется контролем. Пробы ИМЁН и
+    кандидатов идут полным набором (light=False, 31 зонд): имя общее для
+    нескольких нод, решение по нему дорогое, а на шести зондах один зонд
+    переворачивает вердикт (2026-09-02: .128 на 3/6 «забанен», .143 на
+    4/6 «жив»).
 
     Возвращает {"runs": {ключ: run_id}, "errors": [...]}.
     """
@@ -1700,7 +1722,7 @@ def start_diagnosis_probes(
         return {"runs": runs, "errors": ["Нечего проверять"]}
 
     if probe_ids is None:
-        probe_ids = ripe_atlas.resolve_probe_ids(geo=False, light=True)
+        probe_ids = ripe_atlas.resolve_probe_ids(geo=False, light=light)
 
     for target_ip, sni in pairs:
         check = ensure_probe_check(db_session, target_ip, sni)
@@ -1716,7 +1738,7 @@ def start_diagnosis_probes(
             api_key,
             ripe_atlas.resolve_public_flag(db_session, check),
             bool(check.geo_mode),
-            True,
+            light,
             probe_ids,
         )
         if run.status == ripe_atlas.RUN_STATUS_ERROR:
@@ -1889,21 +1911,77 @@ def start_manual_diagnosis(db_session, server, actor: str = "") -> dict:
 
 
 def start_sni_diagnosis(
-    db_session, server, live_ip: str, reason: str = ""
+    db_session, server, live_ips, reason: str = ""
 ) -> dict:
-    """Фаза 2: проверка ИМЁН на адресе, признанном живым.
+    """Фаза 2: проверка ИМЁН на адресах, признанных живыми.
 
-    Адрес доказанно жив, значит отказ имени на нём — доказательство бана
-    этого имени. Проверяются именно те пары, которые потом окажутся в DNS.
+    Адрес доказанно жив, значит отказ имени на нём говорит о фильтрации
+    имени. Но правило ТСПУ бывает и на пару «адрес + имя», поэтому имена
+    проверяются сразу на нескольких живых адресах (до SNI_PROBE_MAX_IPS):
+    имя, упавшее на одном и прошедшее на другом, — бан пары, а не имени.
+    Полный набор зондов: решение по общему имени дорогое.
     """
+    if isinstance(live_ips, str):
+        live_ips = [live_ips]
+    live_ips = [ip for ip in (live_ips or []) if ip][:SNI_PROBE_MAX_IPS]
     _ips, names = server_probe_targets(db_session, server)
     if not names:
         return {"runs": {}, "errors": ["У сервера нет привязанных доменов"]}
+    if not live_ips:
+        return {"runs": {}, "errors": ["Нет живого адреса для проверки имён"]}
     return start_diagnosis_probes(
         db_session,
-        [(live_ip, name) for name in names],
+        [(ip, name) for ip in live_ips for name in names],
         reason=reason or "SNI_DIAGNOSIS",
+        light=False,
     )
+
+
+def recent_name_results(
+    db_session, names: list, since: datetime, exclude_anomaly_id=None,
+) -> dict:
+    """Что известно об именах по диагностикам соседних серверов волны.
+
+    Имя общее для нескольких нод, а диагностика идёт на каждой отдельно.
+    Возвращает {(ip, sni): {"result": "pass"|"fail", "server": имя сервера,
+    "at": "HH:MM"}} по пробам имён на ЖИВЫХ адресах из evidence аномалий,
+    закрытых не раньше since. Для одной пары остаётся самый поздний
+    результат.
+    """
+    wanted = set(names or [])
+    if not wanted:
+        return {}
+    rows = (
+        db_session.query(InfraAnomaly, InfraServer)
+        .join(InfraServer, InfraServer.id == InfraAnomaly.server_id)
+        .filter(InfraAnomaly.resolved_at.isnot(None))
+        .filter(InfraAnomaly.resolved_at >= since)
+        .order_by(InfraAnomaly.resolved_at, InfraAnomaly.id)
+        .all()
+    )
+    results: dict = {}
+    for anomaly, server in rows:
+        if exclude_anomaly_id is not None and anomaly.id == exclude_anomaly_id:
+            continue
+        for item in (anomaly.details or {}).get("evidence") or []:
+            if item.get("step") != "sni_probe":
+                continue
+            sni = item.get("sni")
+            ip = item.get("ip")
+            if sni not in wanted or not ip:
+                continue
+            if item.get("result") == "pass":
+                result = "pass"
+            elif item.get("result") in ("fail", "pair"):
+                result = "fail"
+            else:
+                continue
+            results[(ip, sni)] = {
+                "result": result,
+                "server": server_title(server),
+                "at": anomaly.resolved_at.strftime("%H:%M"),
+            }
+    return results
 
 
 # --- принудительный запуск «Замеров ТСПУ» -----------------------------------

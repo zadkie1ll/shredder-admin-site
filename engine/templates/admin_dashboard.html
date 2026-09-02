@@ -13110,9 +13110,10 @@
             };
             const journalLabel = (labels, value, fallback) => labels[value] || fallback || value || '—';
             const replacementStatusLabels = {
-                pending: 'Запланирована', installing: 'Установка IP', dns_add: 'Добавление DNS',
-                dns_remove: 'Очистка DNS', done: 'Завершена', dns_cleanup: 'DNS очищен',
-                manual_required: 'Нужна проверка', failed: 'Ошибка',
+                pending: 'Запланирована', installing: 'Установка IP', verifying: 'Проверка кандидата',
+                verifying_names: 'Проверка имён', dns_add: 'Добавление DNS',
+                dns_remove: 'Очистка DNS', confirming: 'Постпроверка', done: 'Завершена',
+                dns_cleanup: 'DNS очищен', manual_required: 'Нужна проверка', failed: 'Ошибка',
             };
             const anomalyStatusLabels = {
                 pending: 'Проверяется', checking: 'Проверяем адреса',
@@ -13151,7 +13152,7 @@
                 // Итог диагностики раздельно по адресам и именам: без этого
                 // в журнале осталось бы только «аномалия подтверждена»
                 const verdictLine = verdict
-                    ? ` Заблокированы адреса: ${(verdict.blocked_ips || []).length ? escapeHtml((verdict.blocked_ips || []).join(', ')) : '—'}; имена: ${(verdict.blocked_snis || []).length ? escapeHtml((verdict.blocked_snis || []).join(', ')) : '—'}.`
+                    ? ` Заблокированы адреса: ${(verdict.blocked_ips || []).length ? escapeHtml((verdict.blocked_ips || []).join(', ')) : '—'}; имена: ${(verdict.blocked_snis || []).length ? escapeHtml((verdict.blocked_snis || []).join(', ')) : '—'}.${(verdict.pair_blocked || []).length ? ' Бан пары адрес+имя: ' + escapeHtml((verdict.pair_blocked || []).map((p) => p.ip + ' + ' + p.sni).join(', ')) + '.' : ''}${(verdict.unknown_snis || []).length ? ' Не проверены (не было живого адреса): ' + escapeHtml((verdict.unknown_snis || []).join(', ')) + '.' : ''}`
                     : '';
                 const evidence = ((a.details || {}).evidence || [])
                     .map((item) => `<div class="infra-log-detail-line"><span>${escapeHtml(evidenceMark[item.result] || '·')}</span><span>${escapeHtml(item.text || '')}</span></div>`)
