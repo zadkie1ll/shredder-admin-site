@@ -2712,6 +2712,207 @@ class OfflineAlertTests(InfraDbTestCase):
             infra_worker.check_offline(self.session)
         alert.assert_not_called()
 
+    # --- массовая потеря heartbeat: один сводный алерт --------------------
+
+    def _mass_servers(self, count, **kwargs):
+        return [
+            self.make_server(
+                machine_uid=f"m-mass-{index}", node_name=f"xx-{index}", **kwargs
+            )
+            for index in range(count)
+        ]
+
+    def test_mass_offline_sends_single_alert_with_diagnosis(self):
+        # Инцидент 2026-09-02: 35 нод разом «OFFLINE» из-за коллектора/БД —
+        # один сводный алерт с диагнозом вместо 35 одинаковых 🔴
+        servers = self._mass_servers(
+            6, last_seen_at=utcnow() - timedelta(minutes=15)
+        )
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_offline(self.session)
+        self.session.commit()
+        alert.assert_called_once()
+        text_value = alert.call_args[0][0]
+        self.assertIn("Мониторинг ослеп", text_value)
+        self.assertIn("6 из 6", text_value)
+        self.assertIn("xx-0", text_value)
+        self.assertIn("коллектор", text_value)
+        self.assertIn("автозамена", text_value)
+        for server in servers:
+            self.session.refresh(server)
+            self.assertIsNotNone(server.offline_alerted_at)
+
+        # Повторный тик — дедуп, тишина
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_offline(self.session)
+        alert.assert_not_called()
+
+    def test_mass_recovery_sends_single_alert(self):
+        servers = self._mass_servers(
+            6,
+            last_seen_at=utcnow(),
+            offline_alerted_at=utcnow() - timedelta(minutes=10),
+        )
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_offline(self.session)
+        self.session.commit()
+        alert.assert_called_once()
+        text_value = alert.call_args[0][0]
+        self.assertIn("Мониторинг восстановлен", text_value)
+        self.assertIn("6 серверов", text_value)
+        for server in servers:
+            self.session.refresh(server)
+            self.assertIsNotNone(server.recovered_alerted_at)
+            self.assertGreater(
+                server.recovered_alerted_at, server.offline_alerted_at
+            )
+
+    def test_below_threshold_alerts_per_server(self):
+        self._mass_servers(3, last_seen_at=utcnow() - timedelta(minutes=15))
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_offline(self.session)
+        self.assertEqual(alert.call_count, 3)
+        for call in alert.call_args_list:
+            self.assertIn("Сервер недоступен", call[0][0])
+
+    def test_mass_alert_disabled_by_zero_threshold(self):
+        self.session.add(
+            SystemSetting(key="infra_mass_offline_threshold", value="0")
+        )
+        self.session.commit()
+        self._mass_servers(6, last_seen_at=utcnow() - timedelta(minutes=15))
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_offline(self.session)
+        self.assertEqual(alert.call_count, 6)
+
+    def test_mass_alert_caps_listed_names(self):
+        self._mass_servers(20, last_seen_at=utcnow() - timedelta(minutes=15))
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_offline(self.session)
+        alert.assert_called_once()
+        self.assertIn("и ещё 5", alert.call_args[0][0])
+
+    def test_undelivered_mass_alert_keeps_servers_unalerted(self):
+        servers = self._mass_servers(
+            6, last_seen_at=utcnow() - timedelta(minutes=15)
+        )
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=False
+        ):
+            infra_worker.check_offline(self.session)
+        self.session.commit()
+        for server in servers:
+            self.session.refresh(server)
+            self.assertIsNone(server.offline_alerted_at)
+
+    def test_zero_is_valid_only_for_mass_threshold(self):
+        self.assertEqual(
+            infra.validate_setting("infra_mass_offline_threshold", "0"), "0"
+        )
+        with self.assertRaises(infra.InfraError):
+            infra.validate_setting("infra_offline_after_seconds", "0")
+
+
+class RunStepTests(SimpleTestCase):
+    """Шаг тика воркера: statement_timeout на транзакцию, commit/rollback."""
+
+    class _FakeSession:
+        def __init__(self):
+            self.statements = []
+            self.committed = False
+            self.rolled_back = False
+            self.closed = False
+
+        def execute(self, statement, *args, **kwargs):
+            self.statements.append(str(statement))
+
+        def commit(self):
+            self.committed = True
+
+        def rollback(self):
+            self.rolled_back = True
+
+        def close(self):
+            self.closed = True
+
+    def _run(self, fn, dialect="postgresql", timeout=120):
+        session = self._FakeSession()
+        fake_engine = mock.Mock()
+        fake_engine.dialect.name = dialect
+        with mock.patch.object(
+            infra_worker, "session_factory", return_value=session
+        ), mock.patch.object(infra_worker, "engine", fake_engine), self.settings(
+            INFRA_WORKER_STEP_TIMEOUT=timeout
+        ):
+            ok = infra_worker._run_step("step", fn)
+        return ok, session
+
+    def test_statement_timeout_is_set_local_on_postgres(self):
+        # Инцидент 2026-09-02: INSERT агрегации висел 28 минут и весь тик
+        # с ним — OFFLINE-проверка и детектор не выполнялись вовсе
+        ok, session = self._run(lambda db: None)
+        self.assertTrue(ok)
+        self.assertEqual(
+            session.statements, ["SET LOCAL statement_timeout = 120000"]
+        )
+        self.assertTrue(session.committed)
+        self.assertTrue(session.closed)
+
+    def test_no_timeout_on_other_dialects_or_when_disabled(self):
+        _ok, session = self._run(lambda db: None, dialect="sqlite")
+        self.assertEqual(session.statements, [])
+        _ok, session = self._run(lambda db: None, timeout=0)
+        self.assertEqual(session.statements, [])
+
+    def test_failed_step_rolls_back_and_does_not_raise(self):
+        def boom(db):
+            raise RuntimeError("canceling statement due to statement timeout")
+
+        with self.assertLogs("infra-worker", level="ERROR"):
+            ok, session = self._run(boom)
+        self.assertFalse(ok)
+        self.assertTrue(session.rolled_back)
+        self.assertFalse(session.committed)
+        self.assertTrue(session.closed)
+
+
+class MaintenanceOrderTests(SimpleTestCase):
+    def test_offline_check_runs_first_and_aggregate_before_detector(self):
+        names = []
+
+        def fake_step(name, fn, *args):
+            names.append(name)
+            return True
+
+        saved = infra_worker._tick_counter
+        try:
+            # Следующий тик — чётный: детектор аномалий в него попадает
+            infra_worker._tick_counter = infra_worker._ANOMALY_EVERY_TICKS - 1
+            with mock.patch.object(
+                infra_worker, "_run_step", side_effect=fake_step
+            ), mock.patch.object(
+                infra_worker, "_infra_tables_ready", return_value=True
+            ), mock.patch("engine.geoip_updater.update_if_due"):
+                infra_worker.run_maintenance()
+        finally:
+            infra_worker._tick_counter = saved
+
+        self.assertEqual(names[0], "offline")
+        self.assertLess(names.index("aggregate"), names.index("anomaly-detect"))
+        self.assertIn("replacements", names)
+
 
 class LoadAlertTests(InfraDbTestCase):
     def seed_load(self, server, rx_bps):

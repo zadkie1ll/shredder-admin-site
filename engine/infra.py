@@ -78,6 +78,10 @@ INFRA_SETTINGS = {
         180, int, "OFFLINE: нет heartbeat дольше, сек", None),
     "infra_offline_alert_cooldown_minutes": (
         60, int, "OFFLINE: кулдаун повторного алерта, мин", None),
+    "infra_mass_offline_threshold": (
+        5, int,
+        "OFFLINE: массовая потеря heartbeat — один алерт «мониторинг ослеп» "
+        "вместо N, серверов за проход (0 = выкл)", None),
     "infra_load_threshold_pct": (
         85, int, "Нагрузка канала: порог алерта, %", None),
     "infra_load_duration_minutes": (
@@ -120,6 +124,9 @@ INFRA_SETTINGS = {
         "Окно перекалибровки baseline после новой A-записи у домена, часов",
         None),
 }
+
+# Настройки, где 0 означает «выключено» (validate_setting пропускает ноль)
+ZERO_DISABLES_SETTINGS = ("infra_mass_offline_threshold",)
 
 # Сколько живёт сырая телеметрия и агрегаты
 RAW_RETENTION_HOURS = 26
@@ -191,7 +198,9 @@ def validate_setting(key: str, raw_value: str) -> str:
         value = cast(raw_value)
     except (TypeError, ValueError):
         raise InfraError("Некорректное значение")
-    if cast in (int, float) and value <= 0:
+    if cast in (int, float) and value <= 0 and not (
+        key in ZERO_DISABLES_SETTINGS and value == 0
+    ):
         raise InfraError("Значение должно быть больше нуля")
     if key.endswith("_ratio") and not (0 < value < 1):
         raise InfraError("Отношение должно быть в диапазоне (0, 1)")

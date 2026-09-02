@@ -234,6 +234,8 @@ CENSOR_WORKER_INTERVAL = config("CENSOR_WORKER_INTERVAL", default=60, cast=int)
 # нагрузки -> принудительные «Замеры ТСПУ» -> автозамена IP через Cloudflare.
 INFRA_WORKER_ENABLED = config("INFRA_WORKER_ENABLED", default=True, cast=bool)
 INFRA_WORKER_INTERVAL = config("INFRA_WORKER_INTERVAL", default=30, cast=int)
+# statement_timeout одного шага тика воркера, сек (0 = без лимита)
+INFRA_WORKER_STEP_TIMEOUT = config("INFRA_WORKER_STEP_TIMEOUT", default=120, cast=int)
 # Локальная DB-IP City Lite MMDB для аналитики клиентских IP. Лидер-поток
 # infra_worker скачивает её без аккаунта и ключей в persistent volume.
 # Пустой путь безопасно отключает географию, не скрывая базовую статистику.

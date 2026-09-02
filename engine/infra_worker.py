@@ -3,8 +3,11 @@
 Стартует из web_app/wsgi.py (как censor_worker) и раз в
 INFRA_WORKER_INTERVAL секунд выполняет обслуживание:
 
+- ONLINE/OFFLINE серверов + Telegram-алерты с recovery (идёт ПЕРВЫМ шагом
+  тика); массовая потеря heartbeat (≥ infra_mass_offline_threshold серверов
+  за проход) — один сводный алерт «мониторинг ослеп» вместо N одинаковых:
+  это не ноды, а коллектор ip-guard или Postgres;
 - агрегация телеметрии (raw -> 1 мин -> 15 мин) и retention;
-- ONLINE/OFFLINE серверов + Telegram-алерты с recovery;
 - алерты о длительной высокой нагрузке канала (порог/длительность из
   system_settings, гистерезис + кулдаун);
 - anomaly detection: одновременное падение трафика и TCP-соединений
@@ -17,6 +20,12 @@ INFRA_WORKER_INTERVAL секунд выполняет обслуживание:
 Лидерство между gunicorn-воркерами — Postgres advisory lock (свой ключ,
 отличный от censor_worker). Аномалия никогда не меняет DNS сама: только
 подтверждение существующим механизмом «Замеров ТСПУ» запускает ротацию.
+
+Каждый шаг тика идёт в своей сессии под statement_timeout
+(INFRA_WORKER_STEP_TIMEOUT, SET LOCAL): на больной базе один зависший
+запрос не должен останавливать весь тик (инцидент 2026-09-02: INSERT
+агрегации висел 28 минут, и воркер не доходил ни до OFFLINE-проверки, ни
+до детектора аномалий, ни до замен).
 """
 
 import logging
@@ -36,6 +45,11 @@ _DEFAULT_INTERVAL = 30
 _ANOMALY_EVERY_TICKS = 2
 _PRUNE_EVERY_TICKS = 20
 _DNS_WATCH_EVERY_TICKS = 30
+# statement_timeout одного шага тика, сек (Django settings
+# INFRA_WORKER_STEP_TIMEOUT; 0 = без лимита)
+_DEFAULT_STEP_TIMEOUT_SECONDS = 120
+# Сколько имён серверов перечислять в сводном алерте
+_MASS_ALERT_MAX_NAMES = 15
 
 _started = False
 _start_lock = threading.Lock()
@@ -65,20 +79,45 @@ def _send_alert(text_value: str) -> bool:
 # --- OFFLINE / ONLINE -------------------------------------------------------
 
 
+def _names_line(servers) -> str:
+    from engine import infra
+
+    names = [infra.server_title(server) for server in servers]
+    line = ", ".join(names[:_MASS_ALERT_MAX_NAMES])
+    rest = len(names) - _MASS_ALERT_MAX_NAMES
+    if rest > 0:
+        line += f" и ещё {rest}"
+    return line
+
+
 def check_offline(db_session) -> None:
+    """OFFLINE/ONLINE-алерты по heartbeat.
+
+    Одиночная потеря heartbeat — алерт по серверу. Если за один проход
+    heartbeat потеряли сразу ≥ infra_mass_offline_threshold серверов, это
+    не ноды: heartbeat не принимает коллектор ip-guard или лежит Postgres
+    (инцидент 2026-09-02: все 35 нод «OFFLINE» разом из-за раздутой базы,
+    35 одинаковых 🔴 и ни слова о том, что детектор аномалий и автозамена
+    в этом состоянии не работают). Тогда уходит ОДИН сводный алерт с
+    диагнозом; recovery — тоже сводный. Дедуп прежний: пара timestamps
+    offline_alerted_at/recovered_alerted_at проставляется всем серверам
+    сводного алерта, кулдаун флаппинга — по серверу.
+    """
     from engine import infra
 
     cfg = infra.get_settings(db_session)
     now = infra.utcnow()
     cooldown = timedelta(minutes=cfg["infra_offline_alert_cooldown_minutes"])
+    mass_threshold = int(cfg["infra_mass_offline_threshold"])
     servers = (
         db_session.query(infra.InfraServer)
         .filter(infra.InfraServer.is_archived.is_(False))
         .all()
     )
+    went_offline = []
+    recovered = []
     for server in servers:
         online = infra.is_online(server, cfg, now)
-        title = infra.server_title(server)
         # Инцидент «уже заалерчен», пока recovery-алерт не отправлен позже
         # offline-алерта; timestamps не сбрасываются — это и есть дедуп
         incident_alerted = server.offline_alerted_at is not None and (
@@ -94,6 +133,38 @@ def check_offline(db_session) -> None:
                 and now - server.offline_alerted_at < cooldown
             ):
                 continue
+            went_offline.append(server)
+        else:
+            if not incident_alerted:
+                continue
+            if now - server.offline_alerted_at < timedelta(minutes=1):
+                # Мгновенный флап: даём состоянию устаканиться
+                continue
+            recovered.append(server)
+
+    if mass_threshold > 0 and len(went_offline) >= mass_threshold:
+        delivered = _send_alert(
+            "🔴 <b>Мониторинг ослеп</b>\n\n"
+            f"Одновременно потеряли heartbeat {len(went_offline)} из "
+            f"{len(servers)} серверов:\n{_names_line(went_offline)}\n\n"
+            "Такое не бывает из-за нод. Скорее всего heartbeat не принимает "
+            "коллектор ip-guard или тормозит Postgres (блокировки, раздутые "
+            "таблицы, застрявший xmin-горизонт).\n"
+            "Пока это не починено, детектор аномалий и автозамена IP "
+            "не работают.\n\n"
+            "Проверьте логи коллектора и pg_stat_activity "
+            "(wait_event = Lock, age(backend_xmin))."
+        )
+        if delivered:
+            for server in went_offline:
+                server.offline_alerted_at = now
+            log.warning(
+                "infra: MASS OFFLINE %s/%s servers, single alert sent",
+                len(went_offline), len(servers),
+            )
+    else:
+        for server in went_offline:
+            title = infra.server_title(server)
             minutes = _fmt_age_minutes(server.last_seen_at, now)
             delivered = _send_alert(
                 "🔴 <b>Сервер недоступен</b>\n\n"
@@ -106,12 +177,23 @@ def check_offline(db_session) -> None:
             if delivered:
                 server.offline_alerted_at = now
                 log.warning("infra: server %s OFFLINE, alert sent", title)
-        else:
-            if not incident_alerted:
-                continue
-            if now - server.offline_alerted_at < timedelta(minutes=1):
-                # Мгновенный флап: даём состоянию устаканиться
-                continue
+
+    if mass_threshold > 0 and len(recovered) >= mass_threshold:
+        delivered = _send_alert(
+            "🟢 <b>Мониторинг восстановлен</b>\n\n"
+            f"Heartbeat вернулся у {len(recovered)} серверов:\n"
+            f"{_names_line(recovered)}"
+        )
+        if delivered:
+            for server in recovered:
+                server.recovered_alerted_at = now
+            log.info(
+                "infra: MASS ONLINE %s servers, single alert sent",
+                len(recovered),
+            )
+    else:
+        for server in recovered:
+            title = infra.server_title(server)
             delivered = _send_alert(
                 "🟢 <b>Сервер снова онлайн</b>\n\n"
                 f"Сервер: <b>{title}</b>\n"
@@ -1670,8 +1752,47 @@ def _infra_tables_ready() -> bool:
         db_session.close()
 
 
+def _step_statement_timeout_ms() -> int:
+    from django.conf import settings
+
+    seconds = int(
+        getattr(settings, "INFRA_WORKER_STEP_TIMEOUT", _DEFAULT_STEP_TIMEOUT_SECONDS)
+    )
+    return max(0, seconds) * 1000
+
+
+def _run_step(name, fn, *args) -> bool:
+    """Один шаг тика: своя сессия, statement_timeout на транзакцию, commit.
+
+    SET LOCAL живёт до commit/rollback этого шага и не утекает через пул в
+    веб-запросы. Шаги внутри не коммитят, поэтому лимит действует на весь
+    шаг. Возвращает True при успехе.
+    """
+    db_session = session_factory()
+    try:
+        timeout_ms = _step_statement_timeout_ms()
+        if timeout_ms > 0 and engine.dialect.name == "postgresql":
+            db_session.execute(
+                text(f"SET LOCAL statement_timeout = {int(timeout_ms)}")
+            )
+        fn(db_session, *args)
+        db_session.commit()
+        return True
+    except Exception:
+        db_session.rollback()
+        log.exception("infra worker: %s failed", name)
+        return False
+    finally:
+        db_session.close()
+
+
 def run_maintenance() -> None:
-    """Один тик обслуживания; каждая подзадача — своя сессия и commit."""
+    """Один тик обслуживания; каждая подзадача — своя сессия и commit.
+
+    Порядок: сначала дешёвая OFFLINE-проверка (алерты о слепоте мониторинга
+    важнее агрегатов), потом агрегация, от которой зависят детектор и
+    baseline, дальше остальное.
+    """
     from engine import infra
     from engine import geoip_updater
 
@@ -1688,30 +1809,19 @@ def run_maintenance() -> None:
     if not _infra_tables_ready():
         return
 
-    def _run(name, fn, *args):
-        db_session = session_factory()
-        try:
-            fn(db_session, *args)
-            db_session.commit()
-        except Exception:
-            db_session.rollback()
-            log.exception("infra worker: %s failed", name)
-        finally:
-            db_session.close()
-
-    _run("aggregate", lambda db: infra.aggregate_telemetry(db))
-    _run("offline", check_offline)
-    _run("xray", check_xray)
-    _run("capacity", check_capacity)
-    _run("load", check_load)
+    _run_step("offline", check_offline)
+    _run_step("aggregate", lambda db: infra.aggregate_telemetry(db))
+    _run_step("xray", check_xray)
+    _run_step("capacity", check_capacity)
+    _run_step("load", check_load)
     if _tick_counter % _ANOMALY_EVERY_TICKS == 0:
-        _run("anomaly-detect", detect_anomalies)
-    _run("anomaly-process", process_anomalies)
-    _run("replacements", process_replacements)
+        _run_step("anomaly-detect", detect_anomalies)
+    _run_step("anomaly-process", process_anomalies)
+    _run_step("replacements", process_replacements)
     if _tick_counter % _DNS_WATCH_EVERY_TICKS == 0:
-        _run("dns-watch", watch_dns_changes)
+        _run_step("dns-watch", watch_dns_changes)
     if _tick_counter % _PRUNE_EVERY_TICKS == 0:
-        _run("prune", lambda db: infra.prune_telemetry(db))
+        _run_step("prune", lambda db: infra.prune_telemetry(db))
 
 
 def _simple_loop(interval: int) -> None:
