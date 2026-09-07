@@ -23,6 +23,7 @@ class TrafficLimitStrategy(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     DAY: _ClassVar[TrafficLimitStrategy]
     WEEK: _ClassVar[TrafficLimitStrategy]
     MONTH: _ClassVar[TrafficLimitStrategy]
+    MONTH_ROLLING: _ClassVar[TrafficLimitStrategy]
 ACTIVE: UserStatus
 DISABLED: UserStatus
 LIMITED: UserStatus
@@ -31,6 +32,7 @@ NO_RESET: TrafficLimitStrategy
 DAY: TrafficLimitStrategy
 WEEK: TrafficLimitStrategy
 MONTH: TrafficLimitStrategy
+MONTH_ROLLING: TrafficLimitStrategy
 
 class UserLastConnectedNode(_message.Message):
     __slots__ = ("connected_at", "node_name")
@@ -159,7 +161,7 @@ class GetUserByIdRequest(_message.Message):
     def __init__(self, id: _Optional[int] = ...) -> None: ...
 
 class AddUserRequest(_message.Message):
-    __slots__ = ("username", "email", "telegram_id", "expire_at", "created_at", "last_traffic_reset_at", "active_internal_squads", "status", "traffic_limit_strategy", "description", "tag", "hwid_device_limit")
+    __slots__ = ("username", "email", "telegram_id", "expire_at", "created_at", "last_traffic_reset_at", "active_internal_squads", "status", "traffic_limit_strategy", "description", "tag", "hwid_device_limit", "traffic_limit_bytes")
     USERNAME_FIELD_NUMBER: _ClassVar[int]
     EMAIL_FIELD_NUMBER: _ClassVar[int]
     TELEGRAM_ID_FIELD_NUMBER: _ClassVar[int]
@@ -172,6 +174,7 @@ class AddUserRequest(_message.Message):
     DESCRIPTION_FIELD_NUMBER: _ClassVar[int]
     TAG_FIELD_NUMBER: _ClassVar[int]
     HWID_DEVICE_LIMIT_FIELD_NUMBER: _ClassVar[int]
+    TRAFFIC_LIMIT_BYTES_FIELD_NUMBER: _ClassVar[int]
     username: str
     email: str
     telegram_id: int
@@ -184,7 +187,8 @@ class AddUserRequest(_message.Message):
     description: str
     tag: str
     hwid_device_limit: int
-    def __init__(self, username: _Optional[str] = ..., email: _Optional[str] = ..., telegram_id: _Optional[int] = ..., expire_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_traffic_reset_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., active_internal_squads: _Optional[_Iterable[str]] = ..., status: _Optional[_Union[UserStatus, str]] = ..., traffic_limit_strategy: _Optional[_Union[TrafficLimitStrategy, str]] = ..., description: _Optional[str] = ..., tag: _Optional[str] = ..., hwid_device_limit: _Optional[int] = ...) -> None: ...
+    traffic_limit_bytes: int
+    def __init__(self, username: _Optional[str] = ..., email: _Optional[str] = ..., telegram_id: _Optional[int] = ..., expire_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_traffic_reset_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., active_internal_squads: _Optional[_Iterable[str]] = ..., status: _Optional[_Union[UserStatus, str]] = ..., traffic_limit_strategy: _Optional[_Union[TrafficLimitStrategy, str]] = ..., description: _Optional[str] = ..., tag: _Optional[str] = ..., hwid_device_limit: _Optional[int] = ..., traffic_limit_bytes: _Optional[int] = ...) -> None: ...
 
 class UpdateUserRequest(_message.Message):
     __slots__ = ("uuid", "status", "traffic_limit_bytes", "traffic_limit_strategy", "expire_at", "last_traffic_reset_at", "description", "tag", "telegram_id", "email", "hwid_device_limit", "active_internal_squads")

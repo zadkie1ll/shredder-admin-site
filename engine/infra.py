@@ -776,27 +776,81 @@ def who_connects_payload(db_session, node_name: str, now: datetime) -> dict:
     return payload
 
 
+def node_interface_ips(db_session) -> frozenset[str]:
+    """Публичные адреса нод, стоящие сейчас на интерфейсе.
+
+    Берутся из `infra_server_ips` с `on_interface=true` по ВСЕМ серверам —
+    включая мосты/релеи с белым IP, которые пробрасывают трафик на ноду и
+    в наблюдениях ip-guard выглядят как один «пользователь» с сотнями
+    подключений. Резервы (`on_interface=false`) не исключаются: с них никто
+    не подключается, а если адрес встал на интерфейс — heartbeat поднимет
+    флаг. Тот же принцип, что фильтр адресов нод в детекторе ip-guard.
+
+    Адреса нормализуются через `ipaddress` (обе стороны пишут
+    `str(ip_address(...))`, но сырая строка тоже остаётся в множестве).
+    Ошибка чтения — warning и пустое множество: карточка считает как раньше.
+    """
+
+    try:
+        rows = (
+            db_session.execute(
+                select(InfraServerIp.ip).where(InfraServerIp.on_interface.is_(True))
+            )
+            .scalars()
+            .all()
+        )
+    except Exception as exc:  # noqa: BLE001 — любой сбой БД не должен ронять карточку
+        log.warning(
+            "stage=who_connects status=node_ips_unavailable error=%s",
+            exc,
+        )
+        return frozenset()
+
+    result: set[str] = set()
+    for raw in rows:
+        value = (raw or "").strip()
+        if not value:
+            continue
+        result.add(value)
+        try:
+            result.add(str(ipaddress.ip_address(value)))
+        except ValueError:
+            continue
+    return frozenset(result)
+
+
+def _who_connects_criteria(node_name: str, since: datetime, excluded) -> list:
+    """Общий фильтр запросов блока: нода + окно + минус адреса нод.
+
+    `NOT IN` добавляется только при непустом множестве, чтобы план запроса
+    без адресов нод остался прежним (индекс `(node, last_seen)`).
+    """
+
+    criteria = [
+        UserIpObservation.node == node_name,
+        UserIpObservation.last_seen >= since,
+    ]
+    if excluded:
+        criteria.append(UserIpObservation.ip.not_in(sorted(excluded)))
+    return criteria
+
+
 def _who_connects_payload_uncached(
     db_session, node_name: str, now: datetime
 ) -> dict:
     day_ago = now - timedelta(hours=24)
     hour_ago = now - timedelta(hours=1)
+    excluded = node_interface_ips(db_session)
 
     unique_24h = (
         db_session.query(func.count(func.distinct(UserIpObservation.ip)))
-        .filter(
-            UserIpObservation.node == node_name,
-            UserIpObservation.last_seen >= day_ago,
-        )
+        .filter(*_who_connects_criteria(node_name, day_ago, excluded))
         .scalar()
         or 0
     )
     unique_1h = (
         db_session.query(func.count(func.distinct(UserIpObservation.ip)))
-        .filter(
-            UserIpObservation.node == node_name,
-            UserIpObservation.last_seen >= hour_ago,
-        )
+        .filter(*_who_connects_criteria(node_name, hour_ago, excluded))
         .scalar()
         or 0
     )
@@ -806,23 +860,37 @@ def _who_connects_payload_uncached(
             func.sum(UserIpObservation.hits).label("hits"),
             func.count(func.distinct(UserIpObservation.username)).label("users"),
         )
-        .filter(
-            UserIpObservation.node == node_name,
-            UserIpObservation.last_seen >= day_ago,
-        )
+        .filter(*_who_connects_criteria(node_name, day_ago, excluded))
         .group_by(UserIpObservation.ip)
         .order_by(func.sum(UserIpObservation.hits).desc())
         .limit(20)
         .all()
     )
+    # Сколько уникальных адресов нод реально было отброшено на этой ноде за
+    # 24 часа — админ видит, что фильтр сработал, а не что данных нет
+    excluded_node_ips = 0
+    if excluded:
+        excluded_node_ips = (
+            db_session.query(func.count(func.distinct(UserIpObservation.ip)))
+            .filter(
+                UserIpObservation.node == node_name,
+                UserIpObservation.last_seen >= day_ago,
+                UserIpObservation.ip.in_(sorted(excluded)),
+            )
+            .scalar()
+            or 0
+        )
     return {
         "unique_ips_24h": int(unique_24h),
         "unique_ips_1h": int(unique_1h),
+        "excluded_node_ips": int(excluded_node_ips),
         "top_addresses": [
             {"ip": row.ip, "hits": int(row.hits or 0), "users": int(row.users or 0)}
             for row in top_rows
         ],
-        "geo": _who_connects_geo_payload(db_session, node_name, day_ago, now),
+        "geo": _who_connects_geo_payload(
+            db_session, node_name, day_ago, now, excluded=excluded
+        ),
     }
 
 
@@ -831,6 +899,7 @@ def _who_connects_geo_payload(
     node_name: str,
     day_ago: datetime,
     now: datetime,
+    excluded=frozenset(),
 ) -> dict:
     """Агрегирует страны и субъекты РФ по всем IP ноды за 24 часа.
 
@@ -866,10 +935,7 @@ def _who_connects_geo_payload(
             UserIpObservation.ip,
             func.sum(UserIpObservation.hits).label("hits"),
         )
-        .filter(
-            UserIpObservation.node == node_name,
-            UserIpObservation.last_seen >= day_ago,
-        )
+        .filter(*_who_connects_criteria(node_name, day_ago, excluded))
         .group_by(UserIpObservation.ip)
         .all()
     )

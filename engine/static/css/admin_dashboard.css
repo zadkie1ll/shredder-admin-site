@@ -5416,3 +5416,125 @@ html[data-admin-theme="light"] .acq-chart-scroll-hint.is-active strong {
         grid-column: auto;
     }
 }
+
+/* --- Антиабьюз (Система → Антиабьюз) ----------------------------------- */
+.antiabuse-stack {
+    display: grid;
+    gap: 16px;
+    width: 100%;
+    max-width: 960px;
+}
+
+.antiabuse-unit-field {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.antiabuse-unit-field select.input {
+    max-width: 96px;
+    flex: 0 0 auto;
+}
+
+.antiabuse-bulk-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 14px;
+}
+
+.antiabuse-bulk-row {
+    display: grid;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid rgba(255, 255, 255, .08);
+    border-radius: 12px;
+    background: rgba(255, 255, 255, .02);
+}
+
+.antiabuse-bulk-copy {
+    display: grid;
+    gap: 4px;
+}
+
+.antiabuse-bulk-copy strong {
+    font-size: 13px;
+}
+
+.antiabuse-bulk-copy span {
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.5;
+}
+
+.antiabuse-bulk-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.antiabuse-bulk-result:empty {
+    display: none;
+}
+
+.antiabuse-alerts-toolbar {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+}
+
+.antiabuse-raw summary {
+    cursor: pointer;
+    list-style: none;
+}
+
+.antiabuse-raw summary::before {
+    content: "\25B8";
+    display: inline-block;
+    margin-right: 6px;
+    font-size: 11px;
+}
+
+.antiabuse-raw[open] summary::before {
+    content: "\25BE";
+}
+
+.antiabuse-raw .settings-list {
+    margin-top: 12px;
+}
+
+/* Антиабьюз v2: вложенный индикатор состояния (предупреждения ip-guard) —
+ * красится по собственному атрибуту, а не по тумблеру всей карточки. */
+.antifraud-row-state [data-antiabuse-substate="on"] {
+    color: var(--green);
+}
+
+.antifraud-row-state [data-antiabuse-substate="off"] {
+    color: var(--red);
+}
+
+/* Карточка клиента: управляемый лимит (маркер) / ручной лимит панели. */
+.client-summary-stat.is-managed .client-summary-meta {
+    color: var(--green);
+}
+
+.client-summary-stat.is-manual .client-summary-meta {
+    color: var(--admin-accent);
+}
+
+.client-summary-stat.is-limited .client-summary-value {
+    color: #ff6b6b;
+}
+
+@media (max-width: 720px) {
+    .antiabuse-bulk-controls .btn {
+        flex: 1 1 auto;
+        justify-content: center;
+    }
+
+    .antiabuse-alerts-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+}

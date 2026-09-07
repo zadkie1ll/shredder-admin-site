@@ -93,8 +93,20 @@ UI-слой поверх существующего UX (бизнес-логик�
   достоверный `NOT_FOUND` (подписки реально нет в панели, легитимный кейс —
   удалена rw-cleaner'ом после долгой просрочки); любая другая ошибка —
   исключение `RwmsUnavailableError` (из `common.rwms_client`). Старый
-  `get_user_by_username` (глотает всё как `None`) — deprecated; админские
-  и фоновые вызовы в `engine/views.py` пока остаются на нём осознанно.
+  `get_user_by_username` (глотает всё как `None`) — deprecated; в
+  `engine/views.py` на нём осознанно остаются только чтения, где `None`
+  ничего не создаёт и не пересоздаёт в панели (показ трафика/diff,
+  `update_user` по найденной записи, `temp_ban` → 404, массовые операции).
+- Админ-действия по сроку в `support_admin_api_subscription_manage`
+  (`extend`, `set_trial_hour`) читают панель строго: при
+  `RwmsUnavailableError` ответ `503 {"status": "error", "message": "Срок в БД
+  обновлён, но RWMS/панель временно недоступны…", "result": {"rwms_updated":
+  false, …}}` и НИКАКОГО `create_user_until`/`AddUser` — срок в БД (и снятие
+  автоплатежа для возврата) при этом уже сохранён, админ повторяет
+  синхронизацию «БД → панель» позже; UI показывает это сообщение в тосте.
+  Пересоздание подписки в панели — только по достоверному `NOT_FOUND`
+  (`None`), как раньше. Тесты:
+  `engine.tests.AdminSubscriptionManageRwmsStrictTests`.
 - `dashboard` при `RwmsUnavailableError` деградирует к БД: `seconds_left`
   считается из `user.time_until_expiration`, `has_subscription_access` — по
   БД (`seconds_left > 0`), кабинет рендерится штатно с остатком и кнопками;
@@ -983,7 +995,7 @@ email-сервиса в этом пути нет. Если отправка уп
 значение хранится строкой в существующей таблице `system_settings`.
 
 Вкладка «Система» организована подвкладками (как «Аналитика»): Тарифы, Win-back,
-Платёжные шлюзы, Рефералка, Алерты и Общие. Раскладка runtime-настроек по
+Платёжные шлюзы, Рефералка, Алерты, Антиабьюз и Общие. Раскладка runtime-настроек по
 подвкладкам задаётся константой `SETTING_GROUPS` (шаблон): `slug` группы
 соответствует контейнеру `[data-settings-group]`. Ключи, не попавшие ни в одну
 группу, показываются в скрытой по умолчанию карточке «Прочие» подвкладки «Общие».
@@ -1101,6 +1113,16 @@ ID образуют основную ячейку, сумма и семанти�
 автосписания yk-recurrent `[expire−4ч; expire+overdue]` и клиенту, которому
 готовят возврат, списывали деньги повторно. Число снятых рекуррентов пишется в
 журнал (`removed_recurrents`) и показывается в строке «Последнее действие».
+
+Оба действия по сроку («Продлить», «Подготовить возврат») читают панель строго
+(`get_user_by_username_strict`): при недоступности RWMS/панели — `503` с
+`rwms_updated=false`, панель не пересоздаётся (см. раздел «Недоступность RWMS ≠
+«подписка истекла»»). Продление не снимает и не ломает лимит трафика: ни эти
+действия, ни массовое `extend_days`, ни «БД → панель» в синхронизации не
+передают в `UpdateUser` поля `traffic_limit_bytes`/`traffic_limit_strategy` —
+RWMS оставляет лимит и стратегию сброса панели как есть (раньше слался явный
+`NO_RESET`; после HasField-фикса RWMS он затирал бы `day/week/…` у
+ограниченного триала, см. «Админка: Антиабьюз»).
 
 «Отключить доступ» в карточке клиента — полная блокировка аккаунта, 1:1 с
 бот-командой `/block-user`: запись в `user_blocks` (бот отвечает пользователю
@@ -1324,6 +1346,291 @@ canvas-рендер `acqDraw` (экспортирован вкладкой «П�
 неотмеченные поля не изменяются. Обновление выполняется одной транзакцией и влияет
 только на будущие запуски, не переписывая историю замеров. Десктопная табличная
 раскладка сохранена.
+
+## Админка: Антиабьюз (лимит трафика пробных и алерты ip-guard)
+
+Проблема: абьюзер нагоняет ботов в Telegram-бот, получает сотни 7-дневных
+триалов и раздаёт их тысячам людей. Две защиты, обе управляются ТОЛЬКО из
+админки сайта (`system_settings`, вкладка «Система → Антиабьюз»), по умолчанию
+ВЫКЛЮЧЕНЫ; выключение возвращает поведение «как раньше» для новых подписок.
+Реестр ключей, типы, дефолты и парсеры — в общем `common/models/settings.py`
+(единый источник для сайта, бота, notifier, payment и ip-guard):
+
+| Ключ | Тип, дефолт | Смысл |
+| --- | --- | --- |
+| `trial_traffic_limit_enabled` | bool, `false` | главный выключатель лимита трафика НОВЫХ пробных подписок |
+| `trial_traffic_limit_gb` | float в (0; 100 000] ГиБ, `5` | лимит (дробные допустимы: `0.5` = 512 МиБ); верхняя граница `TRIAL_TRAFFIC_LIMIT_MAX_GB` держит `round(ГиБ × 1024³)` внутри int64 proto с запасом |
+| `trial_traffic_limit_strategy` | enum, `day` | сброс: `no_reset` / `day` / `week` / `month` / `month_rolling` (как в панели Remnawave: никогда / ежедневно / еженедельно / ежемесячно / ежемесячно по дате создания) |
+| `ipguard_alerts_enabled` | bool, `false` | главный выключатель алертов ip-guard по подсетям |
+| `ipguard_alert_segment` | enum, `never_paid` | кого проверять: `never_paid` (пробные без платежа) или `all` |
+| `ipguard_subnets_per_hwid` | int > 0, `10` | допустимо подсетей на одно HWID-устройство (лимит = max(1, устройств) × значение) — порог АЛЕРТА |
+| `ipguard_window_hours` | int > 0, `24` | окно подсчёта подсетей |
+| `ipguard_alert_cooldown_hours` | int > 0, `6` | пауза между повторными алертами по подписке |
+| `ipguard_warnings_enabled` | bool, `false` | v2: предупреждения (уровень `suspicious`) админам — публикуются в `ipguard_alerts` только при включённом ключе; выключено — suspicious только в лог, как раньше |
+| `ipguard_warning_subnets_per_hwid` | int > 0, `3` | v2: порог ПРЕДУПРЕЖДЕНИЯ — предупреждение при `unique_subnets > max(1, HWID) × значение` (и ≤ порога алерта); обязан быть СТРОГО меньше `ipguard_subnets_per_hwid` (`ipguard_warning_threshold_is_valid`) |
+
+«Пробная без платежа» (never_paid) — единая семантика
+`common/models/segments.py` (`PAYS_EXISTS_SQL` / `user_has_payment_sql`): нет ни
+одной `yk_payments.status='succeeded'` и ни одной
+`wata_transactions.transaction_status='Paid'` (JOIN `wata_invoices` по
+`order_id`); на сайте — `engine/sql_helpers.py::user_never_paid`.
+
+### v2: управляемые лимиты (маркеры `managed_traffic_limits`)
+
+**Ручные лимиты владельца неприкосновенны.** Владелец по fair-usage вручную
+ставит суточные капы в панели Remnawave (в том числе платным абьюзерам). Их не
+снимает ни оплата, ни страховка notifier, ни массовые кнопки — только владелец
+руками. Автоматика снимает ТОЛЬКО лимиты, поставленные автоматикой, а «свой»
+лимит узнаёт по маркеру — записи `managed_traffic_limits` (модель
+`common/models/db.py::ManagedTrafficLimit`, хелперы
+`common/managed_traffic_limits.py`; одна запись на пользователя):
+
+- лимит считается **управляемым**, только если маркер есть И панель показывает
+  ровно `limit_bytes` с ровно `strategy` (`is_managed`). Маркер есть, а панель
+  отличается — владелец менял руками: лимит ручной, маркер удаляется с warning
+  (`resolve_managed_limit`), панель НЕ трогается;
+- маркер пишет каждое место сайта, где фича СТАВИТ лимит, **в той же сессии**,
+  что и само действие (`engine/rwms_helpers.py::record_trial_limit_marker`,
+  `reason='trial'`, `release_on='payment'`): регистрация (`create_site_user`,
+  `mobile_api/provisioning.py`) — `applied_by='site:register'`; пересоздание при
+  достоверном NOT_FOUND из карточки и «Применить лимит» — `site:admin:<login>`;
+  массовые операции по списку и по сегменту — `site:bulk`; кнопка backfill —
+  `backfill`. Adoption подписки после crash-окна (наш AddUser прошёл, commit —
+  нет) пишет маркер по правилу backfill: тумблер включён И панель несёт ровно
+  текущий лимит пробных (`adopted_trial_limit`);
+- снимает лимит (`UpdateUser(uuid, traffic_limit_bytes=0, NO_RESET,
+  status=ACTIVE` только для ACTIVE/LIMITED, без сквадов) и удаляет маркер:
+  оплата (`monkey-island-payment`) и страховка notifier — только `is_managed` И
+  `release_on='payment'`; действия админки «Снять лимит» (карточка, по списку,
+  по сегменту) — любой `is_managed` (`admin_release_managed_limit`). **Без
+  маркера никто ничего не трогает**: лимит в панели без маркера — «ручной лимит
+  панели», действия отвечают `outcome=skipped_manual`, панель не тронута;
+- «Применить лимит» на подписку с чужим лимитом — три НЕЗАВИСИМЫХ
+  подтверждения карточки, одно другое не гасит (инвариант: ручной лимит
+  владельца заменяется только по явному решению именно о ручном лимите).
+  `409` перечисляет все неподтверждённые вопросы разом: `{"paid": true}`
+  (клиент платил → `force=1`), `{"manual": true}` (ручной лимит владельца без
+  маркера → `override_manual=1`; после замены лимит становится управляемым с
+  `release_on='payment'` и его снимет оплата/страховка notifier),
+  `{"admin_limit": true}` (маркер `release_on='manual'` — лимит из кнопки
+  алерта бота, `ip_abuse`/`traffic_abuse`, `bot:admin:<id>` →
+  `override_admin_limit=1`); плюс `paid_message` / `manual_message` /
+  `admin_limit_message` и общий `message`. UI задаёт отдельный confirm на
+  каждый флаг (в тексте про ручной лимит — что он будет перезаписан и станет
+  управляемым) и повторяет POST с набором подтверждённых флагов; `force=1`
+  сам по себе ручной лимит НЕ заменяет — ответ остаётся `409 {"manual": true}`.
+  Массовые операции (по списку и по сегменту) такие подписки пропускают:
+  `skipped_manual` (ручной кап) / `skipped_admin_limit` (маркер бота не
+  перезаписывается). Панель уже с ровно лимитом пробных, но без маркера —
+  панель не трогаем, маркер пишем (`outcome=marked`); маркер бота с ровно
+  лимитом пробных — `unchanged`, его `release_on` не меняется;
+- история — события `event_logs` `traffic_limit_applied` /
+  `traffic_limit_released` (payload `reason`/`applied_by`/`limit`/`strategy`/
+  `release_on` + `changed`, `source='site'`, `backfill`, `adopted`, …) —
+  `engine/rwms_helpers.py::add_traffic_limit_event`; аудит админки как раньше
+  (`apply_trial_limit` / `remove_traffic_limit` / `bulk_*` / `antiabuse_bulk_*`
+  / `antiabuse_backfill` с `outcome`, `skipped_paid`, `skipped_manual`);
+- **без таблицы** (миграция не накачена): хелперы common ведут себя как
+  «маркеров нет» (warning не чаще раза в час), регистрация и карточка клиента
+  работают (лимит ставится без маркера, карточка показывает «Маркеры
+  недоступны»), а действия админки с лимитами (карточка, по списку, по сегменту,
+  backfill) отвечают `503 «примените миграцию managed_traffic_limits»` и панель
+  не трогают (`managed_limits_table_available` — проба в savepoint).
+
+Миграцию создаёт владелец (island alembic head `be91cc5b23a5`); DDL:
+
+```sql
+CREATE TABLE managed_traffic_limits (
+    user_id     BIGINT       NOT NULL,
+    limit_bytes BIGINT       NOT NULL,
+    strategy    VARCHAR(16)  NOT NULL,
+    reason      VARCHAR(32)  NOT NULL,
+    release_on  VARCHAR(32)  NOT NULL,
+    applied_by  VARCHAR(64)  NOT NULL,
+    applied_at  TIMESTAMP WITHOUT TIME ZONE NOT NULL DEFAULT now(),
+    expires_at  TIMESTAMP WITHOUT TIME ZONE NULL,
+    note        VARCHAR(256) NULL,
+    CONSTRAINT managed_traffic_limits_pkey PRIMARY KEY (user_id),
+    CONSTRAINT managed_traffic_limits_user_id_fkey
+        FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+);
+```
+
+**Backfill.** На проде лимиты пробных, поставленные фичей до появления таблицы
+(с 2026-09-05 10:50, 5 ГиБ/DAY), маркера не имеют — оплата их не снимет. Кнопка
+«Пометить существующие лимиты пробных как управляемые» (карточка «Управляемые
+лимиты (маркеры)», `support-admin/api/antiabuse-backfill/`, POST, только полный
+админ): предпросмотр (`dry_run=1`, проход по панели без записи) → «Пометить».
+Порциями (`after_id` + `batch_size`, как массовые операции): по ВСЕМ
+пользователям (`ANTIABUSE_BACKFILL_ROWS_SQL`: флаг «платил» — тот же
+`PAYS_EXISTS_SQL`, что у сегментов; без фильтра блокировок и Telegram — маркер
+пассивен), строгое чтение панели; маркер `reason='trial'`,
+`release_on='payment'`, `applied_by='backfill'` пишется ТОЛЬКО если
+`limit_bytes` панели равен текущему `trial_traffic_limit_bytes` И стратегия
+равна текущей. Никогда не платившие — счётчик `marked`; **платившие с той же
+сигнатурой — отдельная группа `marked_paid`** (в предпросмотре: «платившие с
+лимитом пробного: N — будут помечены и сняты страховкой notifier/оплатой»):
+это лимит пробного, поставленный до миграции и не снятый оплатой в окне «код
+v2 задеплоен, таблицы ещё нет»; после пометки его снимет страховка notifier
+или следующая оплата. Ручные капы (1 ГиБ/DAY, 5 ГиБ/NO_RESET, 50/100 ГиБ) под
+правило не попадают; управляемые маркеры, в том числе `release_on='manual'`
+из бота, не перезаписываются (`already`). Ответ:
+`processed/marked/marked_paid/already/skipped/missing/next_after_id/done`;
+каждая порция — аудит `antiabuse_backfill` (`marked_paid`) и события
+`traffic_limit_applied` (`backfill=true`, `never_paid`); панель backfill не
+пишет никогда. `RwmsUnavailableError` → 503 с прогрессом.
+
+### Что делает сайт
+
+- **Создание сайтового триала** (`engine/rwms_helpers.py`): `create_user` /
+  `create_user_until` принимают `traffic_limit` (`TrialTrafficLimit`) и
+  передают в `AddUserRequest` новое optional-поле `traffic_limit_bytes = 13`
+  (`round(ГиБ × 1024³)`) и `traffic_limit_strategy` из настройки
+  (`MONTH_ROLLING = 4` в proto). `trial_traffic_limit_for_new_trial(db_session)`
+  возвращает лимит только при включённом тумблере (новый пользователь платежей
+  не имеет); вызывается из `create_site_user` (magic link / OAuth / Telegram /
+  оплата) и `mobile_api/provisioning.py`. Без лимита запрос прежний
+  (`HasField('traffic_limit_bytes')` = false → панель создаёт без лимита).
+  v2: после `flush` строки `users` — маркер `site:register` и событие
+  `traffic_limit_applied` в той же транзакции.
+- **Пересоздание при достоверном NOT_FOUND** («Продлить» / «Подготовить
+  возврат» в карточке клиента): `trial_traffic_limit_for_user(db_session, user)`
+  — лимит только если включено И пользователь never_paid; v2: маркер
+  `site:admin:<login>`.
+- **Продления не трогают лимит**: «Продлить» / «Подготовить возврат» в
+  карточке клиента, массовое `extend_days` (`admin_bulk_extend`) и «БД →
+  панель» (`push_to_panel` в `support_admin_api_rwms_sync`) не передают в
+  `UpdateUser` ни `traffic_limit_bytes`, ни `traffic_limit_strategy` — RWMS
+  (после фикса «стратегия только при `HasField`») оставляет лимит и стратегию
+  сброса панели как есть. Явный `NO_RESET` остаётся только в намеренном снятии
+  лимита (`admin_rwms_remove_traffic_limit`); как в боте/notifier/payment.
+- **Карточка клиента**: `admin_rwms_traffic_payload` (эндпоинт
+  `support-admin/api/user-traffic/`) дополнен `traffic_limit_bytes`,
+  `traffic_limit_strategy` (+ `_label`), `status` (LIMITED выделяется как «лимит
+  исчерпан»), `is_limited`, `hwid_devices` (`GetUserHwidDevices(uuid).total`,
+  второй read-only RPC). v2: блок `managed_limit`
+  (`admin_managed_limit_payload`): `kind=managed|manual|none|unknown`, подпись
+  «Управляемый лимит (trial, с <дата>, кем) — снимается оплатой» либо «Ручной
+  лимит панели — снимает только владелец в Remnawave», данные маркера
+  (`reason`, `applied_by`, `applied_at`, `release_on`); чтение без побочных
+  эффектов (устаревший маркер на GET не удаляется). Объёмы в карточке —
+  ГиБ/МиБ по основанию 1024 (`formatClientTrafficBytes`).
+- **Действия по клиенту** (`support-admin/api/subscription-manage/`, по образцу
+  `temp_ban`, только полный админ, подтверждение в UI, аудит):
+  `action=apply_trial_limit` — `UpdateUser(uuid, traffic_limit_bytes,
+  traffic_limit_strategy)` из настроек, без сквадов и статуса; перед
+  применением — независимые подтверждения одним `409` (см. v2 выше):
+  платившему — `{"paid": true}` → `force=1` (UI предупреждает: при включённом
+  тумблере страховка notifier снимет такой лимит у платившего в следующем же
+  цикле и пришлёт алерт админам — рабочим сценарием это не считается); ручной
+  лимит владельца — `{"manual": true}` → `override_manual=1`; лимит админа из
+  бота (`release_on='manual'`) — `{"admin_limit": true}` →
+  `override_admin_limit=1`; `force=1` ручной лимит не заменяет. Аудит
+  `apply_trial_limit` хранит `forced`, `override_manual`,
+  `override_admin_limit`, `manual_overridden`, `admin_limit_overridden`;
+  маркер `site:admin:<login>` пишется до `UpdateUser` в savepoint (отказ RWMS
+  откатывает маркер);
+  `action=remove_traffic_limit` — снятие «как было»: `traffic_limit_bytes=0`,
+  `traffic_limit_strategy=NO_RESET`, `status=ACTIVE`, БЕЗ `active_internal_squads`
+  (пустой список RWMS трактует как «не менять» — ban-сквад не снимется) — только
+  управляемого лимита; ручной — `outcome=skipped_manual`, `rwms_updated=false`.
+  `status=ACTIVE` ставится только подписке ACTIVE/LIMITED: DISABLED (полная
+  блокировка) и EXPIRED не трогаем — снятие лимита не разблокирует аккаунт.
+  Панель читается строго: `RwmsUnavailableError` → 503, NOT_FOUND → 404, RWMS не
+  принял → 502; уже нужное состояние — no-op (`rwms_updated=false`); без таблицы
+  маркеров — 503.
+- **Массовые операции по списку** (`support-admin/api/bulk/`): `BULK_ACTIONS`
+  `apply_trial_limit` (платившим не ставится) и `remove_traffic_limit` (только
+  управляемый) — dry-run, аудит `bulk_*`, `BULK_MAX_IDS`. v2: пропуски не
+  считаются применёнными — `applied` не растёт для `skipped_paid` /
+  `skipped_manual` / `skipped_admin_limit` (маркер бота с
+  `release_on='manual'` не перезаписывается) / `skipped`; счётчики и
+  `outcome` строки в ответе.
+- **Массовые операции по сегменту** (`support-admin/api/antiabuse-bulk/`, POST,
+  только полный админ): `action=apply_trial_limit` (сегмент `trial_active`,
+  требует включённого тумблера; платившие — `skipped_paid`) / `remove_trial_limit`
+  (`never_paid`) / `remove_paid_limit` (`paid_any`, страховка) — снимается только
+  управляемый лимит, ручной — `skipped_manual`. Сегменты — из
+  `common/models/segments.py` (`segment_where_sql(..., requires_telegram=False)`;
+  заблокированные исключены самим сегментом). `dry_run=1` → `total` и первые
+  20 username; применение идёт порциями: `after_id` + `batch_size` (1–200, по
+  умолчанию 50) → `processed/applied/marked/skipped/skipped_paid/skipped_manual/
+  skipped_admin_limit/failed/next_after_id/done`, UI зовёт эндпоинт до `done`.
+  Маркер и событие каждого пользователя коммитятся сразу после его
+  `UpdateUser` (короткая транзакция на пользователя, аудит порции — отдельным
+  commit): сбой commit не оставит в панели лимиты без маркеров (такие
+  считались бы ручными, и оплата их не сняла бы). При
+  `RwmsUnavailableError` — `503` с частичным прогрессом (`next_after_id`
+  сохранён, повтор продолжает с того же места). Каждая порция пишется в аудит
+  `antiabuse_bulk_<action>`.
+- **Таблица «Последние алерты ip-guard»** (`support-admin/api/ipguard-alerts/`,
+  GET): последние 50 строк `ipguard_alerts` (`IpAlert`). `username` там —
+  ЧИСЛОВОЙ ID пользователя панели (email в access-логе xray); резолв в
+  `users.username`/uuid через sync `RwmsClientSync.get_user_by_id` с кешем на
+  запрос (один RPC на уникальный ID), при недоступности — деградация до ID.
+  Ноды — из `ipguard_user_ips` за окно алерта (в таблице алертов нод нет).
+  Кнопка «Временный бан» переиспользует `action=temp_ban` карточки клиента по
+  `users.username`; клик по username открывает карточку.
+- **Настройки** (`support-admin/api/antiabuse/`): GET — сырые значения
+  (`settings`), действующие (`effective`: БД либо дефолт common, включая
+  `ipguard_warnings_enabled` / `ipguard_warning_subnets_per_hwid`), списки
+  стратегий/сегментов с русскими подписями, `managed_limits_available`; POST
+  `action=` `trial_limit_enable|trial_limit_disable|trial_limit_set`
+  (`limit_value` + `limit_unit=gib|mib` — МиБ переводятся в ГиБ при
+  сохранении, `strategy`) / `ipguard_enable|ipguard_disable|
+  ipguard_warnings_enable|ipguard_warnings_disable|ipguard_set` (`segment`,
+  `subnets_per_hwid`, `warning_subnets_per_hwid`, `window_hours`,
+  `cooldown_hours`; пустое поле = без изменений). v2: формы вкладки
+  **предзаполнены** актуальными значениями при загрузке и после сохранения (UI
+  перечитывает GET после POST; селекты без «без изменений»), поэтому значение,
+  равное сохранённому, не перезаписывается и в аудит не попадает
+  (`admin_antiabuse_save_settings`). Каждое значение проходит
+  `admin_validate_runtime_setting` (float-ключи: `nan`/`inf` отклоняются,
+  `trial_traffic_limit_gb` — только в (0; 100 000] ГиБ, значение, округляющееся
+  до `0` при 10 знаках, тоже отклоняется) и парную проверку
+  `admin_validate_antiabuse_setting_pair` (включать тумблер можно только при
+  корректных зависимых значениях в БД — те же границы; пара порогов ip-guard
+  `warning < alert` проверяется при сохранении любого из них: второе значение —
+  из этого же сохранения, иначе из БД, иначе дефолт; та же проверка стоит и в
+  общем `runtime-settings`), пишется в аудит `setting_save`. Те же ключи
+  доступны в свёрнутом raw-списке вкладки (группа `antiabuse` в
+  `SETTING_GROUPS`).
+
+### Порядок включения / выключения
+
+0. (v2, один раз) Накатить миграцию `managed_traffic_limits`, затем на вкладке
+   «Антиабьюз» → «Управляемые лимиты (маркеры)» — предпросмотр и «Пометить
+   существующие лимиты пробных как управляемые»: только так оплата снимет
+   лимиты, поставленные до появления маркеров. Платившие с таким лимитом
+   показываются отдельной группой предпросмотра (`marked_paid`) и после
+   пометки снимаются страховкой notifier / следующей оплатой.
+1. Задать лимит и стратегию, включить тумблер «Лимит новых пробных» — с этого
+   момента новые триалы (бот, сайт, mobile, пересоздания) создаются с лимитом
+   и маркером.
+2. При желании — «Применить лимит ко всем активным пробным без платежей»
+   (предпросмотр → подтверждение; порциями; ручные капы владельца пропускаются).
+3. Выключение тумблера возвращает создание «как раньше»; уже ограниченные
+   подписки остаются до «Снять лимит у всех пробных» (снимаются только
+   управляемые). «Снять лимит у всех, кто платил» — страховка (лимит снимает
+   оплата в payment и notifier — тоже только управляемый).
+4. Алерты ip-guard: задать сегмент/подсети/окно/кулдаун, включить тумблер;
+   выключено — детектор только считает и логирует. Предупреждения (уровень
+   suspicious) — отдельный тумблер и порог «подсетей на HWID для
+   предупреждения» (строго меньше порога алерта).
+
+Смежные сервисы: бот (`/start` и пересоздание создают триал с лимитом и
+маркером `bot:start` / `bot:recreate`; уведомление `trial-traffic-limit-reached`
+— только по маркеру `reason='trial'`), notifier (страховка «платил, а лимит
+висит» — только `is_managed` И `release_on='payment'`, без маркера не алертит;
+пересоздание — маркер `notifier:recreate`), payment (`monkey-island-payment`:
+снятие лимита при оплате — только управляемого; пересоздание —
+`payment:recreate`), RWMS (proto:
+`AddUserRequest.traffic_limit_bytes = 13`, `TrafficLimitStrategy.MONTH_ROLLING =
+4`, `UpdateUser` передаёт стратегию только при `HasField`), ip-guard (правило
+«подсетей на HWID», предупреждения по `ipguard_warnings_enabled` /
+`ipguard_warning_subnets_per_hwid`, dry-run при выключенном тумблере). Схема БД:
+новая таблица `managed_traffic_limits` (миграцию пишет владелец, см. DDL выше);
+остальные таблицы не меняются.
 
 ## Админка: CustomConfigTemplate
 
@@ -2128,6 +2435,16 @@ IP-адреса (ACTIVE на интерфейсе / RESERVE / BLOCKED; на эк
 default 60 c) — раньше кэшировалась только гео-агрегация, и остальные три
 запроса выполнялись на каждый тик; выборка идёт по индексу
 `ix_ipguard_user_ips_node_last_seen (node, last_seen)`.
+
+Адреса самих нод — `infra_server_ips.on_interface = true` по всем серверам,
+включая мосты с белым IP, — из подсчётов и списка адресов блока «кто
+подключается» исключаются (`infra.node_interface_ips`, те же адреса, что
+отбрасывает детектор ip-guard; резервы `on_interface = false` не трогаются).
+Поле `excluded_node_ips` в payload карточки — сколько уникальных адресов нод
+было отброшено на этой ноде за 24 ч; в шапке блока при `N > 0` показывается
+пилюля «исключено адресов нод: N». Ошибка чтения `infra_server_ips` — warning
+в лог `infra` (`stage=who_connects`, `status=node_ips_unavailable`) и подсчёт
+без исключений, как раньше.
 
 Интерфейс вкладки построен как обзор парка серверов: сверху показываются
 сводные статусы и текущий трафик, список можно фильтровать по имени и

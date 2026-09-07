@@ -61,7 +61,10 @@ from engine.rwms_helpers import USERNAME_HASH_LENGTH  # noqa: F401 - re-export
 from engine.rwms_helpers import USERNAME_PREFIX  # noqa: F401 - re-export
 from engine.rwms_helpers import RwmsSubscriptionOwnershipError  # noqa: F401
 from engine.rwms_helpers import assert_subscription_owned_by_email
+from engine.rwms_helpers import adopted_trial_limit
 from engine.rwms_helpers import create_user
+from engine.rwms_helpers import record_trial_limit_marker
+from engine.rwms_helpers import trial_traffic_limit_for_new_trial
 from engine.rwms_helpers import deterministic_username  # noqa: F401 - re-export
 from engine.rwms_helpers import normalize_email
 
@@ -152,6 +155,10 @@ def provision_trial_user(db_session, rwms_client, email):
         # Explicit mismatch → ALERT + raise; panel stays untouched.
         assert_subscription_owned_by_email(existing, email, flow="mobile_api")
         rw_user = existing
+        # Антиабьюз v2: наш прошлый AddUser мог поставить лимит, а маркер
+        # пропал с транзакцией — правило backfill (тумблер включён И панель
+        # несёт ровно текущий лимит пробных), иначе маркер не пишется.
+        trial_limit = adopted_trial_limit(db_session, rw_user)
         logger.warning(
             "mobile_api: adopting existing RWMS subscription %s for %s "
             "(crash-window recovery, panel untouched)",
@@ -159,12 +166,17 @@ def provision_trial_user(db_session, rwms_client, email):
             email,
         )
     else:
+        # Антиабьюз: лимит трафика новых пробных (только при включённой
+        # настройке сайта; новый email-пользователь платежей не имеет).
+        # Маркер managed_traffic_limits — ниже, в той же сессии, что и users.
+        trial_limit = trial_traffic_limit_for_new_trial(db_session)
         rw_user = create_user(
             rwms_client=rwms_client,
             username=username,
             trial_period_days=trial_period_days,
             from_referrer=False,
             email=email,
+            traffic_limit=trial_limit,
         )
         if rw_user is None:
             logger.error(
@@ -187,6 +199,10 @@ def provision_trial_user(db_session, rwms_client, email):
             "mobile_api: concurrent insert for %s, re-fetching existing user", email
         )
         return db_session.query(User).filter(User.email == email).one_or_none()
+
+    # Антиабьюз v2: лимит поставлен — маркер «управляемый» (trial, снимается
+    # оплатой) в той же транзакции; без таблицы — warning, без маркера.
+    record_trial_limit_marker(db_session, user, trial_limit)
 
     logger.info(
         "mobile_api: provisioned trial user %s (username=%s, trial=%sd) via email login",

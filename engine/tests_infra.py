@@ -483,6 +483,27 @@ class WhoConnectsGeoTests(InfraDbTestCase):
             [("Москва", 20), ("Самарская область", 10)],
         )
 
+    def test_unlocated_addresses_fall_into_unknown_country_bucket(self):
+        self.add_observation("a", "8.8.8.8", 20)
+        self.add_observation("b", "1.1.1.1", 10)
+        locations = {"8.8.8.8": geoip_lookup.GeoLocation("DE", "Германия")}
+        database = geoip_lookup.GeoIpDatabase("/tmp/test.mmdb", 1)
+
+        with mock.patch.object(
+            geoip_lookup, "configured_database", return_value=database
+        ), mock.patch.object(
+            geoip_lookup, "lookup_ip", side_effect=lambda ip, _: locations.get(ip)
+        ):
+            geo = infra.who_connects_payload(self.session, "de-1", utcnow())["geo"]
+
+        self.assertEqual(geo["located_ips"], 1)
+        self.assertEqual(geo["unlocated_ips"], 1)
+        self.assertEqual(
+            [(row["name"], row["code"], row["hits"]) for row in geo["countries"]],
+            [("Германия", "DE", 20), ("Не определилось", None, 10)],
+        )
+        self.assertEqual(geo["russian_regions"], [])
+
     def test_missing_database_preserves_existing_ip_payload(self):
         self.add_observation("a", "8.8.8.8", 20)
         with mock.patch.object(
@@ -531,6 +552,147 @@ class WhoConnectsGeoTests(InfraDbTestCase):
         self.assertEqual(second["unique_ips_24h"], 1)
         # Кэш пер-нодовый: чужая нода не получает данные соседа
         self.assertEqual(other_node["unique_ips_24h"], 0)
+
+
+class WhoConnectsNodeIpExclusionTests(InfraDbTestCase):
+    """Адреса самих нод (infra_server_ips.on_interface=true) — не пользователи."""
+
+    def add_observation(self, username, ip, hits, node="de-1", age=None):
+        now = utcnow()
+        last_seen = now - age if age else now
+        self.session.add(
+            UserIpObservation(
+                username=username,
+                ip=ip,
+                subnet=f"{ip}/32",
+                node=node,
+                hits=hits,
+                first_seen=last_seen - timedelta(hours=2),
+                last_seen=last_seen,
+            )
+        )
+        self.session.commit()
+
+    def payload(self, node="de-1", geo_database=None, lookup=None):
+        with mock.patch.object(
+            geoip_lookup, "configured_database", return_value=geo_database
+        ), mock.patch.object(
+            geoip_lookup, "lookup_ip", side_effect=lookup or (lambda ip, _: None)
+        ) as lookup_mock:
+            payload = infra.who_connects_payload(self.session, node, utcnow())
+        return payload, lookup_mock
+
+    def test_node_interface_addresses_are_excluded_from_every_counter(self):
+        server = self.make_server()
+        self.make_ip(server, "5.5.5.5", on_interface=True)
+        # Резерв не на интерфейсе — с него никто не подключается, не исключаем
+        self.make_ip(server, "7.7.7.7", on_interface=False, source="manual")
+        # Мост с белым IP — отдельный сервер инфраструктуры, тоже исключается
+        bridge = self.make_server(machine_uid="m-bridge", node_name="bridge-1")
+        self.make_ip(bridge, "6.6.6.6", on_interface=True)
+
+        self.add_observation("bridge", "6.6.6.6", 500)
+        self.add_observation("self", "5.5.5.5", 100)
+        self.add_observation("a", "8.8.8.8", 20)
+        self.add_observation("b", "7.7.7.7", 5)
+
+        database = geoip_lookup.GeoIpDatabase("/tmp/test.mmdb", 1)
+        location = geoip_lookup.GeoLocation("DE", "Германия")
+        payload, lookup = self.payload(
+            geo_database=database, lookup=lambda ip, _: location
+        )
+
+        self.assertEqual(payload["unique_ips_24h"], 2)
+        self.assertEqual(payload["unique_ips_1h"], 2)
+        self.assertEqual(payload["excluded_node_ips"], 2)
+        self.assertEqual(
+            [row["ip"] for row in payload["top_addresses"]], ["8.8.8.8", "7.7.7.7"]
+        )
+        # География считается по тем же адресам: нод нет ни в total_ips, ни
+        # в GeoIP lookup'ах
+        self.assertEqual(payload["geo"]["total_ips"], 2)
+        self.assertEqual(payload["geo"]["total_hits"], 25)
+        self.assertEqual(
+            sorted(call.args[0] for call in lookup.call_args_list),
+            ["7.7.7.7", "8.8.8.8"],
+        )
+
+    def test_excluded_counter_only_counts_window_of_this_node(self):
+        server = self.make_server()
+        self.make_ip(server, "5.5.5.5", on_interface=True)
+        self.make_ip(server, "6.6.6.6", on_interface=True)
+        # Адрес ноды виден на другой ноде и вне окна 24 ч — не в счётчике de-1
+        self.add_observation("x", "5.5.5.5", 10, node="wl-1")
+        self.add_observation("y", "6.6.6.6", 10, age=timedelta(days=2))
+        self.add_observation("a", "8.8.8.8", 1)
+
+        payload, _ = self.payload()
+
+        self.assertEqual(payload["excluded_node_ips"], 0)
+        self.assertEqual(payload["unique_ips_24h"], 1)
+
+    def test_without_node_addresses_payload_is_unchanged(self):
+        self.add_observation("a", "8.8.8.8", 20)
+        self.add_observation("b", "1.1.1.1", 10)
+
+        payload, _ = self.payload()
+
+        self.assertEqual(payload["excluded_node_ips"], 0)
+        self.assertEqual(payload["unique_ips_24h"], 2)
+        self.assertEqual(
+            [row["ip"] for row in payload["top_addresses"]], ["8.8.8.8", "1.1.1.1"]
+        )
+
+    def test_all_observations_from_nodes_gives_empty_list_but_counter(self):
+        server = self.make_server()
+        self.make_ip(server, "5.5.5.5", on_interface=True)
+        self.add_observation("self", "5.5.5.5", 100)
+
+        payload, _ = self.payload()
+
+        self.assertEqual(payload["top_addresses"], [])
+        self.assertEqual(payload["unique_ips_24h"], 0)
+        self.assertEqual(payload["excluded_node_ips"], 1)
+
+    def test_node_addresses_are_normalized_and_blank_rows_skipped(self):
+        server = self.make_server()
+        # Руками отредактированная строка в нестандартной записи IPv6 и мусор
+        self.make_ip(server, "2A01:4F8:0:0:0:0:0:1", on_interface=True)
+        self.make_ip(server, "not-an-ip", on_interface=True)
+        self.make_ip(server, "   ", on_interface=True)
+
+        excluded = infra.node_interface_ips(self.session)
+
+        self.assertEqual(
+            excluded, frozenset({"2A01:4F8:0:0:0:0:0:1", "2a01:4f8::1", "not-an-ip"})
+        )
+
+    def test_read_failure_logs_warning_and_keeps_previous_behaviour(self):
+        self.add_observation("a", "8.8.8.8", 20)
+
+        with mock.patch.object(
+            infra, "select", side_effect=RuntimeError("relation is locked")
+        ), self.assertLogs("infra", level="WARNING") as logs:
+            payload, _ = self.payload()
+
+        self.assertIn("node_ips_unavailable", logs.output[0])
+        self.assertEqual(payload["excluded_node_ips"], 0)
+        self.assertEqual(payload["unique_ips_24h"], 1)
+        self.assertEqual(payload["top_addresses"][0]["ip"], "8.8.8.8")
+
+    def test_detail_payload_exposes_excluded_counter(self):
+        server = self.make_server()
+        self.make_ip(server, "5.5.5.5", on_interface=True)
+        self.add_observation("self", "5.5.5.5", 100)
+        self.add_observation("a", "8.8.8.8", 1)
+
+        with mock.patch.object(
+            geoip_lookup, "configured_database", return_value=None
+        ):
+            detail = infra.server_detail_payload(self.session, server.id)
+
+        self.assertEqual(detail["who_connects"]["excluded_node_ips"], 1)
+        self.assertEqual(detail["who_connects"]["unique_ips_24h"], 1)
 
 
 class SettingsTests(InfraDbTestCase):

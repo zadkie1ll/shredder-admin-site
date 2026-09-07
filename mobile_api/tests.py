@@ -10,9 +10,11 @@ from sqlalchemy.pool import StaticPool
 
 from common.models.db import (
     Base,
+    ManagedTrafficLimit,
     MobileAccessToken,
     MobileAuthCode,
     EmailLoginCode,
+    SystemSetting,
     User,
     UserBlock,
 )
@@ -51,6 +53,7 @@ class MobileAuthHelpersTests(SimpleTestCase):
                 MobileAuthCode.__table__,
                 MobileAccessToken.__table__,
                 UserBlock.__table__,
+                SystemSetting.__table__,
             ],
         )
         self.Session = sessionmaker(bind=self.engine)
@@ -198,6 +201,8 @@ def _make_engine():
             MobileAccessToken.__table__,
             EmailLoginCode.__table__,
             UserBlock.__table__,
+            SystemSetting.__table__,
+            ManagedTrafficLimit.__table__,
         ],
     )
     return engine
@@ -1505,3 +1510,133 @@ class ProvisioningLocalRowOwnershipTests(SimpleTestCase):
         self.assertEqual(session.query(User).count(), 1)
         self.assertEqual(session.query(MobileAccessToken).count(), 0)
         session.close()
+
+
+class ProvisioningManagedLimitMarkerTests(SimpleTestCase):
+    """Антиабьюз v2: лимит пробного, поставленный при провижининге по email,
+    получает маркер managed_traffic_limits (trial / payment / site:register) в
+    той же сессии; при adoption — только если панель несёт ровно текущий лимит
+    пробных (правило backfill); ручной лимит владельца маркера не получает."""
+
+    def setUp(self):
+        self.engine = _make_engine()
+        self.Session = sessionmaker(bind=self.engine)
+
+    def _enable_limit(self, session, gb="0.5"):
+        session.add(SystemSetting(key="trial_traffic_limit_enabled", value="1"))
+        session.add(SystemSetting(key="trial_traffic_limit_gb", value=gb))
+        session.commit()
+
+    def _marker(self, user_id):
+        check = self.Session()
+        try:
+            return check.get(ManagedTrafficLimit, user_id)
+        finally:
+            check.close()
+
+    def test_new_trial_with_limit_gets_marker_in_same_session(self):
+        from mobile_api import provisioning
+
+        email = "marked@example.com"
+        session = self.Session()
+        self._enable_limit(session)
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None
+        with mock.patch(
+            "mobile_api.provisioning.create_user",
+            return_value=_FakeRwUser(expire_at=datetime.utcnow() + timedelta(days=7)),
+        ) as create_user:
+            user = provisioning.provision_trial_user(session, client, email)
+
+        self.assertEqual(create_user.call_args.kwargs["traffic_limit"].limit_bytes, 536870912)
+        # Маркер виден в той же сессии до commit.
+        marker = session.get(ManagedTrafficLimit, user.id)
+        self.assertEqual((marker.limit_bytes, marker.strategy), (536870912, "DAY"))
+        self.assertEqual((marker.reason, marker.release_on, marker.applied_by), ("trial", "payment", "site:register"))
+        session.commit()
+        self.assertIsNotNone(self._marker(user.id))
+        session.close()
+
+    def test_new_trial_without_limit_has_no_marker(self):
+        from mobile_api import provisioning
+
+        email = "plain@example.com"
+        session = self.Session()
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None
+        with mock.patch(
+            "mobile_api.provisioning.create_user",
+            return_value=_FakeRwUser(expire_at=datetime.utcnow() + timedelta(days=7)),
+        ) as create_user:
+            user = provisioning.provision_trial_user(session, client, email)
+        session.commit()
+
+        self.assertIsNone(create_user.call_args.kwargs["traffic_limit"])
+        self.assertIsNone(self._marker(user.id))
+        session.close()
+
+    def test_adoption_marks_only_exact_trial_limit(self):
+        from mobile_api import provisioning
+        from mobile_api.provisioning import deterministic_username
+
+        session = self.Session()
+        self._enable_limit(session, gb="5")
+
+        email = "crashed-limit@example.com"
+        existing = _FakeRwUser(
+            expire_at=datetime.utcnow() + timedelta(days=7),
+            email=email,
+            username=deterministic_username(email),
+        )
+        existing.traffic_limit_bytes = 5 * 1024**3
+        existing.traffic_limit_strategy = 1  # DAY
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = existing
+        with mock.patch("mobile_api.provisioning.create_user") as create_user:
+            user = provisioning.provision_trial_user(session, client, email)
+        session.commit()
+        create_user.assert_not_called()
+        client.add_user.assert_not_called()
+        self.assertEqual(self._marker(user.id).applied_by, "site:register")
+
+        # Другой лимит в панели — ручной кап владельца: маркера нет.
+        email2 = "crashed-manual@example.com"
+        manual = _FakeRwUser(
+            expire_at=datetime.utcnow() + timedelta(days=7),
+            email=email2,
+            username=deterministic_username(email2),
+        )
+        manual.traffic_limit_bytes = 1024**3
+        manual.traffic_limit_strategy = 1
+        client.get_user_by_username_strict.return_value = manual
+        with mock.patch("mobile_api.provisioning.create_user"):
+            user2 = provisioning.provision_trial_user(session, client, email2)
+        session.commit()
+        self.assertIsNone(self._marker(user2.id))
+        session.close()
+
+    def test_marker_degrades_without_table(self):
+        """Таблицы маркеров нет (миграция не накачена): провижининг работает,
+        лимит ставится, маркер не пишется (warning), транзакция цела."""
+        from mobile_api import provisioning
+
+        ManagedTrafficLimit.__table__.drop(self.engine)
+        email = "nomarker@example.com"
+        session = self.Session()
+        self._enable_limit(session)
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None
+        with mock.patch(
+            "mobile_api.provisioning.create_user",
+            return_value=_FakeRwUser(expire_at=datetime.utcnow() + timedelta(days=7)),
+        ), self.assertLogs(level="WARNING") as logs:
+            user = provisioning.provision_trial_user(session, client, email)
+        session.commit()
+
+        self.assertIsNotNone(user)
+        self.assertTrue(any("WITHOUT managed marker" in line for line in logs.output))
+        check = self.Session()
+        self.assertEqual(check.query(User).filter(User.email == email).count(), 1)
+        check.close()
+        session.close()
+

@@ -1,12 +1,39 @@
 import hashlib
 import os
 import logging
+from dataclasses import dataclass
 from datetime import datetime
 from datetime import timezone
 from datetime import timedelta
 from typing import Optional
+from sqlalchemy import select
+from sqlalchemy.exc import DBAPIError
+from common.managed_traffic_limits import APPLIED_BY_SITE_REGISTER
+from common.managed_traffic_limits import EVENT_TRAFFIC_LIMIT_APPLIED
+from common.managed_traffic_limits import EVENT_TRAFFIC_LIMIT_RELEASED
+from common.managed_traffic_limits import REASON_TRIAL
+from common.managed_traffic_limits import RELEASE_ON_PAYMENT
+from common.managed_traffic_limits import is_missing_table_error
+from common.managed_traffic_limits import marker_event_payload
+from common.managed_traffic_limits import normalize_strategy_name
+from common.managed_traffic_limits import upsert_managed_limit
+from common.models.db import EventLog
+from common.models.db import ManagedTrafficLimit
+from common.models.db import SystemSetting
+from common.models.settings import DEFAULT_TRIAL_TRAFFIC_LIMIT_ENABLED
+from common.models.settings import DEFAULT_TRIAL_TRAFFIC_LIMIT_GB
+from common.models.settings import DEFAULT_TRIAL_TRAFFIC_LIMIT_STRATEGY
+from common.models.settings import TRIAL_TRAFFIC_LIMIT_ENABLED_SETTING
+from common.models.settings import TRIAL_TRAFFIC_LIMIT_GB_SETTING
+from common.models.settings import TRIAL_TRAFFIC_LIMIT_STRATEGY_SETTING
+from common.models.settings import parse_bool_setting
+from common.models.settings import parse_positive_float_setting
+from common.models.settings import normalize_trial_traffic_limit_strategy
+from common.models.settings import trial_traffic_limit_bytes
+from common.models.settings import trial_traffic_limit_strategy_proto_name
 from common.rwms_client_sync import RwmsClientSync
 import proto.rwmanager_pb2 as proto
+from .sql_helpers import user_never_paid
 
 # --- Детерминированное имя подписки от email -------------------------------
 #
@@ -153,6 +180,206 @@ def assert_subscription_owned_by_telegram_id(rw_user, telegram_id, *, flow):
     )
 
 
+# --- Антиабьюз: лимит трафика НОВЫХ пробных подписок ------------------------
+#
+# Управляется ТОЛЬКО из админки сайта (system_settings), по умолчанию выключен.
+# Применяется при создании подписки в панели (AddUserRequest.traffic_limit_bytes
+# + traffic_limit_strategy) и ТОЛЬКО если пользователь never_paid: нет ни
+# одного успешного платежа (см. sql_helpers.user_never_paid). Выключение
+# настройки возвращает поведение «как раньше»: новые триалы создаются без
+# лимита, уже ограниченные остаются до кнопки «снять лимит» в админке.
+
+
+@dataclass(frozen=True)
+class TrialTrafficLimit:
+    """Лимит трафика пробной подписки, готовый к передаче в RWMS."""
+
+    limit_gb: float
+    limit_bytes: int
+    # значение настройки в нижнем регистре: no_reset | day | week | month | month_rolling
+    strategy_key: str
+    # имя члена enum TrafficLimitStrategy в rwmanager.proto: NO_RESET | DAY | ...
+    strategy_name: str
+
+    @property
+    def strategy(self) -> int:
+        return getattr(proto.TrafficLimitStrategy, self.strategy_name)
+
+
+def _setting_value(db_session, key):
+    setting = db_session.get(SystemSetting, key)
+    return setting.value if setting is not None else None
+
+
+def trial_traffic_limit_enabled(db_session) -> bool:
+    return parse_bool_setting(
+        _setting_value(db_session, TRIAL_TRAFFIC_LIMIT_ENABLED_SETTING),
+        DEFAULT_TRIAL_TRAFFIC_LIMIT_ENABLED,
+    )
+
+
+def trial_traffic_limit_configured(db_session) -> TrialTrafficLimit:
+    """Сконфигурированный лимит (ГиБ + стратегия) независимо от тумблера.
+
+    Нужен админ-действиям «применить лимит» в карточке/bulk и предпросмотру:
+    тумблер отвечает только за автоматическое применение к новым триалам.
+    """
+    limit_gb = parse_positive_float_setting(
+        _setting_value(db_session, TRIAL_TRAFFIC_LIMIT_GB_SETTING),
+        DEFAULT_TRIAL_TRAFFIC_LIMIT_GB,
+    )
+    raw_strategy = _setting_value(db_session, TRIAL_TRAFFIC_LIMIT_STRATEGY_SETTING)
+    strategy_key = normalize_trial_traffic_limit_strategy(raw_strategy)
+    if raw_strategy is None:
+        strategy_key = DEFAULT_TRIAL_TRAFFIC_LIMIT_STRATEGY
+    return TrialTrafficLimit(
+        limit_gb=limit_gb,
+        limit_bytes=trial_traffic_limit_bytes(limit_gb),
+        strategy_key=strategy_key,
+        strategy_name=trial_traffic_limit_strategy_proto_name(strategy_key),
+    )
+
+
+def trial_traffic_limit_for_new_trial(db_session) -> Optional[TrialTrafficLimit]:
+    """Лимит для СОЗДАВАЕМОЙ пробной подписки нового пользователя.
+
+    У нового пользователя платежей быть не может (строка users создаётся
+    вместе с подпиской), поэтому проверяется только тумблер. ``None`` —
+    лимит выключен: подписка создаётся без лимита, как раньше.
+    """
+    if not trial_traffic_limit_enabled(db_session):
+        return None
+    return trial_traffic_limit_configured(db_session)
+
+
+def trial_traffic_limit_for_user(db_session, user) -> Optional[TrialTrafficLimit]:
+    """Лимит для ПЕРЕСОЗДАНИЯ подписки существующего пользователя (достоверный
+    NOT_FOUND в панели): только если тумблер включён И пользователь never_paid.
+    Платившему (или если строки users нет) лимит не ставится."""
+    if user is None or not trial_traffic_limit_enabled(db_session):
+        return None
+    if user_never_paid(db_session, getattr(user, "id", None)) is not True:
+        return None
+    return trial_traffic_limit_configured(db_session)
+
+
+# --- Антиабьюз v2: маркеры управляемых лимитов (managed_traffic_limits) -----
+#
+# Ручные лимиты владельца НЕПРИКОСНОВЕННЫ. Автоматика снимает только лимиты,
+# поставленные автоматикой, а «свой» лимит узнаёт по маркеру
+# ``managed_traffic_limits`` (common/managed_traffic_limits.py). Каждое место
+# сайта, где фича СТАВИТ лимит (регистрация, пересоздание, «Применить лимит»,
+# массовые операции, backfill), пишет маркер В ТОЙ ЖЕ сессии, что и само
+# действие; снятие (оплата, страховка notifier, кнопки админки) — только при
+# is_managed. Без таблицы (миграция не накачена) хелперы common ведут себя как
+# «маркеров нет» с warning; действия админки при этом отвечают 503
+# (managed_limits_table_available), регистрация и карточка клиента не падают.
+
+
+def managed_limits_table_available(db_session) -> bool:
+    """Таблица ``managed_traffic_limits`` существует (миграция накачена).
+
+    Проба в savepoint: отсутствие таблицы (PostgreSQL 42P01 / SQLite «no such
+    table») откатывает только savepoint, транзакция вызывающего кода цела.
+    Любая другая ошибка БД пробрасывается."""
+    try:
+        with db_session.begin_nested():
+            db_session.execute(select(ManagedTrafficLimit.user_id).limit(1))
+    except DBAPIError as exc:
+        if is_missing_table_error(exc):
+            logging.warning(
+                "managed_traffic_limits: таблица отсутствует (миграция не накачена)"
+            )
+            return False
+        raise
+    return True
+
+
+def record_trial_limit_marker(
+    db_session, user, traffic_limit, applied_by=APPLIED_BY_SITE_REGISTER
+):
+    """Маркер лимита пробного (reason=trial, release_on=payment) для
+    пользователя, которому фича только что поставила ``traffic_limit`` —
+    в сессии вызывающего кода, без commit. ``None`` — лимит не ставился,
+    строки users нет или таблицы маркеров нет (warning из common)."""
+    if traffic_limit is None or user is None or getattr(user, "id", None) is None:
+        return None
+    marker = upsert_managed_limit(
+        db_session,
+        user.id,
+        traffic_limit.limit_bytes,
+        traffic_limit.strategy_name,
+        REASON_TRIAL,
+        RELEASE_ON_PAYMENT,
+        applied_by,
+    )
+    if marker is None:
+        logging.warning(
+            "trial traffic limit for %s applied WITHOUT managed marker "
+            "(managed_traffic_limits table missing): payment will not lift it "
+            "until the migration is applied and backfill is run",
+            getattr(user, "username", user.id),
+        )
+    else:
+        logging.info(
+            "managed traffic limit marker written: user_id=%s limit=%s bytes "
+            "strategy=%s applied_by=%s",
+            user.id,
+            marker.limit_bytes,
+            marker.strategy,
+            applied_by,
+        )
+    return marker
+
+
+def panel_limit_matches(rw_user, traffic_limit) -> bool:
+    """Панельная запись несёт ровно ``traffic_limit`` (байты И стратегия)."""
+    if rw_user is None or traffic_limit is None:
+        return False
+    panel_bytes = getattr(rw_user, "traffic_limit_bytes", None)
+    if panel_bytes is None or isinstance(panel_bytes, bool):
+        return False
+    try:
+        if int(panel_bytes) != int(traffic_limit.limit_bytes):
+            return False
+    except (TypeError, ValueError):
+        return False
+    return (
+        normalize_strategy_name(getattr(rw_user, "traffic_limit_strategy", None))
+        == traffic_limit.strategy_name
+    )
+
+
+def adopted_trial_limit(db_session, rw_user) -> Optional[TrialTrafficLimit]:
+    """Лимит для маркера при adoption подписки (crash-окно между AddUser и
+    commit): наш прошлый AddUser поставил лимит, а маркер пропал вместе с
+    транзакцией. Правило то же, что у backfill: тумблер включён И панель несёт
+    ровно текущий лимит пробных (байты и стратегия). Иначе ``None`` — панель
+    не трогаем, маркер не пишем (ручной лимит владельца остаётся ручным)."""
+    limit = trial_traffic_limit_for_new_trial(db_session)
+    if limit is None or not panel_limit_matches(rw_user, limit):
+        return None
+    return limit
+
+
+def add_traffic_limit_event(db_session, user_id, event_type, marker, **extra):
+    """Событие ``event_logs`` ``traffic_limit_applied`` /
+    ``traffic_limit_released`` (payload ``marker_event_payload``) — история
+    лимитов там, где сайт уже пишет event_logs. Без маркера (таблицы нет) —
+    ничего не пишем."""
+    if marker is None or user_id is None:
+        return None
+    if event_type not in (EVENT_TRAFFIC_LIMIT_APPLIED, EVENT_TRAFFIC_LIMIT_RELEASED):
+        raise ValueError(f"unknown traffic limit event: {event_type!r}")
+    event = EventLog(
+        user_id=int(user_id),
+        event_type=event_type,
+        event_payload=marker_event_payload(marker, **extra),
+    )
+    db_session.add(event)
+    return event
+
+
 def _internal_squads_uuids() -> list[str]:
     squads_uuids_value = os.getenv("INTERNAL_SQUADS_UUIDS")
     squads_uuids = []
@@ -175,24 +402,37 @@ def create_user_until(
     expire_at: datetime,
     email: str | None = None,
     telegram_id: int | None = None,
+    traffic_limit: TrialTrafficLimit | None = None,
 ) -> Optional[proto.UserResponse]:
+    """AddUser в панели. ``traffic_limit`` (антиабьюз пробных) задаёт
+    ``traffic_limit_bytes`` (новое optional-поле 13 AddUserRequest) и
+    стратегию сброса; без него запрос прежний — без лимита, NO_RESET."""
     if expire_at.tzinfo is None:
         expire_at = expire_at.replace(tzinfo=timezone.utc)
 
-    response = rwms_client.add_user(
-        proto.AddUserRequest(
-            username=username,
-            email=email,
-            telegram_id=telegram_id,
-            expire_at=expire_at,
-            status=proto.UserStatus.ACTIVE,
-            traffic_limit_strategy=proto.TrafficLimitStrategy.NO_RESET,
-            active_internal_squads=[*_internal_squads_uuids()],
-            created_at=datetime.now(),
-        )
+    request = proto.AddUserRequest(
+        username=username,
+        email=email,
+        telegram_id=telegram_id,
+        expire_at=expire_at,
+        status=proto.UserStatus.ACTIVE,
+        traffic_limit_strategy=proto.TrafficLimitStrategy.NO_RESET,
+        active_internal_squads=[*_internal_squads_uuids()],
+        created_at=datetime.now(),
     )
+    if traffic_limit is not None:
+        request.traffic_limit_bytes = int(traffic_limit.limit_bytes)
+        request.traffic_limit_strategy = traffic_limit.strategy
+        logging.info(
+            "creating subscription %s with trial traffic limit %s GiB (%s bytes), "
+            "strategy %s",
+            username,
+            traffic_limit.limit_gb,
+            traffic_limit.limit_bytes,
+            traffic_limit.strategy_name,
+        )
 
-    return response
+    return rwms_client.add_user(request)
 
 
 def create_user(
@@ -202,6 +442,7 @@ def create_user(
     from_referrer: bool = False,
     email: str | None = None,
     telegram_id: int | None = None,
+    traffic_limit: TrialTrafficLimit | None = None,
 ) -> Optional[proto.UserResponse]:
     if from_referrer:
         logging.info(
@@ -218,4 +459,5 @@ def create_user(
         expire_at=datetime.now(timezone.utc) + timedelta(days=trial_period_days),
         email=email,
         telegram_id=telegram_id,
+        traffic_limit=traffic_limit,
     )

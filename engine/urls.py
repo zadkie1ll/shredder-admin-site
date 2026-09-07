@@ -124,6 +124,26 @@ urlpatterns = [
         name="support_admin_api_referral_antifraud",
     ),
     path(
+        "support-admin/api/antiabuse/",
+        views.support_admin_api_antiabuse,
+        name="support_admin_api_antiabuse",
+    ),
+    path(
+        "support-admin/api/antiabuse-bulk/",
+        views.support_admin_api_antiabuse_bulk,
+        name="support_admin_api_antiabuse_bulk",
+    ),
+    path(
+        "support-admin/api/antiabuse-backfill/",
+        views.support_admin_api_antiabuse_backfill,
+        name="support_admin_api_antiabuse_backfill",
+    ),
+    path(
+        "support-admin/api/ipguard-alerts/",
+        views.support_admin_api_ipguard_alerts,
+        name="support_admin_api_ipguard_alerts",
+    ),
+    path(
         "support-admin/api/referral-block/",
         views.support_admin_api_referral_block,
         name="support_admin_api_referral_block",

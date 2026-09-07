@@ -7,6 +7,8 @@ from sqlalchemy.orm import Session
 
 from common.models.db import User
 from common.models.db import WataInvoice
+from common.models.segments import user_has_payment_sql
+from common.models.segments import user_never_paid_from_row
 
 
 def lock_registration_email(db_session, email) -> None:
@@ -51,6 +53,27 @@ def lock_registration_telegram_id(db_session, telegram_id) -> None:
         text("SELECT pg_advisory_xact_lock(hashtext(:identity))"),
         {"identity": f"telegram:{int(telegram_id)}"},
     )
+
+
+def user_never_paid(db_session, user_id) -> bool | None:
+    """«Пробная без платежа» (never_paid) для одного пользователя.
+
+    Единый источник семантики — ``common/models/segments.py``
+    (``PAYS_EXISTS_SQL``): нет ни одной ``yk_payments.status='succeeded'`` и
+    ни одной ``wata_transactions.transaction_status='Paid'`` (JOIN
+    ``wata_invoices`` по ``order_id``). Тот же предикат, что у сегментов
+    ``trial_active``/``never_paid`` рассылок и у бота
+    (``has_payment_for_user_by_tg_id``).
+
+    Возвращает ``True`` — не платил, ``False`` — платил, ``None`` — строки
+    users нет (вызывающий код не должен трактовать это как «не платил»).
+    """
+    if user_id is None:
+        return None
+    row = db_session.execute(
+        text(user_has_payment_sql("id")), {"user_id": int(user_id)}
+    ).first()
+    return user_never_paid_from_row(row)
 
 
 def save_wata_invoice(

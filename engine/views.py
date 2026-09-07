@@ -1,5 +1,6 @@
 import os
 import uuid
+from types import SimpleNamespace
 import hmac
 import hashlib
 import logging
@@ -59,6 +60,19 @@ from sqlalchemy import Text
 from sqlalchemy import TIMESTAMP
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import SQLAlchemyError
+from common.managed_traffic_limits import APPLIED_BY_BACKFILL
+from common.managed_traffic_limits import APPLIED_BY_SITE_ADMIN_PREFIX
+from common.managed_traffic_limits import APPLIED_BY_SITE_BULK
+from common.managed_traffic_limits import EVENT_TRAFFIC_LIMIT_APPLIED
+from common.managed_traffic_limits import EVENT_TRAFFIC_LIMIT_RELEASED
+from common.managed_traffic_limits import REASON_TRIAL
+from common.managed_traffic_limits import RELEASE_ON_PAYMENT
+from common.managed_traffic_limits import delete_managed_limit
+from common.managed_traffic_limits import get_managed_limit
+from common.managed_traffic_limits import is_managed
+from common.managed_traffic_limits import releasable_on_payment
+from common.managed_traffic_limits import resolve_managed_limit
+from common.managed_traffic_limits import upsert_managed_limit
 from common.models.db import User
 from common.models.db import TemporarySquadBan
 from common.models.db import EventLog
@@ -82,6 +96,8 @@ from common.models.db import SupportTicketStatus
 from common.models.db import SupportTicketAttachment
 from common.models.db import SupportReplyTemplate
 from common.models.db import SystemSetting
+from common.models.db import IpAlert
+from common.models.db import UserIpObservation
 from django.contrib.auth.hashers import check_password
 from django.contrib.auth.hashers import make_password
 from common.models.db import AdminAccount
@@ -89,8 +105,11 @@ from common.models.db import AdminAuditLog
 from common.models.db import Broadcast
 from common.models.db import BroadcastDelivery
 from common.models.segments import ADMIN_SEGMENTS
+from common.models.segments import PAYS_EXISTS_SQL
 from common.models.segments import segment_count_sql
 from common.models.segments import segments_counts_sql
+from common.models.segments import segment_where_sql
+from common.models.segments import user_never_paid_from_row
 from common.models.db import AdminDirectMessage
 from common.models.db import AdminDirectMessageDelivery
 from common.models.db import RwmsSyncMismatch
@@ -135,6 +154,35 @@ from common.models.settings import RUNTIME_SETTING_KEYS
 from common.models.settings import SENSITIVE_RUNTIME_SETTINGS
 from common.models.settings import SITE_TRIAL_REGISTRATION_ENABLED_SETTING
 from common.models.settings import TARIFF_PRICE_SETTINGS
+from common.models.settings import DEFAULT_IPGUARD_ALERTS_ENABLED
+from common.models.settings import DEFAULT_IPGUARD_ALERT_COOLDOWN_HOURS
+from common.models.settings import DEFAULT_IPGUARD_ALERT_SEGMENT
+from common.models.settings import DEFAULT_IPGUARD_SUBNETS_PER_HWID
+from common.models.settings import DEFAULT_IPGUARD_WINDOW_HOURS
+from common.models.settings import DEFAULT_IPGUARD_WARNINGS_ENABLED
+from common.models.settings import DEFAULT_IPGUARD_WARNING_SUBNETS_PER_HWID
+from common.models.settings import IPGUARD_ALERTS_ENABLED_SETTING
+from common.models.settings import IPGUARD_ALERT_COOLDOWN_HOURS_SETTING
+from common.models.settings import IPGUARD_ALERT_SEGMENT_ALL
+from common.models.settings import IPGUARD_ALERT_SEGMENT_NEVER_PAID
+from common.models.settings import IPGUARD_ALERT_SEGMENT_SETTING
+from common.models.settings import IPGUARD_SUBNETS_PER_HWID_SETTING
+from common.models.settings import IPGUARD_WINDOW_HOURS_SETTING
+from common.models.settings import IPGUARD_WARNINGS_ENABLED_SETTING
+from common.models.settings import IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING
+from common.models.settings import ipguard_warning_threshold_is_valid
+from common.models.settings import TRIAL_TRAFFIC_LIMIT_ENABLED_SETTING
+from common.models.settings import TRIAL_TRAFFIC_LIMIT_GB_SETTING
+from common.models.settings import TRIAL_TRAFFIC_LIMIT_STRATEGY_DAY
+from common.models.settings import TRIAL_TRAFFIC_LIMIT_STRATEGY_MONTH
+from common.models.settings import TRIAL_TRAFFIC_LIMIT_STRATEGY_MONTH_ROLLING
+from common.models.settings import TRIAL_TRAFFIC_LIMIT_STRATEGY_NO_RESET
+from common.models.settings import TRIAL_TRAFFIC_LIMIT_STRATEGY_PROTO_NAMES
+from common.models.settings import TRIAL_TRAFFIC_LIMIT_STRATEGY_SETTING
+from common.models.settings import TRIAL_TRAFFIC_LIMIT_STRATEGY_WEEK
+from common.models.settings import normalize_ipguard_alert_segment
+from common.models.settings import parse_bool_setting
+from common.models.settings import parse_positive_int_setting
 from common.models import analytics_event
 from common.models.tariff import Tariff
 from common.models.tariff import TrialPromotionTariff
@@ -150,6 +198,15 @@ from . import node_provisioning
 from . import ripe_atlas
 from . import infra
 from .rwms_helpers import RwmsSubscriptionOwnershipError
+from .rwms_helpers import trial_traffic_limit_configured
+from .rwms_helpers import trial_traffic_limit_enabled
+from .rwms_helpers import trial_traffic_limit_for_new_trial
+from .rwms_helpers import trial_traffic_limit_for_user
+from .rwms_helpers import add_traffic_limit_event
+from .rwms_helpers import adopted_trial_limit
+from .rwms_helpers import managed_limits_table_available
+from .rwms_helpers import panel_limit_matches
+from .rwms_helpers import record_trial_limit_marker
 from .rwms_helpers import assert_subscription_owned_by_email
 from .rwms_helpers import assert_subscription_owned_by_telegram_id
 from .rwms_helpers import create_user
@@ -163,6 +220,7 @@ from .incy import encrypt_incy_url
 from .sql_helpers import lock_registration_email
 from .sql_helpers import lock_registration_telegram_id
 from .sql_helpers import save_wata_invoice
+from .sql_helpers import user_never_paid
 
 from database import session_factory
 from engine.payments import create_yk_payment_sync
@@ -1161,6 +1219,16 @@ def sync_local_user_from_rwms(
             creation_channel=creation_channel,
         ),
     )
+    # Антиабьюз v2: adoption после crash-окна — наш прошлый AddUser поставил
+    # лимит, а маркер пропал с транзакцией. Правило backfill: тумблер включён
+    # И панель несёт ровно текущий лимит пробных → маркер; иначе панель и
+    # маркеры не трогаем (ручной лимит владельца остаётся ручным).
+    marker = record_trial_limit_marker(
+        db_session, user, adopted_trial_limit(db_session, rw_user)
+    )
+    add_traffic_limit_event(
+        db_session, user.id, EVENT_TRAFFIC_LIMIT_APPLIED, marker, adopted=True
+    )
     logging.info(
         "local user %s restored from existing RWMS subscription",
         user.username,
@@ -1433,6 +1501,10 @@ def create_site_user(
                 creation_channel,
             )
 
+    # Антиабьюз: лимит трафика новых пробных подписок (только при включённой
+    # настройке; новый пользователь платежей не имеет по определению). Маркер
+    # managed_traffic_limits пишется ниже, в той же сессии, что и строка users.
+    trial_limit = trial_traffic_limit_for_new_trial(db_session)
     rw_user = create_user(
         rwms_client=rwms_client,
         username=username,
@@ -1440,6 +1512,7 @@ def create_site_user(
         from_referrer=referrer is not None,
         email=email,
         telegram_id=telegram_id,
+        traffic_limit=trial_limit,
     )
 
     if rw_user is None:
@@ -1501,6 +1574,13 @@ def create_site_user(
             traffic_source=context["traffic_source"],
             creation_channel=creation_channel,
         ),
+    )
+    # Антиабьюз v2: лимит поставлен в AddUser — маркер «управляемый» (trial,
+    # снимается оплатой) в той же транзакции; без таблицы — warning, без маркера.
+    marker = record_trial_limit_marker(db_session, user, trial_limit)
+    add_traffic_limit_event(
+        db_session, user.id, EVENT_TRAFFIC_LIMIT_APPLIED, marker,
+        creation_channel=creation_channel,
     )
 
     logging.info(
@@ -5255,6 +5335,11 @@ def admin_runtime_setting_type(key):
 # после проверки key in RUNTIME_SETTING_KEYS (т.е. уже после пропагации common).
 WINBACK_SEND_HOUR_SETTINGS = {"winback_send_hour_start", "winback_send_hour_end"}
 
+# Верхняя граница лимита трафика пробных (ГиБ). Значение в панель уезжает как
+# traffic_limit_bytes = round(ГиБ × 1024³) в int64: 100 000 ГиБ ≈ 1.07e14 байт —
+# запас к 2^63−1 ≈ 9.2e18 в ~85 000 раз, при этом любой реальный лимит внутри.
+TRIAL_TRAFFIC_LIMIT_MAX_GB = 100_000
+
 
 def admin_validate_runtime_setting(key, value):
     key = (key or "").strip()
@@ -5288,9 +5373,30 @@ def admin_validate_runtime_setting(key, value):
             float_value = float(value.replace(",", "."))
         except ValueError:
             return None, "Значение должно быть числом"
+        # float() принимает "nan"/"inf": такое значение сохранилось бы в БД
+        # мусором, а parse_positive_float_setting в сервисах молча ушёл бы на
+        # дефолт — отклоняем на входе.
+        if not math.isfinite(float_value):
+            return None, "Значение должно быть конечным числом"
         if float_value <= 0:
             return None, "Значение должно быть больше нуля"
-        normalized = ("%f" % float_value).rstrip("0").rstrip(".")
+        if (
+            key == TRIAL_TRAFFIC_LIMIT_GB_SETTING
+            and float_value > TRIAL_TRAFFIC_LIMIT_MAX_GB
+        ):
+            # Верхняя граница: traffic_limit_bytes = round(ГиБ × 1024³) обязан
+            # влезать в int64 proto (иначе ValueError до RPC ломает создание
+            # ВСЕХ новых триалов); 100 000 ГиБ ≈ 1.07e14 байт при 2^63 ≈ 9.2e18.
+            return None, (
+                f"Лимит не может превышать {TRIAL_TRAFFIC_LIMIT_MAX_GB} ГиБ"
+            )
+        # 10 знаков: лимит пробных в МиБ (100 МиБ = 0.09765625 ГиБ) не должен
+        # терять точность при хранении в ГиБ.
+        normalized = ("%.10f" % float_value).rstrip("0").rstrip(".")
+        if float(normalized) <= 0:
+            # Слишком маленькое значение округлилось до «0»: в БД оно легло бы
+            # нулём и сервисы молча ушли бы на дефолт.
+            return None, "Значение слишком мало: округляется до нуля"
         return normalized, None
 
     if key in CSV_INT_RUNTIME_SETTINGS:
@@ -5347,6 +5453,218 @@ def admin_validate_traffic_usage_threshold_pair(db_session, key, normalized_valu
     if alert_gb < suspicious_gb:
         return "Критический порог должен быть больше или равен подозрительному"
 
+    return None
+
+
+# --- Антиабьюз: парная валидация и подписи -----------------------------------
+#
+# Обе защиты (лимит трафика новых пробных, алерты ip-guard по подсетям)
+# управляются ТОЛЬКО отсюда (system_settings), по умолчанию выключены;
+# выключение возвращает поведение «как раньше». Ключи, типы и дефолты —
+# в common/models/settings.py (единый реестр для бота/сайта/notifier/ip-guard).
+
+ANTIABUSE_TRIAL_KEYS = (
+    TRIAL_TRAFFIC_LIMIT_ENABLED_SETTING,
+    TRIAL_TRAFFIC_LIMIT_GB_SETTING,
+    TRIAL_TRAFFIC_LIMIT_STRATEGY_SETTING,
+)
+ANTIABUSE_IPGUARD_KEYS = (
+    IPGUARD_ALERTS_ENABLED_SETTING,
+    IPGUARD_ALERT_SEGMENT_SETTING,
+    IPGUARD_SUBNETS_PER_HWID_SETTING,
+    IPGUARD_WINDOW_HOURS_SETTING,
+    IPGUARD_ALERT_COOLDOWN_HOURS_SETTING,
+    IPGUARD_WARNINGS_ENABLED_SETTING,
+    IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING,
+)
+# Пара порогов ip-guard: предупреждение (suspicious) обязано быть СТРОГО
+# меньше алерта, иначе предупреждение никогда не отделить от алерта.
+IPGUARD_THRESHOLD_PAIR_KEYS = (
+    IPGUARD_SUBNETS_PER_HWID_SETTING,
+    IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING,
+)
+IPGUARD_THRESHOLD_DEFAULTS = {
+    IPGUARD_SUBNETS_PER_HWID_SETTING: DEFAULT_IPGUARD_SUBNETS_PER_HWID,
+    IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING: DEFAULT_IPGUARD_WARNING_SUBNETS_PER_HWID,
+}
+ANTIABUSE_SETTING_KEYS = ANTIABUSE_TRIAL_KEYS + ANTIABUSE_IPGUARD_KEYS
+
+# Подписи стратегий сброса — как в панели Remnawave. Ключи — значения
+# настройки trial_traffic_limit_strategy (нижний регистр); имена proto — через
+# TRIAL_TRAFFIC_LIMIT_STRATEGY_PROTO_NAMES (знает MONTH_ROLLING = 4).
+TRAFFIC_LIMIT_STRATEGY_LABELS = {
+    TRIAL_TRAFFIC_LIMIT_STRATEGY_NO_RESET: "Никогда",
+    TRIAL_TRAFFIC_LIMIT_STRATEGY_DAY: "Ежедневно",
+    TRIAL_TRAFFIC_LIMIT_STRATEGY_WEEK: "Еженедельно",
+    TRIAL_TRAFFIC_LIMIT_STRATEGY_MONTH: "Ежемесячно",
+    TRIAL_TRAFFIC_LIMIT_STRATEGY_MONTH_ROLLING: "Ежемесячно по дате создания",
+}
+IPGUARD_SEGMENT_LABELS = {
+    IPGUARD_ALERT_SEGMENT_NEVER_PAID: "Только пробные без платежа",
+    IPGUARD_ALERT_SEGMENT_ALL: "Все подписки",
+}
+_PROTO_STRATEGY_NAME_TO_KEY = {
+    name: key for key, name in TRIAL_TRAFFIC_LIMIT_STRATEGY_PROTO_NAMES.items()
+}
+
+
+def admin_traffic_limit_strategy_key(value):
+    """proto TrafficLimitStrategy (число или имя) → ключ настройки (day, ...).
+    Неизвестное значение (новая стратегия панели) — строкой, без ValueError."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        name = value
+    else:
+        try:
+            name = proto.TrafficLimitStrategy.Name(int(value))
+        except (ValueError, TypeError):
+            return str(value)
+    return _PROTO_STRATEGY_NAME_TO_KEY.get(name.upper(), name.lower())
+
+
+def admin_traffic_limit_strategy_label(strategy_key):
+    if strategy_key is None:
+        return "—"
+    return TRAFFIC_LIMIT_STRATEGY_LABELS.get(str(strategy_key).lower(), str(strategy_key))
+
+
+def admin_user_status_name(value):
+    """proto UserStatus → имя (ACTIVE/DISABLED/LIMITED/EXPIRED); None — нет данных."""
+    if value is None:
+        return None
+    if isinstance(value, str):
+        return value.upper()
+    try:
+        return proto.UserStatus.Name(int(value))
+    except (ValueError, TypeError):
+        return str(value)
+
+
+def admin_safe_int(value, default=None):
+    try:
+        number = int(value)
+    except (TypeError, ValueError):
+        return default
+    return number
+
+
+def admin_format_gib(value):
+    return ("%.10f" % float(value)).rstrip("0").rstrip(".")
+
+
+def admin_traffic_limit_label(limit):
+    return (
+        f"{admin_format_gib(limit.limit_gb)} ГиБ · "
+        f"{admin_traffic_limit_strategy_label(limit.strategy_key).lower()}"
+    )
+
+
+def admin_ipguard_threshold_value(db_session, key, pending=None):
+    """Значение порога ip-guard для парной проверки: из этого же сохранения
+    (``pending``: {key: нормализованное}), иначе из БД, иначе дефолт common."""
+    if pending and key in pending:
+        return pending[key]
+    setting = db_session.get(SystemSetting, key)
+    if setting is not None:
+        return setting.value
+    return IPGUARD_THRESHOLD_DEFAULTS[key]
+
+
+def admin_validate_ipguard_threshold_pair(db_session, key, normalized_value, pending=None):
+    """Порог предупреждения ip-guard строго меньше порога алерта
+    (``ipguard_warning_threshold_is_valid``). Второе значение пары берётся из
+    этого же сохранения, иначе из БД, иначе дефолт."""
+    values = {key: normalized_value}
+    for other_key in IPGUARD_THRESHOLD_PAIR_KEYS:
+        if other_key not in values:
+            values[other_key] = admin_ipguard_threshold_value(
+                db_session, other_key, pending
+            )
+    warning = values[IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING]
+    alert = values[IPGUARD_SUBNETS_PER_HWID_SETTING]
+    if ipguard_warning_threshold_is_valid(warning, alert):
+        return None
+    return (
+        "Порог предупреждения ip-guard (ipguard_warning_subnets_per_hwid="
+        f"{warning}) должен быть положительным и строго меньше порога алерта "
+        f"(ipguard_subnets_per_hwid={alert})"
+    )
+
+
+def admin_validate_antiabuse_setting_pair(
+    db_session, key, normalized_value, pending=None
+):
+    """Парная проверка антиабьюз-настроек (по образцу порогов трафика).
+
+    Включать тумблер можно только при корректных зависимых значениях в БД:
+    лимит/стратегия для пробных, сегмент/подсети/окно/кулдаун для ip-guard,
+    пара порогов для предупреждений ip-guard. Отсутствующий ключ — дефолт
+    common, это нормально; битое значение в БД (руками/старой версией) при
+    включении молча ушло бы в дефолт — вместо этого просим исправить его до
+    включения. Пороги ip-guard (алерт / предупреждение) проверяются парой при
+    сохранении любого из них: второе значение — из этого же сохранения
+    (``pending``), иначе из БД, иначе дефолт.
+    """
+    if key in IPGUARD_THRESHOLD_PAIR_KEYS:
+        return admin_validate_ipguard_threshold_pair(
+            db_session, key, normalized_value, pending
+        )
+    if key == IPGUARD_WARNINGS_ENABLED_SETTING and normalized_value == "1":
+        return admin_validate_ipguard_threshold_pair(
+            db_session,
+            IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING,
+            admin_ipguard_threshold_value(
+                db_session, IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING, pending
+            ),
+            pending,
+        )
+    if key == TRIAL_TRAFFIC_LIMIT_ENABLED_SETTING and normalized_value == "1":
+        checks = (
+            (
+                TRIAL_TRAFFIC_LIMIT_GB_SETTING,
+                "Лимит трафика пробных (trial_traffic_limit_gb) в БД некорректен: "
+                "исправьте его перед включением",
+            ),
+            (
+                TRIAL_TRAFFIC_LIMIT_STRATEGY_SETTING,
+                "Стратегия сброса (trial_traffic_limit_strategy) в БД некорректна: "
+                "исправьте её перед включением",
+            ),
+        )
+    elif key == IPGUARD_ALERTS_ENABLED_SETTING and normalized_value == "1":
+        checks = (
+            (
+                IPGUARD_ALERT_SEGMENT_SETTING,
+                "Сегмент ip-guard (ipguard_alert_segment) в БД некорректен: "
+                "исправьте его перед включением",
+            ),
+            (
+                IPGUARD_SUBNETS_PER_HWID_SETTING,
+                "Подсетей на HWID (ipguard_subnets_per_hwid) в БД некорректно: "
+                "исправьте значение перед включением",
+            ),
+            (
+                IPGUARD_WINDOW_HOURS_SETTING,
+                "Окно ip-guard (ipguard_window_hours) в БД некорректно: "
+                "исправьте значение перед включением",
+            ),
+            (
+                IPGUARD_ALERT_COOLDOWN_HOURS_SETTING,
+                "Кулдаун ip-guard (ipguard_alert_cooldown_hours) в БД некорректен: "
+                "исправьте значение перед включением",
+            ),
+        )
+    else:
+        return None
+
+    for other_key, message in checks:
+        setting = db_session.get(SystemSetting, other_key)
+        if setting is None:
+            continue
+        _, error = admin_validate_runtime_setting(other_key, setting.value)
+        if error:
+            return message
     return None
 
 
@@ -5412,6 +5730,12 @@ def admin_rwms_traffic_payload(username, client=None):
         "used_traffic_bytes": None,
         "lifetime_used_traffic_bytes": None,
         "first_connected": None,
+        "traffic_limit_bytes": None,
+        "traffic_limit_strategy": None,
+        "traffic_limit_strategy_label": None,
+        "status": None,
+        "is_limited": False,
+        "hwid_devices": None,
     }
     if not username:
         return empty
@@ -5443,6 +5767,26 @@ def admin_rwms_traffic_payload(username, client=None):
     except (AttributeError, ValueError, TypeError):
         first_connected = None
 
+    # Антиабьюз: лимит трафика, стратегия сброса и статус подписки (LIMITED —
+    # лимит исчерпан) плюс число HWID-устройств — второй read-only RPC
+    # (GetUserHwidDevices); его недоступность не прячет остальной payload.
+    status = admin_user_status_name(getattr(rwms_user, "status", None))
+    strategy_key = admin_traffic_limit_strategy_key(
+        getattr(rwms_user, "traffic_limit_strategy", None)
+    )
+    hwid_devices = None
+    user_uuid = getattr(rwms_user, "uuid", None)
+    if user_uuid:
+        try:
+            devices = rwms.get_user_hwid_devices(user_uuid)
+        except Exception:
+            logging.exception(
+                "support admin: failed to load hwid devices for %s", username
+            )
+            devices = None
+        if devices is not None:
+            hwid_devices = admin_safe_int(getattr(devices, "total", None))
+
     return {
         "available": True,
         "used_traffic_bytes": safe_bytes(rwms_user.used_traffic_bytes),
@@ -5450,7 +5794,395 @@ def admin_rwms_traffic_payload(username, client=None):
             rwms_user.lifetime_used_traffic_bytes
         ),
         "first_connected": first_connected,
+        "traffic_limit_bytes": safe_bytes(
+            getattr(rwms_user, "traffic_limit_bytes", 0)
+        ),
+        "traffic_limit_strategy": strategy_key,
+        "traffic_limit_strategy_label": admin_traffic_limit_strategy_label(
+            strategy_key
+        ),
+        "status": status,
+        "is_limited": status == "LIMITED",
+        "hwid_devices": hwid_devices,
     }
+
+
+# --- Антиабьюз: применение/снятие лимита трафика в панели ---------------------
+
+
+def admin_rwms_apply_trial_limit(rw_user, limit, client=None):
+    """UpdateUser(uuid, traffic_limit_bytes, traffic_limit_strategy) — БЕЗ
+    active_internal_squads и статуса. Возвращает (изменено, сообщение);
+    RuntimeError, если RWMS не принял запрос. Уже такой же лимит — no-op."""
+    rwms = client or rwms_client
+    current_bytes = admin_safe_int(getattr(rw_user, "traffic_limit_bytes", 0), 0)
+    current_strategy = admin_traffic_limit_strategy_key(
+        getattr(rw_user, "traffic_limit_strategy", None)
+    )
+    label = admin_traffic_limit_label(limit)
+    if current_bytes == limit.limit_bytes and current_strategy == limit.strategy_key:
+        return False, f"лимит уже {label}"
+    response = rwms.update_user(
+        proto.UpdateUserRequest(
+            uuid=rw_user.uuid,
+            traffic_limit_bytes=int(limit.limit_bytes),
+            traffic_limit_strategy=limit.strategy,
+        )
+    )
+    if response is None:
+        raise RuntimeError("RWMS не применил лимит трафика")
+    logging.info(
+        "trial traffic limit applied from admin panel: uuid=%s limit=%s",
+        rw_user.uuid,
+        label,
+    )
+    return True, f"лимит {label}"
+
+
+def admin_rwms_remove_traffic_limit(rw_user, client=None):
+    """Снятие лимита «как было»: traffic_limit_bytes=0, NO_RESET, status=ACTIVE,
+    БЕЗ active_internal_squads (пустой список RWMS трактует как «не менять» —
+    ban-сквад временной блокировки не снимется).
+
+    status=ACTIVE ставится только подписке ACTIVE/LIMITED (LIMITED — лимит
+    исчерпан, доступ нужно вернуть). DISABLED (полная блокировка аккаунта) и
+    EXPIRED не трогаем: снятие лимита не должно разблокировать подписку.
+    """
+    rwms = client or rwms_client
+    current_bytes = admin_safe_int(getattr(rw_user, "traffic_limit_bytes", 0), 0)
+    status = admin_user_status_name(getattr(rw_user, "status", None))
+    if current_bytes == 0 and status != "LIMITED":
+        return False, "лимита нет"
+    request = proto.UpdateUserRequest(
+        uuid=rw_user.uuid,
+        traffic_limit_bytes=0,
+        traffic_limit_strategy=proto.TrafficLimitStrategy.NO_RESET,
+    )
+    if status in (None, "ACTIVE", "LIMITED"):
+        request.status = proto.UserStatus.ACTIVE
+    response = rwms.update_user(request)
+    if response is None:
+        raise RuntimeError("RWMS не снял лимит трафика")
+    logging.info(
+        "traffic limit removed from admin panel: uuid=%s previous_bytes=%s status=%s",
+        rw_user.uuid,
+        current_bytes,
+        status,
+    )
+    return True, "лимит снят" + (
+        "" if status in (None, "ACTIVE", "LIMITED") else f" (статус {status} не менялся)"
+    )
+
+
+# --- Антиабьюз v2: управляемые лимиты (маркеры managed_traffic_limits) --------
+#
+# Ручные лимиты владельца неприкосновенны: автоматика (оплата, страховка
+# notifier, кнопки и массовые операции админки) снимает только лимит с
+# маркером, у которого панель показывает ровно limit_bytes/strategy
+# (is_managed). Маркер пишется в той же сессии, что и постановка лимита;
+# история — event_logs traffic_limit_applied / traffic_limit_released.
+
+MANAGED_LIMITS_MIGRATION_MESSAGE = (
+    "Таблица managed_traffic_limits отсутствует: примените миграцию "
+    "managed_traffic_limits и повторите действие (панель не тронута)"
+)
+
+
+class AdminManagedLimitsUnavailable(Exception):
+    """Таблица маркеров исчезла между проверкой и записью — действие прервано."""
+
+
+def admin_applied_by(request):
+    """applied_by маркера для действий из карточки клиента: site:admin:<login>."""
+    return f"{APPLIED_BY_SITE_ADMIN_PREFIX}{support_admin_actor(request)}"
+
+
+def admin_bytes_label(value):
+    """Объём по основанию 1024: 536870912 → «512 МиБ», 5368709120 → «5 ГиБ»."""
+    number = admin_safe_int(value, 0) or 0
+    if number <= 0:
+        return "0"
+    if number < 1024**3:
+        return f"{admin_format_gib(number / 1024**2)} МиБ"
+    return f"{admin_format_gib(number / 1024**3)} ГиБ"
+
+
+def admin_panel_limit_label(rw_user):
+    """Подпись лимита панели: «1 ГиБ · ежедневно»."""
+    strategy_key = admin_traffic_limit_strategy_key(
+        getattr(rw_user, "traffic_limit_strategy", None)
+    )
+    return (
+        f"{admin_bytes_label(getattr(rw_user, 'traffic_limit_bytes', 0))} · "
+        f"{admin_traffic_limit_strategy_label(strategy_key).lower()}"
+    )
+
+
+def admin_marker_snapshot(marker):
+    """Копия полей маркера (SimpleNamespace) — переживает закрытие сессии."""
+    if marker is None:
+        return None
+    return SimpleNamespace(
+        user_id=marker.user_id,
+        limit_bytes=int(marker.limit_bytes),
+        strategy=marker.strategy,
+        reason=marker.reason,
+        release_on=marker.release_on,
+        applied_by=marker.applied_by,
+        applied_at=marker.applied_at,
+        expires_at=marker.expires_at,
+        note=marker.note,
+    )
+
+
+def admin_managed_limit_payload(marker, panel_bytes, panel_strategy, available=True):
+    """Блок «управляемый / ручной лимит» для карточки клиента.
+
+    kind: managed (маркер и панель совпадают) | manual (лимит в панели без
+    маркера или маркер не совпадает — ставил владелец) | none (лимита нет) |
+    unknown (панель недоступна или таблицы маркеров нет)."""
+    marker_payload = None
+    if marker is not None:
+        marker_payload = {
+            "reason": marker.reason,
+            "applied_by": marker.applied_by,
+            "applied_at": admin_date_label(marker.applied_at),
+            "release_on": marker.release_on,
+            "limit_bytes": int(marker.limit_bytes),
+            "limit_label": admin_bytes_label(marker.limit_bytes),
+            "strategy": admin_traffic_limit_strategy_key(marker.strategy),
+            "expires_at": admin_date_label(marker.expires_at) if marker.expires_at else None,
+            "note": marker.note,
+        }
+    if not available:
+        return {
+            "available": False,
+            "kind": "unknown",
+            "managed": False,
+            "label": (
+                "Маркеры недоступны: примените миграцию managed_traffic_limits"
+            ),
+            "marker": marker_payload,
+        }
+    if panel_bytes is None:
+        return {
+            "available": True,
+            "kind": "unknown",
+            "managed": False,
+            "label": (
+                "Нет данных RWMS"
+                + (" · есть маркер управляемого лимита" if marker_payload else "")
+            ),
+            "marker": marker_payload,
+        }
+    panel_limit = admin_safe_int(panel_bytes, 0) or 0
+    managed = is_managed(marker, panel_limit, panel_strategy)
+    if managed:
+        kind = "managed"
+        label = (
+            f"Управляемый лимит ({marker.reason}, с {marker_payload['applied_at']}, "
+            f"{marker.applied_by}) — снимается "
+            + ("оплатой" if marker.release_on == RELEASE_ON_PAYMENT else marker.release_on)
+        )
+    elif panel_limit > 0:
+        kind = "manual"
+        label = "Ручной лимит панели — снимает только владелец в Remnawave"
+        if marker_payload:
+            label += " (маркер не совпадает с панелью и будет снят)"
+    else:
+        kind = "none"
+        label = "Без лимита"
+    return {
+        "available": True,
+        "kind": kind,
+        "managed": managed,
+        "label": label,
+        "marker": marker_payload,
+    }
+
+
+def admin_panel_limit_is_manual(db_session, user_id, rw_user, limit):
+    """В панели стоит лимит, который автоматика не ставила: маркера нет (или он
+    не совпадает с панелью — resolve его снимает с логом), лимит > 0 и это не
+    ровно текущий лимит пробных (такой считается нашим по правилу backfill)."""
+    panel_bytes = admin_safe_int(getattr(rw_user, "traffic_limit_bytes", 0), 0)
+    if panel_bytes <= 0:
+        return False
+    marker = resolve_managed_limit(
+        db_session, user_id, panel_bytes, getattr(rw_user, "traffic_limit_strategy", None)
+    )
+    if marker is not None:
+        return False
+    return not panel_limit_matches(rw_user, limit)
+
+
+def admin_panel_admin_limit_marker(db_session, user_id, rw_user, limit):
+    """Маркер управляемого лимита, который оплата НЕ снимает (`release_on`
+    не `payment`): лимит из кнопки «Лимит трафика» в алертах бота (ip_abuse /
+    traffic_abuse, `bot:admin:<id>`) — и который «Применить лимит» ПЕРЕПИСАЛ
+    БЫ. Автоматика сайта его не перезаписывает — только с отдельным
+    подтверждением админа. None — маркера нет, он не совпадает с панелью
+    (устаревший, снят resolve), снимается оплатой, либо панель уже несёт ровно
+    лимит пробных (применение — no-op `unchanged`, release_on не меняется)."""
+    panel_bytes = admin_safe_int(getattr(rw_user, "traffic_limit_bytes", 0), 0)
+    if panel_bytes <= 0 or panel_limit_matches(rw_user, limit):
+        return None
+    marker = resolve_managed_limit(
+        db_session, user_id, panel_bytes, getattr(rw_user, "traffic_limit_strategy", None)
+    )
+    if marker is None or releasable_on_payment(marker):
+        return None
+    return marker
+
+
+def admin_admin_limit_label(marker, rw_user):
+    """Подпись лимита админа из бота: «ip_abuse, bot:admin:1, 1 ГиБ · ежедневно»."""
+    return f"{marker.reason}, {marker.applied_by}, {admin_panel_limit_label(rw_user)}"
+
+
+def admin_apply_trial_limit_refusal(
+    rw_user,
+    never_paid,
+    manual,
+    admin_marker,
+    forced=False,
+    override_manual=False,
+    override_admin_limit=False,
+):
+    """Что ещё не подтверждено перед «Применить лимит» из карточки: словарь
+    для 409 (`paid` / `manual` / `admin_limit` — True только у НЕподтверждённых
+    вопросов, `<flag>_message` по каждому, `message` — все вместе) либо None.
+
+    Подтверждения независимы: `force=1` отвечает только на «клиент платил»,
+    `override_manual=1` — только на «ручной лимит владельца»,
+    `override_admin_limit=1` — только на «лимит админа из бота». Одно
+    подтверждение никогда не гасит другой вопрос (инвариант: ручной лимит
+    заменяется только по явному решению именно о ручном лимите)."""
+    pending = {}
+    if never_paid is False and not forced:
+        pending["paid"] = (
+            "Клиент платил: лимит пробного к нему не применяется. "
+            "Подтвердите, если это нужно намеренно."
+        )
+    if manual and not override_manual:
+        pending["manual"] = (
+            "В панели стоит ручной лимит "
+            f"({admin_panel_limit_label(rw_user)}), автоматика его не трогает. "
+            "Подтвердите, если нужно заменить его лимитом пробного (станет "
+            "управляемым и снимется оплатой)."
+        )
+    if admin_marker is not None and not override_admin_limit:
+        pending["admin_limit"] = (
+            "В панели стоит лимит, поставленный админом из бота "
+            f"({admin_admin_limit_label(admin_marker, rw_user)}; оплата его не "
+            "снимает). Подтвердите, если нужно заменить его лимитом пробного "
+            "(станет снимаемым оплатой)."
+        )
+    if not pending:
+        return None
+    refusal = {flag: flag in pending for flag in ("paid", "manual", "admin_limit")}
+    for flag, text in pending.items():
+        refusal[f"{flag}_message"] = text
+    refusal["message"] = " ".join(pending.values())
+    return refusal
+
+
+def admin_apply_managed_trial_limit(
+    db_session,
+    user_id,
+    rw_user,
+    limit,
+    applied_by,
+    allow_manual_override=False,
+    allow_admin_limit_override=False,
+):
+    """Поставить лимит пробного и маркер (одна транзакция: маркер → UpdateUser;
+    отказ RWMS откатывает savepoint с маркером). Возвращает (outcome, текст):
+    applied — панель изменена; marked — панель уже несла ровно этот лимит,
+    добавлен только маркер; unchanged — уже управляемый и такой же;
+    skipped_admin_limit — управляемый лимит, который оплата не снимает
+    (release_on='manual' — лимит админа из бота), не тронут (без override);
+    skipped_manual — ручной лимит панели, не тронут (без override).
+    RuntimeError — RWMS не принял; AdminManagedLimitsUnavailable — таблицы нет."""
+    panel_bytes = admin_safe_int(getattr(rw_user, "traffic_limit_bytes", 0), 0)
+    panel_strategy = getattr(rw_user, "traffic_limit_strategy", None)
+    marker = resolve_managed_limit(db_session, user_id, panel_bytes, panel_strategy)
+    matches = panel_limit_matches(rw_user, limit)
+    if marker is not None and matches:
+        return "unchanged", f"лимит уже {admin_traffic_limit_label(limit)}, управляемый"
+    if (
+        marker is not None
+        and not releasable_on_payment(marker)
+        and not allow_admin_limit_override
+    ):
+        # Маркер бота с release_on='manual': перезапись в trial/payment сделала
+        # бы fair-usage-кап админа снимаемым оплатой — без подтверждения не трогаем.
+        return (
+            "skipped_admin_limit",
+            f"лимит админа из бота ({admin_admin_limit_label(marker, rw_user)}; "
+            "оплата не снимает) — не трогаем",
+        )
+    if marker is None and panel_bytes > 0 and not matches and not allow_manual_override:
+        return (
+            "skipped_manual",
+            f"ручной лимит панели ({admin_panel_limit_label(rw_user)}) — не трогаем",
+        )
+    with db_session.begin_nested():
+        marker = upsert_managed_limit(
+            db_session,
+            user_id,
+            limit.limit_bytes,
+            limit.strategy_name,
+            REASON_TRIAL,
+            RELEASE_ON_PAYMENT,
+            applied_by,
+        )
+        if marker is None:
+            raise AdminManagedLimitsUnavailable(MANAGED_LIMITS_MIGRATION_MESSAGE)
+        changed, message = admin_rwms_apply_trial_limit(rw_user, limit)
+    add_traffic_limit_event(
+        db_session,
+        user_id,
+        EVENT_TRAFFIC_LIMIT_APPLIED,
+        marker,
+        changed=changed,
+        previous_limit=panel_bytes,
+        source="site",
+    )
+    if changed:
+        return "applied", f"применён {message}, помечен управляемым"
+    return "marked", f"{message}; помечен управляемым (снимется оплатой)"
+
+
+def admin_release_managed_limit(db_session, user_id, rw_user, released_by):
+    """Снять лимит ТОЛЬКО если он управляемый (маркер + панель совпадают):
+    UpdateUser(0, NO_RESET, status=ACTIVE для ACTIVE/LIMITED, без сквадов),
+    событие traffic_limit_released, маркер удалён. Возвращает (outcome, текст):
+    released | skipped_manual (лимит без маркера — владелец) | unchanged.
+    RuntimeError — RWMS не принял (маркер остаётся)."""
+    panel_bytes = admin_safe_int(getattr(rw_user, "traffic_limit_bytes", 0), 0)
+    panel_strategy = getattr(rw_user, "traffic_limit_strategy", None)
+    marker = resolve_managed_limit(db_session, user_id, panel_bytes, panel_strategy)
+    if marker is None:
+        if panel_bytes > 0:
+            return (
+                "skipped_manual",
+                f"ручной лимит панели ({admin_panel_limit_label(rw_user)}) — "
+                "снимает только владелец в Remnawave",
+            )
+        return "unchanged", "лимита нет"
+    changed, message = admin_rwms_remove_traffic_limit(rw_user)
+    add_traffic_limit_event(
+        db_session,
+        user_id,
+        EVENT_TRAFFIC_LIMIT_RELEASED,
+        marker,
+        changed=changed,
+        released_by=released_by,
+        source="site",
+    )
+    delete_managed_limit(db_session, user_id)
+    return "released", message
 
 
 def admin_payment_history(db_session, user):
@@ -5584,15 +6316,25 @@ def support_admin_api_user_traffic(request):
         if not user:
             return JsonResponse({"status": "not_found"}, status=404)
         username = user.username
+        # Антиабьюз v2: маркер управляемого лимита читаем в сессии (только
+        # чтение — устаревший маркер здесь не удаляем), RPC — после закрытия.
+        markers_available = managed_limits_table_available(db_session)
+        marker = (
+            admin_marker_snapshot(get_managed_limit(db_session, user.id))
+            if markers_available
+            else None
+        )
     finally:
         db_session.close()
 
-    return JsonResponse(
-        {
-            "status": "ok",
-            "result": admin_rwms_traffic_payload(username),
-        }
+    result = admin_rwms_traffic_payload(username)
+    result["managed_limit"] = admin_managed_limit_payload(
+        marker,
+        result["traffic_limit_bytes"] if result["available"] else None,
+        result["traffic_limit_strategy"],
+        available=markers_available,
     )
+    return JsonResponse({"status": "ok", "result": result})
 
 
 def build_admin_interval_stats(
@@ -6839,6 +7581,154 @@ def support_admin_api_subscription_manage(request):
                 },
             })
 
+        if action in ("apply_trial_limit", "remove_traffic_limit"):
+            # Антиабьюз: лимит трафика пробной подписки в панели. Панель читаем
+            # СТРОГО (как продление): блип RWMS — 503, а не «подписки нет».
+            # v2: ручные лимиты владельца неприкосновенны — снимается только
+            # управляемый (маркер managed_traffic_limits + панель совпадает);
+            # без таблицы маркеров действия недоступны (503, панель не тронута).
+            if not managed_limits_table_available(db_session):
+                return JsonResponse(
+                    {"status": "error", "message": MANAGED_LIMITS_MIGRATION_MESSAGE},
+                    status=503,
+                )
+            try:
+                rwms_user = rwms_client.get_user_by_username_strict(user.username)
+            except RwmsUnavailableError as error:
+                logging.warning(
+                    "RWMS unavailable while applying admin action %s for user %s: %s",
+                    action,
+                    user.username,
+                    error,
+                )
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": (
+                            "RWMS/панель временно недоступны: лимит не изменён, "
+                            "повторите позже"
+                        ),
+                    },
+                    status=503,
+                )
+            if rwms_user is None:
+                return JsonResponse(
+                    {"status": "error", "message": "Подписка в RWMS не найдена"},
+                    status=404,
+                )
+            never_paid = user_never_paid(db_session, user.id)
+            # Три независимых подтверждения: force=1 — «клиент платил»;
+            # override_manual=1 — заменить ручной лимит владельца;
+            # override_admin_limit=1 — заменить лимит админа из бота
+            # (release_on='manual'). Одно подтверждение другой вопрос не гасит.
+            forced = (request.POST.get("force") or "") == "1"
+            override_manual = (request.POST.get("override_manual") or "") == "1"
+            override_admin_limit = (request.POST.get("override_admin_limit") or "") == "1"
+            outcome = "unchanged"
+            if action == "apply_trial_limit":
+                limit = trial_traffic_limit_configured(db_session)
+                manual = admin_panel_limit_is_manual(db_session, user.id, rwms_user, limit)
+                admin_marker = admin_panel_admin_limit_marker(
+                    db_session, user.id, rwms_user, limit
+                )
+                refusal = admin_apply_trial_limit_refusal(
+                    rwms_user,
+                    never_paid,
+                    manual,
+                    admin_marker,
+                    forced=forced,
+                    override_manual=override_manual,
+                    override_admin_limit=override_admin_limit,
+                )
+                if refusal is not None:
+                    # Все неподтверждённые вопросы — одним 409 (UI переспросит
+                    # по каждому отдельно). Устаревший маркер (панель менялась
+                    # руками) уже снят resolve — фиксируем это, панель не тронута.
+                    db_session.commit()
+                    return JsonResponse({"status": "error", **refusal}, status=409)
+                try:
+                    outcome, message = admin_apply_managed_trial_limit(
+                        db_session,
+                        user.id,
+                        rwms_user,
+                        limit,
+                        admin_applied_by(request),
+                        allow_manual_override=override_manual,
+                        allow_admin_limit_override=override_admin_limit,
+                    )
+                except AdminManagedLimitsUnavailable as error:
+                    return JsonResponse(
+                        {"status": "error", "message": str(error)}, status=503
+                    )
+                except RuntimeError as error:
+                    return JsonResponse(
+                        {"status": "error", "message": str(error)}, status=502
+                    )
+                changed = outcome == "applied"
+                admin_audit_write(
+                    db_session,
+                    request,
+                    "apply_trial_limit",
+                    target=user.username,
+                    limit_gb=limit.limit_gb,
+                    limit_bytes=limit.limit_bytes,
+                    strategy=limit.strategy_key,
+                    changed=changed,
+                    outcome=outcome,
+                    never_paid=never_paid,
+                    forced=forced,
+                    override_manual=override_manual,
+                    override_admin_limit=override_admin_limit,
+                    manual_overridden=manual,
+                    admin_limit_overridden=admin_marker is not None,
+                )
+                action_label = (
+                    f"Лимит трафика применён: {admin_traffic_limit_label(limit)} "
+                    "(помечен управляемым, снимется оплатой)"
+                    if changed
+                    else f"Без изменений в панели: {message}"
+                )
+            else:
+                try:
+                    outcome, message = admin_release_managed_limit(
+                        db_session, user.id, rwms_user, admin_applied_by(request)
+                    )
+                except RuntimeError as error:
+                    return JsonResponse(
+                        {"status": "error", "message": str(error)}, status=502
+                    )
+                changed = outcome == "released"
+                admin_audit_write(
+                    db_session,
+                    request,
+                    "remove_traffic_limit",
+                    target=user.username,
+                    changed=changed,
+                    outcome=outcome,
+                    never_paid=never_paid,
+                )
+                if changed:
+                    action_label = (
+                        f"Лимит трафика снят ({message}; сквады не менялись; "
+                        "маркер удалён)"
+                    )
+                elif outcome == "skipped_manual":
+                    action_label = f"Не снят: {message}"
+                else:
+                    action_label = f"Без изменений: {message}"
+            db_session.commit()
+            return JsonResponse({
+                "status": "ok",
+                "result": {
+                    "user": admin_user_payload(user),
+                    "action_label": action_label,
+                    "rwms_updated": changed,
+                    "outcome": outcome,
+                    "manual": outcome == "skipped_manual",
+                    "never_paid": never_paid,
+                },
+            })
+
         if action == "temp_ban":
             # Как «Временный бан» в трафик-алертах бота: переводим подписку в
             # ban-сквад и пишем TemporarySquadBan(unban_at). Снимает бан фоновый
@@ -6976,13 +7866,49 @@ def support_admin_api_subscription_manage(request):
         )
         db_session.commit()
 
-        rwms_user = rwms_client.get_user_by_username(user.username)
+        # Панель читаем СТРОГО: None — только достоверный NOT_FOUND. Блип
+        # RWMS/панели (RwmsUnavailableError) нельзя трактовать как «подписки
+        # нет» и пересоздавать её через AddUser (Remnawave Safety Rules):
+        # срок в БД уже сохранён (БД — истина по времени), панель не трогаем,
+        # админ повторяет синхронизацию «БД → панель» позже.
+        try:
+            rwms_user = rwms_client.get_user_by_username_strict(user.username)
+        except RwmsUnavailableError as error:
+            logging.warning(
+                "RWMS unavailable while applying admin action %s for user %s: %s; "
+                "panel left untouched (no recreate)",
+                action,
+                user.username,
+                error,
+            )
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": (
+                        "Срок в БД обновлён, но RWMS/панель временно недоступны: "
+                        "подписка в панели не изменена и не пересоздавалась. "
+                        "Повторите позже синхронизацию «БД → панель»."
+                    ),
+                    "result": {
+                        "user": admin_user_payload(user),
+                        "old_expire_at": admin_date_label(old_expire),
+                        "new_expire_at": admin_date_label(user.expire_at),
+                        "rwms_updated": False,
+                        "removed_recurrents": removed_recurrents,
+                    },
+                },
+                status=503,
+            )
         rwms_updated = False
         if rwms_user:
             user_email = (
                 rwms_user.email if rwms_user.email and "@" in rwms_user.email else None
             )
             active_squads = [squad.uuid for squad in rwms_user.active_internal_squads]
+            # Антиабьюз: traffic_limit_bytes/traffic_limit_strategy НЕ передаём —
+            # RWMS оставляет лимит и стратегию сброса панели как есть (явный
+            # NO_RESET ломал ежедневный/еженедельный сброс ограниченного триала).
+            # Снятие лимита — только admin_rwms_remove_traffic_limit и оплата.
             response = rwms_client.update_user(
                 proto.UpdateUserRequest(
                     uuid=rwms_user.uuid,
@@ -6990,7 +7916,6 @@ def support_admin_api_subscription_manage(request):
                     telegram_id=rwms_user.telegram_id,
                     expire_at=target_expire,
                     status=proto.UserStatus.ACTIVE,
-                    traffic_limit_strategy=proto.TrafficLimitStrategy.NO_RESET,
                     active_internal_squads=active_squads,
                 )
             )
@@ -7000,14 +7925,28 @@ def support_admin_api_subscription_manage(request):
                 "RWMS subscription for admin-updated user %s is missing, recreating",
                 user.username,
             )
+            # Антиабьюз: при пересоздании лимит пробного — только если
+            # включён И пользователь never_paid (платившему лимит не ставится);
+            # маркер управляемого лимита — в той же сессии (site:admin:<login>).
+            recreate_limit = trial_traffic_limit_for_user(db_session, user)
             response = create_user_until(
                 rwms_client=rwms_client,
                 username=user.username,
                 expire_at=target_expire,
                 email=user.email,
                 telegram_id=user.telegram_id,
+                traffic_limit=recreate_limit,
             )
             rwms_updated = response is not None
+            if rwms_updated and recreate_limit is not None:
+                marker = record_trial_limit_marker(
+                    db_session, user, recreate_limit, admin_applied_by(request)
+                )
+                add_traffic_limit_event(
+                    db_session, user.id, EVENT_TRAFFIC_LIMIT_APPLIED, marker,
+                    recreated=True, source="site",
+                )
+                db_session.commit()
 
         return JsonResponse(
             {
@@ -7102,6 +8041,13 @@ def support_admin_api_runtime_settings(request):
                 return JsonResponse(
                     {"status": "error", "message": pair_error}, status=400
                 )
+            pair_error = admin_validate_antiabuse_setting_pair(
+                db_session, key, normalized_value
+            )
+            if pair_error:
+                return JsonResponse(
+                    {"status": "error", "message": pair_error}, status=400
+                )
             setting = admin_upsert_system_setting(db_session, key, normalized_value)
             admin_audit_write(
                 db_session,
@@ -7181,6 +8127,784 @@ def support_admin_api_referral_antifraud(request):
                     for key in keys
                 ],
             }
+        )
+    finally:
+        db_session.close()
+
+
+# --- Антиабьюз: вкладка «Система → Антиабьюз» --------------------------------
+
+
+def admin_antiabuse_effective(db_session):
+    """Действующие значения (БД либо дефолт common) — то, чем реально
+    руководствуются сайт/бот/notifier/payment/ip-guard."""
+
+    def raw(key):
+        setting = db_session.get(SystemSetting, key)
+        return setting.value if setting is not None else None
+
+    limit = trial_traffic_limit_configured(db_session)
+    segment_raw = raw(IPGUARD_ALERT_SEGMENT_SETTING)
+    segment = (
+        normalize_ipguard_alert_segment(segment_raw)
+        if segment_raw is not None
+        else DEFAULT_IPGUARD_ALERT_SEGMENT
+    )
+    return {
+        "trial_traffic_limit_enabled": trial_traffic_limit_enabled(db_session),
+        "trial_traffic_limit_gb": limit.limit_gb,
+        "trial_traffic_limit_bytes": limit.limit_bytes,
+        "trial_traffic_limit_strategy": limit.strategy_key,
+        "trial_traffic_limit_strategy_label": admin_traffic_limit_strategy_label(
+            limit.strategy_key
+        ),
+        "trial_traffic_limit_label": admin_traffic_limit_label(limit),
+        "ipguard_alerts_enabled": parse_bool_setting(
+            raw(IPGUARD_ALERTS_ENABLED_SETTING), DEFAULT_IPGUARD_ALERTS_ENABLED
+        ),
+        "ipguard_alert_segment": segment,
+        "ipguard_alert_segment_label": IPGUARD_SEGMENT_LABELS.get(segment, segment),
+        "ipguard_subnets_per_hwid": parse_positive_int_setting(
+            raw(IPGUARD_SUBNETS_PER_HWID_SETTING), DEFAULT_IPGUARD_SUBNETS_PER_HWID
+        ),
+        "ipguard_window_hours": parse_positive_int_setting(
+            raw(IPGUARD_WINDOW_HOURS_SETTING), DEFAULT_IPGUARD_WINDOW_HOURS
+        ),
+        "ipguard_alert_cooldown_hours": parse_positive_int_setting(
+            raw(IPGUARD_ALERT_COOLDOWN_HOURS_SETTING),
+            DEFAULT_IPGUARD_ALERT_COOLDOWN_HOURS,
+        ),
+        "ipguard_warnings_enabled": parse_bool_setting(
+            raw(IPGUARD_WARNINGS_ENABLED_SETTING), DEFAULT_IPGUARD_WARNINGS_ENABLED
+        ),
+        "ipguard_warning_subnets_per_hwid": parse_positive_int_setting(
+            raw(IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING),
+            DEFAULT_IPGUARD_WARNING_SUBNETS_PER_HWID,
+        ),
+    }
+
+
+def admin_antiabuse_payload(db_session):
+    settings_by_key = {
+        setting.key: setting
+        for setting in db_session.query(SystemSetting)
+        .filter(SystemSetting.key.in_(ANTIABUSE_SETTING_KEYS))
+        .all()
+    }
+    return {
+        "status": "ok",
+        "settings": [
+            admin_runtime_setting_payload(key, settings_by_key.get(key))
+            for key in ANTIABUSE_SETTING_KEYS
+        ],
+        "effective": admin_antiabuse_effective(db_session),
+        "strategies": [
+            {"value": key, "label": label}
+            for key, label in TRAFFIC_LIMIT_STRATEGY_LABELS.items()
+        ],
+        "segments": [
+            {"value": key, "label": label}
+            for key, label in IPGUARD_SEGMENT_LABELS.items()
+        ],
+        "managed_limits_available": managed_limits_table_available(db_session),
+    }
+
+
+def admin_antiabuse_save_setting(db_session, request, key, raw_value, pending=None):
+    """Валидация (тип + парная) → upsert → аудит setting_save. Текст ошибки
+    либо None; коммитит вызывающая сторона. Значение, совпадающее с уже
+    сохранённым в БД, не перезаписывается и в аудит не пишется (формы вкладки
+    предзаполнены текущими значениями и шлют все поля разом)."""
+    normalized_value, error = admin_validate_runtime_setting(key, raw_value)
+    if error:
+        return f"{key}: {error}"
+    pair_error = admin_validate_antiabuse_setting_pair(
+        db_session, key, normalized_value, pending
+    )
+    if pair_error:
+        return pair_error
+    current = db_session.get(SystemSetting, key)
+    if current is not None and current.value == normalized_value:
+        return None
+    admin_upsert_system_setting(db_session, key, normalized_value)
+    admin_audit_write(
+        db_session, request, "setting_save", target=key, value=normalized_value
+    )
+    return None
+
+
+def admin_antiabuse_save_settings(db_session, request, updates):
+    """Сохранить набор (key, raw) одним действием: сначала типовая валидация
+    всех значений (``pending`` для парных проверок — пара порогов ip-guard
+    проверяется по значениям ЭТОГО сохранения, в любом порядке полей), затем
+    парная проверка и upsert. Первая ошибка — текст, иначе None."""
+    pending = {}
+    for key, raw_value in updates:
+        normalized_value, error = admin_validate_runtime_setting(key, raw_value)
+        if error:
+            return f"{key}: {error}"
+        pending[key] = normalized_value
+    for key, raw_value in updates:
+        error = admin_antiabuse_save_setting(
+            db_session, request, key, raw_value, pending
+        )
+        if error:
+            return error
+    return None
+
+
+def support_admin_api_antiabuse(request):
+    """GET — настройки антиабьюза (сырые + действующие); POST —
+    action=trial_limit_enable|trial_limit_disable|trial_limit_set
+    (limit_value + limit_unit=gib|mib, strategy)|ipguard_enable|ipguard_disable|
+    ipguard_warnings_enable|ipguard_warnings_disable|
+    ipguard_set (segment, subnets_per_hwid, warning_subnets_per_hwid,
+    window_hours, cooldown_hours).
+    Пустое поле в *_set оставляет текущее значение; значение, равное
+    сохранённому, не перезаписывается. Ответ POST — тот же payload, что GET
+    (UI после сохранения дополнительно перечитывает GET)."""
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+
+    db_session = session_factory()
+    try:
+        if request.method == "POST":
+            action = request.POST.get("action")
+            updates = []
+            if action == "trial_limit_enable":
+                updates.append((TRIAL_TRAFFIC_LIMIT_ENABLED_SETTING, "1"))
+            elif action == "trial_limit_disable":
+                updates.append((TRIAL_TRAFFIC_LIMIT_ENABLED_SETTING, "0"))
+            elif action == "trial_limit_set":
+                limit_value = (request.POST.get("limit_value") or "").strip()
+                limit_unit = (request.POST.get("limit_unit") or "gib").strip().lower()
+                if limit_value:
+                    try:
+                        number = float(limit_value.replace(",", "."))
+                    except ValueError:
+                        return JsonResponse(
+                            {"status": "error", "message": "Лимит должен быть числом"},
+                            status=400,
+                        )
+                    if limit_unit == "mib":
+                        number = number / 1024
+                    elif limit_unit != "gib":
+                        return JsonResponse(
+                            {"status": "error", "message": "Единица: ГиБ или МиБ"},
+                            status=400,
+                        )
+                    # В БД лимит хранится в ГиБ (float); МиБ переводятся здесь.
+                    updates.append((TRIAL_TRAFFIC_LIMIT_GB_SETTING, "%.10f" % number))
+                strategy = (request.POST.get("strategy") or "").strip()
+                if strategy:
+                    updates.append((TRIAL_TRAFFIC_LIMIT_STRATEGY_SETTING, strategy))
+            elif action == "ipguard_enable":
+                updates.append((IPGUARD_ALERTS_ENABLED_SETTING, "1"))
+            elif action == "ipguard_disable":
+                updates.append((IPGUARD_ALERTS_ENABLED_SETTING, "0"))
+            elif action == "ipguard_warnings_enable":
+                updates.append((IPGUARD_WARNINGS_ENABLED_SETTING, "1"))
+            elif action == "ipguard_warnings_disable":
+                updates.append((IPGUARD_WARNINGS_ENABLED_SETTING, "0"))
+            elif action == "ipguard_set":
+                for key, form_key in (
+                    (IPGUARD_ALERT_SEGMENT_SETTING, "segment"),
+                    (IPGUARD_SUBNETS_PER_HWID_SETTING, "subnets_per_hwid"),
+                    (
+                        IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING,
+                        "warning_subnets_per_hwid",
+                    ),
+                    (IPGUARD_WINDOW_HOURS_SETTING, "window_hours"),
+                    (IPGUARD_ALERT_COOLDOWN_HOURS_SETTING, "cooldown_hours"),
+                ):
+                    value = (request.POST.get(form_key) or "").strip()
+                    if value:
+                        updates.append((key, value))
+            else:
+                return JsonResponse(
+                    {"status": "error", "message": "Неизвестное действие"}, status=400
+                )
+            if not updates:
+                return JsonResponse(
+                    {"status": "error", "message": "Нет значений для сохранения"},
+                    status=400,
+                )
+            error = admin_antiabuse_save_settings(db_session, request, updates)
+            if error:
+                db_session.rollback()
+                return JsonResponse({"status": "error", "message": error}, status=400)
+            db_session.commit()
+        elif request.method != "GET":
+            return JsonResponse({"status": "error"}, status=405)
+
+        return JsonResponse(admin_antiabuse_payload(db_session))
+    finally:
+        db_session.close()
+
+
+# Массовые операции по лимиту трафика — по СЕГМЕНТУ (common/models/segments.py),
+# порциями: один запрос обрабатывает batch_size пользователей и возвращает
+# next_after_id, UI зовёт снова до done. requires_telegram=False: сайтовые
+# аккаунты без Telegram тоже входят. Заблокированные (user_blocks) исключены
+# самим сегментом.
+ANTIABUSE_BULK_ACTIONS = {
+    "apply_trial_limit": (
+        "trial_active",
+        "Применить лимит ко всем активным пробным без платежей",
+    ),
+    "remove_trial_limit": ("never_paid", "Снять лимит у всех пробных"),
+    "remove_paid_limit": ("paid_any", "Снять лимит у всех, кто платил"),
+}
+ANTIABUSE_BULK_BATCH_DEFAULT = 50
+ANTIABUSE_BULK_BATCH_MAX = 200
+ANTIABUSE_BULK_PREVIEW = 20
+
+
+def antiabuse_bulk_where_sql(action):
+    segment_key, _label = ANTIABUSE_BULK_ACTIONS[action]
+    return segment_where_sql(segment_key, requires_telegram=False)
+
+
+def support_admin_api_antiabuse_bulk(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+    if request.method != "POST":
+        return JsonResponse({"status": "error"}, status=405)
+
+    action = request.POST.get("action")
+    if action not in ANTIABUSE_BULK_ACTIONS:
+        return JsonResponse(
+            {"status": "error", "message": "Неизвестное действие"}, status=400
+        )
+    dry_run = (request.POST.get("dry_run") or "") == "1"
+    try:
+        batch_size = int(request.POST.get("batch_size") or ANTIABUSE_BULK_BATCH_DEFAULT)
+        after_id = int(request.POST.get("after_id") or 0)
+    except ValueError:
+        return JsonResponse(
+            {"status": "error", "message": "batch_size/after_id должны быть числами"},
+            status=400,
+        )
+    batch_size = min(max(batch_size, 1), ANTIABUSE_BULK_BATCH_MAX)
+    after_id = max(after_id, 0)
+    _segment_key, action_label = ANTIABUSE_BULK_ACTIONS[action]
+
+    db_session = session_factory()
+    try:
+        where = antiabuse_bulk_where_sql(action)
+        if not dry_run and not managed_limits_table_available(db_session):
+            # Без маркеров массовые операции не различают ручные лимиты
+            # владельца — не трогаем панель вовсе.
+            return JsonResponse(
+                {"status": "error", "message": MANAGED_LIMITS_MIGRATION_MESSAGE},
+                status=503,
+            )
+        trial_limit = None
+        if action == "apply_trial_limit":
+            # Массовое ограничение — только при включённом тумблере: иначе
+            # новые триалы создавались бы без лимита, а старые — с ним.
+            if not trial_traffic_limit_enabled(db_session):
+                return JsonResponse(
+                    {
+                        "status": "error",
+                        "message": "Сначала включите лимит трафика пробных подписок",
+                    },
+                    status=400,
+                )
+            trial_limit = trial_traffic_limit_configured(db_session)
+
+        if dry_run:
+            total = (
+                db_session.execute(
+                    sa_text(f"SELECT count(*) FROM users u WHERE {where}")
+                ).scalar()
+                or 0
+            )
+            preview_rows = db_session.execute(
+                sa_text(
+                    f"SELECT u.id, u.username FROM users u WHERE {where} "
+                    "ORDER BY u.id LIMIT :limit"
+                ),
+                {"limit": ANTIABUSE_BULK_PREVIEW},
+            ).all()
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "result": {
+                        "dry_run": True,
+                        "action": action,
+                        "action_label": action_label,
+                        "total": int(total),
+                        "preview": [row[1] for row in preview_rows],
+                        "preview_limit": ANTIABUSE_BULK_PREVIEW,
+                        "limit_label": (
+                            admin_traffic_limit_label(trial_limit) if trial_limit else None
+                        ),
+                    },
+                }
+            )
+
+        rows = db_session.execute(
+            sa_text(
+                f"SELECT u.id, u.username FROM users u WHERE {where} "
+                "AND u.id > :after_id ORDER BY u.id LIMIT :limit"
+            ),
+            {"after_id": after_id, "limit": batch_size},
+        ).all()
+
+        # applied — панель изменена; marked — панель уже несла лимит, добавлен
+        # маркер; skipped — нет подписки / лимита / уже управляемый;
+        # skipped_paid — платил (лимит пробного не ставится, applied не растёт);
+        # skipped_manual — ручной лимит владельца, панель не тронута;
+        # skipped_admin_limit — лимит админа из бота (release_on='manual'),
+        # маркер и панель не тронуты.
+        processed = applied = marked = skipped = skipped_paid = skipped_manual = 0
+        skipped_admin_limit = 0
+        failed = 0
+        last_id = after_id
+        failures = []
+        unavailable = None
+        markers_unavailable = False
+        for user_id, username in rows:
+            try:
+                rw_user = rwms_client.get_user_by_username_strict(username)
+            except RwmsUnavailableError as error:
+                unavailable = error
+                break
+            processed += 1
+            last_id = int(user_id)
+            if rw_user is None:
+                skipped += 1
+                continue
+            try:
+                if action == "apply_trial_limit":
+                    if user_never_paid(db_session, user_id) is not True:
+                        outcome = "skipped_paid"
+                    else:
+                        outcome, _message = admin_apply_managed_trial_limit(
+                            db_session, user_id, rw_user, trial_limit, APPLIED_BY_SITE_BULK
+                        )
+                else:
+                    outcome, _message = admin_release_managed_limit(
+                        db_session, user_id, rw_user, APPLIED_BY_SITE_BULK
+                    )
+            except AdminManagedLimitsUnavailable:
+                markers_unavailable = True
+                processed -= 1
+                last_id = int(user_id) - 1
+                break
+            except RuntimeError as error:
+                failed += 1
+                failures.append({"username": username, "message": str(error)[:200]})
+                continue
+            # Маркер и событие — короткой транзакцией на каждого пользователя
+            # сразу после UpdateUser: сбой commit порции не должен оставить в
+            # панели лимиты без маркеров (без маркера лимит считается ручным
+            # и оплата его не снимет).
+            db_session.commit()
+            if outcome in ("applied", "released"):
+                applied += 1
+            elif outcome == "marked":
+                marked += 1
+            elif outcome == "skipped_paid":
+                skipped_paid += 1
+            elif outcome == "skipped_manual":
+                skipped_manual += 1
+            elif outcome == "skipped_admin_limit":
+                skipped_admin_limit += 1
+            else:
+                skipped += 1
+
+        done = unavailable is None and not markers_unavailable and len(rows) < batch_size
+        if processed:
+            admin_audit_write(
+                db_session,
+                request,
+                "antiabuse_bulk_" + action,
+                target=f"{applied}/{processed} users",
+                after_id=after_id,
+                next_after_id=last_id,
+                marked=marked,
+                skipped=skipped,
+                skipped_paid=skipped_paid,
+                skipped_manual=skipped_manual,
+                skipped_admin_limit=skipped_admin_limit,
+                failed=failed,
+                limit_gb=trial_limit.limit_gb if trial_limit else None,
+                rwms_unavailable=unavailable is not None,
+            )
+            db_session.commit()
+        result = {
+            "dry_run": False,
+            "action": action,
+            "action_label": action_label,
+            "processed": processed,
+            "applied": applied,
+            "marked": marked,
+            "skipped": skipped,
+            "skipped_paid": skipped_paid,
+            "skipped_manual": skipped_manual,
+            "skipped_admin_limit": skipped_admin_limit,
+            "failed": failed,
+            "failures": failures[:20],
+            "next_after_id": last_id,
+            "done": done,
+            "batch_size": batch_size,
+        }
+        if markers_unavailable:
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": MANAGED_LIMITS_MIGRATION_MESSAGE,
+                    "result": result,
+                },
+                status=503,
+            )
+        if unavailable is not None:
+            logging.warning(
+                "RWMS unavailable during antiabuse bulk %s after user id %s: %s",
+                action,
+                last_id,
+                unavailable,
+            )
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": (
+                        "RWMS/панель временно недоступны: обработка остановлена, "
+                        f"прогресс сохранён ({applied} изменено, {processed} обработано). "
+                        "Повторите позже — продолжится с того же места."
+                    ),
+                    "result": result,
+                },
+                status=503,
+            )
+        return JsonResponse({"status": "ok", "result": result})
+    finally:
+        db_session.close()
+
+
+# Backfill маркеров: на проде лимиты пробных, поставленные фичей до появления
+# таблицы managed_traffic_limits, маркера не имеют — оплата их не снимет.
+# Кнопка «Пометить существующие лимиты пробных как управляемые» помечает
+# ТОЛЬКО лимиты, совпадающие с текущим лимитом пробных (байты И стратегия).
+# Проход — по ВСЕМ пользователям (без фильтра блокировок/Telegram: маркер
+# пассивен, а заблокированному после разблокировки и оплаты лимит тоже должен
+# сняться): never_paid — счётчик marked; платившие с той же сигнатурой —
+# отдельный счётчик marked_paid (лимит пробного у платившего — наш, поставлен
+# до миграции и не снят оплатой в окне «код v2 задеплоен, таблицы ещё нет»;
+# после пометки reason=trial/release_on=payment его снимет страховка notifier
+# или следующая оплата). Ручные капы владельца (другой объём/стратегия) под
+# правило не попадают; управляемые маркеры (в т.ч. release_on='manual' из
+# бота) не перезаписываются (already). Порциями, как массовые операции;
+# dry_run — тот же проход без записи.
+ANTIABUSE_BACKFILL_LABEL = "Пометить существующие лимиты пробных как управляемые"
+
+# Флаг «платил» считается тем же PAYS_EXISTS_SQL, что и сегменты never_paid /
+# paid_any (один запрос на порцию вместо запроса на пользователя).
+ANTIABUSE_BACKFILL_ROWS_SQL = (
+    f"SELECT u.id, u.username, ({PAYS_EXISTS_SQL}) AS has_payment FROM users u "
+    "WHERE u.id > :after_id ORDER BY u.id LIMIT :limit"
+)
+
+
+def support_admin_api_antiabuse_backfill(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+    if request.method != "POST":
+        return JsonResponse({"status": "error"}, status=405)
+
+    dry_run = (request.POST.get("dry_run") or "") == "1"
+    try:
+        batch_size = int(request.POST.get("batch_size") or ANTIABUSE_BULK_BATCH_DEFAULT)
+        after_id = int(request.POST.get("after_id") or 0)
+    except ValueError:
+        return JsonResponse(
+            {"status": "error", "message": "batch_size/after_id должны быть числами"},
+            status=400,
+        )
+    batch_size = min(max(batch_size, 1), ANTIABUSE_BULK_BATCH_MAX)
+    after_id = max(after_id, 0)
+
+    db_session = session_factory()
+    try:
+        if not managed_limits_table_available(db_session):
+            return JsonResponse(
+                {"status": "error", "message": MANAGED_LIMITS_MIGRATION_MESSAGE},
+                status=503,
+            )
+        trial_limit = trial_traffic_limit_configured(db_session)
+        rows = db_session.execute(
+            sa_text(ANTIABUSE_BACKFILL_ROWS_SQL),
+            {"after_id": after_id, "limit": batch_size},
+        ).all()
+
+        # marked — маркер записан у never_paid (dry_run: был бы записан);
+        # marked_paid — то же у плативших (снимется страховкой notifier /
+        # оплатой); already — уже управляемый; skipped — лимита нет или другой
+        # (ручной); missing — нет подписки в панели.
+        processed = marked = marked_paid = already = skipped = missing = 0
+        last_id = after_id
+        unavailable = None
+        markers_unavailable = False
+        for user_id, username, has_payment in rows:
+            try:
+                rw_user = rwms_client.get_user_by_username_strict(username)
+            except RwmsUnavailableError as error:
+                unavailable = error
+                break
+            processed += 1
+            last_id = int(user_id)
+            if rw_user is None:
+                missing += 1
+                continue
+            if not panel_limit_matches(rw_user, trial_limit):
+                skipped += 1
+                continue
+            panel_bytes = admin_safe_int(getattr(rw_user, "traffic_limit_bytes", 0), 0)
+            panel_strategy = getattr(rw_user, "traffic_limit_strategy", None)
+            existing = get_managed_limit(db_session, user_id)
+            if existing is not None and is_managed(existing, panel_bytes, panel_strategy):
+                already += 1
+                continue
+            never_paid = user_never_paid_from_row(has_payment)
+            if dry_run:
+                if never_paid:
+                    marked += 1
+                else:
+                    marked_paid += 1
+                continue
+            marker = upsert_managed_limit(
+                db_session,
+                user_id,
+                trial_limit.limit_bytes,
+                trial_limit.strategy_name,
+                REASON_TRIAL,
+                RELEASE_ON_PAYMENT,
+                APPLIED_BY_BACKFILL,
+            )
+            if marker is None:
+                markers_unavailable = True
+                processed -= 1
+                last_id = int(user_id) - 1
+                break
+            add_traffic_limit_event(
+                db_session,
+                user_id,
+                EVENT_TRAFFIC_LIMIT_APPLIED,
+                marker,
+                backfill=True,
+                changed=False,
+                never_paid=never_paid,
+                source="site",
+            )
+            logging.info(
+                "managed traffic limit backfilled: user_id=%s username=%s limit=%s never_paid=%s",
+                user_id,
+                username,
+                admin_traffic_limit_label(trial_limit),
+                never_paid,
+            )
+            if never_paid:
+                marked += 1
+            else:
+                marked_paid += 1
+
+        done = unavailable is None and not markers_unavailable and len(rows) < batch_size
+        if processed and not dry_run:
+            admin_audit_write(
+                db_session,
+                request,
+                "antiabuse_backfill",
+                target=f"{marked + marked_paid}/{processed} users",
+                after_id=after_id,
+                next_after_id=last_id,
+                marked_paid=marked_paid,
+                already=already,
+                skipped=skipped,
+                missing=missing,
+                limit_gb=trial_limit.limit_gb,
+                strategy=trial_limit.strategy_key,
+                rwms_unavailable=unavailable is not None,
+            )
+            db_session.commit()
+        result = {
+            "dry_run": dry_run,
+            "action": "backfill_markers",
+            "action_label": ANTIABUSE_BACKFILL_LABEL,
+            "limit_label": admin_traffic_limit_label(trial_limit),
+            "processed": processed,
+            "marked": marked,
+            "marked_paid": marked_paid,
+            "already": already,
+            "skipped": skipped,
+            "missing": missing,
+            "next_after_id": last_id,
+            "done": done,
+            "batch_size": batch_size,
+        }
+        if markers_unavailable:
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": MANAGED_LIMITS_MIGRATION_MESSAGE,
+                    "result": result,
+                },
+                status=503,
+            )
+        if unavailable is not None:
+            logging.warning(
+                "RWMS unavailable during antiabuse backfill after user id %s: %s",
+                last_id,
+                unavailable,
+            )
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": (
+                        "RWMS/панель временно недоступны: обработка остановлена, "
+                        f"прогресс сохранён ({marked + marked_paid} помечено, "
+                        f"{processed} обработано). "
+                        "Повторите позже — продолжится с того же места."
+                    ),
+                    "result": result,
+                },
+                status=503,
+            )
+        return JsonResponse({"status": "ok", "result": result})
+    finally:
+        db_session.close()
+
+
+# Таблица «Последние алерты ip-guard»: username в ipguard_alerts — ЧИСЛОВОЙ ID
+# пользователя панели (email в access-логе xray), не users.username; резолвим
+# через RWMS GetUserById с кешем на запрос, при недоступности — деградация до ID.
+IPGUARD_ALERTS_LIMIT = 50
+
+
+def admin_ipguard_resolve_panel_ids(panel_ids, client=None):
+    """{panel_id: (users.username, uuid) | None} — один RPC на уникальный ID."""
+    rwms = client or rwms_client
+    cache = {}
+    for panel_id in panel_ids:
+        if panel_id in cache:
+            continue
+        numeric = admin_safe_int(str(panel_id).strip())
+        if numeric is None:
+            cache[panel_id] = None
+            continue
+        try:
+            rw_user = rwms.get_user_by_id(numeric)
+        except Exception:
+            logging.exception("support admin: failed to resolve panel id %s", panel_id)
+            rw_user = None
+        cache[panel_id] = (
+            (getattr(rw_user, "username", None) or None, getattr(rw_user, "uuid", None) or None)
+            if rw_user is not None
+            else None
+        )
+    return cache
+
+
+def admin_ipguard_alert_nodes(db_session, alerts):
+    """{alert.id: [ноды]} — из ipguard_user_ips за окно алерта (в самой
+    таблице ipguard_alerts нод нет)."""
+    if not alerts:
+        return {}
+    usernames = {alert.username for alert in alerts}
+    earliest = min(
+        alert.created_at - timedelta(hours=alert.window_hours or 0) for alert in alerts
+    )
+    rows = (
+        db_session.query(
+            UserIpObservation.username,
+            UserIpObservation.node,
+            func.min(UserIpObservation.first_seen),
+            func.max(UserIpObservation.last_seen),
+        )
+        .filter(
+            UserIpObservation.username.in_(usernames),
+            UserIpObservation.last_seen >= earliest,
+        )
+        .group_by(UserIpObservation.username, UserIpObservation.node)
+        .all()
+    )
+    by_user = {}
+    for username, node, first_seen, last_seen in rows:
+        by_user.setdefault(username, []).append((node, first_seen, last_seen))
+    result = {}
+    for alert in alerts:
+        # Нода попадает в алерт, если наблюдалась в его окне
+        # [created_at - window; created_at]: появилась не позже алерта и
+        # была видна не раньше начала окна.
+        since = alert.created_at - timedelta(hours=alert.window_hours or 0)
+        result[alert.id] = sorted(
+            {
+                node
+                for node, first_seen, last_seen in by_user.get(alert.username, [])
+                if last_seen is not None
+                and last_seen >= since
+                and (first_seen is None or first_seen <= alert.created_at)
+            }
+        )
+    return result
+
+
+def support_admin_api_ipguard_alerts(request):
+    auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
+    if auth_response:
+        return auth_response
+    if request.method != "GET":
+        return JsonResponse({"status": "error"}, status=405)
+
+    db_session = session_factory()
+    try:
+        alerts = (
+            db_session.query(IpAlert)
+            .order_by(IpAlert.created_at.desc(), IpAlert.id.desc())
+            .limit(IPGUARD_ALERTS_LIMIT)
+            .all()
+        )
+        resolved = admin_ipguard_resolve_panel_ids([alert.username for alert in alerts])
+        local_usernames = set()
+        names = {item[0] for item in resolved.values() if item and item[0]}
+        if names:
+            local_usernames = {
+                row[0]
+                for row in db_session.query(User.username)
+                .filter(User.username.in_(names))
+                .all()
+            }
+        try:
+            nodes = admin_ipguard_alert_nodes(db_session, alerts)
+        except Exception:
+            logging.exception("support admin: failed to load ip-guard alert nodes")
+            nodes = {}
+        rows = []
+        for alert in alerts:
+            item = resolved.get(alert.username)
+            username = item[0] if item else None
+            rows.append(
+                {
+                    "id": alert.id,
+                    "created_at": admin_date_label(alert.created_at),
+                    "level": alert.level,
+                    "panel_id": alert.username,
+                    "username": username,
+                    "user_uuid": item[1] if item else None,
+                    "local_user": bool(username and username in local_usernames),
+                    "unique_subnet_count": alert.unique_subnet_count,
+                    "unique_ip_count": alert.unique_ip_count,
+                    "threshold": alert.threshold,
+                    "window_hours": alert.window_hours,
+                    "nodes": nodes.get(alert.id, []),
+                }
+            )
+        return JsonResponse(
+            {"status": "ok", "result": {"alerts": rows, "limit": IPGUARD_ALERTS_LIMIT}}
         )
     finally:
         db_session.close()
@@ -10761,6 +12485,8 @@ def support_admin_api_rwms_sync(request):
                 return JsonResponse(
                     {"status": "error", "message": "В БД нет expire_at"}, status=400
                 )
+            # Лимит трафика и стратегию сброса не трогаем (антиабьюз): поля
+            # не заданы → RWMS оставляет их в панели как есть.
             response = rwms_client.update_user(
                 proto.UpdateUserRequest(
                     uuid=rwms_user.uuid,
@@ -10768,7 +12494,6 @@ def support_admin_api_rwms_sync(request):
                     status=proto.UserStatus.ACTIVE
                     if db_expire > datetime.utcnow()
                     else rwms_user.status,
-                    traffic_limit_strategy=proto.TrafficLimitStrategy.NO_RESET,
                     active_internal_squads=[
                         squad.uuid for squad in rwms_user.active_internal_squads
                     ],
@@ -11435,7 +13160,16 @@ def support_admin_api_broadcasts(request):
 
 
 BULK_MAX_IDS = 500
-BULK_ACTIONS = {"extend_days", "block", "unblock", "referral_block", "referral_unblock"}
+BULK_ACTIONS = {
+    "extend_days",
+    "block",
+    "unblock",
+    "referral_block",
+    "referral_unblock",
+    # Антиабьюз: лимит трафика пробных (по списку пользователей)
+    "apply_trial_limit",
+    "remove_traffic_limit",
+}
 
 
 def admin_bulk_find_users(db_session, raw_ids):
@@ -11472,6 +13206,8 @@ def admin_bulk_extend(db_session, user, days):
     user_email = (
         rwms_user.email if rwms_user.email and "@" in rwms_user.email else None
     )
+    # Лимит трафика и стратегию сброса не трогаем (антиабьюз): поля не заданы
+    # → RWMS оставляет их в панели как есть.
     response = rwms_client.update_user(
         proto.UpdateUserRequest(
             uuid=rwms_user.uuid,
@@ -11479,7 +13215,6 @@ def admin_bulk_extend(db_session, user, days):
             telegram_id=rwms_user.telegram_id,
             expire_at=target_expire,
             status=proto.UserStatus.ACTIVE,
-            traffic_limit_strategy=proto.TrafficLimitStrategy.NO_RESET,
             active_internal_squads=[
                 squad.uuid for squad in rwms_user.active_internal_squads
             ],
@@ -11618,6 +13353,42 @@ def admin_bulk_unblock(db_session, user):
     return "разблокирован (подписка истекла, панель не активировалась)"
 
 
+def admin_bulk_apply_trial_limit(db_session, user, limit):
+    """Лимит пробного по списку → (outcome, текст): платившим не ставится
+    (skipped_paid — applied не растёт), ручной лимит владельца не трогается
+    (skipped_manual), маркер site:bulk пишется в той же транзакции. Панель
+    читается строго (RwmsUnavailableError всплывает — строка помечается
+    ошибкой)."""
+    if user_never_paid(db_session, user.id) is not True:
+        return "skipped_paid", "платил — лимит пробного не применён"
+    rwms_user = rwms_client.get_user_by_username_strict(user.username)
+    if rwms_user is None:
+        return "skipped", "подписки нет в RWMS (панель не тронута)"
+    outcome, message = admin_apply_managed_trial_limit(
+        db_session, user.id, rwms_user, limit, APPLIED_BY_SITE_BULK
+    )
+    if outcome == "unchanged":
+        return outcome, f"без изменений: {message}"
+    return outcome, message
+
+
+def admin_bulk_remove_traffic_limit(db_session, user):
+    """Снятие лимита по списку → (outcome, текст): только управляемый
+    (released); ручной лимит владельца — skipped_manual, панель не тронута."""
+    rwms_user = rwms_client.get_user_by_username_strict(user.username)
+    if rwms_user is None:
+        return "skipped", "подписки нет в RWMS (панель не тронута)"
+    outcome, message = admin_release_managed_limit(
+        db_session, user.id, rwms_user, APPLIED_BY_SITE_BULK
+    )
+    if outcome == "unchanged":
+        return outcome, f"без изменений: {message}"
+    return outcome, message
+
+
+BULK_TRAFFIC_LIMIT_ACTIONS = {"apply_trial_limit", "remove_traffic_limit"}
+
+
 def support_admin_api_bulk(request):
     auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
     if auth_response:
@@ -11665,8 +13436,24 @@ def support_admin_api_bulk(request):
                 status=400,
             )
 
+        if (
+            action in BULK_TRAFFIC_LIMIT_ACTIONS
+            and not dry_run
+            and not managed_limits_table_available(db_session)
+        ):
+            return JsonResponse(
+                {"status": "error", "message": MANAGED_LIMITS_MIGRATION_MESSAGE},
+                status=503,
+            )
+        trial_limit = (
+            trial_traffic_limit_configured(db_session)
+            if action == "apply_trial_limit"
+            else None
+        )
         results = []
         applied = 0
+        # Антиабьюз: пропуски не считаются применёнными (applied не растёт).
+        skipped_paid = skipped_manual = skipped_admin_limit = skipped = 0
         for token, user in resolved:
             if dry_run:
                 current = admin_dt(user.expire_at)
@@ -11681,12 +13468,24 @@ def support_admin_api_bulk(request):
                     "unblock": "будет разблокирован",
                     "referral_block": "рефералка будет заблокирована",
                     "referral_unblock": "рефералка будет разблокирована",
+                    "apply_trial_limit": (
+                        f"будет применён лимит {admin_traffic_limit_label(trial_limit)} "
+                        "(только если не платил; ручной лимит панели не трогается)"
+                        if trial_limit
+                        else ""
+                    ),
+                    "remove_traffic_limit": (
+                        "лимит трафика будет снят (0, NO_RESET, ACTIVE; "
+                        "сквады не меняются) — только управляемый, ручной лимит "
+                        "панели не трогается"
+                    ),
                 }[action]
                 results.append(
                     {"token": token, "username": user.username, "ok": True,
                      "message": preview}
                 )
                 continue
+            outcome = "applied"
             try:
                 if action == "extend_days":
                     message = admin_bulk_extend(db_session, user, days)
@@ -11694,6 +13493,12 @@ def support_admin_api_bulk(request):
                     message = admin_bulk_block(db_session, user, reason)
                 elif action == "unblock":
                     message = admin_bulk_unblock(db_session, user)
+                elif action == "apply_trial_limit":
+                    outcome, message = admin_bulk_apply_trial_limit(
+                        db_session, user, trial_limit
+                    )
+                elif action == "remove_traffic_limit":
+                    outcome, message = admin_bulk_remove_traffic_limit(db_session, user)
                 elif action == "referral_block":
                     block = db_session.get(ReferralProgramBlock, user.id)
                     if block:
@@ -11711,10 +13516,19 @@ def support_admin_api_bulk(request):
                     )
                     message = "рефералка разблокирована"
                 db_session.commit()
-                applied += 1
+                if outcome in ("applied", "released", "marked"):
+                    applied += 1
+                elif outcome == "skipped_paid":
+                    skipped_paid += 1
+                elif outcome == "skipped_manual":
+                    skipped_manual += 1
+                elif outcome == "skipped_admin_limit":
+                    skipped_admin_limit += 1
+                else:
+                    skipped += 1
                 results.append(
                     {"token": token, "username": user.username, "ok": True,
-                     "message": message}
+                     "outcome": outcome, "message": message}
                 )
             except Exception as error:
                 db_session.rollback()
@@ -11731,7 +13545,12 @@ def support_admin_api_bulk(request):
                 "bulk_" + action,
                 target=f"{applied}/{len(resolved)} users",
                 days=days if action == "extend_days" else None,
+                limit_gb=trial_limit.limit_gb if trial_limit else None,
                 missing=len(missing),
+                skipped_paid=skipped_paid,
+                skipped_manual=skipped_manual,
+                skipped_admin_limit=skipped_admin_limit,
+                skipped=skipped,
             )
             db_session.commit()
 
@@ -11741,6 +13560,10 @@ def support_admin_api_bulk(request):
                 "result": {
                     "dry_run": dry_run,
                     "applied": applied,
+                    "skipped_paid": skipped_paid,
+                    "skipped_manual": skipped_manual,
+                    "skipped_admin_limit": skipped_admin_limit,
+                    "skipped": skipped,
                     "total": len(resolved),
                     "missing": missing,
                     "rows": results,

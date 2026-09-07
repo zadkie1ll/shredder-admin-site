@@ -3283,6 +3283,10 @@
         data-subscription-manage-url="{% url 'support_admin_api_subscription_manage' %}"
         data-runtime-settings-url="{% url 'support_admin_api_runtime_settings' %}"
         data-referral-antifraud-url="{% url 'support_admin_api_referral_antifraud' %}"
+        data-antiabuse-url="{% url 'support_admin_api_antiabuse' %}"
+        data-antiabuse-bulk-url="{% url 'support_admin_api_antiabuse_bulk' %}"
+        data-antiabuse-backfill-url="{% url 'support_admin_api_antiabuse_backfill' %}"
+        data-ipguard-alerts-url="{% url 'support_admin_api_ipguard_alerts' %}"
         data-referral-block-url="{% url 'support_admin_api_referral_block' %}"
         data-reply-templates-url="{% url 'support_admin_api_reply_templates' %}"
         data-config-templates-url="{% url 'support_admin_api_config_templates' %}"
@@ -4369,6 +4373,8 @@
                         <option value="unblock">Разблокировать</option>
                         <option value="referral_block">Заблокировать рефералку</option>
                         <option value="referral_unblock">Разблокировать рефералку</option>
+                        <option value="apply_trial_limit">Применить лимит трафика пробного (не платившим)</option>
+                        <option value="remove_traffic_limit">Снять лимит трафика (0, без сброса, ACTIVE)</option>
                     </select>
                     <input class="input" id="bulk-days" type="number" min="1" max="365" placeholder="Дней" style="max-width:110px;">
                     <input class="input" id="bulk-reason" placeholder="Причина (для блокировок)" style="max-width:260px;">
@@ -4392,6 +4398,7 @@
                 <button type="button" class="subtab" data-subtab="sys-payment" role="tab"><i class="fas fa-credit-card"></i>Платёжные шлюзы</button>
                 <button type="button" class="subtab" data-subtab="sys-referral" role="tab"><i class="fas fa-network-wired"></i>Рефералка</button>
                 <button type="button" class="subtab" data-subtab="sys-alerts" role="tab"><i class="fas fa-triangle-exclamation"></i>Алерты</button>
+                <button type="button" class="subtab" data-subtab="sys-antiabuse" role="tab"><i class="fas fa-shield-halved"></i>Антиабьюз</button>
                 <button type="button" class="subtab" data-subtab="sys-sync" role="tab"><i class="fas fa-arrows-rotate"></i>Синхронизация</button>
                 <button type="button" class="subtab" data-subtab="sys-audit" role="tab"><i class="fas fa-clipboard-list"></i>Аудит</button>
                 <button type="button" class="subtab" data-subtab="sys-staff" role="tab"><i class="fas fa-users-gear"></i>Сотрудники</button>
@@ -4511,6 +4518,292 @@
                     <h2 class="system-card-title">Пороги трафика</h2>
                     <div class="settings-list" data-settings-group="alerts"></div>
                 </section>
+            </div>
+
+            <div id="subpanel-sys-antiabuse" class="subtab-panel">
+                <div class="antiabuse-stack">
+                    <section class="card system-card antiabuse-card" data-antiabuse-card="trial">
+                        <div class="referral-section-heading">
+                            <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-gauge-high"></i></span>
+                            <div>
+                                <h2 class="system-card-title">Лимит трафика пробных подписок</h2>
+                                <p>Новые пробные подписки без единого платежа создаются в панели с лимитом трафика и маркером «управляемый». Оплата снимает только управляемый лимит; ручные капы владельца в панели, реф-бонусы и промокоды лимит не трогают.</p>
+                            </div>
+                        </div>
+                        <div id="antiabuse-trial-status" class="referral-antifraud-status" aria-live="polite"></div>
+                        <form id="antiabuse-trial-form" class="referral-antifraud-form" data-antiabuse-form="trial">
+                            {% csrf_token %}
+                            <button type="submit" name="action" value="trial_limit_set" class="antifraud-implicit-submit" tabindex="-1" aria-hidden="true"></button>
+                            <div class="antifraud-panel">
+                                <div class="antifraud-row antifraud-row-state">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Лимит новых пробных</div>
+                                        <div class="antifraud-row-desc">Выключено — новые пробные создаются без лимита (как раньше); уже ограниченные остаются до кнопки «Снять лимит у всех пробных» ниже.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <button class="antifraud-switch" id="antiabuse-trial-toggle" type="submit" name="action" value="trial_limit_enable" role="switch" aria-checked="false">
+                                            <span class="antifraud-switch-track" aria-hidden="true"><span class="antifraud-switch-thumb"></span></span>
+                                            <span class="antifraud-switch-label" data-antiabuse-toggle-label>Включить</span>
+                                        </button>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Состояние</span>
+                                        <strong data-antifraud-state data-antiabuse-state="trial">—</strong>
+                                    </div>
+                                </div>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Лимит трафика</div>
+                                        <div class="antifraud-row-desc">Объём на период сброса. В БД хранится в ГиБ (дробные допустимы: 0.5 ГиБ = 512 МиБ); МиБ пересчитываются при сохранении.</div>
+                                    </div>
+                                    <div class="antifraud-row-control antiabuse-unit-field">
+                                        <input class="input" name="limit_value" type="number" min="0" step="any" inputmode="decimal" placeholder="Например, 5" aria-label="Лимит трафика">
+                                        <select class="input" name="limit_unit" aria-label="Единица измерения">
+                                            <option value="gib">ГиБ</option>
+                                            <option value="mib">МиБ</option>
+                                        </select>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="trial_traffic_limit_gb">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Сброс лимита</div>
+                                        <div class="antifraud-row-desc">Стратегия сброса трафика, как в панели Remnawave: никогда / ежедневно / еженедельно / ежемесячно / ежемесячно по дате создания.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <select class="input" name="strategy" aria-label="Стратегия сброса" data-antiabuse-strategy-select></select>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="trial_traffic_limit_strategy">—</strong>
+                                    </div>
+                                </label>
+
+                                <div class="antifraud-footer">
+                                    <p class="antifraud-footer-note">Поля предзаполнены текущими значениями. В панель уйдёт: <strong data-antiabuse-current="trial_traffic_limit_label">—</strong>.</p>
+                                    <button class="btn btn-secondary" type="submit" name="action" value="trial_limit_set"><i class="fas fa-floppy-disk"></i>Сохранить</button>
+                                </div>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section class="card system-card antiabuse-card" data-antiabuse-card="ipguard">
+                        <div class="referral-section-heading">
+                            <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-network-wired"></i></span>
+                            <div>
+                                <h2 class="system-card-title">Алерты по подсетям (ip-guard)</h2>
+                                <p>Алерт админам, если подписка за окно приходит из большего числа подсетей, чем разрешено: допустимо = max(1, HWID-устройств) × «подсетей на HWID».</p>
+                            </div>
+                        </div>
+                        <div id="antiabuse-ipguard-status" class="referral-antifraud-status" aria-live="polite"></div>
+                        <form id="antiabuse-ipguard-form" class="referral-antifraud-form" data-antiabuse-form="ipguard">
+                            {% csrf_token %}
+                            <button type="submit" name="action" value="ipguard_set" class="antifraud-implicit-submit" tabindex="-1" aria-hidden="true"></button>
+                            <div class="antifraud-panel">
+                                <div class="antifraud-row antifraud-row-state">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Алерты ip-guard</div>
+                                        <div class="antifraud-row-desc">Выключено — алерты не отправляются (детектор только считает и пишет в лог, как раньше).</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <button class="antifraud-switch" id="antiabuse-ipguard-toggle" type="submit" name="action" value="ipguard_enable" role="switch" aria-checked="false">
+                                            <span class="antifraud-switch-track" aria-hidden="true"><span class="antifraud-switch-thumb"></span></span>
+                                            <span class="antifraud-switch-label" data-antiabuse-toggle-label>Включить</span>
+                                        </button>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Состояние</span>
+                                        <strong data-antifraud-state data-antiabuse-state="ipguard">—</strong>
+                                    </div>
+                                </div>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Кого проверять</div>
+                                        <div class="antifraud-row-desc">Только пробные без единого платежа (never_paid) или все подписки.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <select class="input" name="segment" aria-label="Сегмент проверки" data-antiabuse-segment-select></select>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_alert_segment">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Подсетей на HWID-устройство</div>
+                                        <div class="antifraud-row-desc">Допустимо уникальных подсетей на одно устройство за окно; без учёта HWID в панели считается как одно устройство.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="subnets_per_hwid" type="number" min="1" inputmode="numeric" placeholder="Например, 10" aria-label="Подсетей на HWID">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_subnets_per_hwid">—</strong>
+                                    </div>
+                                </label>
+
+                                <div class="antifraud-row antifraud-row-state">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Предупреждения</div>
+                                        <div class="antifraud-row-desc">Уровень suspicious публикуется в ipguard_alerts только при включённых предупреждениях и подсетей &gt; max(1, HWID) × «подсетей для предупреждения» (и не выше порога алерта). Выключено — suspicious только в лог, как раньше.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <button class="antifraud-switch" id="antiabuse-ipguard-warnings-toggle" type="submit" name="action" value="ipguard_warnings_enable" role="switch" aria-checked="false">
+                                            <span class="antifraud-switch-track" aria-hidden="true"><span class="antifraud-switch-thumb"></span></span>
+                                            <span class="antifraud-switch-label" data-antiabuse-toggle-label>Включить</span>
+                                        </button>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Состояние</span>
+                                        <strong data-antiabuse-state="ipguard_warnings">—</strong>
+                                    </div>
+                                </div>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Подсетей на HWID для предупреждения</div>
+                                        <div class="antifraud-row-desc">Порог предупреждения: строго меньше «подсетей на HWID-устройство» (порога алерта).</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="warning_subnets_per_hwid" type="number" min="1" inputmode="numeric" placeholder="Например, 3" aria-label="Подсетей на HWID для предупреждения">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_warning_subnets_per_hwid">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Окно подсчёта</div>
+                                        <div class="antifraud-row-desc">За сколько часов считаются уникальные подсети.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="window_hours" type="number" min="1" inputmode="numeric" placeholder="Например, 24" aria-label="Окно, часов">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_window_hours">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Пауза между алертами</div>
+                                        <div class="antifraud-row-desc">Часов между повторными алертами по одной подписке.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="cooldown_hours" type="number" min="1" inputmode="numeric" placeholder="Например, 6" aria-label="Пауза, часов">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_alert_cooldown_hours">—</strong>
+                                    </div>
+                                </label>
+
+                                <div class="antifraud-footer">
+                                    <p class="antifraud-footer-note">Поля предзаполнены текущими значениями; порог предупреждения обязан быть строго меньше порога алерта.</p>
+                                    <button class="btn btn-secondary" type="submit" name="action" value="ipguard_set"><i class="fas fa-floppy-disk"></i>Сохранить</button>
+                                </div>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section class="card system-card antiabuse-card">
+                        <div class="referral-section-heading">
+                            <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-layer-group"></i></span>
+                            <div>
+                                <h2 class="system-card-title">Массовые операции по лимиту</h2>
+                                <p>Сначала предпросмотр (сколько подписок и первые 20), затем подтверждение. Обработка идёт порциями; сквады не меняются, подписки не пересоздаются. Снимаются только управляемые лимиты (с маркером); ручные капы владельца в панели пропускаются, платившим лимит не ставится.</p>
+                            </div>
+                        </div>
+                        <div class="antiabuse-bulk-list">
+                            <div class="antiabuse-bulk-row" data-antiabuse-bulk="apply_trial_limit">
+                                <div class="antiabuse-bulk-copy">
+                                    <strong>Применить лимит ко всем активным пробным без платежей</strong>
+                                    <span>Сегмент trial_active: подписка активна и ни одного успешного платежа. Работает только при включённом тумблере выше.</span>
+                                </div>
+                                <div class="antiabuse-bulk-controls">
+                                    <button class="btn btn-secondary" type="button" data-antiabuse-bulk-preview="apply_trial_limit"><i class="fas fa-eye"></i>Предпросмотр</button>
+                                    <button class="btn btn-danger" type="button" data-antiabuse-bulk-apply="apply_trial_limit" disabled><i class="fas fa-bolt"></i>Применить</button>
+                                </div>
+                                <div class="antiabuse-bulk-result" data-antiabuse-bulk-result="apply_trial_limit"></div>
+                            </div>
+                            <div class="antiabuse-bulk-row" data-antiabuse-bulk="remove_trial_limit">
+                                <div class="antiabuse-bulk-copy">
+                                    <strong>Снять лимит у всех пробных</strong>
+                                    <span>Сегмент never_paid: вернуть «как было» (0, без сброса, статус ACTIVE у ограниченных) — после выключения тумблера. Только управляемые лимиты; ручные пропускаются.</span>
+                                </div>
+                                <div class="antiabuse-bulk-controls">
+                                    <button class="btn btn-secondary" type="button" data-antiabuse-bulk-preview="remove_trial_limit"><i class="fas fa-eye"></i>Предпросмотр</button>
+                                    <button class="btn btn-danger" type="button" data-antiabuse-bulk-apply="remove_trial_limit" disabled><i class="fas fa-bolt"></i>Снять</button>
+                                </div>
+                                <div class="antiabuse-bulk-result" data-antiabuse-bulk-result="remove_trial_limit"></div>
+                            </div>
+                            <div class="antiabuse-bulk-row" data-antiabuse-bulk="remove_paid_limit">
+                                <div class="antiabuse-bulk-copy">
+                                    <strong>Снять лимит у всех, кто платил</strong>
+                                    <span>Страховка: сегмент paid_any — у платившего управляемого лимита пробного быть не должно. Ручные капы владельца (без маркера) не трогаются.</span>
+                                </div>
+                                <div class="antiabuse-bulk-controls">
+                                    <button class="btn btn-secondary" type="button" data-antiabuse-bulk-preview="remove_paid_limit"><i class="fas fa-eye"></i>Предпросмотр</button>
+                                    <button class="btn btn-danger" type="button" data-antiabuse-bulk-apply="remove_paid_limit" disabled><i class="fas fa-bolt"></i>Снять</button>
+                                </div>
+                                <div class="antiabuse-bulk-result" data-antiabuse-bulk-result="remove_paid_limit"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card system-card antiabuse-card" data-antiabuse-card="backfill">
+                        <div class="referral-section-heading">
+                            <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-tags"></i></span>
+                            <div>
+                                <h2 class="system-card-title">Управляемые лимиты (маркеры)</h2>
+                                <p>Автоматика — оплата, страховка notifier, кнопки этой вкладки — снимает только лимиты с маркером managed_traffic_limits, то есть поставленные ею самой. Ручные капы владельца в панели неприкосновенны. Лимиты пробных, поставленные до появления маркеров, нужно пометить один раз.</p>
+                            </div>
+                        </div>
+                        <div id="antiabuse-backfill-status" class="referral-antifraud-status" aria-live="polite"></div>
+                        <div class="antiabuse-bulk-list">
+                            <div class="antiabuse-bulk-row" data-antiabuse-bulk="backfill_markers">
+                                <div class="antiabuse-bulk-copy">
+                                    <strong>Пометить существующие лимиты пробных как управляемые</strong>
+                                    <span>Только если лимит в панели ровно равен текущему лимиту пробных (объём и стратегия). Другие лимиты — ручные капы владельца — не помечаются, лимиты админа из бота не перезаписываются. Платившие с таким лимитом показываются отдельной группой: после пометки его снимет страховка notifier или следующая оплата. Предпросмотр проходит по панели без записи.</span>
+                                </div>
+                                <div class="antiabuse-bulk-controls">
+                                    <button class="btn btn-secondary" type="button" data-antiabuse-backfill="1"><i class="fas fa-eye"></i>Предпросмотр</button>
+                                    <button class="btn btn-danger" type="button" data-antiabuse-backfill="0" disabled><i class="fas fa-tags"></i>Пометить</button>
+                                </div>
+                                <div class="antiabuse-bulk-result" data-antiabuse-bulk-result="backfill_markers"></div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card system-card antiabuse-card">
+                        <div class="antiabuse-alerts-toolbar">
+                            <h2 class="system-card-title" style="margin:0;">Последние алерты ip-guard</h2>
+                            <label class="client-number-field"><input class="input" id="antiabuse-ban-hours" type="number" min="1" step="1" value="24" aria-label="Длительность временного бана"><span>часа бана</span></label>
+                            <button type="button" class="subtab" id="antiabuse-alerts-refresh" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Обновить</button>
+                        </div>
+                        <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                            Последние 50 записей ipguard_alerts. «ID панели» — числовой ID пользователя Remnawave (email в access-логе xray);
+                            username подписки подтягивается из RWMS, при недоступности остаётся только ID. «Временный бан» — то же действие, что в карточке клиента.
+                        </div>
+                        <div id="antiabuse-alerts-table" style="margin-top:12px;overflow-x:auto;"></div>
+                    </section>
+
+                    <details class="card system-card system-settings-card antiabuse-raw">
+                        <summary class="system-card-title">Все ключи антиабьюза (raw)</summary>
+                        <div class="settings-list" data-settings-group="antiabuse"></div>
+                    </details>
+                </div>
             </div>
 
             <div id="subpanel-sys-sync" class="subtab-panel">
@@ -5744,6 +6037,7 @@
             if (tabId === 'system') {
                 loadRuntimeSettings();
                 loadReferralAntifraud();
+                loadAntiabuse();
             }
             if (tabId === 'infrastructure') initInfrastructureTab();
             history.replaceState(null, '', `#${tabId}`);
@@ -7936,6 +8230,11 @@
                         <strong class="client-summary-value" data-client-traffic-value aria-live="polite">Загрузка…</strong>
                         <span class="client-summary-meta" data-client-traffic-meta>Фактическое потребление</span>
                     </div>
+                    <div class="client-summary-stat" data-client-traffic-limit-stat>
+                        <span class="client-summary-label"><i class="fas fa-gauge-high"></i>Лимит трафика <small>RWMS</small></span>
+                        <strong class="client-summary-value" data-client-traffic-limit-value aria-live="polite">Загрузка…</strong>
+                        <span class="client-summary-meta" data-client-traffic-limit-meta>Статус подписки и HWID-устройства</span>
+                    </div>
                     <div class="client-summary-stat">
                         <span class="client-summary-label"><i class="fas fa-calendar"></i>Регистрация</span>
                         <strong class="client-summary-value">${escapeHtml(result.first_seen)}</strong>
@@ -8010,6 +8309,17 @@
                             </div>
                             <div class="client-action-list">
                                 <div class="client-action-row">
+                                    <span class="client-action-icon"><i class="fas fa-gauge-high"></i></span>
+                                    <div class="client-action-copy">
+                                        <strong>Лимит трафика пробного</strong>
+                                        <span>Применить лимит из настроек «Антиабьюз» (без сквадов, с маркером «управляемый») или снять: 0, без сброса, статус ACTIVE — ban-сквад не снимается. Снимается только управляемый лимит; ручной лимит владельца в панели не трогается</span>
+                                    </div>
+                                    <div class="client-action-controls">
+                                        <button class="btn btn-secondary client-action-button" type="button" data-client-sub-action="apply_trial_limit">Применить лимит</button>
+                                        <button class="btn btn-secondary client-action-button" type="button" data-client-sub-action="remove_traffic_limit">Снять лимит</button>
+                                    </div>
+                                </div>
+                                <div class="client-action-row">
                                     <span class="client-action-icon"><i class="fas fa-user-lock"></i></span>
                                     <div class="client-action-copy">
                                         <strong>Временная блокировка</strong>
@@ -8056,7 +8366,8 @@
         function formatClientTrafficBytes(value) {
             let number = Number(value);
             if (!Number.isFinite(number) || number < 0) return '—';
-            const units = ['Б', 'КБ', 'МБ', 'ГБ', 'ТБ'];
+            // Основание 1024 — подписи ГиБ/МиБ, как в настройках антиабьюза и панели.
+            const units = ['Б', 'КиБ', 'МиБ', 'ГиБ', 'ТиБ'];
             let unit = 0;
             while (number >= 1024 && unit < units.length - 1) {
                 number /= 1024;
@@ -8072,6 +8383,14 @@
             const statTarget = document.querySelector('[data-client-traffic-stat]');
             const firstConnectedTarget = document.querySelector('[data-client-first-connected-value]');
             const setFirstConnected = (text) => { if (firstConnectedTarget?.isConnected) firstConnectedTarget.textContent = text; };
+            const limitStat = document.querySelector('[data-client-traffic-limit-stat]');
+            const limitValue = document.querySelector('[data-client-traffic-limit-value]');
+            const limitMeta = document.querySelector('[data-client-traffic-limit-meta]');
+            const setLimit = (value, meta, limited = false) => {
+                if (limitValue?.isConnected) limitValue.textContent = value;
+                if (limitMeta?.isConnected) limitMeta.textContent = meta;
+                limitStat?.classList.toggle('is-limited', limited);
+            };
             if (!valueTarget || !metaTarget || !main.dataset.userTrafficUrl) return;
             try {
                 const params = new URLSearchParams({q: query});
@@ -8084,9 +8403,26 @@
                     metaTarget.textContent = 'Нет данных RWMS';
                     statTarget?.classList.add('is-unavailable');
                     setFirstConnected('—');
+                    setLimit('—', 'Нет данных RWMS');
                     return;
                 }
                 setFirstConnected(traffic.first_connected || 'Не подключался');
+                // Антиабьюз: лимит и стратегия сброса из панели, статус LIMITED
+                // (лимит исчерпан) выделяется, число HWID-устройств рядом.
+                const limitBytes = Number(traffic.traffic_limit_bytes) || 0;
+                const strategy = traffic.traffic_limit_strategy_label ? String(traffic.traffic_limit_strategy_label).toLowerCase() : '';
+                const hwid = traffic.hwid_devices === null || traffic.hwid_devices === undefined ? '—' : traffic.hwid_devices;
+                // Антиабьюз v2: управляемый лимит (маркер managed_traffic_limits,
+                // кто и когда поставил) либо ручной лимит панели (владелец).
+                const managed = traffic.managed_limit || {};
+                const managedLabel = limitBytes > 0 || managed.marker ? (managed.label || '') : '';
+                limitStat?.classList.toggle('is-managed', managed.kind === 'managed');
+                limitStat?.classList.toggle('is-manual', managed.kind === 'manual');
+                setLimit(
+                    limitBytes > 0 ? `${formatClientTrafficBytes(limitBytes)}${strategy ? ` · ${strategy}` : ''}` : 'Без лимита',
+                    `Статус: ${traffic.status || '—'}${traffic.is_limited ? ' — лимит исчерпан' : ''} · HWID-устройств: ${hwid}${managedLabel ? ` · ${managedLabel}` : ''}`,
+                    Boolean(traffic.is_limited),
+                );
                 const used = formatClientTrafficBytes(traffic.used_traffic_bytes);
                 const lifetime = formatClientTrafficBytes(traffic.lifetime_used_traffic_bytes);
                 valueTarget.textContent = used;
@@ -8099,6 +8435,7 @@
                 metaTarget.textContent = 'RWMS временно недоступен';
                 statTarget?.classList.add('is-unavailable');
                 setFirstConnected('—');
+                setLimit('—', 'RWMS временно недоступен');
             }
         }
 
@@ -8383,6 +8720,8 @@
 
         document.querySelector('#panel-system .subtab[data-subtab="sys-sync"]')?.addEventListener('click', loadSysSyncMismatches);
         document.querySelector('#panel-system .subtab[data-subtab="sys-audit"]')?.addEventListener('click', loadSysAuditLog);
+        document.querySelector('#panel-system .subtab[data-subtab="sys-antiabuse"]')?.addEventListener('click', loadIpguardAlerts);
+        document.getElementById('antiabuse-alerts-refresh')?.addEventListener('click', loadIpguardAlerts);
         document.getElementById('sys-sync-refresh')?.addEventListener('click', loadSysSyncMismatches);
         document.getElementById('sys-audit-refresh')?.addEventListener('click', loadSysAuditLog);
         document.getElementById('sys-audit-days')?.addEventListener('change', loadSysAuditLog);
@@ -8991,7 +9330,7 @@
             const target = document.getElementById('bulk-result');
             const head = result.dry_run
                 ? `<div class="info-card" style="margin-bottom:8px;">Предпросмотр: найдено ${result.total}, не найдено ${result.missing.length}. Проверьте список и нажмите «Применить».</div>`
-                : `<div class="info-card" style="margin-bottom:8px;">Готово: применено ${result.applied}/${result.total}.</div>`;
+                : `<div class="info-card" style="margin-bottom:8px;">Готово: применено ${result.applied}/${result.total}${result.skipped_paid ? `, пропущено платящих ${result.skipped_paid}` : ''}${result.skipped_manual ? `, ручных лимитов ${result.skipped_manual}` : ''}${result.skipped_admin_limit ? `, лимитов админа из бота (не тронуты) ${result.skipped_admin_limit}` : ''}${result.skipped ? `, без изменений ${result.skipped}` : ''}.</div>`;
             const missing = result.missing.length
                 ? `<div class="info-card red" style="margin-bottom:8px;">Не найдены: ${result.missing.map(escapeHtml).join(', ')}</div>` : '';
             target.innerHTML = head + missing + adminTable(
@@ -9675,13 +10014,16 @@
             block_account: 'Полностью заблокировать аккаунт (как /block-user)? Бот будет отвечать только «аккаунт заблокирован», рефералка и автоплатёж отключатся, подписка в RWMS → DISABLED.',
             unblock_account: 'Снять блокировку аккаунта? Доступ к боту и рефералка вернутся, подписка в RWMS станет ACTIVE (если срок не истёк); автоплатёж останется выключенным.',
             temp_ban: 'Временно забанить подписку (ban-сквад)? Снимется автоматически по истечении срока. Пользователю уйдёт уведомление о блокировке от бота.',
+            apply_trial_limit: 'Применить к подписке лимит трафика пробного из настроек «Антиабьюз»? Сквады и статус не меняются; платившему клиенту потребуется отдельное подтверждение.',
+            remove_traffic_limit: 'Снять лимит трафика (0, без сброса, статус ACTIVE у ограниченных)? Сквады не меняются — временный бан не снимется. Снимается только управляемый лимит (с маркером); ручной лимит владельца в панели не трогается.',
         };
 
-        async function clientSubscriptionAction(action) {
+        async function clientSubscriptionAction(action, extra = {}) {
             const formData = new FormData();
             formData.append('csrfmiddlewaretoken', csrfToken);
             formData.append('q', clientCardState.q);
             formData.append('action', action);
+            Object.entries(extra).forEach(([key, value]) => formData.append(key, String(value)));
             if (action === 'extend') {
                 const days = document.getElementById('client-extend-days')?.value;
                 if (!days || Number(days) < 1) {
@@ -9699,7 +10041,10 @@
                 }
                 formData.append('hours', hours);
             }
-            if (CLIENT_SUB_CONFIRMS[action] && !confirm(CLIENT_SUB_CONFIRMS[action])) return;
+            // Повтор после подтверждения 409 (force / override_manual / override_admin_limit) —
+            // первичный вопрос уже задавали.
+            const confirmedRetry = Boolean(extra.force || extra.override_manual || extra.override_admin_limit);
+            if (!confirmedRetry && CLIENT_SUB_CONFIRMS[action] && !confirm(CLIENT_SUB_CONFIRMS[action])) return;
             let response;
             try {
                 response = await fetch(main.dataset.subscriptionManageUrl, {
@@ -9712,7 +10057,54 @@
                 return;
             }
             if (!response.ok) {
-                showAdminToast('Не удалось выполнить действие', 'error');
+                // 503 при недоступности RWMS/панели несёт конкретное сообщение
+                // (срок в БД уже сохранён, панель не тронута) — показываем его.
+                let errorMessage = 'Не удалось выполнить действие';
+                let refusal = null;
+                try {
+                    const errorPayload = await response.json();
+                    if (errorPayload && errorPayload.message) errorMessage = errorPayload.message;
+                    if (response.status === 409 && errorPayload) {
+                        refusal = {
+                            paid: Boolean(errorPayload.paid),
+                            manual: Boolean(errorPayload.manual),
+                            adminLimit: Boolean(errorPayload.admin_limit),
+                            paidMessage: errorPayload.paid_message || errorMessage,
+                            manualMessage: errorPayload.manual_message || errorMessage,
+                            adminLimitMessage: errorPayload.admin_limit_message || errorMessage,
+                        };
+                    }
+                } catch (error) {}
+                // 409 «Применить лимит»: сервер перечисляет ВСЕ неподтверждённые вопросы
+                // (paid / manual / admin_limit), каждый подтверждается отдельно и своим
+                // флагом (force=1 / override_manual=1 / override_admin_limit=1): ответ
+                // «клиент платил — применить» НЕ разрешает замену ручного лимита владельца.
+                if (refusal && action === 'apply_trial_limit' && (refusal.paid || refusal.manual || refusal.adminLimit)) {
+                    const next = {...extra};
+                    if (refusal.paid && !extra.force) {
+                        // Страховка notifier: при включённом тумблере «Лимит новых пробных»
+                        // лимит у платившего снимается в следующем же цикле (с алертом админам).
+                        if (!confirm(`${refusal.paidMessage}\n\nВнимание: если лимиты пробных включены, страховка notifier снимет этот лимит у платившего клиента в следующем же цикле и пришлёт алерт админам.\n\nПрименить лимит всё равно?`)) return;
+                        next.force = '1';
+                    }
+                    if (refusal.manual && !extra.override_manual) {
+                        // Ручной лимит владельца: после замены он станет управляемым
+                        // (release_on=payment) — его снимет оплата или страховка notifier.
+                        if (!confirm(`${refusal.manualMessage}\n\nЗаменить ручной лимит панели лимитом пробного? Ручной лимит владельца будет ПЕРЕЗАПИСАН: лимит станет управляемым (release_on=payment) и снимется оплатой или страховкой notifier — владельцу придётся ставить кап заново.`)) return;
+                        next.override_manual = '1';
+                    }
+                    if (refusal.adminLimit && !extra.override_admin_limit) {
+                        // Лимит из кнопки алерта бота (release_on=manual): оплата его не
+                        // снимает; после замены станет снимаемым оплатой.
+                        if (!confirm(`${refusal.adminLimitMessage}\n\nЗаменить лимит админа из бота лимитом пробного? Он станет управляемым (release_on=payment) и снимется оплатой или страховкой notifier.`)) return;
+                        next.override_admin_limit = '1';
+                    }
+                    if (Object.keys(next).length > Object.keys(extra).length) {
+                        clientSubscriptionAction(action, next);
+                        return;
+                    }
+                }
+                showAdminToast(errorMessage, 'error');
                 return;
             }
             const payload = await response.json();
@@ -9910,7 +10302,10 @@
             // остаются сгруппированными, чтобы не дублироваться в «Прочих».
             {slug: 'referral-antifraud', keys: ['referral_registration_autoblock_enabled', 'referral_registration_burst_limit', 'referral_registration_burst_window_minutes']},
             {slug: 'alerts', keys: ['traffic_usage_suspicious_gb', 'traffic_usage_alert_gb']},
-            {slug: 'general', keys: ['trial_period_days', 'site_trial_registration_enabled', 'banned_telegram_ids', 'web_login_url', 'redirect_url', 'internal_squads_uuids', 'technical_work_enabled', 'apple_recommended_app', 'admin_report_enabled', 'admin_report_hour_msk']},
+            // Антиабьюз: основной UI — формы вкладки «Антиабьюз»; ключи
+            // сгруппированы, чтобы не уехать в «Прочие» (raw-список свёрнут).
+            {slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid']},
+            {slug: 'general', keys: ['trial_period_days', 'site_trial_registration_enabled', 'banned_telegram_ids', 'web_login_url', 'redirect_url', 'internal_squads_uuids', 'technical_work_enabled', 'apple_recommended_app', 'webapp_enabled', 'webapp_url', 'webapp_button_text', 'admin_report_enabled', 'admin_report_hour_msk']},
         ];
 
         function settingRowHtml(setting) {
@@ -10027,6 +10422,7 @@
             }
             showAdminToast(formData.get('action') === 'delete' ? 'Настройка удалена из БД' : 'Настройка сохранена');
             loadRuntimeSettings(true);
+            if (ANTIABUSE_KEYS.has(String(formData.get('key') || ''))) loadAntiabuse(true);
             loadReferralAntifraud();
         }
 
@@ -10108,6 +10504,393 @@
             loadRuntimeSettings();
             showAdminToast('Антифрод обновлен');
         }
+
+        // --- Антиабьюз: лимит трафика пробных и алерты ip-guard ----------------
+        const ANTIABUSE_KEYS = new Set(['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid']);
+        const ANTIABUSE_BULK_BATCH = 50;
+        const ANTIABUSE_CONFIRMS = {
+            trial_limit_enable: 'Включить лимит трафика для НОВЫХ пробных подписок без платежа? Уже существующие подписки не изменятся — для них есть «Применить лимит ко всем активным пробным» ниже.',
+            trial_limit_disable: 'Выключить лимит? Новые пробные будут создаваться без лимита (как раньше); уже ограниченные останутся до «Снять лимит у всех пробных».',
+            ipguard_enable: 'Включить алерты ip-guard админам по подсетям?',
+            ipguard_disable: 'Выключить алерты ip-guard? Детектор продолжит считать и писать в лог, но публиковать не будет.',
+            ipguard_warnings_enable: 'Включить предупреждения ip-guard (уровень suspicious) админам? Порог предупреждения должен быть строго меньше порога алерта.',
+            ipguard_warnings_disable: 'Выключить предупреждения ip-guard? Suspicious останется только в логе (как раньше), алерты не изменятся.',
+        };
+        const ANTIABUSE_BULK_LABELS = {
+            apply_trial_limit: 'Применить лимит ко всем активным пробным без платежей',
+            remove_trial_limit: 'Снять лимит у всех пробных',
+            remove_paid_limit: 'Снять лимит у всех, кто платил',
+        };
+        const ANTIABUSE_BACKFILL_LABEL = 'Пометить существующие лимиты пробных как управляемые';
+
+        function formatGib(value) {
+            const number = Number(value);
+            if (!Number.isFinite(number) || number <= 0) return '—';
+            if (number < 1) return `${new Intl.NumberFormat('ru-RU', {maximumFractionDigits: 1}).format(number * 1024)} МиБ`;
+            return `${new Intl.NumberFormat('ru-RU', {maximumFractionDigits: 3}).format(number)} ГиБ`;
+        }
+
+        // stateKey — какой из индикаторов состояния формы обновлять
+        // ([data-antiabuse-state="..."]); primary — тумблер всей карточки
+        // (красит панель), иначе — вложенный (предупреждения ip-guard).
+        function antiabuseSetToggle(form, toggleId, isEnabled, enableAction, disableAction, stateKey = null, primary = true) {
+            const toggle = document.getElementById(toggleId);
+            if (toggle) {
+                toggle.value = isEnabled ? disableAction : enableAction;
+                toggle.setAttribute('aria-checked', String(isEnabled));
+                const actionLabel = isEnabled ? 'Выключить' : 'Включить';
+                toggle.title = actionLabel;
+                const label = toggle.querySelector('[data-antiabuse-toggle-label]');
+                if (label) label.textContent = actionLabel;
+            }
+            const panel = form?.querySelector('.antifraud-panel');
+            if (panel && primary) panel.classList.toggle('is-enabled', isEnabled);
+            const state = form?.querySelector(stateKey ? `[data-antiabuse-state="${stateKey}"]` : '[data-antiabuse-state]');
+            if (state) {
+                state.textContent = isEnabled ? 'Включено' : 'Выключено';
+                state.dataset.antiabuseSubstate = isEnabled ? 'on' : 'off';
+            }
+        }
+
+        function antiabuseSetCurrent(form, name, text) {
+            const target = form?.querySelector(`[data-antiabuse-current="${name}"]`);
+            if (target) target.textContent = text;
+        }
+
+        // Предзаполнение поля актуальным значением (при загрузке вкладки и
+        // после сохранения) — форма всегда показывает текущее состояние.
+        function antiabuseSetField(form, name, value) {
+            const field = form?.elements?.[name];
+            if (field) field.value = value === null || value === undefined ? '' : String(value);
+        }
+
+        function antiabuseNumberText(value) {
+            const number = Number(value);
+            if (!Number.isFinite(number)) return '';
+            return String(Number(number.toFixed(10)));
+        }
+
+        function antiabuseOptionsHtml(items, selected) {
+            return (items || []).map((item) => `<option value="${escapeHtml(item.value)}"${String(item.value) === String(selected ?? '') ? ' selected' : ''}>${escapeHtml(item.label)}</option>`).join('');
+        }
+
+        function renderAntiabuse(payload) {
+            const effective = payload.effective || {};
+            const trialForm = document.getElementById('antiabuse-trial-form');
+            if (trialForm) {
+                const select = trialForm.querySelector('[data-antiabuse-strategy-select]');
+                if (select) select.innerHTML = antiabuseOptionsHtml(payload.strategies, effective.trial_traffic_limit_strategy);
+                // Лимит в БД хранится в ГиБ; меньше 1 ГиБ показываем в МиБ.
+                const limitGib = Number(effective.trial_traffic_limit_gb);
+                if (Number.isFinite(limitGib) && limitGib > 0 && limitGib < 1) {
+                    antiabuseSetField(trialForm, 'limit_value', antiabuseNumberText(limitGib * 1024));
+                    antiabuseSetField(trialForm, 'limit_unit', 'mib');
+                } else {
+                    antiabuseSetField(trialForm, 'limit_value', Number.isFinite(limitGib) && limitGib > 0 ? antiabuseNumberText(limitGib) : '');
+                    antiabuseSetField(trialForm, 'limit_unit', 'gib');
+                }
+                antiabuseSetToggle(trialForm, 'antiabuse-trial-toggle', Boolean(effective.trial_traffic_limit_enabled), 'trial_limit_enable', 'trial_limit_disable', 'trial');
+                antiabuseSetCurrent(trialForm, 'trial_traffic_limit_gb', formatGib(effective.trial_traffic_limit_gb));
+                antiabuseSetCurrent(trialForm, 'trial_traffic_limit_strategy', effective.trial_traffic_limit_strategy_label || '—');
+                antiabuseSetCurrent(trialForm, 'trial_traffic_limit_label', effective.trial_traffic_limit_label || '—');
+            }
+            const ipguardForm = document.getElementById('antiabuse-ipguard-form');
+            if (ipguardForm) {
+                const select = ipguardForm.querySelector('[data-antiabuse-segment-select]');
+                if (select) select.innerHTML = antiabuseOptionsHtml(payload.segments, effective.ipguard_alert_segment);
+                antiabuseSetField(ipguardForm, 'subnets_per_hwid', effective.ipguard_subnets_per_hwid);
+                antiabuseSetField(ipguardForm, 'warning_subnets_per_hwid', effective.ipguard_warning_subnets_per_hwid);
+                antiabuseSetField(ipguardForm, 'window_hours', effective.ipguard_window_hours);
+                antiabuseSetField(ipguardForm, 'cooldown_hours', effective.ipguard_alert_cooldown_hours);
+                antiabuseSetToggle(ipguardForm, 'antiabuse-ipguard-toggle', Boolean(effective.ipguard_alerts_enabled), 'ipguard_enable', 'ipguard_disable', 'ipguard');
+                antiabuseSetToggle(ipguardForm, 'antiabuse-ipguard-warnings-toggle', Boolean(effective.ipguard_warnings_enabled), 'ipguard_warnings_enable', 'ipguard_warnings_disable', 'ipguard_warnings', false);
+                antiabuseSetCurrent(ipguardForm, 'ipguard_alert_segment', effective.ipguard_alert_segment_label || '—');
+                antiabuseSetCurrent(ipguardForm, 'ipguard_subnets_per_hwid', effective.ipguard_subnets_per_hwid ?? '—');
+                antiabuseSetCurrent(ipguardForm, 'ipguard_warning_subnets_per_hwid', effective.ipguard_warning_subnets_per_hwid ?? '—');
+                antiabuseSetCurrent(ipguardForm, 'ipguard_window_hours', effective.ipguard_window_hours ? `${effective.ipguard_window_hours} ч` : '—');
+                antiabuseSetCurrent(ipguardForm, 'ipguard_alert_cooldown_hours', effective.ipguard_alert_cooldown_hours ? `${effective.ipguard_alert_cooldown_hours} ч` : '—');
+            }
+            ['antiabuse-trial-status', 'antiabuse-ipguard-status'].forEach((id) => {
+                const target = document.getElementById(id);
+                if (target) target.innerHTML = '';
+            });
+            const backfillStatus = document.getElementById('antiabuse-backfill-status');
+            if (backfillStatus) {
+                backfillStatus.innerHTML = payload.managed_limits_available === false
+                    ? inlineError('Таблица managed_traffic_limits отсутствует — примените миграцию. Действия с лимитами (карточка, массовые операции, пометка) недоступны, регистрация работает без маркеров.')
+                    : '';
+            }
+            document.querySelectorAll('[data-antiabuse-backfill="1"]').forEach((button) => { button.disabled = payload.managed_limits_available === false; });
+        }
+
+        async function loadAntiabuse(silent = false) {
+            const status = document.getElementById('antiabuse-trial-status');
+            if (!status || !main.dataset.antiabuseUrl) return;
+            if (!silent) status.innerHTML = inlineLoading('Загружаем...');
+            try {
+                const response = await fetch(main.dataset.antiabuseUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store'});
+                if (!response.ok) throw new Error();
+                renderAntiabuse(await response.json());
+            } catch (error) {
+                status.innerHTML = inlineError('Не удалось загрузить настройки антиабьюза');
+            }
+        }
+
+        async function submitAntiabuseForm(event) {
+            event.preventDefault();
+            const form = event.target;
+            const formData = new FormData(form);
+            const action = event.submitter?.value || form.querySelector('.antifraud-implicit-submit')?.value || '';
+            formData.set('action', action);
+            if (ANTIABUSE_CONFIRMS[action] && !confirm(ANTIABUSE_CONFIRMS[action])) return;
+            let response;
+            try {
+                response = await fetch(main.dataset.antiabuseUrl, {
+                    method: 'POST',
+                    body: formData,
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                });
+            } catch (error) {
+                showAdminToast('Ошибка запроса', 'error');
+                return;
+            }
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.status !== 'ok') {
+                showAdminToast(payload.message || 'Не удалось сохранить настройки антиабьюза', 'error');
+                return;
+            }
+            renderAntiabuse(payload);
+            loadRuntimeSettings(true);
+            // Перечитываем GET после POST: форма показывает то, что реально в БД.
+            loadAntiabuse(true);
+            showAdminToast('Антиабьюз обновлён');
+        }
+
+        function antiabuseBulkElements(action) {
+            const row = document.querySelector(`[data-antiabuse-bulk="${action}"]`);
+            return {
+                row,
+                result: row?.querySelector('[data-antiabuse-bulk-result]'),
+                preview: row?.querySelector('[data-antiabuse-bulk-preview]'),
+                apply: row?.querySelector('[data-antiabuse-bulk-apply]'),
+            };
+        }
+
+        async function antiabuseBulkRequest(action, params) {
+            const body = new FormData();
+            body.append('csrfmiddlewaretoken', csrfToken);
+            body.append('action', action);
+            Object.entries(params).forEach(([key, value]) => body.append(key, String(value)));
+            const response = await fetch(main.dataset.antiabuseBulkUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+            const payload = await response.json().catch(() => ({}));
+            return {ok: response.ok && payload.status === 'ok', payload};
+        }
+
+        async function antiabuseBulkPreview(action) {
+            const els = antiabuseBulkElements(action);
+            if (!els.result) return;
+            els.result.innerHTML = inlineLoading('Считаем предпросмотр...');
+            if (els.apply) els.apply.disabled = true;
+            const {ok, payload} = await antiabuseBulkRequest(action, {dry_run: '1'});
+            if (!ok) {
+                els.result.innerHTML = '';
+                return showAdminToast(payload.message || 'Ошибка предпросмотра', 'error');
+            }
+            const result = payload.result || {};
+            const preview = result.preview || [];
+            els.result.innerHTML = `<div class="info-card">Предпросмотр: подписок в сегменте — <b>${result.total}</b>${result.limit_label ? ` · лимит ${escapeHtml(result.limit_label)}` : ''}.${preview.length ? ` Первые ${preview.length}: ${preview.map(escapeHtml).join(', ')}` : ''}${result.total > preview.length ? ' …' : ''} Ничего не изменено — нажмите «Применить»/«Снять».</div>`;
+            if (els.apply) els.apply.disabled = !(result.total > 0);
+        }
+
+        function antiabuseBulkProgressHtml(totals, done, message) {
+            const head = done ? 'Готово' : 'Обработка…';
+            const failures = totals.failures.length
+                ? `<div class="info-card red" style="margin-top:8px;">Ошибки: ${totals.failures.slice(0, 20).map((f) => `${escapeHtml(f.username)} — ${escapeHtml(f.message)}`).join('; ')}</div>` : '';
+            const extra = [
+                totals.marked ? `помечено управляемыми ${totals.marked}` : '',
+                totals.skippedPaid ? `пропущено платящих ${totals.skippedPaid}` : '',
+                totals.skippedManual ? `ручных лимитов (не тронуты) ${totals.skippedManual}` : '',
+                totals.skippedAdminLimit ? `лимитов админа из бота (не тронуты) ${totals.skippedAdminLimit}` : '',
+            ].filter(Boolean);
+            return `<div class="info-card${message ? ' red' : ''}">${head}: обработано ${totals.processed}, изменено ${totals.applied}${extra.length ? `, ${extra.join(', ')}` : ''}, без изменений/пропущено ${totals.skipped}, ошибок ${totals.failed}.${message ? ` ${escapeHtml(message)}` : ''}</div>${failures}`;
+        }
+
+        async function antiabuseBulkApply(action) {
+            const els = antiabuseBulkElements(action);
+            if (!els.result || !els.apply) return;
+            const label = ANTIABUSE_BULK_LABELS[action] || action;
+            if (!confirm(`${label}? Операция пойдёт порциями по ${ANTIABUSE_BULK_BATCH} подписок; сквады не меняются, подписки не пересоздаются.`)) return;
+            const totals = {processed: 0, applied: 0, marked: 0, skipped: 0, skippedPaid: 0, skippedManual: 0, skippedAdminLimit: 0, failed: 0, failures: []};
+            let afterId = 0;
+            els.apply.disabled = true;
+            if (els.preview) els.preview.disabled = true;
+            els.result.innerHTML = inlineLoading('Применяем...');
+            try {
+                for (;;) {
+                    const {ok, payload} = await antiabuseBulkRequest(action, {dry_run: '0', after_id: afterId, batch_size: ANTIABUSE_BULK_BATCH});
+                    const result = payload.result || null;
+                    if (result) {
+                        totals.processed += result.processed || 0;
+                        totals.applied += result.applied || 0;
+                        totals.marked += result.marked || 0;
+                        totals.skipped += result.skipped || 0;
+                        totals.skippedPaid += result.skipped_paid || 0;
+                        totals.skippedManual += result.skipped_manual || 0;
+                        totals.skippedAdminLimit += result.skipped_admin_limit || 0;
+                        totals.failed += result.failed || 0;
+                        totals.failures.push(...(result.failures || []));
+                        afterId = result.next_after_id ?? afterId;
+                    }
+                    if (!ok) {
+                        els.result.innerHTML = antiabuseBulkProgressHtml(totals, false, payload.message || 'Ошибка');
+                        showAdminToast(payload.message || 'Ошибка массовой операции', 'error');
+                        break;
+                    }
+                    els.result.innerHTML = antiabuseBulkProgressHtml(totals, Boolean(result?.done), '');
+                    if (!result || result.done) {
+                        showAdminToast(`${label}: изменено ${totals.applied}`);
+                        break;
+                    }
+                }
+            } finally {
+                if (els.preview) els.preview.disabled = false;
+            }
+        }
+
+        // Backfill маркеров: тот же порционный конвейер, что у массовых операций;
+        // dry_run=1 — проход по панели без записи (предпросмотр).
+        async function antiabuseBackfillRequest(params) {
+            const body = new FormData();
+            body.append('csrfmiddlewaretoken', csrfToken);
+            Object.entries(params).forEach(([key, value]) => body.append(key, String(value)));
+            const response = await fetch(main.dataset.antiabuseBackfillUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+            const payload = await response.json().catch(() => ({}));
+            return {ok: response.ok && payload.status === 'ok', payload};
+        }
+
+        function antiabuseBackfillProgressHtml(totals, dryRun, done, message) {
+            const head = done ? (dryRun ? 'Предпросмотр' : 'Готово') : 'Обработка…';
+            const marked = dryRun ? `будет помечено ${totals.marked}` : `помечено ${totals.marked}`;
+            // Платившие с ровно лимитом пробного — отдельной группой: после пометки
+            // такой лимит снимет страховка notifier / следующая оплата.
+            const markedPaid = totals.markedPaid
+                ? `, <strong>платившие с лимитом пробного: ${totals.markedPaid}</strong> — ${dryRun ? 'будут помечены' : 'помечены'} и сняты страховкой notifier/оплатой`
+                : '';
+            return `<div class="info-card${message ? ' red' : ''}">${head}: обработано ${totals.processed}, ${marked}${markedPaid}, уже управляемых ${totals.already}, без лимита или с другим (ручным) лимитом ${totals.skipped}, нет в панели ${totals.missing}${totals.limitLabel ? ` · лимит пробных ${escapeHtml(totals.limitLabel)}` : ''}.${message ? ` ${escapeHtml(message)}` : ''}${dryRun && done && !message ? ' Ничего не изменено — нажмите «Пометить».' : ''}</div>`;
+        }
+
+        async function antiabuseBackfillRun(dryRun) {
+            const els = antiabuseBulkElements('backfill_markers');
+            const buttons = Array.from(document.querySelectorAll('[data-antiabuse-backfill]'));
+            const applyButton = buttons.find((button) => button.dataset.antiabuseBackfill === '0');
+            if (!els.result) return;
+            if (!dryRun && !confirm(`${ANTIABUSE_BACKFILL_LABEL}? Помечаются только лимиты, равные текущему лимиту пробных (объём и стратегия); панель не меняется. У плативших такой лимит после пометки снимет страховка notifier или следующая оплата.`)) return;
+            const totals = {processed: 0, marked: 0, markedPaid: 0, already: 0, skipped: 0, missing: 0, limitLabel: ''};
+            let afterId = 0;
+            buttons.forEach((button) => { button.disabled = true; });
+            els.result.innerHTML = inlineLoading(dryRun ? 'Проходим по панели...' : 'Помечаем...');
+            try {
+                for (;;) {
+                    const {ok, payload} = await antiabuseBackfillRequest({dry_run: dryRun ? '1' : '0', after_id: afterId, batch_size: ANTIABUSE_BULK_BATCH});
+                    const result = payload.result || null;
+                    if (result) {
+                        totals.processed += result.processed || 0;
+                        totals.marked += result.marked || 0;
+                        totals.markedPaid += result.marked_paid || 0;
+                        totals.already += result.already || 0;
+                        totals.skipped += result.skipped || 0;
+                        totals.missing += result.missing || 0;
+                        totals.limitLabel = result.limit_label || totals.limitLabel;
+                        afterId = result.next_after_id ?? afterId;
+                    }
+                    if (!ok) {
+                        els.result.innerHTML = antiabuseBackfillProgressHtml(totals, dryRun, false, payload.message || 'Ошибка');
+                        showAdminToast(payload.message || 'Ошибка пометки лимитов', 'error');
+                        break;
+                    }
+                    els.result.innerHTML = antiabuseBackfillProgressHtml(totals, dryRun, Boolean(result?.done), '');
+                    if (!result || result.done) {
+                        showAdminToast(dryRun ? `Предпросмотр: будет помечено ${totals.marked + totals.markedPaid}` : `Помечено управляемыми: ${totals.marked + totals.markedPaid}`);
+                        if (applyButton) applyButton.disabled = !(dryRun && totals.marked + totals.markedPaid > 0);
+                        break;
+                    }
+                }
+            } finally {
+                buttons.filter((button) => button.dataset.antiabuseBackfill === '1').forEach((button) => { button.disabled = false; });
+            }
+        }
+
+        function ipguardAlertRowHtml(row) {
+            const levelClass = row.level === 'alert' ? 'red' : 'gold';
+            const client = row.username
+                ? `<button type="button" class="client-text-button" data-ipguard-open-card="${escapeHtml(row.username)}">${escapeHtml(row.username)}</button>${row.local_user ? '' : ' <span class="muted">(нет в БД)</span>'}${row.user_uuid ? ` <span class="muted" title="${escapeHtml(row.user_uuid)}">uuid</span>` : ''}`
+                : '<span class="muted">не разрешён (RWMS)</span>';
+            const ban = row.username && row.local_user
+                ? `<button type="button" class="btn btn-danger" data-ipguard-temp-ban="${escapeHtml(row.username)}"><i class="fas fa-user-lock"></i>Временный бан</button>`
+                : '';
+            return [
+                escapeHtml(row.created_at || '—'),
+                `<span class="${levelClass}">${escapeHtml(row.level || '—')}</span>`,
+                escapeHtml(row.panel_id || '—'),
+                client,
+                `${escapeHtml(row.unique_subnet_count)} / ${escapeHtml(row.unique_ip_count)}`,
+                escapeHtml(row.threshold ?? '—'),
+                `${escapeHtml(row.window_hours ?? '—')} ч`,
+                escapeHtml((row.nodes || []).join(', ') || '—'),
+                ban,
+            ];
+        }
+
+        async function loadIpguardAlerts() {
+            const target = document.getElementById('antiabuse-alerts-table');
+            if (!target || !main.dataset.ipguardAlertsUrl) return;
+            target.innerHTML = inlineLoading('Загружаем алерты...');
+            try {
+                const response = await fetch(main.dataset.ipguardAlertsUrl, {headers: {'X-Requested-With': 'XMLHttpRequest'}, cache: 'no-store'});
+                const payload = await response.json();
+                if (!response.ok || payload.status !== 'ok') throw new Error();
+                const rows = payload.result?.alerts || [];
+                target.innerHTML = rows.length
+                    ? adminTable(['Когда', 'Уровень', 'ID панели', 'Клиент', 'Подсетей / IP', 'Порог', 'Окно', 'Ноды', ''], rows.map(ipguardAlertRowHtml))
+                    : '<div class="info-card muted">Алертов нет.</div>';
+            } catch (error) {
+                target.innerHTML = '<div class="info-card red">Не удалось загрузить алерты ip-guard</div>';
+            }
+        }
+
+        async function ipguardTempBan(username) {
+            // То же действие temp_ban, что в карточке клиента (по users.username).
+            const hours = document.getElementById('antiabuse-ban-hours')?.value;
+            if (!hours || Number(hours) < 1) return showAdminToast('Укажите длительность бана в часах', 'error');
+            if (!confirm(`Временно забанить подписку ${username} на ${hours} ч (ban-сквад)? Снимется автоматически по истечении срока. Пользователю уйдёт уведомление о блокировке от бота.`)) return;
+            const formData = new FormData();
+            formData.append('csrfmiddlewaretoken', csrfToken);
+            formData.append('q', username);
+            formData.append('action', 'temp_ban');
+            formData.append('hours', hours);
+            let response;
+            try {
+                response = await fetch(main.dataset.subscriptionManageUrl, {method: 'POST', body: formData, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+            } catch (error) {
+                return showAdminToast('Ошибка запроса', 'error');
+            }
+            const payload = await response.json().catch(() => ({}));
+            if (!response.ok || payload.status !== 'ok') return showAdminToast(payload.message || 'Не удалось выполнить временный бан', 'error');
+            showAdminToast(payload.result?.action_label || 'Временный бан установлен');
+        }
+
+        document.addEventListener('click', (event) => {
+            const ban = event.target.closest('[data-ipguard-temp-ban]');
+            if (ban) { ipguardTempBan(ban.dataset.ipguardTempBan); return; }
+            const open = event.target.closest('[data-ipguard-open-card]');
+            if (open) { openClientCardFromNodeTraffic(open.dataset.ipguardOpenCard); return; }
+            const preview = event.target.closest('[data-antiabuse-bulk-preview]');
+            if (preview) { antiabuseBulkPreview(preview.dataset.antiabuseBulkPreview); return; }
+            const apply = event.target.closest('[data-antiabuse-bulk-apply]');
+            if (apply) { antiabuseBulkApply(apply.dataset.antiabuseBulkApply); return; }
+            const backfill = event.target.closest('[data-antiabuse-backfill]');
+            if (backfill) antiabuseBackfillRun(backfill.dataset.antiabuseBackfill === '1');
+        });
 
         async function clientReferralBlockAction(button) {
             const action = button.dataset.clientReferralBlockAction;
@@ -11685,6 +12468,7 @@
 
         document.addEventListener('submit', (event) => {
             if (event.target.matches('[data-setting-form]')) submitRuntimeSetting(event);
+            if (event.target.matches('[data-antiabuse-form]')) submitAntiabuseForm(event);
         });
         document.addEventListener('input', (event) => {
             if (event.target.matches('[data-setting-control]')) updateSettingDirtyState(event.target);
@@ -13289,6 +14073,7 @@
                         <div class="infra-detail-who-totals">
                             <span class="infra-detail-who-pill">уникальных IP ${(who.unique_ips_24h || 0).toLocaleString('ru-RU')}</span>
                             <span class="infra-detail-who-pill">за час ${(who.unique_ips_1h || 0).toLocaleString('ru-RU')}</span>
+                            ${Number(who.excluded_node_ips || 0) > 0 ? `<span class="infra-detail-who-pill" title="Адреса самих нод (стоят на интерфейсе серверов инфраструктуры, включая мосты) не считаются подключениями пользователей">исключено адресов нод: ${Number(who.excluded_node_ips || 0).toLocaleString('ru-RU')}</span>` : ''}
                             ${geo.enabled && whoHasData ? `<span class="infra-detail-who-pill">определено ${(geo.located_ips || 0).toLocaleString('ru-RU')} из ${(geo.total_ips || 0).toLocaleString('ru-RU')}</span><span class="infra-detail-who-pill">из России ${Number(geo.russia_share_pct || 0).toFixed(1)}%</span>` : ''}
                         </div>
                     </header>

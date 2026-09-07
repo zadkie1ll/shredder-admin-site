@@ -1,6 +1,7 @@
 import hashlib
 import hmac
 import json
+import re
 import time
 from contextlib import ExitStack
 from datetime import date
@@ -24,6 +25,7 @@ from common.models.db import WataInvoice
 from common.models.db import WataTransaction
 from common.models.db import YkPayment
 
+from common.models.settings import RUNTIME_SETTING_KEYS
 from common.models.settings import BOT_APPLE_RECOMMENDED_APP_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_ONEDAY_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_THREEDAYS_SETTING
@@ -2292,7 +2294,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         # вместо жёсткой двухколоночной сетки, вылезавшей за экран.
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
-        for slug in ("sys-tariffs", "sys-winback", "sys-payment", "sys-referral", "sys-alerts", "sys-general"):
+        for slug in ("sys-tariffs", "sys-winback", "sys-payment", "sys-referral", "sys-alerts", "sys-antiabuse", "sys-general"):
             self.assertIn(f'data-subtab="{slug}"', template)
             self.assertIn(f'id="subpanel-{slug}"', template)
         # Runtime-настройки раскладываются по контейнерам групп.
@@ -5466,6 +5468,46 @@ class ReferralAntifraudPanelTests(SimpleTestCase):
         self.assertIn("target.innerHTML = '';", self.template)
 
 
+class AdminSettingsGroupsTests(SimpleTestCase):
+    """Вкладки раздела «Система» строятся по захардкоженному в шаблоне списку
+    SETTING_GROUPS. Любой ключ из реестра common обязан попасть в группу —
+    иначе он молча уезжает в «Прочие» и остаётся без нормального UI."""
+
+    def _grouped_keys(self):
+        template = (
+            Path(__file__).resolve().parent / "templates" / "admin_dashboard.html"
+        ).read_text(encoding="utf-8")
+        block = re.search(
+            r"const SETTING_GROUPS = \[(.*?)\n        \];", template, re.S
+        )
+        self.assertIsNotNone(block, "не найден блок SETTING_GROUPS")
+        slugs = {
+            "tariffs",
+            "winback",
+            "payment",
+            "referral",
+            "referral-antifraud",
+            "alerts",
+            "antiabuse",
+            "general",
+        }
+        return set(re.findall(r"'([a-z_0-9]+)'", block.group(1))) - slugs
+
+    def test_every_runtime_setting_key_is_grouped(self):
+        self.assertEqual(set(RUNTIME_SETTING_KEYS) - self._grouped_keys(), set())
+
+    def test_no_unknown_keys_in_groups(self):
+        self.assertEqual(self._grouped_keys() - set(RUNTIME_SETTING_KEYS), set())
+
+    def test_mini_app_keys_are_grouped_into_general(self):
+        # Ключи Mini App (`webapp_*`) — рабочие настройки бота острова; без
+        # группы они уезжали в скрытую карточку «Прочие» и переставали
+        # находиться глазами в подвкладке «Общие».
+        grouped = self._grouped_keys()
+        for key in ("webapp_enabled", "webapp_url", "webapp_button_text"):
+            self.assertIn(key, grouped, key)
+
+
 class AdSpendMultiAccountTests(SimpleTestCase):
     def test_model_has_account_with_composite_unique(self):
         from common.models.db import AdSpend
@@ -6019,6 +6061,12 @@ class AdminClientWorkspaceTests(SimpleTestCase):
                 "used_traffic_bytes": None,
                 "lifetime_used_traffic_bytes": None,
                 "first_connected": None,
+                "traffic_limit_bytes": None,
+                "traffic_limit_strategy": None,
+                "traffic_limit_strategy_label": None,
+                "status": None,
+                "is_limited": False,
+                "hwid_devices": None,
             },
         )
 
@@ -6657,6 +6705,256 @@ class AdminStage4Tests(SimpleTestCase):
         self.assertIn('id="bulk-preview"', template)
         self.assertIn("dry-run", template)
         self.assertIn('data-broadcast-stop=', template)
+
+
+class AdminSubscriptionManageRwmsStrictTests(SimpleTestCase):
+    """Админ-действия по сроку (extend / set_trial_hour) читают панель строго.
+
+    Блип RWMS/панели (RwmsUnavailableError) — НЕ «подписки нет»: ответ 503,
+    rwms_updated=false и никакого AddUser/пересоздания; срок в БД при этом
+    уже сохранён (БД — истина по времени). Пересоздание через
+    create_user_until — только по достоверному NOT_FOUND (None), как раньше;
+    найденная запись обновляется update_user in-place."""
+
+    class _FakeSession:
+        def __init__(self):
+            self.added = []
+            self.commits = 0
+            self.closed = False
+            self.recurrent_deletes = 0
+
+        def get(self, model, key):
+            # system_settings пусты: антиабьюз выключен (дефолты common)
+            return None
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        def query(self, *models):
+            session = self
+
+            class _Query:
+                def filter(self, *args, **kwargs):
+                    return self
+
+                def delete(self, synchronize_session=False):
+                    session.recurrent_deletes += 1
+                    return 1
+
+            return _Query()
+
+        def commit(self):
+            self.commits += 1
+
+        def close(self):
+            self.closed = True
+
+    def _user(self):
+        return SimpleNamespace(
+            id=7,
+            username="42",
+            email="user@example.com",
+            telegram_id=42,
+            # Срок в будущем: база продления — expire_at из БД, а не utcnow.
+            expire_at=datetime(2030, 1, 1, 12, 0, 0),
+            autopay_allow=True,
+        )
+
+    def _call(self, action, client, days=None):
+        from engine.views import support_admin_api_subscription_manage
+
+        session = self._FakeSession()
+        user = self._user()
+        data = {"q": user.username, "action": action}
+        if days is not None:
+            data["days"] = str(days)
+        request = RequestFactory().post(
+            "/support-admin/api/subscription-manage/", data=data
+        )
+        request.session = {}
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+            mock.patch("engine.views.admin_find_user", return_value=user),
+            mock.patch("engine.views.rwms_client", client),
+        ):
+            response = support_admin_api_subscription_manage(request)
+        return response, session, user
+
+    def test_rwms_unavailable_returns_503_and_never_recreates(self):
+        from datetime import timedelta
+
+        original_expire = self._user().expire_at
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = RwmsUnavailableError(
+            "42", None, "panel down"
+        )
+
+        with self.assertLogs(level="WARNING") as logs:
+            response, session, user = self._call("extend", client, days=7)
+
+        self.assertEqual(response.status_code, 503)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["status"], "error")
+        self.assertIn("временно недоступны", payload["message"])
+        self.assertIs(payload["result"]["rwms_updated"], False)
+        self.assertEqual(payload["result"]["user"]["username"], "42")
+        # Панель не тронута: ни update, ни AddUser/пересоздания.
+        client.add_user.assert_not_called()
+        client.update_user.assert_not_called()
+        client.get_user_by_username.assert_not_called()
+        client.get_user_by_username_strict.assert_called_once_with("42")
+        # Срок в БД уже сохранён (БД — истина по времени), сессия закрыта.
+        self.assertEqual(session.commits, 1)
+        self.assertEqual(user.expire_at, original_expire + timedelta(days=7))
+        self.assertTrue(session.closed)
+        self.assertTrue(any("panel left untouched" in line for line in logs.output))
+
+    def test_rwms_unavailable_on_refund_prep_keeps_autopay_removed(self):
+        """«Подготовить возврат» при блипе панели: автоплатёж всё равно снят и
+        рекуррент удалён в БД (иначе клиенту спишут повторно), панель — 503
+        без пересоздания."""
+        from datetime import timedelta
+
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = RwmsUnavailableError(
+            "42", None, "panel down"
+        )
+
+        with self.assertLogs(level="WARNING"):
+            response, session, user = self._call("set_trial_hour", client)
+
+        self.assertEqual(response.status_code, 503)
+        payload = json.loads(response.content)
+        self.assertIs(payload["result"]["rwms_updated"], False)
+        self.assertEqual(payload["result"]["removed_recurrents"], 1)
+        self.assertFalse(user.autopay_allow)
+        self.assertEqual(session.recurrent_deletes, 1)
+        self.assertEqual(session.commits, 1)
+        self.assertLess(user.expire_at, datetime.utcnow() + timedelta(hours=1, minutes=1))
+        client.add_user.assert_not_called()
+        client.update_user.assert_not_called()
+
+    def test_confirmed_not_found_recreates_subscription_as_before(self):
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None  # достоверный NOT_FOUND
+        client.add_user.return_value = SimpleNamespace(uuid="recreated")
+
+        with self.assertLogs(level="WARNING") as logs:
+            response, session, user = self._call("extend", client, days=3)
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        self.assertEqual(payload["status"], "ok")
+        self.assertIs(payload["result"]["rwms_updated"], True)
+        client.add_user.assert_called_once()
+        add_request = client.add_user.call_args.args[0]
+        self.assertEqual(add_request.username, "42")
+        self.assertEqual(add_request.telegram_id, 42)
+        client.update_user.assert_not_called()
+        client.get_user_by_username.assert_not_called()
+        self.assertEqual(session.commits, 1)
+        self.assertTrue(any("recreating" in line for line in logs.output))
+
+    def test_found_subscription_is_updated_in_place(self):
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = _FakeSiteRwUser(
+            uuid="panel-uuid",
+            email="user@example.com",
+            telegram_id=42,
+            active_internal_squads=[],
+        )
+        client.update_user.return_value = SimpleNamespace(uuid="panel-uuid")
+
+        response, session, user = self._call("extend", client, days=3)
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        self.assertIs(payload["result"]["rwms_updated"], True)
+        client.update_user.assert_called_once()
+        self.assertEqual(client.update_user.call_args.args[0].uuid, "panel-uuid")
+        client.add_user.assert_not_called()
+        client.get_user_by_username.assert_not_called()
+
+    def test_extend_and_refund_prep_keep_panel_traffic_limit_untouched(self):
+        """Антиабьюз: продление / «Подготовить возврат» не трогают лимит
+        трафика и стратегию сброса ограниченного триала. Раньше в UpdateUser
+        уезжал явный traffic_limit_strategy=NO_RESET: после HasField-фикса RWMS
+        он затирал стратегию day/week/... при сохранённом traffic_limit_bytes —
+        лимит становился одноразовым на весь срок."""
+        import proto.rwmanager_pb2 as rw_proto
+
+        for action, days in (("extend", 3), ("set_trial_hour", None)):
+            client = mock.Mock()
+            client.get_user_by_username_strict.return_value = _FakeSiteRwUser(
+                uuid="panel-uuid",
+                email="user@example.com",
+                telegram_id=42,
+                active_internal_squads=[SimpleNamespace(uuid="squad-1")],
+                traffic_limit_bytes=5 * 1024**3,
+                traffic_limit_strategy=rw_proto.TrafficLimitStrategy.DAY,
+                status=rw_proto.UserStatus.ACTIVE,
+            )
+            client.update_user.return_value = SimpleNamespace(uuid="panel-uuid")
+
+            response, session, user = self._call(action, client, days=days)
+
+            self.assertEqual(response.status_code, 200, action)
+            self.assertIs(json.loads(response.content)["result"]["rwms_updated"], True)
+            client.update_user.assert_called_once()
+            request = client.update_user.call_args.args[0]
+            self.assertEqual(request.uuid, "panel-uuid")
+            self.assertFalse(request.HasField("traffic_limit_strategy"), action)
+            self.assertFalse(request.HasField("traffic_limit_bytes"), action)
+            self.assertTrue(request.HasField("expire_at"), action)
+            self.assertEqual(request.status, rw_proto.UserStatus.ACTIVE)
+            self.assertEqual(list(request.active_internal_squads), ["squad-1"])
+            client.add_user.assert_not_called()
+
+    def test_admin_extensions_never_send_traffic_limit_fields(self):
+        """Регресс-гард: явный NO_RESET не должен вернуться в продления сайта
+        (карточка клиента, «БД → панель», bulk extend_days). Снятие лимита —
+        только admin_rwms_remove_traffic_limit и оплата."""
+        import inspect
+
+        from engine import views
+
+        manage = inspect.getsource(views.support_admin_api_subscription_manage)
+        expire_branch = manage[manage.index("old_expire = user.expire_at"):]
+        for name, src in (
+            ("subscription_manage/expire", expire_branch),
+            ("rwms_sync", inspect.getsource(views.support_admin_api_rwms_sync)),
+            ("admin_bulk_extend", inspect.getsource(views.admin_bulk_extend)),
+        ):
+            self.assertNotIn("traffic_limit_strategy=", src, name)
+            self.assertNotIn("traffic_limit_bytes=", src, name)
+        # Намеренное снятие лимита остаётся явным.
+        self.assertIn(
+            "traffic_limit_strategy=proto.TrafficLimitStrategy.NO_RESET",
+            inspect.getsource(views.admin_rwms_remove_traffic_limit),
+        )
+
+    def test_expire_branch_source_uses_strict_read_only(self):
+        """Регресс-гард: ветка продления/возврата не должна вернуться на
+        deprecated get_user_by_username (любая ошибка → None → AddUser)."""
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_subscription_manage)
+        branch = src[src.index("old_expire = user.expire_at"):]
+        self.assertIn("get_user_by_username_strict(user.username)", branch)
+        self.assertIn("except RwmsUnavailableError", branch)
+        self.assertNotIn("rwms_client.get_user_by_username(", branch)
+        # create_user_until — только после strict-чтения (достоверный NOT_FOUND).
+        self.assertLess(
+            branch.index("except RwmsUnavailableError"),
+            branch.index("create_user_until("),
+        )
+
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        # UI показывает серверное сообщение 503, а не общее «Не удалось».
+        self.assertIn("const errorPayload = await response.json();", template)
 
 
 class AdminStage5PromoTests(SimpleTestCase):
@@ -8606,6 +8904,9 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
         # География приходит с backend и дополняет, а не заменяет реальные IP.
         for marker in (
             "const whoRows = (who.top_addresses || []).slice(0, 20);",
+            # Адреса самих нод отброшены на backend; пилюля только при N > 0
+            "${Number(who.excluded_node_ips || 0) > 0 ? `<span class=\"infra-detail-who-pill\"",
+            "исключено адресов нод: ${Number(who.excluded_node_ips || 0).toLocaleString('ru-RU')}</span>` : ''}",
             "const geo = who.geo || {};",
             "const whoTotalHits = Math.max(",
             "const barWidth = Math.max(2, Math.round(hits / whoMaxHits * 100));",
@@ -8869,3 +9170,2895 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)
+
+
+# ============================================================================
+# Антиабьюз: лимит трафика пробных подписок и алерты ip-guard
+# ============================================================================
+
+
+class _AntiabuseSqliteMixin:
+    """SQLite-фикстура антиабьюза: users + платежи (семантика PAYS_EXISTS_SQL)
+    + system_settings + user_blocks + таблицы ip-guard. JSONB-таблицы (журнал
+    админов) на SQLite не создаются — в тестах эндпоинтов admin_audit_write
+    мокается и проверяется по вызовам."""
+
+    def setUp(self):
+        from common.models.db import IpAlert
+        from common.models.db import ManagedTrafficLimit
+        from common.models.db import SystemSetting
+        from common.models.db import UserBlock
+        from common.models.db import UserIpObservation
+
+        self.engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        Base.metadata.create_all(
+            self.engine,
+            tables=[
+                User.__table__,
+                SystemSetting.__table__,
+                YkPayment.__table__,
+                WataInvoice.__table__,
+                WataTransaction.__table__,
+                UserBlock.__table__,
+                IpAlert.__table__,
+                UserIpObservation.__table__,
+                ManagedTrafficLimit.__table__,
+            ],
+        )
+        self.Session = sessionmaker(bind=self.engine)
+        self.session = self.Session()
+        self.addCleanup(self.session.close)
+        self._next_row_id = 100
+
+    # --- маркеры managed_traffic_limits (антиабьюз v2) ---------------------
+
+    def _marker(
+        self,
+        user,
+        limit_bytes=5 * 1024**3,
+        strategy="DAY",
+        reason="trial",
+        release_on="payment",
+        applied_by="bot:start",
+    ):
+        from common.models.db import ManagedTrafficLimit
+
+        marker = ManagedTrafficLimit(
+            user_id=user.id,
+            limit_bytes=limit_bytes,
+            strategy=strategy,
+            reason=reason,
+            release_on=release_on,
+            applied_by=applied_by,
+            applied_at=datetime(2026, 9, 5, 10, 50, 0),
+        )
+        self.session.add(marker)
+        self.session.flush()
+        return marker
+
+    def _marker_of(self, user_id):
+        from common.models.db import ManagedTrafficLimit
+
+        self.session.expire_all()
+        return self.session.get(ManagedTrafficLimit, user_id)
+
+    def _drop_marker_table(self):
+        """«Миграция не накачена»: таблицы маркеров нет."""
+        from common.models.db import ManagedTrafficLimit
+
+        self.session.close()
+        ManagedTrafficLimit.__table__.drop(self.engine)
+
+    def _row_id(self):
+        self._next_row_id += 1
+        return self._next_row_id
+
+    def _user(self, user_id, username, **kwargs):
+        user = User(id=user_id, username=username, **kwargs)
+        self.session.add(user)
+        self.session.flush()
+        return user
+
+    def _set(self, key, value):
+        from common.models.db import SystemSetting
+
+        setting = self.session.get(SystemSetting, key)
+        if setting is None:
+            self.session.add(SystemSetting(key=key, value=value))
+        else:
+            setting.value = value
+        self.session.flush()
+
+    def _yk_payment(self, user, status="succeeded"):
+        self.session.add(
+            YkPayment(
+                id=self._row_id(),
+                user_id=user.id,
+                amount=249,
+                currency="RUB",
+                status=status,
+                created_at=datetime(2026, 8, 1, 12, 0, 0),
+                payment_id=f"yk-{user.id}-{status}",
+                subscription_period="month",
+            )
+        )
+        self.session.flush()
+
+    def _wata_payment(self, user, status="Paid"):
+        order_id = f"order-{user.id}-{status}"
+        self.session.add(
+            WataInvoice(
+                id=self._row_id(),
+                user_id=user.id,
+                invoice_id=f"inv-{order_id}",
+                amount=249,
+                currency="RUB",
+                status="Opened",
+                terminal_name="t",
+                terminal_public_id="tp",
+                creation_time=datetime(2026, 8, 1, 12, 0, 0),
+                order_id=order_id,
+                expiration_datetime=datetime(2030, 1, 1),
+                tariff_id="month",
+            )
+        )
+        self.session.add(
+            WataTransaction(
+                id=self._row_id(),
+                transaction_id=f"tx-{order_id}",
+                transaction_type="Payment",
+                terminal_public_id="tp",
+                transaction_status=status,
+                terminal_name="t",
+                amount=249,
+                currency="RUB",
+                order_id=order_id,
+                order_description="d",
+                commission=0,
+                payment_time=datetime(2026, 8, 1, 12, 5, 0),
+            )
+        )
+        self.session.flush()
+
+
+class AntiabuseNeverPaidHelperTests(_AntiabuseSqliteMixin, SimpleTestCase):
+    def test_user_never_paid_matches_pays_exists_semantics(self):
+        """«Пробная без платежа» = нет yk succeeded и нет wata Paid (JOIN
+        wata_invoices по order_id); pending/Declined платежом не считаются;
+        отсутствующий пользователь — None, а не «не платил»."""
+        from engine.sql_helpers import user_never_paid
+
+        trial = self._user(1, "trial")
+        yk = self._user(2, "yk")
+        self._yk_payment(yk)
+        pending = self._user(3, "pending")
+        self._yk_payment(pending, status="pending")
+        wata = self._user(4, "wata")
+        self._wata_payment(wata)
+        declined = self._user(5, "declined")
+        self._wata_payment(declined, status="Declined")
+
+        self.assertIs(user_never_paid(self.session, trial.id), True)
+        self.assertIs(user_never_paid(self.session, yk.id), False)
+        self.assertIs(user_never_paid(self.session, pending.id), True)
+        self.assertIs(user_never_paid(self.session, wata.id), False)
+        self.assertIs(user_never_paid(self.session, declined.id), True)
+        self.assertIsNone(user_never_paid(self.session, 999))
+        self.assertIsNone(user_never_paid(self.session, None))
+
+
+class AntiabuseTrialLimitHelpersTests(_AntiabuseSqliteMixin, SimpleTestCase):
+    def test_disabled_by_default_means_no_limit(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        from engine import rwms_helpers
+
+        self.assertFalse(rwms_helpers.trial_traffic_limit_enabled(self.session))
+        self.assertIsNone(rwms_helpers.trial_traffic_limit_for_new_trial(self.session))
+        user = self._user(1, "u")
+        self.assertIsNone(rwms_helpers.trial_traffic_limit_for_user(self.session, user))
+        # Сконфигурированный лимит (для кнопок «применить») — дефолты common.
+        limit = rwms_helpers.trial_traffic_limit_configured(self.session)
+        self.assertEqual(limit.limit_gb, 5.0)
+        self.assertEqual(limit.limit_bytes, 5 * 1024**3)
+        self.assertEqual(limit.strategy_key, "day")
+        self.assertEqual(limit.strategy_name, "DAY")
+        self.assertEqual(limit.strategy, rw_proto.TrafficLimitStrategy.DAY)
+
+    def test_enabled_limit_from_settings_with_month_rolling(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        from engine import rwms_helpers
+
+        self._set("trial_traffic_limit_enabled", "1")
+        self._set("trial_traffic_limit_gb", "0.5")
+        self._set("trial_traffic_limit_strategy", "month_rolling")
+
+        limit = rwms_helpers.trial_traffic_limit_for_new_trial(self.session)
+
+        self.assertEqual(limit.limit_bytes, 536870912)
+        self.assertEqual(limit.strategy_name, "MONTH_ROLLING")
+        self.assertEqual(limit.strategy, rw_proto.TrafficLimitStrategy.MONTH_ROLLING)
+        self.assertEqual(rw_proto.TrafficLimitStrategy.MONTH_ROLLING, 4)
+
+    def test_limit_for_existing_user_requires_never_paid(self):
+        from engine import rwms_helpers
+
+        self._set("trial_traffic_limit_enabled", "1")
+        trial = self._user(1, "trial")
+        paid = self._user(2, "paid")
+        self._yk_payment(paid)
+
+        self.assertIsNotNone(rwms_helpers.trial_traffic_limit_for_user(self.session, trial))
+        self.assertIsNone(rwms_helpers.trial_traffic_limit_for_user(self.session, paid))
+        self.assertIsNone(rwms_helpers.trial_traffic_limit_for_user(self.session, None))
+        # Нет строки users — лимит не ставится (None ≠ «не платил»).
+        self.assertIsNone(
+            rwms_helpers.trial_traffic_limit_for_user(self.session, SimpleNamespace(id=999))
+        )
+
+    def test_broken_settings_fall_back_to_common_defaults(self):
+        from engine import rwms_helpers
+
+        self._set("trial_traffic_limit_enabled", "1")
+        self._set("trial_traffic_limit_gb", "abc")
+        self._set("trial_traffic_limit_strategy", "quarter")
+
+        limit = rwms_helpers.trial_traffic_limit_for_new_trial(self.session)
+
+        self.assertEqual(limit.limit_gb, 5.0)
+        self.assertEqual(limit.strategy_key, "day")
+
+
+class AntiabuseCreateUserRequestTests(SimpleTestCase):
+    def test_create_user_until_without_limit_is_unchanged(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        from engine import rwms_helpers
+
+        client = mock.Mock()
+        client.add_user.return_value = SimpleNamespace(uuid="u")
+
+        rwms_helpers.create_user_until(
+            client, "42", datetime(2030, 1, 1), email="a@b.c", telegram_id=42
+        )
+
+        request = client.add_user.call_args.args[0]
+        self.assertFalse(request.HasField("traffic_limit_bytes"))
+        self.assertEqual(request.traffic_limit_strategy, rw_proto.TrafficLimitStrategy.NO_RESET)
+        self.assertEqual(request.status, rw_proto.UserStatus.ACTIVE)
+        self.assertEqual(request.username, "42")
+        self.assertEqual(request.telegram_id, 42)
+
+    def test_create_user_with_limit_sets_field_13_and_strategy(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        from engine import rwms_helpers
+
+        client = mock.Mock()
+        client.add_user.return_value = SimpleNamespace(uuid="u")
+        limit = rwms_helpers.TrialTrafficLimit(
+            limit_gb=0.5,
+            limit_bytes=536870912,
+            strategy_key="month_rolling",
+            strategy_name="MONTH_ROLLING",
+        )
+
+        with self.assertLogs(level="INFO") as logs:
+            rwms_helpers.create_user(client, "42", 7, traffic_limit=limit)
+
+        request = client.add_user.call_args.args[0]
+        self.assertTrue(request.HasField("traffic_limit_bytes"))
+        self.assertEqual(request.traffic_limit_bytes, 536870912)
+        self.assertEqual(
+            request.traffic_limit_strategy, rw_proto.TrafficLimitStrategy.MONTH_ROLLING
+        )
+        # Поле добавлено аддитивно: номер 13, существующие не тронуты.
+        self.assertEqual(
+            rw_proto.AddUserRequest.DESCRIPTOR.fields_by_name["traffic_limit_bytes"].number,
+            13,
+        )
+        self.assertTrue(any("trial traffic limit" in line for line in logs.output))
+
+    def test_trial_creation_paths_pass_limit_from_settings(self):
+        import inspect
+
+        from engine import views
+        from mobile_api import provisioning
+
+        src = inspect.getsource(views.create_site_user)
+        self.assertIn("trial_limit = trial_traffic_limit_for_new_trial(db_session)", src)
+        self.assertIn("traffic_limit=trial_limit", src)
+        # Маркер — в той же сессии, что и строка users.
+        self.assertIn("record_trial_limit_marker(db_session, user, trial_limit)", src)
+        mobile_src = inspect.getsource(provisioning)
+        self.assertIn("trial_limit = trial_traffic_limit_for_new_trial(db_session)", mobile_src)
+        self.assertIn("traffic_limit=trial_limit", mobile_src)
+        self.assertIn("record_trial_limit_marker(db_session, user, trial_limit)", mobile_src)
+        # Пересоздание при достоверном NOT_FOUND — только never_paid и включено;
+        # маркер site:admin:<login> в той же сессии.
+        manage_src = inspect.getsource(views.support_admin_api_subscription_manage)
+        self.assertIn("recreate_limit = trial_traffic_limit_for_user(db_session, user)", manage_src)
+        self.assertIn("traffic_limit=recreate_limit", manage_src)
+        self.assertIn("record_trial_limit_marker(", manage_src)
+
+    def test_site_registration_forwards_limit_to_create_user(self):
+        from engine.views import create_site_user
+
+        session = _SiteRegistrationFakeSession()
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None
+        sentinel = object()
+        email = "limit@example.com"
+        context = {
+            "referrer": None,
+            "ymid": None,
+            "traffic_source": None,
+        }
+
+        with mock.patch(
+            "engine.views.get_registration_context", return_value=context
+        ), mock.patch("engine.views.rwms_client", client), mock.patch(
+            "engine.views.trial_traffic_limit_for_new_trial", return_value=sentinel
+        ), mock.patch(
+            "engine.views.create_user",
+            side_effect=lambda **kwargs: _FakeSiteRwUser(username=kwargs["username"]),
+        ) as create_rwms_user, mock.patch(
+            "engine.views.add_user_to_traffic_progress"
+        ), mock.patch("engine.views.add_event_log"), mock.patch(
+            "engine.views.should_create_trial_for_channel", return_value=True
+        ), mock.patch(
+            "engine.views.record_trial_limit_marker"
+        ) as record_marker, mock.patch("engine.views.add_traffic_limit_event"):
+            user = create_site_user(session, email, SimpleNamespace())
+
+        self.assertIs(create_rwms_user.call_args.kwargs["traffic_limit"], sentinel)
+        # Тот же лимит уходит в маркер для только что созданной строки users.
+        self.assertIs(record_marker.call_args.args[2], sentinel)
+        self.assertIs(record_marker.call_args.args[1], user)
+
+
+class AntiabuseClientActionsTests(_AntiabuseSqliteMixin, SimpleTestCase):
+    """Действия карточки клиента apply_trial_limit / remove_traffic_limit.
+
+    v2: панель — mock RWMS, маркеры managed_traffic_limits — реальная SQLite-
+    сессия; аудит и event_logs (JSONB) мокаются и проверяются по вызовам.
+    Ручные лимиты владельца (без маркера) не снимаются и без подтверждения не
+    заменяются."""
+
+    class _Session:
+        """Фейковая сессия для продлений (push_to_panel / bulk extend), которые
+        маркеры не трогают."""
+
+        def __init__(self, paid=False, settings=None):
+            self.paid = paid
+            self.settings = settings or {}
+            self.added = []
+            self.commits = 0
+            self.closed = False
+
+        def get(self, model, key):
+            value = self.settings.get(key)
+            return SimpleNamespace(key=key, value=value) if value is not None else None
+
+        def execute(self, statement, params=None):
+            return SimpleNamespace(first=lambda: (self.paid,))
+
+        def add(self, obj):
+            self.added.append(obj)
+
+        def commit(self):
+            self.commits += 1
+
+        def rollback(self):
+            return None
+
+        def close(self):
+            self.closed = True
+
+    def setUp(self):
+        super().setUp()
+        self.audit = mock.Mock()
+        self.events = mock.Mock()
+        self.user = self._user(
+            7,
+            "42",
+            telegram_id=42,
+            expire_at=datetime(2030, 1, 1, 12, 0, 0),
+            autopay_allow=True,
+        )
+        self.session.commit()
+
+    def _panel(self, limit_bytes=0, strategy=0, status=0, uuid="panel-uuid"):
+        return SimpleNamespace(
+            uuid=uuid,
+            traffic_limit_bytes=limit_bytes,
+            traffic_limit_strategy=strategy,
+            status=status,
+        )
+
+    def _client(self, panel=None, update_result=SimpleNamespace(uuid="panel-uuid")):
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = panel
+        client.update_user.return_value = update_result
+        return client
+
+    def _call(self, action, client, **data):
+        from engine.views import support_admin_api_subscription_manage
+
+        request = RequestFactory().post(
+            "/support-admin/api/subscription-manage/",
+            data={"q": "42", "action": action, **data},
+        )
+        request.session = {}
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=self.session),
+            mock.patch("engine.views.rwms_client", client),
+            mock.patch("engine.views.admin_audit_write", self.audit),
+            mock.patch("engine.views.add_traffic_limit_event", self.events),
+        ):
+            response = support_admin_api_subscription_manage(request)
+        return response, json.loads(response.content)
+
+    def _audit_actions(self):
+        return [(call.args[2], call.kwargs) for call in self.audit.call_args_list]
+
+    @staticmethod
+    def _fake_session_audit_actions(session):
+        from common.models.db import AdminAuditLog
+
+        return [(o.action, o.details) for o in session.added if isinstance(o, AdminAuditLog)]
+
+    def _event_types(self):
+        return [call.args[2] for call in self.events.call_args_list]
+
+    def test_apply_trial_limit_updates_panel_without_squads_or_status(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        self._set("trial_traffic_limit_gb", "1.5")
+        self._set("trial_traffic_limit_strategy", "week")
+        self.session.commit()
+        client = self._client(self._panel())
+
+        response, payload = self._call("apply_trial_limit", client)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(payload["result"]["rwms_updated"], True)
+        self.assertIs(payload["result"]["never_paid"], True)
+        self.assertEqual(payload["result"]["outcome"], "applied")
+        self.assertIn("1.5 ГиБ", payload["result"]["action_label"])
+        self.assertIn("управляемым", payload["result"]["action_label"])
+        request = client.update_user.call_args.args[0]
+        self.assertEqual(request.uuid, "panel-uuid")
+        self.assertEqual(request.traffic_limit_bytes, int(1.5 * 1024**3))
+        self.assertEqual(request.traffic_limit_strategy, rw_proto.TrafficLimitStrategy.WEEK)
+        self.assertFalse(request.HasField("status"))
+        self.assertEqual(list(request.active_internal_squads), [])
+        client.get_user_by_username.assert_not_called()
+        client.add_user.assert_not_called()
+        # Маркер в той же сессии: trial / payment / site:admin:<login>.
+        marker = self._marker_of(7)
+        self.assertIsNotNone(marker)
+        self.assertEqual(marker.limit_bytes, int(1.5 * 1024**3))
+        self.assertEqual(marker.strategy, "WEEK")
+        self.assertEqual(marker.reason, "trial")
+        self.assertEqual(marker.release_on, "payment")
+        self.assertTrue(marker.applied_by.startswith("site:admin:"))
+        actions = self._audit_actions()
+        self.assertEqual(actions[0][0], "apply_trial_limit")
+        self.assertEqual(actions[0][1]["strategy"], "week")
+        self.assertEqual(actions[0][1]["outcome"], "applied")
+        self.assertEqual(self._event_types(), ["traffic_limit_applied"])
+
+    def test_apply_trial_limit_refuses_paid_client_without_force(self):
+        self._yk_payment(self.user)
+        self.session.commit()
+        client = self._client(self._panel())
+
+        response, payload = self._call("apply_trial_limit", client)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIs(payload["paid"], True)
+        client.update_user.assert_not_called()
+        self.assertIsNone(self._marker_of(7))
+
+        response, payload = self._call("apply_trial_limit", client, force="1")
+
+        self.assertEqual(response.status_code, 200)
+        client.update_user.assert_called_once()
+        actions = self._audit_actions()
+        self.assertIs(actions[0][1]["forced"], True)
+        self.assertIs(actions[0][1]["never_paid"], False)
+        self.assertIsNotNone(self._marker_of(7))
+
+    def test_apply_trial_limit_marks_equal_panel_limit_as_managed(self):
+        """Панель уже несёт ровно лимит пробных, маркера нет (лимит поставлен
+        до появления таблицы): панель не трогаем, маркер пишем — с этого
+        момента лимит снимет оплата. Повтор — без изменений и без события."""
+        client = self._client(self._panel(5 * 1024**3, 1))  # DAY — дефолт
+
+        response, payload = self._call("apply_trial_limit", client)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(payload["result"]["rwms_updated"], False)
+        self.assertEqual(payload["result"]["outcome"], "marked")
+        self.assertTrue(payload["result"]["action_label"].startswith("Без изменений в панели"))
+        self.assertIn("помечен управляемым", payload["result"]["action_label"])
+        client.update_user.assert_not_called()
+        marker = self._marker_of(7)
+        self.assertEqual((marker.limit_bytes, marker.strategy), (5 * 1024**3, "DAY"))
+        self.assertEqual(self._event_types(), ["traffic_limit_applied"])
+
+        response, payload = self._call("apply_trial_limit", client)
+
+        self.assertEqual(payload["result"]["outcome"], "unchanged")
+        self.assertIn("управляемый", payload["result"]["action_label"])
+        client.update_user.assert_not_called()
+        self.assertEqual(self._event_types(), ["traffic_limit_applied"])
+
+    def test_apply_trial_limit_refuses_manual_panel_limit_without_override_manual(self):
+        """Ручной кап владельца (лимит без маркера, не равный лимиту пробных)
+        неприкосновенен: 409 {"manual": true}; force=1 (подтверждение «клиент
+        платил») его НЕ заменяет; заменить — только с override_manual=1 (явное
+        решение админа именно о ручном лимите), после чего лимит становится
+        управляемым."""
+        client = self._client(self._panel(1024**3, 1))
+
+        response, payload = self._call("apply_trial_limit", client)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIs(payload["manual"], True)
+        self.assertIs(payload["paid"], False)
+        self.assertIs(payload["admin_limit"], False)
+        self.assertIn("1 ГиБ · ежедневно", payload["message"])
+        self.assertEqual(payload["manual_message"], payload["message"])
+        client.update_user.assert_not_called()
+        self.assertIsNone(self._marker_of(7))
+        self.audit.assert_not_called()
+
+        response, payload = self._call("apply_trial_limit", client, force="1")
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIs(payload["manual"], True)
+        client.update_user.assert_not_called()
+        self.assertIsNone(self._marker_of(7))
+        self.audit.assert_not_called()
+
+        response, payload = self._call("apply_trial_limit", client, override_manual="1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["result"]["outcome"], "applied")
+        self.assertEqual(client.update_user.call_args.args[0].traffic_limit_bytes, 5 * 1024**3)
+        audit = self._audit_actions()[0][1]
+        self.assertIs(audit["manual_overridden"], True)
+        self.assertIs(audit["override_manual"], True)
+        self.assertIs(audit["forced"], False)
+        self.assertIs(audit["admin_limit_overridden"], False)
+        self.assertIsNotNone(self._marker_of(7))
+
+    def test_apply_trial_limit_paid_and_manual_need_separate_confirmations(self):
+        """Плативший клиент с ручным капом владельца: 409 несёт ОБА флага;
+        force=1 (ответ на «платил») ручной лимит не трогает — снова 409 manual,
+        панель и маркеры не тронуты; override_manual=1 сам по себе не отвечает
+        на «платил»; применяется только с обоими флагами."""
+        self._yk_payment(self.user)
+        self.session.commit()
+        client = self._client(self._panel(1024**3, 1))
+
+        response, payload = self._call("apply_trial_limit", client)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIs(payload["paid"], True)
+        self.assertIs(payload["manual"], True)
+        self.assertIs(payload["admin_limit"], False)
+        self.assertIn("Клиент платил", payload["paid_message"])
+        self.assertIn("1 ГиБ · ежедневно", payload["manual_message"])
+        self.assertIn("Клиент платил", payload["message"])
+        self.assertIn("ручной лимит", payload["message"])
+
+        response, payload = self._call("apply_trial_limit", client, force="1")
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIs(payload["paid"], False)
+        self.assertIs(payload["manual"], True)
+        self.assertNotIn("Клиент платил", payload["message"])
+        client.update_user.assert_not_called()
+        self.assertIsNone(self._marker_of(7))
+        self.audit.assert_not_called()
+
+        response, payload = self._call("apply_trial_limit", client, override_manual="1")
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIs(payload["paid"], True)
+        self.assertIs(payload["manual"], False)
+        client.update_user.assert_not_called()
+        self.assertIsNone(self._marker_of(7))
+
+        response, payload = self._call(
+            "apply_trial_limit", client, force="1", override_manual="1"
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["result"]["outcome"], "applied")
+        self.assertIs(payload["result"]["never_paid"], False)
+        client.update_user.assert_called_once()
+        self.assertEqual(client.update_user.call_args.args[0].traffic_limit_bytes, 5 * 1024**3)
+        marker = self._marker_of(7)
+        self.assertEqual((marker.reason, marker.release_on), ("trial", "payment"))
+        audit = self._audit_actions()[0][1]
+        self.assertIs(audit["forced"], True)
+        self.assertIs(audit["override_manual"], True)
+        self.assertIs(audit["manual_overridden"], True)
+        self.assertIs(audit["never_paid"], False)
+
+    def test_apply_trial_limit_refuses_bot_admin_limit_without_override(self):
+        """Маркер из кнопки алерта бота (ip_abuse, release_on='manual'):
+        оплата его не снимает, и карточка без отдельного подтверждения его не
+        перезаписывает — 409 {"admin_limit": true}; force=1 не помогает; только
+        override_admin_limit=1 заменяет его лимитом пробного (trial/payment)."""
+        self._marker(
+            self.user,
+            limit_bytes=1024**3,
+            strategy="DAY",
+            reason="ip_abuse",
+            release_on="manual",
+            applied_by="bot:admin:1",
+        )
+        self.session.commit()
+        client = self._client(self._panel(1024**3, 1))
+
+        response, payload = self._call("apply_trial_limit", client)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIs(payload["admin_limit"], True)
+        self.assertIs(payload["manual"], False)
+        self.assertIs(payload["paid"], False)
+        self.assertIn("ip_abuse", payload["admin_limit_message"])
+        self.assertIn("bot:admin:1", payload["admin_limit_message"])
+        self.assertIn("1 ГиБ · ежедневно", payload["message"])
+        client.update_user.assert_not_called()
+        self.audit.assert_not_called()
+
+        response, payload = self._call("apply_trial_limit", client, force="1", override_manual="1")
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIs(payload["admin_limit"], True)
+        client.update_user.assert_not_called()
+        marker = self._marker_of(7)
+        self.assertEqual((marker.reason, marker.release_on, marker.applied_by), ("ip_abuse", "manual", "bot:admin:1"))
+        self.assertEqual(marker.limit_bytes, 1024**3)
+
+        response, payload = self._call("apply_trial_limit", client, override_admin_limit="1")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["result"]["outcome"], "applied")
+        self.assertEqual(client.update_user.call_args.args[0].traffic_limit_bytes, 5 * 1024**3)
+        marker = self._marker_of(7)
+        self.assertEqual((marker.reason, marker.release_on), ("trial", "payment"))
+        self.assertTrue(marker.applied_by.startswith("site:admin:"))
+        audit = self._audit_actions()[0][1]
+        self.assertIs(audit["override_admin_limit"], True)
+        self.assertIs(audit["admin_limit_overridden"], True)
+        self.assertIs(audit["manual_overridden"], False)
+        self.assertEqual(self._event_types(), ["traffic_limit_applied"])
+
+    def test_apply_trial_limit_keeps_bot_admin_marker_when_panel_already_equal(self):
+        """Маркер бота (release_on='manual') с ровно лимитом пробных: unchanged,
+        release_on не перезаписывается в payment."""
+        self._marker(self.user, reason="traffic_abuse", release_on="manual", applied_by="bot:admin:1")
+        self.session.commit()
+        client = self._client(self._panel(5 * 1024**3, 1))
+
+        response, payload = self._call("apply_trial_limit", client)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(payload["result"]["outcome"], "unchanged")
+        client.update_user.assert_not_called()
+        marker = self._marker_of(7)
+        self.assertEqual((marker.reason, marker.release_on), ("traffic_abuse", "manual"))
+
+    def test_apply_drops_stale_marker_when_owner_changed_limit_by_hand(self):
+        """Маркер есть, а панель отличается — владелец менял руками: маркер
+        снимается (с логом), лимит считается ручным, панель не трогается."""
+        self._marker(self.user, limit_bytes=5 * 1024**3, strategy="DAY")
+        self.session.commit()
+        client = self._client(self._panel(1024**3, 0))  # 1 ГиБ, NO_RESET — руками
+
+        with self.assertLogs(level="WARNING") as logs:
+            response, payload = self._call("apply_trial_limit", client)
+
+        self.assertEqual(response.status_code, 409)
+        self.assertIs(payload["manual"], True)
+        self.assertIsNone(self._marker_of(7))
+        self.assertTrue(any("лимит ручной" in line for line in logs.output))
+        client.update_user.assert_not_called()
+
+    def test_remove_traffic_limit_restores_as_before_without_squads(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        self._marker(self.user)
+        self.session.commit()
+        client = self._client(self._panel(5 * 1024**3, 1, rw_proto.UserStatus.LIMITED))
+
+        response, payload = self._call("remove_traffic_limit", client)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(payload["result"]["rwms_updated"], True)
+        self.assertEqual(payload["result"]["outcome"], "released")
+        request = client.update_user.call_args.args[0]
+        self.assertEqual(request.uuid, "panel-uuid")
+        self.assertTrue(request.HasField("traffic_limit_bytes"))
+        self.assertEqual(request.traffic_limit_bytes, 0)
+        self.assertTrue(request.HasField("traffic_limit_strategy"))
+        self.assertEqual(request.traffic_limit_strategy, rw_proto.TrafficLimitStrategy.NO_RESET)
+        self.assertTrue(request.HasField("status"))
+        self.assertEqual(request.status, rw_proto.UserStatus.ACTIVE)
+        # Пустой список сквадов RWMS трактует как «не менять» — ban-сквад остаётся.
+        self.assertEqual(list(request.active_internal_squads), [])
+        self.assertEqual(self._audit_actions()[0][0], "remove_traffic_limit")
+        self.assertEqual(self._audit_actions()[0][1]["outcome"], "released")
+        # Маркер удалён, событие traffic_limit_released записано.
+        self.assertIsNone(self._marker_of(7))
+        self.assertEqual(self._event_types(), ["traffic_limit_released"])
+        self.assertIn("маркер удалён", payload["result"]["action_label"])
+
+    def test_remove_traffic_limit_never_reactivates_disabled_subscription(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        self._marker(self.user)
+        self.session.commit()
+        client = self._client(self._panel(5 * 1024**3, 1, rw_proto.UserStatus.DISABLED))
+
+        response, payload = self._call("remove_traffic_limit", client)
+
+        self.assertEqual(response.status_code, 200)
+        request = client.update_user.call_args.args[0]
+        self.assertEqual(request.traffic_limit_bytes, 0)
+        self.assertFalse(request.HasField("status"))
+        self.assertIn("DISABLED не менялся", payload["result"]["action_label"])
+        self.assertIsNone(self._marker_of(7))
+
+    def test_remove_traffic_limit_skips_manual_limit(self):
+        """Лимит в панели без маркера — ручной кап владельца: не снимаем,
+        панель не трогаем, отвечаем 200 с пометкой (manual), аудит пишем."""
+        client = self._client(self._panel(5 * 1024**3, 1, 2))
+
+        response, payload = self._call("remove_traffic_limit", client)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(payload["result"]["rwms_updated"], False)
+        self.assertIs(payload["result"]["manual"], True)
+        self.assertEqual(payload["result"]["outcome"], "skipped_manual")
+        self.assertTrue(payload["result"]["action_label"].startswith("Не снят"))
+        self.assertIn("владелец", payload["result"]["action_label"])
+        client.update_user.assert_not_called()
+        self.assertEqual(self._audit_actions()[0][1]["outcome"], "skipped_manual")
+        self.events.assert_not_called()
+
+        # Маркер не совпадает с панелью (владелец сменил лимит): снимается
+        # только маркер, панель не трогаем.
+        self._marker(self.user, limit_bytes=1024**3, strategy="DAY")
+        self.session.commit()
+        with self.assertLogs(level="WARNING"):
+            response, payload = self._call("remove_traffic_limit", client)
+        self.assertEqual(payload["result"]["outcome"], "skipped_manual")
+        client.update_user.assert_not_called()
+        self.assertIsNone(self._marker_of(7))
+
+    def test_remove_traffic_limit_is_noop_without_limit(self):
+        client = self._client(self._panel())
+
+        response, payload = self._call("remove_traffic_limit", client)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIs(payload["result"]["rwms_updated"], False)
+        self.assertEqual(payload["result"]["outcome"], "unchanged")
+        client.update_user.assert_not_called()
+
+    def test_limit_actions_read_panel_strictly(self):
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = RwmsUnavailableError(
+            "42", None, "panel down"
+        )
+        with self.assertLogs(level="WARNING"):
+            response, payload = self._call("apply_trial_limit", client)
+        self.assertEqual(response.status_code, 503)
+        client.update_user.assert_not_called()
+        client.add_user.assert_not_called()
+
+        client = self._client(None)
+        response, payload = self._call("remove_traffic_limit", client)
+        self.assertEqual(response.status_code, 404)
+        client.add_user.assert_not_called()
+
+        # RWMS не принял снятие: 502, маркер остаётся (лимит в панели тоже).
+        self._marker(self.user, limit_bytes=1, strategy="DAY")
+        self.session.commit()
+        client = self._client(self._panel(1, 1, 2), update_result=None)
+        response, payload = self._call("remove_traffic_limit", client)
+        self.assertEqual(response.status_code, 502)
+        self.assertIsNotNone(self._marker_of(7))
+        self.events.assert_not_called()
+
+        # RWMS не принял постановку: 502, маркер откатывается вместе с savepoint.
+        from common.models.db import ManagedTrafficLimit
+
+        self.session.query(ManagedTrafficLimit).delete()
+        self.session.commit()
+        client = self._client(self._panel(), update_result=None)
+        response, payload = self._call("apply_trial_limit", client)
+        self.assertEqual(response.status_code, 502)
+        self.assertIsNone(self._marker_of(7))
+        self.events.assert_not_called()
+
+    def test_limit_actions_require_marker_table(self):
+        """Без таблицы managed_traffic_limits (миграция не накачена) действия
+        отвечают 503 и панель не трогают — иначе ручные лимиты владельца были
+        бы неотличимы от наших."""
+        self._drop_marker_table()
+        client = self._client(self._panel(5 * 1024**3, 1, 2))
+
+        for action in ("apply_trial_limit", "remove_traffic_limit"):
+            with self.assertLogs(level="WARNING"):
+                response, payload = self._call(action, client)
+            self.assertEqual(response.status_code, 503, action)
+            self.assertIn("managed_traffic_limits", payload["message"])
+        client.update_user.assert_not_called()
+        client.get_user_by_username_strict.assert_not_called()
+        self.audit.assert_not_called()
+
+    def test_recreate_on_not_found_applies_limit_only_for_never_paid(self):
+        """Продление при достоверном NOT_FOUND пересоздаёт подписку (как
+        раньше); лимит пробного попадает в AddUser только при включённом
+        тумблере И never_paid — и тогда же пишется маркер site:admin:<login>."""
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None
+        client.add_user.return_value = SimpleNamespace(uuid="recreated")
+        self._set("trial_traffic_limit_enabled", "1")
+        self._set("trial_traffic_limit_gb", "2")
+        self._set("trial_traffic_limit_strategy", "week")
+        self.session.commit()
+
+        with self.assertLogs(level="WARNING"):
+            response, payload = self._call("extend", client, days="3")
+
+        self.assertEqual(response.status_code, 200)
+        add_request = client.add_user.call_args.args[0]
+        self.assertTrue(add_request.HasField("traffic_limit_bytes"))
+        self.assertEqual(add_request.traffic_limit_bytes, 2 * 1024**3)
+        marker = self._marker_of(7)
+        self.assertEqual((marker.limit_bytes, marker.strategy), (2 * 1024**3, "WEEK"))
+        self.assertTrue(marker.applied_by.startswith("site:admin:"))
+        self.assertEqual(self._event_types(), ["traffic_limit_applied"])
+
+        # Платившему лимит не ставится и маркер не пишется.
+        from common.models.db import ManagedTrafficLimit
+
+        self.session.query(ManagedTrafficLimit).delete()
+        self._yk_payment(self.user)
+        self.session.commit()
+        client.add_user.reset_mock()
+        with self.assertLogs(level="WARNING"):
+            response, payload = self._call("extend", client, days="3")
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(client.add_user.call_args.args[0].HasField("traffic_limit_bytes"))
+        self.assertIsNone(self._marker_of(7))
+
+        # Выключенный тумблер — как раньше, даже для never_paid.
+        self.session.query(YkPayment).delete()
+        self._set("trial_traffic_limit_enabled", "0")
+        self.session.commit()
+        client.add_user.reset_mock()
+        with self.assertLogs(level="WARNING"):
+            self._call("extend", client, days="3")
+        self.assertFalse(client.add_user.call_args.args[0].HasField("traffic_limit_bytes"))
+        self.assertIsNone(self._marker_of(7))
+
+    def test_push_to_panel_keeps_panel_traffic_limit_untouched(self):
+        """Синхронизация «БД → панель» обновляет срок/статус/сквады, но не
+        передаёт traffic_limit_bytes/traffic_limit_strategy — лимит и
+        стратегия сброса ограниченного триала в панели остаются как есть."""
+        import proto.rwmanager_pb2 as rw_proto
+
+        from engine.views import support_admin_api_rwms_sync
+
+        client = mock.Mock()
+        client.get_user_by_username.return_value = SimpleNamespace(
+            uuid="panel-uuid",
+            status=rw_proto.UserStatus.ACTIVE,
+            active_internal_squads=[SimpleNamespace(uuid="squad-1")],
+            traffic_limit_bytes=5 * 1024**3,
+            traffic_limit_strategy=rw_proto.TrafficLimitStrategy.DAY,
+        )
+        client.update_user.return_value = SimpleNamespace(uuid="panel-uuid")
+        session = self._Session()
+        user = SimpleNamespace(
+            id=7, username="42", email=None, telegram_id=42,
+            expire_at=datetime(2030, 1, 1, 12, 0, 0), autopay_allow=True,
+        )
+        request = RequestFactory().post(
+            "/support-admin/api/rwms-sync/", data={"q": "42", "action": "push_to_panel"}
+        )
+        request.session = {}
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+            mock.patch("engine.views.admin_find_user", return_value=user),
+            mock.patch("engine.views.rwms_client", client),
+        ):
+            response = support_admin_api_rwms_sync(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content)["result"]["synced"], "to_panel")
+        client.update_user.assert_called_once()
+        request = client.update_user.call_args.args[0]
+        self.assertEqual(request.uuid, "panel-uuid")
+        self.assertFalse(request.HasField("traffic_limit_strategy"))
+        self.assertFalse(request.HasField("traffic_limit_bytes"))
+        self.assertTrue(request.HasField("expire_at"))
+        self.assertEqual(request.status, rw_proto.UserStatus.ACTIVE)
+        self.assertEqual(list(request.active_internal_squads), ["squad-1"])
+        client.add_user.assert_not_called()
+        self.assertEqual(self._fake_session_audit_actions(session)[0][0], "rwms_sync_push")
+        self.assertEqual(session.commits, 1)
+
+    def test_bulk_extend_keeps_panel_traffic_limit_untouched(self):
+        """Массовое продление (bulk extend_days) — тот же контракт: лимит и
+        стратегия сброса панели не передаются, не снимаются и не ломаются."""
+        import proto.rwmanager_pb2 as rw_proto
+
+        from engine.views import admin_bulk_extend
+
+        client = mock.Mock()
+        client.get_user_by_username.return_value = SimpleNamespace(
+            uuid="panel-uuid",
+            email="user@example.com",
+            telegram_id=42,
+            status=rw_proto.UserStatus.ACTIVE,
+            active_internal_squads=[SimpleNamespace(uuid="squad-1")],
+            traffic_limit_bytes=5 * 1024**3,
+            traffic_limit_strategy=rw_proto.TrafficLimitStrategy.DAY,
+        )
+        client.update_user.return_value = SimpleNamespace(uuid="panel-uuid")
+        user = SimpleNamespace(
+            id=7, username="42", expire_at=datetime(2030, 1, 1, 12, 0, 0)
+        )
+
+        with mock.patch("engine.views.rwms_client", client):
+            message = admin_bulk_extend(self._Session(), user, 3)
+
+        self.assertTrue(message.startswith("продлено до "))
+        self.assertEqual(user.expire_at, datetime(2030, 1, 4, 12, 0, 0))
+        client.update_user.assert_called_once()
+        request = client.update_user.call_args.args[0]
+        self.assertEqual(request.uuid, "panel-uuid")
+        self.assertFalse(request.HasField("traffic_limit_strategy"))
+        self.assertFalse(request.HasField("traffic_limit_bytes"))
+        self.assertTrue(request.HasField("expire_at"))
+        self.assertEqual(request.status, rw_proto.UserStatus.ACTIVE)
+        self.assertEqual(request.email, "user@example.com")
+        self.assertEqual(list(request.active_internal_squads), ["squad-1"])
+        client.add_user.assert_not_called()
+
+
+class AntiabuseBulkListTests(_AntiabuseSqliteMixin, SimpleTestCase):
+    """Массовые операции по списку пользователей (support-admin/api/bulk/):
+    платившие и ручные лимиты владельца пропускаются (applied не растёт),
+    маркер site:bulk пишется в той же транзакции."""
+
+    def setUp(self):
+        super().setUp()
+        self.audit = mock.Mock()
+        self.events = mock.Mock()
+        self.user = self._user(
+            7, "42", telegram_id=42, expire_at=datetime(2030, 1, 1), autopay_allow=True
+        )
+        self.session.commit()
+
+    def _call(self, action, client, dry_run, ids="42"):
+        from engine.views import support_admin_api_bulk
+
+        request = RequestFactory().post(
+            "/support-admin/api/bulk/",
+            data={"ids": ids, "action": action, "dry_run": "1" if dry_run else "0"},
+        )
+        request.session = {}
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=self.session),
+            mock.patch("engine.views.rwms_client", client),
+            mock.patch("engine.views.admin_audit_write", self.audit),
+            mock.patch("engine.views.add_traffic_limit_event", self.events),
+        ):
+            response = support_admin_api_bulk(request)
+        return response.status_code, json.loads(response.content)
+
+    def _panel(self, limit_bytes=0, strategy=0, status=0):
+        return SimpleNamespace(
+            uuid="panel-uuid",
+            traffic_limit_bytes=limit_bytes,
+            traffic_limit_strategy=strategy,
+            status=status,
+        )
+
+    def test_bulk_actions_registered(self):
+        from engine.views import BULK_ACTIONS
+
+        self.assertIn("apply_trial_limit", BULK_ACTIONS)
+        self.assertIn("remove_traffic_limit", BULK_ACTIONS)
+
+    def test_dry_run_previews_limit_without_touching_panel(self):
+        client = mock.Mock()
+
+        status, payload = self._call("apply_trial_limit", client, dry_run=True)
+
+        self.assertEqual(payload["status"], "ok")
+        self.assertIn("5 ГиБ · ежедневно", payload["result"]["rows"][0]["message"])
+        self.assertIn("ручной лимит панели не трогается", payload["result"]["rows"][0]["message"])
+        status, payload = self._call("remove_traffic_limit", client, dry_run=True)
+        self.assertIn("сквады не меняются", payload["result"]["rows"][0]["message"])
+        self.assertIn("только управляемый", payload["result"]["rows"][0]["message"])
+        client.get_user_by_username_strict.assert_not_called()
+        client.update_user.assert_not_called()
+
+    def test_apply_skips_paid_and_updates_never_paid(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        paid = self._user(8, "paid", expire_at=datetime(2030, 1, 1), autopay_allow=True)
+        self._yk_payment(paid)
+        self.session.commit()
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = self._panel()
+        client.update_user.return_value = SimpleNamespace(uuid="panel-uuid")
+
+        status, payload = self._call("apply_trial_limit", client, dry_run=False, ids="paid")
+
+        row = payload["result"]["rows"][0]
+        self.assertIn("платил", row["message"])
+        self.assertEqual(row["outcome"], "skipped_paid")
+        # Пропущенный платящий — не «применено».
+        self.assertEqual(payload["result"]["applied"], 0)
+        self.assertEqual(payload["result"]["skipped_paid"], 1)
+        client.update_user.assert_not_called()
+        self.assertIsNone(self._marker_of(8))
+
+        status, payload = self._call("apply_trial_limit", client, dry_run=False)
+
+        self.assertEqual(payload["result"]["applied"], 1)
+        self.assertEqual(payload["result"]["skipped_paid"], 0)
+        request = client.update_user.call_args.args[0]
+        self.assertEqual(request.traffic_limit_bytes, 5 * 1024**3)
+        self.assertEqual(request.traffic_limit_strategy, rw_proto.TrafficLimitStrategy.DAY)
+        self.assertEqual(list(request.active_internal_squads), [])
+        marker = self._marker_of(7)
+        self.assertEqual(marker.applied_by, "site:bulk")
+        self.assertEqual((marker.reason, marker.release_on), ("trial", "payment"))
+        audit = self.audit.call_args_list[-1]
+        self.assertEqual(audit.args[2], "bulk_apply_trial_limit")
+        self.assertEqual(audit.kwargs["limit_gb"], 5.0)
+        self.assertEqual(self.audit.call_args_list[0].kwargs["skipped_paid"], 1)
+        self.assertEqual([c.args[2] for c in self.events.call_args_list], ["traffic_limit_applied"])
+
+    def test_apply_skips_manual_limit_and_marks_equal_limit(self):
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = self._panel(1024**3, 1)
+
+        status, payload = self._call("apply_trial_limit", client, dry_run=False)
+
+        self.assertEqual(payload["result"]["applied"], 0)
+        self.assertEqual(payload["result"]["skipped_manual"], 1)
+        self.assertEqual(payload["result"]["rows"][0]["outcome"], "skipped_manual")
+        self.assertIn("ручной лимит панели", payload["result"]["rows"][0]["message"])
+        client.update_user.assert_not_called()
+        self.assertIsNone(self._marker_of(7))
+
+        client.get_user_by_username_strict.return_value = self._panel(5 * 1024**3, 1)
+        status, payload = self._call("apply_trial_limit", client, dry_run=False)
+
+        self.assertEqual(payload["result"]["applied"], 1)
+        self.assertEqual(payload["result"]["rows"][0]["outcome"], "marked")
+        client.update_user.assert_not_called()
+        self.assertEqual(self._marker_of(7).applied_by, "site:bulk")
+
+    def test_apply_skips_bot_admin_limit_marker(self):
+        """Маркер из кнопки алерта бота (release_on='manual') массовая операция
+        по списку не перезаписывает: skipped_admin_limit, панель и маркер не
+        тронуты, applied не растёт."""
+        self._marker(
+            self.user,
+            limit_bytes=1024**3,
+            strategy="DAY",
+            reason="traffic_abuse",
+            release_on="manual",
+            applied_by="bot:admin:1",
+        )
+        self.session.commit()
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = self._panel(1024**3, 1)
+
+        status, payload = self._call("apply_trial_limit", client, dry_run=False)
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["result"]["applied"], 0)
+        self.assertEqual(payload["result"]["skipped_admin_limit"], 1)
+        self.assertEqual(payload["result"]["skipped_manual"], 0)
+        row = payload["result"]["rows"][0]
+        self.assertEqual(row["outcome"], "skipped_admin_limit")
+        self.assertIn("лимит админа из бота", row["message"])
+        self.assertIn("bot:admin:1", row["message"])
+        client.update_user.assert_not_called()
+        marker = self._marker_of(7)
+        self.assertEqual((marker.reason, marker.release_on, marker.limit_bytes), ("traffic_abuse", "manual", 1024**3))
+        self.assertEqual(self.audit.call_args.kwargs["skipped_admin_limit"], 1)
+        self.events.assert_not_called()
+
+    def test_remove_rows_and_rwms_outage_are_reported_per_row(self):
+        self._marker(self.user, limit_bytes=10, strategy="DAY")
+        self.session.commit()
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = self._panel(10, 1, 2)
+        client.update_user.return_value = SimpleNamespace(uuid="panel-uuid")
+
+        status, payload = self._call("remove_traffic_limit", client, dry_run=False)
+
+        self.assertEqual(payload["result"]["applied"], 1)
+        self.assertEqual(client.update_user.call_args.args[0].traffic_limit_bytes, 0)
+        self.assertIsNone(self._marker_of(7))
+        self.assertEqual([c.args[2] for c in self.events.call_args_list], ["traffic_limit_released"])
+
+        # Без маркера лимит ручной — не снимаем.
+        client.update_user.reset_mock()
+        status, payload = self._call("remove_traffic_limit", client, dry_run=False)
+        self.assertEqual(payload["result"]["applied"], 0)
+        self.assertEqual(payload["result"]["skipped_manual"], 1)
+        client.update_user.assert_not_called()
+
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = RwmsUnavailableError("42", None, "down")
+        with self.assertLogs(level="ERROR"):
+            status, payload = self._call("remove_traffic_limit", client, dry_run=False)
+        self.assertEqual(payload["result"]["applied"], 0)
+        self.assertIs(payload["result"]["rows"][0]["ok"], False)
+        client.add_user.assert_not_called()
+
+    def test_bulk_limit_actions_require_marker_table(self):
+        self._drop_marker_table()
+        client = mock.Mock()
+
+        for action in ("apply_trial_limit", "remove_traffic_limit"):
+            with self.assertLogs(level="WARNING"):
+                status, payload = self._call(action, client, dry_run=False)
+            self.assertEqual(status, 503, action)
+            self.assertIn("managed_traffic_limits", payload["message"])
+        client.get_user_by_username_strict.assert_not_called()
+        # Предпросмотр таблицы не требует.
+        status, payload = self._call("apply_trial_limit", client, dry_run=True)
+        self.assertEqual(status, 200)
+
+
+class AntiabuseSegmentBulkTests(_AntiabuseSqliteMixin, SimpleTestCase):
+    """Массовые операции по сегменту (support-admin/api/antiabuse-bulk/)."""
+
+    def setUp(self):
+        super().setUp()
+        self.audit = mock.Mock()
+        self.events = mock.Mock()
+
+    def _post(self, client, **data):
+        from engine.views import support_admin_api_antiabuse_bulk
+
+        request = RequestFactory().post("/support-admin/api/antiabuse-bulk/", data=data)
+        request.session = {}
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=self.session),
+            mock.patch("engine.views.rwms_client", client),
+            mock.patch("engine.views.admin_audit_write", self.audit),
+            mock.patch("engine.views.add_traffic_limit_event", self.events),
+        ):
+            response = support_admin_api_antiabuse_bulk(request)
+        return response.status_code, json.loads(response.content)
+
+    def _paid_users(self):
+        p1 = self._user(1, "p1")
+        p2 = self._user(2, "p2")
+        p3 = self._user(3, "p3")
+        for user in (p1, p2, p3):
+            self._yk_payment(user)
+        self._user(4, "trial")
+        self.session.commit()
+
+    def test_dry_run_counts_segment_without_panel_calls(self):
+        self._paid_users()
+        client = mock.Mock()
+
+        status, payload = self._post(client, action="remove_paid_limit", dry_run="1")
+
+        self.assertEqual(status, 200)
+        result = payload["result"]
+        self.assertIs(result["dry_run"], True)
+        self.assertEqual(result["total"], 3)
+        self.assertEqual(result["preview"], ["p1", "p2", "p3"])
+        self.assertIsNone(result["limit_label"])
+        client.get_user_by_username_strict.assert_not_called()
+        client.update_user.assert_not_called()
+        self.audit.assert_not_called()
+
+        status, payload = self._post(client, action="remove_trial_limit", dry_run="1")
+        self.assertEqual(payload["result"]["total"], 1)
+        self.assertEqual(payload["result"]["preview"], ["trial"])
+
+    def test_remove_processes_in_batches_and_skips_unlimited_and_manual(self):
+        """Снимается только управляемый лимит (маркер + панель совпадают):
+        p1 — маркер есть → снят; p2 — лимита нет → пропуск; p3 — лимит без
+        маркера (ручной кап владельца) → skipped_manual, панель не тронута."""
+        import proto.rwmanager_pb2 as rw_proto
+
+        self._paid_users()
+        self._marker(self.session.get(User, 1), limit_bytes=5 * 1024**3, strategy="DAY")
+        self.session.commit()
+        panel = {
+            "p1": SimpleNamespace(uuid="u1", traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1, status=2),
+            "p2": SimpleNamespace(uuid="u2", traffic_limit_bytes=0, traffic_limit_strategy=0, status=0),
+            "p3": SimpleNamespace(uuid="u3", traffic_limit_bytes=1024, traffic_limit_strategy=1, status=0),
+        }
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = lambda name: panel[name]
+        client.update_user.return_value = SimpleNamespace()
+
+        status, payload = self._post(
+            client, action="remove_paid_limit", dry_run="0", batch_size="2", after_id="0"
+        )
+
+        self.assertEqual(status, 200)
+        result = payload["result"]
+        self.assertEqual((result["processed"], result["applied"], result["skipped"], result["failed"]), (2, 1, 1, 0))
+        self.assertEqual(result["skipped_manual"], 0)
+        self.assertIs(result["done"], False)
+        self.assertEqual(result["next_after_id"], 2)
+        self.assertIsNone(self._marker_of(1))
+
+        status, payload = self._post(
+            client, action="remove_paid_limit", dry_run="0", batch_size="2", after_id="2"
+        )
+
+        result = payload["result"]
+        self.assertEqual((result["processed"], result["applied"], result["skipped_manual"]), (1, 0, 1))
+        self.assertIs(result["done"], True)
+        requests = [call.args[0] for call in client.update_user.call_args_list]
+        self.assertEqual([r.uuid for r in requests], ["u1"])
+        for request in requests:
+            self.assertEqual(request.traffic_limit_bytes, 0)
+            self.assertEqual(request.traffic_limit_strategy, rw_proto.TrafficLimitStrategy.NO_RESET)
+            self.assertEqual(request.status, rw_proto.UserStatus.ACTIVE)
+            self.assertEqual(list(request.active_internal_squads), [])
+        self.assertEqual(self.audit.call_count, 2)
+        self.assertEqual(self.audit.call_args_list[0].args[2], "antiabuse_bulk_remove_paid_limit")
+        self.assertEqual(self.audit.call_args_list[1].kwargs["skipped_manual"], 1)
+        self.assertEqual([c.args[2] for c in self.events.call_args_list], ["traffic_limit_released"])
+        client.add_user.assert_not_called()
+
+    def test_remove_drops_stale_marker_without_touching_panel(self):
+        """Маркер не совпадает с панелью (владелец сменил лимит руками):
+        маркер снимается, панель не трогается."""
+        self._paid_users()
+        self._marker(self.session.get(User, 1), limit_bytes=1024**3, strategy="DAY")
+        self.session.commit()
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = SimpleNamespace(
+            uuid="u1", traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1, status=2
+        )
+
+        with self.assertLogs(level="WARNING"):
+            status, payload = self._post(client, action="remove_paid_limit", dry_run="0", batch_size="1")
+
+        self.assertEqual(status, 200)
+        self.assertEqual((payload["result"]["applied"], payload["result"]["skipped_manual"]), (0, 1))
+        client.update_user.assert_not_called()
+        self.assertIsNone(self._marker_of(1))
+
+    def test_bulk_requires_marker_table(self):
+        self._paid_users()
+        self._drop_marker_table()
+        client = mock.Mock()
+
+        with self.assertLogs(level="WARNING"):
+            status, payload = self._post(client, action="remove_paid_limit", dry_run="0")
+
+        self.assertEqual(status, 503)
+        self.assertIn("managed_traffic_limits", payload["message"])
+        client.get_user_by_username_strict.assert_not_called()
+        self.audit.assert_not_called()
+        # Предпросмотр (только подсчёт по БД) таблицы маркеров не требует.
+        status, payload = self._post(client, action="remove_paid_limit", dry_run="1")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["result"]["total"], 3)
+
+    def test_rwms_unavailable_returns_503_with_partial_progress(self):
+        self._paid_users()
+        self._marker(self.session.get(User, 1), limit_bytes=10, strategy="DAY")
+        self.session.commit()
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = [
+            SimpleNamespace(uuid="u1", traffic_limit_bytes=10, traffic_limit_strategy=1, status=2),
+            RwmsUnavailableError("p2", None, "down"),
+        ]
+        client.update_user.return_value = SimpleNamespace()
+
+        with self.assertLogs(level="WARNING"):
+            status, payload = self._post(client, action="remove_paid_limit", dry_run="0")
+
+        self.assertEqual(status, 503)
+        self.assertIn("прогресс сохранён", payload["message"])
+        result = payload["result"]
+        self.assertEqual((result["processed"], result["applied"]), (1, 1))
+        self.assertEqual(result["next_after_id"], 1)
+        self.assertIs(result["done"], False)
+        self.assertEqual(client.update_user.call_count, 1)
+        self.assertIs(self.audit.call_args.kwargs["rwms_unavailable"], True)
+
+    def test_apply_trial_limit_requires_enabled_toggle_and_uses_segment(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        self._user(4, "trial")
+        self.session.commit()
+        client = mock.Mock()
+
+        status, payload = self._post(client, action="apply_trial_limit", dry_run="1")
+
+        self.assertEqual(status, 400)
+        self.assertIn("включите", payload["message"])
+        client.get_user_by_username_strict.assert_not_called()
+
+        self._set("trial_traffic_limit_enabled", "1")
+        self._set("trial_traffic_limit_gb", "0.5")
+        self.session.commit()
+        client.get_user_by_username_strict.return_value = SimpleNamespace(
+            uuid="u4", traffic_limit_bytes=0, traffic_limit_strategy=0, status=0
+        )
+        client.update_user.return_value = SimpleNamespace()
+        # trial_active использует now() AT TIME ZONE (Postgres) — на SQLite
+        # подменяем условие сегмента, сам конвейер порций проверяем как есть.
+        with mock.patch("engine.views.antiabuse_bulk_where_sql", return_value="u.username = 'trial'"):
+            status, payload = self._post(client, action="apply_trial_limit", dry_run="1")
+            self.assertEqual(payload["result"]["total"], 1)
+            self.assertEqual(payload["result"]["limit_label"], "512 МиБ · ежедневно".replace("512 МиБ", "0.5 ГиБ"))
+            status, payload = self._post(client, action="apply_trial_limit", dry_run="0")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["result"]["applied"], 1)
+        self.assertEqual((payload["result"]["marked"], payload["result"]["skipped_paid"]), (0, 0))
+        request = client.update_user.call_args.args[0]
+        self.assertEqual(request.traffic_limit_bytes, 536870912)
+        self.assertEqual(request.traffic_limit_strategy, rw_proto.TrafficLimitStrategy.DAY)
+        self.assertFalse(request.HasField("status"))
+        marker = self._marker_of(4)
+        self.assertEqual((marker.limit_bytes, marker.strategy, marker.applied_by), (536870912, "DAY", "site:bulk"))
+        self.assertEqual([c.args[2] for c in self.events.call_args_list], ["traffic_limit_applied"])
+
+    def test_apply_skips_paid_and_manual_marks_equal(self):
+        """apply по сегменту: платившему лимит не ставится (skipped_paid,
+        applied не растёт), ручной кап владельца пропускается (skipped_manual),
+        панель с ровно нашим лимитом без маркера — только помечается (marked)."""
+        trial = self._user(1, "trial")
+        paid = self._user(2, "paid")
+        self._user(3, "manual")
+        self._user(4, "equal")
+        self._yk_payment(paid)
+        self._set("trial_traffic_limit_enabled", "1")
+        self.session.commit()
+        panel = {
+            "trial": SimpleNamespace(uuid="u1", traffic_limit_bytes=0, traffic_limit_strategy=0, status=0),
+            "paid": SimpleNamespace(uuid="u2", traffic_limit_bytes=0, traffic_limit_strategy=0, status=0),
+            "manual": SimpleNamespace(uuid="u3", traffic_limit_bytes=1024**3, traffic_limit_strategy=1, status=0),
+            "equal": SimpleNamespace(uuid="u4", traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1, status=0),
+        }
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = lambda name: panel[name]
+        client.update_user.return_value = SimpleNamespace()
+
+        with mock.patch(
+            "engine.views.antiabuse_bulk_where_sql",
+            return_value="u.username IN ('trial', 'paid', 'manual', 'equal')",
+        ):
+            status, payload = self._post(client, action="apply_trial_limit", dry_run="0")
+
+        self.assertEqual(status, 200)
+        result = payload["result"]
+        self.assertEqual(
+            (result["processed"], result["applied"], result["marked"], result["skipped_paid"], result["skipped_manual"]),
+            (4, 1, 1, 1, 1),
+        )
+        self.assertEqual([c.args[0].uuid for c in client.update_user.call_args_list], ["u1"])
+        self.assertIsNotNone(self._marker_of(1))
+        self.assertIsNone(self._marker_of(2))
+        self.assertIsNone(self._marker_of(3))
+        self.assertEqual(self._marker_of(4).applied_by, "site:bulk")
+        self.assertEqual(self.audit.call_args.kwargs["skipped_paid"], 1)
+        self.assertEqual(self.audit.call_args.kwargs["marked"], 1)
+
+    def test_apply_skips_bot_admin_limit_markers_with_counter(self):
+        """Сегментный apply не перезаписывает маркеры бота с release_on='manual':
+        лимит с другой сигнатурой — skipped_admin_limit (панель и маркер не
+        тронуты); с ровно лимитом пробных — unchanged, release_on остаётся."""
+        self._user(1, "trial")
+        self._user(2, "adminlim")
+        self._user(3, "adminequal")
+        self._marker(
+            self.session.get(User, 2),
+            limit_bytes=1024**3,
+            strategy="DAY",
+            reason="ip_abuse",
+            release_on="manual",
+            applied_by="bot:admin:1",
+        )
+        self._marker(
+            self.session.get(User, 3),
+            reason="traffic_abuse",
+            release_on="manual",
+            applied_by="bot:admin:1",
+        )
+        self._set("trial_traffic_limit_enabled", "1")
+        self.session.commit()
+        panel = {
+            "trial": SimpleNamespace(uuid="u1", traffic_limit_bytes=0, traffic_limit_strategy=0, status=0),
+            "adminlim": SimpleNamespace(uuid="u2", traffic_limit_bytes=1024**3, traffic_limit_strategy=1, status=0),
+            "adminequal": SimpleNamespace(uuid="u3", traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1, status=0),
+        }
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = lambda name: panel[name]
+        client.update_user.return_value = SimpleNamespace()
+
+        with mock.patch(
+            "engine.views.antiabuse_bulk_where_sql",
+            return_value="u.username IN ('trial', 'adminlim', 'adminequal')",
+        ):
+            status, payload = self._post(client, action="apply_trial_limit", dry_run="0")
+
+        self.assertEqual(status, 200)
+        result = payload["result"]
+        self.assertEqual(
+            (result["processed"], result["applied"], result["skipped_admin_limit"], result["skipped_manual"], result["skipped"]),
+            (3, 1, 1, 0, 1),
+        )
+        self.assertEqual([c.args[0].uuid for c in client.update_user.call_args_list], ["u1"])
+        marker = self._marker_of(2)
+        self.assertEqual((marker.reason, marker.release_on, marker.limit_bytes), ("ip_abuse", "manual", 1024**3))
+        marker = self._marker_of(3)
+        self.assertEqual((marker.reason, marker.release_on), ("traffic_abuse", "manual"))
+        self.assertEqual(self.audit.call_args.kwargs["skipped_admin_limit"], 1)
+        self.assertEqual([c.args[2] for c in self.events.call_args_list], ["traffic_limit_applied"])
+
+    def test_apply_commits_marker_per_user_right_after_update(self):
+        """Маркер каждого пользователя коммитится сразу после его UpdateUser
+        (короткая транзакция), а не раз на порцию: сбой commit на N-м
+        пользователе не оставит в панели N-1 лимитов без маркеров. Проверяем
+        порядок commit/UpdateUser (сам откат на SQLite не воспроизвести:
+        pysqlite фиксирует транзакцию на RELEASE внешнего SAVEPOINT)."""
+        self._user(1, "t1")
+        self._user(2, "t2")
+        self._set("trial_traffic_limit_enabled", "1")
+        self.session.commit()
+        timeline = []
+        real_commit = self.session.commit
+
+        def commit():
+            timeline.append("commit")
+            real_commit()
+
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = lambda name: SimpleNamespace(
+            uuid=name, traffic_limit_bytes=0, traffic_limit_strategy=0, status=0
+        )
+
+        def update_user(request):
+            timeline.append(f"update:{request.uuid}")
+            return SimpleNamespace()
+
+        client.update_user.side_effect = update_user
+
+        with (
+            mock.patch("engine.views.antiabuse_bulk_where_sql", return_value="u.username IN ('t1', 't2')"),
+            mock.patch.object(self.session, "commit", side_effect=commit),
+        ):
+            status, payload = self._post(client, action="apply_trial_limit", dry_run="0")
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["result"]["applied"], 2)
+        # UpdateUser → commit → UpdateUser → commit → commit аудита порции.
+        self.assertEqual(timeline, ["update:t1", "commit", "update:t2", "commit", "commit"])
+        self.assertIsNotNone(self._marker_of(1))
+        self.assertIsNotNone(self._marker_of(2))
+        self.assertEqual(self.audit.call_count, 1)
+
+    def test_rejects_unknown_action_and_bad_params(self):
+        client = mock.Mock()
+        status, payload = self._post(client, action="delete_everyone", dry_run="1")
+        self.assertEqual(status, 400)
+        status, payload = self._post(client, action="remove_paid_limit", after_id="x")
+        self.assertEqual(status, 400)
+
+    def test_segments_come_from_common_registry(self):
+        from common.models.segments import segment_where_sql
+        from engine.views import ANTIABUSE_BULK_ACTIONS, antiabuse_bulk_where_sql
+
+        self.assertEqual(
+            {key: value[0] for key, value in ANTIABUSE_BULK_ACTIONS.items()},
+            {
+                "apply_trial_limit": "trial_active",
+                "remove_trial_limit": "never_paid",
+                "remove_paid_limit": "paid_any",
+            },
+        )
+        self.assertEqual(
+            antiabuse_bulk_where_sql("apply_trial_limit"),
+            segment_where_sql("trial_active", requires_telegram=False),
+        )
+        self.assertNotIn("telegram_id IS NOT NULL", antiabuse_bulk_where_sql("remove_trial_limit"))
+
+
+class AntiabuseIpguardAlertsTests(_AntiabuseSqliteMixin, SimpleTestCase):
+    def _get(self, client):
+        from engine.views import support_admin_api_ipguard_alerts
+
+        request = RequestFactory().get("/support-admin/api/ipguard-alerts/")
+        request.session = {}
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=self.session),
+            mock.patch("engine.views.rwms_client", client),
+        ):
+            response = support_admin_api_ipguard_alerts(request)
+        return response.status_code, json.loads(response.content)
+
+    def _seed(self):
+        from common.models.db import IpAlert
+        from common.models.db import UserIpObservation
+
+        self._user(1, "123456")
+        self.session.add_all([
+            IpAlert(id=1, username="777", level="alert", unique_ip_count=30, unique_subnet_count=25,
+                    threshold=10, window_hours=24, created_at=datetime(2026, 9, 1, 12, 0, 0)),
+            IpAlert(id=2, username="777", level="suspicious", unique_ip_count=12, unique_subnet_count=11,
+                    threshold=10, window_hours=24, created_at=datetime(2026, 9, 1, 6, 0, 0)),
+            IpAlert(id=3, username="not-a-number", level="alert", unique_ip_count=5, unique_subnet_count=5,
+                    threshold=1, window_hours=24, created_at=datetime(2026, 8, 30, 6, 0, 0)),
+            UserIpObservation(id=1, username="777", ip="1.2.3.4", subnet="1.2.3.0/24", node="nl1", hits=1,
+                              first_seen=datetime(2026, 9, 1, 11, 0, 0), last_seen=datetime(2026, 9, 1, 11, 0, 0)),
+            UserIpObservation(id=2, username="777", ip="5.6.7.8", subnet="5.6.7.0/24", node="de1", hits=1,
+                              first_seen=datetime(2026, 8, 31, 1, 0, 0), last_seen=datetime(2026, 8, 31, 1, 0, 0)),
+            UserIpObservation(id=3, username="777", ip="9.9.9.9", subnet="9.9.9.0/24", node="fi1", hits=1,
+                              first_seen=datetime(2026, 8, 31, 20, 0, 0), last_seen=datetime(2026, 8, 31, 20, 0, 0)),
+        ])
+        self.session.commit()
+
+    def test_alerts_resolve_panel_ids_with_per_request_cache(self):
+        self._seed()
+        client = mock.Mock()
+        client.get_user_by_id.return_value = SimpleNamespace(username="123456", uuid="uuid-1")
+
+        status, payload = self._get(client)
+
+        self.assertEqual(status, 200)
+        rows = payload["result"]["alerts"]
+        self.assertEqual([row["id"] for row in rows], [1, 2, 3])
+        # Один RPC на уникальный числовой ID; нечисловой username не резолвится.
+        client.get_user_by_id.assert_called_once_with(777)
+        self.assertEqual(rows[0]["panel_id"], "777")
+        self.assertEqual(rows[0]["username"], "123456")
+        self.assertEqual(rows[0]["user_uuid"], "uuid-1")
+        self.assertIs(rows[0]["local_user"], True)
+        self.assertEqual(rows[0]["level"], "alert")
+        self.assertEqual(rows[0]["unique_subnet_count"], 25)
+        self.assertEqual(rows[0]["created_at"], "01.09.2026 15:00")
+        # Ноды — только из окна алерта (24 ч до created_at): de1 старше.
+        self.assertEqual(rows[0]["nodes"], ["fi1", "nl1"])
+        self.assertEqual(rows[1]["nodes"], ["fi1"])
+        self.assertIsNone(rows[2]["username"])
+        self.assertIs(rows[2]["local_user"], False)
+        self.assertEqual(payload["result"]["limit"], 50)
+
+    def test_alerts_degrade_to_panel_id_when_rwms_unavailable(self):
+        self._seed()
+        client = mock.Mock()
+        client.get_user_by_id.return_value = None
+
+        status, payload = self._get(client)
+
+        self.assertEqual(status, 200)
+        rows = payload["result"]["alerts"]
+        self.assertEqual(rows[0]["panel_id"], "777")
+        self.assertIsNone(rows[0]["username"])
+        self.assertIs(rows[0]["local_user"], False)
+
+        client = mock.Mock()
+        client.get_user_by_id.side_effect = RuntimeError("boom")
+        with self.assertLogs(level="ERROR"):
+            status, payload = self._get(client)
+        self.assertEqual(status, 200)
+        self.assertIsNone(payload["result"]["alerts"][0]["username"])
+
+    def test_resolved_username_missing_locally_is_flagged(self):
+        self._seed()
+        client = mock.Mock()
+        client.get_user_by_id.return_value = SimpleNamespace(username="stranger", uuid="u")
+
+        status, payload = self._get(client)
+
+        row = payload["result"]["alerts"][0]
+        self.assertEqual(row["username"], "stranger")
+        self.assertIs(row["local_user"], False)
+
+    def test_endpoint_is_read_only_get(self):
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_ipguard_alerts)
+        self.assertIn('if request.method != "GET":', src)
+        for name in ("update_user", "add_user", "delete"):
+            self.assertNotIn(name, src)
+
+
+class AntiabuseSettingsEndpointTests(_AntiabuseSqliteMixin, SimpleTestCase):
+    def setUp(self):
+        super().setUp()
+        self.audit = mock.Mock()
+
+    def _request(self, method="GET", **data):
+        from engine.views import support_admin_api_antiabuse
+
+        factory = RequestFactory()
+        if method == "POST":
+            request = factory.post("/support-admin/api/antiabuse/", data=data)
+        elif method == "GET":
+            request = factory.get("/support-admin/api/antiabuse/")
+        else:
+            request = factory.generic(method, "/support-admin/api/antiabuse/")
+        request.session = {}
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=self.session),
+            mock.patch("engine.views.admin_audit_write", self.audit),
+        ):
+            response = support_admin_api_antiabuse(request)
+        return response.status_code, json.loads(response.content)
+
+    def test_get_returns_common_defaults_when_nothing_is_set(self):
+        status, payload = self._request()
+
+        self.assertEqual(status, 200)
+        effective = payload["effective"]
+        self.assertIs(effective["trial_traffic_limit_enabled"], False)
+        self.assertEqual(effective["trial_traffic_limit_gb"], 5.0)
+        self.assertEqual(effective["trial_traffic_limit_bytes"], 5 * 1024**3)
+        self.assertEqual(effective["trial_traffic_limit_strategy"], "day")
+        self.assertEqual(effective["trial_traffic_limit_label"], "5 ГиБ · ежедневно")
+        self.assertIs(effective["ipguard_alerts_enabled"], False)
+        self.assertEqual(effective["ipguard_alert_segment"], "never_paid")
+        self.assertEqual(effective["ipguard_subnets_per_hwid"], 10)
+        self.assertEqual(effective["ipguard_window_hours"], 24)
+        self.assertEqual(effective["ipguard_alert_cooldown_hours"], 6)
+        self.assertIs(effective["ipguard_warnings_enabled"], False)
+        self.assertEqual(effective["ipguard_warning_subnets_per_hwid"], 3)
+        self.assertIs(payload["managed_limits_available"], True)
+        self.assertEqual(len(payload["settings"]), 10)
+        self.assertEqual(
+            [item["key"] for item in payload["settings"]][-2:],
+            ["ipguard_warnings_enabled", "ipguard_warning_subnets_per_hwid"],
+        )
+        self.assertTrue(all(item["is_set"] is False for item in payload["settings"]))
+        self.assertEqual(
+            [item["value"] for item in payload["strategies"]],
+            ["no_reset", "day", "week", "month", "month_rolling"],
+        )
+        self.assertEqual(
+            [item["label"] for item in payload["strategies"]],
+            ["Никогда", "Ежедневно", "Еженедельно", "Ежемесячно", "Ежемесячно по дате создания"],
+        )
+        self.assertEqual([item["value"] for item in payload["segments"]], ["never_paid", "all"])
+
+    def test_set_limit_in_mib_is_stored_as_gib(self):
+        from common.models.db import SystemSetting
+
+        status, payload = self._request(
+            "POST", action="trial_limit_set", limit_value="512", limit_unit="mib",
+            strategy="month_rolling",
+        )
+
+        self.assertEqual(status, 200)
+        effective = payload["effective"]
+        self.assertEqual(effective["trial_traffic_limit_gb"], 0.5)
+        self.assertEqual(effective["trial_traffic_limit_bytes"], 536870912)
+        self.assertEqual(effective["trial_traffic_limit_strategy"], "month_rolling")
+        self.assertEqual(self.session.get(SystemSetting, "trial_traffic_limit_gb").value, "0.5")
+        self.assertEqual(
+            [call.args[2] for call in self.audit.call_args_list], ["setting_save", "setting_save"]
+        )
+        self.assertEqual(
+            {call.kwargs["target"] for call in self.audit.call_args_list},
+            {"trial_traffic_limit_gb", "trial_traffic_limit_strategy"},
+        )
+
+        # 100 МиБ → 0.09765625 ГиБ без потери точности → ровно 104857600 байт.
+        status, payload = self._request(
+            "POST", action="trial_limit_set", limit_value="100", limit_unit="mib"
+        )
+        self.assertEqual(payload["effective"]["trial_traffic_limit_bytes"], 104857600)
+        # Пустой лимит + стратегия: лимит не трогаем.
+        status, payload = self._request("POST", action="trial_limit_set", strategy="week")
+        self.assertEqual(payload["effective"]["trial_traffic_limit_bytes"], 104857600)
+        self.assertEqual(payload["effective"]["trial_traffic_limit_strategy"], "week")
+
+    def test_toggle_requires_valid_dependent_values(self):
+        self._set("trial_traffic_limit_gb", "abc")
+        self.session.commit()
+
+        status, payload = self._request("POST", action="trial_limit_enable")
+
+        self.assertEqual(status, 400)
+        self.assertIn("trial_traffic_limit_gb", payload["message"])
+        status, payload = self._request()
+        self.assertIs(payload["effective"]["trial_traffic_limit_enabled"], False)
+
+        self._set("trial_traffic_limit_gb", "3")
+        self.session.commit()
+        status, payload = self._request("POST", action="trial_limit_enable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["trial_traffic_limit_enabled"], True)
+        status, payload = self._request("POST", action="trial_limit_disable")
+        self.assertIs(payload["effective"]["trial_traffic_limit_enabled"], False)
+
+    def test_ipguard_set_and_toggle(self):
+        status, payload = self._request(
+            "POST", action="ipguard_set", segment="all", subnets_per_hwid="4",
+            window_hours="12", cooldown_hours="",
+        )
+
+        self.assertEqual(status, 200)
+        effective = payload["effective"]
+        self.assertEqual(effective["ipguard_alert_segment"], "all")
+        self.assertEqual(effective["ipguard_alert_segment_label"], "Все подписки")
+        self.assertEqual(effective["ipguard_subnets_per_hwid"], 4)
+        self.assertEqual(effective["ipguard_window_hours"], 12)
+        self.assertEqual(effective["ipguard_alert_cooldown_hours"], 6)
+
+        status, payload = self._request("POST", action="ipguard_set", subnets_per_hwid="0")
+        self.assertEqual(status, 400)
+        status, payload = self._request("POST", action="ipguard_set", segment="everyone")
+        self.assertEqual(status, 400)
+
+        status, payload = self._request("POST", action="ipguard_enable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["ipguard_alerts_enabled"], True)
+        status, payload = self._request("POST", action="ipguard_disable")
+        self.assertIs(payload["effective"]["ipguard_alerts_enabled"], False)
+
+    def test_ipguard_warning_threshold_pair(self):
+        """Порог предупреждения строго меньше порога алерта: второе значение
+        берётся из этого же сохранения (в любом порядке полей), иначе из БД,
+        иначе дефолт; тумблер предупреждений включается только при валидной
+        паре."""
+        # Дефолт предупреждения 3: алерт 3 не подходит (не строго меньше).
+        status, payload = self._request("POST", action="ipguard_set", subnets_per_hwid="3")
+        self.assertEqual(status, 400)
+        self.assertIn("ipguard_warning_subnets_per_hwid=3", payload["message"])
+        self.assertIn("ipguard_subnets_per_hwid=3", payload["message"])
+        self.audit.assert_not_called()
+
+        # Пара в одном сохранении валидна независимо от порядка ключей.
+        status, payload = self._request(
+            "POST", action="ipguard_set", subnets_per_hwid="3", warning_subnets_per_hwid="2"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["effective"]["ipguard_subnets_per_hwid"], 3)
+        self.assertEqual(payload["effective"]["ipguard_warning_subnets_per_hwid"], 2)
+
+        # Одно поле — второе из БД: предупреждение 3 при алерте 3 — отказ.
+        status, payload = self._request("POST", action="ipguard_set", warning_subnets_per_hwid="3")
+        self.assertEqual(status, 400)
+        status, payload = self._request("POST", action="ipguard_set", warning_subnets_per_hwid="0")
+        self.assertEqual(status, 400)
+        self.assertIn("ipguard_warning_subnets_per_hwid", payload["message"])
+        status, payload = self._request()
+        self.assertEqual(payload["effective"]["ipguard_warning_subnets_per_hwid"], 2)
+
+        status, payload = self._request("POST", action="ipguard_warnings_enable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["ipguard_warnings_enabled"], True)
+        status, payload = self._request("POST", action="ipguard_warnings_disable")
+        self.assertIs(payload["effective"]["ipguard_warnings_enabled"], False)
+
+        # Битая пара в БД (руками) не даёт включить предупреждения.
+        self._set("ipguard_warning_subnets_per_hwid", "5")
+        self.session.commit()
+        status, payload = self._request("POST", action="ipguard_warnings_enable")
+        self.assertEqual(status, 400)
+        self.assertIn("ipguard_warning_subnets_per_hwid=5", payload["message"])
+        status, payload = self._request("POST", action="ipguard_warnings_disable")
+        self.assertEqual(status, 200)
+
+    def test_unchanged_values_are_not_rewritten(self):
+        """Формы предзаполнены и шлют все поля разом: значение, равное
+        сохранённому, не перезаписывается и в аудит не попадает."""
+        status, payload = self._request(
+            "POST", action="trial_limit_set", limit_value="5", limit_unit="gib", strategy="day"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(self.audit.call_count, 2)
+
+        status, payload = self._request(
+            "POST", action="trial_limit_set", limit_value="5", limit_unit="gib", strategy="day"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(self.audit.call_count, 2)
+        self.assertEqual(payload["effective"]["trial_traffic_limit_gb"], 5.0)
+
+        status, payload = self._request(
+            "POST", action="ipguard_set", segment="never_paid", subnets_per_hwid="10",
+            warning_subnets_per_hwid="3", window_hours="24", cooldown_hours="6",
+        )
+        self.assertEqual(status, 200)
+        # Дефолты без строк в БД записываются один раз…
+        self.assertEqual(self.audit.call_count, 7)
+        status, payload = self._request(
+            "POST", action="ipguard_set", segment="never_paid", subnets_per_hwid="10",
+            warning_subnets_per_hwid="3", window_hours="24", cooldown_hours="6",
+        )
+        # …повтор — без записи и аудита.
+        self.assertEqual(self.audit.call_count, 7)
+
+    def test_raw_runtime_settings_endpoint_validates_ipguard_pair(self):
+        from engine.views import support_admin_api_runtime_settings
+
+        def save(key, value):
+            request = RequestFactory().post(
+                "/support-admin/api/runtime-settings/",
+                data={"action": "save", "key": key, "value": value},
+            )
+            request.session = {}
+            with (
+                mock.patch("engine.views.require_support_admin_role", return_value=None),
+                mock.patch("engine.views.session_factory", return_value=self.session),
+                mock.patch("engine.views.admin_audit_write", self.audit),
+            ):
+                response = support_admin_api_runtime_settings(request)
+            return response.status_code, json.loads(response.content)
+
+        status, payload = save("ipguard_subnets_per_hwid", "3")
+        self.assertEqual(status, 400)
+        self.assertIn("строго меньше", payload["message"])
+        status, payload = save("ipguard_subnets_per_hwid", "4")
+        self.assertEqual(status, 200)
+        status, payload = save("ipguard_warning_subnets_per_hwid", "4")
+        self.assertEqual(status, 400)
+        status, payload = save("ipguard_warning_subnets_per_hwid", "1")
+        self.assertEqual(status, 200)
+        status, payload = save("ipguard_warnings_enabled", "1")
+        self.assertEqual(status, 200)
+
+    def test_managed_limits_flag_reflects_missing_table(self):
+        self._drop_marker_table()
+        with self.assertLogs(level="WARNING"):
+            status, payload = self._request()
+        self.assertEqual(status, 200)
+        self.assertIs(payload["managed_limits_available"], False)
+
+    def test_invalid_requests(self):
+        status, payload = self._request("POST", action="nuke")
+        self.assertEqual(status, 400)
+        status, payload = self._request("POST", action="trial_limit_set")
+        self.assertEqual(status, 400)
+        self.assertIn("Нет значений", payload["message"])
+        status, payload = self._request("POST", action="trial_limit_set", limit_value="x")
+        self.assertEqual(status, 400)
+        status, payload = self._request("POST", action="trial_limit_set", limit_value="1", limit_unit="tb")
+        self.assertEqual(status, 400)
+        status, payload = self._request("POST", action="trial_limit_set", limit_value="0")
+        self.assertEqual(status, 400)
+        # nan/inf проходят float(), но в БД попасть не должны.
+        for limit_value, limit_unit in (
+            ("nan", "gib"), ("inf", "gib"), ("Infinity", "mib"),
+            # Вне диапазона: 1e13 МиБ ≈ 9.8e9 ГиБ переполнили бы int64 байт.
+            ("1e13", "mib"), ("9000000000", "gib"),
+            # Округляется до «0» при 10 знаках.
+            ("0.00000000001", "gib"), ("0.00000001", "mib"),
+        ):
+            status, payload = self._request(
+                "POST", action="trial_limit_set", limit_value=limit_value,
+                limit_unit=limit_unit,
+            )
+            self.assertEqual(status, 400, (limit_value, limit_unit))
+            self.assertIn("trial_traffic_limit_gb", payload["message"], limit_value)
+        status, payload = self._request("PUT")
+        self.assertEqual(status, 405)
+        self.audit.assert_not_called()
+        status, payload = self._request()
+        self.assertEqual(payload["effective"]["trial_traffic_limit_gb"], 5.0)
+
+
+class AntiabuseValidationTests(_AntiabuseSqliteMixin, SimpleTestCase):
+    def test_pair_validation_only_guards_enabling(self):
+        from engine.views import admin_validate_antiabuse_setting_pair as validate
+
+        self.assertIsNone(validate(self.session, "trial_traffic_limit_enabled", "0"))
+        self.assertIsNone(validate(self.session, "trial_traffic_limit_enabled", "1"))
+        self.assertIsNone(validate(self.session, "ipguard_alerts_enabled", "1"))
+        self.assertIsNone(validate(self.session, "trial_traffic_limit_gb", "5"))
+
+        self._set("trial_traffic_limit_strategy", "quarter")
+        error = validate(self.session, "trial_traffic_limit_enabled", "1")
+        self.assertIn("trial_traffic_limit_strategy", error)
+        self.assertIsNone(validate(self.session, "trial_traffic_limit_enabled", "0"))
+        self.assertIsNone(validate(self.session, "ipguard_alerts_enabled", "1"))
+
+        self._set("ipguard_window_hours", "0")
+        error = validate(self.session, "ipguard_alerts_enabled", "1")
+        self.assertIn("ipguard_window_hours", error)
+
+    def test_runtime_settings_endpoint_uses_pair_validation(self):
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_runtime_settings)
+        self.assertIn("admin_validate_antiabuse_setting_pair(", src)
+
+    def test_ipguard_threshold_pair_validation(self):
+        from engine.views import admin_validate_antiabuse_setting_pair as validate
+
+        # Дефолты: алерт 10, предупреждение 3.
+        self.assertIsNone(validate(self.session, "ipguard_subnets_per_hwid", "4"))
+        self.assertIsNotNone(validate(self.session, "ipguard_subnets_per_hwid", "3"))
+        self.assertIsNone(validate(self.session, "ipguard_warning_subnets_per_hwid", "9"))
+        self.assertIsNotNone(validate(self.session, "ipguard_warning_subnets_per_hwid", "10"))
+        self.assertIsNone(validate(self.session, "ipguard_warnings_enabled", "1"))
+        self.assertIsNone(validate(self.session, "ipguard_warnings_enabled", "0"))
+        # Значение из этого же сохранения важнее БД/дефолта.
+        pending = {"ipguard_warning_subnets_per_hwid": "2", "ipguard_subnets_per_hwid": "3"}
+        self.assertIsNone(validate(self.session, "ipguard_subnets_per_hwid", "3", pending))
+        self.assertIsNone(validate(self.session, "ipguard_warning_subnets_per_hwid", "2", pending))
+        # Значение из БД.
+        self._set("ipguard_subnets_per_hwid", "4")
+        self.assertIsNotNone(validate(self.session, "ipguard_warning_subnets_per_hwid", "4"))
+        self.assertIsNone(validate(self.session, "ipguard_warning_subnets_per_hwid", "3"))
+        self._set("ipguard_warning_subnets_per_hwid", "abc")
+        error = validate(self.session, "ipguard_warnings_enabled", "1")
+        self.assertIn("ipguard_warning_subnets_per_hwid=abc", error)
+        self.assertIsNone(validate(self.session, "ipguard_warnings_enabled", "0"))
+
+    def test_generic_validator_handles_antiabuse_keys(self):
+        self.assertEqual(admin_validate_runtime_setting("trial_traffic_limit_gb", "0,5"), ("0.5", None))
+        self.assertEqual(
+            admin_validate_runtime_setting("trial_traffic_limit_gb", "0.09765625"),
+            ("0.09765625", None),
+        )
+        self.assertEqual(
+            admin_validate_runtime_setting("trial_traffic_limit_strategy", "MONTH_ROLLING"),
+            ("month_rolling", None),
+        )
+        self.assertEqual(admin_validate_runtime_setting("ipguard_alert_segment", "ALL"), ("all", None))
+        self.assertEqual(admin_validate_runtime_setting("trial_traffic_limit_enabled", "on"), ("1", None))
+        self.assertIsNotNone(admin_validate_runtime_setting("ipguard_subnets_per_hwid", "0")[1])
+        self.assertIsNotNone(admin_validate_runtime_setting("trial_traffic_limit_gb", "0")[1])
+        self.assertIsNotNone(admin_validate_runtime_setting("trial_traffic_limit_strategy", "yearly")[1])
+        self.assertEqual(admin_runtime_setting_type("trial_traffic_limit_strategy"), "enum")
+        self.assertEqual(admin_runtime_setting_type("trial_traffic_limit_gb"), "float")
+
+
+    def test_float_validator_rejects_nan_and_inf_for_all_float_keys(self):
+        """float() принимает "nan"/"inf": без проверки они сохранялись в БД
+        мусором, а parse_positive_float_setting в сервисах молча уходил на
+        дефолт (5 ГиБ) — админ считал, что задал другое значение."""
+        from common.models.settings import POSITIVE_FLOAT_RUNTIME_SETTINGS
+
+        self.assertIn("traffic_usage_suspicious_gb", POSITIVE_FLOAT_RUNTIME_SETTINGS)
+        for key in POSITIVE_FLOAT_RUNTIME_SETTINGS:
+            for raw in ("nan", "NaN", "inf", "-inf", "Infinity", "+inf"):
+                normalized, error = admin_validate_runtime_setting(key, raw)
+                self.assertIsNone(normalized, (key, raw))
+                self.assertIn("конечным", error, (key, raw))
+            self.assertEqual(admin_validate_runtime_setting(key, "2.5"), ("2.5", None))
+
+    def test_trial_limit_gb_bounds_fit_int64(self):
+        from common.models.settings import trial_traffic_limit_bytes
+
+        from engine.views import TRIAL_TRAFFIC_LIMIT_MAX_GB
+
+        # Верхняя граница: байты с большим запасом внутри int64 proto.
+        self.assertEqual(TRIAL_TRAFFIC_LIMIT_MAX_GB, 100_000)
+        self.assertLess(trial_traffic_limit_bytes(TRIAL_TRAFFIC_LIMIT_MAX_GB), 2**62)
+        self.assertEqual(
+            admin_validate_runtime_setting("trial_traffic_limit_gb", "100000"),
+            ("100000", None),
+        )
+        for raw in ("100000.0000000001", "100001", "9000000000", "1e13"):
+            normalized, error = admin_validate_runtime_setting("trial_traffic_limit_gb", raw)
+            self.assertIsNone(normalized, raw)
+            self.assertIn("100000 ГиБ", error, raw)
+        # Нижняя граница: значение, округляющееся до «0» при 10 знаках.
+        for raw in ("0.00000000001", "1e-12"):
+            normalized, error = admin_validate_runtime_setting("trial_traffic_limit_gb", raw)
+            self.assertIsNone(normalized, raw)
+            self.assertIn("слишком мало", error, raw)
+        self.assertEqual(
+            admin_validate_runtime_setting("trial_traffic_limit_gb", "0.001"),
+            ("0.001", None),
+        )
+        # Верхняя граница — только для лимита пробных, остальные float без неё.
+        self.assertEqual(
+            admin_validate_runtime_setting("traffic_usage_alert_gb", "9000000000"),
+            ("9000000000", None),
+        )
+
+    def test_pair_validation_rejects_broken_limit_in_db(self):
+        """Битый лимит в БД (nan / вне диапазона) не даёт включить тумблер."""
+        from engine.views import admin_validate_antiabuse_setting_pair as validate
+
+        for raw in ("nan", "inf", "1e13", "0"):
+            self._set("trial_traffic_limit_gb", raw)
+            error = validate(self.session, "trial_traffic_limit_enabled", "1")
+            self.assertIsNotNone(error, raw)
+            self.assertIn("trial_traffic_limit_gb", error, raw)
+            self.assertIsNone(validate(self.session, "trial_traffic_limit_enabled", "0"))
+        self._set("trial_traffic_limit_gb", "100000")
+        self.assertIsNone(validate(self.session, "trial_traffic_limit_enabled", "1"))
+
+
+class AntiabuseTrafficPayloadTests(SimpleTestCase):
+    def test_payload_exposes_limit_strategy_status_and_hwid(self):
+        from engine import views
+
+        rwms = mock.Mock()
+        rwms.get_user_by_username.return_value = SimpleNamespace(
+            uuid="u1",
+            used_traffic_bytes=1,
+            lifetime_used_traffic_bytes=2,
+            traffic_limit_bytes=5 * 1024**3,
+            traffic_limit_strategy=4,
+            status=2,
+        )
+        rwms.get_user_hwid_devices.return_value = SimpleNamespace(total=3, devices=[])
+
+        payload = views.admin_rwms_traffic_payload("42", client=rwms)
+
+        self.assertEqual(payload["traffic_limit_bytes"], 5 * 1024**3)
+        self.assertEqual(payload["traffic_limit_strategy"], "month_rolling")
+        self.assertEqual(payload["traffic_limit_strategy_label"], "Ежемесячно по дате создания")
+        self.assertEqual(payload["status"], "LIMITED")
+        self.assertIs(payload["is_limited"], True)
+        self.assertEqual(payload["hwid_devices"], 3)
+        rwms.get_user_hwid_devices.assert_called_once_with("u1")
+
+    def test_payload_survives_hwid_failure_and_unknown_strategy(self):
+        from engine import views
+
+        rwms = mock.Mock()
+        rwms.get_user_by_username.return_value = SimpleNamespace(
+            uuid="u1",
+            used_traffic_bytes=1,
+            lifetime_used_traffic_bytes=2,
+            traffic_limit_bytes=0,
+            traffic_limit_strategy=9,
+            status=0,
+        )
+        rwms.get_user_hwid_devices.side_effect = RuntimeError("down")
+
+        with self.assertLogs(level="ERROR"):
+            payload = views.admin_rwms_traffic_payload("42", client=rwms)
+
+        self.assertTrue(payload["available"])
+        self.assertIsNone(payload["hwid_devices"])
+        self.assertEqual(payload["traffic_limit_strategy"], "9")
+        self.assertEqual(payload["status"], "ACTIVE")
+        self.assertIs(payload["is_limited"], False)
+
+        rwms.get_user_hwid_devices.side_effect = None
+        rwms.get_user_hwid_devices.return_value = None
+        payload = views.admin_rwms_traffic_payload("42", client=rwms)
+        self.assertIsNone(payload["hwid_devices"])
+
+
+class AntiabuseTemplateAndDocsTests(SimpleTestCase):
+    def test_template_has_antiabuse_tab_forms_bulk_and_alerts(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        css = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        for needle in (
+            'data-subtab="sys-antiabuse"',
+            'id="subpanel-sys-antiabuse"',
+            'id="antiabuse-trial-form"',
+            'id="antiabuse-ipguard-form"',
+            'id="antiabuse-trial-toggle"',
+            'id="antiabuse-ipguard-toggle"',
+            'name="limit_unit"',
+            '<option value="mib">МиБ</option>',
+            "data-antiabuse-strategy-select",
+            "data-antiabuse-segment-select",
+            'name="subnets_per_hwid"',
+            'name="window_hours"',
+            'name="cooldown_hours"',
+            "Выключено — новые пробные создаются без лимита",
+            "Выключено — алерты не отправляются",
+            'data-antiabuse-bulk-preview="apply_trial_limit"',
+            'data-antiabuse-bulk-apply="remove_trial_limit"',
+            'data-antiabuse-bulk-apply="remove_paid_limit"',
+            'id="antiabuse-alerts-table"',
+            'id="antiabuse-ban-hours"',
+            "data-ipguard-temp-ban",
+            "data-ipguard-open-card",
+            "async function loadIpguardAlerts",
+            "async function antiabuseBulkApply",
+            "async function antiabuseBulkPreview",
+            "async function submitAntiabuseForm",
+            "const ANTIABUSE_BULK_BATCH = 50",
+            "data-antiabuse-url=",
+            "data-antiabuse-bulk-url=",
+            "data-ipguard-alerts-url=",
+            'data-settings-group="antiabuse"',
+            "{slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid']}",
+            "loadAntiabuse();",
+            # v2: предупреждения ip-guard, backfill маркеров, предзаполнение.
+            'id="antiabuse-ipguard-warnings-toggle"',
+            'value="ipguard_warnings_enable"',
+            'name="warning_subnets_per_hwid"',
+            'data-antiabuse-state="ipguard_warnings"',
+            'data-antiabuse-current="ipguard_warning_subnets_per_hwid"',
+            "data-antiabuse-backfill-url=",
+            'data-antiabuse-backfill="1"',
+            'data-antiabuse-backfill="0"',
+            'data-antiabuse-bulk-result="backfill_markers"',
+            'id="antiabuse-backfill-status"',
+            "async function antiabuseBackfillRun",
+            "function antiabuseSetField(",
+            "antiabuseSetField(ipguardForm, 'warning_subnets_per_hwid', effective.ipguard_warning_subnets_per_hwid)",
+            "antiabuseOptionsHtml(payload.strategies, effective.trial_traffic_limit_strategy)",
+            "antiabuseSetField(trialForm, 'limit_unit', 'mib')",
+            "// Перечитываем GET после POST",
+            "loadAntiabuse(true);\n            showAdminToast('Антиабьюз обновлён');",
+            "totals.skippedPaid += result.skipped_paid || 0;",
+            "totals.skippedManual += result.skipped_manual || 0;",
+            "totals.skippedAdminLimit += result.skipped_admin_limit || 0;",
+            "лимитов админа из бота (не тронуты) ${totals.skippedAdminLimit}",
+            # Backfill: платившие с ровно лимитом пробного — отдельная группа.
+            "totals.markedPaid += result.marked_paid || 0;",
+            "платившие с лимитом пробного: ${totals.markedPaid}",
+            "сняты страховкой notifier/оплатой",
+            "applyButton.disabled = !(dryRun && totals.marked + totals.markedPaid > 0);",
+            "managed_limits_available === false",
+            "if (event.target.matches('[data-antiabuse-form]')) submitAntiabuseForm(event);",
+            "formData.append('action', 'temp_ban');",
+        ):
+            self.assertIn(needle, template, needle)
+        for needle in (
+            ".antiabuse-stack",
+            ".antiabuse-bulk-row",
+            ".client-summary-stat.is-limited",
+            '[data-antiabuse-substate="on"]',
+            ".client-summary-stat.is-managed",
+            ".client-summary-stat.is-manual",
+        ):
+            self.assertIn(needle, css, needle)
+        # Селекты без «— без изменений —»: форма предзаполнена актуальным значением.
+        self.assertNotIn("— без изменений —", template)
+
+    def test_client_card_exposes_limit_and_actions(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+
+        for needle in (
+            'data-client-sub-action="apply_trial_limit"',
+            'data-client-sub-action="remove_traffic_limit"',
+            "apply_trial_limit: 'Применить к подписке лимит трафика пробного",
+            "remove_traffic_limit: 'Снять лимит трафика (0, без сброса, статус ACTIVE у ограниченных)?",
+            "data-client-traffic-limit-value",
+            "data-client-traffic-limit-meta",
+            "traffic.is_limited",
+            "traffic.hwid_devices",
+            "traffic.traffic_limit_strategy_label",
+            "paid: Boolean(errorPayload.paid),",
+            # Подсказка при force=1 платившему: страховка notifier снимет лимит.
+            "страховка notifier снимет этот лимит у платившего клиента в следующем же цикле",
+            '<option value="apply_trial_limit">',
+            '<option value="remove_traffic_limit">',
+            # v2: ручной лимит владельца — 409 manual с отдельным подтверждением;
+            # подпись «управляемый / ручной» в карточке; ГиБ/МиБ по 1024.
+            "manual: Boolean(errorPayload.manual),",
+            "Заменить ручной лимит панели лимитом пробного?",
+            # v2.1: три независимых подтверждения — force / override_manual /
+            # override_admin_limit; повтор со всеми подтверждёнными флагами.
+            "adminLimit: Boolean(errorPayload.admin_limit),",
+            "if (refusal.paid && !extra.force) {",
+            "next.force = '1';",
+            "if (refusal.manual && !extra.override_manual) {",
+            "Ручной лимит владельца будет ПЕРЕЗАПИСАН: лимит станет управляемым (release_on=payment)",
+            "next.override_manual = '1';",
+            "if (refusal.adminLimit && !extra.override_admin_limit) {",
+            "Заменить лимит админа из бота лимитом пробного?",
+            "next.override_admin_limit = '1';",
+            "clientSubscriptionAction(action, next);",
+            "const confirmedRetry = Boolean(extra.force || extra.override_manual || extra.override_admin_limit);",
+            "лимитов админа из бота (не тронуты) ${result.skipped_admin_limit}",
+            "traffic.managed_limit",
+            "is-managed",
+            "ручной лимит владельца в панели не трогается",
+            "const units = ['Б', 'КиБ', 'МиБ', 'ГиБ', 'ТиБ'];",
+            "пропущено платящих ${result.skipped_paid}",
+        ):
+            self.assertIn(needle, template, needle)
+        self.assertNotIn("['Б', 'КБ', 'МБ', 'ГБ', 'ТБ']", template)
+
+    def test_endpoints_routed_and_admin_only(self):
+        import inspect
+
+        from django.urls import reverse
+
+        from engine import views
+
+        self.assertEqual(reverse("support_admin_api_antiabuse"), "/support-admin/api/antiabuse/")
+        self.assertEqual(
+            reverse("support_admin_api_antiabuse_bulk"), "/support-admin/api/antiabuse-bulk/"
+        )
+        self.assertEqual(
+            reverse("support_admin_api_ipguard_alerts"), "/support-admin/api/ipguard-alerts/"
+        )
+        self.assertEqual(
+            reverse("support_admin_api_antiabuse_backfill"),
+            "/support-admin/api/antiabuse-backfill/",
+        )
+        for func in (
+            views.support_admin_api_antiabuse,
+            views.support_admin_api_antiabuse_bulk,
+            views.support_admin_api_antiabuse_backfill,
+            views.support_admin_api_ipguard_alerts,
+        ):
+            self.assertIn(
+                "require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)",
+                inspect.getsource(func),
+                func.__name__,
+            )
+
+    def test_limit_helpers_never_delete_recreate_or_touch_squads(self):
+        import inspect
+
+        from engine import views
+
+        for func in (views.admin_rwms_apply_trial_limit, views.admin_rwms_remove_traffic_limit):
+            src = inspect.getsource(func)
+            self.assertNotIn("add_user", src)
+            self.assertNotIn("active_internal_squads=", src)
+            self.assertNotIn("delete", src.lower())
+        bulk_src = inspect.getsource(views.support_admin_api_antiabuse_bulk)
+        self.assertNotIn("add_user", bulk_src)
+        self.assertNotIn("create_user", bulk_src)
+        self.assertIn("get_user_by_username_strict", bulk_src)
+        # Backfill только помечает: панель не пишется вовсе.
+        backfill_src = inspect.getsource(views.support_admin_api_antiabuse_backfill)
+        for forbidden in ("add_user", "create_user", "update_user", "delete_managed_limit"):
+            self.assertNotIn(forbidden, backfill_src, forbidden)
+        self.assertIn("get_user_by_username_strict", backfill_src)
+        # Снятие — только при маркере (resolve → is_managed), маркер удаляется
+        # после UpdateUser; ручной лимит — skipped_manual.
+        release_src = inspect.getsource(views.admin_release_managed_limit)
+        self.assertLess(release_src.index("resolve_managed_limit("), release_src.index("admin_rwms_remove_traffic_limit("))
+        self.assertLess(release_src.index("admin_rwms_remove_traffic_limit("), release_src.index("delete_managed_limit("))
+        self.assertIn('"skipped_manual"', release_src)
+
+    def test_readme_documents_antiabuse(self):
+        readme = Path("README.md").read_text()
+
+        for needle in (
+            "## Админка: Антиабьюз",
+            "trial_traffic_limit_enabled",
+            "ipguard_alerts_enabled",
+            "support-admin/api/antiabuse/",
+            "support-admin/api/antiabuse-bulk/",
+            "support-admin/api/ipguard-alerts/",
+            "apply_trial_limit",
+            "remove_traffic_limit",
+            "Продления не трогают лимит",
+            "Продление не снимает и не ломает лимит трафика",
+            "страховка notifier снимет такой лимит",
+            "(0; 100 000] ГиБ",
+            "### Порядок включения / выключения",
+            # v2: маркеры, предупреждения ip-guard, backfill, миграция.
+            "managed_traffic_limits",
+            "ipguard_warnings_enabled",
+            "ipguard_warning_subnets_per_hwid",
+            "support-admin/api/antiabuse-backfill/",
+            "Пометить существующие лимиты пробных как управляемые",
+            "Ручные лимиты владельца неприкосновенны",
+            "site:admin:<login>",
+            "traffic_limit_applied",
+            "CREATE TABLE managed_traffic_limits",
+            # v2.1: раздельные подтверждения карточки, лимиты админа из бота,
+            # backfill платившим, commit на пользователя в сегментном apply.
+            "`override_manual=1`",
+            "`override_admin_limit=1`",
+            "сам по себе ручной лимит НЕ заменяет — ответ остаётся `409 {\"manual\": true}`",
+            "`skipped_admin_limit`",
+            "`marked_paid`",
+            "лимитом пробного: N — будут помечены и сняты страховкой notifier/оплатой",
+            "ANTIABUSE_BACKFILL_ROWS_SQL",
+            "коммитятся сразу после его\n  `UpdateUser`",
+        ):
+            self.assertIn(needle, readme, needle)
+
+
+
+class AntiabuseIslandBrandingTests(SimpleTestCase):
+    """Антиабьюз приехал обратным портом из зеркального стека Monkey Village.
+
+    Village и Island — зеркальные проекты, правки ходят в обе стороны, поэтому
+    в перенесённом коде и документации не должно остаться village-брендинга:
+    имена соседних сервисов (`monkey-island-payment`, а не `wata-webhook`),
+    домены, `MV_`-переменные и village-овская alembic-ревизия сбивают с толку
+    и на инциденте уводят дежурного не в тот репозиторий.
+    """
+
+    PORTED_SOURCES = (
+        "engine/rwms_helpers.py",
+        "engine/sql_helpers.py",
+        "engine/views.py",
+        "engine/infra.py",
+        "mobile_api/provisioning.py",
+        "engine/templates/admin_dashboard.html",
+        "engine/static/css/admin_dashboard.css",
+    )
+
+    VILLAGE_TOKENS = ("monkey-village", "monkeyvillage", "mv.fornex", "MV_")
+
+    def _antiabuse_readme_section(self):
+        readme = Path("README.md").read_text(encoding="utf-8")
+        start = readme.index("## Админка: Антиабьюз")
+        end = readme.index("\n## ", start + 1)
+        return readme[start:end]
+
+    def test_ported_sources_carry_no_village_branding(self):
+        for path in self.PORTED_SOURCES:
+            text = Path(path).read_text(encoding="utf-8")
+            for token in self.VILLAGE_TOKENS:
+                self.assertNotIn(token, text, f"{path}: {token}")
+
+    def test_readme_antiabuse_section_names_island_services(self):
+        section = self._antiabuse_readme_section()
+        # Соседний сервис оплаты на острове называется monkey-island-payment.
+        self.assertIn("monkey-island-payment", section)
+        self.assertNotIn("wata-webhook", section)
+        for token in self.VILLAGE_TOKENS:
+            self.assertNotIn(token, section, token)
+
+    def test_readme_antiabuse_section_points_at_island_alembic_head(self):
+        section = self._antiabuse_readme_section()
+        # Миграцию managed_traffic_limits владелец пишет поверх головы ОСТРОВА.
+        self.assertIn("island alembic head `be91cc5b23a5`", section)
+        self.assertNotIn("4459b8ea9544", section)
+
+
+class AntiabuseManagedLimitHelpersTests(_AntiabuseSqliteMixin, SimpleTestCase):
+    """engine/rwms_helpers.py: маркеры управляемых лимитов, проба таблицы,
+    правило adoption, события event_logs."""
+
+    def _limit(self, gb=5.0, strategy="day"):
+        from engine.rwms_helpers import TrialTrafficLimit
+
+        return TrialTrafficLimit(
+            limit_gb=gb,
+            limit_bytes=int(gb * 1024**3),
+            strategy_key=strategy,
+            strategy_name=strategy.upper(),
+        )
+
+    def test_table_available_probe_keeps_session_usable(self):
+        from engine.rwms_helpers import managed_limits_table_available
+
+        self._user(1, "u")
+        self.session.commit()
+        self.assertTrue(managed_limits_table_available(self.session))
+        self._drop_marker_table()
+        with self.assertLogs(level="WARNING") as logs:
+            self.assertFalse(managed_limits_table_available(self.session))
+        self.assertTrue(any("миграция не накачена" in line for line in logs.output))
+        # Транзакция вызывающего кода цела: обычные запросы работают.
+        self.assertEqual(self.session.get(User, 1).username, "u")
+
+    def test_record_marker_writes_trial_payment_marker_in_session(self):
+        from engine.rwms_helpers import record_trial_limit_marker
+
+        user = self._user(1, "u")
+        marker = record_trial_limit_marker(self.session, user, self._limit(0.5, "week"))
+        self.assertIsNotNone(marker)
+        self.session.commit()
+        stored = self._marker_of(1)
+        self.assertEqual(stored.limit_bytes, 536870912)
+        self.assertEqual(stored.strategy, "WEEK")
+        self.assertEqual((stored.reason, stored.release_on, stored.applied_by), ("trial", "payment", "site:register"))
+        # Повтор с другим applied_by — upsert той же записи.
+        record_trial_limit_marker(self.session, user, self._limit(), "site:admin:root")
+        self.session.commit()
+        stored = self._marker_of(1)
+        self.assertEqual((stored.limit_bytes, stored.applied_by), (5 * 1024**3, "site:admin:root"))
+        # Без лимита / без пользователя — ничего не пишем.
+        self.assertIsNone(record_trial_limit_marker(self.session, user, None))
+        self.assertIsNone(record_trial_limit_marker(self.session, None, self._limit()))
+        self.assertIsNone(record_trial_limit_marker(self.session, SimpleNamespace(id=None), self._limit()))
+
+    def test_record_marker_degrades_without_table(self):
+        from engine.rwms_helpers import record_trial_limit_marker
+
+        self._user(1, "u")
+        self.session.commit()
+        self._drop_marker_table()
+        user = self.session.get(User, 1)
+        with self.assertLogs(level="WARNING") as logs:
+            self.assertIsNone(record_trial_limit_marker(self.session, user, self._limit()))
+        self.assertTrue(any("WITHOUT managed marker" in line for line in logs.output))
+        self.assertEqual(self.session.get(User, 1).username, "u")
+
+    def test_panel_limit_matches_and_adoption_rule(self):
+        from engine.rwms_helpers import adopted_trial_limit
+        from engine.rwms_helpers import panel_limit_matches
+
+        limit = self._limit()
+        self.assertTrue(panel_limit_matches(SimpleNamespace(traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1), limit))
+        self.assertTrue(panel_limit_matches(SimpleNamespace(traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy="DAY"), limit))
+        self.assertFalse(panel_limit_matches(SimpleNamespace(traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=0), limit))
+        self.assertFalse(panel_limit_matches(SimpleNamespace(traffic_limit_bytes=1024**3, traffic_limit_strategy=1), limit))
+        self.assertFalse(panel_limit_matches(SimpleNamespace(traffic_limit_bytes=0, traffic_limit_strategy=1), limit))
+        self.assertFalse(panel_limit_matches(SimpleNamespace(), limit))
+        self.assertFalse(panel_limit_matches(SimpleNamespace(traffic_limit_bytes="x", traffic_limit_strategy=1), limit))
+        self.assertFalse(panel_limit_matches(None, limit))
+        self.assertFalse(panel_limit_matches(SimpleNamespace(traffic_limit_bytes=1), None))
+
+        panel = SimpleNamespace(traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1)
+        # Тумблер выключен — adoption маркер не пишет.
+        self.assertIsNone(adopted_trial_limit(self.session, panel))
+        self._set("trial_traffic_limit_enabled", "1")
+        adopted = adopted_trial_limit(self.session, panel)
+        self.assertEqual((adopted.limit_bytes, adopted.strategy_name), (5 * 1024**3, "DAY"))
+        # Другой лимит в панели — ручной, не наш.
+        self.assertIsNone(adopted_trial_limit(self.session, SimpleNamespace(traffic_limit_bytes=1024**3, traffic_limit_strategy=1)))
+
+    def test_add_traffic_limit_event_payload(self):
+        from engine.rwms_helpers import add_traffic_limit_event
+
+        marker = SimpleNamespace(
+            limit_bytes=5 * 1024**3, strategy="DAY", reason="trial", release_on="payment", applied_by="bot:start"
+        )
+        session = SimpleNamespace(added=[])
+        session.add = session.added.append
+
+        event = add_traffic_limit_event(session, 7, "traffic_limit_applied", marker, changed=True)
+
+        self.assertEqual(event.user_id, 7)
+        self.assertEqual(event.event_type, "traffic_limit_applied")
+        self.assertEqual(
+            event.event_payload,
+            {"reason": "trial", "applied_by": "bot:start", "limit": 5 * 1024**3, "strategy": "DAY", "release_on": "payment", "changed": True},
+        )
+        self.assertEqual(session.added, [event])
+        self.assertIsNone(add_traffic_limit_event(session, 7, "traffic_limit_released", None))
+        self.assertIsNone(add_traffic_limit_event(session, None, "traffic_limit_released", marker))
+        with self.assertRaises(ValueError):
+            add_traffic_limit_event(session, 7, "limit_changed", marker)
+        self.assertEqual(len(session.added), 1)
+
+    def test_admin_payload_helpers(self):
+        from engine.views import admin_bytes_label
+        from engine.views import admin_managed_limit_payload
+        from engine.views import admin_marker_snapshot
+
+        self.assertEqual(admin_bytes_label(536870912), "512 МиБ")
+        self.assertEqual(admin_bytes_label(5 * 1024**3), "5 ГиБ")
+        self.assertEqual(admin_bytes_label(int(1.5 * 1024**3)), "1.5 ГиБ")
+        self.assertEqual(admin_bytes_label(0), "0")
+        self.assertEqual(admin_bytes_label("x"), "0")
+
+        user = self._user(1, "u")
+        marker = admin_marker_snapshot(self._marker(user, applied_by="bot:start"))
+        self.assertIsNone(admin_marker_snapshot(None))
+
+        managed = admin_managed_limit_payload(marker, 5 * 1024**3, "day")
+        self.assertEqual(managed["kind"], "managed")
+        self.assertIs(managed["managed"], True)
+        self.assertIn("Управляемый лимит (trial, с ", managed["label"])
+        self.assertIn("bot:start", managed["label"])
+        self.assertIn("снимается оплатой", managed["label"])
+        self.assertEqual(managed["marker"]["limit_label"], "5 ГиБ")
+        self.assertEqual(managed["marker"]["strategy"], "day")
+
+        manual = admin_managed_limit_payload(marker, 1024**3, "day")
+        self.assertEqual(manual["kind"], "manual")
+        self.assertIn("владелец", manual["label"])
+        self.assertIn("маркер не совпадает", manual["label"])
+        self.assertEqual(admin_managed_limit_payload(None, 1024**3, "day")["kind"], "manual")
+        self.assertEqual(admin_managed_limit_payload(None, 0, None)["kind"], "none")
+        self.assertEqual(admin_managed_limit_payload(marker, None, None)["kind"], "unknown")
+        self.assertIn("есть маркер", admin_managed_limit_payload(marker, None, None)["label"])
+        unavailable = admin_managed_limit_payload(None, 5 * 1024**3, "day", available=False)
+        self.assertEqual((unavailable["kind"], unavailable["available"]), ("unknown", False))
+        self.assertIn("managed_traffic_limits", unavailable["label"])
+
+
+class AntiabuseTrafficEndpointTests(_AntiabuseSqliteMixin, SimpleTestCase):
+    """support-admin/api/user-traffic/: карточка клиента показывает
+    «управляемый лимит (trial, с <дата>, кем)» либо «ручной лимит панели»;
+    без таблицы маркеров карточка не падает."""
+
+    def _get(self, client, q="42"):
+        from engine.views import support_admin_api_user_traffic
+
+        request = RequestFactory().get("/support-admin/api/user-traffic/", {"q": q})
+        request.session = {}
+        with (
+            mock.patch("engine.views.require_support_admin", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=self.session),
+            mock.patch("engine.views.rwms_client", client),
+        ):
+            response = support_admin_api_user_traffic(request)
+        return response.status_code, json.loads(response.content)
+
+    def _client(self, limit_bytes, strategy=1, status=0):
+        client = mock.Mock()
+        client.get_user_by_username.return_value = SimpleNamespace(
+            uuid="u1",
+            used_traffic_bytes=1,
+            lifetime_used_traffic_bytes=2,
+            traffic_limit_bytes=limit_bytes,
+            traffic_limit_strategy=strategy,
+            status=status,
+        )
+        client.get_user_hwid_devices.return_value = SimpleNamespace(total=1)
+        return client
+
+    def setUp(self):
+        super().setUp()
+        self.user = self._user(7, "42")
+        self.session.commit()
+
+    def test_managed_manual_and_none(self):
+        self._marker(self.user, applied_by="bot:start")
+        self.session.commit()
+
+        status, payload = self._get(self._client(5 * 1024**3, 1, 2))
+        self.assertEqual(status, 200)
+        managed = payload["result"]["managed_limit"]
+        self.assertEqual(managed["kind"], "managed")
+        self.assertEqual(managed["marker"]["applied_by"], "bot:start")
+        self.assertEqual(managed["marker"]["reason"], "trial")
+        self.assertIs(payload["result"]["is_limited"], True)
+
+        # Владелец сменил лимит руками: ручной (маркер на GET не удаляем).
+        status, payload = self._get(self._client(1024**3, 1))
+        self.assertEqual(payload["result"]["managed_limit"]["kind"], "manual")
+        self.assertIsNotNone(self._marker_of(7))
+
+        from common.models.db import ManagedTrafficLimit
+
+        self.session.query(ManagedTrafficLimit).delete()
+        self.session.commit()
+        status, payload = self._get(self._client(1024**3, 1))
+        self.assertEqual(payload["result"]["managed_limit"]["kind"], "manual")
+        self.assertIsNone(payload["result"]["managed_limit"]["marker"])
+        status, payload = self._get(self._client(0, 0))
+        self.assertEqual(payload["result"]["managed_limit"]["kind"], "none")
+
+    def test_panel_unavailable_and_missing_table(self):
+        client = mock.Mock()
+        client.get_user_by_username.return_value = None
+        status, payload = self._get(client)
+        self.assertEqual(status, 200)
+        self.assertIs(payload["result"]["available"], False)
+        self.assertEqual(payload["result"]["managed_limit"]["kind"], "unknown")
+
+        status, payload = self._get(client, q="nobody")
+        self.assertEqual(status, 404)
+
+        self._drop_marker_table()
+        with self.assertLogs(level="WARNING"):
+            status, payload = self._get(self._client(5 * 1024**3, 1))
+        self.assertEqual(status, 200)
+        self.assertIs(payload["result"]["available"], True)
+        managed = payload["result"]["managed_limit"]
+        self.assertIs(managed["available"], False)
+        self.assertEqual(managed["kind"], "unknown")
+        self.assertIn("managed_traffic_limits", managed["label"])
+
+
+class AntiabuseBackfillTests(_AntiabuseSqliteMixin, SimpleTestCase):
+    """support-admin/api/antiabuse-backfill/: «Пометить существующие лимиты
+    пробных как управляемые» — все пользователи, панель ровно с текущим
+    лимитом пробных (байты И стратегия) → маркер backfill (never_paid —
+    marked, платившие — marked_paid); dry-run, порции, аудит."""
+
+    def setUp(self):
+        super().setUp()
+        self.audit = mock.Mock()
+        self.events = mock.Mock()
+
+    def _post(self, client, **data):
+        from engine.views import support_admin_api_antiabuse_backfill
+
+        request = RequestFactory().post("/support-admin/api/antiabuse-backfill/", data=data)
+        request.session = {}
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=self.session),
+            mock.patch("engine.views.rwms_client", client),
+            mock.patch("engine.views.admin_audit_write", self.audit),
+            mock.patch("engine.views.add_traffic_limit_event", self.events),
+        ):
+            response = support_admin_api_antiabuse_backfill(request)
+        return response.status_code, json.loads(response.content)
+
+    def _fixture(self):
+        t1 = self._user(1, "t1")  # наш лимит без маркера → marked
+        self._user(2, "t2")  # ручной кап 1 ГиБ → skipped
+        self._user(3, "t3")  # без лимита → skipped
+        t4 = self._user(4, "t4")  # уже управляемый → already
+        self._user(5, "t5")  # нет в панели → missing
+        paid = self._user(6, "paid")  # платил, ровно лимит пробного → marked_paid
+        self._yk_payment(paid)
+        paid_cap = self._user(7, "paidcap")  # платил, ручной кап 1 ГиБ → skipped
+        self._wata_payment(paid_cap)
+        self._marker(t4)
+        self.session.commit()
+        panel = {
+            "t1": SimpleNamespace(uuid="u1", traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1, status=0),
+            "t2": SimpleNamespace(uuid="u2", traffic_limit_bytes=1024**3, traffic_limit_strategy=1, status=0),
+            "t3": SimpleNamespace(uuid="u3", traffic_limit_bytes=0, traffic_limit_strategy=0, status=0),
+            "t4": SimpleNamespace(uuid="u4", traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1, status=2),
+            "t5": None,
+            "paid": SimpleNamespace(uuid="u6", traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1, status=0),
+            "paidcap": SimpleNamespace(uuid="u7", traffic_limit_bytes=1024**3, traffic_limit_strategy=1, status=0),
+        }
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = lambda name: panel[name]
+        return client, t1
+
+    def test_dry_run_counts_without_writing(self):
+        client, t1 = self._fixture()
+
+        status, payload = self._post(client, dry_run="1")
+
+        self.assertEqual(status, 200)
+        result = payload["result"]
+        self.assertIs(result["dry_run"], True)
+        self.assertEqual(result["action_label"], "Пометить существующие лимиты пробных как управляемые")
+        self.assertEqual(result["limit_label"], "5 ГиБ · ежедневно")
+        self.assertEqual(
+            (result["processed"], result["marked"], result["marked_paid"], result["already"], result["skipped"], result["missing"]),
+            (7, 1, 1, 1, 3, 1),
+        )
+        self.assertIs(result["done"], True)
+        self.assertIsNone(self._marker_of(1))
+        self.assertIsNone(self._marker_of(6))
+        # Платившие тоже проходят по панели: их лимит пробного — отдельная группа.
+        self.assertEqual(client.get_user_by_username_strict.call_count, 7)
+        self.assertIn(mock.call("paid"), client.get_user_by_username_strict.call_args_list)
+        client.update_user.assert_not_called()
+        self.audit.assert_not_called()
+        self.events.assert_not_called()
+
+    def test_apply_marks_matching_limits_in_batches(self):
+        client, t1 = self._fixture()
+
+        status, payload = self._post(client, dry_run="0", batch_size="3")
+
+        self.assertEqual(status, 200)
+        result = payload["result"]
+        self.assertEqual((result["processed"], result["marked"], result["marked_paid"], result["skipped"]), (3, 1, 0, 2))
+        self.assertIs(result["done"], False)
+        self.assertEqual(result["next_after_id"], 3)
+        marker = self._marker_of(1)
+        self.assertEqual((marker.limit_bytes, marker.strategy), (5 * 1024**3, "DAY"))
+        self.assertEqual((marker.reason, marker.release_on, marker.applied_by), ("trial", "payment", "backfill"))
+        self.assertEqual(self.audit.call_args.args[2], "antiabuse_backfill")
+        self.assertEqual(self.audit.call_args.kwargs["strategy"], "day")
+        self.assertEqual(self.audit.call_args.kwargs["marked_paid"], 0)
+        events = self.events.call_args_list
+        self.assertEqual([c.args[2] for c in events], ["traffic_limit_applied"])
+        self.assertIs(events[0].kwargs["backfill"], True)
+        self.assertIs(events[0].kwargs["never_paid"], True)
+
+        status, payload = self._post(client, dry_run="0", batch_size="5", after_id="3")
+
+        result = payload["result"]
+        self.assertEqual(
+            (result["processed"], result["marked"], result["marked_paid"], result["already"], result["skipped"], result["missing"]),
+            (4, 0, 1, 1, 1, 1),
+        )
+        self.assertIs(result["done"], True)
+        # Уже управляемый маркер не перезаписан (applied_by прежний).
+        self.assertEqual(self._marker_of(4).applied_by, "bot:start")
+        # Плативший с ровно лимитом пробного помечен trial/payment/backfill —
+        # дальше его снимет страховка notifier / следующая оплата.
+        marker = self._marker_of(6)
+        self.assertEqual((marker.limit_bytes, marker.strategy), (5 * 1024**3, "DAY"))
+        self.assertEqual((marker.reason, marker.release_on, marker.applied_by), ("trial", "payment", "backfill"))
+        self.assertIs(self.events.call_args_list[-1].kwargs["never_paid"], False)
+        self.assertEqual(self.audit.call_args.kwargs["marked_paid"], 1)
+        self.assertEqual(self.audit.call_args.kwargs["target"], "1/4 users")
+        # Ручной кап платившего (другая сигнатура) не помечен.
+        self.assertIsNone(self._marker_of(7))
+        client.update_user.assert_not_called()
+        client.add_user.assert_not_called()
+
+    def test_bot_admin_marker_is_not_overwritten_when_managed(self):
+        """Маркер бота (release_on='manual') с ровно лимитом пробных — already:
+        backfill не переводит его в payment."""
+        t1 = self._user(1, "t1")
+        self._marker(t1, reason="ip_abuse", release_on="manual", applied_by="bot:admin:1")
+        self.session.commit()
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = SimpleNamespace(
+            uuid="u1", traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1, status=0
+        )
+
+        status, payload = self._post(client, dry_run="0")
+
+        self.assertEqual((payload["result"]["marked"], payload["result"]["already"]), (0, 1))
+        marker = self._marker_of(1)
+        self.assertEqual((marker.reason, marker.release_on, marker.applied_by), ("ip_abuse", "manual", "bot:admin:1"))
+
+    def test_stale_marker_is_overwritten_when_panel_matches(self):
+        """Маркер с другим лимитом, а панель — ровно наш текущий: маркер
+        обновляется (backfill), панель не трогаем."""
+        t1 = self._user(1, "t1")
+        self._marker(t1, limit_bytes=1024**3, strategy="WEEK", applied_by="bot:start")
+        self.session.commit()
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = SimpleNamespace(
+            uuid="u1", traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1, status=0
+        )
+
+        status, payload = self._post(client, dry_run="0")
+
+        self.assertEqual(payload["result"]["marked"], 1)
+        marker = self._marker_of(1)
+        self.assertEqual((marker.limit_bytes, marker.strategy, marker.applied_by), (5 * 1024**3, "DAY", "backfill"))
+
+    def test_rwms_unavailable_returns_503_with_progress(self):
+        self._user(1, "t1")
+        self._user(2, "t2")
+        self.session.commit()
+        client = mock.Mock()
+        client.get_user_by_username_strict.side_effect = [
+            SimpleNamespace(uuid="u1", traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1, status=0),
+            RwmsUnavailableError("t2", None, "down"),
+        ]
+
+        with self.assertLogs(level="WARNING"):
+            status, payload = self._post(client, dry_run="0")
+
+        self.assertEqual(status, 503)
+        self.assertIn("прогресс сохранён", payload["message"])
+        self.assertEqual((payload["result"]["processed"], payload["result"]["marked"]), (1, 1))
+        self.assertEqual(payload["result"]["next_after_id"], 1)
+        self.assertIs(payload["result"]["done"], False)
+        self.assertIsNotNone(self._marker_of(1))
+        self.assertIs(self.audit.call_args.kwargs["rwms_unavailable"], True)
+
+    def test_requires_marker_table_and_validates_params(self):
+        client = mock.Mock()
+        status, payload = self._post(client, dry_run="1", after_id="x")
+        self.assertEqual(status, 400)
+
+        from engine.views import support_admin_api_antiabuse_backfill
+
+        request = RequestFactory().get("/support-admin/api/antiabuse-backfill/")
+        request.session = {}
+        with mock.patch("engine.views.require_support_admin_role", return_value=None):
+            self.assertEqual(support_admin_api_antiabuse_backfill(request).status_code, 405)
+
+        self._drop_marker_table()
+        with self.assertLogs(level="WARNING"):
+            status, payload = self._post(client, dry_run="1")
+        self.assertEqual(status, 503)
+        self.assertIn("managed_traffic_limits", payload["message"])
+        client.get_user_by_username_strict.assert_not_called()
+
+    def test_rows_sql_covers_paid_and_never_paid_regardless_of_block_and_telegram(self):
+        """Backfill идёт по всем пользователям; флаг «платил» — тот же
+        PAYS_EXISTS_SQL, что у сегментов never_paid/paid_any; без фильтра
+        блокировок и Telegram."""
+        from common.models.segments import PAYS_EXISTS_SQL
+        from engine.views import ANTIABUSE_BACKFILL_ROWS_SQL
+
+        self.assertIn(f"({PAYS_EXISTS_SQL}) AS has_payment", ANTIABUSE_BACKFILL_ROWS_SQL)
+        self.assertIn("WHERE u.id > :after_id ORDER BY u.id LIMIT :limit", ANTIABUSE_BACKFILL_ROWS_SQL)
+        self.assertNotIn("user_blocks", ANTIABUSE_BACKFILL_ROWS_SQL)
+        self.assertNotIn("telegram_id", ANTIABUSE_BACKFILL_ROWS_SQL)
+        self.assertNotIn("NOT (", ANTIABUSE_BACKFILL_ROWS_SQL)
+
+
+class AntiabuseSiteRegistrationMarkerTests(_AntiabuseSqliteMixin, SimpleTestCase):
+    """create_site_user: маркер пишется в ТОЙ ЖЕ сессии, что и строка users
+    (реальная SQLite-сессия), при adoption — только по правилу backfill."""
+
+    def _create(self, client, email="limit@example.com"):
+        context = {"referrer": None, "ymid": None, "traffic_source": None}
+        with (
+            mock.patch("engine.views.get_registration_context", return_value=context),
+            mock.patch("engine.views.rwms_client", client),
+            mock.patch("engine.views.add_user_to_traffic_progress"),
+            mock.patch("engine.views.add_event_log"),
+            mock.patch("engine.views.add_traffic_limit_event") as events,
+            mock.patch("engine.views.should_create_trial_for_channel", return_value=True),
+        ):
+            user = create_site_user(self.session, email, SimpleNamespace())
+        return user, events
+
+    def test_new_trial_writes_marker_when_limit_enabled(self):
+        self._set("trial_traffic_limit_enabled", "1")
+        self._set("trial_traffic_limit_gb", "0.5")
+        self.session.commit()
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None
+        created = {}
+
+        def create_user(**kwargs):
+            created.update(kwargs)
+            return _FakeSiteRwUser(username=kwargs["username"], traffic_limit_bytes=536870912, traffic_limit_strategy=1)
+
+        with mock.patch("engine.views.create_user", side_effect=create_user):
+            user, events = self._create(client)
+
+        self.assertEqual(created["traffic_limit"].limit_bytes, 536870912)
+        # Маркер в сессии ещё до commit (та же транзакция, что и users).
+        from common.models.db import ManagedTrafficLimit
+
+        marker = self.session.get(ManagedTrafficLimit, user.id)
+        self.assertEqual((marker.limit_bytes, marker.strategy, marker.applied_by), (536870912, "DAY", "site:register"))
+        self.assertEqual(events.call_args.args[2], "traffic_limit_applied")
+        self.assertEqual(events.call_args.kwargs["creation_channel"], "site")
+        self.session.commit()
+        self.assertIsNotNone(self._marker_of(user.id))
+
+    def test_new_trial_without_limit_writes_no_marker(self):
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = None
+        with mock.patch(
+            "engine.views.create_user",
+            side_effect=lambda **kwargs: _FakeSiteRwUser(username=kwargs["username"]),
+        ):
+            user, events = self._create(client)
+        self.session.commit()
+        self.assertIsNone(self._marker_of(user.id))
+        events.assert_called_once()
+        self.assertIsNone(events.call_args.args[3])
+
+    def test_adoption_marks_only_exact_trial_limit(self):
+        email = "crash@example.com"
+        username = site_registration_username(email)
+        self._set("trial_traffic_limit_enabled", "1")
+        self.session.commit()
+        client = mock.Mock()
+        client.get_user_by_username_strict.return_value = _FakeSiteRwUser(
+            username=username, email=email, traffic_limit_bytes=5 * 1024**3, traffic_limit_strategy=1
+        )
+
+        with mock.patch("engine.views.create_user") as create_user:
+            user, events = self._create(client, email=email)
+
+        create_user.assert_not_called()
+        client.add_user.assert_not_called()
+        self.session.commit()
+        self.assertEqual(self._marker_of(user.id).applied_by, "site:register")
+        self.assertIs(events.call_args.kwargs["adopted"], True)
+
+        # Другой лимит в панели (ручной) — маркера нет.
+        email2 = "crash2@example.com"
+        client.get_user_by_username_strict.return_value = _FakeSiteRwUser(
+            username=site_registration_username(email2), email=email2,
+            traffic_limit_bytes=1024**3, traffic_limit_strategy=1,
+        )
+        with mock.patch("engine.views.create_user"):
+            user2, events = self._create(client, email=email2)
+        self.session.commit()
+        self.assertIsNone(self._marker_of(user2.id))
+

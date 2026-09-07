@@ -10,11 +10,14 @@ enum UserStatus {
   EXPIRED = 3;
 }
 
+// Стратегия сброса трафика, как в панели Remnawave: никогда / ежедневно /
+// еженедельно / ежемесячно / ежемесячно по дате создания подписки.
 enum TrafficLimitStrategy {
   NO_RESET = 0;
   DAY = 1;
   WEEK = 2;
   MONTH = 3;
+  MONTH_ROLLING = 4;
 }
 
 message UserLastConnectedNode {
@@ -105,6 +108,10 @@ message AddUserRequest {
   optional string description = 10;
   optional string tag = 11;
   optional int64 hwid_device_limit = 12;
+  // Лимит трафика в байтах при создании подписки (антиабьюз пробных
+  // подписок, включается настройкой сайта trial_traffic_limit_enabled).
+  // Не задано — панель создаёт подписку без лимита, как раньше.
+  optional int64 traffic_limit_bytes = 13;
 }
 
 message UpdateUserRequest {
