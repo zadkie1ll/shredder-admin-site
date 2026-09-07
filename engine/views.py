@@ -5461,7 +5461,7 @@ def admin_validate_traffic_usage_threshold_pair(db_session, key, normalized_valu
 # Обе защиты (лимит трафика новых пробных, алерты ip-guard по подсетям)
 # управляются ТОЛЬКО отсюда (system_settings), по умолчанию выключены;
 # выключение возвращает поведение «как раньше». Ключи, типы и дефолты —
-# в common/models/settings.py (единый реестр для бота/сайта/notifier/ip-guard).
+# в common/models/settings.py (единый реестр для бота/сайта/user-notify/ip-guard).
 
 ANTIABUSE_TRIAL_KEYS = (
     TRIAL_TRAFFIC_LIMIT_ENABLED_SETTING,
@@ -5877,7 +5877,7 @@ def admin_rwms_remove_traffic_limit(rw_user, client=None):
 # --- Антиабьюз v2: управляемые лимиты (маркеры managed_traffic_limits) --------
 #
 # Ручные лимиты владельца неприкосновенны: автоматика (оплата, страховка
-# notifier, кнопки и массовые операции админки) снимает только лимит с
+# user-notify, кнопки и массовые операции админки) снимает только лимит с
 # маркером, у которого панель показывает ровно limit_bytes/strategy
 # (is_managed). Маркер пишется в той же сессии, что и постановка лимита;
 # история — event_logs traffic_limit_applied / traffic_limit_released.
@@ -8137,7 +8137,7 @@ def support_admin_api_referral_antifraud(request):
 
 def admin_antiabuse_effective(db_session):
     """Действующие значения (БД либо дефолт common) — то, чем реально
-    руководствуются сайт/бот/notifier/payment/ip-guard."""
+    руководствуются сайт/бот/user-notify/payment/ip-guard."""
 
     def raw(key):
         setting = db_session.get(SystemSetting, key)
@@ -8595,7 +8595,7 @@ def support_admin_api_antiabuse_bulk(request):
 # сняться): never_paid — счётчик marked; платившие с той же сигнатурой —
 # отдельный счётчик marked_paid (лимит пробного у платившего — наш, поставлен
 # до миграции и не снят оплатой в окне «код v2 задеплоен, таблицы ещё нет»;
-# после пометки reason=trial/release_on=payment его снимет страховка notifier
+# после пометки reason=trial/release_on=payment его снимет страховка user-notify
 # или следующая оплата). Ручные капы владельца (другой объём/стратегия) под
 # правило не попадают; управляемые маркеры (в т.ч. release_on='manual' из
 # бота) не перезаписываются (already). Порциями, как массовые операции;
@@ -8643,7 +8643,7 @@ def support_admin_api_antiabuse_backfill(request):
         ).all()
 
         # marked — маркер записан у never_paid (dry_run: был бы записан);
-        # marked_paid — то же у плативших (снимется страховкой notifier /
+        # marked_paid — то же у плативших (снимется страховкой user-notify /
         # оплатой); already — уже управляемый; skipped — лимита нет или другой
         # (ручной); missing — нет подписки в панели.
         processed = marked = marked_paid = already = skipped = missing = 0

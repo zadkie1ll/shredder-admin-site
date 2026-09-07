@@ -4767,7 +4767,7 @@
                             <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-tags"></i></span>
                             <div>
                                 <h2 class="system-card-title">Управляемые лимиты (маркеры)</h2>
-                                <p>Автоматика — оплата, страховка notifier, кнопки этой вкладки — снимает только лимиты с маркером managed_traffic_limits, то есть поставленные ею самой. Ручные капы владельца в панели неприкосновенны. Лимиты пробных, поставленные до появления маркеров, нужно пометить один раз.</p>
+                                <p>Автоматика — оплата, страховка user-notify, кнопки этой вкладки — снимает только лимиты с маркером managed_traffic_limits, то есть поставленные ею самой. Ручные капы владельца в панели неприкосновенны. Лимиты пробных, поставленные до появления маркеров, нужно пометить один раз.</p>
                             </div>
                         </div>
                         <div id="antiabuse-backfill-status" class="referral-antifraud-status" aria-live="polite"></div>
@@ -4775,7 +4775,7 @@
                             <div class="antiabuse-bulk-row" data-antiabuse-bulk="backfill_markers">
                                 <div class="antiabuse-bulk-copy">
                                     <strong>Пометить существующие лимиты пробных как управляемые</strong>
-                                    <span>Только если лимит в панели ровно равен текущему лимиту пробных (объём и стратегия). Другие лимиты — ручные капы владельца — не помечаются, лимиты админа из бота не перезаписываются. Платившие с таким лимитом показываются отдельной группой: после пометки его снимет страховка notifier или следующая оплата. Предпросмотр проходит по панели без записи.</span>
+                                    <span>Только если лимит в панели ровно равен текущему лимиту пробных (объём и стратегия). Другие лимиты — ручные капы владельца — не помечаются, лимиты админа из бота не перезаписываются. Платившие с таким лимитом показываются отдельной группой: после пометки его снимет страховка user-notify или следующая оплата. Предпросмотр проходит по панели без записи.</span>
                                 </div>
                                 <div class="antiabuse-bulk-controls">
                                     <button class="btn btn-secondary" type="button" data-antiabuse-backfill="1"><i class="fas fa-eye"></i>Предпросмотр</button>
@@ -10082,21 +10082,21 @@
                 if (refusal && action === 'apply_trial_limit' && (refusal.paid || refusal.manual || refusal.adminLimit)) {
                     const next = {...extra};
                     if (refusal.paid && !extra.force) {
-                        // Страховка notifier: при включённом тумблере «Лимит новых пробных»
+                        // Страховка user-notify: при включённом тумблере «Лимит новых пробных»
                         // лимит у платившего снимается в следующем же цикле (с алертом админам).
-                        if (!confirm(`${refusal.paidMessage}\n\nВнимание: если лимиты пробных включены, страховка notifier снимет этот лимит у платившего клиента в следующем же цикле и пришлёт алерт админам.\n\nПрименить лимит всё равно?`)) return;
+                        if (!confirm(`${refusal.paidMessage}\n\nВнимание: если лимиты пробных включены, страховка user-notify снимет этот лимит у платившего клиента в следующем же цикле и пришлёт алерт админам.\n\nПрименить лимит всё равно?`)) return;
                         next.force = '1';
                     }
                     if (refusal.manual && !extra.override_manual) {
                         // Ручной лимит владельца: после замены он станет управляемым
-                        // (release_on=payment) — его снимет оплата или страховка notifier.
-                        if (!confirm(`${refusal.manualMessage}\n\nЗаменить ручной лимит панели лимитом пробного? Ручной лимит владельца будет ПЕРЕЗАПИСАН: лимит станет управляемым (release_on=payment) и снимется оплатой или страховкой notifier — владельцу придётся ставить кап заново.`)) return;
+                        // (release_on=payment) — его снимет оплата или страховка user-notify.
+                        if (!confirm(`${refusal.manualMessage}\n\nЗаменить ручной лимит панели лимитом пробного? Ручной лимит владельца будет ПЕРЕЗАПИСАН: лимит станет управляемым (release_on=payment) и снимется оплатой или страховкой user-notify — владельцу придётся ставить кап заново.`)) return;
                         next.override_manual = '1';
                     }
                     if (refusal.adminLimit && !extra.override_admin_limit) {
                         // Лимит из кнопки алерта бота (release_on=manual): оплата его не
                         // снимает; после замены станет снимаемым оплатой.
-                        if (!confirm(`${refusal.adminLimitMessage}\n\nЗаменить лимит админа из бота лимитом пробного? Он станет управляемым (release_on=payment) и снимется оплатой или страховкой notifier.`)) return;
+                        if (!confirm(`${refusal.adminLimitMessage}\n\nЗаменить лимит админа из бота лимитом пробного? Он станет управляемым (release_on=payment) и снимется оплатой или страховкой user-notify.`)) return;
                         next.override_admin_limit = '1';
                     }
                     if (Object.keys(next).length > Object.keys(extra).length) {
@@ -10772,9 +10772,9 @@
             const head = done ? (dryRun ? 'Предпросмотр' : 'Готово') : 'Обработка…';
             const marked = dryRun ? `будет помечено ${totals.marked}` : `помечено ${totals.marked}`;
             // Платившие с ровно лимитом пробного — отдельной группой: после пометки
-            // такой лимит снимет страховка notifier / следующая оплата.
+            // такой лимит снимет страховка user-notify / следующая оплата.
             const markedPaid = totals.markedPaid
-                ? `, <strong>платившие с лимитом пробного: ${totals.markedPaid}</strong> — ${dryRun ? 'будут помечены' : 'помечены'} и сняты страховкой notifier/оплатой`
+                ? `, <strong>платившие с лимитом пробного: ${totals.markedPaid}</strong> — ${dryRun ? 'будут помечены' : 'помечены'} и сняты страховкой user-notify/оплатой`
                 : '';
             return `<div class="info-card${message ? ' red' : ''}">${head}: обработано ${totals.processed}, ${marked}${markedPaid}, уже управляемых ${totals.already}, без лимита или с другим (ручным) лимитом ${totals.skipped}, нет в панели ${totals.missing}${totals.limitLabel ? ` · лимит пробных ${escapeHtml(totals.limitLabel)}` : ''}.${message ? ` ${escapeHtml(message)}` : ''}${dryRun && done && !message ? ' Ничего не изменено — нажмите «Пометить».' : ''}</div>`;
         }
@@ -10784,7 +10784,7 @@
             const buttons = Array.from(document.querySelectorAll('[data-antiabuse-backfill]'));
             const applyButton = buttons.find((button) => button.dataset.antiabuseBackfill === '0');
             if (!els.result) return;
-            if (!dryRun && !confirm(`${ANTIABUSE_BACKFILL_LABEL}? Помечаются только лимиты, равные текущему лимиту пробных (объём и стратегия); панель не меняется. У плативших такой лимит после пометки снимет страховка notifier или следующая оплата.`)) return;
+            if (!dryRun && !confirm(`${ANTIABUSE_BACKFILL_LABEL}? Помечаются только лимиты, равные текущему лимиту пробных (объём и стратегия); панель не меняется. У плативших такой лимит после пометки снимет страховка user-notify или следующая оплата.`)) return;
             const totals = {processed: 0, marked: 0, markedPaid: 0, already: 0, skipped: 0, missing: 0, limitLabel: ''};
             let afterId = 0;
             buttons.forEach((button) => { button.disabled = true; });

@@ -270,7 +270,7 @@ def trial_traffic_limit_for_user(db_session, user) -> Optional[TrialTrafficLimit
 # ``managed_traffic_limits`` (common/managed_traffic_limits.py). Каждое место
 # сайта, где фича СТАВИТ лимит (регистрация, пересоздание, «Применить лимит»,
 # массовые операции, backfill), пишет маркер В ТОЙ ЖЕ сессии, что и само
-# действие; снятие (оплата, страховка notifier, кнопки админки) — только при
+# действие; снятие (оплата, страховка user-notify, кнопки админки) — только при
 # is_managed. Без таблицы (миграция не накачена) хелперы common ведут себя как
 # «маркеров нет» с warning; действия админки при этом отвечают 503
 # (managed_limits_table_available), регистрация и карточка клиента не падают.

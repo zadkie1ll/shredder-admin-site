@@ -11328,7 +11328,7 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             # Backfill: платившие с ровно лимитом пробного — отдельная группа.
             "totals.markedPaid += result.marked_paid || 0;",
             "платившие с лимитом пробного: ${totals.markedPaid}",
-            "сняты страховкой notifier/оплатой",
+            "сняты страховкой user-notify/оплатой",
             "applyButton.disabled = !(dryRun && totals.marked + totals.markedPaid > 0);",
             "managed_limits_available === false",
             "if (event.target.matches('[data-antiabuse-form]')) submitAntiabuseForm(event);",
@@ -11361,8 +11361,8 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             "traffic.hwid_devices",
             "traffic.traffic_limit_strategy_label",
             "paid: Boolean(errorPayload.paid),",
-            # Подсказка при force=1 платившему: страховка notifier снимет лимит.
-            "страховка notifier снимет этот лимит у платившего клиента в следующем же цикле",
+            # Подсказка при force=1 платившему: страховка user-notify снимет лимит.
+            "страховка user-notify снимет этот лимит у платившего клиента в следующем же цикле",
             '<option value="apply_trial_limit">',
             '<option value="remove_traffic_limit">',
             # v2: ручной лимит владельца — 409 manual с отдельным подтверждением;
@@ -11462,7 +11462,7 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             "remove_traffic_limit",
             "Продления не трогают лимит",
             "Продление не снимает и не ломает лимит трафика",
-            "страховка notifier снимет такой лимит",
+            "страховка user-notify снимет такой лимит",
             "(0; 100 000] ГиБ",
             "### Порядок включения / выключения",
             # v2: маркеры, предупреждения ip-guard, backfill, миграция.
@@ -11482,7 +11482,7 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             "сам по себе ручной лимит НЕ заменяет — ответ остаётся `409 {\"manual\": true}`",
             "`skipped_admin_limit`",
             "`marked_paid`",
-            "лимитом пробного: N — будут помечены и сняты страховкой notifier/оплатой",
+            "лимитом пробного: N — будут помечены и сняты страховкой user-notify/оплатой",
             "ANTIABUSE_BACKFILL_ROWS_SQL",
             "коммитятся сразу после его\n  `UpdateUser`",
         ):
@@ -11876,7 +11876,7 @@ class AntiabuseBackfillTests(_AntiabuseSqliteMixin, SimpleTestCase):
         # Уже управляемый маркер не перезаписан (applied_by прежний).
         self.assertEqual(self._marker_of(4).applied_by, "bot:start")
         # Плативший с ровно лимитом пробного помечен trial/payment/backfill —
-        # дальше его снимет страховка notifier / следующая оплата.
+        # дальше его снимет страховка user-notify / следующая оплата.
         marker = self._marker_of(6)
         self.assertEqual((marker.limit_bytes, marker.strategy), (5 * 1024**3, "DAY"))
         self.assertEqual((marker.reason, marker.release_on, marker.applied_by), ("trial", "payment", "backfill"))
