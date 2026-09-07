@@ -3,7 +3,7 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <meta name="theme-color" content="#090a0f" media="(prefers-color-scheme: dark)">
     <meta name="theme-color" content="#090a0f" media="(prefers-color-scheme: light)">
     <meta name="color-scheme" content="dark">
@@ -4663,9 +4663,11 @@
     </style>
     {% include "includes/yandex_metrika.html" %}
     <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
+    <link rel="stylesheet" href="{% static 'css/cabinet-mobile.css' %}?v=2">
 </head>
 <body class="dashboard-v2{% if tg_webapp_mode %} tg-webapp{% endif %}" style="--dashboard-bg-image: url('{% static 'img/bg6.png' %}');">
 
+    {% include "includes/cabinet_icons.html" %}
     <div class="page-background">
         <div class="page-background-image">
         </div>
@@ -4765,119 +4767,47 @@
             </div>
         </aside>
 
-        <nav class="nav-mobile">
-            <button type="button" onclick="showTab('home')" class="nav-btn active" data-tab="home"><i class="fas fa-th-large"></i><span>Главная</span></button>
-            <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i><span>Установка</span></button>
-            <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-friends"></i><span>Рефералы</span></button>
-            <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-headset"></i><span>Поддержка</span></button>
-            <button type="button" onclick="showTab('settings')" class="nav-btn" data-tab="settings"><i class="far fa-user"></i><span>Профиль</span></button>
+        <nav class="nav-mobile" aria-label="Основная навигация">
+            <button type="button" onclick="showTab('home')" class="nav-btn active" data-tab="home"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-home"></use></svg><span>Главная</span></button>
+            <button type="button" onclick="mi3OpenDevices()" class="nav-btn" aria-haspopup="dialog" aria-controls="mi3-devices-sheet"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-phone"></use></svg><span>Устройства</span></button>
+            <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-help"></use></svg><span>Помощь</span></button>
+            <button type="button" onclick="showTab('settings')" class="nav-btn" data-tab="settings"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-user"></use></svg><span>Профиль</span></button>
         </nav>
 
         <main class="main-content">
                 
             <div id="tab-home" class="tab-content active">
                 <div id="main-dashboard-view">
-                    <div class="tg-mini-home">
+                    <div class="tg-mini-home cabinet-home">
                         <div class="mi3-topbar">
-                            <div class="tg-mini-brand" style="margin-bottom:0">
-                                <span class="tg-mini-brand-mark" aria-hidden="true">
-                                    <img src="{% static 'icons/logo-face-white.png' %}?v=2" alt="">
-                                </span>
-                                <span class="mi3-brand-name">MONKEY ISLAND <b>VPN</b></span>
+                            <div class="tg-mini-brand">
+                                <span class="tg-mini-brand-mark" aria-hidden="true"><img src="{% static 'icons/logo-face-white.png' %}?v=2" alt=""></span>
+                                <span class="mi3-brand-name">MONKEY ISLAND <span>VPN</span></span>
                             </div>
-                            <span class="mi3-avatar" aria-hidden="true">{{ user.username|slice:":2" }}</span>
+                            <button type="button" class="mi3-avatar" onclick="showTab('settings')" aria-label="Открыть профиль">{{ user.username|slice:":2" }}</button>
                         </div>
-
-                        <div class="mi3-hero">
-                            <div class="mi3-label">Личный кабинет</div>
-                            <h1 class="mi3-title">
-                                {% if has_subscription_access %}Ваш VPN <b>готов</b><br>к работе{% else %}Подключите VPN<br>за пару минут{% endif %}
-                            </h1>
-                            <p class="mi3-sub">
-                                {% if has_subscription_access %}Подключайте устройства и управляйте подпиской без лишних экранов.{% else %}Выберите тариф — доступ откроется сразу после оплаты.{% endif %}
-                            </p>
-                        </div>
-
-                        <section class="mi3-card" aria-label="Статус подписки">
-                            <div class="mi3-status-row">
-                                <span class="mi3-status{% if show_expiring_banner %} is-warning{% elif not has_subscription_access %} is-off{% endif %}">
-                                    {% if not has_subscription_access %}Подписка не активна{% elif show_expiring_banner %}Скоро закончится{% else %}Подписка активна{% endif %}
-                                </span>
-                                {% if has_subscription_access %}<span class="mi3-days">{{ days_left }} дн.</span>{% endif %}
+                        <section class="cabinet-access" aria-labelledby="cabinet-access-title">
+                            <div class="cabinet-access-heading">
+                                <h1 id="cabinet-access-title">Ваш доступ</h1>
+                                <span class="mi3-status{% if not has_subscription_access %} is-off{% elif show_expiring_banner %} is-warning{% endif %}">{% if not has_subscription_access %}Не активен{% elif show_expiring_banner %}Истекает{% else %}Активен{% endif %}</span>
                             </div>
-                            <div class="mi3-date">
-                                {% if has_subscription_access %}До {{ user.expire_at|date:"j E Y" }}{% else %}Доступ не активен{% endif %}
-                            </div>
-                            {% if has_subscription_access %}
-                            <div class="mi3-progress" aria-hidden="true"><i id="mi3-progress-fill" style="width:0%"></i></div>
-                            {% endif %}
-                            <div class="mi3-card-foot">
-                                <span><i class="fas fa-infinity" aria-hidden="true"></i>Безлимитный трафик</span>
-                                <span id="mi3-devices-chip" hidden><i class="fas fa-laptop" aria-hidden="true"></i><span id="mi3-devices-count"></span></span>
-                            </div>
+                            <dl class="cabinet-dates">
+                                <div><dt>Подписка до</dt><dd>{% if has_subscription_access %}{{ user.expire_at|date:"j E Y" }}{% else %}Нет доступа{% endif %}</dd></div>
+                                <div><dt>Осталось</dt><dd>{{ time_left_value }} {{ time_left_unit }}</dd></div>
+                            </dl>
+                            <p class="cabinet-service-note">Безлимитный трафик<span id="cabinet-device-limit"></span></p>
+                            {% if has_recurrent %}<p class="cabinet-recurrent-note">Автопродление включено</p>{% endif %}
                         </section>
-
-                        {% if not has_subscription_access %}
-                            <button type="button" onclick="showTariffs()" class="tg-mini-primary">
-                                <i class="fas fa-credit-card" aria-hidden="true"></i>
-                                Купить подписку
-                            </button>
-                        {% elif show_expiring_banner %}
-                            <button type="button" onclick="showTariffs()" class="tg-mini-primary">
-                                <i class="fas fa-rotate" aria-hidden="true"></i>
-                                Продлить подписку
-                            </button>
-                        {% else %}
-                            <button type="button" onclick="mi3OpenConnect()" class="tg-mini-primary">
-                                <i class="fas fa-plug" aria-hidden="true"></i>
-                                Подключить устройство
-                            </button>
-                        {% endif %}
-
+                        <button type="button" onclick="showTariffs()" class="cabinet-renew">
+                            <span>{% if not has_subscription_access %}Купить подписку{% elif has_recurrent %}Продлить заранее{% else %}Продлить подписку{% endif %}</span><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-arrow"></use></svg>
+                        </button>
                         {% if has_subscription_access %}
-                        <div class="mi3-tiles" role="group" aria-label="Быстрые действия">
-                            <button type="button" class="mi3-tile mi3-tile-renew" onclick="showTariffs()"><i class="far fa-calendar-plus"></i>Продлить</button>
-                            <button type="button" class="mi3-tile" onclick="mi3OpenDevices()"><i class="fas fa-laptop"></i>Устройства</button>
-                            <button type="button" class="mi3-tile" onclick="showTab('support')"><i class="far fa-comments"></i>Помощь</button>
-                        </div>
-
-                        <section aria-label="Подключённые устройства" id="mi3-connected-block" hidden>
-                            <div class="mi3-section-head">
-                                <h3>Сейчас подключено</h3>
-                                <button type="button" onclick="mi3OpenDevices()">Все устройства</button>
-                            </div>
-                            <div id="mi3-connected-list"></div>
-                        </section>
+                        <button type="button" onclick="mi3OpenConnect()" class="cabinet-connect"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-plus"></use></svg><span>Подключить устройство</span><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
                         {% endif %}
-
-                        <section class="tg-mini-action-list" aria-label="Действия с подпиской">
-                            {% if has_subscription_access %}
-                            {# Не рекламируем отмену автопродления на главном экране: #}
-                            {# отключение живёт маленькой ссылкой внутри истории платежей #}
-                            <button type="button" onclick="openPaymentsHistorySheet()" class="tg-mini-action-row">
-                                <i class="fas fa-receipt" aria-hidden="true"></i>
-                                <span class="tg-mini-action-label">История платежей</span>
-                                <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
-                            </button>
-                            {% if show_expiring_banner %}
-                            <button type="button" onclick="showTab('setup')" class="tg-mini-action-row">
-                                <i class="fas fa-plug" aria-hidden="true"></i>
-                                <span class="tg-mini-action-label">Подключить VPN</span>
-                                <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
-                            </button>
-                            {% endif %}
-                            {% else %}
-                            <button type="button" onclick="showTariffs()" class="tg-mini-action-row">
-                                <i class="fas fa-tag" aria-hidden="true"></i>
-                                <span class="tg-mini-action-label">Посмотреть тарифы</span>
-                                <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
-                            </button>
-                            <button type="button" onclick="showTab('support')" class="tg-mini-action-row">
-                                <i class="far fa-comment" aria-hidden="true"></i>
-                                <span class="tg-mini-action-label">Задать вопрос</span>
-                                <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
-                            </button>
-                            {% endif %}
+                        <section class="cabinet-actions" aria-label="Управление подпиской">
+                            <button type="button" class="cabinet-action" onclick="mi3OpenDevices()" aria-haspopup="dialog" aria-controls="mi3-devices-sheet"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-phone"></use></svg><span>Устройства</span><span id="mi3-devices-count" class="cabinet-action-count" aria-live="polite">Загрузка…</span><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
+                            <button type="button" class="cabinet-action" onclick="openPaymentsHistorySheet()"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-wallet"></use></svg><span>Платежи и подписка</span><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
+                            <button type="button" class="cabinet-action" onclick="showTab('profile')"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-gift"></use></svg><span>Пригласить друга</span><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
                         </section>
                     </div>
                     {% if not tg_webapp_mode %}
@@ -7415,10 +7345,11 @@
                 ?.classList.contains('is-open');
             const setupActive = document.body.classList.contains('is-setup-tab')
                 && document.body.classList.contains('setup-wizard-active');
-            if (referralTermsOpen || setupActive) back.show(); else back.hide();
+            if (document.querySelector('.mi3-sheet.is-open') || referralTermsOpen || setupActive) back.show(); else back.hide();
         }
 
         function handleTgBackButton() {
+            if (document.querySelector('.mi3-sheet.is-open')) { window.mi3CloseSheets(); return; }
             const referralTermsModal = document.getElementById('referral-terms-modal');
             if (referralTermsModal?.classList.contains('is-open')) {
                 closeReferralTerms();
@@ -7861,7 +7792,7 @@
             // Компактный флоу: определяем устройство пользователя и сразу показываем
             // рекомендованное приложение (первое в installData), а не хардкод Android.
             // setPlatform синхронизирует дропдаун платформы и строит чипы приложений.
-            setPlatform(detectNewSetupPlatform());
+            if (document.getElementById('app-selector')) setPlatform(detectNewSetupPlatform());
             updateSubscriptionOverview();
             setupSupportAjaxForm(document.getElementById('support-message-form'));
             setupSupportAjaxForm(document.getElementById('support-create-form'));
@@ -8727,15 +8658,16 @@
         <div class="mi3-sheet-grab" aria-hidden="true"></div>
         <div class="mi3-sheet-top">
             <div>
-                <div class="mi3-sheet-kicker">Подписка</div>
-                <div class="mi3-sheet-title">Устройства</div>
+                <h2 class="mi3-sheet-title">Устройства</h2>
             </div>
             <button type="button" class="mi3-sheet-close" onclick="mi3CloseSheets()" aria-label="Закрыть"><i class="fas fa-xmark"></i></button>
         </div>
         <p class="mi3-sheet-text" id="mi3-devices-note">Устройства, на которых добавлена ваша подписка.</p>
-        <div id="mi3-devices-list" style="margin-top:16px"><div class="mi3-empty">Загружаем…</div></div>
+        <div id="mi3-devices-list" tabindex="0" aria-label="Список устройств"><div class="mi3-empty">Загружаем…</div></div>
+        <button type="button" class="cabinet-connect cabinet-sheet-connect" onclick="mi3OpenConnect()"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-plus"></use></svg><span>Подключить устройство</span></button>
     </div>
 
+    <script src="{% static 'js/cabinet-sheets.js' %}?v=1"></script>
     <script>
     (function mi3Cabinet() {
         const PLATFORMS = [
@@ -8770,20 +8702,14 @@
             }[c]));
         }
 
-        function openSheet(el) {
-            overlay.classList.add('is-open');
-            el.classList.add('is-open');
-            document.body.style.overflow = 'hidden';
-        }
-
-        window.mi3CloseSheets = function () {
-            overlay.classList.remove('is-open');
-            connectSheet.classList.remove('is-open');
-            devicesSheet.classList.remove('is-open');
-            const bonus = document.getElementById('mi3-bonus-sheet');
-            if (bonus) bonus.classList.remove('is-open');
-            document.body.style.overflow = '';
-        };
+        const sheets = new CabinetSheets({
+            overlay, sheets: document.querySelectorAll('.mi3-sheet'),
+            background: document.getElementById('app-container'),
+            onChange: () => updateTgBackButton(),
+        });
+        function openSheet(el) { sheets.open(el); }
+        window.mi3CloseSheets = () => sheets.close();
+        window.mi3OpenBonus = () => openSheet(document.getElementById('mi3-bonus-sheet'));
 
         function platformLabel(key) {
             const all = PLATFORMS.concat(PLATFORMS_EXTRA);
@@ -9089,35 +9015,11 @@
         }
 
         function updateHomeDevices(data) {
-            const chip = document.getElementById('mi3-devices-chip');
             const count = document.getElementById('mi3-devices-count');
-            if (chip && count) {
-                const limit = data.limit ? ' из ' + data.limit : '';
-                const word = data.limit ? 'устройств' : mi3PluralDevices(data.total);
-                count.textContent = data.total + limit + ' ' + word;
-                chip.hidden = false;
-            }
+            if (count) count.textContent = data.total + (data.limit ? ' из ' + data.limit : '');
+            const limit = document.getElementById('cabinet-device-limit');
+            if (limit) limit.textContent = data.limit ? ' · до ' + data.limit + ' устройств' : '';
             renderDesktopDevices(data);
-            const block = document.getElementById('mi3-connected-block');
-            const list = document.getElementById('mi3-connected-list');
-            if (!block || !list) return;
-            if (!data.devices.length) { block.hidden = true; return; }
-            block.hidden = false;
-            list.innerHTML = data.devices.slice(0, 2).map((d) => {
-                const meta = deviceMeta(d);
-                return `
-                    <div class="mi3-device-row">
-                        <span class="mi3-device-icon"><i class="${deviceIcon(d)}"></i></span>
-                        <span class="mi3-device-main">
-                            <span class="mi3-device-name">${esc(deviceTitle(d))}</span>
-                            <span class="mi3-device-meta${meta.online ? ' is-online' : ''}" style="display:block">${esc(meta.text)}</span>
-                        </span>
-                        <i class="fas fa-chevron-right" style="color:rgba(255,255,255,.35)"></i>
-                    </div>`;
-            }).join('');
-            list.querySelectorAll('.mi3-device-row').forEach((row) => {
-                row.addEventListener('click', () => window.mi3OpenDevices());
-            });
         }
 
         function renderDevicesSheet(data) {
@@ -9126,23 +9028,26 @@
             const limit = data.limit ? ' из ' + data.limit : '';
             const word = data.limit ? 'устройств' : mi3PluralDevices(data.total);
             note.textContent = data.total
-                ? 'Подключено ' + data.total + limit + ' ' + word + '. Удалите лишнее, чтобы освободить слот.'
+                ? 'Использовано ' + data.total + limit + (data.limit ? '' : ' ' + word)
                 : 'Пока ни одно устройство не добавило подписку.';
             if (!data.devices.length) {
-                list.innerHTML = '<div class="mi3-empty">Подключите первое устройство с главного экрана.</div>';
+                list.innerHTML = '<div class="mi3-empty">Подключите первое устройство — оно появится здесь автоматически.</div>';
                 return;
             }
             list.innerHTML = data.devices.map((d) => {
-                const meta = deviceMeta(d);
+                const added = d.created_at ? new Date(d.created_at) : null;
+                const meta = { online: false, text: added && !Number.isNaN(added.getTime()) ? 'Добавлен ' + added.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : (d.platform || 'Устройство подписки') };
                 return `
-                    <div class="mi3-device-row">
-                        <span class="mi3-device-icon"><i class="${deviceIcon(d)}"></i></span>
+                    <details class="mi3-device-row"><summary>
+                        <svg class="cabinet-icon mi3-device-icon" aria-hidden="true"><use href="#cabinet-${/mac|windows|linux/i.test(d.platform || '') ? 'laptop' : 'phone'}"></use></svg>
                         <span class="mi3-device-main">
                             <span class="mi3-device-name">${esc(deviceTitle(d))}</span>
                             <span class="mi3-device-meta${meta.online ? ' is-online' : ''}" style="display:block">${esc(meta.text)}</span>
                         </span>
-                        <button type="button" class="mi3-device-del" data-mi3-hwid="${esc(d.hwid)}">Удалить</button>
-                    </div>`;
+                        <svg class="cabinet-icon cabinet-device-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg>
+                        </summary><div class="cabinet-device-details"><p>Удаление освободит место. Саму подписку это не отменит.</p>
+                        <button type="button" class="mi3-device-del" data-mi3-hwid="${esc(d.hwid)}" aria-label="Удалить ${esc(deviceTitle(d))}">Удалить устройство</button>
+                    </div></details>`;
             }).join('');
             bindDeviceDeleteButtons(list);
         }
@@ -9160,23 +9065,15 @@
 
         window.mi3OpenDevices = async function () {
             openSheet(devicesSheet);
+            if (!devicesCache) document.getElementById('mi3-devices-list').innerHTML = '<div class="mi3-empty" role="status">Загружаем устройства…</div>';
             if (devicesCache) renderDevicesSheet(devicesCache);
             const data = await loadDevices();
             if (data) { renderDevicesSheet(data); updateHomeDevices(data); }
             else if (!devicesCache) {
                 document.getElementById('mi3-devices-list').innerHTML =
-                    '<div class="mi3-empty">Не удалось загрузить устройства. Попробуйте позже.</div>';
+                    '<div class="mi3-empty" role="status">Не удалось загрузить устройства.<button type="button" class="cabinet-retry" onclick="mi3OpenDevices()">Повторить</button></div>';
             }
         };
-
-        // Прогресс подписки: доля оставшегося от года, минимум 4% для видимости
-        (function initProgress() {
-            const fill = document.getElementById('mi3-progress-fill');
-            if (!fill) return;
-            const days = parseInt('{{ days_left|default:0 }}', 10) || 0;
-            const pct = Math.max(4, Math.min(100, Math.round((days / 365) * 100)));
-            requestAnimationFrame(() => { fill.style.width = pct + '%'; });
-        })();
 
         document.querySelectorAll('[data-desktop-device-filter]').forEach((button) => {
             button.addEventListener('click', function () {
@@ -9189,12 +9086,14 @@
         });
 
         // Устройства на главной — фоновая загрузка для mobile и desktop.
-        if (document.getElementById('mi3-devices-chip') || document.getElementById('desktop-devices-list')) {
+        if (document.getElementById('mi3-devices-count') || document.getElementById('desktop-devices-list')) {
             loadDevices().then((data) => {
                 if (data) {
                     updateHomeDevices(data);
                     return;
                 }
+                const count = document.getElementById('mi3-devices-count');
+                if (count) count.textContent = 'Открыть';
                 const desktopList = document.getElementById('desktop-devices-list');
                 if (desktopList) {
                     desktopList.innerHTML = '<div class="desktop-devices-empty">Не удалось загрузить устройства. Попробуйте обновить страницу.</div>';

@@ -218,7 +218,7 @@ class DashboardSetupTemplateTests(SimpleTestCase):
         self.assertIn("align-self: flex-start;", template)
         self.assertIn("align-self: stretch;", template)
         self.assertIn('data-tab="setup"><i class="fas fa-bolt"></i> Установка</button>', template)
-        self.assertIn("<span>Установка</span>", template)
+        self.assertIn("<span>Устройства</span>", template)
         self.assertIn("installInstruction", template)
         self.assertIn("formatInstallLinkLabel", template)
         self.assertNotIn("setup-connect-extra-list", template)
