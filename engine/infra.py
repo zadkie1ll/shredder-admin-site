@@ -111,6 +111,16 @@ INFRA_SETTINGS = {
     "infra_control_names": (
         "ya.ru,www.microsoft.com", str,
         "Диагностика: контрольные посторонние имена (через запятую)", None),
+    "infra_tspu_max_names": (
+        8, int,
+        "Диагностика: сколько имён проверять за одну аномалию (каждое имя — "
+        "полный прогон 33 зондов на каждом живом адресе, ~660 кредитов Atlas)",
+        None),
+    "infra_control_names_burned": (
+        "", str,
+        "Диагностика: выгоревшие контрольные имена (через запятую) — "
+        "заполняется автоматически, очистите, чтобы вернуть имя в работу",
+        None),
     "infra_capacity_warn_pct": (
         70, int, "Лимиты ноды: порог предупреждения, %", None),
     "infra_capacity_alert_cooldown_minutes": (
@@ -141,6 +151,18 @@ TSPU_FRESH_RUN_MINUTES = 5
 # реальных кредитов RIPE Atlas, а heartbeat-данные (список адресов) приходят
 # с ноды и не должны уметь запускать десятки замеров
 TSPU_MAX_TARGETS = 4
+# Дефолт лимита на число ИМЁН одной диагностики; настраивается ключом
+# infra_tspu_max_names. Отдельный от лимита адресов: раньше один срез резал
+# и адреса, и имена, и при списке имён один домен съедал бы весь лимит.
+# Имена идут полным набором зондов на каждом из SNI_PROBE_MAX_IPS адресов,
+# поэтому потолок фазы 2 — имена × SNI_PROBE_MAX_IPS полных прогонов.
+# Срезанные имена НЕ считаются чистыми: они попадают в unknown_snis и
+# проверяются на кандидате перед публикацией.
+TSPU_MAX_NAMES = 8
+# Потолок числа имён на одной связке «сервер + домен»: защита от вставки
+# мусора в поле ввода, а не бизнес-ограничение (протоколов бывает больше
+# трёх).
+MAX_DOMAIN_SNIS = 12
 # Подавление аномалий после рестарта агента/ребута сервера
 ANOMALY_AGENT_RESTART_MINUTES = 15
 ANOMALY_REBOOT_MINUTES = 30
@@ -229,7 +251,8 @@ def parse_control_names(raw: str) -> list[str]:
     Контрольное имя — посторонний домен, заведомо не находящийся под
     фильтром; проба им по нашему адресу проверяет сам адрес, потому что имя
     вне подозрений. Список нужен на случай, если контрольное имя всё же
-    выгорит: тогда берётся следующее (см. control_name_burned).
+    выгорит: тогда берётся следующее (см. control_burn_state и
+    active_control_names).
     """
     seen = set()
     names = []
@@ -241,6 +264,49 @@ def parse_control_names(raw: str) -> list[str]:
         seen.add(name)
         names.append(name)
     return names
+
+
+def active_control_names(cfg: dict) -> list[str]:
+    """Контрольные имена за вычетом выгоревших.
+
+    Выгоревшее имя попадает под фильтр само и делает вывод «адрес забанен»
+    ложным, поэтому диагностика переходит на следующее имя из списка. Если
+    выгорели все, работаем прежним списком: остаться совсем без контроля
+    хуже, чем мерить сомнительным именем — вердикт всё равно перепроверяется
+    клиентскими именами.
+    """
+    names = parse_control_names(cfg.get("infra_control_names"))
+    burned = set(parse_control_names(cfg.get("infra_control_names_burned")))
+    alive = [name for name in names if name not in burned]
+    return alive or names
+
+
+def mark_control_name_burned(db_session, name: str) -> bool:
+    """Помечает контрольное имя выгоревшим. True, если пометка новая.
+
+    Пишется в system_settings, а не в отдельную таблицу: список короткий,
+    виден в админке и снимается там же одним движением, когда имя
+    разблокируют.
+    """
+    name = (name or "").strip().strip(".").lower()
+    if not name:
+        return False
+    cfg = get_settings(db_session)
+    burned = parse_control_names(cfg.get("infra_control_names_burned"))
+    if name in burned:
+        return False
+    burned.append(name)
+    value = ",".join(burned)
+    row = db_session.get(SystemSetting, "infra_control_names_burned")
+    if row is None:
+        db_session.add(
+            SystemSetting(key="infra_control_names_burned", value=value)
+        )
+    else:
+        row.value = value
+    db_session.flush()
+    log.warning("infra: control name %s marked burned (all: %s)", name, value)
+    return True
 
 
 # --- вычисления -------------------------------------------------------------
@@ -726,6 +792,16 @@ def server_detail_payload(db_session, server_id) -> dict:
         },
         "ips": [_ip_payload(row) for row in ips],
         "domains": [row.domain for row in domains],
+        "domains_detail": [
+            {
+                "domain": row.domain,
+                "client_snis": list(row.client_snis or []),
+                "snis": domain_client_snis(row),
+                "own_name": domain_own_name_on_wire(row),
+                "custom_sni": bool(row.client_snis),
+            }
+            for row in domains
+        ],
         "entry": server_entry_payload(db_session, server, ips, domains),
         "commands": [_command_payload(row) for row in commands],
         "anomalies": [_anomaly_payload(row) for row in anomalies],
@@ -1283,11 +1359,68 @@ def set_ip_blocked(db_session, server_id, ip_id, blocked: bool) -> InfraServerIp
     return row
 
 
-def add_domain(db_session, server_id, domain: str) -> InfraServerDomain:
+def normalize_client_snis(raw) -> list[str]:
+    """Клиентские имена домена: нормализация и проверка. Пусто -> [].
+
+    Принимает список или строку через запятую/пробел/перевод строки: в
+    админке это одно поле ввода, а имён у связки столько, сколько протоколов
+    развели на ноде через haproxy.
+
+    В отличие от домена A-записи, имя из ClientHello не обязано быть
+    настоящим доменом: под протоколы заводятся example.com/net/org, а иногда
+    и localhost. Точка поэтому не требуется — запрещены только разделители
+    (пробел, слеш, запятая: запятая внутри значения означала бы, что список
+    не разобрали, и в Atlas уехало бы 'a.com,b.com' одним именем, сжигая
+    полный прогон) и длина сверх колонки.
+    """
+    if raw is None:
+        items = []
+    elif isinstance(raw, (list, tuple)):
+        items = list(raw)
+    else:
+        items = str(raw).replace("\n", ",").replace(" ", ",").split(",")
+    names: list[str] = []
+    for item in items:
+        name = str(item or "").strip().strip(".").lower()
+        if not name:
+            continue
+        if " " in name or "/" in name or "," in name or len(name) > 255:
+            raise InfraError(f"Некорректный SNI: {name[:64]}")
+        if name not in names:
+            names.append(name)
+    if len(names) > MAX_DOMAIN_SNIS:
+        raise InfraError(
+            f"Слишком много имён (максимум {MAX_DOMAIN_SNIS})"
+        )
+    return names
+
+
+def domain_client_snis(row) -> list[str]:
+    """Что уходит в ClientHello для этой связки «сервер + домен».
+
+    НИКОГДА не пустой список: без заданных имён это сам домен (старая
+    схема). Пустой список означал бы фазу 2 без целей, то есть вердикт по
+    адресу вслепую по одному контрольному имени — ровно тот путь, которым
+    2026-09-02 адрес уехал без единой проверки имён.
+    """
+    names = list(getattr(row, "client_snis", None) or [])
+    normalized = [str(n).strip().lower() for n in names if str(n).strip()]
+    return normalized or [row.domain]
+
+
+def domain_own_name_on_wire(row) -> bool:
+    """Уходит ли сам домен A-записи в эфир (старая схема или смешанная)."""
+    return row.domain in domain_client_snis(row)
+
+
+def add_domain(
+    db_session, server_id, domain: str, client_snis="" 
+) -> InfraServerDomain:
     server = get_server(db_session, server_id)
     domain = (domain or "").strip().strip(".").lower()
     if not domain or "." not in domain or " " in domain or "/" in domain:
         raise InfraError("Некорректный домен")
+    snis = normalize_client_snis(client_snis)
     # Один домен может стоять на нескольких серверах (round-robin из
     # нескольких A-записей); запрещён только дубль в рамках одного сервера
     existing = (
@@ -1300,10 +1433,63 @@ def add_domain(db_session, server_id, domain: str) -> InfraServerDomain:
     )
     if existing is not None:
         raise InfraError("Домен уже привязан к этому серверу")
-    row = InfraServerDomain(server_id=server.id, domain=domain)
+    row = InfraServerDomain(
+        server_id=server.id,
+        domain=domain,
+        client_snis=_stored_snis(snis, domain),
+    )
     db_session.add(row)
     db_session.flush()
     return row
+
+
+def _stored_snis(snis: list, domain: str):
+    """Что писать в колонку: None для старой схемы «единственное имя = домен».
+
+    Так строка, которую админ не трогал, и строка, где он явно вписал сам
+    домен, читаются одинаково, а NULL остаётся однозначным признаком
+    «имена не настраивали».
+    """
+    if not snis or snis == [domain]:
+        return None
+    return list(snis)
+
+
+def set_domain_snis(
+    db_session, server_id, domain: str, client_snis, apply_all: bool = False
+) -> list:
+    """Задаёт (или снимает) клиентские имена домена.
+
+    apply_all — записать тот же набор ВСЕМ доменам сервера. Имена разводит
+    haproxy по req.ssl_sni на общем :443, то есть набор относится скорее к
+    ноде, чем к отдельному домену; при нескольких A-записях у одной ноды
+    вбивать один и тот же список руками в каждый домен — заведомая
+    возможность опечататься.
+
+    Пустое значение и список из одного домена дают NULL: это одна и та же
+    старая схема «имя = домен».
+    """
+    server = get_server(db_session, server_id)
+    domain = (domain or "").strip().strip(".").lower()
+    snis = normalize_client_snis(client_snis)
+
+    query = db_session.query(InfraServerDomain).filter(
+        InfraServerDomain.server_id == server.id
+    )
+    if apply_all:
+        rows = query.order_by(InfraServerDomain.domain).all()
+        if not rows:
+            raise InfraError("У сервера нет привязанных доменов", 404)
+    else:
+        row = query.filter(InfraServerDomain.domain == domain).one_or_none()
+        if row is None:
+            raise InfraError("Домен не найден", 404)
+        rows = [row]
+
+    for row in rows:
+        row.client_snis = _stored_snis(snis, row.domain)
+    db_session.flush()
+    return rows
 
 
 def delete_domain(db_session, server_id, domain: str) -> None:
@@ -1443,17 +1629,24 @@ def set_tspu_checks_enabled(db_session, server_id, enabled: bool) -> InfraServer
 def request_replacement(
     db_session, server_id, old_ip: str, created_by: str, anomaly_id=None,
     domains: list = None, banned_names: list = None,
+    domain_snis: dict = None, sni_banned: dict = None,
 ) -> InfraIpReplacement:
     """replaceFailedIp: заявка на замену IP (идемпотентная).
 
     Вызывается воркером после подтверждения ТСПУ или админом вручную.
 
     domains — из каких доменов убирать старый адрес. None означает «все
-    домены сервера». banned_names — имена, забаненные по вердикту
-    диагностики: под них новый адрес не публикуется (имя всё равно не
+    домены сервера». banned_names — домены СТАРОЙ схемы (имя = домен), чьё
+    имя забанено: под них новый адрес не публикуется (имя всё равно не
     работает, а чистый адрес под ним рискует уйти в бан следом), но мёртвый
     старый адрес из их A-записей убирается. Остальные имена перед
     публикацией проверяются на кандидате по одному.
+
+    domain_snis — {домен: [клиентские имена]} для доменов заявки: пробы на
+    кандидате идут именно этими именами, а не доменами A-записей.
+    sni_banned — {домен: [забаненные имена этого домена]}: их отказ на
+    кандидате ожидаем и публикацию не отменяет (имя забанено везде, а
+    старый адрес мёртв); чинится сменой имени в конфигах.
     """
     server = get_server(db_session, server_id)
     old_ip = (old_ip or "").strip()
@@ -1521,6 +1714,16 @@ def request_replacement(
                     else ""
                 ),
                 "banned_names": sorted(set(banned_names or [])),
+                "domain_snis": {
+                    str(domain): [str(name) for name in (names or [])]
+                    for domain, names in (domain_snis or {}).items()
+                    if names
+                },
+                "sni_banned": {
+                    str(domain): sorted({str(name) for name in (names or [])})
+                    for domain, names in (sni_banned or {}).items()
+                    if names
+                },
             }
         ],
     )
@@ -1859,6 +2062,15 @@ def collect_probes(db_session, runs_map: dict) -> tuple:
     return probes, pending
 
 
+def max_probe_names(db_session) -> int:
+    """Сколько имён проверяем за одну аномалию (настройка, не константа)."""
+    try:
+        value = int(get_settings(db_session)["infra_tspu_max_names"])
+    except (KeyError, TypeError, ValueError):
+        return TSPU_MAX_NAMES
+    return max(1, min(MAX_DOMAIN_SNIS * 4, value))
+
+
 def server_probe_targets(db_session, server) -> tuple:
     """Что проверять у сервера: (адреса, имена).
 
@@ -1867,9 +2079,17 @@ def server_probe_targets(db_session, server) -> tuple:
     такой же таймаут, как заблокированный, и был бы ошибочно объявлен
     забаненным.
 
-    Имена — то, что клиенты реально шлют в рукопожатии. Пока это домены
-    A-записей; когда у ноды маскировочное имя отличается от домена, оно
-    будет храниться отдельно и подставляться здесь.
+    Имена — то, что клиенты реально шлют в рукопожатии: client_snis связки,
+    а где они не заданы — сам домен (старая схема, где домен и был
+    маскировочным именем). Имена дедуплицируются по всему серверу: haproxy
+    разводит протоколы по SNI на общем адресе, поэтому один и тот же набор
+    обычно стоит на всех доменах ноды — это одна проба на имя, а не по одной
+    на каждый домен. Домен A-записи, которого нет в списке имён, не
+    проверяется вовсе: в эфир он не уходит, фильтровать ТСПУ его нечему.
+
+    Возвращает (адреса, имена, срезанные_имена). Срезанные возвращаются
+    явно: молчаливое обрезание читалось бы как «проверено всё», хотя
+    проверена только часть.
     """
     ips = []
     for row in (
@@ -1889,14 +2109,70 @@ def server_probe_targets(db_session, server) -> tuple:
         if address.version == 4 and address.is_global:
             ips.append(row.ip)
 
-    names = [
-        row.domain
+    # Обход по доменам «в ширину», а не по одному домену целиком: срез
+    # забирает первые имена каждого домена по кругу, поэтому лимит не
+    # съедается одним доменом
+    per_domain = [
+        domain_client_snis(row)
         for row in db_session.query(InfraServerDomain)
         .filter(InfraServerDomain.server_id == server.id)
         .order_by(InfraServerDomain.domain)
         .all()
     ]
-    return ips[:TSPU_MAX_TARGETS], names[:TSPU_MAX_TARGETS]
+    ordered: list[str] = []
+    for index in range(max((len(items) for items in per_domain), default=0)):
+        for items in per_domain:
+            if index < len(items) and items[index] not in ordered:
+                ordered.append(items[index])
+    limit = max_probe_names(db_session)
+    return ips[:TSPU_MAX_TARGETS], ordered[:limit], ordered[limit:]
+
+
+def server_domain_targets(db_session, server_id) -> list[dict]:
+    """Домены сервера с их именами: [{"domain", "snis": [...]}, ...].
+
+    "snis" непустой всегда: у домена старой схемы это он сам. Потребители
+    (классификатор, решение о смене DNS) отличают схемы по тому, входит ли
+    домен в собственный список имён.
+    """
+    return [
+        {"domain": row.domain, "snis": domain_client_snis(row)}
+        for row in db_session.query(InfraServerDomain)
+        .filter(InfraServerDomain.server_id == server_id)
+        .order_by(InfraServerDomain.domain)
+        .all()
+    ]
+
+
+def names_ever_seen_passing(db_session, names: list) -> set:
+    """Какие из имён хоть раз наблюдались прошедшими на любом адресе.
+
+    Имя, которое НИ РАЗУ не проходило, отказывает не обязательно из-за ТСПУ:
+    на ноде без default_backend неизвестный SNI даёт молчаливый обрыв после
+    ClientHello, неотличимый от фильтрации, — а неизвестным его делает
+    опечатка в карточке или имя, которого нода просто не обслуживает. Без
+    этой проверки одна опечатка объявляла бы имя забаненным, а при
+    выгоревшем контроле — ещё и живой адрес мёртвым, и запускала бы замену.
+    """
+    from engine import infra_diagnosis
+
+    wanted = [str(name).strip().lower() for name in (names or []) if name]
+    if not wanted:
+        return set()
+    rows = (
+        db_session.query(CensorCheck.sni)
+        .join(CensorCheckRun, CensorCheckRun.check_id == CensorCheck.id)
+        .filter(CensorCheck.sni.in_(wanted))
+        .filter(CensorCheckRun.status == ripe_atlas.RUN_STATUS_COMPLETE)
+        .filter(CensorCheckRun.total_probes > 0)
+        .filter(
+            CensorCheckRun.ok_probes * 100
+            > CensorCheckRun.total_probes * infra_diagnosis.PROBE_FAIL_MAX_PCT
+        )
+        .distinct()
+        .all()
+    )
+    return {str(row[0]).strip().lower() for row in rows}
 
 
 def start_ip_diagnosis(db_session, server, reason: str = "") -> dict:
@@ -1908,13 +2184,13 @@ def start_ip_diagnosis(db_session, server, reason: str = "") -> dict:
     имени был бы ложным.
     """
     cfg = get_settings(db_session)
-    control_names = parse_control_names(cfg["infra_control_names"])
+    control_names = active_control_names(cfg)
     if not control_names:
         return {"runs": {}, "errors": ["Не задано контрольное имя"],
                 "control_name": ""}
     control_name = control_names[0]
 
-    ips, _names = server_probe_targets(db_session, server)
+    ips, _names, _dropped = server_probe_targets(db_session, server)
     if not ips:
         return {"runs": {}, "errors": ["Нет активных публичных IPv4"],
                 "control_name": control_name}
@@ -1976,31 +2252,74 @@ def start_manual_diagnosis(db_session, server, actor: str = "") -> dict:
     return dict(result, anomaly_id=anomaly.id)
 
 
-def start_sni_diagnosis(
-    db_session, server, live_ips, reason: str = ""
-) -> dict:
-    """Фаза 2: проверка ИМЁН на адресах, признанных живыми.
+def corroborating_name(names: list, known_good: set) -> str:
+    """Каким одним именем перепроверять подозрительный адрес.
 
-    Адрес доказанно жив, значит отказ имени на нём говорит о фильтрации
-    имени. Но правило ТСПУ бывает и на пару «адрес + имя», поэтому имена
-    проверяются сразу на нескольких живых адресах (до SNI_PROBE_MAX_IPS):
-    имя, упавшее на одном и прошедшее на другом, — бан пары, а не имени.
-    Полный набор зондов: решение по общему имени дорогое.
+    Берём имя, которое уже наблюдалось рабочим: только его отказ что-то
+    доказывает. Если истории нет ни у одного — первое по порядку, чтобы
+    выбор оставался детерминированным и один и тот же инцидент, разобранный
+    дважды, давал одинаковые пробы.
+    """
+    for name in names or []:
+        if name in (known_good or set()):
+            return name
+    return (names or [""])[0]
+
+
+def start_sni_diagnosis(
+    db_session, server, live_ips, suspect_ips=None, reason: str = ""
+) -> dict:
+    """Фаза 2: проверка ИМЁН, на живых и на подозрительных адресах.
+
+    На ЖИВОМ адресе проверяются все имена: адрес доказанно жив, значит отказ
+    имени на нём говорит о фильтрации имени. Правило ТСПУ бывает и на пару
+    «адрес + имя», поэтому имена идут сразу на нескольких живых адресах (до
+    SNI_PROBE_MAX_IPS): имя, упавшее на одном и прошедшее на другом, — бан
+    пары, а не имени.
+
+    На ПОДОЗРИТЕЛЬНОМ адресе (контрольное имя не прошло) проверяется одно
+    имя — этого достаточно, чтобы ответить на единственный вопрос «ходит ли
+    через адрес хоть что-нибудь». Без этой пробы вердикт «адрес забанен»
+    держался бы на одном свидетеле — контрольном имени, — а оно бывает и
+    выгоревшим, и забаненным в паре именно с этим адресом. Ровно так живая
+    нода уезжала на резервный адрес (эстонский инцидент 07.09.2026).
+    Стоимость — один полный прогон на подозрительный адрес.
+
+    Полный набор зондов: решения здесь дорогие.
     """
     if isinstance(live_ips, str):
         live_ips = [live_ips]
     live_ips = [ip for ip in (live_ips or []) if ip][:SNI_PROBE_MAX_IPS]
-    _ips, names = server_probe_targets(db_session, server)
+    suspect_ips = [
+        ip for ip in (suspect_ips or []) if ip and ip not in live_ips
+    ][:TSPU_MAX_TARGETS]
+    _ips, names, dropped = server_probe_targets(db_session, server)
     if not names:
         return {"runs": {}, "errors": ["У сервера нет привязанных доменов"]}
-    if not live_ips:
-        return {"runs": {}, "errors": ["Нет живого адреса для проверки имён"]}
-    return start_diagnosis_probes(
+    if not live_ips and not suspect_ips:
+        return {"runs": {}, "errors": ["Нет адреса для проверки имён"]}
+    pairs = [(ip, name) for ip in live_ips for name in names]
+    if suspect_ips:
+        witness = corroborating_name(
+            names, names_ever_seen_passing(db_session, names)
+        )
+        pairs += [(ip, witness) for ip in suspect_ips]
+    started = start_diagnosis_probes(
         db_session,
-        [(ip, name) for ip in live_ips for name in names],
+        pairs,
         reason=reason or "SNI_DIAGNOSIS",
         light=False,
     )
+    if dropped:
+        # Молчаливое обрезание читалось бы как «проверено всё»
+        started["errors"] = list(started.get("errors") or []) + [
+            f"Имён больше {max_probe_names(db_session)} — не проверены: "
+            + ", ".join(dropped)
+            + " (защита кредитов RIPE Atlas); они останутся неизвестными и "
+            "будут проверены на кандидате перед публикацией"
+        ]
+    started["dropped_names"] = dropped
+    return started
 
 
 def recent_name_results(
@@ -2079,13 +2398,18 @@ def force_tspu_check(db_session, server: InfraServer, reason: str) -> dict:
             continue
         if address.version == 4 and address.is_global:
             target_ips.append(row.ip)
-    domains = [
-        row.domain
-        for row in db_session.query(InfraServerDomain)
+    # Для авто-строки замера нужен SNI, а не домен: в ClientHello уходит
+    # клиентское имя связки, и их у связки может быть несколько
+    domains = []
+    for row in (
+        db_session.query(InfraServerDomain)
         .filter(InfraServerDomain.server_id == server.id)
         .order_by(InfraServerDomain.domain)
         .all()
-    ]
+    ):
+        for name in domain_client_snis(row):
+            if name not in domains:
+                domains.append(name)
 
     run_ids: list[int] = []
     errors: list[str] = []

@@ -15145,14 +15145,39 @@ def support_admin_api_infra_servers(request):
 
             if action == "add_domain":
                 row = infra.add_domain(
-                    db_session, server_id, request.POST.get("domain") or ""
+                    db_session, server_id, request.POST.get("domain") or "",
+                    request.POST.get("client_snis") or "",
                 )
                 admin_audit_write(
                     db_session, request, "infra_domain_add", target=row.domain,
                     server_id=int(server_id or 0),
+                    value=", ".join(row.client_snis or []),
                 )
                 db_session.commit()
                 return JsonResponse({"status": "ok"})
+
+            if action == "set_domain_snis":
+                apply_all = str(
+                    request.POST.get("apply_all") or ""
+                ).strip().lower() in ("1", "true", "yes", "on")
+                rows = infra.set_domain_snis(
+                    db_session, server_id, request.POST.get("domain") or "",
+                    request.POST.get("client_snis") or "",
+                    apply_all=apply_all,
+                )
+                admin_audit_write(
+                    db_session, request, "infra_domain_snis",
+                    target=", ".join(row.domain for row in rows),
+                    server_id=int(server_id or 0),
+                    value=", ".join(rows[0].client_snis or []) if rows else "",
+                    apply_all=apply_all,
+                )
+                db_session.commit()
+                return JsonResponse({
+                    "status": "ok",
+                    "domains": [row.domain for row in rows],
+                    "client_snis": list(rows[0].client_snis or []) if rows else [],
+                })
 
             if action == "delete_domain":
                 infra.delete_domain(

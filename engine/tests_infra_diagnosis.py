@@ -88,6 +88,26 @@ class ClassifyTests(SimpleTestCase):
         self.assertEqual(result["blocked_snis"], ["nl.example.space"])
 
     def test_ip_block_only(self):
+        # На подозрительном адресе клиентское имя тоже не проходит — отказ
+        # контроля подтверждён вторым, независимым именем
+        result = diag.classify(
+            ip_probes={
+                "185.10.0.10": probe(1, 12),
+                "185.10.0.11": probe(11, 12),
+            },
+            sni_probes={
+                ("185.10.0.11", "nl.example.space"): probe(11, 12),
+                ("185.10.0.10", "nl.example.space"): probe(0, 12),
+            },
+            control_name="ya.ru",
+        )
+        self.assertEqual(result["blocked_ips"], ["185.10.0.10"])
+        self.assertEqual(result["blocked_snis"], [])
+        self.assertEqual(result["unconfirmed_ips"], [])
+
+    def test_control_alone_never_blocks_an_address(self):
+        # Единственный свидетель — контрольное имя: вердикта нет. Ровно так
+        # живая нода уезжала на резервный адрес 07.09.2026
         result = diag.classify(
             ip_probes={
                 "185.10.0.10": probe(1, 12),
@@ -96,8 +116,22 @@ class ClassifyTests(SimpleTestCase):
             sni_probes={("185.10.0.11", "nl.example.space"): probe(11, 12)},
             control_name="ya.ru",
         )
+        self.assertEqual(result["blocked_ips"], [])
+        self.assertEqual(result["ips"]["185.10.0.10"], diag.IP_UNKNOWN)
+        self.assertEqual(result["unconfirmed_ips"], ["185.10.0.10"])
+        self.assertIn(
+            "подтвердить это нечем", diag.evidence_text(result["evidence"])
+        )
+
+    def test_hard_block_needs_no_second_witness(self):
+        # TCP не устанавливается: имя в эфир не уходило, фильтрация по имени
+        # исключена — вывод об адресе не требует второго имени
+        result = diag.classify(
+            ip_probes={"185.10.0.10": hard_fail(), "185.10.0.11": probe(11, 12)},
+            control_name="ya.ru",
+        )
         self.assertEqual(result["blocked_ips"], ["185.10.0.10"])
-        self.assertEqual(result["blocked_snis"], [])
+        self.assertEqual(result["unconfirmed_ips"], [])
 
     def test_all_names_blocked_on_live_address(self):
         # Раньше это был неразрешимый случай: теперь адрес доказанно жив,
@@ -164,6 +198,7 @@ class ClassifyTests(SimpleTestCase):
     def test_outside_ok_confirms_filtering(self):
         result = diag.classify(
             ip_probes={"185.10.0.10": probe(0, 12)},
+            sni_probes={("185.10.0.10", "nl.example.space"): probe(0, 12)},
             outside_probes={"185.10.0.10": probe(6, 6)},
             control_name="ya.ru",
         )
@@ -292,11 +327,12 @@ class PairBlockTests(SimpleTestCase):
         self.assertEqual(result["snis"]["de.monkora.org"], diag.SNI_OK)
 
     def test_untested_name_is_absent_from_verdicts(self):
-        # Живого адреса нет — имена не проверялись: их нет ни среди чистых,
-        # ни среди забаненных (вызывающий код считает их неизвестными)
+        # Живого адреса нет. Имя-свидетель на подозрительном адресе тоже не
+        # прошло — адрес забанен, но вердикта по ИМЕНИ нет: на мёртвом
+        # адресе падает всё
         result = diag.classify(
             ip_probes={"62.192.153.131": probe(0, 6)},
-            sni_probes={},
+            sni_probes={("62.192.153.131", "de.example.xyz"): probe(0, 6)},
             control_name="google.ru",
         )
         self.assertEqual(result["blocked_ips"], ["62.192.153.131"])
@@ -306,26 +342,262 @@ class PairBlockTests(SimpleTestCase):
 
 
 class DomainSplitTests(SimpleTestCase):
-    def test_only_clean_domains_are_repointed(self):
+    """Свод вердиктов по именам на домены.
+
+    Имён у связки «сервер + домен» столько, сколько протоколов развели на
+    haproxy: он слушает общий :443 и разводит трафик по req.ssl_sni. Домен
+    A-записи в рукопожатие при этом не уходит вовсе, если его нет в списке.
+    """
+
+    def test_dns_is_repointed_regardless_of_name_verdicts(self):
+        # Решение владельца 09.09.2026: A-запись переставляется всегда.
+        # Прежняя заморозка оставляла клиентов на МЁРТВОМ адресе до ручного
+        # вмешательства — в том числе когда имя вовсе не было забанено
         domains = [
             {"domain": "a.example.org"},
             {"domain": "b.example.org"},
-            {"domain": "c.example.org", "sni": "mask.example.net"},
+            {"domain": "c.example.org", "snis": ["mask.example.net"]},
         ]
-        safe, unsafe = diag.domains_safe_to_repoint(domains, ["b.example.org"])
-        self.assertEqual([d["domain"] for d in safe],
-                         ["a.example.org", "c.example.org"])
-        self.assertEqual([d["domain"] for d in unsafe], ["b.example.org"])
+        for blocked in ([], ["b.example.org"], ["mask.example.net"],
+                        ["a.example.org", "b.example.org", "mask.example.net"]):
+            with self.subTest(blocked=blocked):
+                safe, unsafe = diag.domains_safe_to_repoint(domains, blocked)
+                self.assertEqual(len(safe), 3)
+                self.assertEqual(unsafe, [])
 
-    def test_client_sni_wins_over_domain(self):
-        # У ноды имя клиента может отличаться от домена A-записи
-        domains = [{"domain": "ru-1.example.xyz", "sni": "max.ru"}]
-        safe, unsafe = diag.domains_safe_to_repoint(domains, ["max.ru"])
-        self.assertEqual(safe, [])
-        self.assertEqual(len(unsafe), 1)
+    def test_blocked_names_are_reported_per_domain(self):
+        # Отчёт нужен по каждому имени: при трёх именах «первое имя домена»
+        # отправило бы владельца менять работающий протокол
+        domains = [{
+            "domain": "de.monkora.org",
+            "snis": ["example.org", "example.com", "example.net"],
+        }]
+        hit = diag.domains_with_blocked_sni(domains, ["example.com"])[0]
+        self.assertEqual(hit["blocked"], ["example.com"])
+        self.assertEqual(hit["clean"], ["example.org", "example.net"])
+        self.assertFalse(hit["own"])
 
-    def test_no_blocked_names_means_everything_safe(self):
-        domains = [{"domain": "a.example.org"}, {"domain": "b.example.org"}]
-        safe, unsafe = diag.domains_safe_to_repoint(domains, [])
-        self.assertEqual(len(safe), 2)
+    def test_self_sni_domain_is_reported_as_own(self):
+        # Почти весь парк ходит с self-SNI: домен и есть имя
+        domains = [{"domain": "ru-1.example.xyz"}]
+        hit = diag.domains_with_blocked_sni(domains, ["ru-1.example.xyz"])[0]
+        self.assertTrue(hit["own"])
+        self.assertEqual(hit["clean"], [])
+        # И DNS всё равно переставляется
+        safe, unsafe = diag.domains_safe_to_repoint(
+            domains, ["ru-1.example.xyz"]
+        )
+        self.assertEqual(len(safe), 1)
         self.assertEqual(unsafe, [])
+
+    def test_clean_domains_are_not_reported(self):
+        domains = [{"domain": "a.example.org"}, {"domain": "b.example.org"}]
+        self.assertEqual(diag.domains_with_blocked_sni(domains, []), [])
+
+    def test_domain_snis_never_empty(self):
+        # Пустой список означал бы фазу 2 без целей и вердикт по адресу
+        # вслепую по одному контрольному имени
+        self.assertEqual(
+            diag.domain_snis({"domain": "a.example.org"}), ["a.example.org"]
+        )
+        self.assertEqual(
+            diag.domain_snis({"domain": "a.example.org", "snis": []}),
+            ["a.example.org"],
+        )
+
+    def test_domain_own_name(self):
+        self.assertTrue(diag.domain_own_name({"domain": "a.example.org"}))
+        self.assertTrue(diag.domain_own_name(
+            {"domain": "a.example.org", "snis": ["a.example.org", "mask.net"]}
+        ))
+        self.assertFalse(diag.domain_own_name(
+            {"domain": "a.example.org", "snis": ["mask.net"]}
+        ))
+
+
+class ControlBurnTests(SimpleTestCase):
+    """Выгорание контрольного имени.
+
+    Контроль — единственная опора вердикта по адресу. Пока его отказ читался
+    как бан адреса, выгоревшее имя (google.ru на эстонском адресе, 07.09.2026)
+    превращало живую ноду в «заблокированную» и запускало замену адресов.
+    """
+
+    def test_client_sni_pass_proves_burn_on_single_ip(self):
+        # Прежняя эвристика требовала двух адресов и на одноадресной ноде
+        # не срабатывала никогда
+        ip_probes = {"185.1.1.1": probe(0, 20)}
+        sni_probes = {("185.1.1.1", "example.org"): probe(19, 20)}
+        self.assertEqual(
+            diag.control_burn_state(ip_probes, sni_probes),
+            diag.CONTROL_BURN_PROVEN,
+        )
+        result = diag.classify(
+            ip_probes=ip_probes, sni_probes=sni_probes, control_name="google.ru"
+        )
+        self.assertEqual(result["control_burn"], diag.CONTROL_BURN_PROVEN)
+        self.assertEqual(result["burned_control_name"], "google.ru")
+        # Адрес жив: клиенты через него ходят
+        self.assertEqual(result["ips"], {"185.1.1.1": diag.IP_OK})
+        self.assertEqual(result["blocked_ips"], [])
+        self.assertEqual(result["snis"], {"example.org": diag.SNI_OK})
+
+    def test_both_names_fail_means_address_blocked(self):
+        # Контроль выгорел на одном адресе, но на другом упало и клиентское
+        # имя — отказ обоих имён указывает на адрес
+        ip_probes = {"185.1.1.1": probe(0, 20), "185.1.1.2": probe(0, 20)}
+        sni_probes = {
+            ("185.1.1.1", "example.org"): probe(19, 20),
+            ("185.1.1.2", "example.org"): probe(0, 20),
+        }
+        result = diag.classify(
+            ip_probes=ip_probes, sni_probes=sni_probes, control_name="google.ru"
+        )
+        self.assertEqual(result["control_burn"], diag.CONTROL_BURN_PROVEN)
+        self.assertEqual(result["blocked_ips"], ["185.1.1.2"])
+        self.assertEqual(result["ips"]["185.1.1.1"], diag.IP_OK)
+
+    def test_burned_control_without_sni_probe_gives_no_verdict(self):
+        # Контроль выгорел, клиентским именем адрес не проверяли —
+        # доказательств нет, вердикт не выносится
+        ip_probes = {"185.1.1.1": probe(0, 20), "185.1.1.2": probe(0, 20)}
+        sni_probes = {("185.1.1.1", "example.org"): probe(19, 20)}
+        result = diag.classify(
+            ip_probes=ip_probes, sni_probes=sni_probes, control_name="google.ru"
+        )
+        self.assertEqual(result["ips"]["185.1.1.2"], diag.IP_UNKNOWN)
+        self.assertEqual(result["blocked_ips"], [])
+
+    def test_suspected_burn_without_sni_evidence(self):
+        # Контроль упал на всех адресах, опровергнуть нечем: вердиктов нет
+        ip_probes = {"185.1.1.1": probe(0, 20), "185.1.1.2": probe(1, 20)}
+        result = diag.classify(ip_probes=ip_probes, control_name="google.ru")
+        self.assertEqual(result["control_burn"], diag.CONTROL_BURN_SUSPECTED)
+        self.assertFalse(result["actionable"])
+        self.assertEqual(result["blocked_ips"], [])
+
+    def test_clean_control_is_not_burned(self):
+        ip_probes = {"185.1.1.1": probe(19, 20), "185.1.1.2": probe(0, 20)}
+        sni_probes = {
+            ("185.1.1.1", "example.org"): probe(19, 20),
+            ("185.1.1.2", "example.org"): probe(0, 20),
+        }
+        result = diag.classify(
+            ip_probes=ip_probes, sni_probes=sni_probes, control_name="ya.ru"
+        )
+        self.assertEqual(result["control_burn"], "")
+        self.assertEqual(result["blocked_ips"], ["185.1.1.2"])
+
+
+class UnprovenNameTests(SimpleTestCase):
+    """Имя, которое ни разу нигде не проходило.
+
+    На ноде без default_backend неизвестный SNI рвётся молча после
+    ClientHello — на пробе это неотличимо от фильтрации ТСПУ. Так же
+    выглядит опечатка в карточке сервера. Объявлять такое имя забаненным
+    нельзя: вердикт заморозил бы DNS домена или, при выгоревшем контроле,
+    объявил бы живой адрес мёртвым.
+    """
+
+    def test_never_seen_name_is_unknown_not_blocked(self):
+        result = diag.classify(
+            ip_probes={"185.1.1.1": probe(19, 20)},
+            sni_probes={("185.1.1.1", "exmaple.org"): probe(0, 20)},
+            control_name="ya.ru",
+            known_good_snis=set(),
+        )
+        self.assertEqual(result["blocked_snis"], [])
+        self.assertEqual(result["unproven_snis"], ["exmaple.org"])
+        self.assertEqual(result["snis"]["exmaple.org"], diag.SNI_UNKNOWN)
+        self.assertIn("ни разу", diag.evidence_text(result["evidence"]))
+
+    def test_known_good_name_is_blocked_as_before(self):
+        result = diag.classify(
+            ip_probes={"185.1.1.1": probe(19, 20)},
+            sni_probes={("185.1.1.1", "example.org"): probe(0, 20)},
+            control_name="ya.ru",
+            known_good_snis={"example.org"},
+        )
+        self.assertEqual(result["blocked_snis"], ["example.org"])
+        self.assertEqual(result["unproven_snis"], [])
+
+    def test_pass_in_this_run_proves_the_name(self):
+        # Имя прошло на одном живом адресе и упало на другом: это бан пары,
+        # история для такого вывода не нужна
+        result = diag.classify(
+            ip_probes={"185.1.1.1": probe(19, 20), "185.1.1.2": probe(18, 20)},
+            sni_probes={
+                ("185.1.1.1", "example.org"): probe(19, 20),
+                ("185.1.1.2", "example.org"): probe(0, 20),
+            },
+            control_name="ya.ru",
+            known_good_snis=set(),
+        )
+        self.assertEqual(result["blocked_snis"], [])
+        self.assertEqual(result["unproven_snis"], [])
+        self.assertEqual(
+            result["pair_blocked"], [{"ip": "185.1.1.2", "sni": "example.org"}]
+        )
+
+    def test_none_means_trust_all_names(self):
+        # Истории нет вовсе — поведение как до появления проверки
+        result = diag.classify(
+            ip_probes={"185.1.1.1": probe(19, 20)},
+            sni_probes={("185.1.1.1", "example.org"): probe(0, 20)},
+            control_name="ya.ru",
+        )
+        self.assertEqual(result["blocked_snis"], ["example.org"])
+
+    def test_burned_control_needs_a_proven_name(self):
+        # Контроль выгорел, а на втором адресе проверялось только имя,
+        # которое никогда не проходило: доказательств бана адреса нет
+        result = diag.classify(
+            ip_probes={"185.1.1.1": probe(0, 20), "185.1.1.2": probe(0, 20)},
+            sni_probes={
+                ("185.1.1.1", "example.org"): probe(19, 20),
+                ("185.1.1.2", "exmaple.org"): probe(0, 20),
+            },
+            control_name="google.ru",
+            known_good_snis={"example.org"},
+        )
+        self.assertEqual(result["control_burn"], diag.CONTROL_BURN_PROVEN)
+        self.assertEqual(result["ips"]["185.1.1.2"], diag.IP_UNKNOWN)
+        self.assertEqual(result["blocked_ips"], [])
+
+
+class MultiNameAddressTests(SimpleTestCase):
+    """Несколько имён на адресе: адрес жив, если проходит ЛЮБОЕ."""
+
+    def test_any_name_pass_keeps_address_alive(self):
+        result = diag.classify(
+            ip_probes={"185.1.1.1": probe(0, 20)},
+            sni_probes={
+                ("185.1.1.1", "example.org"): probe(0, 20),
+                ("185.1.1.1", "example.com"): probe(18, 20),
+                ("185.1.1.1", "example.net"): probe(0, 20),
+            },
+            control_name="google.ru",
+            known_good_snis={"example.org", "example.com", "example.net"},
+        )
+        self.assertEqual(result["ips"], {"185.1.1.1": diag.IP_OK})
+        self.assertEqual(result["blocked_ips"], [])
+        # Контроль упал там, где клиентское имя прошло — он и выгорел
+        self.assertEqual(result["control_burn"], diag.CONTROL_BURN_PROVEN)
+        self.assertEqual(
+            sorted(result["blocked_snis"]), ["example.net", "example.org"]
+        )
+
+    def test_all_names_fail_with_control_means_address_blocked(self):
+        result = diag.classify(
+            ip_probes={"185.1.1.1": probe(0, 20)},
+            sni_probes={
+                ("185.1.1.1", "example.org"): probe(0, 20),
+                ("185.1.1.1", "example.com"): probe(0, 20),
+            },
+            control_name="ya.ru",
+            known_good_snis={"example.org", "example.com"},
+        )
+        self.assertEqual(result["blocked_ips"], ["185.1.1.1"])
+        # Имена на мёртвом адресе вердикта не получают
+        self.assertEqual(result["blocked_snis"], [])
+

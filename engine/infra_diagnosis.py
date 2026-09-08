@@ -58,6 +58,10 @@ CONFIDENCE_LOW = "low"
 # на выборке в пару зондов «половина не прошла» ничего не значит.
 MIN_PROBES_HIGH_CONFIDENCE = 5
 
+# Состояние контрольного имени
+CONTROL_BURN_PROVEN = "proven"
+CONTROL_BURN_SUSPECTED = "suspected"
+
 
 def probe_passed(probe: dict) -> bool:
     """Проба засчитана, если пробилось больше порога зондов."""
@@ -114,18 +118,61 @@ def is_hard_block(probe: dict) -> bool:
     return not probe_passed(probe) and dominant_stage(probe) == STAGE_TCP_FAIL
 
 
-def control_name_burned(ip_probes: dict) -> bool:
-    """Выгорело ли само контрольное имя.
+def sni_passes_by_ip(sni_probes: dict) -> dict:
+    """{адрес: [имена, прошедшие на нём]} по сырым пробам имён.
 
-    Если контроль не проходит сразу на ВСЕХ адресах парка, объяснение
-    «все наши адреса разом забанили» менее правдоподобно, чем «контрольное
-    имя попало под фильтр». Без этой проверки выгорание контроля выглядело
-    бы как тотальный бан и запустило бы бессмысленные замены.
+    Считается ДО вердиктов по адресам и намеренно не смотрит на них: проход
+    клиентского имени на адресе сам по себе доказывает, что адрес принимает
+    соединения, независимо от того, что показал контроль.
     """
-    probes = [probe for probe in ip_probes.values() if probe]
-    if len(probes) < 2:
-        return False
-    return all(not probe_passed(probe) for probe in probes)
+    result: dict[str, list[str]] = {}
+    for (ip, sni), probe in (sni_probes or {}).items():
+        if probe is not None and probe_passed(probe):
+            result.setdefault(ip, []).append(sni)
+    return result
+
+
+def sni_tested_by_ip(sni_probes: dict) -> dict:
+    """{адрес: [имена, которые на нём вообще проверялись]}."""
+    result: dict[str, list[str]] = {}
+    for (ip, sni), probe in (sni_probes or {}).items():
+        if probe is not None:
+            result.setdefault(ip, []).append(sni)
+    return result
+
+
+def control_burn_state(ip_probes: dict, sni_probes: dict | None = None) -> str:
+    """Выгорело ли контрольное имя: "proven" | "suspected" | "".
+
+    proven — контроль упал на адресе, где КЛИЕНТСКОЕ имя прошло. Клиентское
+    имя доказало, что адрес принимает соединения, значит отказ относится к
+    самому контрольному имени. Работает и на одноадресной ноде, где прежняя
+    эвристика «упало на всех адресах» не могла сработать в принципе.
+
+    suspected — контроль упал сразу на всех адресах парка, и опровергнуть
+    это нечем. Одновременный бан всех адресов менее правдоподобен, чем
+    выгорание контроля, но доказательства нет: вердикты не выносятся.
+    """
+    passes = sni_passes_by_ip(sni_probes or {})
+    for ip, probe in (ip_probes or {}).items():
+        if probe is None or probe_passed(probe):
+            continue
+        if passes.get(ip):
+            return CONTROL_BURN_PROVEN
+    probes = [probe for probe in (ip_probes or {}).values() if probe]
+    if len(probes) >= 2 and all(not probe_passed(probe) for probe in probes):
+        # Если на упавших адресах падало и КЛИЕНТСКОЕ имя, отказ контроля
+        # подтверждён вторым независимым именем: версия «выгорел контроль»
+        # перестаёт объяснять данные, адреса действительно не отвечают
+        tested = sni_tested_by_ip(sni_probes or {})
+        corroborated = any(
+            tested.get(ip)
+            for ip, probe in (ip_probes or {}).items()
+            if probe is not None and not probe_passed(probe)
+        )
+        if not corroborated:
+            return CONTROL_BURN_SUSPECTED
+    return ""
 
 
 def classify(
@@ -135,6 +182,7 @@ def classify(
     node_healthy: bool = True,
     control_name: str = "",
     external_sni_results: dict | None = None,
+    known_good_snis: set | None = None,
 ) -> dict:
     """Раздельные вердикты по адресам и именам.
 
@@ -155,8 +203,24 @@ def classify(
     живых адресах и проходит на других — это бан пары «адрес + имя»
     (pair_blocked), само имя чистое.
 
+    known_good_snis: имена, которые хоть раз наблюдались прошедшими (по
+                    истории замеров). Имя вне этого множества, не прошедшее
+                    нигде и сейчас, считается НЕПРОВЕРЕННЫМ, а не
+                    забаненным: на ноде без default_backend неизвестный SNI
+                    даёт молчаливый обрыв после ClientHello, неотличимый от
+                    фильтрации, — так выглядит опечатка в карточке или имя,
+                    которого нода не обслуживает. None означает «истории
+                    нет, доверяем всем именам» (поведение до этой проверки).
+
+    Отказ контрольного имени на адресе, где ПРОШЛО клиентское имя, означает
+    не бан адреса, а выгорание самого контроля: адрес признаётся живым,
+    control_burn="proven", и имя надо ротировать. Пока контроль выгорел,
+    адрес объявляется заблокированным только при отказе и клиентского имени
+    тоже; если клиентским именем адрес не проверяли — вердикта нет.
+
     Возвращает {"ips", "snis", "blocked_ips", "blocked_snis", "pair_blocked",
-    "confidence", "evidence", "control_burned", "actionable"}.
+    "confidence", "evidence", "control_burned", "control_burn",
+    "burned_control_name", "actionable"}.
     actionable=False означает, что автоматические действия запрещены:
     причина — в evidence.
     """
@@ -181,21 +245,41 @@ def classify(
             "ips": {}, "snis": {}, "blocked_ips": [], "blocked_snis": [],
             "pair_blocked": [], "confidence": CONFIDENCE_HIGH,
             "evidence": evidence, "control_burned": False,
+            "control_burn": "", "burned_control_name": "",
+            "unproven_snis": [], "unconfirmed_ips": [],
             "actionable": False,
         }
 
-    burned = control_name_burned(ip_probes)
-    if burned:
+    live_by_sni = sni_passes_by_ip(sni_probes)
+    tested_by_sni = sni_tested_by_ip(sni_probes)
+    # «Проверенное» имя — то, что хоть раз где-то проходило: по истории
+    # замеров, в этом прогоне или у соседа по волне. Только отказ такого
+    # имени что-то доказывает; отказ имени, не проходившего никогда, с
+    # равной вероятностью означает опечатку в карточке
+    proven_names = set(known_good_snis or set())
+    for names in live_by_sni.values():
+        proven_names.update(names)
+    for (_ip, sni), item in (external_sni_results or {}).items():
+        if (item or {}).get("result") == "pass":
+            proven_names.add(sni)
+    trust_all_names = known_good_snis is None
+    proven_tested_by_ip = {
+        ip: [n for n in names if trust_all_names or n in proven_names]
+        for ip, names in tested_by_sni.items()
+    }
+    burn = control_burn_state(ip_probes, sni_probes)
+    if burn == CONTROL_BURN_SUSPECTED:
         evidence.append(
             {
                 "step": "control_check",
                 "result": "fail",
                 "text": (
                     f"Контрольное имя {control_name or '—'} не проходит ни на "
-                    f"одном из {len(ip_probes)} адресов. Одновременный бан всех "
-                    "адресов менее правдоподобен, чем выгорание самого "
-                    "контрольного имени — вердикты не выносятся, нужно "
-                    "следующее имя из списка"
+                    f"одном из {len(ip_probes)} адресов, и ни на одном из них "
+                    "не прошло клиентское имя. Одновременный бан всех адресов "
+                    "менее правдоподобен, чем выгорание самого контрольного "
+                    "имени — вердикты не выносятся, нужно следующее имя из "
+                    "списка"
                 ),
             }
         )
@@ -203,13 +287,54 @@ def classify(
             "ips": {}, "snis": {}, "blocked_ips": [], "blocked_snis": [],
             "pair_blocked": [], "confidence": CONFIDENCE_LOW,
             "evidence": evidence, "control_burned": True,
+            "control_burn": CONTROL_BURN_SUSPECTED,
+            "burned_control_name": control_name,
+            "unproven_snis": [], "unconfirmed_ips": [],
             "actionable": False,
         }
+    if burn == CONTROL_BURN_PROVEN:
+        burned_at = [
+            ip for ip, probe in ip_probes.items()
+            if probe is not None and not probe_passed(probe) and live_by_sni.get(ip)
+        ]
+        evidence.append(
+            {
+                "step": "control_check", "result": "fail", "burned": True,
+                "text": (
+                    f"Контрольное имя {control_name or '—'} не проходит на "
+                    + ", ".join(burned_at)
+                    + ", где клиентское имя ("
+                    + ", ".join(
+                        sorted({n for ip in burned_at for n in live_by_sni.get(ip, [])})
+                    )
+                    + ") проходит. Адрес принимает соединения — выгорело само "
+                    "контрольное имя, его надо заменить следующим из списка. "
+                    "Вердикты ниже опираются на клиентские имена"
+                ),
+            }
+        )
 
     # --- статус адресов -----------------------------------------------------
+    # При выгоревшем контроле его отказ ничего не доказывает: адрес признаётся
+    # заблокированным, только если на нём упало и клиентское имя, а без проб
+    # клиентского имени вердикт не выносится вовсе.
     weak_sample = False
+    unconfirmed: list[str] = []
     for ip, probe in ip_probes.items():
         if probe is None:
+            if live_by_sni.get(ip):
+                ips[ip] = IP_OK
+                evidence.append(
+                    {
+                        "step": "ip_probe", "ip": ip, "result": "pass",
+                        "text": (
+                            f"Адрес {ip}: контролем не проверялся, но "
+                            f"клиентское имя {', '.join(live_by_sni[ip])} на нём "
+                            "проходит — адрес жив"
+                        ),
+                    }
+                )
+                continue
             ips[ip] = IP_UNKNOWN
             evidence.append(
                 {
@@ -235,6 +360,24 @@ def classify(
             )
             continue
 
+        if live_by_sni.get(ip):
+            # Контроль упал, а клиентское имя прошло: адрес принимает
+            # соединения, отказ относится к контрольному имени
+            ips[ip] = IP_OK
+            evidence.append(
+                {
+                    "step": "ip_probe", "ip": ip, "sni": control_name,
+                    "result": "pass", "control_burned": True,
+                    "text": (
+                        f"Адрес {ip}: контрольное имя {control_name} не проходит "
+                        f"({_probe_label(probe)}), но клиентское имя "
+                        f"{', '.join(live_by_sni[ip])} проходит — адрес жив, "
+                        "под фильтром контрольное имя"
+                    ),
+                }
+            )
+            continue
+
         outside = outside_probes.get(ip)
         if outside is not None and not probe_passed(outside):
             # Снаружи тоже не работает — это не фильтрация, а маршрут/нода
@@ -253,6 +396,41 @@ def classify(
             )
             continue
 
+        if not is_hard_block(probe) and not proven_tested_by_ip.get(ip):
+            # ЕДИНСТВЕННЫЙ свидетель — контрольное имя, а оно бывает и
+            # выгоревшим, и забаненным в паре именно с этим адресом. Раньше
+            # такого адреса хватало для автозамены: так живая нода уехала на
+            # резерв 07.09.2026. Теперь нужен отказ второго, доказанно
+            # рабочего имени — либо жёсткая форма, где вывод не требует имён.
+            ips[ip] = IP_UNKNOWN
+            unconfirmed.append(ip)
+            untried = tested_by_sni.get(ip) or []
+            evidence.append(
+                {
+                    "step": "ip_probe", "ip": ip, "sni": control_name,
+                    "result": "inconclusive",
+                    "text": (
+                        f"Адрес {ip}: контрольное имя {control_name} не проходит "
+                        f"({_probe_label(probe)}), но подтвердить это нечем"
+                        + (
+                            " — из клиентских имён на нём проверялись только "
+                            "никогда не проходившие ("
+                            + ", ".join(untried) + ")"
+                            if untried
+                            else " — клиентским именем адрес не проверялся"
+                        )
+                        + (
+                            "; контрольное имя к тому же выгорело"
+                            if burn == CONTROL_BURN_PROVEN
+                            else ""
+                        )
+                        + ". Вердикт не выносится: одного контрольного имени "
+                        "для замены адреса недостаточно"
+                    ),
+                }
+            )
+            continue
+
         ips[ip] = IP_BLOCKED
         note = _stage_note(probe)
         outside_note = (
@@ -261,6 +439,14 @@ def classify(
             else ""
         )
         hard = " Жёсткая форма: вывод не требует проб по именам." if is_hard_block(probe) else ""
+        burned_note = (
+            " Контрольное имя выгорело, но на этом адресе не прошло и "
+            "клиентское имя ("
+            + ", ".join(tested_by_sni.get(ip, []))
+            + ") — отказ обоих имён указывает на адрес."
+            if burn == CONTROL_BURN_PROVEN
+            else ""
+        )
         evidence.append(
             {
                 "step": "ip_probe", "ip": ip, "sni": control_name,
@@ -269,7 +455,7 @@ def classify(
                     f"Адрес {ip}: контрольное имя {control_name} не проходит "
                     f"({_probe_label(probe)}"
                     + (f", {note}" if note else "")
-                    + f"){outside_note} — адрес заблокирован.{hard}"
+                    + f"){outside_note} — адрес заблокирован.{hard}{burned_note}"
                 ),
             }
         )
@@ -298,6 +484,7 @@ def classify(
             external_passes.setdefault(sni, []).append(dict(item, ip=ip))
 
     pair_blocked: list[dict] = []
+    unproven: list[str] = []
     for (ip, sni), probe in sni_probes.items():
         if ips.get(ip) != IP_OK:
             # На мёртвом адресе падает всё; вывод об имени был бы ложным
@@ -364,6 +551,28 @@ def classify(
                 }
             )
             continue
+        if not trust_all_names and sni not in proven_names:
+            # Имя не проходило НИКОГДА и НИГДЕ: на ноде без default_backend
+            # неизвестный SNI рвётся молча после ClientHello — ровно как под
+            # фильтром. Объявить такое имя забаненным значило бы поверить
+            # опечатке в карточке
+            snis[sni] = SNI_UNKNOWN
+            if sni not in unproven:
+                unproven.append(sni)
+            evidence.append(
+                {
+                    "step": "sni_probe", "ip": ip, "sni": sni,
+                    "result": "warn", "unproven": True,
+                    "text": (
+                        f"Имя {sni} на живом адресе {ip}: не проходит ({label}), "
+                        "но оно не проходило ни разу за всю историю замеров — "
+                        "вердикт не выносится: так же выглядит опечатка в "
+                        "карточке или имя, которого нода не обслуживает "
+                        "(ACL haproxy / serverNames инбаунда)"
+                    ),
+                }
+            )
+            continue
         snis[sni] = SNI_BLOCKED
         where = (
             f" ни на одном из {len(fails[sni])} живых адресов"
@@ -405,22 +614,81 @@ def classify(
         "pair_blocked": pair_blocked,
         "confidence": confidence,
         "evidence": evidence,
-        "control_burned": False,
+        "control_burned": burn == CONTROL_BURN_PROVEN,
+        "control_burn": burn,
+        "burned_control_name": control_name if burn else "",
+        "unproven_snis": unproven,
+        "unconfirmed_ips": unconfirmed,
         "actionable": confidence == CONFIDENCE_HIGH,
     }
 
 
-def domains_safe_to_repoint(domains: list, blocked_snis: list) -> tuple:
-    """Делит домены на те, где замена адреса осмысленна, и заблокированные.
+def domain_snis(domain: dict) -> list:
+    """Имена, которые клиенты шлют в ClientHello для этого домена.
 
-    Публиковать чистый адрес под фильтруемым именем нельзя: имя всё равно не
-    работает, а связывать новый адрес с ним незачем. Возвращает
-    (можно_менять, нельзя_менять).
+    Никогда не пустой список: у домена старой схемы это он сам.
+    """
+    item = domain or {}
+    names = [str(n).strip().lower() for n in (item.get("snis") or []) if n]
+    return names or [item.get("domain") or ""]
+
+
+def domain_own_name(domain: dict) -> bool:
+    """Уходит ли сам домен A-записи в эфир.
+
+    Домен, которого нет в собственном списке имён, ТСПУ не видит вовсе:
+    клиент резолвит его в адрес, но в рукопожатие шлёт имя своего
+    протокола. Всё, что решается по такому домену, решается про адрес.
+    """
+    return (domain or {}).get("domain") in domain_snis(domain)
+
+
+def domains_safe_to_repoint(domains: list, blocked_snis: list) -> tuple:
+    """A-запись переставляется ВСЕГДА; вердикт по имени на это не влияет.
+
+    Решение владельца (09.09.2026). Прежде домен, который сам уходил в эфир,
+    при бане своего имени замораживался: считалось, что публиковать чистый
+    адрес под фильтруемым именем незачем, а новый адрес рискует уйти в бан
+    следом. На практике это оставляло клиентов на МЁРТВОМ адресе до ручного
+    вмешательства, причём в самом частом случае — когда имя вовсе не
+    забанено, а виноват адрес.
+
+    Теперь так: нашли живой адрес — перевели на него DNS, а состояние имён
+    ушло в алерт отдельно. Цена решения: если имя действительно под
+    фильтром, клиенты не заработают и на новом адресе, а резервный адрес
+    окажется связан с фильтруемым именем. Взамен ночная авария с баном
+    адреса чинится без участия человека.
+
+    Сигнатура сохранена ради вызывающего кода и тестов: второй список
+    всегда пуст.
+    """
+    return list(domains), []
+
+
+def domains_with_blocked_sni(domains: list, blocked_snis: list) -> list:
+    """Домены, у которых под фильтр попало хотя бы одно имя.
+
+    Возвращает [{"domain", "blocked": [...], "clean": [...], "own": bool}].
+    Их A-записи меняются как обычно (кроме случая, когда домен уходит в эфир
+    сам и чистых имён не осталось), но клиенты соответствующих протоколов не
+    заработают, пока имя не заменят в конфигах: об этом нужен отдельный
+    алерт, и называть он обязан ИМЕННО забаненное имя, а не первое из
+    списка — иначе владелец пойдёт менять работающий протокол.
     """
     blocked = set(blocked_snis or [])
-    safe = [d for d in domains if (d.get("sni") or d.get("domain")) not in blocked]
-    unsafe = [d for d in domains if (d.get("sni") or d.get("domain")) in blocked]
-    return safe, unsafe
+    result = []
+    for d in domains:
+        names = domain_snis(d)
+        hit = [n for n in names if n in blocked]
+        if not hit:
+            continue
+        result.append({
+            "domain": (d or {}).get("domain"),
+            "blocked": hit,
+            "clean": [n for n in names if n not in blocked],
+            "own": domain_own_name(d),
+        })
+    return result
 
 
 def evidence_text(evidence: list) -> str:

@@ -797,6 +797,99 @@ def _anomaly_probe_maps(db_session, details: dict) -> tuple:
     return ip_probes, sni_probes, ip_pending or sni_pending
 
 
+def _handle_control_burn(
+    db_session, verdict, details, title, evidence_text
+) -> None:
+    """Реакция на выгорание контрольного имени: ротация и алерт.
+
+    Контрольное имя — единственная опора вердикта по адресу, и его молчаливое
+    выгорание превращает живой адрес в «забаненный» и запускает замену. Пока
+    выгорание не доказано (proven), имя не снимается автоматически: снять
+    рабочий контроль по одному подозрению хуже, чем один раз не вынести
+    вердикт.
+    """
+    from engine import infra
+    from engine import infra_diagnosis as diag
+
+    burn = verdict.get("control_burn") or ""
+    if not burn:
+        return
+    control_name = verdict.get("burned_control_name") or (
+        details.get("control_name") or ""
+    )
+    if burn == diag.CONTROL_BURN_SUSPECTED:
+        _send_alert(
+            "🟠 <b>ТСПУ: подозрение на выгорание контрольного имени</b>\n\n"
+            f"Сервер: <b>{title}</b>\n"
+            f"Контрольное имя: <code>{control_name or '—'}</code>\n\n"
+            "Оно не проходит ни на одном адресе сервера, и опровергнуть это "
+            "нечем: клиентские имена там тоже не проверялись или не прошли. "
+            "Вердикты не вынесены, автозамена не запускалась.\n\n"
+            "Если адреса точно живы — впишите имя в настройку "
+            "<code>infra_control_names_burned</code>, диагностика перейдёт на "
+            "следующее имя из списка.\n\n"
+            "<b>Проверки:</b>\n" + evidence_text
+        )
+        return
+
+    rotated = infra.mark_control_name_burned(db_session, control_name)
+    if not rotated:
+        return
+    remaining = infra.active_control_names(infra.get_settings(db_session))
+    _send_alert(
+        "🟡 <b>ТСПУ: контрольное имя выгорело, переключено</b>\n\n"
+        f"Сервер: <b>{title}</b>\n"
+        f"Выгоревшее имя: <code>{control_name or '—'}</code>\n"
+        "Оно не проходит там, где клиентское имя проходит: адрес принимает "
+        "соединения, под фильтром само контрольное имя.\n\n"
+        + (
+            "Дальше диагностика пойдёт с именем "
+            f"<code>{remaining[0]}</code>."
+            if remaining
+            else "⚠️ Свободных контрольных имён не осталось — добавьте новое в "
+            "<code>infra_control_names</code>."
+        )
+        + "\n\nСнять пометку можно, очистив "
+        "<code>infra_control_names_burned</code> в настройках.\n\n"
+        "<b>Проверки:</b>\n" + evidence_text
+    )
+
+
+def _live_summary(verdict) -> str:
+    """«Что сейчас живо»: адреса и имена, реально прошедшие на них.
+
+    Главный вопрос владельца при разборе ночной аварии — какой адрес рабочий
+    и с какими именами он отработал. Вытаскиваем это из evidence, чтобы не
+    приходилось читать журнал целиком.
+    """
+    from engine import infra_diagnosis as diag
+
+    live: dict = {}
+    for item in verdict.get("evidence") or []:
+        if item.get("step") != "sni_probe" or item.get("result") != "pass":
+            continue
+        live.setdefault(item.get("ip"), []).append(item.get("sni"))
+    ok_ips = [
+        ip for ip, state in (verdict.get("ips") or {}).items()
+        if state == diag.IP_OK
+    ]
+    if not ok_ips:
+        return "Живых адресов не найдено."
+    lines = []
+    for ip in ok_ips:
+        names = live.get(ip) or []
+        lines.append(
+            f"<code>{ip}</code>: "
+            + (
+                "проходят " + ", ".join(f"<code>{n}</code>" for n in names)
+                if names
+                else "жив по контрольному имени, клиентские на нём не "
+                "проверялись"
+            )
+        )
+    return "Живые адреса:\n" + "\n".join(lines)
+
+
 def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
     """Классификация проб и действия по её итогам.
 
@@ -820,30 +913,33 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
     now = infra.utcnow()
     ip_probes, sni_probes, _pending = _anomaly_probe_maps(db_session, details)
 
-    all_domains = [
-        {"domain": row.domain}
-        for row in db_session.query(infra.InfraServerDomain)
-        .filter(infra.InfraServerDomain.server_id == anomaly.server_id)
-        .order_by(infra.InfraServerDomain.domain)
-        .all()
-    ]
+    all_domains = infra.server_domain_targets(db_session, anomaly.server_id)
     domain_names = [item["domain"] for item in all_domains]
+    # Проверяются клиентские имена, а не домены A-записей: домен, у которого
+    # есть своё имя, в рукопожатие не попадает и под фильтр не может. Имена
+    # дедуплицируются — одно имя на нескольких доменах проверяется один раз
+    probe_names: list[str] = []
+    for item in all_domains:
+        for name in diag.domain_snis(item):
+            if name and name not in probe_names:
+                probe_names.append(name)
     # Имена общие для нескольких нод: что известно о них по соседним
     # серверам той же волны, входит в вердикт
     external = (
         infra.recent_name_results(
             db_session,
-            domain_names,
+            probe_names,
             since=now - timedelta(minutes=infra.NAME_WAVE_WINDOW_MINUTES),
             exclude_anomaly_id=anomaly.id,
         )
-        if domain_names
+        if probe_names
         else {}
     )
 
     verdict = diag.classify(
         ip_probes=ip_probes,
         sni_probes=sni_probes,
+        known_good_snis=infra.names_ever_seen_passing(db_session, probe_names),
         node_healthy=not (
             server is not None
             and (
@@ -854,8 +950,16 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
         control_name=details.get("control_name") or "",
         external_sni_results=external,
     )
-    tested = set(verdict["snis"].keys())
-    unknown_snis = [name for name in domain_names if name not in tested]
+    # Имя с вердиктом «не проверено» (срезано лимитом, некуда было проверить
+    # или никогда не проходило) чистым не считается — оно будет проверено на
+    # кандидате перед публикацией
+    tested = {
+        name for name, state in verdict["snis"].items()
+        if state != diag.SNI_UNKNOWN
+    }
+    unknown_snis = [name for name in probe_names if name not in tested]
+    unproven_snis = list(verdict.get("unproven_snis") or [])
+    unconfirmed_ips = list(verdict.get("unconfirmed_ips") or [])
     if unknown_snis and verdict["actionable"] and verdict["blocked_ips"]:
         verdict["evidence"].append(
             {
@@ -876,11 +980,51 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
         "blocked_snis": verdict["blocked_snis"],
         "pair_blocked": verdict["pair_blocked"],
         "unknown_snis": unknown_snis,
+        "unproven_snis": unproven_snis,
+        "unconfirmed_ips": unconfirmed_ips,
         "confidence": verdict["confidence"],
         "actionable": verdict["actionable"],
+        "control_burn": verdict.get("control_burn") or "",
     }
     anomaly.details = dict(details)
     anomaly.resolved_at = now
+
+    _handle_control_burn(db_session, verdict, details, title, evidence_text)
+
+    if unproven_snis:
+        _send_alert(
+            "🟡 <b>ТСПУ: имя ни разу не проходило</b>\n\n"
+            f"Сервер: <b>{title}</b>\n"
+            "Имена: "
+            + ", ".join(f"<code>{n}</code>" for n in unproven_snis)
+            + "\n\nНи одного успешного замера за всю историю. Вердикт "
+            "«забанено» намеренно НЕ вынесен: так же выглядит опечатка в "
+            "карточке сервера и имя, которого нода не обслуживает — на ноде "
+            "без default_backend неизвестный SNI рвётся молча после "
+            "ClientHello, ровно как под фильтром.\n\nПроверьте написание "
+            "имени, ACL haproxy и serverNames инбаунда. Если имя верное и "
+            "нода его обслуживает — значит оно под фильтром с самого "
+            "начала.\n\n<b>Как это выяснено:</b>\n" + evidence_text
+        )
+
+    if unconfirmed_ips:
+        # Молчаливое бездействие — такая же потеря доверия, как ложная
+        # замена: админ должен видеть, что адрес подозрителен и почему
+        # вердикт не вынесен
+        _send_alert(
+            "🟠 <b>ТСПУ: адрес подозрителен, подтвердить нечем</b>\n\n"
+            f"Сервер: <b>{title}</b>\n"
+            "Адреса: "
+            + ", ".join(f"<code>{ip}</code>" for ip in unconfirmed_ips)
+            + "\n\nКонтрольное имя на них не проходит, но второго "
+            "свидетеля нет: клиентские имена на этих адресах не проверялись "
+            "или ни разу не наблюдались рабочими. Автозамена НЕ запущена "
+            "намеренно — одного контрольного имени для правки боевого DNS "
+            "недостаточно, оно бывает и выгоревшим, и забаненным в паре "
+            "именно с этим адресом.\n\nПроверьте адреса руками; если бан "
+            "настоящий — замените адрес кнопкой в карточке.\n\n"
+            "<b>Проверки:</b>\n" + evidence_text
+        )
 
     blocked_ips = verdict["blocked_ips"]
     blocked_snis = verdict["blocked_snis"]
@@ -905,31 +1049,53 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
 
     # Под забаненные имена новый адрес не публикуется; остальные (чистые
     # и неизвестные) проверяются на кандидате по одному
+    # Домен старой схемы (имя = домен) под баном имени адрес не меняет:
+    # публиковать чистый адрес под фильтруемым именем незачем. Домен с
+    # собственным клиентским именем адрес меняет всегда — в эфир он не
+    # уходит, и бан имени про него ничего не говорит; чинится такое имя
+    # правкой конфигов, а не DNS.
     safe, unsafe = diag.domains_safe_to_repoint(all_domains, blocked_snis)
     safe_names = [item["domain"] for item in safe]
     unsafe_names = [item["domain"] for item in unsafe]
+    # Свод по доменам считаем ПОСЛЕ вердиктов по именам: имя — сущность
+    # паркового уровня (одна маска стоит на многих нодах), домен — нет
+    blocked_hits = diag.domains_with_blocked_sni(all_domains, blocked_snis)
+    # A-запись переставляется у всех доменов; бан имени лечится в конфигах
+    sni_banned = {hit["domain"]: hit["blocked"] for hit in blocked_hits}
+    domain_snis = {
+        item["domain"]: diag.domain_snis(item) for item in all_domains
+    }
 
-    if blocked_snis:
+    if sni_banned:
+        # Алерт обязан называть ИМЕННО забаненные имена: при трёх именах на
+        # домен «первое имя домена» отправило бы менять работающий протокол
         _send_alert(
-            "🟥 <b>ТСПУ: заблокировано имя</b>\n\n"
+            "🟥 <b>ТСПУ: заблокировано клиентское имя (SNI)</b>\n\n"
             f"Сервер: <b>{title}</b>\n"
-            "Имена: "
-            + ", ".join(f"<code>{name}</code>" for name in blocked_snis)
-            + "\n\n<b>Новый адрес под эти имена не публикуется намеренно:</b> "
-            "он рискует уйти в бан следом, а само имя от смены адреса не "
-            "заработает. Мёртвый адрес из их A-записей убирается, если у "
-            "имени остаются другие записи.\n\n"
-            "<b>Требуется ручное вмешательство:</b> клиентов нужно перевести "
-            "на другое имя, а это правка хостов в Remnawave и обновление "
-            "подписок.\n"
-            + (
-                "Чистые имена этого сервера: "
-                + ", ".join(f"<code>{n}</code>" for n in safe_names)
-                if safe_names
-                else "⚠️ Чистых имён у сервера не осталось — нужен новый домен."
+            "Под фильтром: "
+            + ", ".join(f"<code>{n}</code>" for n in blocked_snis)
+            + "\n\n"
+            + "\n".join(
+                f"<code>{hit['domain']}</code>: в бане "
+                + ", ".join(f"<code>{n}</code>" for n in hit["blocked"])
+                + (
+                    "; продолжают работать "
+                    + ", ".join(f"<code>{n}</code>" for n in hit["clean"])
+                    if hit["clean"]
+                    else "; чистых имён у домена не осталось"
+                )
+                for hit in blocked_hits
+                if hit["domain"] in sni_banned
             )
-            + "\n\n<b>Как это выяснено:</b>\n" + evidence_text
+            + "\n\n<b>Требуется ручное вмешательство:</b> сменить имя в "
+            "конфигурации ноды (ACL haproxy и serverNames соответствующего "
+            "инбаунда) и в хостах Remnawave.\n\n<b>DNS это не блокирует:</b> "
+            "если адрес забанен, A-записи переставляются на живой адрес как "
+            "обычно — клиенты остальных имён чинятся сразу, а забаненное имя "
+            "не заработает ни на старом адресе, ни на новом.\n\n"
+            "<b>Как это выяснено:</b>\n" + evidence_text
         )
+
 
     if not blocked_ips:
         return
@@ -941,9 +1107,12 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
             "Адреса: "
             + ", ".join(f"<code>{ip}</code>" for ip in blocked_ips)
             + "\n\nАвтозамена не выполнена.\n\n"
-            "<b>Проверки:</b>\n" + evidence_text
+            + live_block
+            + "\n\n<b>Проверки:</b>\n" + evidence_text
         )
         return
+
+    live_block = _live_summary(verdict)
 
     if not cfg["infra_auto_replace_enabled"]:
         _send_alert(
@@ -953,21 +1122,34 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
             + ", ".join(f"<code>{ip}</code>" for ip in blocked_ips)
             + "\n\nЗамените адрес вручную "
             "(настройка infra_auto_replace_enabled).\n\n"
-            "<b>Проверки:</b>\n" + evidence_text
+            + live_block
+            + "\n\n<b>Проверки:</b>\n" + evidence_text
         )
         return
 
-    if not safe_names:
-        # Все имена сервера под фильтром: менять адрес некуда и незачем
+    # Гейт «менять адрес вообще» считается по ИМЕНАМ, а не по доменам: хотя
+    # бы одно чистое, спорное или непроверенное имя — замена идёт (спорное
+    # проверится на кандидате). Отменяем только когда у сервера не осталось
+    # ни одного работающего имени: новый адрес ничего не починит, а резерв
+    # сгорит. Пустой safe_names — тот же случай в терминах доменов: всем
+    # доменам, уходящим в эфир самими собой, публиковаться нечем.
+    all_names_blocked = bool(probe_names) and all(
+        name in set(blocked_snis) for name in probe_names
+    )
+    if all_names_blocked or not safe_names:
         _send_alert(
             "🟥 <b>ТСПУ: заблокированы и адрес, и все имена сервера</b>\n\n"
             f"Сервер: <b>{title}</b>\n"
             "Адреса: "
             + ", ".join(f"<code>{ip}</code>" for ip in blocked_ips)
             + "\nИмена: "
-            + ", ".join(f"<code>{n}</code>" for n in unsafe_names)
+            + ", ".join(
+                f"<code>{n}</code>"
+                for n in (blocked_snis if all_names_blocked else unsafe_names)
+            )
             + "\n\nЗамена адреса не выполнялась: переводить клиентов внутри "
-            "этого сервера некуда, нужен новый домен.\n\n"
+            "этого сервера некуда — сначала смените имена в конфигурации ноды "
+            "и хостах Remnawave, потом замените адрес кнопкой в карточке.\n\n"
             "<b>Проверки:</b>\n" + evidence_text
         )
         return
@@ -982,6 +1164,8 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
                 anomaly_id=anomaly.id,
                 domains=domain_names,
                 banned_names=unsafe_names,
+                domain_snis=domain_snis,
+                sni_banned=sni_banned,
             )
         except infra.InfraError as e:
             log.warning(
@@ -1033,28 +1217,46 @@ def process_anomalies(db_session) -> None:
                 ip for ip, probe in ip_probes.items()
                 if diag.probe_passed(probe)
             ]
-            burned = diag.control_name_burned(ip_probes)
-            if live_ips and not burned:
-                # Фаза 2: имена проверяются на доказанно живых адресах, на
-                # нескольких сразу (до SNI_PROBE_MAX_IPS): только так бан
-                # имени отличим от бана пары «адрес + имя»
-                probe_ips = live_ips[: infra.SNI_PROBE_MAX_IPS]
+            # Фаза 2 идёт по ОБЕИМ группам адресов. На живом адресе она
+            # отличает бан имени от бана пары «адрес + имя». На каждом
+            # подозрительном отвечает на другой вопрос: ходит ли через него
+            # хоть что-нибудь. Без этой пробы вердикт «адрес забанен»
+            # держался бы на одном свидетеле — контрольном имени, — а оно
+            # бывает и выгоревшим, и забаненным в паре именно с этим
+            # адресом; так живая нода и уехала на резерв 07.09.2026.
+            # Жёсткая форма (TCP не устанавливается) исключается: имя там не
+            # пройдёт по определению — рукопожатия не было, имя в эфир не
+            # уходило, — и зонды жгли бы кредиты зря.
+            suspect_ips = [
+                ip for ip, probe in ip_probes.items()
+                if probe is not None
+                and not diag.probe_passed(probe)
+                and not diag.is_hard_block(probe)
+            ]
+            probe_ips = live_ips[: infra.SNI_PROBE_MAX_IPS]
+            if probe_ips or suspect_ips:
                 started = infra.start_sni_diagnosis(
-                    db_session, server, probe_ips,
+                    db_session, server, probe_ips, suspect_ips=suspect_ips,
                     reason="ANOMALY_SNI_DIAGNOSIS",
                 )
                 if started["runs"]:
                     details["sni_runs"] = started["runs"]
-                    details["sni_probe_ip"] = probe_ips[0]
+                    details["sni_probe_ip"] = (probe_ips or suspect_ips)[0]
                     details["sni_probe_ips"] = probe_ips
+                    details["sni_witness_ips"] = suspect_ips
+                    details["sni_probe_mode"] = (
+                        "live+witness" if probe_ips and suspect_ips
+                        else "live" if probe_ips
+                        else "witness"
+                    )
                     anomaly.details = dict(details)
                     anomaly.censor_run_ids = list(
                         (details.get("ip_runs") or {}).values()
                     ) + list(started["runs"].values())
                     anomaly.status = "checking_sni"
                     continue
-            # Живых адресов нет либо имена проверить не на чем: вердикт
-            # выносится по тому, что уже известно
+            # Проверять имена не на чем: вердикт выносится по тому, что уже
+            # известно
             _finalize_anomaly(db_session, anomaly, server, title, details)
             continue
 
@@ -1476,7 +1678,7 @@ def _start_candidate_verification(db_session, replacement, server) -> None:
     from engine import infra
 
     cfg = infra.get_settings(db_session)
-    control_names = infra.parse_control_names(cfg["infra_control_names"])
+    control_names = infra.active_control_names(cfg)
     if not control_names:
         # Проверять нечем: не блокируем замену, но говорим об этом в журнале
         _rlog(
@@ -1596,6 +1798,42 @@ def _banned_names(replacement) -> list:
     return list(created.get("banned_names") or [])
 
 
+def _domain_snis(replacement) -> dict:
+    """{домен заявки: [имена, которые клиенты шлют в ClientHello]}.
+
+    Заявки, созданные до появления имён, карты не хранят — там имя и есть
+    домен, что и было единственной схемой на момент их создания.
+    """
+    created = _rlog_last(replacement, "created") or {}
+    mapping = dict(created.get("domain_snis") or {})
+    result = {}
+    for domain in (replacement.domains or []):
+        names = mapping.get(domain)
+        if isinstance(names, str):  # заявка ранней версии: одно имя строкой
+            names = [names]
+        result[domain] = [n for n in (names or []) if n] or [domain]
+    return result
+
+
+def _sni_banned_names(replacement) -> dict:
+    """{домен: [его забаненные имена]} по вердикту диагностики.
+
+    Отказ такого имени на кандидате ожидаем и публикацию домена не
+    отменяет: имя забанено везде, на новом адресе оно тоже не пройдёт — но
+    домен в эфир не уходит, а старый адрес мёртв. Чинится сменой имени в
+    конфигах, а не в DNS.
+    """
+    created = _rlog_last(replacement, "created") or {}
+    raw = created.get("sni_banned") or {}
+    if isinstance(raw, list):  # заявка ранней версии: список доменов
+        snis = _domain_snis(replacement)
+        return {domain: list(snis.get(domain) or []) for domain in raw}
+    return {
+        domain: [n for n in (names or []) if n]
+        for domain, names in dict(raw).items()
+    }
+
+
 def _names_to_publish(replacement) -> list:
     """Под какие имена кандидата можно публиковать: домены заявки минус
     забаненные по вердикту."""
@@ -1640,10 +1878,22 @@ def _start_names_verification(db_session, replacement) -> None:
         )
         replacement.status = "dns_add"
         return
+    # Проверяется то, что уйдёт в ClientHello, а не имя A-записи; одинаковые
+    # имена у разных доменов дают одну пробу. Лимита здесь НЕТ намеренно:
+    # это последняя защита перед правкой боевых A-записей, а непроверенное
+    # имя публикуется (см. ветку probe is None ниже) — именно так адрес уехал
+    # под непроверенным именем 2026-09-02. Стоимость — один адрес × число
+    # различных имён, самая дешёвая точка конвейера.
+    snis = _domain_snis(replacement)
+    probe_snis: list[str] = []
+    for domain in names:
+        for sni in snis.get(domain) or [domain]:
+            if sni not in probe_snis:
+                probe_snis.append(sni)
     try:
         started = infra.start_diagnosis_probes(
             db_session,
-            [(replacement.new_ip, name) for name in names],
+            [(replacement.new_ip, sni) for sni in probe_snis],
             reason="CANDIDATE_NAMES_VERIFY",
             light=False,
         )
@@ -1673,7 +1923,7 @@ def _start_names_verification(db_session, replacement) -> None:
         replacement,
         "verifying_names",
         f"Проверяем на кандидате {replacement.new_ip} имена: "
-        + ", ".join(names),
+        + ", ".join(probe_snis),
         runs=started["runs"],
     )
 
@@ -1700,50 +1950,81 @@ def _replacement_step_verifying_names(db_session, replacement, server) -> None:
         return  # ждём зонды; зависание закроет общий stuck-таймаут
 
     ip = replacement.new_ip
+    snis = _domain_snis(replacement)
+    banned = _sni_banned_names(replacement)
     publish, skipped, unverified = [], [], []
-    for name in names:
-        probe = probes.get(infra.probe_key(ip, name))
-        if probe is None:
-            unverified.append(name)
+    failing_names: dict = {}
+    for domain in names:
+        domain_names = snis.get(domain) or [domain]
+        domain_banned = set(banned.get(domain) or [])
+        passed, failed, unknown = [], [], []
+        for sni in domain_names:
+            probe = probes.get(infra.probe_key(ip, sni))
+            label_name = domain if sni == domain else f"{domain} / {sni}"
+            if probe is None:
+                unknown.append(sni)
+                _rlog(
+                    replacement,
+                    "name_unverified",
+                    f"Имя {label_name} на кандидате {ip}: проверка не дала "
+                    "результата",
+                )
+                continue
+            label = (
+                f"{diag.availability_pct(probe)}% зондов, "
+                f"{probe['ok_probes']}/{probe['total_probes']}"
+            )
+            if diag.probe_passed(probe):
+                passed.append(sni)
+                _rlog(
+                    replacement, "name_verified",
+                    f"Имя {label_name} на кандидате {ip}: проходит ({label})",
+                )
+                continue
+            failed.append(sni)
+            stage = diag.dominant_stage(probe) or "нет ответа"
             _rlog(
                 replacement,
-                "name_unverified",
-                f"Имя {name} на кандидате {ip}: проверка не дала результата "
-                "— публикуем с оговоркой",
+                "name_skipped" if sni not in domain_banned else "name_verified",
+                f"Имя {label_name} на кандидате {ip}: НЕ проходит ({label}, "
+                f"стадия {stage})"
+                + (
+                    " — ожидаемо, имя забанено вердиктом"
+                    if sni in domain_banned
+                    else " — бан пары «адрес + имя» либо имени"
+                ),
             )
-            continue
-        label = (
-            f"{diag.availability_pct(probe)}% зондов, "
-            f"{probe['ok_probes']}/{probe['total_probes']}"
-        )
-        if diag.probe_passed(probe):
-            publish.append(name)
+        if failed:
+            failing_names[domain] = failed
+        # Домен публикуется ВСЕГДА (решение владельца 09.09.2026): адрес
+        # кандидата уже доказан живым контрольным именем на шаге verifying, а
+        # состояние имён на решение о DNS не влияет. Старый адрес мёртв —
+        # оставить клиентов на нём хуже любого исхода здесь. Какие имена на
+        # кандидате не прошли, видно в журнале и в итоговом алерте.
+        if passed:
+            publish.append(domain)
+        elif not failed and unknown:
+            unverified.append(domain)
+        else:
+            publish.append(domain)
             _rlog(
                 replacement,
                 "name_verified",
-                f"Имя {name} на кандидате {ip}: проходит ({label}) — публикуем",
+                f"Домен {domain} публикуется, хотя на кандидате {ip} не прошло "
+                "ни одно его имя (" + ", ".join(failed + unknown) + "): адрес "
+                "кандидата признан живым, а старый адрес мёртв. Имена чинятся "
+                "в конфигурации ноды и хостах Remnawave",
             )
-            continue
-        stage = diag.dominant_stage(probe) or "нет ответа"
-        skipped.append(name)
-        _rlog(
-            replacement,
-            "name_skipped",
-            f"Имя {name} на кандидате {ip}: НЕ проходит ({label}, стадия "
-            f"{stage}) — не публикуется: бан пары «адрес + имя» либо имени",
+    summary = "Публикуем: " + ", ".join(publish + unverified)
+    if failing_names:
+        summary += "; не прошли на кандидате имена: " + ", ".join(
+            f"{domain} ({', '.join(names)})"
+            for domain, names in failing_names.items()
         )
-    if publish or unverified:
-        summary = "Публикуем: " + ", ".join(publish + unverified)
-    else:
-        summary = (
-            "Ни одно имя на кандидате не проходит — публиковать нечего, "
-            "старый адрес всё равно убираем из DNS"
-        )
-    if skipped:
-        summary += "; не публикуем: " + ", ".join(skipped)
     _rlog(
         replacement, "names_verified", summary,
         publish=publish, skipped=skipped, unverified=unverified,
+        failing_names=failing_names,
     )
     replacement.status = "dns_add"
 
@@ -1834,10 +2115,16 @@ def _start_replacement_confirmation(db_session, replacement, title) -> None:
         )
         _finish_replacement(db_session, replacement, title, confirmed=None)
         return
+    snis = _domain_snis(replacement)
+    probe_snis: list[str] = []
+    for domain in names:
+        for sni in snis.get(domain) or [domain]:
+            if sni not in probe_snis:
+                probe_snis.append(sni)
     try:
         started = infra.start_diagnosis_probes(
             db_session,
-            [(replacement.new_ip, name) for name in names],
+            [(replacement.new_ip, sni) for sni in probe_snis],
             reason="REPLACEMENT_CONFIRM",
             light=False,
         )
@@ -1868,7 +2155,7 @@ def _start_replacement_confirmation(db_session, replacement, title) -> None:
         replacement,
         "confirming",
         f"Проверяем, что связки {replacement.new_ip} + "
-        + ", ".join(names) + " действительно работают",
+        + ", ".join(probe_snis) + " действительно работают",
         runs=started["runs"],
     )
 
@@ -1894,37 +2181,60 @@ def _replacement_step_confirming(db_session, replacement, server, title) -> None
         return
 
     ip = replacement.new_ip
+    snis = _domain_snis(replacement)
+    published = _published_names(replacement)
+    # Итог нужен по доменам (их видит админ), а пробы шли по именам. ВНУТРИ
+    # домена правило any-of: домен считается заработавшим, если работает хотя
+    # бы одно его имя. Иначе при трёх именах падение одного протокольного
+    # имени давало бы страшный алерт «замена не решила проблему» на КАЖДОЙ
+    # замене. Между доменами по-прежнему all-of.
+    checked = [(domain, snis.get(domain) or [domain]) for domain in published]
+    if not checked:
+        checked = [
+            (key.partition("|")[2], [key.partition("|")[2]]) for key in runs
+        ]
     results: dict = {}
-    for key in runs:
-        name = key.partition("|")[2]
-        probe = probes.get(key)
-        if probe is None:
-            results[name] = None
+    partial: dict = {}
+    for domain, domain_names in checked:
+        passed, failed, unknown = [], [], []
+        for sni in domain_names:
+            label_name = domain if sni == domain else f"{domain} / {sni}"
+            probe = probes.get(infra.probe_key(ip, sni))
+            if probe is None:
+                unknown.append(sni)
+                _rlog(
+                    replacement,
+                    "confirm_skipped",
+                    f"Постпроверка {ip} + {label_name} не дала результата",
+                )
+                continue
+            label = (
+                f"{diag.availability_pct(probe)}% зондов, "
+                f"{probe['ok_probes']}/{probe['total_probes']}"
+            )
+            if diag.probe_passed(probe):
+                passed.append(sni)
+                _rlog(
+                    replacement, "confirmed",
+                    f"Связка {ip} + {label_name} работает ({label})",
+                )
+                continue
+            failed.append(sni)
+            stage = diag.dominant_stage(probe) or "нет ответа"
             _rlog(
                 replacement,
-                "confirm_skipped",
-                f"Постпроверка {ip} + {name} не дала результата",
+                "not_confirmed",
+                f"Связка {ip} + {label_name} НЕ работает ({label}, стадия "
+                f"{stage})",
             )
-            continue
-        label = (
-            f"{diag.availability_pct(probe)}% зондов, "
-            f"{probe['ok_probes']}/{probe['total_probes']}"
-        )
-        if diag.probe_passed(probe):
-            results[name] = True
-            _rlog(
-                replacement, "confirmed",
-                f"Связка {ip} + {name} работает ({label})",
-            )
-            continue
-        results[name] = False
-        stage = diag.dominant_stage(probe) or "нет ответа"
-        _rlog(
-            replacement,
-            "not_confirmed",
-            f"Связка {ip} + {name} НЕ работает ({label}, стадия {stage}) — "
-            "замена адреса проблему не решила",
-        )
+        if passed:
+            results[domain] = True
+            if failed:
+                partial[domain] = failed
+        elif failed:
+            results[domain] = False
+        else:
+            results[domain] = None
     known = [value for value in results.values() if value is not None]
     if not known:
         confirmed = None
@@ -1934,12 +2244,13 @@ def _replacement_step_confirming(db_session, replacement, server, title) -> None
         confirmed = False
     _finish_replacement(
         db_session, replacement, title, confirmed=confirmed,
-        name_results=results,
+        name_results=results, partial_names=partial,
     )
 
 
 def _finish_replacement(
-    db_session, replacement, title, confirmed, name_results=None
+    db_session, replacement, title, confirmed, name_results=None,
+    partial_names=None,
 ) -> None:
     """Закрывает замену и шлёт итоговый алерт.
 
@@ -1977,6 +2288,28 @@ def _finish_replacement(
             "\nНе опубликовано, имя забанено:\n"
             + "\n".join(f"<code>{d}</code>" for d in banned)
         )
+    sni_banned = _sni_banned_names(replacement)
+    if sni_banned:
+        names_block += (
+            "\nОпубликовано, но часть имён забанена — сменить в конфигах "
+            "ноды и хостах Remnawave:\n"
+            + "\n".join(
+                f"<code>{d}</code>: "
+                + ", ".join(f"<code>{n}</code>" for n in names)
+                for d, names in sni_banned.items()
+                if names
+            )
+        )
+    partial_names = partial_names or {}
+    if partial_names:
+        names_block += (
+            "\nРаботает частично (адрес жив, эти имена не проходят):\n"
+            + "\n".join(
+                f"<code>{d}</code>: "
+                + ", ".join(f"<code>{n}</code>" for n in names)
+                for d, names in partial_names.items()
+            )
+        )
 
     if confirmed is False:
         _send_alert(
@@ -1988,9 +2321,16 @@ def _finish_replacement(
             + "\n\nНовый адрес чист, но клиентская связка «адрес + имя» "
             "не проходит у: "
             + ", ".join(f"<code>{d}</code>" for d in failing)
-            + ". Значит дело не только в адресе: проверьте имя, "
-            "конфигурацию ноды и клиентские конфиги.\n\n"
-            "<b>Что было сделано:</b>\n" + journal
+            + ". Ни одно имя этих доменов на новом адресе не проходит, "
+            "значит дело не только в адресе: проверьте имена, конфигурацию "
+            "ноды и клиентские конфиги.\n\n"
+            + (
+                "Для уже забаненных имён это ожидаемо: адрес заменён, имя "
+                "меняется отдельно.\n\n"
+                if sni_banned
+                else ""
+            )
+            + "<b>Что было сделано:</b>\n" + journal
         )
         return
 

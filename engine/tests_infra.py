@@ -124,8 +124,10 @@ class InfraDbTestCase(SimpleTestCase):
         self.session.commit()
         return row
 
-    def make_domain(self, server, domain):
-        row = InfraServerDomain(server_id=server.id, domain=domain)
+    def make_domain(self, server, domain, client_snis=None):
+        row = InfraServerDomain(
+            server_id=server.id, domain=domain, client_snis=client_snis
+        )
         self.session.add(row)
         self.session.commit()
         return row
@@ -795,6 +797,145 @@ class MutationTests(InfraDbTestCase):
             infra.add_domain(self.session, server.id, "de.example.xyz")
         with self.assertRaises(infra.InfraError):
             infra.add_domain(self.session, server.id, "bad domain")
+
+    def test_client_snis_are_stored_and_normalized(self):
+        server = self.make_server()
+        # Имён столько, сколько протоколов развели на haproxy; имя из
+        # ClientHello может не быть доменом вовсе (localhost под отдельный
+        # протокол) — точка здесь не обязательна
+        infra.add_domain(
+            self.session, server.id, "de.monkora.org",
+            "Example.ORG, example.com , LOCALHOST",
+        )
+        row = self.session.query(InfraServerDomain).one()
+        self.assertEqual(
+            row.client_snis, ["example.org", "example.com", "localhost"]
+        )
+
+        # Дубли схлопываются, порядок сохраняется
+        infra.set_domain_snis(
+            self.session, server.id, "de.monkora.org",
+            "example.org example.org example.net",
+        )
+        self.assertEqual(row.client_snis, ["example.org", "example.net"])
+
+        # Пустое значение и список из одного домена — одна и та же старая
+        # схема «имя = домен», хранится как NULL
+        infra.set_domain_snis(self.session, server.id, "de.monkora.org", "")
+        self.assertIsNone(row.client_snis)
+        infra.set_domain_snis(
+            self.session, server.id, "de.monkora.org", "de.monkora.org"
+        )
+        self.assertIsNone(row.client_snis)
+
+        # Смешанная схема выразима: домен уходит в эфир сам И есть маска
+        infra.set_domain_snis(
+            self.session, server.id, "de.monkora.org",
+            "de.monkora.org,example.org",
+        )
+        self.assertEqual(row.client_snis, ["de.monkora.org", "example.org"])
+        self.assertTrue(infra.domain_own_name_on_wire(row))
+
+        with self.assertRaises(infra.InfraError):
+            infra.set_domain_snis(
+                self.session, server.id, "de.monkora.org", ["bad/sni"]
+            )
+        with self.assertRaises(infra.InfraError):
+            infra.set_domain_snis(
+                self.session, server.id, "de.monkora.org",
+                [f"n{i}.example" for i in range(infra.MAX_DOMAIN_SNIS + 1)],
+            )
+        with self.assertRaises(infra.InfraError):
+            infra.set_domain_snis(self.session, server.id, "nope.example", "x")
+
+    def test_set_domain_snis_apply_all(self):
+        # haproxy разводит по SNI на общем адресе — набор имён обычно один
+        # на ноду, вбивать его в каждый домен руками значит опечататься
+        server = self.make_server()
+        self.make_domain(server, "a.example.xyz")
+        self.make_domain(server, "b.example.xyz")
+        other = self.make_server(machine_uid="m-2")
+        self.make_domain(other, "c.example.xyz")
+
+        infra.set_domain_snis(
+            self.session, server.id, "a.example.xyz",
+            "example.com,example.org", apply_all=True,
+        )
+        rows = {
+            row.domain: row.client_snis
+            for row in self.session.query(InfraServerDomain).all()
+        }
+        self.assertEqual(rows["a.example.xyz"], ["example.com", "example.org"])
+        self.assertEqual(rows["b.example.xyz"], ["example.com", "example.org"])
+        # Чужой сервер не затронут
+        self.assertIsNone(rows["c.example.xyz"])
+
+    def test_probe_targets_deduplicate_and_report_truncation(self):
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(
+            server, "a.example.xyz", client_snis=["example.com", "example.org"]
+        )
+        self.make_domain(
+            server, "b.example.xyz", client_snis=["example.com", "example.net"]
+        )
+        self.make_domain(server, "c.example.xyz")
+        ips, names, dropped = infra.server_probe_targets(self.session, server)
+        self.assertEqual(ips, ["185.10.0.10"])
+        # Общее имя двух доменов проверяется один раз; обход «в ширину»,
+        # поэтому лимит не съедается одним доменом
+        self.assertEqual(
+            names, ["example.com", "c.example.xyz", "example.org", "example.net"]
+        )
+        self.assertEqual(dropped, [])
+
+        self.make_domain(server, "d.example.xyz", client_snis=["example.info"])
+        # Лимит — настройка: имён у ноды может быть и семь
+        self.session.add(
+            SystemSetting(key="infra_tspu_max_names", value="4")
+        )
+        self.session.commit()
+        _ips, names, dropped = infra.server_probe_targets(self.session, server)
+        self.assertEqual(len(names), 4)
+        # Срезанное возвращается явно, а не исчезает молча
+        self.assertEqual(dropped, ["example.net"])
+
+        targets = infra.server_domain_targets(self.session, server.id)
+        self.assertEqual(
+            targets[0], {"domain": "a.example.xyz",
+                         "snis": ["example.com", "example.org"]},
+        )
+        # Домен старой схемы: имя — он сам, список никогда не пустой
+        self.assertEqual(
+            targets[2], {"domain": "c.example.xyz", "snis": ["c.example.xyz"]},
+        )
+
+    def test_burned_control_names_are_skipped(self):
+        self.session.add(
+            SystemSetting(key="infra_control_names", value="ya.ru,ms.example")
+        )
+        self.session.add(
+            SystemSetting(key="infra_control_names_burned", value="ya.ru")
+        )
+        self.session.commit()
+        cfg = infra.get_settings(self.session)
+        self.assertEqual(infra.active_control_names(cfg), ["ms.example"])
+
+        # Выгорели все — работаем прежним списком: остаться без контроля хуже
+        self.session.query(SystemSetting).filter(
+            SystemSetting.key == "infra_control_names_burned"
+        ).one().value = "ya.ru,ms.example"
+        self.session.commit()
+        cfg = infra.get_settings(self.session)
+        self.assertEqual(infra.active_control_names(cfg), ["ya.ru", "ms.example"])
+
+    def test_mark_control_name_burned_is_idempotent(self):
+        self.assertTrue(infra.mark_control_name_burned(self.session, "Google.RU"))
+        self.assertFalse(infra.mark_control_name_burned(self.session, "google.ru"))
+        self.session.commit()
+        row = self.session.get(SystemSetting, "infra_control_names_burned")
+        self.assertEqual(row.value, "google.ru")
+        self.assertFalse(infra.mark_control_name_burned(self.session, "  "))
 
     def test_ensure_ip_command_is_deduplicated(self):
         server = self.make_server()
@@ -1877,15 +2018,24 @@ class ProcessAnomalyTests(InfraDbTestCase):
         server = self.make_server()
         self.make_ip(server, "185.10.0.10", on_interface=True)
         self.make_domain(server, "de.example.xyz")
+        self._seed_known_good("de.example.xyz")
         ip_run = self.make_run("185.10.0.10", ok_probes=2, blocked_probes=18)
         sni_run = self.make_run(
             "185.10.0.11", ok_probes=18, blocked_probes=2,
             sni="de.example.xyz",
         )
+        # Свидетель на подозрительном адресе: имя там тоже не проходит
+        witness = self.make_run(
+            "185.10.0.10", ok_probes=0, blocked_probes=20,
+            sni="de.example.xyz",
+        )
         anomaly = self.make_anomaly(
             server,
             {"185.10.0.10|ya.ru": ip_run.id},
-            {"185.10.0.11|de.example.xyz": sni_run.id},
+            {
+                "185.10.0.11|de.example.xyz": sni_run.id,
+                "185.10.0.10|de.example.xyz": witness.id,
+            },
             status="checking_sni",
         )
 
@@ -1905,6 +2055,9 @@ class ProcessAnomalyTests(InfraDbTestCase):
         server = self.make_server()
         self.make_ip(server, "185.10.0.10", on_interface=True)
         self.make_domain(server, "de.example.xyz")
+        # Имя уже наблюдалось рабочим: без истории вердикт «забанено»
+        # не выносится (защита от опечатки в карточке)
+        self._seed_known_good("de.example.xyz")
         ip_run = self.make_run("185.10.0.10", ok_probes=18, blocked_probes=2)
         sni_run = self.make_run(
             "185.10.0.10", ok_probes=1, blocked_probes=19,
@@ -1932,7 +2085,7 @@ class ProcessAnomalyTests(InfraDbTestCase):
         self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
         text = alert.call_args[0][0]
         self.assertIn("заблокировано имя", text)
-        self.assertIn("не публикуется намеренно", text)
+        self.assertIn("DNS это не блокирует", text)
         # Алерт объясняет, какими проверками это установлено
         self.assertIn("Как это выяснено", text)
 
@@ -1946,6 +2099,10 @@ class ProcessAnomalyTests(InfraDbTestCase):
         self.make_ip(server, "185.10.0.20", on_interface=True)
         self.make_domain(server, "clean.example.xyz")
         self.make_domain(server, "burned.example.xyz")
+        # Имя уже наблюдалось рабочим: без истории вердикт «забанено»
+        # не выносится (защита от опечатки в карточке)
+        self._seed_known_good("clean.example.xyz")
+        self._seed_known_good("burned.example.xyz")
         dead_run = self.make_run(
             "185.10.0.10", ok_probes=0, blocked_probes=20, stage="tcp_fail"
         )
@@ -1985,10 +2142,15 @@ class ProcessAnomalyTests(InfraDbTestCase):
         )
         created = replacement.log[0]
         self.assertEqual(created["step"], "created")
-        self.assertEqual(created["banned_names"], ["burned.example.xyz"])
+        # DNS переставляется у всех доменов: вердикт по имени публикацию
+        # больше не блокирует
+        self.assertEqual(created["banned_names"], [])
+        self.assertEqual(
+            created["sni_banned"], {"burned.example.xyz": ["burned.example.xyz"]}
+        )
         # И отдельно предупреждение про имя
         self.assertTrue(
-            any("заблокировано имя" in call[0][0]
+            any("заблокировано клиентское имя" in call[0][0]
                 for call in alert.call_args_list)
         )
 
@@ -2002,9 +2164,18 @@ class ProcessAnomalyTests(InfraDbTestCase):
         self.make_ip(server, "185.10.0.10", on_interface=True)
         self.make_domain(server, "a.example.xyz")
         self.make_domain(server, "b.example.xyz")
+        self._seed_known_good("a.example.xyz")
         dead_run = self.make_run("185.10.0.10", ok_probes=0, blocked_probes=20)
+        # Имя-свидетель на подозрительном адресе тоже не проходит: отказ
+        # контроля подтверждён вторым независимым именем
+        witness = self.make_run(
+            "185.10.0.10", ok_probes=0, blocked_probes=20, sni="a.example.xyz"
+        )
         anomaly = self.make_anomaly(
-            server, {"185.10.0.10|ya.ru": dead_run.id}, status="checking_sni"
+            server,
+            {"185.10.0.10|ya.ru": dead_run.id},
+            {"185.10.0.10|a.example.xyz": witness.id},
+            status="checking_sni",
         )
 
         with mock.patch.object(
@@ -2071,6 +2242,9 @@ class ProcessAnomalyTests(InfraDbTestCase):
                 "185.10.0.30|x.example.xyz": x_on_b.id,
                 "185.10.0.20|y.example.xyz": y_on_a.id,
                 "185.10.0.30|y.example.xyz": y_on_b.id,
+                "185.10.0.10|x.example.xyz": self.make_run(
+                    "185.10.0.10", ok_probes=0, blocked_probes=20,
+                    sni="x.example.xyz").id,
             },
             status="checking_sni",
         )
@@ -2126,6 +2300,9 @@ class ProcessAnomalyTests(InfraDbTestCase):
         self.make_ip(server, "185.10.0.10", on_interface=True)
         self.make_ip(server, "185.10.0.20", on_interface=True)
         self.make_domain(server, "de.example.xyz")
+        # Имя уже наблюдалось рабочим: без истории вердикт «забанено»
+        # не выносится (защита от опечатки в карточке)
+        self._seed_known_good("de.example.xyz")
         dead_run = self.make_run("185.10.0.10", ok_probes=0, blocked_probes=20)
         live_run = self.make_run("185.10.0.20", ok_probes=19, blocked_probes=1)
         name_run = self.make_run(
@@ -2223,9 +2400,14 @@ class ProcessAnomalyTests(InfraDbTestCase):
         self.assertEqual(
             sorted(calls[0]["pairs"]),
             sorted(
-                (ip, name)
-                for ip in ("185.10.0.20", "185.10.0.30")
-                for name in ("a.example.xyz", "b.example.xyz")
+                [
+                    (ip, name)
+                    for ip in ("185.10.0.20", "185.10.0.30")
+                    for name in ("a.example.xyz", "b.example.xyz")
+                ]
+                # плюс один свидетель на подозрительном адресе: без него
+                # вердикт «забанен» держался бы на одном контрольном имени
+                + [("185.10.0.10", "a.example.xyz")]
             ),
         )
         self.assertEqual(
@@ -2238,6 +2420,9 @@ class ProcessAnomalyTests(InfraDbTestCase):
         self.make_ip(server, "185.10.0.10", on_interface=True)
         self.make_ip(server, "185.10.0.20", on_interface=True)
         self.make_domain(server, "one.example.xyz")
+        # Имя уже наблюдалось рабочим: без истории вердикт «забанено»
+        # не выносится (защита от опечатки в карточке)
+        self._seed_known_good("one.example.xyz")
         dead_run = self.make_run(
             "185.10.0.10", ok_probes=0, blocked_probes=20, stage="tcp_fail"
         )
@@ -2266,7 +2451,8 @@ class ProcessAnomalyTests(InfraDbTestCase):
         )
 
     def test_control_name_burned_blocks_all_actions(self):
-        # Контроль не проходит нигде — виновато контрольное имя, не адреса
+        # Контроль не проходит нигде, клиентским именем опровергнуть нечем:
+        # подозрение на выгорание контроля, вердикты не выносятся
         server = self.make_server()
         self.make_ip(server, "185.10.0.10", on_interface=True)
         self.make_ip(server, "185.10.0.20", on_interface=True)
@@ -2276,9 +2462,12 @@ class ProcessAnomalyTests(InfraDbTestCase):
         anomaly = self.make_anomaly(
             server,
             {"185.10.0.10|ya.ru": run_a.id, "185.10.0.20|ya.ru": run_b.id},
+            status="checking_sni",
         )
 
-        with mock.patch.object(infra_worker, "_send_alert", return_value=True):
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
             infra_worker.process_anomalies(self.session)
         self.session.commit()
         self.session.refresh(anomaly)
@@ -2286,6 +2475,477 @@ class ProcessAnomalyTests(InfraDbTestCase):
         # Ни одной замены: сначала нужно сменить контрольное имя
         self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
         self.assertEqual(anomaly.details["verdict"]["blocked_ips"], [])
+        self.assertEqual(
+            anomaly.details["verdict"]["control_burn"], "suspected"
+        )
+        # Раньше выгорание проходило молча — админ не знал, что диагностика
+        # ослепла
+        self.assertTrue(
+            any("выгорание контрольного имени" in call[0][0]
+                for call in alert.call_args_list)
+        )
+        # По подозрению имя автоматически не снимается
+        self.assertIsNone(
+            self.session.get(SystemSetting, "infra_control_names_burned")
+        )
+
+    def test_suspect_ips_go_to_sni_phase(self):
+        # Живых адресов нет: фаза 2 всё равно запускается — проход
+        # клиентского имени на «мёртвом» адресе доказал бы, что выгорел
+        # контроль, а не адрес
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        run = self.make_run("185.10.0.10", ok_probes=0, blocked_probes=20)
+        anomaly = self.make_anomaly(server, {"185.10.0.10|ya.ru": run.id})
+
+        with mock.patch.object(
+            infra, "start_sni_diagnosis",
+            return_value={"runs": {"185.10.0.10|de.example.xyz": 777},
+                          "errors": []},
+        ) as started:
+            with mock.patch.object(
+                infra_worker, "_send_alert", return_value=True
+            ):
+                infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        self.assertEqual(anomaly.status, "checking_sni")
+        self.assertEqual(started.call_args[0][2], [])
+        self.assertEqual(
+            started.call_args[1]["suspect_ips"], ["185.10.0.10"]
+        )
+        self.assertEqual(anomaly.details["sni_probe_mode"], "witness")
+
+    def test_hard_blocked_ips_skip_sni_phase(self):
+        # TCP не устанавливается: клиентское имя там не пройдёт по
+        # определению — зонды не жжём
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        run = self.make_run(
+            "185.10.0.10", ok_probes=0, blocked_probes=20, stage="tcp_fail"
+        )
+        anomaly = self.make_anomaly(server, {"185.10.0.10|ya.ru": run.id})
+
+        with mock.patch.object(infra, "start_sni_diagnosis") as started:
+            with mock.patch.object(
+                infra_worker, "_send_alert", return_value=True
+            ):
+                infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        started.assert_not_called()
+        self.assertEqual(anomaly.status, "confirmed")
+
+    def test_client_sni_pass_proves_control_burned(self):
+        # Контроль упал, а клиентское имя на том же адресе прошло: адрес
+        # жив, выгорело контрольное имя — оно помечается и ротируется
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        ip_run = self.make_run("185.10.0.10", ok_probes=0, blocked_probes=20)
+        sni_run = self.make_run(
+            "185.10.0.10", ok_probes=19, blocked_probes=1,
+            sni="de.example.xyz",
+        )
+        anomaly = self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": ip_run.id},
+            {"185.10.0.10|de.example.xyz": sni_run.id},
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        self.assertEqual(anomaly.details["verdict"]["control_burn"], "proven")
+        self.assertEqual(anomaly.details["verdict"]["blocked_ips"], [])
+        self.assertEqual(anomaly.status, "dismissed")
+        # Замены нет: адрес доказанно жив
+        self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
+        setting = self.session.get(SystemSetting, "infra_control_names_burned")
+        self.assertEqual(setting.value, "ya.ru")
+        self.assertTrue(
+            any("контрольное имя выгорело" in call[0][0]
+                for call in alert.call_args_list)
+        )
+
+    def _seed_known_good(self, sni):
+        """История «имя когда-то проходило»: без неё вердикт по имени не
+        выносится (защита от опечатки в карточке)."""
+        self.make_run("203.0.113.1", ok_probes=20, blocked_probes=0, sni=sni)
+
+    def test_custom_sni_ban_still_replaces_dns(self):
+        # У домена свои клиентские имена: домен в эфир не уходит, бан одного
+        # имени публикацию нового адреса не блокирует
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(
+            server, "de.example.xyz",
+            client_snis=["example.org", "example.com"],
+        )
+        self._seed_known_good("example.org")
+        ip_run = self.make_run("185.10.0.10", ok_probes=2, blocked_probes=18)
+        live_run = self.make_run("185.10.0.11", ok_probes=18, blocked_probes=2)
+        banned_run = self.make_run(
+            "185.10.0.11", ok_probes=0, blocked_probes=20, sni="example.org"
+        )
+        clean_run = self.make_run(
+            "185.10.0.11", ok_probes=19, blocked_probes=1, sni="example.com"
+        )
+        # Свидетель на подозрительном адресе: через .10 не идёт и имя
+        witness = self.make_run(
+            "185.10.0.10", ok_probes=0, blocked_probes=20, sni="example.org"
+        )
+        anomaly = self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": ip_run.id, "185.10.0.11|ya.ru": live_run.id},
+            {
+                "185.10.0.11|example.org": banned_run.id,
+                "185.10.0.11|example.com": clean_run.id,
+                "185.10.0.10|example.org": witness.id,
+            },
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        self.assertEqual(
+            anomaly.details["verdict"]["blocked_snis"], ["example.org"]
+        )
+        replacement = self.session.query(InfraIpReplacement).one()
+        self.assertEqual(replacement.old_ip, "185.10.0.10")
+        created = replacement.log[0]
+        # Домен не в бане: A-запись переставляется как обычно
+        self.assertEqual(created["banned_names"], [])
+        self.assertEqual(
+            created["sni_banned"], {"de.example.xyz": ["example.org"]}
+        )
+        self.assertEqual(
+            created["domain_snis"],
+            {"de.example.xyz": ["example.org", "example.com"]},
+        )
+        # Алерт называет ИМЕННО забаненное имя, а не первое имя домена
+        sni_alerts = [
+            call[0][0] for call in alert.call_args_list
+            if "клиентское имя (SNI)" in call[0][0]
+        ]
+        self.assertTrue(sni_alerts)
+        self.assertIn("example.org", sni_alerts[0])
+        self.assertIn("продолжают работать", sni_alerts[0])
+
+    def test_one_banned_name_of_three_keeps_live_address(self):
+        # Адрес жив (any-of по именам), один протокол под фильтром: замены
+        # нет, DNS не трогаем, уходит только алерт про имя
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(
+            server, "de.example.xyz",
+            client_snis=["example.org", "example.com", "example.net"],
+        )
+        for name in ("example.org", "example.com", "example.net"):
+            self._seed_known_good(name)
+        ip_run = self.make_run("185.10.0.10", ok_probes=18, blocked_probes=2)
+        anomaly = self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": ip_run.id},
+            {
+                "185.10.0.10|example.org": self.make_run(
+                    "185.10.0.10", ok_probes=19, blocked_probes=1,
+                    sni="example.org").id,
+                "185.10.0.10|example.com": self.make_run(
+                    "185.10.0.10", ok_probes=0, blocked_probes=20,
+                    sni="example.com").id,
+                "185.10.0.10|example.net": self.make_run(
+                    "185.10.0.10", ok_probes=18, blocked_probes=2,
+                    sni="example.net").id,
+            },
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        self.assertEqual(anomaly.details["verdict"]["blocked_ips"], [])
+        self.assertEqual(
+            anomaly.details["verdict"]["blocked_snis"], ["example.com"]
+        )
+        # Живой адрес не меняем: сжигать резерв из-за имени нельзя
+        self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
+        self.assertEqual(anomaly.status, "confirmed")
+        text = alert.call_args_list[0][0][0]
+        self.assertIn("example.com", text)
+        self.assertIn("example.org", text)
+
+    def test_never_passing_name_is_not_declared_blocked(self):
+        # Опечатка в карточке или имя, которого нода не обслуживает,
+        # выглядит на пробе точно как бан ТСПУ — вердикт не выносим
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz", client_snis=["exmaple.org"])
+        ip_run = self.make_run("185.10.0.10", ok_probes=18, blocked_probes=2)
+        anomaly = self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": ip_run.id},
+            {"185.10.0.10|exmaple.org": self.make_run(
+                "185.10.0.10", ok_probes=0, blocked_probes=20,
+                sni="exmaple.org").id},
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        self.assertEqual(anomaly.details["verdict"]["blocked_snis"], [])
+        self.assertEqual(
+            anomaly.details["verdict"]["unproven_snis"], ["exmaple.org"]
+        )
+        self.assertIn("exmaple.org", anomaly.details["verdict"]["unknown_snis"])
+        self.assertTrue(
+            any("ни разу не проходило" in call[0][0]
+                for call in alert.call_args_list)
+        )
+
+    def test_control_alone_does_not_trigger_replacement(self):
+        # Ровно инцидент 07.09.2026: контрольное имя не проходит, живых
+        # адресов нет, второго свидетеля нет — замены быть не должно
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz", client_snis=["example.org"])
+        ip_run = self.make_run("185.10.0.10", ok_probes=0, blocked_probes=20)
+        # Имя-свидетель падает, но оно никогда и нигде не проходило —
+        # доказательством его отказ не является
+        witness = self.make_run(
+            "185.10.0.10", ok_probes=0, blocked_probes=20, sni="example.org"
+        )
+        anomaly = self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": ip_run.id},
+            {"185.10.0.10|example.org": witness.id},
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        self.assertEqual(anomaly.details["verdict"]["blocked_ips"], [])
+        self.assertEqual(
+            anomaly.details["verdict"]["unconfirmed_ips"], ["185.10.0.10"]
+        )
+        self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
+        # Молчать тоже нельзя: админ должен знать, что адрес подозрителен
+        self.assertTrue(
+            any("подтвердить нечем" in call[0][0]
+                for call in alert.call_args_list)
+        )
+
+    def test_witness_pass_keeps_address_and_burns_control(self):
+        # Контроль упал, а боевое имя на том же адресе прошло: адрес живой,
+        # выгорел контроль — замены нет, имя ротируется
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz", client_snis=["example.org"])
+        ip_run = self.make_run("185.10.0.10", ok_probes=0, blocked_probes=20)
+        witness = self.make_run(
+            "185.10.0.10", ok_probes=19, blocked_probes=1, sni="example.org"
+        )
+        anomaly = self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": ip_run.id},
+            {"185.10.0.10|example.org": witness.id},
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        self.assertEqual(anomaly.details["verdict"]["blocked_ips"], [])
+        self.assertEqual(anomaly.details["verdict"]["control_burn"], "proven")
+        self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
+        self.assertEqual(
+            self.session.get(
+                SystemSetting, "infra_control_names_burned"
+            ).value,
+            "ya.ru",
+        )
+        self.assertTrue(
+            any("контрольное имя выгорело" in call[0][0]
+                for call in alert.call_args_list)
+        )
+
+    def test_self_sni_node_recovers_without_human(self):
+        # Главный боевой сценарий: домен = SNI (self-SNI, так идёт почти весь
+        # парк), два адреса, один выгорел, имя НЕ забанено. Замена должна
+        # пройти сама, ночью, без участия человека
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.20", on_interface=True)
+        self.make_ip(
+            server, "185.10.0.30", on_interface=False, source="manual",
+            interface=None,
+        )
+        self.make_domain(server, "de.example.xyz")
+        self._seed_known_good("de.example.xyz")
+        anomaly = self.make_anomaly(
+            server,
+            {
+                "185.10.0.10|ya.ru": self.make_run(
+                    "185.10.0.10", ok_probes=0, blocked_probes=20).id,
+                "185.10.0.20|ya.ru": self.make_run(
+                    "185.10.0.20", ok_probes=19, blocked_probes=1).id,
+            },
+            {
+                # Имя живо на живом адресе и не проходит на выгоревшем
+                "185.10.0.20|de.example.xyz": self.make_run(
+                    "185.10.0.20", ok_probes=19, blocked_probes=1,
+                    sni="de.example.xyz").id,
+                "185.10.0.10|de.example.xyz": self.make_run(
+                    "185.10.0.10", ok_probes=0, blocked_probes=20,
+                    sni="de.example.xyz").id,
+            },
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        verdict = anomaly.details["verdict"]
+        self.assertEqual(verdict["blocked_ips"], ["185.10.0.10"])
+        # Имя чистое: оно прошло на живом адресе
+        self.assertEqual(verdict["blocked_snis"], [])
+        # Замена создана автоматически, домен в неё входит
+        replacement = self.session.query(InfraIpReplacement).one()
+        self.assertEqual(replacement.old_ip, "185.10.0.10")
+        self.assertEqual(replacement.domains, ["de.example.xyz"])
+        self.assertEqual(replacement.log[0]["banned_names"], [])
+        # На мёртвом адресе вердикт по имени не выносится: там падает всё
+        self.assertEqual(verdict["pair_blocked"], [])
+
+    def test_alert_reports_live_addresses_and_their_names(self):
+        # «Какой адрес живой и с какими SNI отработал» — первое, что нужно
+        # при разборе ночной аварии
+        self.session.add(
+            SystemSetting(key="infra_auto_replace_enabled", value="false")
+        )
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(server, "185.10.0.20", on_interface=True)
+        self.make_domain(
+            server, "de.example.xyz", client_snis=["example.org", "example.com"]
+        )
+        for name in ("example.org", "example.com"):
+            self._seed_known_good(name)
+        anomaly = self.make_anomaly(
+            server,
+            {
+                "185.10.0.10|ya.ru": self.make_run(
+                    "185.10.0.10", ok_probes=0, blocked_probes=20).id,
+                "185.10.0.20|ya.ru": self.make_run(
+                    "185.10.0.20", ok_probes=19, blocked_probes=1).id,
+            },
+            {
+                "185.10.0.20|example.org": self.make_run(
+                    "185.10.0.20", ok_probes=19, blocked_probes=1,
+                    sni="example.org").id,
+                "185.10.0.20|example.com": self.make_run(
+                    "185.10.0.20", ok_probes=18, blocked_probes=2,
+                    sni="example.com").id,
+                "185.10.0.10|example.org": self.make_run(
+                    "185.10.0.10", ok_probes=0, blocked_probes=20,
+                    sni="example.org").id,
+            },
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        text = " ".join(call[0][0] for call in alert.call_args_list)
+        self.assertIn("Живые адреса", text)
+        self.assertIn("185.10.0.20", text)
+        self.assertIn("example.org", text)
+        self.assertIn("example.com", text)
+
+    def test_all_names_banned_cancels_replacement(self):
+        # Все имена сервера под фильтром: новый адрес ничего не починит,
+        # резерв сжигать нельзя
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(
+            server, "de.example.xyz", client_snis=["example.org", "example.com"]
+        )
+        for name in ("example.org", "example.com"):
+            self._seed_known_good(name)
+        ip_run = self.make_run("185.10.0.10", ok_probes=2, blocked_probes=18)
+        live_run = self.make_run("185.10.0.11", ok_probes=18, blocked_probes=2)
+        anomaly = self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": ip_run.id, "185.10.0.11|ya.ru": live_run.id},
+            {
+                "185.10.0.11|example.org": self.make_run(
+                    "185.10.0.11", ok_probes=0, blocked_probes=20,
+                    sni="example.org").id,
+                "185.10.0.11|example.com": self.make_run(
+                    "185.10.0.11", ok_probes=0, blocked_probes=20,
+                    sni="example.com").id,
+                "185.10.0.10|example.org": self.make_run(
+                    "185.10.0.10", ok_probes=0, blocked_probes=20,
+                    sni="example.org").id,
+            },
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        self.assertEqual(
+            anomaly.details["verdict"]["blocked_ips"], ["185.10.0.10"]
+        )
+        self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
+        self.assertTrue(
+            any("все имена сервера" in call[0][0]
+                for call in alert.call_args_list)
+        )
 
     def test_tspu_ok_dismisses_anomaly(self):
         server = self.make_server()
@@ -2573,6 +3233,154 @@ class ReplacementFlowTests(InfraDbTestCase):
         self.session.commit()
         return replacement
 
+    def make_pending_with_snis(self, server, domain_snis, sni_banned=None):
+        """Заявка с картой имён в журнале — как её создаёт диагностика."""
+        replacement = InfraIpReplacement(
+            server_id=server.id,
+            old_ip="185.10.0.10",
+            domains=list(domain_snis.keys()),
+            status="pending",
+            created_at=utcnow(),
+            updated_at=utcnow(),
+            log=[{
+                "ts": "2026-09-08T00:00:00",
+                "step": "created",
+                "message": "Заявка на замену 185.10.0.10 (test)",
+                "banned_names": [],
+                "domain_snis": domain_snis,
+                "sni_banned": sni_banned or {},
+            }],
+        )
+        self.session.add(replacement)
+        self.session.commit()
+        return replacement
+
+    def drive_to_names_verification(self, replacement):
+        """Прогоняет заявку до шага проверки имён на кандидате."""
+        infra_worker.process_replacements(self.session)
+        self.session.commit()
+        command = self.session.query(InfraAgentCommand).first()
+        if command is not None:
+            command.status = "ok"
+            self.session.commit()
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+        self.session.refresh(replacement)
+        self.complete_verification(replacement, ok=True)
+        infra_worker.process_replacements(self.session)
+        self.session.commit()
+        self.session.refresh(replacement)
+
+    def test_candidate_publishes_domain_if_any_name_passes(self):
+        # Три имени на домен: одно не проходит, два работают. Оставлять
+        # клиентов рабочих протоколов на мёртвом адресе нельзя
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(
+            server, "185.10.0.11", source="manual", on_interface=False,
+            interface=None,
+        )
+        replacement = self.make_pending_with_snis(
+            server,
+            {"de.example.xyz": ["example.org", "example.com", "example.net"]},
+        )
+
+        cf1, cf2, cf3, cf4 = self.cloudflare_mocks()
+        with cf1, cf2, cf3, cf4, mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ):
+            self.drive_to_names_verification(replacement)
+            self.assertEqual(replacement.status, "verifying_names")
+            # Проверяются ВСЕ имена, лимита на этом шаге нет намеренно
+            last = self.probe_calls[-1]
+            self.assertEqual(
+                [sni for _ip, sni in last["pairs"]],
+                ["example.org", "example.com", "example.net"],
+            )
+            self.complete_step_runs(
+                replacement, "verifying_names",
+                per_name={"example.com": False},
+            )
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+
+        entry = next(
+            item for item in reversed(replacement.log)
+            if item.get("step") == "names_verified"
+        )
+        self.assertEqual(entry["publish"], ["de.example.xyz"])
+        self.assertEqual(entry["skipped"], [])
+        self.assertEqual(
+            entry["failing_names"], {"de.example.xyz": ["example.com"]}
+        )
+
+    def test_candidate_publishes_domain_even_when_no_name_passes(self):
+        # Ни одно имя не прошло на кандидате. Решение владельца: адрес всё
+        # равно публикуем — кандидат признан живым контрольным именем, а
+        # старый адрес мёртв. Какие имена не прошли, видно в журнале
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(
+            server, "185.10.0.11", source="manual", on_interface=False,
+            interface=None,
+        )
+        replacement = self.make_pending_with_snis(
+            server, {"de.example.xyz": ["example.org", "example.com"]}
+        )
+
+        cf1, cf2, cf3, cf4 = self.cloudflare_mocks()
+        with cf1, cf2, cf3, cf4, mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ):
+            self.drive_to_names_verification(replacement)
+            self.complete_step_runs(replacement, "verifying_names", ok=False)
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+
+        entry = next(
+            item for item in reversed(replacement.log)
+            if item.get("step") == "names_verified"
+        )
+        self.assertEqual(entry["publish"], ["de.example.xyz"])
+        self.assertEqual(entry["skipped"], [])
+        self.assertEqual(
+            entry["failing_names"],
+            {"de.example.xyz": ["example.org", "example.com"]},
+        )
+
+    def test_candidate_publishes_when_only_banned_names_fail(self):
+        # Упали ровно те имена, которые вердикт уже назвал забаненными: на
+        # новом адресе они и не могли пройти, а старый адрес мёртв
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_ip(
+            server, "185.10.0.11", source="manual", on_interface=False,
+            interface=None,
+        )
+        replacement = self.make_pending_with_snis(
+            server,
+            {"de.example.xyz": ["example.org"]},
+            sni_banned={"de.example.xyz": ["example.org"]},
+        )
+
+        cf1, cf2, cf3, cf4 = self.cloudflare_mocks()
+        with cf1, cf2, cf3, cf4, mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ):
+            self.drive_to_names_verification(replacement)
+            self.complete_step_runs(replacement, "verifying_names", ok=False)
+            infra_worker.process_replacements(self.session)
+            self.session.commit()
+            self.session.refresh(replacement)
+
+        entry = next(
+            item for item in reversed(replacement.log)
+            if item.get("step") == "names_verified"
+        )
+        self.assertEqual(entry["publish"], ["de.example.xyz"])
+
     def test_full_happy_path(self):
         server = self.make_server()
         self.make_ip(server, "185.10.0.10", on_interface=True)
@@ -2726,10 +3534,10 @@ class ReplacementFlowTests(InfraDbTestCase):
         self.session.commit()
         self.session.refresh(replacement)
 
-    def test_name_failing_on_candidate_is_not_published_but_old_ip_removed(self):
-        # Кандидат жив по контролю, имя a на нём проходит, имя b — нет (бан
-        # пары «адрес + имя»). Публикуется только a; мёртвый старый адрес
-        # убирается из ОБОИХ доменов, у b остаётся другая живая запись
+    def test_domain_is_published_even_when_its_name_fails_on_candidate(self):
+        # Кандидат жив по контролю, имя a на нём проходит, имя b — нет.
+        # Решение владельца: DNS переставляется всё равно — старый адрес
+        # мёртв, оставлять на нём клиентов хуже любого исхода здесь
         server = self.make_server()
         self.make_ip(server, "185.10.0.10", on_interface=True)
         self.make_ip(server, "185.10.0.11", on_interface=True)
@@ -2757,33 +3565,33 @@ class ReplacementFlowTests(InfraDbTestCase):
             self.session.refresh(replacement)
 
         self.assertEqual(replacement.status, "done")
-        self.assertEqual(added, [("a.example.xyz", "185.10.0.11")])
+        self.assertEqual(
+            sorted(added),
+            [("a.example.xyz", "185.10.0.11"), ("b.example.xyz", "185.10.0.11")],
+        )
         self.assertEqual(
             sorted(removed),
             [("a.example.xyz", "185.10.0.10"), ("b.example.xyz", "185.10.0.10")],
         )
         text = alert.call_args[0][0]
         self.assertIn("IP автоматически заменён", text)
-        self.assertIn("Не опубликовано", text)
         self.assertIn("b.example.xyz", text)
         journal = " ".join(item["message"] for item in replacement.log or [])
-        self.assertIn("НЕ проходит", journal)
-        # Постпроверка шла только по опубликованному имени
-        confirm = [
-            call for call in self.probe_calls
-            if call["reason"] == "REPLACEMENT_CONFIRM"
-        ]
-        self.assertEqual(confirm[0]["pairs"], [("185.10.0.11", "a.example.xyz")])
+        self.assertIn("не прошло ни одно его имя", journal)
 
     def test_last_record_is_kept_for_unpublished_name(self):
-        # Под имя b новый адрес не опубликован, а старый — его единственная
-        # запись: не удаляем, домен без записей хуже домена с мёртвой
+        # Домен b исключён из публикации явным banned_names: новый адрес под
+        # него не пишется, а старый — его единственная запись. Не удаляем:
+        # домен без записей хуже домена с мёртвой
         server = self.make_server()
         self.make_ip(server, "185.10.0.10", on_interface=True)
         self.make_ip(server, "185.10.0.11", on_interface=True)
-        replacement = self.make_pending(
-            server, domains=["a.example.xyz", "b.example.xyz"]
+        replacement = infra.request_replacement(
+            self.session, server.id, "185.10.0.10", "test",
+            domains=["a.example.xyz", "b.example.xyz"],
+            banned_names=["b.example.xyz"],
         )
+        self.session.commit()
         patchers, added, removed = self.cloudflare_recorder({
             "a.example.xyz": [{"id": "r1", "content": "185.10.0.10"}],
             "b.example.xyz": [{"id": "r2", "content": "185.10.0.10"}],
@@ -3924,6 +4732,54 @@ class InfraViewTests(InfraDbTestCase):
 
         payload = json_module.loads(response.content)
         self.assertIn("Некорректный IP", payload["message"])
+
+    def test_domain_sni_actions(self):
+        server = self.make_server()
+        response = self.views.support_admin_api_infra_servers(
+            self.factory.post(
+                "/support-admin/api/infra-servers/",
+                {
+                    "action": "add_domain", "id": server.id,
+                    "domain": "de.monkora.org",
+                    "client_snis": "example.org, example.com",
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+
+        response = self.views.support_admin_api_infra_servers(
+            self.factory.post(
+                "/support-admin/api/infra-servers/",
+                {
+                    "action": "set_domain_snis", "id": server.id,
+                    "domain": "de.monkora.org",
+                    "client_snis": "example.com,localhost",
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        check_session = self.Session()
+        try:
+            row = (
+                check_session.query(InfraServerDomain)
+                .filter(InfraServerDomain.server_id == server.id)
+                .one()
+            )
+            self.assertEqual(row.client_snis, ["example.com", "localhost"])
+        finally:
+            check_session.close()
+
+        # Мусор в поле не должен уехать в Atlas одним именем
+        response = self.views.support_admin_api_infra_servers(
+            self.factory.post(
+                "/support-admin/api/infra-servers/",
+                {
+                    "action": "set_domain_snis", "id": server.id,
+                    "domain": "de.monkora.org", "client_snis": "a/b",
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 400)
 
     def test_settings_view(self):
         response = self.views.support_admin_api_infra_settings(

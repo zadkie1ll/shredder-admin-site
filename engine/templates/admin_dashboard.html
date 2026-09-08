@@ -260,14 +260,20 @@
         html[data-admin-theme="light"] .infra-mini-btn.danger:hover { border-color: rgba(197,54,69,.4); background: rgba(211,65,78,.06); color: #b52f3e; }
         html[data-admin-theme="light"] .infra-mini-btn:focus-visible { border-color: rgba(154,113,0,.5); box-shadow: 0 0 0 3px rgba(181,139,0,.1); color: #242a34; }
         .infra-domain-manage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 420px)); align-content: start; align-items: start; gap: 10px; }
-        .infra-domain-manage-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 50px; padding: 10px 12px; border: 1px solid var(--panel-border); border-radius: 11px; background: var(--inner-card-bg); transition: opacity .16s, border-color .16s, background .16s, transform .16s; }
+        .infra-domain-manage-item { display: flex; flex-direction: column; align-items: stretch; gap: 9px; min-height: 50px; padding: 10px 12px; border: 1px solid var(--panel-border); border-radius: 11px; background: var(--inner-card-bg); transition: opacity .16s, border-color .16s, background .16s, transform .16s; }
+        .infra-domain-manage-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+        .infra-domain-sni-row { display: flex; align-items: center; gap: 8px; }
+        .infra-domain-sni-row .infra-domain-sni-input { flex: 1 1 auto; min-width: 0; height: 30px; padding: 0 9px; border: 1px solid var(--panel-border); border-radius: 8px; background: var(--panel-bg); color: var(--text-main); font-family: inherit; font-size: 11.5px; }
+        .infra-domain-sni-row .infra-mini-btn { flex: 0 0 auto; }
+        .infra-domain-manage-copy .infra-badge { flex: 0 0 auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .infra-domain-sni-hint { color: var(--muted); font-size: 9.5px; font-weight: 700; white-space: nowrap; }
         .infra-domain-manage-copy { display: flex; align-items: center; gap: 7px; min-width: 0; }
         .infra-domain-manage-copy i { color: var(--brand-gold); font-size: 9px; }
         .infra-domain-manage-copy code { overflow: hidden; color: var(--text-main); font-size: 12.5px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
         .infra-domain-manage-item.is-pending { border-color: rgba(255,199,0,.28); border-radius: 8px; background: rgba(255,199,0,.055); }
         .infra-domain-manage-item.is-removing { opacity: .48; transform: translateX(3px); }
         .infra-domain-manage-list > [data-infra-domains-empty] { grid-column: 1 / -1; margin: 0; padding: 13px 14px; border: 1px dashed var(--panel-border); border-radius: 11px; }
-        .infra-domain-add-form { grid-template-columns: minmax(260px, 520px) auto; align-items: end; justify-content: start; gap: 10px; max-width: 760px; margin-top: 16px; }
+        .infra-domain-add-form { grid-template-columns: minmax(220px, 360px) minmax(180px, 300px) auto; align-items: end; justify-content: start; gap: 10px; max-width: 900px; margin-top: 16px; }
         .infra-domain-add-form .infra-form-submit { width: auto; min-width: 180px; justify-self: start; padding: 0 18px; white-space: nowrap; }
         .infra-domain-warning { max-width: 760px; margin-top: 10px; }
         .infra-inline-state { display: inline-flex; align-items: center; gap: 6px; color: var(--brand-gold); font-size: 9.5px; font-weight: 800; white-space: nowrap; }
@@ -13400,17 +13406,41 @@
             });
         }
 
-        function infraDomainRowHtml(domain, pending = false, blockedSni = false) {
+        // ТСПУ фильтрует имя из ClientHello, а это не домен A-записи: на ноде
+        // haproxy слушает общий :443 и разводит протоколы по req.ssl_sni, так
+        // что имён у связки столько, сколько развели протоколов (xhttp / tcp
+        // reality / grpc / ...). Пустое поле = старая схема «имя = домен».
+        function infraDomainRowHtml(item, pending = false, blockedSnis = null) {
+            const data = typeof item === 'string' ? {domain: item} : (item || {});
+            const domain = data.domain || '';
             const safeDomain = escapeHtml(domain);
-            const blockedBadge = blockedSni
-                ? '<span class="infra-badge infra-badge-offline" title="Имя под фильтром ТСПУ: A-запись не меняется намеренно — новый адрес под фильтруемым именем рискует уйти в бан следом">ИМЯ В БАНЕ</span>'
+            const clientSnis = data.client_snis || [];
+            const wireSnis = (data.snis && data.snis.length) ? data.snis : [domain];
+            const banned = blockedSnis || new Set();
+            const hitNames = wireSnis.filter((name) => banned.has(name));
+            const ownName = data.own_name ?? !clientSnis.length;
+            const frozen = hitNames.length && ownName && hitNames.length === wireSnis.length;
+            const blockedBadge = hitNames.length
+                ? (frozen
+                    ? `<span class="infra-badge infra-badge-offline" title="Рабочих имён не осталось, и домен уходит в эфир сам: A-запись не меняется намеренно — новый адрес под фильтруемым именем рискует уйти в бан следом">ИМЯ В БАНЕ: ${escapeHtml(hitNames.join(', '))}</span>`
+                    : `<span class="infra-badge infra-badge-offline" title="Эти имена под фильтром ТСПУ. A-запись домена меняется как обычно — менять надо ACL haproxy и serverNames инбаунда на ноде плюс хосты Remnawave">SNI В БАНЕ: ${escapeHtml(hitNames.join(', '))}</span>`)
                 : '';
+            const sniRow = pending ? '' : `
+                    <div class="infra-domain-sni-row">
+                        <span class="infra-domain-sni-hint" title="Имена, которые клиенты шлют в ClientHello, через запятую — по одному на протокол. Пусто: в эфир уходит сам домен">SNI</span>
+                        <input class="infra-domain-sni-input" type="text" value="${escapeHtml(clientSnis.join(', '))}" placeholder="как домен (${safeDomain})" autocomplete="off" spellcheck="false" data-infra-sni-input="${safeDomain}">
+                        <button type="button" class="infra-mini-btn" data-infra-save-sni="${safeDomain}">Сохранить</button>
+                        <button type="button" class="infra-mini-btn" title="Записать этот же набор имён всем доменам сервера: haproxy разводит по SNI на общем адресе, набор обычно один на ноду" data-infra-save-sni-all="${safeDomain}">Всем</button>
+                    </div>`;
             return `
                 <div class="infra-domain-manage-item${pending ? ' is-pending' : ''}" data-infra-domain-item="${safeDomain}">
-                    <div class="infra-domain-manage-copy"><i class="fas fa-link"></i><code>${safeDomain}</code>${blockedBadge}</div>
-                    ${pending
-                        ? '<span class="infra-inline-state"><span class="infra-action-spinner" aria-hidden="true"></span>Привязываем</span>'
-                        : `<button type="button" class="infra-mini-btn danger" data-infra-delete-domain="${safeDomain}">Удалить</button>`}
+                    <div class="infra-domain-manage-head">
+                        <div class="infra-domain-manage-copy"><i class="fas fa-link"></i><code>${safeDomain}</code>${blockedBadge}</div>
+                        ${pending
+                            ? '<span class="infra-inline-state"><span class="infra-action-spinner" aria-hidden="true"></span>Привязываем</span>'
+                            : `<button type="button" class="infra-mini-btn danger" data-infra-delete-domain="${safeDomain}">Удалить</button>`}
+                    </div>
+                    ${sniRow}
                 </div>`;
         }
 
@@ -13437,13 +13467,40 @@
             return list.lastElementChild;
         }
 
-        function infraConfirmPendingDomain(container, pendingRow, domain, server) {
+        function infraConfirmPendingDomain(container, pendingRow, domain, server, clientSnis = []) {
             if (!pendingRow?.isConnected) return;
-            pendingRow.insertAdjacentHTML('beforebegin', infraDomainRowHtml(domain));
+            const snis = clientSnis.filter(Boolean);
+            pendingRow.insertAdjacentHTML('beforebegin', infraDomainRowHtml({
+                domain,
+                client_snis: snis,
+                snis: snis.length ? snis : [domain],
+                own_name: !snis.length || snis.includes(domain),
+            }));
             const savedRow = pendingRow.previousElementSibling;
             pendingRow.remove();
             infraWireDomainDeleteButton(savedRow?.querySelector('[data-infra-delete-domain]'), server);
+            infraWireDomainSniButton(savedRow?.querySelector('[data-infra-save-sni]'), server);
+            infraWireDomainSniButton(savedRow?.querySelector('[data-infra-save-sni-all]'), server, true);
             infraSyncDomainEmptyState(container.querySelector('#infra-domains-list'));
+        }
+
+        function infraWireDomainSniButton(button, server, applyAll = false) {
+            if (!button) return;
+            button.addEventListener('click', async () => {
+                const domain = applyAll ? button.dataset.infraSaveSniAll : button.dataset.infraSaveSni;
+                const row = button.closest('[data-infra-domain-item]');
+                const input = row?.querySelector('[data-infra-sni-input]');
+                const value = (input?.value || '').trim();
+                if (applyAll && !confirm(`Записать имена «${value || '(пусто)'}» ВСЕМ доменам сервера?`)) return;
+                const ok = value
+                    ? (applyAll ? `Имена сохранены всем доменам сервера` : `Имена сохранены: ${value}`)
+                    : (applyAll ? 'Имена сняты у всех доменов сервера' : 'Имена сняты — в эфир уходит сам домен');
+                await infraAction(
+                    {action: 'set_domain_snis', id: server.id, domain, client_snis: value, apply_all: applyAll ? '1' : ''},
+                    ok,
+                    {busyTarget: button, pendingLabel: 'Сохраняем…', refreshDetail: applyAll},
+                );
+            });
         }
 
         function infraWireDomainDeleteButton(button, server) {
@@ -13573,7 +13630,11 @@
                     </section>`;
             }).join('') || '<div class="help-block">Адресов пока нет</div>';
 
-            const domainsHtml = (detail.domains || []).map((domain) => infraDomainRowHtml(domain, false, diagBlockedSnis.has(domain))).join('')
+            const domainItems = detail.domains_detail
+                || (detail.domains || []).map((domain) => ({domain}));
+            const domainsHtml = domainItems.map((item) => infraDomainRowHtml(
+                item, false, diagBlockedSnis,
+            )).join('')
                 || '<div class="help-block" data-infra-domains-empty>Домены не привязаны — автозамена IP не сможет переключить DNS</div>';
 
             const who = detail.who_connects || {};
@@ -14175,6 +14236,14 @@
                                     <input class="infra-control" type="text" name="domain" placeholder="de.example.xyz" inputmode="url" autocomplete="off" spellcheck="false">
                                 </span>
                             </label>
+                            <label class="infra-form-field">
+                                <span class="infra-form-label">SNI (необязательно)</span>
+                                <span class="infra-form-hint">Имена из ClientHello через запятую — по одному на протокол haproxy: example.org, example.com, localhost. Пусто — проверяем сам домен</span>
+                                <span class="infra-control-wrap">
+                                    <i class="fas fa-mask infra-control-icon"></i>
+                                    <input class="infra-control" type="text" name="client_snis" placeholder="как домен" autocomplete="off" spellcheck="false">
+                                </span>
+                            </label>
                             <button class="btn infra-form-submit" type="submit"><i class="fas fa-plus"></i>Привязать домен</button>
                         </form>
                         ${detail.cloudflare_enabled ? '' : '<div class="help-block infra-domain-warning">⚠️ CLOUDFLARE_API_TOKEN не настроен — автозамена IP не сможет переключить DNS</div>'}
@@ -14351,25 +14420,33 @@
                 const form = event.target;
                 if (form.getAttribute('aria-busy') === 'true') return;
                 const input = form.domain;
+                const sniInput = form.client_snis;
                 const originalDomain = input.value.trim();
                 const domain = originalDomain.replace(/^\.+|\.+$/g, '').toLowerCase();
+                const clientSnisRaw = (sniInput?.value || '').trim();
+                const clientSnis = clientSnisRaw
+                    .split(/[,\s]+/)
+                    .map((name) => name.replace(/^\.+|\.+$/g, '').toLowerCase())
+                    .filter(Boolean);
                 if (!domain) return;
                 const pendingRow = infraAppendPendingDomain(container, domain);
                 input.value = '';
+                if (sniInput) sniInput.value = '';
                 input.focus({preventScroll: true});
                 await infraAction(
-                    {action: 'add_domain', id: server.id, domain},
+                    {action: 'add_domain', id: server.id, domain, client_snis: clientSnisRaw},
                     'Домен привязан',
                     {
                         busyTarget: form,
                         pendingLabel: 'Привязываем…',
                         refreshDetail: false,
-                        onSuccess: () => infraConfirmPendingDomain(container, pendingRow, domain, server),
+                        onSuccess: () => infraConfirmPendingDomain(container, pendingRow, domain, server, clientSnis),
                         onError: () => {
                             const list = pendingRow?.parentElement;
                             pendingRow?.remove();
                             infraSyncDomainEmptyState(list);
                             if (!input.value.trim()) input.value = originalDomain;
+                            if (sniInput && !sniInput.value.trim()) sniInput.value = clientSnisRaw;
                             input.focus({preventScroll: true});
                             input.setSelectionRange(0, input.value.length);
                         },
@@ -14422,6 +14499,12 @@
             });
             container.querySelectorAll('[data-infra-delete-domain]').forEach((button) => {
                 infraWireDomainDeleteButton(button, server);
+            });
+            container.querySelectorAll('[data-infra-save-sni]').forEach((button) => {
+                infraWireDomainSniButton(button, server);
+            });
+            container.querySelectorAll('[data-infra-save-sni-all]').forEach((button) => {
+                infraWireDomainSniButton(button, server, true);
             });
         }
 
