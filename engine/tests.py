@@ -84,6 +84,7 @@ from engine.views import ACQ_PAYS_TARIFF_CTE
 from engine.views import ACQ_TIMING_LABELS
 from engine.views import _acq_ads
 from engine.views import _acq_ads_daily
+from engine.views import _acq_ads_summary
 from engine.views import _acq_pushes
 from engine.views import _acq_renew45
 from engine.views import _acq_renewal_ladder
@@ -953,6 +954,99 @@ class AcquisitionAdsDailyTests(SimpleTestCase):
         spend_row = result["spends"][0]
         self.assertEqual(spend_row["impressions"], 5000)
         self.assertEqual(spend_row["clicks"], 200)
+
+
+class AcquisitionAdsSummaryTests(SimpleTestCase):
+    """Сводка рекламы за диапазон дат: расход по аккаунтам, суммарный
+    расход и цены за те же самые даты."""
+
+    @mock.patch("engine.views._acq_rows")
+    def test_summary_sums_accounts_and_prices_stages(self, rows_mock):
+        rows_mock.side_effect = [
+            [
+                {"account": "default", "spend": Decimal("3000"), "impressions": 30000, "clicks": 300},
+                {"account": "second@yandex.ru", "spend": Decimal("1000"), "impressions": 10000, "clicks": 100},
+            ],
+            [{"subs": 200}],
+            [{"conns": 80}],
+            [{"sales": 16, "new_rub": Decimal("8000")}],
+        ]
+
+        result = _acq_ads_summary(object(), "2026-08-21", "2026-09-09")
+
+        self.assertFalse(result["needs_migration"])
+        self.assertEqual((result["start"], result["end"], result["days"]), ("2026-08-21", "2026-09-09", 20))
+        self.assertEqual(result["spend"], 4000.0)
+        self.assertEqual(result["impressions"], 40000)
+        self.assertEqual(result["clicks"], 400)
+        self.assertEqual(result["cpc"], 10.0)
+        self.assertEqual(result["cost_per_sub"], 20.0)
+        self.assertEqual(result["cost_per_conn"], 50.0)
+        self.assertEqual(result["cost_per_sale"], 250.0)
+        self.assertEqual(result["new_rub"], 8000.0)
+        self.assertEqual(result["drr"], 50.0)
+        self.assertEqual(result["romi"], 2.0)
+        self.assertEqual([a["account"] for a in result["accounts"]], ["default", "second@yandex.ru"])
+        self.assertEqual([a["share"] for a in result["accounts"]], [75.0, 25.0])
+        self.assertEqual(result["accounts"][1]["cpc"], 10.0)
+        # Все четыре запроса получают один и тот же диапазон.
+        for call in rows_mock.call_args_list:
+            self.assertEqual(call.kwargs["start"], date(2026, 8, 21))
+            self.assertEqual(call.kwargs["end"], date(2026, 9, 9))
+            self.assertIn("BETWEEN :start AND :end", call.args[1])
+
+    @mock.patch("engine.views._acq_rows")
+    def test_summary_swaps_reversed_dates_and_hides_cpc_without_traffic(self, rows_mock):
+        rows_mock.side_effect = [
+            [{"account": "default", "spend": Decimal("500"), "impressions": None, "clicks": None}],
+            [{"subs": 0}],
+            [{"conns": 0}],
+            [{"sales": 0, "new_rub": Decimal("0")}],
+        ]
+
+        result = _acq_ads_summary(object(), "2026-09-09", "2026-09-01")
+
+        self.assertEqual((result["start"], result["end"], result["days"]), ("2026-09-01", "2026-09-09", 9))
+        self.assertIsNone(result["cpc"])
+        self.assertIsNone(result["impressions"])
+        self.assertIsNone(result["cost_per_sub"])
+        self.assertIsNone(result["cost_per_sale"])
+        self.assertIsNone(result["drr"])
+        self.assertEqual(result["romi"], 0.0)
+        self.assertEqual(result["accounts"][0]["share"], 100.0)
+
+    @mock.patch("engine.views._acq_rows")
+    def test_summary_defaults_to_last_30_days_and_reports_migration(self, rows_mock):
+        rows_mock.side_effect = Exception("relation ad_spends does not exist")
+
+        result = _acq_ads_summary(mock.Mock(), None, None)
+
+        self.assertTrue(result["needs_migration"])
+        call = rows_mock.call_args
+        self.assertEqual((call.kwargs["end"] - call.kwargs["start"]).days, 29)
+
+    def test_summary_rejects_bad_dates_and_huge_ranges(self):
+        with self.assertRaises(ValueError):
+            _acq_ads_summary(object(), "2026-13-01", "2026-09-09")
+        with self.assertRaises(ValueError):
+            _acq_ads_summary(object(), "2020-01-01", "2026-09-09")
+
+    def test_summary_section_is_wired_into_admin_page(self):
+        from engine.views import ACQ_SECTIONS
+
+        self.assertIn("ads_summary", ACQ_SECTIONS)
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        css = Path("engine/static/css/admin-concept-sections.css").read_text()
+        for marker in (
+            'id="acq-ads-summary"', 'id="acq-ads-sum-start"', 'id="acq-ads-sum-end"',
+            'data-ads-summary-preset="30"', 'id="acq-ads-summary-apply"',
+            "async function loadAdsSummary()", "acqFetch('ads_summary', params)",
+            "loaders['acq-ads'] = () => Promise.all([original(), loadAdsSummary()])",
+            "Расход по аккаунтам", "Цена подключения", "Цена продажи",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, template)
+        self.assertIn(".acq-ads-summary-tiles", css)
 
 
 class AcquisitionAdsTemplateTests(SimpleTestCase):
@@ -6185,6 +6279,29 @@ class AdminClientWorkspaceTests(SimpleTestCase):
         self.assertIn(".client-actions-grid", css)
         self.assertIn(".client-danger-panel", css)
 
+    def test_client_overview_actions_use_registry_layout(self):
+        """Действия с клиентом — один реестр: две группы, у строки справа две
+        колонки одинаковой ширины, поле дней/часов прижато к своей кнопке."""
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        css = Path("engine/static/css/admin-concept-customers.css").read_text()
+
+        overview = template[template.index("function clientOverviewSectionHtml"):template.index("function formatClientTrafficBytes")]
+        self.assertIn('class="card client-actions-grid client-action-registry"', overview)
+        self.assertEqual(overview.count('class="client-action-pair"'), 2)
+        self.assertEqual(overview.count("client-action-button is-primary"), 7)
+        self.assertIn('data-client-sub-action="remove_traffic_limit">Снять лимит', overview)
+        self.assertIn('data-client-sub-action="apply_trial_limit">Применить лимит', overview)
+        self.assertIn('class="client-action-help"', overview)
+        self.assertIn("ручной лимит владельца в панели не трогается", overview)
+        for action in ("extend", "set_trial_hour", "stop_autopay", "apply_trial_limit", "remove_traffic_limit", "temp_ban", "block_account", "unblock_account"):
+            self.assertIn(f'data-client-sub-action="{action}"', overview)
+        for field in ('id="client-extend-days"', 'id="client-ban-hours"', 'data-client-section-link="referrals"'):
+            self.assertIn(field, overview)
+        self.assertIn("#panel-user-payments .client-action-registry .client-action-controls { display: grid; grid-template-columns: var(--client-action-btn) var(--client-action-btn);", css)
+        self.assertIn(".client-action-button.is-primary { grid-column: 2; }", css)
+        self.assertIn(".client-action-pair { grid-column: 1 / -1;", css)
+        self.assertIn("@import url('./admin-concept-customers.css?v=4');", Path("engine/static/css/admin-concept.css").read_text())
+
 
 class AdminMoscowTimeTests(SimpleTestCase):
     """Админка работает по московскому времени (UTC+3): метки времени
@@ -6255,6 +6372,24 @@ class AdminPaymentJournalTests(SimpleTestCase):
         # Карточка клиента больше не держит собственную упрощённую разметку журнала.
         self.assertNotIn('class="payment-journal-details client-detail-notice"', template)
         self.assertNotIn('<b class="payment-journal-amount">', template)
+
+    def test_admin_selects_are_enhanced_by_admin_select_script(self):
+        """Нативные выпадающие списки в админке заменяет стилизованный
+        компонент; сам <select> остаётся в DOM для форм, слушателей и тестов."""
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        script = Path("engine/static/js/admin-select.js").read_text()
+        css = Path("engine/static/css/admin_dashboard.css").read_text()
+
+        self.assertIn("{% static 'js/admin-select.js' %}", template)
+        self.assertIn("(pointer: coarse)", script)
+        self.assertIn("select.dispatchEvent(new Event('change', {bubbles: true}))", script)
+        self.assertIn("select.dispatchEvent(new Event('input', {bubbles: true}))", script)
+        self.assertIn("new MutationObserver", script)
+        self.assertIn("data-native-select", script)
+        self.assertIn("[data-date-popover]", script)
+        self.assertIn("window.adminSelect = {sync, enhance};", script)
+        for selector in (".ui-select {", ".ui-select > select.ui-select-native {", ".ui-select-menu {", '.ui-select-option[aria-selected="true"]', 'html[data-admin-theme="light"] .ui-select-menu {'):
+            self.assertIn(selector, css)
 
     def test_payment_journal_details_offer_copy_id_button(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()

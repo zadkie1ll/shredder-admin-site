@@ -10828,6 +10828,127 @@ def _acq_ads(db_session, weeks):
     }
 
 
+def _acq_ads_summary(db_session, start=None, end=None):
+    """Сводка рекламы за произвольный диапазон дат (МСК, включительно).
+
+    Расход по аккаунтам и суммарно, показы/клики, созданные подписки,
+    подключения (первый трафик), продажи (первая оплата) и выручка новых —
+    всё за один и тот же диапазон, чтобы CPC и цены подписки/подключения/
+    продажи были посчитаны от одних и тех же сумм, а не усреднены по дням.
+    Без дат — последние 30 дней.
+    """
+    today = (datetime.now(timezone.utc) + timedelta(hours=3)).date()
+    end_day = date.fromisoformat(end) if end else today
+    start_day = date.fromisoformat(start) if start else end_day - timedelta(days=29)
+    if start_day > end_day:
+        start_day, end_day = end_day, start_day
+    if (end_day - start_day).days > 730:
+        raise ValueError("range too long")
+    params = {"start": start_day, "end": end_day}
+    try:
+        account_rows = _acq_rows(
+            db_session,
+            """
+            SELECT account, COALESCE(sum(amount_rub), 0) AS spend,
+                   sum(impressions) AS impressions, sum(clicks) AS clicks
+            FROM ad_spends
+            WHERE day BETWEEN :start AND :end
+            GROUP BY 1
+            ORDER BY 2 DESC, 1
+            """,
+            **params,
+        )
+    except Exception:
+        db_session.rollback()
+        return {"needs_migration": True, "accounts": []}
+
+    subs_rows = _acq_rows(
+        db_session,
+        """
+        SELECT count(*) AS subs
+        FROM event_logs
+        WHERE event_type = 'subscription_created'
+          AND ((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date BETWEEN :start AND :end
+        """,
+        **params,
+    )
+    conn_rows = _acq_rows(
+        db_session,
+        """
+        SELECT count(DISTINCT user_id) AS conns
+        FROM event_logs
+        WHERE event_type = 'traffic_threshold_reached'
+          AND (event_payload->>'threshold')::int = 0
+          AND ((timestamp AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date BETWEEN :start AND :end
+        """,
+        **params,
+    )
+    sale_rows = _acq_rows(
+        db_session,
+        f"""
+        WITH {ACQ_PAYS_CTE}
+        SELECT count(*) AS sales, COALESCE(sum(amount), 0) AS new_rub
+        FROM pays JOIN first_pay USING (user_id)
+        WHERE paid_at = first_at
+          AND {ACQ_MSK_DAY} BETWEEN :start AND :end
+        """,
+        **params,
+    )
+
+    def ratio(spend, count):
+        return round(spend / count, 2) if spend and count else None
+
+    total_spend = 0.0
+    has_traffic = False
+    impressions = 0
+    clicks = 0
+    accounts = []
+    for r in account_rows:
+        spend = float(r["spend"])
+        total_spend += spend
+        acc_traffic = r["impressions"] is not None or r["clicks"] is not None
+        acc_impr = int(r["impressions"] or 0) if acc_traffic else None
+        acc_clicks = int(r["clicks"] or 0) if acc_traffic else None
+        if acc_traffic:
+            has_traffic = True
+            impressions += acc_impr
+            clicks += acc_clicks
+        accounts.append({
+            "account": r["account"] or "default",
+            "spend": round(spend, 2),
+            "impressions": acc_impr,
+            "clicks": acc_clicks,
+            "cpc": ratio(spend, acc_clicks) if acc_traffic else None,
+        })
+    for a in accounts:
+        a["share"] = round(100.0 * a["spend"] / total_spend, 1) if total_spend else None
+    total_spend = round(total_spend, 2)
+    subs = int(subs_rows[0]["subs"]) if subs_rows else 0
+    conns = int(conn_rows[0]["conns"]) if conn_rows else 0
+    sales = int(sale_rows[0]["sales"]) if sale_rows else 0
+    new_rub = round(float(sale_rows[0]["new_rub"]), 2) if sale_rows else 0.0
+    return {
+        "needs_migration": False,
+        "start": start_day.isoformat(),
+        "end": end_day.isoformat(),
+        "days": (end_day - start_day).days + 1,
+        "spend": total_spend,
+        "impressions": impressions if has_traffic else None,
+        "clicks": clicks if has_traffic else None,
+        "cpc": ratio(total_spend, clicks) if has_traffic else None,
+        "subs": subs,
+        "cost_per_sub": ratio(total_spend, subs),
+        "conns": conns,
+        "cost_per_conn": ratio(total_spend, conns),
+        "sales": sales,
+        "cost_per_sale": ratio(total_spend, sales),
+        "new_rub": new_rub,
+        "drr": round(100.0 * total_spend / new_rub, 1) if total_spend and new_rub else None,
+        "romi": round(new_rub / total_spend, 2) if total_spend else None,
+        "accounts": accounts,
+    }
+
+
 def _acq_ads_daily(db_session, days=92, group="day"):
     """Ежедневная (или помесячная) экономика рекламы.
 
@@ -11904,6 +12025,9 @@ ACQ_SECTIONS = {
     "ads_daily": lambda s, req: _acq_ads_daily(
         s, int(req.GET.get("days", 92)),
         "month" if req.GET.get("group") == "month" else "day",
+    ),
+    "ads_summary": lambda s, req: _acq_ads_summary(
+        s, req.GET.get("start") or None, req.GET.get("end") or None,
     ),
     "cohorts": lambda s, req: _acq_cohorts(s, int(req.GET.get("months", 14))),
     "trials": lambda s, req: _acq_trials(

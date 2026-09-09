@@ -36,6 +36,8 @@ def without_presentation_changes(text):
     # per-key API contract, validation, reset and partial-failure semantics
     # are exercised in admin_winback_browser.cjs; other groups remain exact.
     text = re.sub(r'^ *<script src="\{% static \'js/admin-winback-settings.js\' %\}[^\n]+\n', '', text, flags=re.M)
+    # admin-select.js only enhances native selects; forms and listeners stay.
+    text = re.sub(r'^ *<script src="\{% static \'js/admin-select.js\' %\}[^\n]+\n', '', text, flags=re.M)
     text = re.sub(r'(<div id="subpanel-sys-winback" class="subtab-panel">).*?(?=\n            <div id="subpanel-sys-payment")', r'\1<!-- reviewed unified Win-back editor -->\n', text, count=1, flags=re.S)
     text = re.sub(r"                if \(slug === 'winback'\) \{\n.*?                    return;\n                }\n", '', text, count=1, flags=re.S)
     text = text.replace('function renderRuntimeSettings(settings, winbackLoad)', 'function renderRuntimeSettings(settings)')
@@ -68,6 +70,10 @@ def without_presentation_changes(text):
     # These three static query blocks moved above their charts. Compare every
     # control attribute, data hook and text token while allowing visual divs
     # and their order to change. Other static sections remain byte-compared.
+    # Ads summary (2026-09-09): a read-only section over the same acquisition
+    # API; presets and date fields only drive GET ?section=ads_summary.
+    text = re.sub(r'^ *<section id="acq-ads-summary".*?</section>\n', '', text, count=1, flags=re.M|re.S)
+    text = re.sub(r'^        // \[ads-summary\].*?// \[/ads-summary\]\n\n', '', text, count=1, flags=re.M|re.S)
     class QueryMarkup(HTMLParser):
         def __init__(self):
             super().__init__()

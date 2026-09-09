@@ -3250,7 +3250,7 @@
             #source-users-modal .modal-pagination, #source-users-modal .modal-pagination .btn { width: 100%; }
         }
     </style>
-    <link href="{% static 'css/admin_dashboard.css' %}?v=7" rel="stylesheet">
+    <link href="{% static 'css/admin_dashboard.css' %}?v=8" rel="stylesheet">
     {% include "includes/yandex_metrika.html" %}
     <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
     <link rel="stylesheet" href="{% static 'css/admin-concept.css' %}?v=6">
@@ -3783,6 +3783,42 @@
                         <span id="acq-csv-status" style="font-size:11px;color:var(--muted);"></span>
                     </form>
                 </div>
+                <section id="acq-ads-summary" class="card acq-ads-summary" aria-labelledby="acq-ads-summary-title">
+                    <header class="acq-ads-summary-head">
+                        <div class="acq-ads-summary-heading">
+                            <strong id="acq-ads-summary-title">Сводка за период</strong>
+                            <p>Расход по аккаунтам и стоимость привлечения за выбранные даты — все показатели считаются от одних и тех же сумм.</p>
+                        </div>
+                        <div class="acq-ads-summary-controls">
+                            <div class="acq-ads-summary-presets" role="group" aria-label="Быстрый выбор периода">
+                                <button type="button" class="subtab" data-ads-summary-preset="7">7 дней</button>
+                                <button type="button" class="subtab" data-ads-summary-preset="14">14 дней</button>
+                                <button type="button" class="subtab active" data-ads-summary-preset="30">30 дней</button>
+                                <button type="button" class="subtab" data-ads-summary-preset="90">90 дней</button>
+                            </div>
+                            <div class="date-field" data-date-picker data-range-max-from="#acq-ads-sum-end">
+                                <input type="hidden" id="acq-ads-sum-start">
+                                <button type="button" class="date-trigger" data-date-trigger>
+                                    <span data-date-label>Дата начала</span>
+                                    <i class="fas fa-calendar-days"></i>
+                                </button>
+                                <div class="date-popover" data-date-popover></div>
+                            </div>
+                            <div class="date-field" data-date-picker data-range-min-from="#acq-ads-sum-start">
+                                <input type="hidden" id="acq-ads-sum-end">
+                                <button type="button" class="date-trigger" data-date-trigger>
+                                    <span data-date-label>Дата конца</span>
+                                    <i class="fas fa-calendar-days"></i>
+                                </button>
+                                <div class="date-popover" data-date-popover></div>
+                            </div>
+                            <button type="button" id="acq-ads-summary-apply" class="subtab active">Показать</button>
+                        </div>
+                    </header>
+                    <div id="acq-ads-summary-body" class="acq-ads-summary-body" aria-live="polite">
+                        <p class="acq-ads-summary-note">Загружаем сводку…</p>
+                    </div>
+                </section>
                 <div class="admin-section-query">
                         <select id="acq-ads-group" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
                             <option value="day">По дням</option>
@@ -5599,6 +5635,7 @@
     <div id="admin-toast" class="admin-toast" role="status" aria-live="polite"></div>
 
     <script src="{% static 'js/admin-winback-settings.js' %}?v=1"></script>
+    <script src="{% static 'js/admin-select.js' %}?v=1"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
@@ -8324,6 +8361,10 @@
             const referralBlocked = Boolean(refResult?.referral_block?.blocked);
             const accountBlock = refResult?.account_block || null;
             const accountBlocked = Boolean(accountBlock?.blocked);
+            // Реестр действий: одна карточка, две группы, у каждой строки справа
+            // две колонки одинаковой ширины — дополнительное и основное действие.
+            // Поле дней/часов прижато к своей кнопке (client-action-pair).
+            const trialLimitHelp = 'Применить лимит из настроек «Антиабьюз» (без сквадов, с маркером «управляемый») или снять: 0, без сброса, статус ACTIVE — ban-сквад не снимается. Снимается только управляемый лимит; ручной лимит владельца в панели не трогается';
             return `
                 <section class="client-overview-workspace">
                     <div class="client-overview-heading">
@@ -8333,9 +8374,12 @@
                             <p>Все изменения записываются в журнал администратора</p>
                         </div>
                     </div>
-                    <div class="client-actions-grid">
-                        <article class="card client-action-panel">
-                            <h3 class="client-action-panel-title">Подписка и оплата</h3>
+                    <div class="card client-actions-grid client-action-registry">
+                        <article class="client-action-panel client-action-group">
+                            <div class="client-action-group-head">
+                                <h3 class="client-action-panel-title">Подписка и оплата</h3>
+                                <small>Обычные действия</small>
+                            </div>
                             <div class="client-action-list">
                                 <div class="client-action-row">
                                     <span class="client-action-icon"><i class="fas fa-calendar-plus"></i></span>
@@ -8344,8 +8388,10 @@
                                         <span>Добавить бонусные или компенсационные дни</span>
                                     </div>
                                     <div class="client-action-controls">
-                                        <label class="client-number-field"><input class="input" id="client-extend-days" type="number" min="1" value="30" aria-label="Количество дней продления"><span>дней</span></label>
-                                        <button class="btn client-action-button" type="button" data-client-sub-action="extend">Продлить</button>
+                                        <div class="client-action-pair">
+                                            <label class="client-number-field"><input class="input" id="client-extend-days" type="number" min="1" value="30" aria-label="Количество дней продления"><span>дней</span></label>
+                                            <button class="btn client-action-button is-primary" type="button" data-client-sub-action="extend">Продлить</button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="client-action-row">
@@ -8355,7 +8401,7 @@
                                         <span>Срок станет 1 час · автоплатёж отключится, рекуррент удалится</span>
                                     </div>
                                     <div class="client-action-controls">
-                                        <button class="btn btn-secondary client-action-button" type="button" data-client-sub-action="set_trial_hour">Подготовить</button>
+                                        <button class="btn btn-secondary client-action-button is-primary" type="button" data-client-sub-action="set_trial_hour">Подготовить</button>
                                     </div>
                                 </div>
                                 <div class="client-action-row">
@@ -8365,37 +8411,40 @@
                                         <span>${autopayActive ? 'Регулярные списания разрешены' : 'Активных регулярных списаний нет'}</span>
                                     </div>
                                     <div class="client-action-controls">
-                                        <button class="btn btn-secondary client-action-button" type="button" data-client-sub-action="stop_autopay" ${autopayActive ? '' : 'disabled'}>Отключить</button>
+                                        <button class="btn btn-secondary client-action-button is-primary" type="button" data-client-sub-action="stop_autopay" ${autopayActive ? '' : 'disabled'}>Отключить</button>
                                     </div>
                                 </div>
                             </div>
                         </article>
-                        <article class="card client-action-panel client-danger-panel">
-                            <div class="client-danger-heading">
+                        <article class="client-action-panel client-danger-panel client-action-group">
+                            <div class="client-action-group-head client-danger-heading">
                                 <i class="fas fa-triangle-exclamation"></i>
-                                <div><h3 title="Редкие действия с ограничением подписки">Ограничения доступа</h3></div>
+                                <h3 title="Редкие действия с ограничением подписки">Ограничения доступа</h3>
+                                <small>Редкие действия · с подтверждением</small>
                             </div>
                             <div class="client-action-list">
                                 <div class="client-action-row">
                                     <span class="client-action-icon"><i class="fas fa-gauge-high"></i></span>
                                     <div class="client-action-copy">
-                                        <strong>Лимит трафика пробного</strong>
-                                        <span>Применить лимит из настроек «Антиабьюз» (без сквадов, с маркером «управляемый») или снять: 0, без сброса, статус ACTIVE — ban-сквад не снимается. Снимается только управляемый лимит; ручной лимит владельца в панели не трогается</span>
+                                        <div class="client-action-title-line"><strong>Лимит трафика пробного</strong><button class="client-action-help" type="button" title="${escapeHtml(trialLimitHelp)}" aria-label="Подробнее о лимите трафика">?</button></div>
+                                        <span title="${escapeHtml(trialLimitHelp)}">Лимит из «Антиабьюза» с маркером «управляемый»; ручной лимит владельца не трогается</span>
                                     </div>
                                     <div class="client-action-controls">
-                                        <button class="btn btn-secondary client-action-button" type="button" data-client-sub-action="apply_trial_limit">Применить лимит</button>
-                                        <button class="btn btn-secondary client-action-button" type="button" data-client-sub-action="remove_traffic_limit">Снять лимит</button>
+                                        <button class="btn btn-secondary client-action-button is-secondary" type="button" data-client-sub-action="remove_traffic_limit">Снять лимит</button>
+                                        <button class="btn btn-secondary client-action-button is-primary" type="button" data-client-sub-action="apply_trial_limit">Применить лимит</button>
                                     </div>
                                 </div>
                                 <div class="client-action-row">
                                     <span class="client-action-icon"><i class="fas fa-user-lock"></i></span>
                                     <div class="client-action-copy">
                                         <strong>Временная блокировка</strong>
-                                        <span>Ban-сквад; бот снимет блокировку автоматически · пользователю уйдёт уведомление от бота</span>
+                                        <span>Ban-сквад, снимется автоматически · пользователю уйдёт уведомление от бота</span>
                                     </div>
                                     <div class="client-action-controls">
-                                        <label class="client-number-field"><input class="input" id="client-ban-hours" type="number" min="1" step="1" value="24" aria-label="Длительность блокировки"><span>часа</span></label>
-                                        <button class="btn btn-danger client-action-button" type="button" data-client-sub-action="temp_ban">Заблокировать</button>
+                                        <div class="client-action-pair">
+                                            <label class="client-number-field"><input class="input" id="client-ban-hours" type="number" min="1" step="1" value="24" aria-label="Длительность блокировки"><span>часа</span></label>
+                                            <button class="btn btn-danger client-action-button is-primary" type="button" data-client-sub-action="temp_ban">Заблокировать</button>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="client-action-row">
@@ -8404,26 +8453,28 @@
                                         <div class="client-action-title-line"><strong>${accountBlocked ? 'Аккаунт заблокирован' : 'Отключить доступ'}</strong><span class="client-inline-status ${accountBlocked ? 'is-blocked' : 'is-active'}">${accountBlocked ? 'Заблокирован' : 'Активен'}</span></div>
                                         <span>${accountBlocked
                                             ? `Как /block-user: бот отвечает только «аккаунт заблокирован», рефералка и автоплатёж отключены${accountBlock?.reason ? ` · причина: ${escapeHtml(accountBlock.reason)}` : ''}${accountBlock?.created_at ? ` · с ${escapeHtml(accountBlock.created_at)}` : ''}`
-                                            : 'Полная блокировка, как /block-user: бот отвечает только «аккаунт заблокирован», рефералка и автоплатёж отключаются, RWMS → DISABLED'}</span>
+                                            : 'Как /block-user: бот отвечает только «аккаунт заблокирован», рефералка и автоплатёж отключаются, RWMS → DISABLED'}</span>
                                     </div>
                                     <div class="client-action-controls">
                                         ${accountBlocked
-                                            ? '<button class="btn btn-secondary client-action-button" type="button" data-client-sub-action="unblock_account">Снять блокировку</button>'
-                                            : '<button class="btn btn-danger client-action-button" type="button" data-client-sub-action="block_account">Заблокировать</button>'}
+                                            ? '<button class="btn btn-secondary client-action-button is-primary" type="button" data-client-sub-action="unblock_account">Снять блокировку</button>'
+                                            : '<button class="btn btn-danger client-action-button is-primary" type="button" data-client-sub-action="block_account">Заблокировать</button>'}
                                     </div>
                                 </div>
                             </div>
                         </article>
-                    </div>
-                    <div class="card client-referral-summary-row ${referralBlocked ? 'is-blocked' : ''}">
-                        <div class="client-referral-summary-copy" title="Управление доступом находится рядом с историей приглашений">
-                            <div><span>Реферальные бонусы</span>&nbsp;<strong class="client-inline-status ${referralBlocked ? 'is-blocked' : 'is-active'}">${referralBlocked ? 'Заблокированы' : 'Доступны'}</strong></div>
+                        <div class="client-action-registry-foot">
+                            <div class="client-referral-summary-row ${referralBlocked ? 'is-blocked' : ''}">
+                                <div class="client-referral-summary-copy" title="Управление доступом находится рядом с историей приглашений">
+                                    <div><span>Реферальные бонусы</span>&nbsp;<strong class="client-inline-status ${referralBlocked ? 'is-blocked' : 'is-active'}">${referralBlocked ? 'Заблокированы' : 'Доступны'}</strong></div>
+                                </div>
+                                <button class="btn btn-secondary client-text-button" type="button" data-client-section-link="referrals">Управлять →</button>
+                            </div>
+                            <div class="client-last-action ${clientCardState.lastAction ? '' : 'is-empty'}" role="status">
+                                <span>Последнее действие:</span>
+                                <span>${clientCardState.lastAction || 'В этой сессии действий ещё не было'}</span>
+                            </div>
                         </div>
-                        <button class="btn btn-secondary client-text-button" type="button" data-client-section-link="referrals">Управлять →</button>
-                    </div>
-                    <div class="card client-last-action ${clientCardState.lastAction ? '' : 'is-empty'}" role="status">
-                        <span>Последнее действие:</span>
-                        <span>${clientCardState.lastAction || 'В этой сессии действий ещё не было'}</span>
                     </div>
                 </section>`;
         }
@@ -15694,6 +15745,110 @@
             'acq-cohorts': loadCohorts, 'acq-pushes': loadPushes, 'acq-patterns': loadPatterns,
             'acq-journey': loadJourney, 'acq-mrr': loadMrr, 'acq-payhealth': loadPayHealth,
         };
+
+        // [ads-summary] Сводка рекламы за диапазон дат: расход по аккаунтам,
+        // CPC и цены подписки/подключения/продажи за одни и те же даты.
+        function adsSummaryField(id) {
+            return document.getElementById(id)?.closest('[data-date-picker]');
+        }
+
+        function setAdsSummaryPreset(days) {
+            const today = new Date();
+            const start = addDays(today, -(Number(days) - 1));
+            const startField = adsSummaryField('acq-ads-sum-start');
+            const endField = adsSummaryField('acq-ads-sum-end');
+            if (!startField || !endField) return;
+            setDateFieldValue(startField, isoFromLocalDate(start));
+            setDateFieldValue(endField, isoFromLocalDate(today));
+            document.querySelectorAll('[data-ads-summary-preset]').forEach((button) => {
+                button.classList.toggle('active', button.dataset.adsSummaryPreset === String(days));
+            });
+        }
+
+        function renderAdsSummary(res) {
+            const body = document.getElementById('acq-ads-summary-body');
+            if (!body) return;
+            if (res.needs_migration) {
+                body.innerHTML = '<p class="acq-ads-summary-note">Нужна миграция таблицы <code>ad_spends</code> — сводка появится после неё.</p>';
+                return;
+            }
+            const fullDay = (iso) => dayLabel(iso) + '.' + iso.slice(0, 4);
+            const daysWord = (n) => {
+                const mod10 = n % 10, mod100 = n % 100;
+                if (mod10 === 1 && mod100 !== 11) return 'день';
+                if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'дня';
+                return 'дней';
+            };
+            const tile = (label, value, meta, tone = '') => `
+                <div class="acq-ads-summary-tile${tone ? ` is-${tone}` : ''}">
+                    <span class="acq-ads-summary-tile-label">${label}</span>
+                    <strong class="acq-ads-summary-tile-value">${value}</strong>
+                    <span class="acq-ads-summary-tile-meta">${meta}</span>
+                </div>`;
+            const rubOrDash = (v) => v == null ? '—' : `${fmtRub(v)} ₽`;
+            const tiles = [
+                tile('Расход на рекламу', `${fmtRub(res.spend)} ₽`, res.accounts.length ? `${res.accounts.length} ${res.accounts.length === 1 ? 'аккаунт' : res.accounts.length < 5 ? 'аккаунта' : 'аккаунтов'}` : 'расходов нет', 'spend'),
+                tile('CPC', fmtCost(res.cpc), res.clicks == null ? 'показы и клики не загружены' : `${fmtInt(res.impressions)} показов · ${fmtInt(res.clicks)} кликов`),
+                tile('Цена подписки', fmtCost(res.cost_per_sub), `${fmtInt(res.subs)} подписок`),
+                tile('Цена подключения', fmtCost(res.cost_per_conn), `${fmtInt(res.conns)} подключений`),
+                tile('Цена продажи', fmtCost(res.cost_per_sale), `${fmtInt(res.sales)} новых покупателей`, 'sale'),
+                tile('Выручка новых', rubOrDash(res.new_rub), res.drr == null ? 'ДРР и ROMI не считаются без расходов и выручки' : `ДРР ${res.drr}% · ROMI x${res.romi.toFixed(2)}`),
+            ].join('');
+            const accountRows = res.accounts.map((a) => [
+                a.account, `${fmtRub(a.spend)} ₽`, a.share == null ? '—' : `${a.share}%`,
+                fmtInt(a.impressions), fmtInt(a.clicks), fmtCost(a.cpc),
+            ]);
+            if (res.accounts.length > 1) {
+                accountRows.push(['<b>Итого</b>', `<b>${fmtRub(res.spend)} ₽</b>`, '<b>100%</b>',
+                    `<b>${fmtInt(res.impressions)}</b>`, `<b>${fmtInt(res.clicks)}</b>`, `<b>${fmtCost(res.cpc)}</b>`]);
+            }
+            body.innerHTML = `
+                <p class="acq-ads-summary-range">За <b>${res.days} ${daysWord(res.days)}</b>: ${fullDay(res.start)} — ${fullDay(res.end)}</p>
+                <div class="acq-ads-summary-tiles">${tiles}</div>
+                <div class="acq-ads-summary-accounts">
+                    <div class="acq-ads-summary-accounts-title">Расход по аккаунтам</div>
+                    ${res.accounts.length
+                        ? acqTable(['Аккаунт', 'Расход, ₽', 'Доля', 'Показы', 'Клики', 'CPC'], accountRows)
+                        : '<p class="acq-ads-summary-note">За выбранные даты расходов не записано — загрузите CSV Директа или добавьте траты вручную.</p>'}
+                </div>`;
+        }
+
+        async function loadAdsSummary() {
+            const start = document.getElementById('acq-ads-sum-start')?.value;
+            const end = document.getElementById('acq-ads-sum-end')?.value;
+            if (!start || !end) setAdsSummaryPreset(30);
+            const params = {
+                start: document.getElementById('acq-ads-sum-start').value,
+                end: document.getElementById('acq-ads-sum-end').value,
+            };
+            const body = document.getElementById('acq-ads-summary-body');
+            body?.classList.add('is-loading');
+            try {
+                renderAdsSummary(await acqFetch('ads_summary', params));
+            } catch (error) {
+                if (body) body.innerHTML = `<p class="acq-ads-summary-note is-error">Не удалось загрузить сводку: ${escapeHtml(error.message || String(error))}</p>`;
+                throw error;
+            } finally {
+                body?.classList.remove('is-loading');
+            }
+        }
+
+        (() => {
+            const original = loaders['acq-ads'];
+            loaders['acq-ads'] = () => Promise.all([original(), loadAdsSummary()]);
+            document.querySelectorAll('[data-ads-summary-preset]').forEach((button) => button.addEventListener('click', () => {
+                setAdsSummaryPreset(button.dataset.adsSummaryPreset);
+                loadAdsSummary().catch(console.error);
+            }));
+            document.getElementById('acq-ads-summary-apply')?.addEventListener('click', () => {
+                document.querySelectorAll('[data-ads-summary-preset]').forEach((button) => button.classList.remove('active'));
+                loadAdsSummary().catch(console.error);
+            });
+            ['acq-ads-sum-start', 'acq-ads-sum-end'].forEach((id) => document.getElementById(id)?.addEventListener('input', () => {
+                document.querySelectorAll('[data-ads-summary-preset]').forEach((button) => button.classList.remove('active'));
+            }));
+        })();
+        // [/ads-summary]
 
         function loadAcqSection(name, force = false) {
             const loader = loaders[name];

@@ -42,18 +42,53 @@ html:not([data-admin-theme="light"]) :is(#stats-form, #cohort-form, #panel-acqui
 #stats-form :is(.date-presets-label, .date-preset-group-label) { display: none; }
 #stats-form .date-preset { min-height: 0; padding: 6px 8px; font-size: 11px; font-weight: 400; }
 #panel-acquisition .admin-section-query { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
-#panel-acquisition .admin-section-query > :is(select, .date-field) { flex: 1 1 125px; min-width: 0; }
+#panel-acquisition .admin-section-query > :is(select, .ui-select, .date-field) { flex: 1 1 125px; min-width: 0; }
 #panel-acquisition .subtab-panel .admin-section-query select,
 #panel-acquisition .admin-section-query .date-trigger {
     min-height: 40px; height: 40px; padding: 8px; border-radius: 7px; font-size: 14px !important;
 }
+#panel-acquisition .subtab-panel .admin-section-query .ui-select { min-height: 40px; height: 40px; border-radius: 7px; font-size: 14px !important; }
 #panel-acquisition .admin-section-query > .subtab {
     min-height: 40px; padding: 9px 12px; margin: 0; border-radius: 7px !important;
     background: var(--admin-accent); color: #141414; font-size: 14px; font-weight: 650;
     border: 1px solid var(--admin-accent) !important;
 }
-#panel-acquisition .subtab-panel .card :is(input:not([type=file]), select) {
+#panel-acquisition .subtab-panel .card :is(input:not([type=file]), select, .ui-select) {
     font-family: inherit; font-size: 14px !important; border-radius: 7px !important;
+}
+/* Ads summary: a date range, then the same numbers the charts split by day. */
+#panel-acquisition .acq-ads-summary { display: grid; gap: 18px; }
+#panel-acquisition .acq-ads-summary-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px 24px; flex-wrap: wrap; }
+#panel-acquisition .acq-ads-summary-heading { display: grid; gap: 4px; max-width: 52ch; }
+#panel-acquisition .acq-ads-summary-heading strong { font-size: 18px; line-height: 1.4; font-weight: 600; }
+#panel-acquisition .acq-ads-summary-heading p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--admin-text-muted); }
+#panel-acquisition .acq-ads-summary-controls { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#panel-acquisition .acq-ads-summary-controls .date-field { width: 150px; }
+#panel-acquisition .acq-ads-summary-controls .date-trigger { min-height: 40px; height: 40px; padding: 8px 10px; border-radius: 7px; font-size: 13px !important; }
+#panel-acquisition .acq-ads-summary-presets { display: inline-flex; gap: 4px; padding: 3px; border: 1px solid var(--admin-border); border-radius: 8px; background: var(--admin-surface-soft); }
+#panel-acquisition .acq-ads-summary-presets .subtab { min-height: 32px; padding: 6px 10px; margin: 0; border: 0; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--admin-text-muted); background: transparent; }
+#panel-acquisition .acq-ads-summary-presets .subtab.active { color: #141414; background: var(--admin-accent); }
+#panel-acquisition #acq-ads-summary-apply { min-height: 40px; padding: 9px 14px; margin: 0; border-radius: 7px; font-size: 13px; font-weight: 650; color: #141414; background: var(--admin-accent); border: 1px solid var(--admin-accent); }
+#panel-acquisition .acq-ads-summary-body { display: grid; gap: 16px; transition: opacity .15s; }
+#panel-acquisition .acq-ads-summary-body.is-loading { opacity: .5; }
+#panel-acquisition .acq-ads-summary-range { margin: 0; font-size: 13px; color: var(--admin-text-muted); }
+#panel-acquisition .acq-ads-summary-range b { color: var(--admin-text); }
+#panel-acquisition .acq-ads-summary-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
+#panel-acquisition .acq-ads-summary-tile { display: grid; gap: 4px; min-width: 0; padding: 14px 16px; border: 1px solid var(--admin-border); border-radius: 10px; background: var(--admin-surface-soft); }
+#panel-acquisition .acq-ads-summary-tile-label { font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--admin-text-muted); }
+#panel-acquisition .acq-ads-summary-tile-value { font-size: 22px; line-height: 1.2; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#panel-acquisition .acq-ads-summary-tile-meta { font-size: 12px; color: var(--admin-text-muted); }
+#panel-acquisition .acq-ads-summary-tile.is-spend .acq-ads-summary-tile-value { color: var(--admin-accent); }
+#panel-acquisition .acq-ads-summary-tile.is-sale { border-color: rgba(var(--accent-rgb), .35); }
+#panel-acquisition .acq-ads-summary-accounts { display: grid; gap: 8px; overflow-x: auto; }
+#panel-acquisition .acq-ads-summary-accounts-title { font-size: 13px; font-weight: 600; }
+#panel-acquisition .acq-ads-summary-note { margin: 0; font-size: 13px; color: var(--admin-text-muted); }
+#panel-acquisition .acq-ads-summary-note.is-error { color: var(--workspace-danger, #f298a2); }
+@media (max-width: 700px) {
+    #panel-acquisition .acq-ads-summary-controls { width: 100%; }
+    #panel-acquisition .acq-ads-summary-controls .date-field { flex: 1 1 130px; width: auto; }
+    #panel-acquisition .acq-ads-summary-presets { width: 100%; justify-content: space-between; }
+    #panel-acquisition .acq-ads-summary-presets .subtab { flex: 1; }
 }
 #panel-acquisition :is(#acq-mrr-cards, #acq-payhealth-cards) {
     display: grid !important; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
@@ -308,7 +343,7 @@ html[data-admin-theme="light"] #panel-system [data-winback-status].is-error { co
     #panel-support .ticket-list, #panel-payment-info #payments-history-details { padding: 14px; }
     #panel-acquisition .subtab-panel > .card, #panel-bulk-actions > .card { padding: 14px !important; }
     #stats-form, #cohort-form, #panel-acquisition .admin-section-query { padding: 14px; }
-    #panel-acquisition .admin-section-query > :is(select, .date-field) { flex-basis: 42%; }
+    #panel-acquisition .admin-section-query > :is(select, .ui-select, .date-field) { flex-basis: 42%; }
     #panel-system .system-card-title, #panel-acquisition .chart-title-wrap > strong,
     #panel-payment-info .payment-history-summary-copy > strong { font-size: 17px; }
     #panel-acquisition :is(#acq-mrr-cards, #acq-payhealth-cards) > div > div:last-child { font-size: 24px !important; }

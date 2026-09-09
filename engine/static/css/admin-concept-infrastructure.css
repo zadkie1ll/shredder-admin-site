@@ -54,6 +54,12 @@ html[data-admin-theme="light"] {
     text-align: left; font-size: 14px; font-weight: 400;
     flex: 0 0 auto; height: auto;
 }
+#panel-censor-checks .infra-concept-field .ui-select,
+#panel-node-traffic .infra-concept-field .ui-select,
+#panel-node-provision .node-provision-field .ui-select { min-height: 50px; }
+#panel-censor-checks .infra-concept-field .ui-select-trigger,
+#panel-node-traffic .infra-concept-field .ui-select-trigger,
+#panel-node-provision .node-provision-field .ui-select-trigger { padding: 12px 34px 12px 12px; }
 
 /* ts-block / ix-grid: form and disclosures are separate, spacious work areas. */
 #panel-censor-checks .censor-keys-card,

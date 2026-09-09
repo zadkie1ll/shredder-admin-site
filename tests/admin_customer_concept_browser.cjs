@@ -244,22 +244,26 @@ function lightContrast() {
             for (const property of boxProperties) same(`${width}.tab[${index}].${property}`, actual.tabs[index]?.style[property], approved.tabs[index].style[property]);
         }
         same(`${width}.text-only tabs`, await visibleIcons(page.locator('.client-subtabs i, .client-subtabs svg, .client-subtabs img')), 0);
-        same(`${width}.overview no decorative icons`, await visibleIcons(page.locator('.client-overview-workspace i, .client-overview-workspace svg, .client-overview-workspace img')), 0);
-        // The actual explanatory text is deliberately more detailed; assert
-        // column composition and control sizing, not equal panel/action heights.
-        compareElement(`${width}.columns`, actual.columns, approved.columns, ['x', 'width'], false);
-        for (const property of ['display', 'gridTemplateColumns', 'columnGap']) same(`${width}.columns.${property}`, actual.columns.style[property], approved.columns.style[property]);
+        // The overview replaced the concept's two columns with the approved
+        // action registry (2026-09-09): one card, two groups, six rows, two
+        // equal control columns with the primary button always on the right.
+        // Row icons are part of that registry, so only the heading stays icon-free.
+        same(`${width}.overview heading no decorative icons`, await visibleIcons(page.locator('.client-overview-heading i, .client-overview-heading svg')), 0);
         same(`${width}.panel count`, actual.panels.length, 2);
-        for (let index = 0; index < approved.panels.length; index++) {
-            compareElement(`${width}.panel[${index}]`, actual.panels[index], approved.panels[index], ['x', 'width'], false);
-            for (const property of ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft']) same(`${width}.panel[${index}].${property}`, actual.panels[index]?.style[property], approved.panels[index].style[property]);
+        const registry = await page.evaluate((width) => {
+            const rows = [...document.querySelectorAll('.client-action-registry .client-action-row')];
+            const primaries = rows.map(row => row.querySelector('.client-action-button.is-primary')).filter(Boolean);
+            const rights = primaries.map(button => Math.round(button.getBoundingClientRect().right));
+            const widths = [...document.querySelectorAll('.client-action-registry .client-action-button')].map(button => Math.round(button.getBoundingClientRect().width));
+            return {rows: rows.length, columns: rows.map(row => getComputedStyle(row).gridTemplateColumns.split(' ').length), rights: new Set(rights).size, widths: new Set(widths).size, primaries: primaries.length};
+        }, width);
+        same(`${width}.registry rows`, registry.rows, 6);
+        same(`${width}.registry primaries`, registry.primaries, 6);
+        same(`${width}.registry row columns`, registry.columns, Array(6).fill(width === 390 ? 2 : 3));
+        if (width !== 390) {
+            same(`${width}.registry primary buttons aligned`, registry.rights, 1);
+            same(`${width}.registry equal button widths`, registry.widths, 1);
         }
-        for (const button of actual.actions) {
-            const counterpart = approved.actions.find(candidate => candidate.key === actionsToConcept[button.key]);
-            compareElement(`${width}.action.${button.key}`, button, counterpart, ['width', 'height']);
-            for (const property of boxProperties) same(`${width}.action.${button.key}.${property}`, button.style[property], counterpart?.style[property]);
-        }
-        for (let index = 0; index < approved.numbers.length; index++) compareElement(`${width}.number[${index}]`, actual.numbers[index], approved.numbers[index], ['width', 'height']);
         await capture(reference, '.cu-summary', `reference-summary-${width}`);
         await capture(page, '.client-summary-card', `real-summary-${width}`);
         await capture(reference, '.cu-work', `reference-overview-${width}`, '.cu-summary');

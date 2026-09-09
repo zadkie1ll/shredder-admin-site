@@ -1,7 +1,7 @@
 @import url('./admin-concept-infrastructure.css?v=5');
-@import url('./admin-concept-customers.css?v=3');
+@import url('./admin-concept-customers.css?v=4');
 @import url('./admin-concept-client-details.css?v=4');
-@import url('./admin-concept-sections.css?v=4');
+@import url('./admin-concept-sections.css?v=5');
 
 /* Geometry and visual hierarchy from the approved admin-concept-pattern-hover.
  * Existing forms, data, actions, permissions and state stay in the real template.
@@ -215,7 +215,7 @@ html[data-admin-theme] .admin-table-row.table-head { background: var(--admin-sur
 /* Chart geometry and working settings use the same reading scale as the concept. */
 #panel-acquisition .subtab-panel > .card { padding: 22px !important; margin-bottom: 28px !important; }
 #panel-acquisition .chart-title-wrap > strong { font-size: 18px; line-height: 1.4; font-weight: 600; }
-#panel-acquisition .subtab-panel select { background: var(--admin-surface-soft) !important; color: var(--admin-text) !important; border-color: var(--admin-border-strong) !important; min-height: 40px; }
+#panel-acquisition .subtab-panel :is(select, .ui-select) { background: var(--admin-surface-soft) !important; color: var(--admin-text) !important; border-color: var(--admin-border-strong) !important; min-height: 40px; }
 #acq-today-chart { height: 380px !important; margin-top: 24px !important; }
 #acq-heatmap table { width: 100%; table-layout: fixed; }
 #acq-heatmap td { width: auto !important; height: 28px !important; }
