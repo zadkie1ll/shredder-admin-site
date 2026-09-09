@@ -3255,7 +3255,7 @@
     <link href="{% static 'css/admin_dashboard.css' %}?v=9" rel="stylesheet">
     {% include "includes/yandex_metrika.html" %}
     <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/admin-concept.css' %}?v=8">
+    <link rel="stylesheet" href="{% static 'css/admin-concept.css' %}?v=9">
 </head>
 <body>
     <div class="page-bg"></div>
@@ -9311,6 +9311,42 @@
             return buttons;
         }
 
+        function broadcastMessageHtml(text) {
+            // Telegram-разметка сообщения рендерится, а не показывается
+            // тегами — тот же белый список, что и в предпросмотре
+            return escapeHtml(String(text || ''))
+                .replace(/&lt;(\/?)(b|i|u|s|code)&gt;/gi, '<$1$2>')
+                .replace(/&lt;a href=&quot;(https:\/\/[^&]*)&quot;&gt;/gi, '<a href="$1" target="_blank" rel="noopener">')
+                .replace(/&lt;\/a&gt;/gi, '</a>');
+        }
+
+        function broadcastRateLabel(part, whole) {
+            // Конверсия между ступенями воронки: целые проценты, а ниже 1% —
+            // с одним знаком, чтобы 3 покупки из 1 217 не стали «0%»
+            if (!whole || part === null || part === undefined) return null;
+            const rate = 100 * Number(part) / Number(whole);
+            if (!Number(part)) return '0%';
+            if (rate >= 1) return `${Math.round(rate)}%`;
+            return `${rate.toFixed(1).replace('.', ',')}%`;
+        }
+
+        function broadcastDurationLabel(startLabel, finishLabel) {
+            // Метки приходят строками «дд.мм.гггг чч:мм» в админской зоне
+            const parse = (value) => {
+                const m = /^(\d{2})\.(\d{2})\.(\d{4}) (\d{2}):(\d{2})$/.exec(String(value || ''));
+                return m ? Date.UTC(+m[3], +m[2] - 1, +m[1], +m[4], +m[5]) : null;
+            };
+            const start = parse(startLabel);
+            const finish = parse(finishLabel);
+            if (start === null || finish === null || finish < start) return '';
+            const minutes = Math.round((finish - start) / 60000);
+            if (minutes < 1) return 'меньше минуты';
+            if (minutes < 60) return `${minutes} мин`;
+            const hours = Math.floor(minutes / 60);
+            const rest = minutes % 60;
+            return rest ? `${hours} ч ${rest} мин` : `${hours} ч`;
+        }
+
         function renderBroadcastPreview() {
             const text = document.getElementById('broadcast-text').value;
             const textTarget = document.getElementById('broadcast-preview-text');
@@ -9499,46 +9535,54 @@
                             ? `<span class="broadcast-badge"><i class="fas fa-ticket"></i>${escapeHtml(button.code || 'промокод')}</span>`
                             : button.type === 'tariffs' ? '<span class="broadcast-badge"><i class="fas fa-layer-group"></i>тарифы</span>' : ''),
                     ].filter(Boolean).join(' ');
+                    // Карточка делится на «что отправили» и «что получили»:
+                    // статус и доставка — одной строкой, дальше воронка из
+                    // четырёх ступеней с конверсией на стыке, выручка —
+                    // единственная зелёная ступень
+                    const stateLabel = {running: 'Идёт отправка', stopped: 'Остановлена', done: 'Завершена'}[row.status] || status.label;
+                    const audienceRate = total ? Math.round(100 * sent / total) : 0;
+                    const perBuyer = buyers ? Math.round(revenue / buyers) : null;
+                    const duration = row.status === 'done' ? broadcastDurationLabel(row.created_at, row.finished_at) : '';
+                    const running = row.status === 'running';
+                    const conv = (part, whole) => {
+                        if (running) return '<i class="broadcast-funnel-conv" aria-hidden="true">…</i>';
+                        const label = funnel ? broadcastRateLabel(part, whole) : null;
+                        return label ? `<i class="broadcast-funnel-conv">${label}</i>` : '';
+                    };
+                    const fmt = (value) => value === null ? '—' : Number(value).toLocaleString('ru-RU');
                     return `
                     <article class="broadcast-record" data-status="${escapeHtml(row.status || '')}">
-                        <div class="broadcast-record-main">
-                            <div>
-                                <div class="broadcast-record-title-row">
-                                    <span class="broadcast-record-status" aria-hidden="true"><i class="fas ${status.icon}"></i></span>
-                                    <div class="broadcast-record-title">
-                                        <h3>${escapeHtml(row.title || 'Без названия')}</h3>
-                                        <div class="broadcast-record-meta">
-                                            <span><i class="fas fa-calendar"></i>${escapeHtml(row.created_at || '—')}</span>
-                                            <span><i class="fas fa-user"></i>${escapeHtml(row.created_by || '—')}</span>
-                                        </div>
-                                        <div class="broadcast-badges">${badges}</div>
-                                    </div>
+                        <div class="broadcast-record-what">
+                            <div class="broadcast-record-head">
+                                <span class="broadcast-record-dot" aria-hidden="true"></span>
+                                <div class="broadcast-record-title">
+                                    <h3>${escapeHtml(row.title || 'Без названия')}</h3>
+                                    <div class="broadcast-record-meta"><span>${escapeHtml(row.created_at || '—')}</span><span>${escapeHtml(row.created_by || '—')}</span>${duration ? `<span>${escapeHtml(duration)}</span>` : ''}</div>
                                 </div>
-                                <p class="broadcast-record-message">${escapeHtml(message.slice(0, 320))}${message.length > 320 ? '…' : ''}</p>
                             </div>
-                            <div class="broadcast-delivery" aria-label="Доставлено ${progress}%">
-                                <span class="broadcast-delivery-ring">
-                                    <svg viewBox="0 0 46 46" aria-hidden="true"><circle cx="23" cy="23" r="18"></circle><circle cx="23" cy="23" r="18" pathLength="100" stroke-dasharray="${progress} 100"></circle></svg>
-                                    <b>${progress}%</b>
+                            <div class="broadcast-badges">${badges}</div>
+                            <p class="broadcast-record-message">${broadcastMessageHtml(message)}</p>
+                        </div>
+                        <div class="broadcast-record-result">
+                            <div class="broadcast-record-state">
+                                <span class="broadcast-status-label"><span class="broadcast-record-dot" aria-hidden="true"></span>${stateLabel}</span>
+                                <span class="broadcast-record-delivery">${sent.toLocaleString('ru-RU')} из ${total.toLocaleString('ru-RU')} доставлено · ${audienceRate}%</span>
+                            </div>
+                            <div class="broadcast-funnel" role="list" aria-label="Воронка рассылки">
+                                <div class="broadcast-funnel-step" role="listitem"><span>Доставлено</span><b>${sent.toLocaleString('ru-RU')}</b><small>${audienceRate}% аудитории</small>${conv(claims, sent)}</div>
+                                <div class="broadcast-funnel-step" role="listitem"><span>Забрали скидку</span><b>${fmt(claims)}</b><small></small>${conv(buyers, claims)}</div>
+                                <div class="broadcast-funnel-step" role="listitem"><span>Купили</span><b>${fmt(buyers)}</b><small></small></div>
+                                <div class="broadcast-funnel-step is-revenue" role="listitem"><span>Выручка</span><b>${revenue === null ? '—' : `${revenue.toLocaleString('ru-RU')} ₽`}</b><small>${perBuyer ? `${perBuyer.toLocaleString('ru-RU')} ₽ на покупку` : ''}</small></div>
+                            </div>
+                            <div class="broadcast-record-foot">
+                                <div class="broadcast-record-progress" aria-hidden="true"><span style="width:${progress}%"></span></div>
+                                <span class="broadcast-record-actions">
+                                    ${row.status === 'running' ? `<button class="btn btn-danger broadcast-stop" data-broadcast-stop="${Number(row.id)}"><i class="fas fa-stop"></i>Остановить</button>` : ''}
+                                    ${row.status !== 'running' && !row.archived ? `<button class="btn btn-secondary" data-broadcast-archive="${Number(row.id)}" title="Убрать из основного списка"><i class="fas fa-box-archive"></i>В архив</button>` : ''}
+                                    ${row.archived ? `<button class="btn btn-secondary" data-broadcast-unarchive="${Number(row.id)}"><i class="fas fa-box-open"></i>Вернуть из архива</button>` : ''}
                                 </span>
-                                <span class="broadcast-delivery-copy"><b>${status.label}</b><span>${sent.toLocaleString('ru-RU')} из ${total.toLocaleString('ru-RU')} доставлено</span></span>
                             </div>
                         </div>
-                        <div class="broadcast-metrics">
-                            <div class="broadcast-metric"><span>Доставлено</span><b>${sent.toLocaleString('ru-RU')}</b></div>
-                            <div class="broadcast-metric"><span>Забрали скидку</span><b>${claims === null ? '—' : claims.toLocaleString('ru-RU')}${claimRateLabel}</b></div>
-                            <div class="broadcast-metric"><span>Купили</span><b>${buyers === null ? '—' : buyers.toLocaleString('ru-RU')}${buyerRateLabel}</b></div>
-                            <div class="broadcast-metric"><span>Выручка</span><b>${revenue === null ? '—' : `${revenue.toLocaleString('ru-RU')} ₽`}</b></div>
-                        </div>
-                        <div class="broadcast-record-progress" aria-hidden="true"><span style="width:${progress}%"></span></div>
-                        <footer class="broadcast-record-footer">
-                            <span class="broadcast-status-label">${status.label}</span>
-                            <span class="broadcast-record-actions">
-                                ${row.status === 'running' ? `<button class="btn btn-danger broadcast-stop" data-broadcast-stop="${Number(row.id)}"><i class="fas fa-stop"></i>Остановить</button>` : ''}
-                                ${row.status !== 'running' && !row.archived ? `<button class="btn btn-secondary" data-broadcast-archive="${Number(row.id)}" title="Убрать из основного списка"><i class="fas fa-box-archive"></i>В архив</button>` : ''}
-                                ${row.archived ? `<button class="btn btn-secondary" data-broadcast-unarchive="${Number(row.id)}"><i class="fas fa-box-open"></i>Вернуть из архива</button>` : ''}
-                            </span>
-                        </footer>
                     </article>`;
                 }).join('') : (broadcastsArchiveView ? '<div class="info-card muted">Архив пуст.</div>' : '<div class="info-card muted">Рассылок ещё не было.</div>');
                 target.querySelectorAll('[data-broadcast-stop]').forEach((button) => button.addEventListener('click', async () => {

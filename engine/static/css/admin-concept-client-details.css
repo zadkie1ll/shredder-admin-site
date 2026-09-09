@@ -68,8 +68,11 @@ html[data-admin-theme="light"] #panel-user-payments {
 #panel-user-payments .client-payment-panel .payment-journal-row {
     padding: 15px 10px; min-height: 0; font-size: 13px; background: transparent; cursor: pointer;
 }
-#panel-user-payments .client-payment-panel .payment-journal-row:hover,
-#panel-user-payments .client-payment-panel .payment-journal-item.is-open .payment-journal-row { background: var(--admin-surface-soft); }
+#panel-user-payments .client-payment-panel .payment-journal-row:hover { background: var(--admin-surface-raised); }
+/* An open item reads as one raised block: the clicked row and its details share
+ * the same lifted surface, so the row no longer looks dimmed against the card. */
+#panel-user-payments .client-payment-panel .payment-journal-item.is-open { background: var(--admin-surface-raised); }
+#panel-user-payments .client-payment-panel .payment-journal-item.is-open .payment-journal-row { background: transparent; }
 #panel-user-payments .client-payment-panel .payment-journal-operation { display: block; gap: 0; }
 #panel-user-payments .client-payment-panel .payment-journal-operation-copy strong { font-size: 13px; font-weight: 500; }
 #panel-user-payments .client-payment-panel .payment-journal-id { font-size: 11px; font-weight: 400; }
@@ -81,7 +84,7 @@ html[data-admin-theme="light"] #panel-user-payments {
 }
 #panel-user-payments .client-payment-panel .payment-journal-chevron { font-size: 11px; }
 #panel-user-payments .client-payment-panel .payment-journal-details {
-    margin: 0 10px 15px; padding: 12px 14px; border-radius: 7px; background: var(--admin-surface-soft);
+    margin: 0 10px 15px; padding: 12px 14px; border: 1px solid var(--admin-border); border-radius: 7px; background: var(--admin-surface);
 }
 #panel-user-payments .client-payment-panel .payment-journal-details span { font-size: 10px; font-weight: 500; letter-spacing: .02em; }
 #panel-user-payments .client-payment-panel .payment-journal-details strong { font-size: 12px; font-weight: 500; }

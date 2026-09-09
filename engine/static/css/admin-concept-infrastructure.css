@@ -144,6 +144,7 @@ html[data-admin-theme="light"] {
 #panel-node-provision .node-provision-create-summary { font-size: 13px; font-weight: 400; line-height: 1.5; }
 #panel-node-provision .node-provision-create-form { padding: 0; }
 #panel-node-provision .node-provision-form-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+#panel-node-provision .node-provision-oneliner { margin: 24px 0 0; }
 #panel-node-provision .node-provision-field { gap: 8px; margin: 10px 0; }
 #panel-node-provision .node-provision-field > label { font-size: 14px; font-weight: 400; text-transform: none; letter-spacing: 0; }
 #panel-node-provision .node-provision-request-row { padding: 14px 0; font-size: 13px; }

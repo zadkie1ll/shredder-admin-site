@@ -319,14 +319,6 @@ html[data-admin-theme="light"] #panel-user-payments {
 #panel-broadcasts .broadcast-preview-bubble { border-radius: 12px; background: #203849; box-shadow: none; }
 #panel-broadcasts .broadcast-preview-text { padding: 16px; min-height: 80px; font-size: 14px; line-height: 1.65; color: #edf2f6; }
 #panel-broadcasts .broadcast-preview-caption { color: #afbfcc; font-size: 12px; line-height: 1.5; margin-top: 16px; }
-#panel-broadcasts .broadcast-record { margin: 18px; border-radius: 12px; border-color: var(--workspace-line); }
-#panel-broadcasts .broadcast-record-main { padding: 20px; }
-#panel-broadcasts .broadcast-record-title h3 { font-size: 17px; font-weight: 600; }
-#panel-broadcasts :is(.broadcast-record-meta, .broadcast-record-message, .broadcast-delivery-copy span) { font-size: 12px; line-height: 1.5; }
-#panel-broadcasts .broadcast-metric { padding: 18px 16px; }
-#panel-broadcasts .broadcast-metric b { font-size: 23px; font-weight: 600; }
-#panel-broadcasts .broadcast-metric span { font-size: 12px; font-weight: 500; }
-#panel-broadcasts .broadcast-metric b small { font-size: 11px; }
 
 /* Promo effect, audience and limits are arranged like the approved pc screen. */
 #panel-promocodes, #subpanel-promo-cohorts { --promo-line: var(--workspace-line); --promo-soft: var(--workspace-raised); --promo-surface: var(--workspace-surface); --promo-surface-strong: var(--workspace-input); }
@@ -581,20 +573,81 @@ html[data-admin-theme="light"] :is(#panel-broadcasts, #panel-promocodes, #subpan
 #panel-broadcasts .broadcast-preview-caption { font-weight: 400; }
 #panel-broadcasts .broadcast-preview-buttons { display: block; margin: 0; }
 #panel-broadcasts .broadcast-preview-btn { padding: 11px; border-radius: 7px; margin: 6px 0; font-size: 14px; font-weight: 400; line-height: 1.5; background: #344450; }
-#panel-broadcasts .broadcast-record { padding: 20px; margin: 18px 0 0; border-left: 3px solid #68d7ac; background: transparent; }
+
+/* History as a funnel (approved concept B): the record splits into "what was
+ * sent" and "what came back". Status lives in one line, the four steps are
+ * joined with the conversion on the seam, revenue is the only green step. */
 #panel-broadcasts #broadcasts-list { display: block; padding: 0; }
-#panel-broadcasts .broadcast-record-main { padding: 0; margin-bottom: 18px; }
-#panel-broadcasts .broadcast-record-title h3 { font-size: 14px; margin: 0 0 8px; }
-#panel-broadcasts .broadcast-record-icon { display: none; }
-#panel-broadcasts .broadcast-record-title { grid-template-columns: minmax(0, 1fr); }
-#panel-broadcasts .broadcast-record-meta { margin: 0; }
-#panel-broadcasts .broadcast-metrics { padding: 18px 0; margin-bottom: 16px; gap: 16px; background: transparent; }
-#panel-broadcasts .broadcast-metric { padding: 0; border: 0; }
-#panel-broadcasts .broadcast-metric > span { text-transform: none; letter-spacing: 0; font-size: 12px; font-weight: 400; margin: 0; }
-#panel-broadcasts .broadcast-metric > b { font-size: 23px; font-weight: 700; margin: 8px 0; }
-#panel-broadcasts .broadcast-metric > b > small { display: block; font-size: 12px; font-weight: 400; margin: 8px 0 0; }
-#panel-broadcasts .broadcast-record-footer { padding: 0; min-height: 0; }
-#panel-broadcasts .broadcast-status-label { font-size: 12px; font-weight: 400; color: var(--workspace-success); }
+#panel-broadcasts .broadcast-record {
+    display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(420px, 1fr); gap: 28px;
+    padding: 20px 0; margin: 0; border: 0; border-bottom: 1px solid var(--workspace-line); border-radius: 0;
+    background: transparent; overflow: visible;
+}
+#panel-broadcasts .broadcast-record::before { display: none; }
+#panel-broadcasts .broadcast-record:first-child { padding-top: 4px; }
+#panel-broadcasts .broadcast-record:last-child { padding-bottom: 4px; border-bottom: 0; }
+#panel-broadcasts .broadcast-record-what { min-width: 0; }
+#panel-broadcasts .broadcast-record-head { display: flex; align-items: flex-start; gap: 12px; }
+#panel-broadcasts .broadcast-record-dot { display: inline-block; flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: var(--workspace-success); }
+#panel-broadcasts .broadcast-record-head > .broadcast-record-dot { margin-top: 7px; }
+#panel-broadcasts .broadcast-record[data-status="running"] .broadcast-record-dot { background: var(--brand-gold); box-shadow: 0 0 0 4px rgba(255,199,0,.15); }
+#panel-broadcasts .broadcast-record[data-status="stopped"] .broadcast-record-dot { background: var(--red); }
+#panel-broadcasts .broadcast-record-title { display: block; min-width: 0; }
+#panel-broadcasts .broadcast-record-title h3 { margin: 0; font-size: 15px; font-weight: 700; line-height: 1.35; }
+#panel-broadcasts .broadcast-record-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; margin: 4px 0 10px; color: var(--campaign-caption); font-size: 12px; line-height: 1.5; }
+#panel-broadcasts .broadcast-record-meta span::before { content: none; }
+#panel-broadcasts .broadcast-record-meta i { display: none; }
+#panel-broadcasts .broadcast-badges { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+#panel-broadcasts .broadcast-badge { padding: 2px 8px; border: 1px solid var(--workspace-line); border-radius: 6px; background: transparent; color: var(--campaign-caption); font-size: 11px; font-weight: 600; }
+#panel-broadcasts .broadcast-badge.accent { border-color: transparent; background: var(--workspace-gold-bg); color: var(--campaign-gold); }
+#panel-broadcasts .broadcast-badge i { display: none; }
+#panel-broadcasts .broadcast-record-message {
+    margin: 0; padding: 0 14px; border-left: 2px solid var(--workspace-line); color: var(--campaign-caption);
+    font-size: 13px; line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere;
+}
+#panel-broadcasts .broadcast-record-message b { color: var(--admin-text); font-weight: 700; }
+#panel-broadcasts .broadcast-record-message a { color: var(--workspace-blue); }
+#panel-broadcasts .broadcast-record-result { display: grid; grid-template-rows: auto 1fr auto; gap: 14px; min-width: 0; }
+#panel-broadcasts .broadcast-record-state { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; }
+#panel-broadcasts .broadcast-status-label { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--workspace-success); }
+#panel-broadcasts .broadcast-status-label::before { content: none; }
+#panel-broadcasts .broadcast-record[data-status="running"] .broadcast-status-label { color: var(--brand-gold); }
+#panel-broadcasts .broadcast-record[data-status="stopped"] .broadcast-status-label { color: var(--red); }
+#panel-broadcasts .broadcast-record-delivery { color: var(--campaign-caption); font-size: 12px; font-variant-numeric: tabular-nums; }
+#panel-broadcasts .broadcast-funnel { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); align-items: stretch; }
+#panel-broadcasts .broadcast-funnel-step { position: relative; min-width: 0; padding: 12px 12px 10px; border: 1px solid var(--workspace-line); border-right: 0; background: var(--workspace-raised); }
+#panel-broadcasts .broadcast-funnel-step:first-child { border-radius: 8px 0 0 8px; }
+#panel-broadcasts .broadcast-funnel-step:last-child { border-right: 1px solid var(--workspace-line); border-radius: 0 8px 8px 0; }
+#panel-broadcasts .broadcast-funnel-step > span { display: block; color: var(--campaign-caption); font-size: 11px; }
+#panel-broadcasts .broadcast-funnel-step > b { display: block; margin-top: 4px; font-size: 20px; font-weight: 700; line-height: 1.15; letter-spacing: -.01em; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+#panel-broadcasts .broadcast-funnel-step > small { display: block; min-height: 16px; margin-top: 4px; color: var(--campaign-gold); font-size: 11px; font-weight: 600; }
+#panel-broadcasts .broadcast-funnel-step.is-revenue { background: rgba(56,217,150,.12); border-color: rgba(56,217,150,.25); }
+#panel-broadcasts .broadcast-funnel-step.is-revenue > b { color: var(--workspace-success); }
+#panel-broadcasts .broadcast-record[data-status="running"] .broadcast-funnel-step.is-revenue { background: var(--workspace-raised); border-color: var(--workspace-line); }
+#panel-broadcasts .broadcast-record[data-status="running"] .broadcast-funnel-step.is-revenue > b { color: var(--campaign-caption); }
+#panel-broadcasts .broadcast-funnel-conv {
+    position: absolute; top: -9px; right: -1px; z-index: 1; transform: translateX(50%);
+    padding: 1px 7px; border: 1px solid var(--workspace-line); border-radius: 999px; background: var(--admin-surface);
+    color: var(--campaign-caption); font-size: 10.5px; font-style: normal; font-weight: 700; white-space: nowrap;
+}
+#panel-broadcasts .broadcast-record-foot { display: flex; align-items: center; gap: 16px; }
+#panel-broadcasts .broadcast-record-progress { flex: 1; height: 4px; margin: 0; border-radius: 2px; background: var(--workspace-line); overflow: hidden; }
+#panel-broadcasts .broadcast-record-progress span { display: block; height: 100%; border-radius: 2px; background: var(--workspace-success); }
+#panel-broadcasts .broadcast-record[data-status="running"] .broadcast-record-progress span { background: var(--brand-gold); }
+#panel-broadcasts .broadcast-record[data-status="stopped"] .broadcast-record-progress span { background: var(--red); }
+#panel-broadcasts .broadcast-record-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+#panel-broadcasts .broadcast-record-actions .btn { height: 32px; min-height: 0; padding: 0 12px; font-size: 12px; }
+#panel-broadcasts .broadcast-record-actions .btn.btn-secondary { border-color: transparent; color: var(--campaign-caption); }
+#panel-broadcasts .broadcast-record-actions .btn.btn-secondary:hover { border-color: var(--brand-gold); color: var(--admin-text); }
+@media (max-width: 1100px) {
+    #panel-broadcasts .broadcast-record { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+}
+@media (max-width: 640px) {
+    #panel-broadcasts .broadcast-funnel { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+    #panel-broadcasts .broadcast-funnel-step, #panel-broadcasts .broadcast-funnel-step:first-child, #panel-broadcasts .broadcast-funnel-step:last-child { border: 1px solid var(--workspace-line); border-radius: 8px; }
+    #panel-broadcasts .broadcast-funnel-conv { display: none; }
+    #panel-broadcasts .broadcast-record-foot { flex-wrap: wrap; }
+}
 
 #panel-promocodes :is(.promo-compose-grid, .promo-batch-card, .promo-registry-card) { padding: 22px; margin-bottom: 20px; background: var(--admin-surface); border: 0; border-radius: 10px; }
 #panel-promocodes .promo-guide-hero { margin-bottom: 20px; }
@@ -681,6 +734,7 @@ html[data-admin-theme="light"] :is(#panel-broadcasts, #panel-promocodes, #subpan
 #subpanel-promo-cohorts .promo-cohort-field { display: block; }
 #subpanel-promo-cohorts .promo-cohort-field label { font-weight: 400; }
 #subpanel-promo-cohorts .promo-cohort-form .input { height: 49px; margin-top: 10px; padding: 13px; min-height: 0; font-size: 14px; line-height: normal; border-radius: 8px; background: #111b24; }
+#subpanel-promo-cohorts .promo-cohort-form .btn { height: 49px; min-height: 0; align-self: end; }
 #subpanel-promo-cohorts .promo-cohort-card { padding: 22px; margin-bottom: 20px; border: 0; border-radius: 10px; }
 #subpanel-promo-cohorts .promo-card-head { padding: 0; border: 0; min-height: 0; gap: 18px; }
 #subpanel-promo-cohorts .promo-card-heading { display: block; }
@@ -689,7 +743,7 @@ html[data-admin-theme="light"] :is(#panel-broadcasts, #panel-promocodes, #subpan
 #subpanel-promo-cohorts .promo-card-heading p { font-size: 14px; line-height: 1.5; margin: 5px 0 0; }
 #subpanel-promo-cohorts .promo-cohort-tag { border: 0; padding: 0; border-radius: 0; background: none; font-size: 14px; font-weight: 400; color: var(--campaign-gold); }
 #subpanel-promo-cohorts .promo-cohort-tag + .promo-cohort-tag::before { content: '· '; }
-#subpanel-promo-cohorts .promo-cohort-view-tabs { gap: 16px; padding: 0; margin: 0 0 24px; border-bottom: 1px solid var(--admin-border); }
+#subpanel-promo-cohorts .promo-cohort-view-tabs { gap: 16px; padding: 0; margin: 20px 0 24px; border-bottom: 1px solid var(--admin-border); }
 #subpanel-promo-cohorts .promo-cohort-view-tab { min-height: 0; padding: 0 0 12px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; color: var(--admin-text-muted); font-size: 12px; font-weight: 400; line-height: 1.5; background: none; }
 #subpanel-promo-cohorts .promo-cohort-view-tab[aria-selected="true"] { color: #ffcf32; font-weight: 600; background: none; border-color: var(--admin-accent); }
 #subpanel-promo-cohorts .promo-cohort-view-tab > i { display: none; }
@@ -754,8 +808,6 @@ html[data-admin-theme="light"] #subpanel-promo-cohorts .promo-cohort-metric:nth-
     #panel-broadcasts :is(.broadcast-compose-card, .broadcast-history-card),
     #panel-promocodes :is(.promo-compose-grid, .promo-batch-card, .promo-registry-card) { padding: 16px; }
     #panel-broadcasts :is(.broadcast-primary-fields, .broadcast-promo-audience-options), #panel-promocodes .promo-audience { grid-template-columns: minmax(0, 1fr); }
-    #panel-broadcasts .broadcast-record { padding: 14px; }
-    #panel-broadcasts .broadcast-record-main { grid-template-columns: minmax(0, 1fr); }
     #panel-broadcasts .broadcast-test { margin-left: 0; }
     #panel-broadcasts .broadcast-launch { width: auto; }
     #panel-broadcasts .broadcast-form .input, #panel-promocodes .promo-form .input { font-size: 16px; }

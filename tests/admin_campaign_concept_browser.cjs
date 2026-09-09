@@ -36,8 +36,9 @@ const mappings = {
         ['bubbleSurface', '.broadcast-preview-bubble', '#bc-preview-text', ['backgroundColor', 'borderRadius']],
         ['history', '.broadcast-history-card', '.bc-concept > .mi-panel:last-child', ['width', 'paddingTop', 'borderRadius']],
         ['record', '.broadcast-record', '.bc-record', ['width', 'paddingTop', 'borderRadius']],
-        ['recordMetrics', '.broadcast-metrics', '.bc-stats', ['width', 'gridTemplateColumns', 'columnGap', 'paddingTop']],
-        ['recordValue', '.broadcast-metric b', '.bc-stats b', ['fontSize', 'fontWeight', 'lineHeight']],
+        // История перерисована по концепту B «Воронка» (10.09.2026): мок
+        // .bc-stats больше не эталон, сравнивается только наличие воронки
+        ['recordMetrics', '.broadcast-funnel', '.bc-stats', []],
     ],
     promocodes: [
         ['panel', '.promo-compose-grid', '.pc-concept > .mi-panel', ['width', 'paddingTop', 'paddingRight', 'borderRadius']],

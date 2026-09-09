@@ -518,7 +518,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         rule = stylesheet[rule_start:stylesheet.index("}", rule_start)]
         self.assertIn("flex: 0 0 auto;", rule)
         self.assertIn("height: auto;", rule)
-        self.assertIn("@import url('./admin-concept-infrastructure.css?v=7');", concept_index)
+        self.assertIn("@import url('./admin-concept-infrastructure.css?v=8');", concept_index)
 
     def test_censor_checks_allow_selecting_rows_and_deleting_them(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
@@ -6310,7 +6310,7 @@ class AdminClientWorkspaceTests(SimpleTestCase):
         self.assertIn("#panel-user-payments .client-action-registry .client-action-controls { display: grid; grid-template-columns: var(--client-action-btn) var(--client-action-btn);", css)
         self.assertIn(".client-action-button.is-primary { grid-column: 2; }", css)
         self.assertIn(".client-action-pair { grid-column: 1 / -1;", css)
-        self.assertIn("@import url('./admin-concept-customers.css?v=6');", Path("engine/static/css/admin-concept.css").read_text())
+        self.assertIn("@import url('./admin-concept-customers.css?v=8');", Path("engine/static/css/admin-concept.css").read_text())
 
 
 class AdminMoscowTimeTests(SimpleTestCase):
@@ -12460,6 +12460,28 @@ if (html.includes('В БАНЕ')) { console.error('пометка на уста�
 // Строка «привязываем» и вызов старой формой (строкой вместо объекта)
 html = infraDomainRowHtml('new.example.xyz', true);
 if (!html.includes('Привязываем')) { console.error('pending сломан'); process.exit(1); }
+console.log('ok');
+"""
+        self.assertIn("ok", self._run_node(source))
+
+    def test_broadcast_funnel_helpers(self):
+        region = self._region(
+            "        function broadcastMessageHtml(text) {",
+            "        function renderBroadcastPreview() {",
+        )
+        source = """
+const escapeHtml = (v) => String(v ?? '').replace(/[&<>"]/g,
+  (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+""" + region + """
+// Telegram-разметка рендерится, чужие теги остаются текстом
+const html = broadcastMessageHtml('<b>Скидка</b> <i>x</i> <script>1</script>');
+if (html !== '<b>Скидка</b> <i>x</i> &lt;script&gt;1&lt;/script&gt;') { console.error('markup: ' + html); process.exit(1); }
+// Конверсии: целые, а ниже процента — с десятой, ноль — «0%»
+const rates = [broadcastRateLabel(64, 4727), broadcastRateLabel(12, 64), broadcastRateLabel(3, 1217), broadcastRateLabel(0, 10), broadcastRateLabel(5, 0)];
+if (JSON.stringify(rates) !== JSON.stringify(['1%', '19%', '0,2%', '0%', null])) { console.error('rates: ' + JSON.stringify(rates)); process.exit(1); }
+// Длительность по меткам «дд.мм.гггг чч:мм»
+const d = [broadcastDurationLabel('07.09.2026 14:31', '07.09.2026 15:07'), broadcastDurationLabel('07.09.2026 13:48', '07.09.2026 17:28'), broadcastDurationLabel('07.09.2026 13:48', 'Нет данных'), broadcastDurationLabel('07.09.2026 13:48', '07.09.2026 13:48')];
+if (JSON.stringify(d) !== JSON.stringify(['36 мин', '3 ч 40 мин', '', 'меньше минуты'])) { console.error('duration: ' + JSON.stringify(d)); process.exit(1); }
 console.log('ok');
 """
         self.assertIn("ok", self._run_node(source))
