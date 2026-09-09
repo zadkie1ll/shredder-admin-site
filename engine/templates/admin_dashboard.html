@@ -3253,6 +3253,7 @@
     <link href="{% static 'css/admin_dashboard.css' %}?v=6" rel="stylesheet">
     {% include "includes/yandex_metrika.html" %}
     <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
+    <link rel="stylesheet" href="{% static 'css/admin-concept.css' %}?v=6">
 </head>
 <body>
     <div class="page-bg"></div>
@@ -3269,15 +3270,7 @@
     </header>
     <div class="drawer-overlay" id="drawer-overlay"></div>
     <aside class="sidebar">
-        <div class="brand">
-            <div class="brand-logo">
-                <div class="brand-signal" aria-hidden="true"><span></span><span></span><span></span><span></span><span></span></div>
-                <div>
-                    <div class="brand-name">Monkey Island</div>
-                    <div class="brand-sub">Admin</div>
-                </div>
-            </div>
-        </div>
+        <div class="admin-wordmark">Monkey <span>Island</span></div>
         <nav class="sidebar-nav" aria-label="Разделы админки">
             <span class="nav-section-label">Обзор</span>
             {% if support_admin_is_full_admin or support_admin_is_marketer %}
@@ -3670,10 +3663,7 @@
             </details>
 
             <div id="subpanel-acq-newrep" class="subtab-panel active">
-                <div class="card" style="padding:18px;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
-                        <span class="chart-title-wrap"><strong>Выручка: новые vs повторные покупатели (по дням, МСК)</strong><button type="button" class="chart-info" data-help="newrep" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
-                        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;">
+                <div class="admin-section-query">
                             <select id="acq-newrep-month" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
                                 <option value="" selected>Месяц…</option>
                             </select>
@@ -3701,6 +3691,10 @@
                             </div>
                             <button type="button" id="acq-newrep-apply" class="subtab active" style="border:1px solid rgba(255,199,0,.42);border-radius:8px;">Показать</button>
                         </div>
+                <div class="card" style="padding:18px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:10px;">
+                        <span class="chart-title-wrap"><strong>Выручка: новые vs повторные покупатели (по дням, МСК)</strong><button type="button" class="chart-info" data-help="newrep" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
+
                     </div>
                     <canvas id="acq-newrep-chart" style="width:100%;height:280px;display:block;"></canvas>
                     <div id="acq-newrep-summary" style="margin-top:12px;font-size:12px;color:var(--muted);"></div>
@@ -3789,9 +3783,7 @@
                         <span id="acq-csv-status" style="font-size:11px;color:var(--muted);"></span>
                     </form>
                 </div>
-                <div class="card" style="padding:18px;margin-bottom:14px;">
-                    <span class="chart-title-wrap"><strong>Расходы и воронка: подписки → подключения → продажи</strong><button type="button" class="chart-info" data-help="ads_daily" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;font-size:12px;">
+                <div class="admin-section-query">
                         <select id="acq-ads-group" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
                             <option value="day">По дням</option>
                             <option value="month">По месяцам</option>
@@ -3803,6 +3795,9 @@
                             <option value="365">365 дней</option>
                         </select>
                     </div>
+                <div class="card" style="padding:18px;margin-bottom:14px;">
+                    <span class="chart-title-wrap"><strong>Расходы и воронка: подписки → подключения → продажи</strong><button type="button" class="chart-info" data-help="ads_daily" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
+
                     <canvas id="acq-ads-daily-chart" style="width:100%;height:250px;display:block;margin-top:10px;"></canvas>
                     <div style="font-size:11px;color:var(--muted);margin-top:12px;">Стоимость привлечения, ₽: CPC (клик), подписка, подключение, продажа</div>
                     <canvas id="acq-ads-cost-chart" style="width:100%;height:220px;display:block;margin-top:6px;"></canvas>
@@ -3998,10 +3993,7 @@
             </div>
 
             <div id="subpanel-acq-payhealth" class="subtab-panel">
-                <div class="card" style="padding:18px;">
-                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
-                        <span class="chart-title-wrap"><strong>Здоровье платежей: создано → оплачено</strong></span>
-                        <div style="display:flex;gap:6px;align-items:center;">
+                <div class="admin-section-query">
                             <select id="acq-payhealth-days" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
                                 <option value="30">30 дней</option>
                                 <option value="90" selected>90 дней</option>
@@ -4012,6 +4004,10 @@
                                 <option value="week" selected>по неделям</option>
                             </select>
                         </div>
+                <div class="card" style="padding:18px;">
+                    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;">
+                        <span class="chart-title-wrap"><strong>Здоровье платежей: создано → оплачено</strong></span>
+
                     </div>
                     <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
                         ЮКасса — записи yk_payments (успех/отмена приходят вебхуком); WATA — созданные инвойсы
@@ -4247,9 +4243,8 @@
                     </div>
                     <div class="promo-form">
                         <div class="promo-field">
-                            <div class="promo-field-label">Что получит пользователь <span>выберите один эффект</span></div>
                             <input type="hidden" id="promo-type" value="days">
-                            <div class="promo-type-picker" data-promo-type-picker="promo">
+                            <div class="promo-type-picker" data-promo-type-picker="promo" role="group" aria-label="Что получит пользователь — выберите один эффект" title="Что получит пользователь — выберите один эффект">
                                 <button type="button" class="promo-type-option" data-value="days" aria-pressed="true">
                                     <span class="promo-type-option-icon"><i class="fas fa-calendar-plus"></i></span>
                                     <span><b>Дни подписки</b><small>Добавятся сразу</small></span><i class="fas fa-check"></i>
@@ -4305,7 +4300,7 @@
                     <div class="promo-card-head">
                         <div class="promo-card-heading">
                             <span class="promo-card-icon"><i class="fas fa-lightbulb"></i></span>
-                            <div><h2>Как сработает</h2><p>Подсказка меняется вместе с настройками</p></div>
+                            <div><h2 title="Подсказка меняется вместе с настройками">Как сработает</h2></div>
                         </div>
                     </div>
                     <div class="promo-live-body">
@@ -4334,9 +4329,8 @@
                 <div class="promo-batch-layout">
                     <div class="promo-form promo-batch-form">
                         <div class="promo-field">
-                            <div class="promo-field-label">Эффект каждого купона <span>все коды партии одинаковые</span></div>
                             <input type="hidden" id="batch-type" value="days">
-                            <div class="promo-type-picker" data-promo-type-picker="batch">
+                            <div class="promo-type-picker" data-promo-type-picker="batch" role="group" aria-label="Эффект каждого купона — все коды партии одинаковые" title="Эффект каждого купона — все коды партии одинаковые">
                                 <button type="button" class="promo-type-option" data-value="days" aria-pressed="true">
                                     <span class="promo-type-option-icon"><i class="fas fa-calendar-plus"></i></span>
                                     <span><b>Дни подписки</b><small>Добавятся сразу</small></span><i class="fas fa-check"></i>
@@ -4366,9 +4360,10 @@
                         </div>
                     </div>
                     <aside class="promo-batch-note">
-                        <div class="promo-batch-note-item"><i class="fas fa-file-arrow-down"></i><span>После создания скачайте TXT: в каждой строке будет код и готовая Telegram-ссылка.</span></div>
-                        <div class="promo-batch-note-item"><i class="fas fa-user-lock"></i><span>Один купон сможет забрать только один человек; повторно раздать этот же код нельзя.</span></div>
-                        <div class="promo-batch-note-item"><i class="fas fa-clock"></i><span id="batch-effect-summary">Дни добавятся к подписке сразу после активации купона.</span></div>
+                        <h3>Как сработает</h3>
+                        <div class="promo-batch-effect"><span id="batch-effect-summary">Дни добавятся к подписке сразу после активации купона.</span></div>
+                        <div class="promo-batch-note-item"><b>Одноразовый купон</b><span>Один купон сможет забрать только один человек; повторно раздать этот же код нельзя.</span></div>
+                        <div class="promo-batch-note-item"><b>Скачать TXT</b><span>После создания скачайте TXT: в каждой строке будет код и готовая Telegram-ссылка.</span></div>
                     </aside>
                 </div>
                 <div id="promo-batches"></div>
@@ -4447,10 +4442,7 @@
             </div>
 
             <div id="subpanel-sys-winback" class="subtab-panel">
-                <section class="card system-card system-settings-card">
-                    <h2 class="system-card-title">Win-back предложения</h2>
-                    <div class="settings-list" data-settings-group="winback"></div>
-                </section>
+                <div class="settings-list" data-settings-group="winback"></div>
             </div>
 
             <div id="subpanel-sys-payment" class="subtab-panel">
@@ -5032,25 +5024,25 @@
             <form id="censor-check-form" class="card form-card censor-check-form">
                 {% csrf_token %}
                 <input type="hidden" name="check_id">
-                <input class="input" name="target_ip" maxlength="64" placeholder="IP точки входа" required>
-                <input class="input" name="sni" maxlength="256" placeholder="SNI клиентов (uk.example.org)" required>
-                <select class="input" name="mode" title="Как выбирать зонды и группировать результат">
+                <label class="infra-concept-field"><span>IP точки входа</span><input class="input" name="target_ip" maxlength="64" placeholder="IP точки входа" required></label>
+                <label class="infra-concept-field"><span>SNI клиентов</span><input class="input" name="sni" maxlength="256" placeholder="SNI клиентов (uk.example.org)" required></label>
+                <label class="infra-concept-field"><span>Набор зондов</span><select class="input" name="mode" title="Как выбирать зонды и группировать результат">
                     <option value="op-full">Операторы · полный (33 зонда, 660 кр)</option>
                     <option value="op-light">Операторы · лёгкий (10 зондов, 200 кр)</option>
                     <option value="geo-full">Регионы · полный (50 зондов, 1000 кр)</option>
                     <option value="geo-light">Регионы · лёгкий (20 зондов, 400 кр)</option>
-                </select>
-                <select class="input" name="interval_minutes" title="Расписание запуска">
+                </select></label>
+                <label class="infra-concept-field"><span>Расписание</span><select class="input" name="interval_minutes" title="Расписание запуска">
                     <option value="">Только вручную</option>
                     <option value="60">Каждый час</option>
                     <option value="180">Каждые 3 часа</option>
                     <option value="360">Каждые 6 часов</option>
                     <option value="720">Каждые 12 часов</option>
                     <option value="1440">Раз в сутки</option>
-                </select>
-                <select class="input" name="api_key_id" id="censor-check-key" title="Каким ключом RIPE запускать">
+                </select></label>
+                <label class="infra-concept-field"><span>Ключ RIPE Atlas</span><select class="input" name="api_key_id" id="censor-check-key" title="Каким ключом RIPE запускать">
                     <option value="">Ключ по умолчанию</option>
-                </select>
+                </select></label>
                 <label class="censor-alerts-toggle" title="Слать алерт в Telegram при бане/восстановлении ноды"><input type="checkbox" name="alerts_enabled" value="1" checked> <i class="fas fa-bell"></i> TG-алерт</label>
                 <div class="censor-form-actions">
                     <button class="btn" type="submit"><i class="fas fa-save"></i>Сохранить</button>
@@ -5156,21 +5148,21 @@
                 <p class="admin-subtitle">Потребление трафика подписками — поиск расшаренных подписок по аномальному объёму</p>
             </header>
             <form id="node-traffic-form" class="card form-card node-traffic-form">
-                <select class="input" name="node" id="node-traffic-node">
+                <label class="infra-concept-field"><span>Ноды</span><select class="input" name="node" id="node-traffic-node">
                     <option value="all">Все ноды</option>
-                </select>
+                </select></label>
                 <!-- Статистика панели посуточная по СУТКАМ UTC (03:00–03:00 МСК):
                      начало периода выравнивается вниз до полуночи UTC, поэтому
                      пресеты короче суток не имеют смысла, а «Сегодня» начинается
                      в 03:00 по Москве -->
-                <select class="input" name="hours">
+                <label class="infra-concept-field"><span>Период</span><select class="input" name="hours">
                     <option value="1" selected>Сегодня (с 03:00 МСК)</option>
                     <option value="24">Вчера + сегодня</option>
                     <option value="168">7 дней</option>
                     <option value="720">30 дней</option>
-                </select>
-                <input class="input" name="top" type="number" min="1" max="500" value="50" title="Сколько строк показать">
-                <input class="input" name="min_gib" type="number" min="0" step="0.1" placeholder="мин. GiB" title="Порог трафика в GiB">
+                </select></label>
+                <label class="infra-concept-field"><span>Строк · 1–500</span><input class="input" name="top" type="number" min="1" max="500" value="50" title="Сколько строк показать"></label>
+                <label class="infra-concept-field"><span>Мин. GiB</span><input class="input" name="min_gib" type="number" min="0" step="0.1" placeholder="мин. GiB" title="Порог трафика в GiB"></label>
                 <button class="btn" type="submit"><i class="fas fa-magnifying-glass-chart"></i>Показать</button>
             </form>
             <div id="node-traffic-result"></div>
@@ -5304,16 +5296,16 @@
                         <p class="infra-page-copy">Состояние инфраструктуры, нагрузка и подключения в реальном времени</p>
                     </div>
                     <div class="infra-toolbar" aria-label="Фильтры серверов">
-                        <label class="infra-search">
-                            <i class="fas fa-magnifying-glass"></i>
+                        <label class="infra-search infra-server-control-field">
+                            <span>Поиск серверов</span>
                             <input class="input" id="infra-search" type="search" placeholder="Поиск серверов…" autocomplete="off">
                         </label>
-                        <select class="input infra-filter" id="infra-status-filter" aria-label="Фильтр по статусу">
+                        <label class="infra-server-control-field"><span>Статус</span><select class="input infra-filter" id="infra-status-filter" aria-label="Фильтр по статусу">
                             <option value="all">Все статусы</option>
                             <option value="online">Онлайн</option>
                             <option value="attention">Требуют внимания</option>
                             <option value="offline">Оффлайн</option>
-                        </select>
+                        </select></label>
                         <label class="infra-archive-filter">
                             <input type="checkbox" id="infra-show-archived"> Архивные
                         </label>
@@ -5321,7 +5313,7 @@
                             <i class="fas fa-sliders"></i><span>Настройки</span>
                         </button>
                         <button class="btn btn-secondary infra-refresh-btn" type="button" id="infra-refresh" title="Обновить данные" aria-label="Обновить данные">
-                            <i class="fas fa-rotate"></i>
+                            <i class="fas fa-rotate"></i><span>Обновить</span>
                         </button>
                     </div>
                 </header>
@@ -5365,13 +5357,20 @@
                 <p class="admin-subtitle">Готовые ответы для тикетов поддержки</p>
             </header>
             <form id="reply-template-form" class="card form-card reply-template-form">
+                <h2 class="admin-section-title">Шаблон ответа</h2>
                 {% csrf_token %}
                 <input type="hidden" name="template_id">
                 <div class="form-grid-two">
+                    <label class="admin-section-field"><span>Название</span>
                     <input class="input" name="title" maxlength="160" placeholder="Название заготовки, например: Оплата прошла, подписка не обновилась">
+                    </label>
+                    <label class="admin-section-field"><span>Порядок</span>
                     <input class="input" name="sort_order" type="number" value="100" placeholder="Порядок">
+                    </label>
                 </div>
+                <label class="admin-section-field"><span>Текст</span>
                 <textarea class="input reply-template-body" name="body" rows="5" placeholder="Текст ответа, который будет вставляться в тикет"></textarea>
+                </label>
                 <div class="reply-template-toolbar">
                     <label class="reply-template-active">
                         <input type="checkbox" name="is_active" checked>
@@ -5384,7 +5383,10 @@
                 </div>
             </form>
             <div id="reply-template-message"></div>
+            <section class="admin-template-library">
+            <h2 class="admin-section-title">Шаблоны ответов</h2>
             <div id="reply-templates-result" class="reply-template-list"></div>
+            </section>
         </section>
 
         <section id="panel-support" class="tab-panel">
@@ -5596,6 +5598,7 @@
 
     <div id="admin-toast" class="admin-toast" role="status" aria-live="polite"></div>
 
+    <script src="{% static 'js/admin-winback-settings.js' %}?v=1"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/javascript/javascript.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/addon/edit/matchbrackets.min.js"></script>
@@ -6582,11 +6585,14 @@
                         <h3 class="config-template-title">${escapeHtml(template.name)}</h3>
                         <div class="config-template-meta">
                             <span class="config-template-badge ${template.is_active ? 'active' : ''}">${template.is_active ? 'Активный шаблон' : 'Неактивен'}</span>
-                            ${template.entry_name ? `<span class="config-template-badge">Профиль: ${escapeHtml(template.entry_name)}</span>` : ''}
-                            <span class="config-template-badge">dialerProxy: ${template.enable_dialer_proxy ? escapeHtml(template.dialer_proxy_name || 'ROUTING-IN') : 'выключен'}</span>
-                            ${template.profile_update_interval ? `<span class="config-template-badge">Интервал автообновления: ${escapeHtml(template.profile_update_interval)}</span>` : ''}
                             ${Object.keys(template.additional_headers || {}).length ? '<span class="config-template-badge">+ заголовки</span>' : ''}
                         </div>
+                        <dl class="config-template-facts">
+                            ${template.entry_name ? `<dt>Профиль</dt><dd>${escapeHtml(template.entry_name)}</dd>` : ''}
+                            <dt>dialerProxy</dt><dd>${template.enable_dialer_proxy ? escapeHtml(template.dialer_proxy_name || 'ROUTING-IN') : 'выключен'}</dd>
+                            ${template.profile_update_interval ? `<dt>Интервал автообновления</dt><dd>${escapeHtml(template.profile_update_interval)}</dd>` : ''}
+                            <dt>Заголовки</dt><dd>${Object.keys(template.additional_headers || {}).length}</dd>
+                        </dl>
                     </div>
                     <div class="config-template-card-actions">
                         <button type="button" class="mini-btn" data-config-template-edit="${template.id}"><i class="fas fa-pen"></i>Редактировать</button>
@@ -7420,6 +7426,32 @@
             });
         }
 
+        // Presentation only: use the selected page's existing title and copy.
+        function syncAdminSectionPresentation(panel) {
+            if (!panel) return;
+            const tabs = panel.querySelectorAll(':scope > .subtabs > [data-subtab]');
+            const selected = panel.querySelector(':scope > .subtabs > .active[data-subtab]');
+            const heading = panel.querySelector(':scope > .panel-header .admin-title');
+            if (heading && selected) heading.textContent = selected.textContent.trim();
+            const navButton = document.querySelector(`.sidebar .tab-btn[data-tab="${panel.id.replace(/^panel-/, '')}"]`);
+            if (navButton && tabs.length > 1) {
+                let count = navButton.querySelector('.admin-nav-count');
+                if (!count) {
+                    count = document.createElement('small');
+                    count.className = 'admin-nav-count';
+                    count.title = 'Число вкладок';
+                    navButton.append(count);
+                }
+                count.textContent = tabs.length;
+            }
+            if (panel.id === 'panel-infrastructure') {
+                const copy = panel.querySelector(':scope > .subtab-panel.active .infra-legacy-panel > .panel-header .admin-subtitle, :scope > .subtab-panel.active .infra-page-copy');
+                const subtitle = panel.querySelector(':scope > .panel-header .admin-subtitle');
+                if (copy && subtitle) subtitle.textContent = copy.textContent;
+            }
+        }
+        document.querySelectorAll('.tab-panel:has(> .subtabs)').forEach(syncAdminSectionPresentation);
+
         function showSubtab(panelId, name) {
             // name пустой => клик пришёл с кнопки, у которой класс subtab взят
             // только ради стиля (без data-subtab). Ничего не переключаем, иначе
@@ -7433,6 +7465,7 @@
             panel.querySelectorAll('.subtab-panel').forEach((subpanel) => {
                 subpanel.classList.toggle('active', subpanel.id === `subpanel-${name}`);
             });
+            syncAdminSectionPresentation(panel);
         }
 
         function setupSubtabs(panelId) {
@@ -8055,19 +8088,41 @@
         function clientPaymentsSectionHtml(result) {
             const history = result.history || [];
             return `
-                <section class="card payment-journal">
-                    <header class="payment-journal-header">
-                        <div>
-                            <span class="payment-journal-eyebrow"><i class="fas fa-receipt"></i>Журнал операций</span>
-                            <h3>История платежей</h3>
-                            <p>Последние операции клиента — сначала новые</p>
-                        </div>
+                <section class="card payment-journal client-detail-panel client-payment-panel">
+                    <h2>История платежей</h2>
+                    <div class="client-detail-head">
+                        <span class="client-detail-note">Последние операции клиента — сначала новые</span>
                         <div class="payment-journal-summary" aria-label="Сводка статусов">${paymentJournalSummaryHtml(history)}</div>
-                    </header>
-                    ${paymentJournalRowsHtml(history, {context: 'client'})}
-                    <footer class="payment-journal-footer">
+                    </div>
+                    <div class="payment-journal-list">
+                        ${history.length ? history.map((payment, index) => {
+                            const status = paymentStatusDescriptor(payment);
+                            const date = paymentDateParts(payment.date);
+                            const system = String(payment.system || 'Платёжная система');
+                            const tariff = String(payment.tariff || 'Тариф не указан');
+                            const detailId = `payment-journal-detail-client-${index}`;
+                            return `
+                                <article class="payment-journal-item is-${status.key}" data-payment-journal-item>
+                                    <button class="payment-journal-row" type="button" data-payment-journal-toggle aria-expanded="false" aria-controls="${detailId}">
+                                        <span class="payment-journal-operation-copy">
+                                            <span>${payment.trial ? 'Пробный период' : 'Подписка'} · ${escapeHtml(tariff)}</span>
+                                            <small class="payment-journal-id" title="${escapeHtml(payment.id)}">${escapeHtml(payment.id)}</small>
+                                        </span>
+                                        <span class="payment-journal-date">${escapeHtml(date.date)}<small>${date.time ? `${escapeHtml(date.time)} · ` : ''}${escapeHtml(system)}</small></span>
+                                        <b class="payment-journal-amount">${escapeHtml(paymentAmountLabel(payment))}</b>
+                                        <span class="payment-journal-status is-${status.key}">● ${escapeHtml(status.label)}</span>
+                                    </button>
+                                    <div class="payment-journal-details client-detail-notice" id="${detailId}" hidden>
+                                        <span>ID платежа: <span class="payment-journal-full-id">${escapeHtml(payment.id || '—')}</span></span>
+                                        <span> · Провайдер: ${escapeHtml(system)}</span>
+                                        <span> · Результат: <span class="is-${status.key}">${escapeHtml(payment.status || status.label)}</span></span>
+                                    </div>
+                                </article>`;
+                        }).join('') : '<p class="client-detail-note">Платежей пока нет.</p>'}
+                    </div>
+                    <footer class="payment-journal-footer client-detail-note">
                         <span>Показано операций: <strong>${history.length}</strong></span>
-                        <span><i class="fas fa-arrow-pointer"></i>Нажмите строку, чтобы раскрыть технические детали</span>
+                        <span>Нажмите строку, чтобы раскрыть технические детали</span>
                     </footer>
                 </section>`;
         }
@@ -8080,17 +8135,17 @@
             const updatedAt = block.updated_at || block.created_at || '';
             const actionsHtml = canManage
                 ? (isBlocked
-                    ? `<button class="btn btn-secondary client-action-button" type="button" data-client-referral-block-action="unblock"><i class="fas fa-unlock"></i>Разблокировать</button>`
+                    ? `<button class="btn btn-secondary client-action-button" type="button" data-client-referral-block-action="unblock">Разблокировать</button>`
                     : `
-                        <input class="input" type="text" maxlength="255" data-client-referral-block-reason placeholder="Причина блокировки">
-                        <button class="btn btn-danger client-action-button" type="button" data-client-referral-block-action="block"><i class="fas fa-ban"></i>Заблокировать</button>
+                        <input class="input" type="text" maxlength="255" data-client-referral-block-reason placeholder="Причина блокировки" aria-label="Причина блокировки бонусов">
+                        <button class="btn btn-danger client-action-button" type="button" data-client-referral-block-action="block">Заблокировать</button>
                     `)
                 : '';
             return `
-                <section class="card client-referral-manage-card ${isBlocked ? 'is-blocked' : ''}">
+                <section class="card client-referral-manage-card client-detail-ref-strip ${isBlocked ? 'is-blocked' : ''}">
                     <div class="client-referral-manage-copy">
                         <div class="client-ref-control-title-row">
-                            <div class="client-referral-manage-title"><i class="fas fa-gift"></i>Реферальные бонусы</div>
+                            <strong class="client-referral-manage-title">Реферальные бонусы ·</strong>
                             <span class="client-ref-status ${isBlocked ? 'is-blocked' : 'is-active'}">${isBlocked ? 'Заблокированы' : 'Доступны'}</span>
                         </div>
                         <div class="client-referral-manage-desc">${isBlocked ? 'Новые бонусы за приглашённых пользователей не начисляются.' : 'Клиент может получать новые бонусы за приглашённых пользователей.'}</div>
@@ -8107,13 +8162,13 @@
             const referrals = refResult.referrals || [];
             const controlHtml = clientReferralControlHtml(refResult);
             const metricsHtml = `
-                <div class="metrics-grid three">
+                <div class="metrics-grid three client-detail-metrics">
                     ${metric('Рефералов', refResult.summary.referrals, 'fa-user-plus')}
                     ${metric('Оплатили', refResult.summary.paid_referrals, 'fa-coins')}
                     ${metric('Бонусных дней', refResult.summary.bonus_days, 'fa-gift')}
                 </div>`;
             if (!referrals.length) {
-                return `${controlHtml}${metricsHtml}<div class="card info-card muted client-empty">У клиента пока нет приглашённых рефералов.</div>`;
+                return `${controlHtml}${metricsHtml}<section class="card client-detail-panel client-referral-empty"><h2>Приглашённые пользователи</h2><p class="client-detail-note">У клиента пока нет приглашённых рефералов.</p></section>`;
             }
             return `
                 ${controlHtml}
@@ -8238,48 +8293,52 @@
             const username = user.username ? `@${user.username}` : (user.email || `ID ${user.id || '—'}`);
             const avatarSource = String(user.username || user.email || user.telegram_id || '?').replace(/^@/, '');
             const avatar = user.username
-                ? `@${avatarSource.slice(0, 1).toUpperCase()}`
+                ? `@${avatarSource.slice(0, 1)}`
                 : avatarSource.slice(0, 1).toUpperCase();
             return `
                 <section class="card client-summary-card">
                     <div class="client-summary-identity">
                         <div class="client-summary-avatar" aria-hidden="true">${escapeHtml(avatar)}</div>
                         <div class="client-summary-identity-copy">
-                            <strong>${escapeHtml(username)}</strong>
-                            <span>${escapeHtml(user.email || 'Email не указан')}</span>
-                            <span><i class="fab fa-telegram-plane"></i>Telegram ID: ${escapeHtml(user.telegram_id || '—')}</span>
+                            <h2>${escapeHtml(username)}</h2>
+                            <p>${escapeHtml(user.email || 'Email не указан')}</p>
+                            <small>Telegram ID: ${escapeHtml(user.telegram_id || '—')}</small>
                         </div>
                     </div>
-                    <div class="client-summary-stat client-summary-subscription">
-                        <span class="client-status-pill ${user.is_active ? 'is-active' : 'is-expired'}">${user.is_active ? 'Активна' : 'Истекла'}</span>
-                        <span class="client-summary-label">Подписка до</span>
+                    <div class="client-summary-stat client-summary-subscription ${user.is_active ? 'is-active' : 'is-expired'}">
+                        <small class="client-summary-label">Подписка до</small>
                         <strong class="client-summary-value">${escapeHtml(user.expire_at || '—')}</strong>
+                        <span class="client-status-pill ${user.is_active ? 'is-active' : 'is-expired'}">● ${user.is_active ? 'Активна' : 'Истекла'}</span>
                     </div>
                     <div class="client-summary-stat">
-                        <span class="client-summary-label"><i class="fas fa-wallet"></i>LTV</span>
+                        <small class="client-summary-label">LTV</small>
                         <strong class="client-summary-value">${escapeHtml(money(result.ltv))}</strong>
+                        <span class="client-summary-meta"></span>
                     </div>
                     <div class="client-summary-stat" data-client-traffic-stat>
-                        <span class="client-summary-label"><i class="fas fa-signal"></i>Трафик <small>RWMS</small></span>
+                        <small class="client-summary-label">Трафик · RWMS</small>
                         <strong class="client-summary-value" data-client-traffic-value aria-live="polite">Загрузка…</strong>
                         <span class="client-summary-meta" data-client-traffic-meta>Фактическое потребление</span>
                     </div>
                     <div class="client-summary-stat" data-client-traffic-limit-stat>
-                        <span class="client-summary-label"><i class="fas fa-gauge-high"></i>Лимит трафика <small>RWMS</small></span>
+                        <small class="client-summary-label">Лимит трафика · RWMS</small>
                         <strong class="client-summary-value" data-client-traffic-limit-value aria-live="polite">Загрузка…</strong>
                         <span class="client-summary-meta" data-client-traffic-limit-meta>Статус подписки и HWID-устройства</span>
                     </div>
                     <div class="client-summary-stat">
-                        <span class="client-summary-label"><i class="fas fa-calendar"></i>Регистрация</span>
+                        <small class="client-summary-label">Регистрация</small>
                         <strong class="client-summary-value">${escapeHtml(result.first_seen)}</strong>
+                        <span class="client-summary-meta"></span>
                     </div>
                     <div class="client-summary-stat" data-client-first-connected-stat>
-                        <span class="client-summary-label"><i class="fas fa-plug"></i>Первое подключение <small>RWMS</small></span>
+                        <small class="client-summary-label">Первое подключение · RWMS</small>
                         <strong class="client-summary-value" data-client-first-connected-value aria-live="polite">Загрузка…</strong>
+                        <span class="client-summary-meta"></span>
                     </div>
                     <div class="client-summary-stat">
-                        <span class="client-summary-label"><i class="fas fa-arrows-rotate"></i>Автоплатёж</span>
+                        <small class="client-summary-label">Автоплатёж</small>
                         <strong class="client-summary-value ${autopayActive ? 'green' : ''}">${autopayActive ? 'Подключён' : 'Отключён'}</strong>
+                        <span class="client-summary-meta"></span>
                     </div>
                 </section>`;
         }
@@ -8339,7 +8398,7 @@
                         <article class="card client-action-panel client-danger-panel">
                             <div class="client-danger-heading">
                                 <i class="fas fa-triangle-exclamation"></i>
-                                <div><h3>Ограничения доступа</h3><p>Редкие действия с ограничением подписки</p></div>
+                                <div><h3 title="Редкие действия с ограничением подписки">Ограничения доступа</h3></div>
                             </div>
                             <div class="client-action-list">
                                 <div class="client-action-row">
@@ -8382,16 +8441,13 @@
                         </article>
                     </div>
                     <div class="card client-referral-summary-row ${referralBlocked ? 'is-blocked' : ''}">
-                        <span class="client-referral-summary-icon"><i class="fas fa-gift"></i></span>
-                        <div class="client-referral-summary-copy">
-                            <div><strong>Реферальные бонусы</strong><span class="client-inline-status ${referralBlocked ? 'is-blocked' : 'is-active'}">${referralBlocked ? 'Заблокированы' : 'Доступны'}</span></div>
-                            <span>Управление доступом находится рядом с историей приглашений</span>
+                        <div class="client-referral-summary-copy" title="Управление доступом находится рядом с историей приглашений">
+                            <div><span>Реферальные бонусы</span>&nbsp;<strong class="client-inline-status ${referralBlocked ? 'is-blocked' : 'is-active'}">${referralBlocked ? 'Заблокированы' : 'Доступны'}</strong></div>
                         </div>
-                        <button class="client-text-button" type="button" data-client-section-link="referrals">Управлять <i class="fas fa-chevron-right"></i></button>
+                        <button class="btn btn-secondary client-text-button" type="button" data-client-section-link="referrals">Управлять →</button>
                     </div>
-                    <div class="card client-last-action ${clientCardState.lastAction ? '' : 'is-empty'}">
-                        <span class="client-last-action-icon"><i class="fas fa-clock-rotate-left"></i></span>
-                        <strong>Последнее действие:</strong>
+                    <div class="card client-last-action ${clientCardState.lastAction ? '' : 'is-empty'}" role="status">
+                        <span>Последнее действие:</span>
                         <span>${clientCardState.lastAction || 'В этой сессии действий ещё не было'}</span>
                     </div>
                 </section>`;
@@ -8521,21 +8577,22 @@
                         ${clientPaymentsSectionHtml(result)}
                     </div>
                     <div class="client-section ${section === 'referrals' ? 'active' : ''}" data-client-section="referrals">
-                        <div class="result-stack">${clientReferralsSectionHtml(refPayload?.result)}</div>
+                        <div class="result-stack client-referrals-workspace">${clientReferralsSectionHtml(refPayload?.result)}</div>
                     </div>
                     <div class="client-section ${section === 'timeline' ? 'active' : ''}" data-client-section="timeline">
-                        <section class="card"><div id="client-timeline-body" class="info-card muted">Откройте вкладку, чтобы загрузить таймлайн.</div></section>
+                        <section class="card client-detail-panel"><h2>Таймлайн клиента</h2><div id="client-timeline-body" class="info-card muted">Откройте вкладку, чтобы загрузить таймлайн.</div></section>
                     </div>
                     <div class="client-section ${section === 'rwmssync' ? 'active' : ''}" data-client-section="rwmssync">
-                        <section class="card"><div id="client-rwms-body" class="info-card muted">Откройте вкладку, чтобы сравнить БД и панель.</div></section>
+                        <section class="card client-detail-panel"><h2>Синхронизация подписки</h2><div id="client-rwms-body" class="info-card muted">Откройте вкладку, чтобы сравнить БД и панель.</div></section>
                     </div>
                     <div class="client-section ${section === 'message' ? 'active' : ''}" data-client-section="message">
-                        <section class="card client-dm">
+                        <section class="card client-dm client-detail-panel">
+                            <h2>Сообщение пользователю</h2>
                             <div class="client-dm-compose">
-                                <textarea id="client-dm-text" class="input" rows="3" placeholder="Сообщение пользователю"></textarea>
+                                <label class="client-detail-field" for="client-dm-text"><span>Текст сообщения</span><textarea id="client-dm-text" class="input" rows="5" placeholder="Сообщение пользователю"></textarea></label>
                                 <div class="client-dm-compose-foot">
-                                    <span class="client-dm-compose-hint"><i class="fas fa-circle-info"></i>Отправят оба бота от имени поддержки</span>
-                                    <button class="btn" type="button" id="client-dm-send"><i class="fas fa-paper-plane"></i>Отправить</button>
+                                    <span class="client-dm-compose-hint">Отправят оба бота от имени поддержки</span>
+                                    <button class="btn" type="button" id="client-dm-send">Отправить</button>
                                 </div>
                             </div>
                             <div id="client-dm-history" class="client-dm-history"></div>
@@ -8588,19 +8645,20 @@
                     return;
                 }
                 target.className = 'client-timeline';
-                target.innerHTML = items.map((item) => {
+                target.innerHTML = `<div class="client-timeline-table-wrap"><table class="client-timeline-table"><thead><tr><th>Дата</th><th>Категория</th><th>Событие</th><th>Детали</th></tr></thead><tbody>${items.map((item) => {
                     // event_type почти всегда дублирует заголовок — не показываем этот шум.
                     const detailChips = Object.entries(item.details || {})
                         .filter(([key, value]) => !(key === 'event_type' && String(value) === item.title))
                         .map(([key, value]) => `<span class="client-timeline-detail">${escapeHtml(key)}: ${escapeHtml(value === null ? '—' : (typeof value === 'object' ? JSON.stringify(value) : value))}</span>`)
                         .join('');
                     return `
-                    <div class="client-timeline-row">
-                        <span class="client-timeline-ts">${escapeHtml(item.ts)}</span>
-                        <span class="client-timeline-cat"><i class="fas ${TIMELINE_CATEGORY_ICONS[item.category] || 'fa-circle-dot'}"></i>${escapeHtml(item.category)}</span>
-                        <span class="client-timeline-text">${escapeHtml(item.title)}${detailChips}</span>
-                    </div>`;
-                }).join('');
+                    <tr class="client-timeline-row">
+                        <td class="client-timeline-ts">${escapeHtml(item.ts)}</td>
+                        <td class="client-timeline-cat">${escapeHtml(item.category)}</td>
+                        <td class="client-timeline-text">${escapeHtml(item.title)}</td>
+                        <td>${detailChips || '—'}</td>
+                    </tr>`;
+                }).join('')}</tbody></table></div>`;
             } catch (error) {
                 delete target.dataset.loaded;
                 target.className = '';
@@ -8621,7 +8679,6 @@
                 const {user, panel, diffs} = payload.result;
                 const diffRows = (diffs || []).map((diff) => `
                     <div class="client-sync-diff">
-                        <i class="fas fa-triangle-exclamation"></i>
                         <div>
                             <b>${escapeHtml(diff.label)}</b>
                             <span>БД: ${escapeHtml(diff.db)} · Панель: ${escapeHtml(diff.panel)}</span>
@@ -8629,17 +8686,17 @@
                     </div>`).join('');
                 target.className = 'client-sync';
                 target.innerHTML = `
-                    <div class="metrics-grid two">
+                    <div class="metrics-grid two client-detail-metrics">
                         ${metric('БД: окончание', escapeHtml(user.expire_at || '—'), 'fa-database')}
-                        ${metric('Панель', panel ? `${escapeHtml(panel.expire_at || '—')} · ${escapeHtml(panel.status)}` : 'нет подписки', 'fa-server')}
+                        <div class="metric"><div class="metric-label">Панель</div><div class="metric-value">${panel ? escapeHtml(panel.expire_at || '—') : 'нет подписки'}</div>${panel ? `<div class="client-detail-metric-note">${escapeHtml(panel.status)}</div>` : ''}</div>
                     </div>
-                    ${diffRows || '<div class="client-sync-ok"><i class="fas fa-circle-check"></i>Расхождений нет</div>'}
+                    ${diffRows || '<div class="client-sync-ok">✓ Расхождений нет</div>'}
                     <div class="client-sync-actions">
-                        <button class="btn" type="button" data-rwms-sync-action="push_to_panel" ${panel ? '' : 'disabled'}><i class="fas fa-upload"></i>БД → панель</button>
-                        <button class="btn" type="button" data-rwms-sync-action="pull_from_panel" ${panel ? '' : 'disabled'}><i class="fas fa-download"></i>Панель → БД</button>
-                        <button class="btn btn-secondary" type="button" data-rwms-sync-action="refresh"><i class="fas fa-rotate"></i>Обновить</button>
-                        <span class="client-sync-hint">Синхронизируется только дата окончания и статус; подписки не пересоздаются и не удаляются.</span>
-                    </div>`;
+                        <button class="btn" type="button" data-rwms-sync-action="push_to_panel" ${panel ? '' : 'disabled'}>БД → панель</button>
+                        <button class="btn" type="button" data-rwms-sync-action="pull_from_panel" ${panel ? '' : 'disabled'}>Панель → БД</button>
+                        <button class="btn btn-secondary" type="button" data-rwms-sync-action="refresh">Обновить</button>
+                    </div>
+                    <p class="client-sync-hint">Синхронизируется только дата окончания и статус; подписки не пересоздаются и не удаляются.</p>`;
                 target.querySelectorAll('[data-rwms-sync-action]').forEach((button) => button.addEventListener('click', async () => {
                     const action = button.dataset.rwmsSyncAction;
                     if (action === 'refresh') return loadClientRwmsSync(true);
@@ -9523,10 +9580,10 @@
                     ${promoUsageMarkup(row.used_count, row.max_uses)}
                     <div class="promo-code-date"><b>${row.valid_until ? escapeHtml(row.valid_until) : 'Без срока'}</b>${row.valid_until ? 'активировать до даты' : 'активация не ограничена'}</div>
                     <div class="promo-row-actions">
-                        <button type="button" class="promo-icon-action" data-promo-copy="${code}" title="Скопировать код" aria-label="Скопировать код ${code}"><i class="fas fa-copy"></i></button>
-                        <a class="promo-icon-action" href="${deepLink}" target="_blank" rel="noopener" title="Открыть deep-link" aria-label="Открыть ссылку промокода"><i class="fab fa-telegram"></i></a>
-                        <button type="button" class="promo-icon-action" data-promo-toggle="${row.id}" title="${row.is_active ? 'Выключить' : 'Включить'}" aria-label="${row.is_active ? 'Выключить' : 'Включить'} промокод ${code}"><i class="fas fa-power-off"></i></button>
-                        <button type="button" class="promo-icon-action is-danger" data-promo-delete="${row.id}" data-promo-code="${code}" data-promo-uses="${row.used_count}" title="Удалить" aria-label="Удалить промокод ${code}"><i class="fas fa-trash"></i></button>
+                        <button type="button" class="promo-icon-action" data-promo-copy="${code}" title="Скопировать код" aria-label="Скопировать код ${code}">Код</button>
+                        <a class="promo-icon-action" href="${deepLink}" target="_blank" rel="noopener" title="Открыть deep-link" aria-label="Открыть ссылку промокода">Ссылка</a>
+                        <button type="button" class="promo-icon-action" data-promo-toggle="${row.id}" title="${row.is_active ? 'Выключить' : 'Включить'}" aria-label="${row.is_active ? 'Выключить' : 'Включить'} промокод ${code}">${row.is_active ? 'Выключить' : 'Включить'}</button>
+                        <button type="button" class="promo-icon-action is-danger" data-promo-delete="${row.id}" data-promo-code="${code}" data-promo-uses="${row.used_count}" title="Удалить" aria-label="Удалить промокод ${code}">Удалить</button>
                     </div>
                 </article>`;
             }).join('');
@@ -9589,8 +9646,8 @@
             ];
             const funnelHtml = `<article class="promo-cohort-panel">
                 <div class="promo-cohort-panel-head"><div><h3>Воронка монетизации</h3><p>Конверсия указана относительно предыдущего шага</p></div><span class="promo-cohort-panel-count">${num(activations)} активаций</span></div>
-                <div class="promo-cohort-funnel">${funnel.map((step, index) => {
-                    const height = index === 0 ? 100 : Math.max(step.value ? 6 : 0, promoCohortPct(step.value, activations));
+                <div class="promo-cohort-funnel">${funnel.map((step) => {
+                    const height = activations > 0 ? Math.min(100, 100 * step.value / activations) : 0;
                     return `<div class="promo-cohort-funnel-step">
                         <div class="promo-cohort-funnel-value"><b>${num(step.value)}</b><span>${step.rate}</span></div>
                         <div class="promo-cohort-funnel-track"><span class="promo-cohort-funnel-bar" style="height:${height}%"></span></div>
@@ -10411,7 +10468,7 @@
             if (indicator) indicator.hidden = !isDirty;
         }
 
-        function renderRuntimeSettings(settings) {
+        function renderRuntimeSettings(settings, winbackLoad) {
             const containers = document.querySelectorAll('[data-settings-group]');
             if (!containers.length) return;
             const byKey = Object.fromEntries((settings || []).map((s) => [s.key, s]));
@@ -10424,6 +10481,14 @@
                     ? ungrouped
                     : (group?.keys || []).map((k) => byKey[k]).filter(Boolean);
                 container.classList.toggle('has-settings', Boolean(rows.length));
+                if (slug === 'winback') {
+                    AdminWinbackSettings.render(container, rows, {
+                        url: main.dataset.runtimeSettingsUrl, csrfToken,
+                        controlHtml: settingControlHtml, escapeHtml,
+                        loadToken: winbackLoad?.get(container),
+                    });
+                    return;
+                }
                 container.innerHTML = rows.length
                     ? settingsListHtml(rows)
                     : '<div class="info-card muted">Настроек нет.</div>';
@@ -10435,20 +10500,39 @@
         async function loadRuntimeSettings(silent = false) {
             const containers = document.querySelectorAll('[data-settings-group]');
             if (!containers.length || !main.dataset.runtimeSettingsUrl) return;
+            const winbackLoad = new Map();
+            containers.forEach((container) => {
+                if (container.dataset.settingsGroup === 'winback') {
+                    winbackLoad.set(container, AdminWinbackSettings.beginLoad(container));
+                }
+            });
             if (!silent) containers.forEach((container) => {
+                if (container.dataset.settingsGroup === 'winback' && container.querySelector('[data-winback-form]')) return;
                 container.classList.remove('has-settings');
                 container.innerHTML = inlineLoading('Загружаем настройки...');
             });
-            const response = await fetch(main.dataset.runtimeSettingsUrl, {
-                headers: {'X-Requested-With': 'XMLHttpRequest'},
-                cache: 'no-store',
-            });
-            if (!response.ok) {
-                if (!silent) containers.forEach((container) => { container.innerHTML = inlineError('Не удалось загрузить настройки'); });
-                return;
+            try {
+                const response = await fetch(main.dataset.runtimeSettingsUrl, {
+                    headers: {'X-Requested-With': 'XMLHttpRequest'},
+                    cache: 'no-store',
+                });
+                if (!response.ok) {
+                    containers.forEach((container) => {
+                        if (container.dataset.settingsGroup === 'winback'
+                            && AdminWinbackSettings.loadError(container, winbackLoad.get(container), 'Не удалось загрузить настройки')) return;
+                        if (!silent) container.innerHTML = inlineError('Не удалось загрузить настройки');
+                    });
+                    return;
+                }
+                const payload = await response.json();
+                renderRuntimeSettings(payload.settings || [], winbackLoad);
+            } catch (error) {
+                containers.forEach((container) => {
+                    if (container.dataset.settingsGroup !== 'winback') return;
+                    const kept = AdminWinbackSettings.loadError(container, winbackLoad.get(container), 'Не удалось загрузить настройки. Проверьте соединение.');
+                    if (!kept && !silent) container.innerHTML = inlineError('Не удалось загрузить настройки');
+                });
             }
-            const payload = await response.json();
-            renderRuntimeSettings(payload.settings || []);
         }
 
         async function submitRuntimeSetting(event) {
@@ -11169,17 +11253,18 @@
                 target.innerHTML = '<div class="node-provision-empty"><i class="fas fa-server"></i><br>Заявок пока нет — создай первую установку выше.</div>';
                 return;
             }
-            target.innerHTML = requests.map((request) => `
-                <article class="node-provision-request-row">
-                    <div class="node-provision-request-main">
-                        <span class="node-provision-request-icon"><i class="fas fa-server"></i></span>
+            target.innerHTML = `<table class="node-provision-request-table">
+                <thead><tr><th scope="col">Нода / IP</th><th scope="col">Скрипт · версия</th><th scope="col">Создана</th><th scope="col">Состояние</th><th scope="col"><span class="admin-sr-only">Действия</span></th></tr></thead>
+                <tbody>${requests.map((request) => `
+                <tr class="node-provision-request-row">
+                    <td><div class="node-provision-request-main">
                         <div><div class="node-provision-request-name">${escapeHtml(request.node_name)}</div><div class="node-provision-request-note">#${request.id} · ${escapeHtml(request.claimed_ip || 'IP пока не получен')}</div></div>
-                    </div>
-                    <div><div class="node-provision-cell-label">Скрипт</div><div class="node-provision-cell-value">${escapeHtml(request.script_name || nodeProvisionTypeLabel(request.node_type))} · v${request.script_version || '?'}</div></div>
-                    <div><div class="node-provision-cell-label">Создана</div><div class="node-provision-cell-value">${escapeHtml(nodeProvisionDateLabel(request.created_at))}</div></div>
-                    <div>${nodeProvisionStatusBadge(request.status)}</div>
-                    <button class="btn btn-secondary" type="button" data-open-provision-request="${request.id}">Открыть</button>
-                </article>`).join('');
+                    </div></td>
+                    <td><div class="node-provision-cell-value">${escapeHtml(request.script_name || nodeProvisionTypeLabel(request.node_type))} · v${request.script_version || '?'}</div></td>
+                    <td><div class="node-provision-cell-value">${escapeHtml(nodeProvisionDateLabel(request.created_at))}</div></td>
+                    <td>${nodeProvisionStatusBadge(request.status)}</td>
+                    <td><button class="btn btn-secondary" type="button" data-open-provision-request="${request.id}">Открыть</button></td>
+                </tr>`).join('')}</tbody></table>`;
             target.querySelectorAll('[data-open-provision-request]').forEach((button) => {
                 button.addEventListener('click', () => openNodeProvisionDetail(Number(button.dataset.openProvisionRequest)));
             });
@@ -12967,10 +13052,10 @@
                     <article class="infra-server-card${cardTone}" data-infra-server="${server.id}" role="button" tabindex="0" aria-label="Открыть сервер ${name}">
                         <header class="infra-server-card-head">
                             <div class="infra-server-card-identity">
-                                <span class="infra-server-icon"><i class="fas fa-server"></i></span>
+                                ${server.country_code ? `<span class="infra-server-card-country" role="img" aria-label="Страна: ${escapeHtml(server.country_code)}">${infraCountryFlag(server.country_code)}</span>` : '<span class="infra-server-icon"><i class="fas fa-server"></i></span>'}
                                 <div class="infra-server-card-copy">
-                                    <div class="infra-server-card-name">${server.country_code ? infraCountryFlag(server.country_code) + ' ' : ''}${name}</div>
-                                    <div class="infra-server-card-host" title="${host}">${host}</div>
+                                    <div class="infra-server-card-name">${name}</div>
+                                    ${server.country_code ? `<div class="infra-server-card-country-code">${escapeHtml(server.country_code)}</div>` : ''}
                                 </div>
                             </div>
                             <div class="infra-server-card-head-actions">
@@ -12978,6 +13063,7 @@
                                 <button type="button" class="infra-mini-btn infra-row-action" data-infra-menu="${server.id}" title="Быстрые действия" aria-haspopup="menu" aria-label="Быстрые действия ${name}"><i class="fas fa-ellipsis-vertical"></i></button>
                             </div>
                         </header>
+                        <div class="infra-server-card-host" title="${host}">${host}</div>
                         ${view.flags ? `<div class="infra-server-card-flags">${view.flags}</div>` : ''}
                         <div class="infra-server-card-traffic">
                             <div>
@@ -15008,7 +15094,7 @@
         // Раскладывает легенду по строкам под ширину канвы. Возвращает массив
         // строк, каждая — список {series, x} с уже посчитанной позицией.
         function acqLegendRows(ctx, legend, availableWidth) {
-            ctx.font = '10px sans-serif';
+            ctx.font = '12px Manrope, system-ui, sans-serif';
             const rows = [];
             let row = [];
             let x = 6;
@@ -15050,14 +15136,15 @@
                 const legend = [...barSeries, ...lineSeries].filter((sr) => sr.label);
                 // Легенда переносится по строкам: в одну строку она не влезает на
                 // узких экранах и раньше просто уезжала за правый край канвы.
-                const legendRowH = 14;
+                const legendRowH = 18;
                 const legendRows = acqLegendRows(ctx, legend, Math.max(80, w - 12));
-                const padL = 54, padR = lineSeries.length ? 54 : 14;
+                const lineOnly = opts.lineOnly && !barSeries.length && lineSeries.length;
+                const padL = 54, padR = lineSeries.length && !lineOnly ? 54 : 14;
                 const padT = 6 + legendRows.length * legendRowH + 6, padB = 26;
                 const plotW = w - padL - padR, plotH = Math.max(1, h - padT - padB);
                 meta.padL = padL;
                 meta.step = n ? plotW / n : 0;
-                if (!n) { ctx.fillStyle = adminChartUiColor('empty'); ctx.font = '12px sans-serif'; ctx.fillText('Нет данных', padL, h / 2); return; }
+                if (!n) { ctx.fillStyle = adminChartUiColor('empty'); ctx.font = '12px Manrope, system-ui, sans-serif'; ctx.fillText('Нет данных', padL, h / 2); return; }
                 const barTotals = labels.map((_, i2) => barSeries.reduce((acc, sr) => acc + (sr.data[i2] || 0), 0));
                 const maxBar = Math.max(1, ...barTotals);
                 const maxLine = Math.max(1, ...lineSeries.flatMap((sr) => sr.data.filter((v) => v != null)));
@@ -15069,15 +15156,15 @@
                     ctx.fillRect(padL + hi * step, padT, step, plotH);
                 }
                 ctx.fillStyle = adminChartUiColor('label');
-                ctx.font = '10px sans-serif'; ctx.textAlign = 'right';
+                ctx.font = '11px Manrope, system-ui, sans-serif'; ctx.textAlign = 'right';
                 for (let g = 0; g <= 4; g++) {
                     const y = padT + plotH - (plotH * g) / 4;
                     // Нулевая линия заметнее прочих: от неё считываются высоты баров.
                     ctx.strokeStyle = adminChartUiColor(g === 0 ? 'gridStrong' : 'grid');
                     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
                     ctx.fillStyle = adminChartUiColor('label');
-                    ctx.fillText(adminChartAxisLabel((maxBar * g) / 4, barFmt), padL - 6, y + 3);
-                    if (lineSeries.length) { ctx.textAlign = 'left'; ctx.fillText(adminChartAxisLabel((maxLine * g) / 4, lineFmt), w - padR + 6, y + 3); ctx.textAlign = 'right'; }
+                    ctx.fillText(adminChartAxisLabel(((lineOnly ? maxLine : maxBar) * g) / 4, lineOnly ? lineFmt : barFmt), padL - 6, y + 3);
+                    if (lineSeries.length && !lineOnly) { ctx.textAlign = 'left'; ctx.fillText(adminChartAxisLabel((maxLine * g) / 4, lineFmt), w - padR + 6, y + 3); ctx.textAlign = 'right'; }
                 }
                 barSeries.length && labels.forEach((_, i2) => {
                     let y = padT + plotH;
@@ -15096,6 +15183,33 @@
                         y -= bh;
                     });
                 });
+                // Optional range fill uses the same series and scale as the
+                // lines/tooltip. Missing values break the band, never invent data.
+                if (opts.rangeBand) {
+                    const lower = lineSeries[opts.rangeBand[0]]?.data || [];
+                    const upper = lineSeries[opts.rangeBand[1]]?.data || [];
+                    let segment = [];
+                    const fillSegment = () => {
+                        if (segment.length > 1) {
+                            ctx.beginPath();
+                            segment.forEach((i2, index) => {
+                                const x = padL + (i2 + .5) * step;
+                                const y = padT + plotH - lower[i2] / maxLine * plotH;
+                                if (index === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+                            });
+                            segment.slice().reverse().forEach((i2) => ctx.lineTo(padL + (i2 + .5) * step, padT + plotH - upper[i2] / maxLine * plotH));
+                            ctx.closePath();
+                            ctx.fillStyle = adminChartUiColor('highlight');
+                            ctx.fill();
+                        }
+                        segment = [];
+                    };
+                    labels.forEach((_, i2) => {
+                        if (Number.isFinite(lower[i2]) && Number.isFinite(upper[i2])) segment.push(i2);
+                        else fillSegment();
+                    });
+                    fillSegment();
+                }
                 lineSeries.forEach((sr) => {
                     ctx.strokeStyle = adminChartSeriesColor(sr); ctx.lineWidth = sr.width || 2;
                     if (sr.dash) ctx.setLineDash(sr.dash); else ctx.setLineDash([]);
@@ -15124,15 +15238,15 @@
                         ctx.lineWidth = 2; ctx.strokeStyle = adminChartUiColor('pointBorder'); ctx.stroke();
                     });
                 }
-                ctx.fillStyle = adminChartUiColor('label'); ctx.textAlign = 'center'; ctx.font = '9px sans-serif';
+                ctx.fillStyle = adminChartUiColor('label'); ctx.textAlign = 'center'; ctx.font = '11px Manrope, system-ui, sans-serif';
                 // Шаг подписей считается по реальной ширине текста, а не по
                 // фиксированному «каждая n/14»: иначе на узком экране даты слипаются.
                 const widestLabel = labels.reduce((acc, lb) => Math.max(acc, ctx.measureText(String(lb)).width), 0);
                 const every = Math.max(1, Math.ceil((widestLabel + 10) / Math.max(1, step)));
                 labels.forEach((lb, i2) => { if (i2 % every === 0) ctx.fillText(lb, padL + i2 * step + step / 2, h - 8); });
-                ctx.textAlign = 'left'; ctx.font = '10px sans-serif';
+                ctx.textAlign = 'left'; ctx.font = '12px Manrope, system-ui, sans-serif';
                 legendRows.forEach((row, rowIndex) => {
-                    const ly = 4 + rowIndex * legendRowH;
+                    const ly = 6 + rowIndex * legendRowH;
                     row.forEach((item) => {
                         ctx.fillStyle = adminChartSeriesColor(item.series);
                         ctx.fillRect(item.x, ly, 8, 8);
@@ -15415,7 +15529,7 @@
                     {label: 'Медиана', tone: 'neutral', data: res.typical.p50, fmt: 'rub'},
                     {label: 'Сегодня', tone: 'amber', width: 3, data: res.today.map((v, h) => (h <= cutoff ? v : null)), fmt: 'rub'},
                 ],
-                {fullLabels: hrs.map((h) => `к ${h}:59 МСК (накопленная выручка)`)});
+                {fullLabels: hrs.map((h) => `к ${h}:59 МСК (накопленная выручка)`), lineOnly: true, rangeBand: [0, 1]});
             const cell = {};
             let maxRub = 1;
             res.heatmap.forEach((r) => { cell[`${r.dow}-${r.hr}`] = r; maxRub = Math.max(maxRub, r.rub); });

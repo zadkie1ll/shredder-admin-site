@@ -1,0 +1,321 @@
+/* Approved gallery: mi-query, mi-panel, mi-setting, mi-tablewrap and mi-split.
+ * These rules are scoped to the real sections. Additional production fields,
+ * source metadata, actions, errors and disclosure controls remain accessible.
+ */
+:is(#subpanel-overview, #subpanel-cohort) .card:not(.form-card),
+#panel-acquisition .subtab-panel > .card,
+#panel-system .system-card,
+#panel-payment-info .info-card,
+#panel-bulk-actions > .card,
+#panel-reply-templates .form-card,
+#panel-support .ticket-list {
+    border: 0; border-radius: 10px; background: var(--admin-surface);
+    box-shadow: none; padding: 22px; margin-bottom: 28px;
+}
+#panel-system .system-card-title,
+#panel-acquisition .subtab-panel > .card > strong {
+    font-size: 18px; font-weight: 600; line-height: 1.4; margin: 0 0 13px;
+    letter-spacing: 0; color: var(--admin-text); text-transform: none;
+}
+#panel-system .system-settings-card { width: 100%; max-width: none; }
+#panel-acquisition .chart-title-wrap { margin-bottom: 13px; gap: 8px; }
+#panel-acquisition .chart-title-wrap > strong { letter-spacing: 0; }
+#panel-acquisition .card:has(#acq-newrep-chart) .chart-title-wrap > strong,
+#panel-acquisition .card:has(#acq-mrr-chart) .chart-title-wrap > strong,
+#panel-acquisition .card:has(#acq-pushes-chart) .chart-title-wrap > strong {
+    color: var(--admin-money);
+}
+
+/* The original filters remain intact, in the separate query surface used by
+ * the approved concept. Month shortcuts and custom date popovers are retained.
+ */
+#stats-form, #cohort-form, #panel-acquisition .admin-section-query {
+    padding: 18px 20px; margin: 0 0 26px; border: 1px solid var(--admin-border);
+    border-radius: 10px; background: var(--admin-surface); box-shadow: none;
+}
+html:not([data-admin-theme="light"]) :is(#stats-form, #cohort-form, #panel-acquisition .admin-section-query) {
+    background: #15181d; border-color: #30353e;
+}
+#stats-form { gap: 12px; }
+#stats-form .date-presets { gap: 6px; margin: 15px 0 0; padding: 0; border: 0; }
+#stats-form .date-preset-group { display: contents; }
+#stats-form :is(.date-presets-label, .date-preset-group-label) { display: none; }
+#stats-form .date-preset { min-height: 0; padding: 6px 8px; font-size: 11px; font-weight: 400; }
+#panel-acquisition .admin-section-query { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+#panel-acquisition .admin-section-query > :is(select, .date-field) { flex: 1 1 125px; min-width: 0; }
+#panel-acquisition .subtab-panel .admin-section-query select,
+#panel-acquisition .admin-section-query .date-trigger {
+    min-height: 40px; height: 40px; padding: 8px; border-radius: 7px; font-size: 14px !important;
+}
+#panel-acquisition .admin-section-query > .subtab {
+    min-height: 40px; padding: 9px 12px; margin: 0; border-radius: 7px !important;
+    background: var(--admin-accent); color: #141414; font-size: 14px; font-weight: 650;
+    border: 1px solid var(--admin-accent) !important;
+}
+#panel-acquisition .subtab-panel .card :is(input:not([type=file]), select) {
+    font-family: inherit; font-size: 14px !important; border-radius: 7px !important;
+}
+#panel-acquisition :is(#acq-mrr-cards, #acq-payhealth-cards) {
+    display: grid !important; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 20px !important; padding: 0 0 23px; margin: 20px 0 28px !important;
+    border-bottom: 1px solid var(--admin-border);
+}
+#panel-acquisition :is(#acq-mrr-cards, #acq-payhealth-cards) > div {
+    min-width: 0 !important; padding: 0 !important; background: none !important;
+    border: 0 !important; border-radius: 0 !important;
+}
+#panel-acquisition :is(#acq-mrr-cards, #acq-payhealth-cards) > div > div:first-child {
+    color: var(--admin-text-soft) !important; font-size: 12px !important; font-weight: 550;
+}
+#panel-acquisition :is(#acq-mrr-cards, #acq-payhealth-cards) > div > div:last-child {
+    margin: 5px 0; font-size: 27px !important; font-weight: 600 !important;
+    letter-spacing: -.5px; line-height: 1.5; font-variant-numeric: tabular-nums;
+}
+#panel-acquisition .acq-chart-data-section { padding: 0; border: 0; background: transparent; margin-top: 28px; }
+#panel-acquisition .acq-chart-data-header { padding: 0 0 13px; }
+#panel-acquisition .acq-chart-data-kicker { display: none; }
+#panel-acquisition .acq-chart-data-heading h3 { font-size: 18px; font-weight: 600; }
+
+/* The real tables have more columns than the gallery fixtures. Their horizontal
+ * scrolling remains local, with the same 13px type and 15px row rhythm.
+ * The payment heatmap keeps its separate cell geometry and color scale.
+ */
+:is(#panel-acquisition, #panel-system, #panel-bulk-actions) table:not(#acq-heatmap table) {
+    width: 100%; border-collapse: collapse; font-size: 13px !important;
+}
+:is(#panel-acquisition, #panel-system, #panel-bulk-actions) table:not(#acq-heatmap table) th {
+    padding: 14px 10px !important; background: var(--admin-surface-raised);
+    color: var(--admin-text-soft) !important; font-size: 11px !important;
+    font-weight: 500 !important; letter-spacing: 0; text-align: left;
+    border-bottom: 1px solid var(--admin-border-strong) !important; white-space: nowrap;
+}
+:is(#panel-acquisition, #panel-system, #panel-bulk-actions) table:not(#acq-heatmap table) td {
+    padding: 15px 10px !important; border-bottom: 1px solid var(--admin-border) !important;
+    font-size: 13px !important; line-height: 1.5; font-variant-numeric: tabular-nums; vertical-align: middle;
+}
+:is(#panel-acquisition, #panel-system, #panel-bulk-actions) table:not(#acq-heatmap table) td:first-child { font-weight: 500; }
+:is(#panel-acquisition, #panel-system, #panel-bulk-actions) table:not(#acq-heatmap table) tr:last-child td { border-bottom: 0 !important; }
+html:not([data-admin-theme="light"]) :is(#panel-acquisition, #panel-system, #panel-bulk-actions) table:not(#acq-heatmap table) tbody tr:hover { background: #1d232b; }
+#subpanel-overview :is(.sources-table-row, .sources-table-row.table-head),
+#subpanel-cohort :is(.sources-table-row, .sources-table-row.table-head) { padding: 15px 10px; font-size: 13px; }
+#subpanel-overview .sources-table-row.table-head,
+#subpanel-cohort .sources-table-row.table-head { padding: 14px 10px; font-size: 11px; font-weight: 500; letter-spacing: 0; }
+#subpanel-overview .sources-th,
+#subpanel-cohort .sources-th { font-size: 11px; font-weight: 500; letter-spacing: 0; }
+
+/* Runtime settings use the concept's label/value columns. Real provenance and
+ * save/reset actions occupy a second line under the value, never disappear.
+ */
+html[data-admin-theme] #panel-system .settings-list.has-settings { overflow: visible; border: 0; border-radius: 0; background: transparent; }
+#panel-system .settings-list-head { display: none; }
+html[data-admin-theme] #panel-system .settings-list.has-settings .setting-row {
+    grid-template-columns: minmax(0, 1fr) minmax(110px, .6fr); gap: 10px 24px;
+    min-height: 0; padding: 18px 0; margin: 0; border-radius: 0;
+    border: 0; border-bottom: 1px solid var(--admin-border); background: transparent; box-shadow: none;
+}
+html[data-admin-theme] #panel-system .settings-list.has-settings .setting-row:last-child { border-bottom: 0; }
+#panel-system .setting-row-info { grid-column: 1; grid-row: 1 / 3; align-self: center; }
+#panel-system .setting-value-editor { grid-column: 2; grid-row: 1; padding: 0; }
+#panel-system .setting-row-side { grid-column: 2; grid-row: 2; justify-content: space-between; flex-wrap: wrap; gap: 8px 12px; }
+#panel-system .setting-row-origin { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; min-width: 0; }
+#panel-system .setting-key { font-size: 14px; line-height: 1.5; font-weight: 400; color: var(--admin-text); }
+#panel-system .setting-meta { margin-top: 5px; font-size: 12px; font-weight: 400; line-height: 1.5; }
+#panel-system .setting-type-badge { font-size: 10px; font-weight: 400; letter-spacing: 0; text-transform: none; }
+#panel-system .setting-state-date { font-size: 10px; font-weight: 400; }
+#panel-system .setting-value-editor .input { border-radius: 7px; min-height: 40px; padding: 10px 12px; font-size: 14px; }
+#panel-system .setting-select-shell .input { padding-right: 32px; }
+#panel-system .setting-action { min-height: 32px; font-size: 11px; font-weight: 400; border-radius: 7px; padding: 6px 8px; }
+html[data-admin-theme] #panel-system .settings-list.has-settings .setting-row.is-dirty { background: var(--admin-accent-soft); }
+#panel-system .referral-section-icon { display: none; }
+#panel-system .referral-section-heading { gap: 0; padding: 0; margin-bottom: 13px; border: 0; }
+#panel-system .referral-section-heading p { font-size: 12px; font-weight: 400; line-height: 1.5; }
+#panel-system :is(.antifraud-panel, .antiabuse-bulk-list) { border: 0; border-radius: 0; background: transparent; }
+#panel-system .antifraud-row { padding: 18px 0; background: transparent; gap: 24px; }
+#panel-system .antifraud-row-name { font-size: 14px; font-weight: 400; }
+#panel-system :is(.antifraud-row-desc, .antiabuse-bulk-copy > span) { font-size: 12px; font-weight: 400; line-height: 1.5; }
+#panel-system .antiabuse-bulk-row { padding: 18px 0; background: transparent; }
+#panel-system .referral-settings-stack, #panel-system .antiabuse-stack { gap: 0; }
+
+/* Payment journal: plain table rows, with expandable full ID/provider/result.
+ * User, timestamps, mixed currencies and pending/cancelled states are retained.
+ */
+#panel-payment-info #payment-info-form { padding: 0; border: 0; background: transparent; gap: 10px; margin-bottom: 22px; }
+#panel-payment-info #payments-history-details { padding: 22px; border: 0; border-radius: 10px; margin-bottom: 28px; }
+#panel-payment-info .payment-history-summary { padding: 0 0 13px; border: 0; min-height: 0; gap: 10px; background: transparent; }
+#panel-payment-info .payment-history-summary-icon,
+#panel-payment-info .payment-history-summary-eyebrow,
+#panel-payment-info .payment-history-summary-copy > span,
+#panel-payment-info .payment-journal-provider { display: none; }
+#panel-payment-info .payment-history-summary-copy > strong { font-size: 18px; font-weight: 600; line-height: 1.4; letter-spacing: 0; }
+#panel-payment-info .payment-history-summary-copy > small { margin-top: 5px; font-size: 12px; font-weight: 400; }
+#panel-payment-info .payment-journal-columns { padding: 14px 10px; font-size: 11px; font-weight: 500; letter-spacing: 0; text-transform: none; background: var(--admin-surface-raised); color: var(--admin-text-soft); }
+#panel-payment-info .payment-journal-row { padding: 15px 10px; font-size: 13px; min-height: 0; background: transparent; }
+#panel-payment-info .payment-journal-operation { display: block; gap: 0; }
+#panel-payment-info .payment-journal-operation-copy strong { font-size: 13px; font-weight: 500; }
+#panel-payment-info .payment-journal-id { font-size: 11px; font-weight: 400; }
+#panel-payment-info .payment-journal-date { font-size: 13px; font-weight: 400; }
+#panel-payment-info .payment-journal-date small { font-size: 11px; font-weight: 400; }
+#panel-payment-info .payment-journal-amount { font-size: 13px; font-weight: 600; }
+#panel-payment-info .payment-journal-status { padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 12px; font-weight: 400; }
+#panel-payment-info .payment-journal-item { background: transparent; border-bottom: 1px solid var(--admin-border); }
+#panel-payment-info .payment-journal-item::before { display: none; }
+#panel-payment-info .payment-journal-details { margin: 0 10px 15px; padding: 12px 14px; border-radius: 7px; background: var(--admin-surface-soft); }
+#panel-payment-info .payment-journal-details strong { font-size: 12px; font-weight: 500; }
+#panel-payment-info .payments-board-footer { padding: 20px 0 0; border: 0; font-size: 12px; font-weight: 400; background: transparent; color: var(--admin-text-muted); }
+#panel-payment-info .metrics-grid { gap: 20px; padding-bottom: 23px; border-bottom: 1px solid var(--admin-border); }
+#panel-payment-info .metric { border: 0; padding: 0; background: transparent; border-radius: 0; min-height: 0; }
+
+#panel-bulk-actions > .card { padding: 22px !important; }
+#panel-bulk-actions > .card > p { font-size: 12px; font-weight: 400; line-height: 1.5; }
+#panel-bulk-actions #bulk-ids { padding: 10px 12px; border-radius: 7px; font-size: 14px; line-height: 1.5; min-height: 100px; }
+
+/* The existing list and editor become the gallery's two-column split.
+ * Active/order metadata, full response text and deletion remain available.
+ */
+#panel-reply-templates.active { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 0 18px; align-items: start; }
+#panel-reply-templates > .panel-header { grid-column: 1 / -1; }
+#panel-reply-templates #reply-template-form { grid-column: 2; grid-row: 2; gap: 16px; padding: 22px; }
+#panel-reply-templates .admin-template-library { grid-column: 1; grid-row: 2; min-width: 0; padding: 22px; background: var(--admin-surface); border-radius: 10px; margin-bottom: 28px; }
+#panel-reply-templates #reply-templates-result { display: block; min-width: 0; }
+#panel-reply-templates .admin-section-title { margin: 0 0 13px; font-size: 18px; font-weight: 600; line-height: 1.4; color: var(--admin-text); }
+#panel-reply-templates .admin-section-field { display: grid; gap: 7px; font-size: 12px; font-weight: 400; color: var(--admin-text-muted); min-width: 0; }
+#panel-reply-templates :is(.admin-section-field .input, .reply-template-body) { width: 100%; }
+#panel-reply-templates #reply-template-form .form-grid-two { grid-template-columns: minmax(0, 1fr); }
+#panel-reply-templates #reply-template-message { grid-column: 1 / -1; grid-row: 3; }
+#panel-reply-templates .reply-template-card { margin: 0; padding: 15px 10px; gap: 8px; border: 0; border-bottom: 1px solid var(--admin-border); border-radius: 0; background: transparent; }
+#panel-reply-templates .reply-template-card:last-child { border-bottom: 0; }
+#panel-reply-templates .reply-template-title { font-size: 14px; font-weight: 500; line-height: 1.5; letter-spacing: 0; }
+#panel-reply-templates .reply-template-meta { margin-top: 5px; font-size: 11px; font-weight: 400; }
+#panel-reply-templates .reply-template-badge { border: 0; border-radius: 0; padding: 0; background: transparent; }
+#panel-reply-templates .reply-template-text { font-size: 12px; font-weight: 400; line-height: 1.5; }
+#panel-reply-templates .reply-template-card.inactive { opacity: 1; }
+#panel-reply-templates .reply-template-card.inactive .reply-template-title { color: var(--admin-text-muted); }
+#panel-reply-templates .reply-template-card-actions { padding: 0; gap: 10px; }
+#panel-reply-templates .mini-btn { min-height: 32px; border-radius: 7px; font-size: 12px; font-weight: 400; background: transparent; }
+#panel-reply-templates .reply-template-body { min-height: 140px; padding: 10px 12px; font-size: 14px; }
+#panel-reply-templates .reply-template-active { font-size: 12px; font-weight: 400; }
+#panel-support .ticket-list { max-height: none; overflow: visible; }
+#panel-support .ticket-link { padding: 15px 10px; border-bottom: 1px solid var(--admin-border); }
+#panel-support .ticket-link:last-child { border-bottom: 0; }
+#panel-support .ticket-subject { font-size: 14px; font-weight: 500; line-height: 1.5; margin: 0; }
+#panel-support .ticket-meta { font-size: 11px; font-weight: 400; }
+#panel-support .ticket-user { margin-top: 5px; font-size: 12px; font-weight: 400; }
+:is(#subpanel-overview, #subpanel-cohort, #panel-system, #panel-payment-info, #panel-bulk-actions, #panel-reply-templates) :is(.input, textarea, .date-trigger) { text-align: left; }
+
+/* Ticket conversation is an existing separate route. It shares the approved
+ * message surfaces without changing delivery, attachments or ticket actions. */
+body:has(.ticket-page) {
+    --bg-color: #101215; --card-bg: #171a1e; --inner-card-bg: #242931;
+    --input-bg: #13161a; --panel-border: #2a2e34; --card-border: #353a42;
+    --muted: #aeb6c1; --text-main: #edf0f3; --brand-gold: #ffcc24;
+    font-family: Manrope, system-ui, sans-serif; font-size: 14px; line-height: 1.5;
+}
+body:has(.ticket-page)::before, body:has(.ticket-page)::after { content: none; }
+.ticket-page { padding: 26px; }
+.ticket-page .ticket-shell { gap: 24px; }
+.ticket-page .ticket-title { font-size: 30px; font-weight: 650; line-height: 1.25; letter-spacing: -.7px; }
+.ticket-page .ticket-subtitle { margin-top: 5px; font-size: 13px; font-weight: 400; }
+.ticket-page .ticket-header a { color: var(--muted); font-size: 12px; font-weight: 400; }
+.ticket-page :is(.ticket-user-card, .chat-card) { padding: 22px; border: 0; border-radius: 10px; background: var(--card-bg); box-shadow: none; backdrop-filter: none; }
+.ticket-page .ticket-user-grid { gap: 20px; font-size: 14px; font-weight: 400; }
+.ticket-page .ticket-user-item { padding: 0; border: 0; border-radius: 0; background: transparent; }
+.ticket-page .ticket-user-label { font-size: 12px; font-weight: 500; }
+.ticket-page .ticket-user-value { white-space: normal; overflow-wrap: anywhere; }
+.ticket-page .msg { max-width: 88%; padding: 14px 16px; border: 0; border-radius: 10px; margin-bottom: 12px; }
+.ticket-page .msg-user { background: #242931; }
+.ticket-page .msg-support { background: #292719; }
+.ticket-page .msg p { color: var(--text-main); font-size: 14px; font-weight: 400; line-height: 1.5; }
+.ticket-page .msg > div:first-child > span { font-weight: 400; }
+.ticket-page :is(.ticket-action-btn, .quick-replies-toggle) { min-height: 40px; padding: 9px 13px; border-radius: 7px; font-size: 14px; font-weight: 400; }
+.ticket-page .quick-replies-toggle { border-color: #3b4149; color: var(--text-main); background: transparent; }
+.ticket-page .quick-replies-panel { border: 1px solid var(--panel-border); border-radius: 10px; background: var(--card-bg); box-shadow: none; }
+.ticket-page .quick-reply-item { border: 0; border-bottom: 1px solid var(--panel-border); border-radius: 0; background: transparent; }
+.ticket-page .quick-reply-title { font-size: 14px; font-weight: 500; }
+.ticket-page .quick-reply-preview { font-size: 12px; font-weight: 400; line-height: 1.5; }
+.ticket-page .composer-textarea { border: 1px solid #353a42; border-radius: 7px; padding: 10px 12px; font-size: 14px; font-weight: 400; }
+.ticket-page .file-btn { border-color: #3b4149; background: transparent; border-radius: 7px; color: var(--muted); }
+.ticket-page .composer button[type=submit] { border-radius: 7px; background: var(--brand-gold); }
+.ticket-page :is(button, a, textarea, input):focus-visible { outline: 2px solid var(--brand-gold); outline-offset: 3px; }
+
+@media (max-width: 700px) {
+    html[data-admin-theme] #panel-system .settings-list.has-settings .setting-row { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    #panel-system .setting-row-info, #panel-system .setting-value-editor, #panel-system .setting-row-side { grid-column: 1; grid-row: auto; }
+    #panel-reply-templates.active { grid-template-columns: minmax(0, 1fr); }
+    #panel-reply-templates .admin-template-library { grid-column: 1; grid-row: 2; }
+    #panel-reply-templates #reply-template-form { grid-column: 1; grid-row: 3; }
+    #panel-reply-templates #reply-template-message { grid-row: 4; }
+    #panel-acquisition :is(#acq-mrr-cards, #acq-payhealth-cards) { gap: 12px !important; }
+    .ticket-page { padding: 20px; }
+}
+
+/* Win-back follows the actual mi-setting editor, including its single footer
+ * action. Extra production parameters use the same row instead of being lost.
+ */
+#panel-system .winback-settings-card { margin: 0 0 28px; }
+#panel-system .winback-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+#panel-system .winback-setting {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(110px, .6fr);
+    align-items: center; gap: 24px; padding: 18px 0;
+    border-bottom: 1px solid var(--admin-border);
+}
+#panel-system .winback-setting:last-child { border-bottom: 0; }
+#panel-system .winback-setting-label > label {
+    display: block; margin: 0; color: var(--admin-text); font-size: 14px;
+    font-weight: 400; line-height: 1.5; letter-spacing: 0; text-transform: none;
+}
+#panel-system [data-winback-dirty] { font-size: 12px; color: var(--admin-accent); }
+#panel-system .winback-setting-value { min-width: 0; }
+html[data-admin-theme] #panel-system .winback-setting-value .input {
+    width: 100%; height: auto; min-height: 0; border: 1px solid var(--admin-border-strong);
+    border-radius: 7px; padding: 10px 12px; font-size: 14px; font-weight: 400;
+    line-height: 1.5; color: var(--admin-text); background: var(--admin-surface-soft);
+}
+html:not([data-admin-theme="light"]) #panel-system .winback-setting-value .input { border-color: #353a42; }
+#panel-system .winback-setting-value .setting-select-shell::after { display: none; }
+#panel-system .winback-setting-value select { appearance: auto; }
+#panel-system .winback-settings-footer {
+    display: flex; justify-content: space-between; align-items: center; gap: 15px;
+    margin-top: 20px; color: var(--admin-text-soft); font-size: 12px;
+}
+#panel-system .winback-settings-footer .btn {
+    min-height: 40px; padding: 9px 13px; border-radius: 7px; margin-left: auto;
+    font-size: 14px; font-weight: 600; white-space: normal;
+}
+#panel-system [data-winback-status].is-error { color: var(--admin-error, #ff8fa3); }
+html[data-admin-theme="light"] #panel-system [data-winback-status].is-error { color: #b52e4a; }
+#panel-system .winback-settings-details { margin-top: 28px; font-size: 12px; color: var(--admin-text-soft); }
+#panel-system .winback-settings-details > summary { cursor: pointer; padding: 10px 0; width: fit-content; }
+#panel-system .winback-settings-details > p { max-width: 80ch; margin: 8px 0; }
+#panel-system .winback-setting-details {
+    display: flex; align-items: center; justify-content: space-between; gap: 24px;
+    padding: 18px 0; border-bottom: 1px solid var(--admin-border);
+}
+#panel-system .winback-setting-details > div { min-width: 0; overflow-wrap: anywhere; }
+#panel-system .winback-setting-details strong { color: var(--admin-text); font-weight: 500; }
+#panel-system .winback-setting-details p { margin: 6px 0; }
+#panel-system .winback-setting-details .btn { flex-shrink: 0; font-size: 12px; }
+#panel-system .winback-setting-details .setting-row-origin { margin-top: 6px; }
+@media (max-width: 700px) {
+    #panel-system .winback-setting { grid-template-columns: minmax(0, 1fr); gap: 10px; }
+    html[data-admin-theme] #panel-system .winback-setting-value .input { font-size: 16px; }
+    #panel-system .winback-setting-details { flex-wrap: wrap; gap: 12px; }
+    #panel-system .winback-settings-footer { flex-wrap: wrap; }
+}
+@media (max-width: 600px) {
+    :is(#subpanel-overview, #subpanel-cohort) .card:not(.form-card),
+    #panel-system .system-card, #panel-payment-info .info-card,
+    #panel-reply-templates #reply-template-form, #panel-reply-templates .admin-template-library,
+    #panel-support .ticket-list, #panel-payment-info #payments-history-details { padding: 14px; }
+    #panel-acquisition .subtab-panel > .card, #panel-bulk-actions > .card { padding: 14px !important; }
+    #stats-form, #cohort-form, #panel-acquisition .admin-section-query { padding: 14px; }
+    #panel-acquisition .admin-section-query > :is(select, .date-field) { flex-basis: 42%; }
+    #panel-system .system-card-title, #panel-acquisition .chart-title-wrap > strong,
+    #panel-payment-info .payment-history-summary-copy > strong { font-size: 17px; }
+    #panel-acquisition :is(#acq-mrr-cards, #acq-payhealth-cards) > div > div:last-child { font-size: 24px !important; }
+    #panel-payment-info .payment-journal-row { padding: 15px 0; }
+    #panel-reply-templates .reply-template-form .form-grid-two { grid-template-columns: minmax(0, 1fr); }
+    #panel-reply-templates .admin-section-title { font-size: 17px; }
+    .ticket-page :is(.ticket-user-card, .chat-card) { padding: 14px; }
+    .ticket-page .ticket-title { font-size: 26px; }
+    .ticket-page .ticket-user-grid { gap: 12px; }
+}

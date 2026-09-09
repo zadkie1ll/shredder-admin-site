@@ -64,6 +64,8 @@ fs.mkdirSync(shots, {recursive:true});
  for(let i=0;i<6;i++) assert.equal(await activity.nth(i).isVisible(),true,'activity visible without expanding device');
  assert.equal(await sheet.locator('details[open]').count(),0);
  assert.equal(await sheet.locator('.mi3-device-meta.is-online').count(),1);
+ assert.deepEqual(await activity.first().evaluate(e=>[getComputedStyle(e).color,getComputedStyle(e,'::before').color]),['rgb(56, 217, 150)','rgb(56, 217, 150)'],'online text and dot are green');
+ for(let i=1;i<6;i++) assert.equal(await activity.nth(i).evaluate(e=>getComputedStyle(e).color),'rgb(191, 192, 197)','inactive and unknown activity remain gray');
  assert.equal(await page.locator('#app-container').evaluate(e=>e.inert),true);
  await page.waitForFunction(()=>[...document.querySelectorAll('#mi3-devices-list svg use')].every(e=>e.getBBox().width>0));
  await page.screenshot({path:path.join(shots,'devices-390.png'),fullPage:true});

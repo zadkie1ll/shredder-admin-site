@@ -48,6 +48,7 @@
 #mi3-devices-sheet .mi3-device-icon { width: 30px; height: 36px; border: 0; border-radius: 0; color: #c7c8cc; background: none; font-size: 23px; }
 #mi3-devices-sheet .mi3-device-name { font-size: 15px; font-weight: 500; overflow-wrap: anywhere; }
 #mi3-devices-sheet .mi3-device-meta { font-size: 13px; color: #bfc0c5; }
+#mi3-devices-sheet .mi3-device-meta.is-online { color: #38d996; }
 #mi3-devices-sheet .mi3-device-del { min-height: 44px; padding: 10px; }
 #mi3-devices-sheet .mi3-empty { color: #bfc0c5; }
 .cabinet-sheet-connect { border: 1px solid #707278; background: none; justify-content: center; margin-top: 16px; }
