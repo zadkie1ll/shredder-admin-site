@@ -88,8 +88,10 @@ const timeline = [{ts: '01.09.2026 20:51', category: 'Платежи', title: '�
         const details = page.locator('#payment-journal-detail-client-0');
         assert.equal(await details.isVisible(), true);
         assert.match(await details.textContent(), /fixture-payment-1.*YooKassa.*canceled/s);
-        assert.equal(await details.evaluate(element => getComputedStyle(element.firstElementChild).textTransform), 'none');
-        assert.equal(await payments.locator('.payment-journal-row').first().evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length), width === 390 ? 2 : 4);
+        assert.equal(await details.locator('[data-payment-copy-id="fixture-payment-1"]').count(), 1);
+        assert.equal(await payments.locator('.payment-journal-chevron').count() > 0, true);
+        assert.equal(await payments.locator('.payment-journal-columns').evaluate(element => getComputedStyle(element).display), width === 390 ? 'none' : 'grid');
+        assert.equal(await payments.locator('.payment-journal-row').first().evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').length), width === 390 ? 3 : 5);
         await shot('real-user-payments', width);
         await page.locator('[data-payment-journal-toggle]').first().click();
         assert.equal(await details.isVisible(), false);

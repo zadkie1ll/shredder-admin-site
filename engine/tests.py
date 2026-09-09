@@ -503,6 +503,22 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn('data-label="Последний замер"', template)
         self.assertIn('class="censor-row-actions" data-label="Действия"', template)
 
+    def test_censor_check_form_fields_do_not_inherit_row_flex_basis(self):
+        """Старые flex-правила инпутов формы замеров ТСПУ задавали flex-basis
+        130-240 px для строчной раскладки; внутри колоночного label концепта
+        это превращалось в высоту поля. Концептный CSS обязан это гасить."""
+        stylesheet = Path("engine/static/css/admin-concept-infrastructure.css").read_text()
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        concept_index = Path("engine/static/css/admin-concept.css").read_text()
+
+        self.assertIn('.censor-check-form .input[name="mode"] { flex: 2 1 240px;', template)
+        self.assertIn(".infra-concept-field {\n    display: flex; flex-direction: column;", stylesheet)
+        rule_start = stylesheet.index("#panel-censor-checks .infra-concept-field .input,")
+        rule = stylesheet[rule_start:stylesheet.index("}", rule_start)]
+        self.assertIn("flex: 0 0 auto;", rule)
+        self.assertIn("height: auto;", rule)
+        self.assertIn("@import url('./admin-concept-infrastructure.css?v=5');", concept_index)
+
     def test_censor_checks_allow_selecting_rows_and_deleting_them(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
         for marker in (
@@ -6236,6 +6252,30 @@ class AdminPaymentJournalTests(SimpleTestCase):
         )
         self.assertIn("details.hidden = !shouldOpen", template)
         self.assertNotIn('<span class="payments-pages"', template)
+        # Карточка клиента больше не держит собственную упрощённую разметку журнала.
+        self.assertNotIn('class="payment-journal-details client-detail-notice"', template)
+        self.assertNotIn('<b class="payment-journal-amount">', template)
+
+    def test_payment_journal_details_offer_copy_id_button(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        css = Path("engine/static/css/admin_dashboard.css").read_text()
+        client_css = Path("engine/static/css/admin-concept-client-details.css").read_text()
+
+        self.assertIn('data-payment-copy-id="${escapeHtml(payment.id)}"', template)
+        self.assertIn('aria-label="Скопировать ID платежа"', template)
+        self.assertIn("async function copyPaymentId(button)", template)
+        self.assertIn("event.target.closest('[data-payment-copy-id]')", template)
+        self.assertIn("showAdminToast('ID платежа скопирован', 'success')", template)
+        self.assertIn("document.execCommand('copy')", template)
+        for selector in (
+            ".payment-journal-copy {",
+            ".payment-journal-copy.is-copied",
+            'html[data-admin-theme="light"] .payment-journal-copy {',
+        ):
+            self.assertIn(selector, css)
+        self.assertIn("#panel-user-payments .client-payment-panel .payment-journal-columns {", client_css)
+        self.assertIn("#panel-user-payments .client-payment-panel .payment-journal-chevron", client_css)
+        self.assertNotIn(".client-payment-panel .payment-journal-row { grid-template-columns: 1fr 1fr; }", client_css)
 
     def test_payment_journal_has_desktop_mobile_and_light_styles(self):
         css = Path("engine/static/css/admin_dashboard.css").read_text()

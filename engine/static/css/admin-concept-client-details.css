@@ -50,56 +50,42 @@ html[data-admin-theme="light"] #panel-user-payments {
     color: var(--admin-text); font-weight: 400;
 }
 
-/* Payment rows keep the same disclosure IDs and delegated toggle. */
+/* Payment rows share paymentJournalRowsHtml() with the global payments page and
+ * mirror its concept styling (#panel-payment-info in admin-concept-sections.css):
+ * column headers, chevron affordance and labelled technical details. */
 #panel-user-payments .client-payment-panel .payment-journal-summary {
     margin: 0; gap: 8px; font-size: 14px; line-height: 1.5; font-weight: 700;
 }
-#panel-user-payments .client-payment-panel .payment-journal-list { display: block; }
+#panel-user-payments .client-payment-panel .payment-journal-provider { display: none; }
+#panel-user-payments .client-payment-panel .payment-journal-columns {
+    padding: 14px 10px; border-bottom: 0; font-size: 11px; font-weight: 500; letter-spacing: 0;
+    text-transform: none; background: var(--admin-surface-raised); color: var(--admin-text-soft);
+}
 #panel-user-payments .client-payment-panel .payment-journal-item {
-    padding: 16px 0; border: 0; border-top: 1px solid var(--client-detail-line);
-    background: transparent;
+    background: transparent; border: 0; border-bottom: 1px solid var(--admin-border);
 }
-#panel-user-payments .client-payment-panel .payment-journal-item::before { content: none; }
+#panel-user-payments .client-payment-panel .payment-journal-item::before { display: none; }
 #panel-user-payments .client-payment-panel .payment-journal-row {
-    display: grid; grid-template-columns: 2fr 1.4fr .8fr 1fr;
-    gap: 12px; align-items: center; width: 100%; min-width: 0;
-    min-height: 0; padding: 0; margin: 0; border: 0; border-radius: 0;
-    background: transparent; font-size: 14px; line-height: 1.5; font-weight: 400;
+    padding: 15px 10px; min-height: 0; font-size: 13px; background: transparent; cursor: pointer;
 }
-#panel-user-payments .client-payment-panel .payment-journal-operation-copy {
-    display: block; min-width: 0; overflow-wrap: anywhere;
-}
-#panel-user-payments .client-payment-panel .payment-journal-date {
-    display: block; font-size: 14px; line-height: 1.5; color: var(--admin-text);
-}
-#panel-user-payments .client-payment-panel :is(.payment-journal-id, .payment-journal-date > small) {
-    display: block; margin: 5px 0 0; font-family: inherit;
-    font-size: 12px; line-height: 1.5; font-weight: 400;
-    color: var(--client-detail-sub); white-space: normal; overflow-wrap: anywhere;
-}
-#panel-user-payments .client-payment-panel .payment-journal-amount {
-    font-size: 14px; line-height: 1.5; font-weight: 700; color: var(--admin-text);
-}
+#panel-user-payments .client-payment-panel .payment-journal-row:hover,
+#panel-user-payments .client-payment-panel .payment-journal-item.is-open .payment-journal-row { background: var(--admin-surface-soft); }
+#panel-user-payments .client-payment-panel .payment-journal-operation { display: block; gap: 0; }
+#panel-user-payments .client-payment-panel .payment-journal-operation-copy strong { font-size: 13px; font-weight: 500; }
+#panel-user-payments .client-payment-panel .payment-journal-id { font-size: 11px; font-weight: 400; }
+#panel-user-payments .client-payment-panel .payment-journal-date { font-size: 13px; font-weight: 400; }
+#panel-user-payments .client-payment-panel .payment-journal-date small { font-size: 11px; font-weight: 400; }
+#panel-user-payments .client-payment-panel .payment-journal-amount { font-size: 13px; font-weight: 600; }
 #panel-user-payments .client-payment-panel .payment-journal-status {
-    display: block; min-height: 0; padding: 0; border: 0; border-radius: 0;
-    background: transparent; font-size: 14px; line-height: 1.5;
-    font-weight: 400; white-space: normal;
+    padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 12px; font-weight: 400;
 }
-#panel-user-payments .client-payment-panel .payment-journal-status.is-success { color: var(--workspace-success); }
-#panel-user-payments .client-payment-panel .payment-journal-status.is-error { color: var(--workspace-danger); }
-#panel-user-payments .client-payment-panel .payment-journal-status.is-pending { color: var(--admin-accent); }
-#panel-user-payments .client-detail-notice {
-    padding: 14px; margin: 0; background: var(--client-detail-notice-bg);
-    border: 1px solid var(--client-detail-notice-line); border-radius: 10px;
-    color: var(--client-detail-notice-text); font-size: 14px; line-height: 1.5;
-    font-weight: 400; overflow-wrap: anywhere;
+#panel-user-payments .client-payment-panel .payment-journal-chevron { font-size: 11px; }
+#panel-user-payments .client-payment-panel .payment-journal-details {
+    margin: 0 10px 15px; padding: 12px 14px; border-radius: 7px; background: var(--admin-surface-soft);
 }
-#panel-user-payments .client-payment-panel .payment-journal-details:not([hidden]) { display: block; }
-#panel-user-payments .client-payment-panel .payment-journal-details span,
-#panel-user-payments .client-payment-panel .payment-journal-full-id {
-    display: inline; margin: 0; font: inherit; color: inherit;
-    white-space: normal; overflow-wrap: anywhere; text-transform: none; letter-spacing: normal;
-}
+#panel-user-payments .client-payment-panel .payment-journal-details span { font-size: 10px; font-weight: 500; letter-spacing: .02em; }
+#panel-user-payments .client-payment-panel .payment-journal-details strong { font-size: 12px; font-weight: 500; }
+#panel-user-payments .client-payment-panel .payment-journal-empty { font-size: 13px; }
 #panel-user-payments .client-payment-panel .payment-journal-footer {
     border: 0; display: flex; flex-wrap: wrap; gap: 8px 20px; justify-content: space-between;
     background: transparent;
@@ -239,6 +225,5 @@ html[data-admin-theme="light"] #panel-user-payments .client-detail-metrics .metr
     #panel-user-payments .client-detail-metrics { gap: 12px; }
 }
 @media (max-width: 560px) {
-    #panel-user-payments .client-payment-panel .payment-journal-row { grid-template-columns: 1fr 1fr; }
     #panel-user-payments .client-detail-ref-strip .client-ref-control-actions .input { flex: 0 1 180px; }
 }

@@ -110,6 +110,11 @@ def without_presentation_changes(text):
         body = re.sub(r'<div class="infra-server-card-identity">.*?(?=<div class="infra-server-card-head-actions">)', '<!-- reviewed server identity -->', match.group(), count=1, flags=re.S)
         return body.replace('                        <div class="infra-server-card-host" title="${host}">${host}</div>\n', '')
     text = re.sub(r'^        function renderInfraServerCards\b.*?(?=^        (?:async )?function |\Z)', server_identity, text, flags=re.M|re.S)
+    # Payment journal rows gained a copy-ID button and the client tab reuses
+    # paymentJournalRowsHtml; the clipboard helper only reads a data attribute.
+    text = re.sub(r"(admin_dashboard\.css' %\}\?v=)\d+", r"\1N", text)
+    text = re.sub(r'^        async function copyPaymentId\b.*?(?=^        (?:async )?function |\Z)', '', text, flags=re.M|re.S)
+    text = re.sub(r"\n            const paymentCopy = event\.target\.closest\('\[data-payment-copy-id\]'\);\n            if \(paymentCopy\) \{\n.*?\n            \}\n", '', text, count=1, flags=re.S)
     rendering_blocks = {
         'renderClientCard': (r'            target.innerHTML = `', r'            loadClientTraffic\(clientCardState.q\);'),
         'loadClientTimeline': (r"                target.className = 'client-timeline';", r'            } catch \(error\) {'),
@@ -123,7 +128,7 @@ def without_presentation_changes(text):
             assert count == 1, f'Rendering boundary changed for {name}'
             return updated
         text = re.sub(function_pattern, mask_rendering, text, flags=re.M|re.S)
-    return re.sub(r'^        (?:async )?function (?:configTemplateCard|acqDraw|loadPatterns|clientSummaryHtml|clientOverviewSectionHtml|clientPaymentsSectionHtml|clientReferralControlHtml|clientReferralsSectionHtml)\b.*?(?=^        (?:async )?function |\Z)', '', text, flags=re.M|re.S)
+    return re.sub(r'^        (?:async )?function (?:configTemplateCard|acqDraw|loadPatterns|paymentJournalRowsHtml|clientSummaryHtml|clientOverviewSectionHtml|clientPaymentsSectionHtml|clientReferralControlHtml|clientReferralsSectionHtml)\b.*?(?=^        (?:async )?function |\Z)', '', text, flags=re.M|re.S)
 assert without_presentation_changes(source) == without_presentation_changes(control), 'Unexpected change outside reviewed presentation renderers'
 print('PASS: forms, permissions, API bindings and action handlers unchanged outside reviewed presentation renderers and isolated Win-back editor.')
 print('Rendered six admin fixtures without connecting to databases or services.')

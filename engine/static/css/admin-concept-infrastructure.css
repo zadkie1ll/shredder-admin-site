@@ -44,11 +44,15 @@ html[data-admin-theme="light"] {
     margin: 10px 0; color: var(--workspace-caption, var(--admin-text-muted));
     font-size: 14px; font-weight: 400; line-height: 1.5;
 }
+/* Legacy `.censor-check-form .input[name=...]` flex rules (basis 130-240 px)
+ * were written for a row layout; inside the column-direction label that
+ * flex-basis becomes the control height. `flex: 0 0 auto` neutralises it. */
 #panel-censor-checks .infra-concept-field .input,
 #panel-node-traffic .infra-concept-field .input,
 #panel-node-provision .node-provision-field .input {
     width: 100%; min-height: 0; padding: 12px; line-height: 1.5;
     text-align: left; font-size: 14px; font-weight: 400;
+    flex: 0 0 auto; height: auto;
 }
 
 /* ts-block / ix-grid: form and disclosures are separate, spacious work areas. */
@@ -223,19 +227,22 @@ html[data-admin-theme="light"] {
 #panel-config-templates .ua-rule-form-grid { gap: 18px; }
 #panel-config-templates .ua-rule-item { padding: 14px; background: transparent; border-radius: 8px; }
 #panel-config-templates .ua-rule-step code { font-size: 13px; font-weight: 500; white-space: normal; overflow-wrap: anywhere; }
-#panel-config-templates .config-template-list { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-#panel-config-templates .config-template-card { gap: 0; padding: 22px; border: 1px solid var(--concept-infra-line); border-radius: 14px; background: #181f26; box-shadow: none; }
+#panel-config-templates .config-template-list { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; }
+#panel-config-templates .config-template-card { gap: 0; padding: 18px 20px; border: 1px solid var(--concept-infra-line); border-radius: 14px; background: #181f26; box-shadow: none; }
+#panel-config-templates .config-template-head { gap: 8px; }
 #panel-config-templates .config-template-card.inactive { opacity: 1; }
 #panel-config-templates .config-template-card:has(.config-template-badge.active) { border-color: var(--concept-infra-success-line); box-shadow: inset 3px 0 var(--green); }
-#panel-config-templates .config-template-title { margin-bottom: 14px; color: var(--text-main); font-size: 14px; line-height: 1.5; font-weight: 600; }
+#panel-config-templates .config-template-title { margin-bottom: 0; color: var(--text-main); font-size: 15px; line-height: 1.4; font-weight: 600; }
 #panel-config-templates .config-template-meta { gap: 10px; font-size: 13px; font-weight: 400; }
 #panel-config-templates .config-template-badge { color: var(--concept-infra-info); font-size: 12px; font-weight: 500; border-color: var(--concept-infra-line); background: transparent; }
 #panel-config-templates .config-template-badge.active { color: var(--green); border-color: var(--concept-infra-success-line); }
-#panel-config-templates .config-template-facts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 12px; margin: 20px 0; font-size: 14px; line-height: 1.5; }
-#panel-config-templates .config-template-facts dt { color: var(--muted); font-weight: 400; }
-#panel-config-templates .config-template-facts dd { margin: 0; color: var(--concept-infra-info); font-weight: 400; overflow-wrap: anywhere; }
-#panel-config-templates .config-template-card-actions { gap: 8px; padding: 0; border: 0; margin: 14px 0; }
-#panel-config-templates .config-template-card-actions .mini-btn { min-height: 40px; padding: 9px 13px; border-radius: 7px; font-size: 14px; font-weight: 400; background: transparent; }
+/* Label and value sit next to each other: the label column takes only the width
+ * it needs, so a wide card no longer pushes the value far away from its label. */
+#panel-config-templates .config-template-facts { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 14px; align-items: baseline; margin: 12px 0 0; padding-top: 12px; border-top: 1px solid var(--concept-infra-line); font-size: 13px; line-height: 1.5; }
+#panel-config-templates .config-template-facts dt { color: var(--muted); font-weight: 400; white-space: nowrap; }
+#panel-config-templates .config-template-facts dd { margin: 0; color: var(--concept-infra-info); font-weight: 500; overflow-wrap: anywhere; }
+#panel-config-templates .config-template-card-actions { gap: 8px; padding: 14px 0 0; border: 0; margin: 14px 0 0; border-top: 1px solid var(--concept-infra-line); }
+#panel-config-templates .config-template-card-actions .mini-btn { min-height: 36px; padding: 7px 12px; border-radius: 7px; font-size: 13px; font-weight: 400; background: transparent; }
 #panel-config-templates .config-delivery-heading-icon,
 #panel-config-templates .config-delivery-icon,
 #panel-config-templates .config-template-card-actions .mini-btn > i { display: none; }
@@ -349,7 +356,7 @@ html[data-admin-theme="light"] #subpanel-inf-servers .infra-detail-stat.is-olive
     #panel-node-provision .node-provision-code-lines,
     #panel-node-provision .node-provision-editor-highlight,
     #panel-node-provision .node-provision-script-editor { font-size: 16px; }
-    #panel-config-templates .config-template-card { padding: 22px; }
+    #panel-config-templates .config-template-card { padding: 18px; }
 }
 @media (max-width: 700px) {
     #panel-censor-checks .infra-concept-field .input,

@@ -4070,6 +4070,53 @@ html[data-admin-theme="light"] .acq-chart-data-shell.has-overflow-x:not(.is-at-r
     font-weight: 650;
 }
 
+.payment-journal-detail-id {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "label label" "value copy";
+    align-items: center;
+    column-gap: 8px;
+}
+
+.payment-journal-detail-id > span { grid-area: label; }
+.payment-journal-detail-id > strong {
+    grid-area: value;
+    overflow: visible;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
+}
+
+.payment-journal-copy {
+    grid-area: copy;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 7px;
+    background: rgba(255, 255, 255, .04);
+    color: rgba(255, 255, 255, .62);
+    font-size: 11px;
+    cursor: pointer;
+    transition: color .15s ease, border-color .15s ease, background .15s ease;
+}
+
+.payment-journal-copy:hover,
+.payment-journal-copy:focus-visible {
+    border-color: rgba(var(--accent-rgb), .6);
+    background: rgba(var(--accent-rgb), .12);
+    color: var(--admin-accent);
+    outline: none;
+}
+
+.payment-journal-copy.is-copied {
+    border-color: rgba(67, 190, 135, .6);
+    background: rgba(67, 190, 135, .14);
+    color: #43be87;
+}
+
 .payment-journal-footer,
 .payment-history-panel > .payments-board-footer {
     min-height: 40px;
@@ -4159,6 +4206,19 @@ html[data-admin-theme="light"] .payment-journal-user,
 html[data-admin-theme="light"] .payment-journal-date,
 html[data-admin-theme="light"] .payment-journal-details strong {
     color: #4e5662;
+}
+
+html[data-admin-theme="light"] .payment-journal-copy {
+    border-color: rgba(29, 34, 42, .16);
+    background: #fff;
+    color: #4e5662;
+}
+
+html[data-admin-theme="light"] .payment-journal-copy:hover,
+html[data-admin-theme="light"] .payment-journal-copy:focus-visible {
+    border-color: rgba(var(--accent-rgb), .6);
+    background: rgba(var(--accent-rgb), .14);
+    color: #7a5a00;
 }
 
 html[data-admin-theme="light"] .payment-journal-summary-dot {

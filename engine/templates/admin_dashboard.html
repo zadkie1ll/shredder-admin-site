@@ -3250,7 +3250,7 @@
             #source-users-modal .modal-pagination, #source-users-modal .modal-pagination .btn { width: 100%; }
         }
     </style>
-    <link href="{% static 'css/admin_dashboard.css' %}?v=6" rel="stylesheet">
+    <link href="{% static 'css/admin_dashboard.css' %}?v=7" rel="stylesheet">
     {% include "includes/yandex_metrika.html" %}
     <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
     <link rel="stylesheet" href="{% static 'css/admin-concept.css' %}?v=6">
@@ -8073,7 +8073,7 @@
                                     <i class="fas fa-chevron-right payment-journal-chevron" aria-hidden="true"></i>
                                 </button>
                                 <div class="payment-journal-details" id="${detailId}" hidden>
-                                    <div><span>ID платежа</span><strong class="payment-journal-full-id">${escapeHtml(payment.id || '—')}</strong></div>
+                                    <div class="payment-journal-detail-id"><span>ID платежа</span><strong class="payment-journal-full-id">${escapeHtml(payment.id || '—')}</strong>${payment.id ? `<button class="payment-journal-copy" type="button" data-payment-copy-id="${escapeHtml(payment.id)}" title="Скопировать ID платежа" aria-label="Скопировать ID платежа"><i class="fas fa-copy" aria-hidden="true"></i></button>` : ''}</div>
                                     <div><span>Провайдер</span><strong>${escapeHtml(system)}</strong></div>
                                     ${showUser ? `<div><span>Пользователь</span><strong>${escapeHtml(user || '—')}</strong></div>` : ''}
                                     <div><span>Результат</span><strong class="is-${status.key}">${escapeHtml(payment.status || status.label)}</strong></div>
@@ -8094,32 +8094,7 @@
                         <span class="client-detail-note">Последние операции клиента — сначала новые</span>
                         <div class="payment-journal-summary" aria-label="Сводка статусов">${paymentJournalSummaryHtml(history)}</div>
                     </div>
-                    <div class="payment-journal-list">
-                        ${history.length ? history.map((payment, index) => {
-                            const status = paymentStatusDescriptor(payment);
-                            const date = paymentDateParts(payment.date);
-                            const system = String(payment.system || 'Платёжная система');
-                            const tariff = String(payment.tariff || 'Тариф не указан');
-                            const detailId = `payment-journal-detail-client-${index}`;
-                            return `
-                                <article class="payment-journal-item is-${status.key}" data-payment-journal-item>
-                                    <button class="payment-journal-row" type="button" data-payment-journal-toggle aria-expanded="false" aria-controls="${detailId}">
-                                        <span class="payment-journal-operation-copy">
-                                            <span>${payment.trial ? 'Пробный период' : 'Подписка'} · ${escapeHtml(tariff)}</span>
-                                            <small class="payment-journal-id" title="${escapeHtml(payment.id)}">${escapeHtml(payment.id)}</small>
-                                        </span>
-                                        <span class="payment-journal-date">${escapeHtml(date.date)}<small>${date.time ? `${escapeHtml(date.time)} · ` : ''}${escapeHtml(system)}</small></span>
-                                        <b class="payment-journal-amount">${escapeHtml(paymentAmountLabel(payment))}</b>
-                                        <span class="payment-journal-status is-${status.key}">● ${escapeHtml(status.label)}</span>
-                                    </button>
-                                    <div class="payment-journal-details client-detail-notice" id="${detailId}" hidden>
-                                        <span>ID платежа: <span class="payment-journal-full-id">${escapeHtml(payment.id || '—')}</span></span>
-                                        <span> · Провайдер: ${escapeHtml(system)}</span>
-                                        <span> · Результат: <span class="is-${status.key}">${escapeHtml(payment.status || status.label)}</span></span>
-                                    </div>
-                                </article>`;
-                        }).join('') : '<p class="client-detail-note">Платежей пока нет.</p>'}
-                    </div>
+                    ${paymentJournalRowsHtml(history, {context: 'client'})}
                     <footer class="payment-journal-footer client-detail-note">
                         <span>Показано операций: <strong>${history.length}</strong></span>
                         <span>Нажмите строку, чтобы раскрыть технические детали</span>
@@ -9923,6 +9898,39 @@
             const label = select.options[select.selectedIndex].textContent;
             loadPromoCohort(kind === 'batch' ? {batch_id: id} : {promo_id: id}, label);
         });
+
+        async function copyPaymentId(button) {
+            const value = String(button.dataset.paymentCopyId || '');
+            if (!value) return;
+            let copied = false;
+            try {
+                await navigator.clipboard.writeText(value);
+                copied = true;
+            } catch (error) {
+                const helper = document.createElement('textarea');
+                helper.value = value;
+                helper.setAttribute('readonly', '');
+                helper.style.position = 'fixed';
+                helper.style.opacity = '0';
+                document.body.appendChild(helper);
+                helper.select();
+                try { copied = document.execCommand('copy'); } catch (fallbackError) { copied = false; }
+                helper.remove();
+            }
+            if (!copied) {
+                window.prompt('Скопируйте ID платежа', value);
+                return;
+            }
+            showAdminToast('ID платежа скопирован', 'success');
+            button.classList.add('is-copied');
+            const icon = button.querySelector('i');
+            if (icon) icon.className = 'fas fa-check';
+            clearTimeout(button._copiedTimer);
+            button._copiedTimer = setTimeout(() => {
+                button.classList.remove('is-copied');
+                if (icon) icon.className = 'fas fa-copy';
+            }, 1600);
+        }
 
         async function copyPromoText(value) {
             try {
@@ -12597,6 +12605,13 @@
                 paymentToggle.setAttribute('aria-expanded', String(shouldOpen));
                 item?.classList.toggle('is-open', shouldOpen);
                 if (details) details.hidden = !shouldOpen;
+            }
+
+            const paymentCopy = event.target.closest('[data-payment-copy-id]');
+            if (paymentCopy) {
+                event.preventDefault();
+                event.stopPropagation();
+                copyPaymentId(paymentCopy);
             }
 
             const recentClientButton = event.target.closest('[data-client-recent-query]');
