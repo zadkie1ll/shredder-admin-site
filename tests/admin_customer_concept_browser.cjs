@@ -70,6 +70,7 @@ function measureCustomer(reference) {
     return {
         card: snapshot(card), identity: snapshot(identity),
         avatar: snapshot(identity.querySelector(reference ? '.cu-avatar' : '.client-summary-avatar')),
+        groups: reference ? 3 : card.querySelectorAll('.client-summary-group').length,
         identityCopy: [...copy.children].map(snapshot), facts,
         nav: snapshot(nav), tabs: [...nav.querySelectorAll('button')].map(snapshot),
         overview: snapshot(overview), columns: snapshot(columns),
@@ -215,27 +216,24 @@ function lightContrast() {
         comparisons.push({width, actual, approved});
         same(`${width} no real overflow`, actual.pageOverflow, false);
         same(`${width} no reference overflow`, approved.pageOverflow, false);
-        compareElement(`${width}.summary`, actual.card, approved.card, ['width', 'height']);
-        for (const property of [...boxProperties, 'display', 'gridTemplateColumns', 'rowGap', 'columnGap', 'color', 'backgroundColor']) same(`${width}.summary.${property}`, actual.card.style[property], approved.card.style[property]);
-        compareElement(`${width}.identity`, actual.identity, approved.identity);
-        compareElement(`${width}.avatar`, actual.avatar, approved.avatar);
+        // Геометрия блока cu-summary с компом больше НЕ сверяется.
+        // 09.09.2026 владелец выбрал для сводки композицию «три истории»
+        // (подписка / деньги / трафик) взамен семи равнозначных плиток
+        // концепта: они были одного кегля и веса, трафик и его лимит лежали в
+        // разных ячейках, а перенос строк задавался nth-child(n+5), то есть
+        // зависел от числа полей, а не от смысла. Комп для этого блока
+        // перестал быть источником истины — см. docs/admin-design/customer-mapping.md.
+        // Остальные блоки (вкладки, действия, поля, контраст) сверяются как прежде,
+        // а типографику и поверхности сводки продолжают проверять контрастные пробы ниже.
+        same(`${width}.summary present`, Boolean(actual.card), true);
+        same(`${width}.identity present`, Boolean(actual.identity), true);
         same(`${width}.avatar text`, actual.avatar.text, approved.avatar.text);
         for (let index = 0; index < approved.identityCopy.length; index++) {
-            compareElement(`${width}.identityCopy[${index}]`, actual.identityCopy[index], approved.identityCopy[index]);
             same(`${width}.identityCopy[${index}] text`, actual.identityCopy[index]?.text, approved.identityCopy[index].text);
         }
-        same(`${width}.fact count`, actual.facts.length, 7);
-        for (let index = 0; index < approved.facts.length; index++) {
-            compareElement(`${width}.fact[${index}]`, actual.facts[index], approved.facts[index]);
-            for (const element of ['label', 'value', 'note']) {
-                compareElement(`${width}.fact[${index}].${element}`, actual.facts[index]?.[element], approved.facts[index][element]);
-                // The incumbent status prefix is useful business copy and may
-                // stay. It must not change the summary's grid or typography.
-                const text = actual.facts[index]?.[element]?.text.replace(/^Статус: /, '');
-                same(`${width}.fact[${index}].${element} text`, text, approved.facts[index][element]?.text);
-            }
-            same(`${width}.fact[${index}].value color`, actual.facts[index]?.value?.style.color, approved.facts[index].value.style.color);
-        }
+        // Три группы вместо семи плиток; счётчик защищает от случайного возврата
+        // к плиточной раскладке и от потери группы.
+        same(`${width}.group count`, actual.groups, 3);
         compareElement(`${width}.tabs`, actual.nav, approved.nav);
         same(`${width}.tab count`, actual.tabs.length, 6);
         for (let index = 0; index < approved.tabs.length; index++) {
@@ -327,11 +325,17 @@ function lightContrast() {
                     subscription: item('.client-summary-subscription'),
                     expiry: item('.client-summary-subscription .client-summary-value'),
                     status: item('.client-status-pill'),
-                    autopay: item('.client-summary-stat:last-child .client-summary-value'),
+                    // Автоплатёж переехал в подчинённую строку группы «Подписка»
+                    autopay: item('.client-summary-subscription .client-summary-rowvalue'),
                     traffic: item('[data-client-traffic-value]'),
                     trafficMeta: item('[data-client-traffic-meta]'),
                     limit: item('[data-client-traffic-limit-value]'),
                     limitMeta: item('[data-client-traffic-limit-meta]'),
+                    // Статус RWMS и число устройств — отдельные строки группы
+                    // «Трафик»; раньше они были склеены в одну подпись вместе
+                    // с примечанием про управляемый лимит
+                    rwmsStatus: item('[data-client-rwms-status]'),
+                    hwid: item('[data-client-hwid]'),
                     limitClasses: card.querySelector('[data-client-traffic-limit-stat]').className,
                     trafficClasses: card.querySelector('[data-client-traffic-stat]').className,
                     firstConnected: item('[data-client-first-connected-value]'),
@@ -357,13 +361,14 @@ function lightContrast() {
             }
             if (name === 'limited') {
                 check(`${theme}.limited class`, () => assert.ok(state.limitClasses.split(' ').includes('is-limited')));
-                check(`${theme}.limited information`, () => assert.ok(state.limitMeta.text.includes('LIMITED — лимит исчерпан')));
+                check(`${theme}.limited information`, () => assert.ok(state.rwmsStatus.text.includes('LIMITED — лимит исчерпан')));
                 same(`${theme}.limited color`, state.limit.color, state.semantic.danger);
             }
             if (name === 'unavailable') {
                 same(`${theme}.unavailable traffic`, state.traffic.text, '—');
                 same(`${theme}.unavailable traffic note`, state.trafficMeta.text, 'Нет данных RWMS');
                 same(`${theme}.unavailable limit`, state.limit.text, '—');
+                same(`${theme}.unavailable status`, state.rwmsStatus.text, '—');
                 same(`${theme}.unavailable first connection`, state.firstConnected.text, '—');
                 same(`${theme}.unavailable neutral color`, state.traffic.color, state.semantic.muted);
                 check(`${theme}.unavailable class`, () => assert.ok(state.trafficClasses.split(' ').includes('is-unavailable')));
@@ -380,5 +385,5 @@ function lightContrast() {
     assert.deepEqual(mutations, [], 'No mutation attempted');
     assert.deepEqual(errors, [], 'No uncaught JavaScript errors');
     assert.deepEqual(failures, [], `Customer concept mismatches; see ${path.join(outputDir, 'report.json')}`);
-    console.log(`PASS: customer summary geometry/type matches approved concept at 1440/1100/390px; text-only tabs, control sizing, light contrast, three roles and all action bindings preserved; ${captures.length} screenshots; zero mutations.`);
+    console.log(`PASS: summary uses the three-story composition (subscription/money/traffic) with concept typography and semantics; tabs, control sizing, light contrast, three roles and all action bindings still match the approved concept at 1440/1100/390px; ${captures.length} screenshots; zero mutations.`);
 })().catch(error => {console.error(error); process.exit(1);});

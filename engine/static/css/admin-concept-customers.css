@@ -86,43 +86,64 @@ html[data-admin-theme="light"] #panel-user-payments {
 #panel-user-payments > .client-panel-header > div { display: contents; }
 #panel-user-payments .client-panel-header .admin-title { grid-column: 1 / -1; grid-row: 1; }
 #panel-user-payments .client-panel-header .admin-subtitle { grid-column: 1; grid-row: 2; align-self: center; margin: 0; font-size: 12px; }
-#panel-user-payments .client-new-search-button { grid-column: 2; grid-row: 2; margin: 0; font-size: 14px; font-weight: 400; min-height: 40px; line-height: 1.5; background: transparent; color: var(--admin-text); }
-#panel-user-payments .client-new-search-button > i { display: none; }
-#user-payments-result > .result-stack { display: block; }
-#panel-user-payments .client-summary-card {
-    display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 22px; padding: 24px; margin: 0;
-    border: 1px solid var(--workspace-line); border-radius: 14px;
-    background: var(--workspace-summary); box-shadow: none; overflow: visible;
+#panel-user-payments .client-search-form {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 12px;
+    align-items: center; padding: 14px 16px; margin-bottom: 20px;
 }
-#panel-user-payments .client-summary-identity { grid-column: span 2; padding: 0; gap: 16px; align-items: center; }
+#panel-user-payments .client-search-hint { color: var(--client-label); }
+#panel-user-payments .client-search-hint kbd { border-color: var(--workspace-input-line); background: var(--workspace-summary); color: var(--admin-text); }
+#user-payments-result > .result-stack { display: block; }
+/* Сводка клиента: композиция «три истории» — подписка, деньги, трафик.
+ * Пришла на смену семи равнозначным плиткам концепта: они были одного кегля,
+ * трафик и его лимит лежали в разных ячейках, а перенос строк задавался
+ * nth-child(n+5). Типографика, поверхности и семантика цвета остаются
+ * концептными; меняется только композиция. Блок cu-summary по этой причине
+ * выведен из пиксельной сверки в tests/admin_customer_concept_browser.cjs.
+ */
+#panel-user-payments .client-summary-card {
+    display: grid; gap: 0; padding: 0; margin: 0;
+    border: 1px solid var(--workspace-line); border-radius: 14px;
+    background: var(--workspace-summary); box-shadow: none; overflow: hidden;
+}
+#panel-user-payments .client-summary-head { gap: 16px; padding: 20px 24px; border-bottom: 1px solid var(--workspace-line); }
+#panel-user-payments .client-summary-identity { gap: 16px; align-items: center; }
 #panel-user-payments .client-summary-avatar {
-    display: block; width: auto; height: auto; flex: 0 0 auto; padding: 18px;
+    display: grid; place-items: center; width: 56px; height: 56px; flex: 0 0 56px; padding: 0;
     border: 0; border-radius: 50%; background: var(--client-avatar); color: var(--client-gold);
-    font-size: 24px; line-height: 1.5; font-weight: 400; letter-spacing: 0;
+    font-size: 19px; line-height: 1.5; font-weight: 400; letter-spacing: 0;
 }
 #panel-user-payments .client-summary-identity-copy { display: block; min-width: 0; }
 #panel-user-payments .client-summary-identity-copy h2 { margin: 0; font-size: 23px; line-height: 1.5; font-weight: 600; letter-spacing: 0; color: var(--admin-text); }
-#panel-user-payments .client-summary-identity-copy p { margin: 6px 0; font-size: 14px; line-height: 1.5; font-weight: 400; color: var(--workspace-caption); }
+#panel-user-payments .client-summary-identity-copy p { margin: 4px 0 0; font-size: 14px; line-height: 1.5; font-weight: 400; color: var(--workspace-caption); }
 #panel-user-payments .client-summary-identity-copy small { font-size: smaller; line-height: 1.5; color: var(--admin-text); }
 #panel-user-payments .client-summary-identity-copy :is(h2, p, small) { white-space: normal; overflow-wrap: anywhere; }
-#panel-user-payments .client-summary-stat:nth-child(n) {
-    grid-column: auto; min-height: 0; padding: 0; margin: 0; border: 0; gap: 8px; justify-content: flex-start;
-}
+#panel-user-payments .client-summary-groups { gap: 1px; background: var(--workspace-line); }
+#panel-user-payments .client-summary-group { gap: 14px; padding: 20px 24px; background: var(--workspace-summary); }
+#panel-user-payments .client-summary-group-title { font-size: smaller; line-height: 1.5; font-weight: 600; letter-spacing: .1em; color: var(--client-label); }
+#panel-user-payments .client-summary-group-title::after { background: var(--workspace-line); }
 #panel-user-payments .client-summary-label { display: block; min-height: 0; font-size: smaller; line-height: 1.5; font-weight: 400; white-space: normal; color: var(--client-label); }
 #panel-user-payments .client-summary-value { font-size: 22px; line-height: 1.5; font-weight: 700; color: var(--admin-text); white-space: normal; overflow: visible; overflow-wrap: anywhere; letter-spacing: 0; font-variant-numeric: normal; }
 #panel-user-payments .client-summary-meta { font-size: 12px; line-height: 1.5; font-weight: 400; color: var(--client-meta); white-space: normal; overflow: visible; overflow-wrap: anywhere; }
-#panel-user-payments .client-summary-stat:nth-child(3) .client-summary-value { color: var(--client-gold); }
-#panel-user-payments :is([data-client-traffic-stat], [data-client-traffic-limit-stat]):not(.is-unavailable) .client-summary-value { color: var(--workspace-blue); }
+#panel-user-payments .client-summary-rowvalue { font-size: 14px; line-height: 1.5; font-weight: 400; color: var(--admin-text); white-space: normal; overflow: visible; overflow-wrap: anywhere; font-variant-numeric: normal; }
+#panel-user-payments .client-summary-meter-track { background: var(--workspace-track); }
+#panel-user-payments .client-summary-meter-fill { background: var(--workspace-success); }
+#panel-user-payments .client-summary-meter-fill.is-warn { background: var(--client-gold); }
+#panel-user-payments .client-summary-meter-fill.is-over { background: var(--workspace-danger); }
+#panel-user-payments .client-summary-meter-scale { font-size: 12px; line-height: 1.5; font-weight: 400; color: var(--client-meta); }
+#panel-user-payments .client-summary-note { padding: 14px 24px; border-top: 1px solid var(--workspace-line); font-size: 12px; line-height: 1.5; font-weight: 400; color: var(--client-meta); }
+#panel-user-payments .client-summary-money { color: var(--client-gold); }
+#panel-user-payments [data-client-traffic-stat]:not(.is-unavailable) .client-summary-value { color: var(--workspace-blue); }
 #panel-user-payments .client-summary-subscription.is-active .client-summary-value,
-#panel-user-payments .client-summary-value.green { color: var(--workspace-success); }
+#panel-user-payments .client-summary-rowvalue.green { color: var(--workspace-success); }
 #panel-user-payments .client-summary-subscription.is-expired .client-summary-value { color: var(--workspace-danger); }
-#panel-user-payments .client-summary-stat.is-managed .client-summary-meta { color: var(--workspace-success); }
-#panel-user-payments .client-summary-stat.is-manual .client-summary-meta { color: var(--client-gold); }
-#panel-user-payments [data-client-traffic-limit-stat].is-limited .client-summary-value { color: var(--workspace-danger); }
-#panel-user-payments .client-summary-stat.is-unavailable :is(.client-summary-value, .client-summary-meta) { color: var(--admin-text-muted); }
-#panel-user-payments .client-summary-card:has([data-client-traffic-stat].is-unavailable) [data-client-traffic-limit-stat] :is(.client-summary-value, .client-summary-meta) { color: var(--admin-text-muted); }
-#panel-user-payments .client-summary-subscription .client-status-pill { display: block; width: auto; align-self: stretch; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: 12px; line-height: 1.5; font-weight: 400; }
+#panel-user-payments .client-summary-note.is-managed { color: var(--workspace-success); }
+#panel-user-payments .client-summary-note.is-manual { color: var(--client-gold); }
+#panel-user-payments .client-summary-rows.is-limited [data-client-traffic-limit-value] { color: var(--workspace-danger); }
+#panel-user-payments .client-summary-stat.is-unavailable :is(.client-summary-value, .client-summary-meta, .client-summary-rowvalue) { color: var(--admin-text-muted); }
+/* Пилюля переехала из ячейки подписки в шапку карточки, рядом с именем:
+ * состояние подписки — первое, что читает админ. Здесь она остаётся
+ * пилюлей, а не строкой текста, потому что стоит вне сетки групп. */
+#panel-user-payments .client-summary-head .client-status-pill { align-self: center; font-size: 12px; line-height: 1.5; font-weight: 600; }
 #panel-user-payments .client-status-pill.is-active { color: var(--workspace-success); }
 #panel-user-payments .client-status-pill.is-expired { color: var(--workspace-danger); }
 #panel-user-payments .client-inline-status { display: inline; min-height: 0; padding: 0; border: 0; border-radius: 0; background: transparent; font-size: inherit; font-weight: inherit; line-height: inherit; }
@@ -442,7 +463,7 @@ html[data-admin-theme="light"] #panel-user-payments {
     #subpanel-promo-cohorts .promo-cohort-table-scroll { max-width: 100%; }
 }
 @media (max-width: 560px) {
-    #panel-user-payments .client-summary-card { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 16px; gap: 20px 12px; }
+    #panel-user-payments :is(.client-summary-head, .client-summary-group, .client-summary-note) { padding: 16px; }
     #panel-user-payments .client-summary-identity-copy h2 { font-size: 20px; }
     #panel-user-payments .client-summary-value { font-size: 19px; }
     #panel-user-payments .client-timeline-row { grid-template-columns: minmax(0, 1fr); gap: 6px; }
@@ -458,7 +479,6 @@ html[data-admin-theme="light"] #panel-user-payments {
 }
 
 @media (max-width: 600px) {
-    #panel-user-payments .client-panel-header .client-new-search-button { grid-column: 1; grid-row: 3; justify-self: start; width: auto; }
     #panel-user-payments .client-action-panel-title, #panel-user-payments .client-danger-heading h3 { font-size: 17px; }
 }
 
@@ -518,15 +538,17 @@ html[data-admin-theme="light"] :is(#panel-broadcasts, #panel-promocodes, #subpan
 #panel-broadcasts :is(.broadcast-segment-symbol, .broadcast-segment-trigger > i) { display: none; }
 #panel-broadcasts .broadcast-segment-copy { display: flex; flex-wrap: wrap; gap: 4px; }
 #panel-broadcasts .broadcast-segment-copy b { margin: 0; font-size: 14px; font-weight: 400; line-height: 1.5; color: inherit; }
+#panel-broadcasts .broadcast-segment-copy :is(b, small) { white-space: normal; overflow: visible; text-overflow: clip; }
 #panel-broadcasts .broadcast-segment-copy small { font-size: 12px; font-weight: 400; line-height: 1.75; color: var(--campaign-caption); }
 #panel-broadcasts #broadcast-segment-hint { font-size: 12px; font-weight: 400; color: var(--workspace-blue); }
 #panel-broadcasts #broadcast-segment-hint::before { content: none; }
-#panel-broadcasts .broadcast-segment-menu { padding: 12px; background: var(--workspace-surface); border-color: #ae902c; box-shadow: 0 14px 30px #0008; }
+#panel-broadcasts .broadcast-segment-menu { left: 0; right: auto; width: max(100%, min(440px, calc(100vw - 42px))); padding: 12px; background: var(--workspace-surface); border-color: #ae902c; box-shadow: 0 14px 30px #0008; }
 #panel-broadcasts .broadcast-segment-menu-head { padding: 0 0 12px; }
 #panel-broadcasts .broadcast-segment-list { max-height: 360px; padding: 0; }
 #panel-broadcasts .broadcast-segment-option { grid-template-columns: minmax(0, 1fr) auto; padding: 13px 4px; border: 0; border-bottom: 1px solid #303a45; border-radius: 0; min-height: 0; }
 #panel-broadcasts :is(.broadcast-segment-option-icon, .broadcast-segment-check) { display: none; }
 #panel-broadcasts .broadcast-segment-option-copy b { font-size: 14px; font-weight: 400; }
+#panel-broadcasts .broadcast-segment-option-copy :is(b, small) { white-space: normal; overflow: visible; text-overflow: clip; }
 #panel-broadcasts .broadcast-segment-count { border: 0; padding: 0; font-size: 14px; font-weight: 700; }
 #panel-broadcasts .broadcast-tools { padding: 0; border: 0; background: transparent; border-radius: 0; margin: 20px 0; gap: 12px; justify-content: flex-start; }
 #panel-broadcasts .broadcast-media-row { display: contents; }

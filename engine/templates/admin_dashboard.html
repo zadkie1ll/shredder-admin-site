@@ -262,21 +262,23 @@
         .infra-domain-manage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 440px)); align-content: start; align-items: start; gap: 10px; }
         .infra-domain-manage-item { display: flex; flex-direction: column; align-items: stretch; gap: 9px; min-height: 50px; padding: 10px 12px; border: 1px solid var(--panel-border); border-radius: 11px; background: var(--inner-card-bg); transition: opacity .16s, border-color .16s, background .16s, transform .16s; }
         .infra-domain-manage-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
-        .infra-domain-sni-row { display: flex; align-items: center; gap: 8px; }
-        .infra-domain-sni-row .infra-domain-sni-input { flex: 1 1 auto; min-width: 0; height: 30px; padding: 0 9px; border: 1px solid var(--panel-border); border-radius: 8px; background: var(--panel-bg); color: var(--text-main); font-family: inherit; font-size: 11.5px; }
-        .infra-domain-sni-row .infra-mini-btn { flex: 0 0 auto; }
         .infra-domain-badges { display: flex; flex-wrap: wrap; gap: 6px; }
         .infra-domain-badges .infra-badge { max-width: 100%; white-space: normal; text-align: left; line-height: 1.35; }
-        .infra-domain-sni-hint { color: var(--muted); font-size: 9.5px; font-weight: 700; white-space: nowrap; }
         .infra-domain-wire { color: var(--muted); font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; }
         .infra-domain-wire code { color: var(--text-main); font-weight: 700; }
+        .infra-domain-wire code.is-banned { color: var(--red); text-decoration: line-through; text-decoration-thickness: 1px; }
+        .infra-snis-copy { max-width: 72ch; margin: 0 0 14px; color: var(--muted); font-size: 12px; line-height: 1.55; }
+        .infra-snis-form { grid-template-columns: minmax(260px, 620px) auto; align-items: end; justify-content: start; gap: 10px; max-width: 900px; margin-top: 0; }
+        .infra-snis-form .infra-form-submit { width: auto; min-width: 150px; justify-self: start; padding: 0 18px; white-space: nowrap; }
+        .infra-snis-wire { margin-top: 12px; font-size: 11px; }
+        .infra-snis-source { color: var(--muted); font-weight: 600; }
         .infra-domain-manage-copy { display: flex; align-items: center; gap: 7px; min-width: 0; }
         .infra-domain-manage-copy i { color: var(--brand-gold); font-size: 9px; }
         .infra-domain-manage-copy code { overflow: hidden; color: var(--text-main); font-size: 12.5px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
         .infra-domain-manage-item.is-pending { border-color: rgba(255,199,0,.28); border-radius: 8px; background: rgba(255,199,0,.055); }
         .infra-domain-manage-item.is-removing { opacity: .48; transform: translateX(3px); }
         .infra-domain-manage-list > [data-infra-domains-empty] { grid-column: 1 / -1; margin: 0; padding: 13px 14px; border: 1px dashed var(--panel-border); border-radius: 11px; }
-        .infra-domain-add-form { grid-template-columns: minmax(220px, 360px) minmax(180px, 300px) auto; align-items: end; justify-content: start; gap: 10px; max-width: 900px; margin-top: 16px; }
+        .infra-domain-add-form { grid-template-columns: minmax(220px, 420px) auto; align-items: end; justify-content: start; gap: 10px; max-width: 900px; margin-top: 16px; }
         .infra-domain-add-form .infra-form-submit { width: auto; min-width: 180px; justify-self: start; padding: 0 18px; white-space: nowrap; }
         .infra-domain-warning { max-width: 760px; margin-top: 10px; }
         .infra-inline-state { display: inline-flex; align-items: center; gap: 6px; color: var(--brand-gold); font-size: 9.5px; font-weight: 800; white-space: nowrap; }
@@ -722,8 +724,8 @@
             #infra-server-detail .infra-detail-management-panels > .infra-detail-management-panel { min-height: 0; padding: 17px 15px 19px; }
             .infra-detail-management-panel#infra-detail-server-info .infra-kv { grid-template-columns: minmax(100px, auto) minmax(0, 1fr); gap: 7px 11px; }
             .infra-domain-manage-list { grid-template-columns: 1fr; }
-            .infra-domain-add-form { grid-template-columns: 1fr; max-width: none; }
-            .infra-domain-add-form .infra-form-submit { width: auto; }
+            .infra-domain-add-form, .infra-snis-form { grid-template-columns: 1fr; max-width: none; }
+            .infra-domain-add-form .infra-form-submit, .infra-snis-form .infra-form-submit { width: auto; }
             .infra-journal-head { align-items: flex-start; flex-direction: column; }
             .infra-log-row { grid-template-columns: 30px minmax(0, 1fr); gap: 4px 10px; }
             .infra-log-time { grid-column: 2; grid-row: 1; flex-direction: row; align-items: baseline; gap: 7px; padding-top: 0; }
@@ -3250,10 +3252,10 @@
             #source-users-modal .modal-pagination, #source-users-modal .modal-pagination .btn { width: 100%; }
         }
     </style>
-    <link href="{% static 'css/admin_dashboard.css' %}?v=8" rel="stylesheet">
+    <link href="{% static 'css/admin_dashboard.css' %}?v=9" rel="stylesheet">
     {% include "includes/yandex_metrika.html" %}
     <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/admin-concept.css' %}?v=6">
+    <link rel="stylesheet" href="{% static 'css/admin-concept.css' %}?v=8">
 </head>
 <body>
     <div class="page-bg"></div>
@@ -3287,6 +3289,7 @@
             {% if support_admin_is_full_admin %}
                 <button class="tab-btn" data-tab="bulk-actions"><i class="fas fa-layer-group"></i><span>Массовые операции</span></button>
                 <button class="tab-btn" data-tab="system"><i class="fas fa-sliders"></i><span>Система</span></button>
+                <button class="tab-btn" data-tab="node-traffic"><i class="fas fa-tower-broadcast"></i><span>Трафик нод</span></button>
                 <button class="tab-btn" data-tab="infrastructure"><i class="fas fa-network-wired"></i><span>Инфраструктура</span></button>
             {% endif %}
             <span class="nav-section-label">Поддержка</span>
@@ -4063,13 +4066,13 @@
                     <h1 class="admin-title">Пользователи</h1>
                     <p class="admin-subtitle">Профиль, подписка, платежи и рефералы — всё по одному пользователю</p>
                 </div>
-                <button class="btn btn-secondary client-new-search-button" type="button" id="client-new-search" hidden>
-                    <i class="fas fa-search"></i>Найти другого клиента
-                </button>
             </header>
             <form id="user-payments-form" class="card form-card form-grid-two client-search-form">
-                <input class="input" name="q" placeholder="username, email или telegram_id">
+                <input class="input" id="client-search-input" name="q" placeholder="username, email или telegram_id"
+                       aria-label="Поиск клиента" aria-keyshortcuts="Control+F Meta+F"
+                       autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" enterkeyhint="search">
                 <button class="btn" type="submit"><i class="fas fa-search"></i>Найти</button>
+                <span class="client-search-hint"><kbd>Ctrl</kbd><kbd>F</kbd><span>фокус в поле</span></span>
             </form>
             <div id="user-payments-result"></div>
         </section>
@@ -4939,6 +4942,35 @@
         {% endif %}
 
         {% if support_admin_is_full_admin %}
+        <!-- «Трафик нод» вынесен из подвкладок инфраструктуры в отдельный
+             раздел сайдбара: это самостоятельный отчёт, за которым ходят
+             напрямую, а не по пути к установке нод или конфигам. -->
+        <section id="panel-node-traffic" class="tab-panel">
+            <header class="panel-header">
+                <h1 class="admin-title">Трафик нод</h1>
+                <p class="admin-subtitle">Потребление трафика подписками — поиск расшаренных подписок по аномальному объёму</p>
+            </header>
+            <form id="node-traffic-form" class="card form-card node-traffic-form">
+                <label class="infra-concept-field"><span>Ноды</span><select class="input" name="node" id="node-traffic-node">
+                    <option value="all">Все ноды</option>
+                </select></label>
+                <!-- Статистика панели посуточная по СУТКАМ UTC (03:00–03:00 МСК):
+                     начало периода выравнивается вниз до полуночи UTC, поэтому
+                     пресеты короче суток не имеют смысла, а «Сегодня» начинается
+                     в 03:00 по Москве -->
+                <label class="infra-concept-field"><span>Период</span><select class="input" name="hours">
+                    <option value="1" selected>Сегодня (с 03:00 МСК)</option>
+                    <option value="24">Вчера + сегодня</option>
+                    <option value="168">7 дней</option>
+                    <option value="720">30 дней</option>
+                </select></label>
+                <label class="infra-concept-field"><span>Строк · 1–500</span><input class="input" name="top" type="number" min="1" max="500" value="50" title="Сколько строк показать"></label>
+                <label class="infra-concept-field"><span>Мин. GiB</span><input class="input" name="min_gib" type="number" min="0" step="0.1" placeholder="мин. GiB" title="Порог трафика в GiB"></label>
+                <button class="btn" type="submit"><i class="fas fa-magnifying-glass-chart"></i>Показать</button>
+            </form>
+            <div id="node-traffic-result"></div>
+        </section>
+
         <section id="panel-infrastructure" class="tab-panel">
             <header class="panel-header">
                 <h1 class="admin-title">Инфраструктура</h1>
@@ -4948,7 +4980,6 @@
             <div class="subtabs" role="tablist" aria-label="Разделы инфраструктуры">
                 <button type="button" class="subtab active" data-subtab="inf-tspu" role="tab"><i class="fas fa-satellite-dish"></i>Замеры ТСПУ</button>
                 <button type="button" class="subtab" data-subtab="inf-provision" role="tab"><i class="fas fa-server"></i>Установка нод</button>
-                <button type="button" class="subtab" data-subtab="inf-traffic" role="tab"><i class="fas fa-tower-broadcast"></i>Трафик нод</button>
                 <button type="button" class="subtab" data-subtab="inf-configs" role="tab"><i class="fas fa-file-code"></i>Конфиги</button>
                 <button type="button" class="subtab" data-subtab="inf-servers" role="tab"><i class="fas fa-hard-drive"></i>Серверы</button>
             </div>
@@ -5175,33 +5206,6 @@
                 <div id="node-provision-scripts-health" class="node-provision-scripts-health"><span><i class="fas fa-spinner fa-spin"></i> Загружаем скрипты установки</span></div>
                 <div id="node-provision-scripts"></div>
             </section>
-        </section>
-            </div>
-            <div id="subpanel-inf-traffic" class="subtab-panel">
-<section id="panel-node-traffic" class="infra-legacy-panel">
-            <header class="panel-header">
-                <h1 class="admin-title">Трафик нод</h1>
-                <p class="admin-subtitle">Потребление трафика подписками — поиск расшаренных подписок по аномальному объёму</p>
-            </header>
-            <form id="node-traffic-form" class="card form-card node-traffic-form">
-                <label class="infra-concept-field"><span>Ноды</span><select class="input" name="node" id="node-traffic-node">
-                    <option value="all">Все ноды</option>
-                </select></label>
-                <!-- Статистика панели посуточная по СУТКАМ UTC (03:00–03:00 МСК):
-                     начало периода выравнивается вниз до полуночи UTC, поэтому
-                     пресеты короче суток не имеют смысла, а «Сегодня» начинается
-                     в 03:00 по Москве -->
-                <label class="infra-concept-field"><span>Период</span><select class="input" name="hours">
-                    <option value="1" selected>Сегодня (с 03:00 МСК)</option>
-                    <option value="24">Вчера + сегодня</option>
-                    <option value="168">7 дней</option>
-                    <option value="720">30 дней</option>
-                </select></label>
-                <label class="infra-concept-field"><span>Строк · 1–500</span><input class="input" name="top" type="number" min="1" max="500" value="50" title="Сколько строк показать"></label>
-                <label class="infra-concept-field"><span>Мин. GiB</span><input class="input" name="min_gib" type="number" min="0" step="0.1" placeholder="мин. GiB" title="Порог трафика в GiB"></label>
-                <button class="btn" type="submit"><i class="fas fa-magnifying-glass-chart"></i>Показать</button>
-            </form>
-            <div id="node-traffic-result"></div>
         </section>
             </div>
             <div id="subpanel-inf-configs" class="subtab-panel">
@@ -6079,7 +6083,6 @@
         const LEGACY_INFRA_TABS = {
             'censor-checks': 'inf-tspu',
             'node-provision': 'inf-provision',
-            'node-traffic': 'inf-traffic',
             'config-templates': 'inf-configs',
         };
 
@@ -6113,6 +6116,7 @@
                 loadReferralAntifraud();
                 loadAntiabuse();
             }
+            if (tabId === 'node-traffic') initNodeTrafficTab();
             if (tabId === 'infrastructure') initInfrastructureTab();
             history.replaceState(null, '', `#${tabId}`);
             const activeBtn = document.querySelector(`.tab-btn[data-tab="${tabId}"]`);
@@ -6126,7 +6130,6 @@
         const infraSubtabLoaders = {
             'inf-tspu': () => loadCensorChecks(),
             'inf-provision': () => initNodeProvisionTab(),
-            'inf-traffic': () => initNodeTrafficTab(),
             'inf-configs': () => { loadConfigTemplates(); loadUaRules(); },
             'inf-servers': () => initInfraServersTab(),
         };
@@ -7960,10 +7963,43 @@
         }
 
         function setClientSearchMode(hasClient) {
+            // Форма поиска видна всегда. Раньше при загруженной карточке она
+            // пряталась, а вместо неё показывалась кнопка «Найти другого
+            // клиента» — на сотне поисков в сутки это сотня лишних кликов и
+            // столько же наведений мышью. Аргумент сохранён: его передают
+            // четыре места, и семантика «карточка загружена» ещё нужна.
             const form = document.getElementById('user-payments-form');
-            const reopenButton = document.getElementById('client-new-search');
-            if (form) form.hidden = Boolean(hasClient);
-            if (reopenButton) reopenButton.hidden = !hasClient;
+            if (form) form.hidden = false;
+            document.getElementById('panel-user-payments')?.classList.toggle('has-client', Boolean(hasClient));
+        }
+
+        // Ctrl+F / Cmd+F (и Ctrl+K как запасное) переводят фокус в поиск
+        // клиента и выделяют прошлый запрос целиком: следующий telegram_id
+        // вставляется поверх без единого движения мышью. Сравниваем по
+        // event.code — при русской раскладке event.key даёт «а», и проверка
+        // по нему не сработала бы.
+        function clientSearchHotkeyAction(event, scope) {
+            if (!event || event.altKey || event.shiftKey) return 'ignore';
+            if (!(event.ctrlKey || event.metaKey)) return 'ignore';
+            if (event.code !== 'KeyF' && event.code !== 'KeyK') return 'ignore';
+            const doc = scope || document;
+            const active = doc.activeElement;
+            // Кастомный селект и меню сегмента рассылки держат свой ввод
+            if (active?.closest?.('.ui-select, #broadcast-segment-menu')) return 'ignore';
+            // Редакторы кода: и CodeMirror, и textarea install-скрипта
+            if (active?.closest?.('.CodeMirror, [data-node-script-editor]')) return 'ignore';
+            return 'focus';
+        }
+
+        function focusClientSearch() {
+            if (typeof activeAdminTab !== 'undefined' && activeAdminTab !== 'user-payments') {
+                showAdminTab('user-payments');
+            }
+            setClientSearchMode(false);
+            const input = document.getElementById('client-search-input');
+            if (!input) return;
+            input.focus();
+            input.select();
         }
 
         function renderClientStartState() {
@@ -8307,52 +8343,115 @@
             const avatar = user.username
                 ? `@${avatarSource.slice(0, 1)}`
                 : avatarSource.slice(0, 1).toUpperCase();
+            // Поля сгруппированы по решению, которое принимает админ:
+            // подписка, деньги, трафик. Раньше это были семь равнозначных
+            // плиток одного кегля, а перенос строк задавался nth-child(n+5),
+            // то есть зависел от числа полей, а не от смысла. Трафик и его
+            // лимит — одна история «сколько съел из сколького» — теперь в
+            // одной группе со шкалой. Регистрация и первое подключение
+            // спущены в подчинённые строки: они нужны редко.
+            const paidCount = (result.history || []).filter((item) => item.success).length;
+            const daysLeft = user.days_left;
+            let subscriptionMeta = '';
+            if (typeof daysLeft === 'number') {
+                if (daysLeft > 0) subscriptionMeta = `осталось ${daysLeft} ${pluralDays(daysLeft)}`;
+                else if (daysLeft === 0) subscriptionMeta = 'истекает сегодня';
+                else subscriptionMeta = `истекла ${Math.abs(daysLeft)} ${pluralDays(daysLeft)} назад`;
+            }
             return `
                 <section class="card client-summary-card">
-                    <div class="client-summary-identity">
-                        <div class="client-summary-avatar" aria-hidden="true">${escapeHtml(avatar)}</div>
-                        <div class="client-summary-identity-copy">
-                            <h2>${escapeHtml(username)}</h2>
-                            <p>${escapeHtml(user.email || 'Email не указан')}</p>
-                            <small>Telegram ID: ${escapeHtml(user.telegram_id || '—')}</small>
+                    <header class="client-summary-head">
+                        <div class="client-summary-identity">
+                            <div class="client-summary-avatar" aria-hidden="true">${escapeHtml(avatar)}</div>
+                            <div class="client-summary-identity-copy">
+                                <h2>${escapeHtml(username)}</h2>
+                                <p>${escapeHtml(user.email || 'Email не указан')}</p>
+                                <small>Telegram ID: ${escapeHtml(user.telegram_id || '—')}</small>
+                            </div>
                         </div>
-                    </div>
-                    <div class="client-summary-stat client-summary-subscription ${user.is_active ? 'is-active' : 'is-expired'}">
-                        <small class="client-summary-label">Подписка до</small>
-                        <strong class="client-summary-value">${escapeHtml(user.expire_at || '—')}</strong>
                         <span class="client-status-pill ${user.is_active ? 'is-active' : 'is-expired'}">● ${user.is_active ? 'Активна' : 'Истекла'}</span>
+                    </header>
+                    <div class="client-summary-groups">
+                        <section class="client-summary-group client-summary-subscription ${user.is_active ? 'is-active' : 'is-expired'}">
+                            <h3 class="client-summary-group-title">Подписка</h3>
+                            <div class="client-summary-lead">
+                                <strong class="client-summary-value">${escapeHtml(user.expire_at || '—')}</strong>
+                                <span class="client-summary-meta">${escapeHtml(subscriptionMeta)}</span>
+                            </div>
+                            <dl class="client-summary-rows">
+                                <div class="client-summary-row">
+                                    <dt class="client-summary-label">Автоплатёж</dt>
+                                    <dd class="client-summary-rowvalue ${autopayActive ? 'green' : ''}">${autopayActive ? 'Подключён' : 'Отключён'}</dd>
+                                </div>
+                                <div class="client-summary-row">
+                                    <dt class="client-summary-label">Статус RWMS</dt>
+                                    <dd class="client-summary-rowvalue" data-client-rwms-status aria-live="polite">Загрузка…</dd>
+                                </div>
+                            </dl>
+                        </section>
+                        <section class="client-summary-group">
+                            <h3 class="client-summary-group-title">Деньги</h3>
+                            <div class="client-summary-lead">
+                                <strong class="client-summary-value client-summary-money">${escapeHtml(money(result.ltv))}</strong>
+                                <span class="client-summary-meta">${paidCount ? `${paidCount} ${pluralPayments(paidCount)}` : 'платежей не было'}</span>
+                            </div>
+                            <dl class="client-summary-rows">
+                                <div class="client-summary-row">
+                                    <dt class="client-summary-label">Регистрация</dt>
+                                    <dd class="client-summary-rowvalue">${escapeHtml(result.first_seen)}</dd>
+                                </div>
+                                <div class="client-summary-row" data-client-first-connected-stat>
+                                    <dt class="client-summary-label">Первое подключение</dt>
+                                    <dd class="client-summary-rowvalue" data-client-first-connected-value aria-live="polite">Загрузка…</dd>
+                                </div>
+                            </dl>
+                        </section>
+                        <section class="client-summary-group client-summary-stat" data-client-traffic-stat>
+                            <h3 class="client-summary-group-title">Трафик · RWMS</h3>
+                            <div class="client-summary-lead">
+                                <strong class="client-summary-value" data-client-traffic-value aria-live="polite">Загрузка…</strong>
+                                <span class="client-summary-meta" data-client-traffic-meta>Фактическое потребление</span>
+                            </div>
+                            <div class="client-summary-meter" data-client-traffic-meter hidden>
+                                <div class="client-summary-meter-track">
+                                    <span class="client-summary-meter-fill" data-client-traffic-meter-fill></span>
+                                </div>
+                                <div class="client-summary-meter-scale">
+                                    <span data-client-traffic-meter-share></span>
+                                    <span data-client-traffic-meter-lifetime></span>
+                                </div>
+                            </div>
+                            <dl class="client-summary-rows" data-client-traffic-limit-stat>
+                                <div class="client-summary-row">
+                                    <dt class="client-summary-label">Лимит</dt>
+                                    <dd class="client-summary-rowvalue" data-client-traffic-limit-value aria-live="polite">Загрузка…</dd>
+                                </div>
+                                <div class="client-summary-row">
+                                    <dt class="client-summary-label">HWID-устройств</dt>
+                                    <dd class="client-summary-rowvalue" data-client-hwid>—</dd>
+                                </div>
+                            </dl>
+                        </section>
                     </div>
-                    <div class="client-summary-stat">
-                        <small class="client-summary-label">LTV</small>
-                        <strong class="client-summary-value">${escapeHtml(money(result.ltv))}</strong>
-                        <span class="client-summary-meta"></span>
-                    </div>
-                    <div class="client-summary-stat" data-client-traffic-stat>
-                        <small class="client-summary-label">Трафик · RWMS</small>
-                        <strong class="client-summary-value" data-client-traffic-value aria-live="polite">Загрузка…</strong>
-                        <span class="client-summary-meta" data-client-traffic-meta>Фактическое потребление</span>
-                    </div>
-                    <div class="client-summary-stat" data-client-traffic-limit-stat>
-                        <small class="client-summary-label">Лимит трафика · RWMS</small>
-                        <strong class="client-summary-value" data-client-traffic-limit-value aria-live="polite">Загрузка…</strong>
-                        <span class="client-summary-meta" data-client-traffic-limit-meta>Статус подписки и HWID-устройства</span>
-                    </div>
-                    <div class="client-summary-stat">
-                        <small class="client-summary-label">Регистрация</small>
-                        <strong class="client-summary-value">${escapeHtml(result.first_seen)}</strong>
-                        <span class="client-summary-meta"></span>
-                    </div>
-                    <div class="client-summary-stat" data-client-first-connected-stat>
-                        <small class="client-summary-label">Первое подключение · RWMS</small>
-                        <strong class="client-summary-value" data-client-first-connected-value aria-live="polite">Загрузка…</strong>
-                        <span class="client-summary-meta"></span>
-                    </div>
-                    <div class="client-summary-stat">
-                        <small class="client-summary-label">Автоплатёж</small>
-                        <strong class="client-summary-value ${autopayActive ? 'green' : ''}">${autopayActive ? 'Подключён' : 'Отключён'}</strong>
-                        <span class="client-summary-meta"></span>
-                    </div>
+                    <p class="client-summary-note" data-client-traffic-limit-meta hidden></p>
                 </section>`;
+        }
+
+        function pluralDays(value) {
+            const abs = Math.abs(value);
+            const mod10 = abs % 10;
+            const mod100 = abs % 100;
+            if (mod10 === 1 && mod100 !== 11) return 'день';
+            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'дня';
+            return 'дней';
+        }
+
+        function pluralPayments(value) {
+            const mod10 = value % 10;
+            const mod100 = value % 100;
+            if (mod10 === 1 && mod100 !== 11) return 'успешный платёж';
+            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) return 'успешных платежа';
+            return 'успешных платежей';
         }
 
         function clientOverviewSectionHtml(result, refResult) {
@@ -8502,10 +8601,53 @@
             const limitStat = document.querySelector('[data-client-traffic-limit-stat]');
             const limitValue = document.querySelector('[data-client-traffic-limit-value]');
             const limitMeta = document.querySelector('[data-client-traffic-limit-meta]');
-            const setLimit = (value, meta, limited = false) => {
+            const rwmsStatus = document.querySelector('[data-client-rwms-status]');
+            const hwidTarget = document.querySelector('[data-client-hwid]');
+            const meter = document.querySelector('[data-client-traffic-meter]');
+            const meterFill = document.querySelector('[data-client-traffic-meter-fill]');
+            const meterShare = document.querySelector('[data-client-traffic-meter-share]');
+            const meterLifetime = document.querySelector('[data-client-traffic-meter-lifetime]');
+            const setStatusRow = (status, hwid) => {
+                if (rwmsStatus?.isConnected) rwmsStatus.textContent = status;
+                if (hwidTarget?.isConnected) hwidTarget.textContent = hwid;
+            };
+            // Примечание про управляемый/ручной лимит — отдельная строка под
+            // группами: это самый длинный текст карточки, в ячейке он
+            // перевешивал всё остальное, набранный при этом мельчайшим кеглем.
+            const setLimit = (value, note, limited = false, kind = '') => {
                 if (limitValue?.isConnected) limitValue.textContent = value;
-                if (limitMeta?.isConnected) limitMeta.textContent = meta;
+                if (limitMeta?.isConnected) {
+                    limitMeta.textContent = note;
+                    limitMeta.hidden = !note;
+                    limitMeta.classList.toggle('is-managed', kind === 'managed');
+                    limitMeta.classList.toggle('is-manual', kind === 'manual');
+                }
                 limitStat?.classList.toggle('is-limited', limited);
+            };
+            // Одна шкала на группу: доля израсходованного от лимита. Подпись
+            // называет значение, которого шкала реально достигает, а при
+            // кратном превышении — во сколько раз (5 ГиБ против 486 ГиБ
+            // «сотней процентов» не описываются).
+            const setMeter = (usedBytes, limitBytes, lifetimeLabel) => {
+                if (!meter?.isConnected) return;
+                if (!limitBytes || !(usedBytes >= 0)) {
+                    meter.hidden = true;
+                    return;
+                }
+                const ratio = usedBytes / limitBytes;
+                const pct = Math.max(0, Math.min(100, Math.round(ratio * 100)));
+                if (meterFill) {
+                    meterFill.style.width = `${pct}%`;
+                    meterFill.classList.toggle('is-warn', ratio >= 0.75 && ratio < 1);
+                    meterFill.classList.toggle('is-over', ratio >= 1);
+                }
+                if (meterShare) {
+                    meterShare.textContent = ratio >= 2
+                        ? `×${new Intl.NumberFormat('ru-RU', {maximumFractionDigits: 1}).format(ratio)} от лимита`
+                        : `${pct}% лимита`;
+                }
+                if (meterLifetime) meterLifetime.textContent = lifetimeLabel ? `за всё время ${lifetimeLabel}` : '';
+                meter.hidden = false;
             };
             if (!valueTarget || !metaTarget || !main.dataset.userTrafficUrl) return;
             try {
@@ -8519,6 +8661,8 @@
                     metaTarget.textContent = 'Нет данных RWMS';
                     statTarget?.classList.add('is-unavailable');
                     setFirstConnected('—');
+                    setStatusRow('—', '—');
+                    setMeter(0, 0, '');
                     setLimit('—', 'Нет данных RWMS');
                     return;
                 }
@@ -8536,13 +8680,21 @@
                 limitStat?.classList.toggle('is-manual', managed.kind === 'manual');
                 setLimit(
                     limitBytes > 0 ? `${formatClientTrafficBytes(limitBytes)}${strategy ? ` · ${strategy}` : ''}` : 'Без лимита',
-                    `Статус: ${traffic.status || '—'}${traffic.is_limited ? ' — лимит исчерпан' : ''} · HWID-устройств: ${hwid}${managedLabel ? ` · ${managedLabel}` : ''}`,
+                    managedLabel,
                     Boolean(traffic.is_limited),
+                    managed.kind || '',
+                );
+                setStatusRow(
+                    `${traffic.status || '—'}${traffic.is_limited ? ' — лимит исчерпан' : ''}`,
+                    hwid,
                 );
                 const used = formatClientTrafficBytes(traffic.used_traffic_bytes);
                 const lifetime = formatClientTrafficBytes(traffic.lifetime_used_traffic_bytes);
                 valueTarget.textContent = used;
-                metaTarget.textContent = `За всё время: ${lifetime}`;
+                metaTarget.textContent = limitBytes > 0
+                    ? `из ${formatClientTrafficBytes(limitBytes)}${strategy ? ` · ${strategy}` : ''}`
+                    : `за всё время: ${lifetime}`;
+                setMeter(Number(traffic.used_traffic_bytes) || 0, limitBytes, lifetime);
                 statTarget?.setAttribute('title', `RWMS: текущий период ${used}; за всё время ${lifetime}`);
                 statTarget?.classList.remove('is-unavailable');
             } catch (error) {
@@ -8551,6 +8703,8 @@
                 metaTarget.textContent = 'RWMS временно недоступен';
                 statTarget?.classList.add('is-unavailable');
                 setFirstConnected('—');
+                setStatusRow('—', '—');
+                setMeter(0, 0, '');
                 setLimit('—', 'RWMS временно недоступен');
             }
         }
@@ -12755,7 +12909,6 @@
 
         const statsForm = document.getElementById('stats-form');
         const userPaymentsForm = document.getElementById('user-payments-form');
-        const clientNewSearchButton = document.getElementById('client-new-search');
         const paymentInfoForm = document.getElementById('payment-info-form');
         const referralAntifraudForm = document.getElementById('referral-antifraud-form');
         const replyTemplateForm = document.getElementById('reply-template-form');
@@ -12776,11 +12929,18 @@
             userPaymentsForm.addEventListener('submit', loadClientCard);
             renderClientStartState();
         }
-        clientNewSearchButton?.addEventListener('click', () => {
-            setClientSearchMode(false);
-            const input = userPaymentsForm?.elements.q;
-            input?.focus();
-            input?.select();
+        document.addEventListener('keydown', (event) => {
+            if (clientSearchHotkeyAction(event) !== 'focus') return;
+            // Без preventDefault браузер откроет собственный поиск по странице
+            event.preventDefault();
+            focusClientSearch();
+        });
+        // Escape в поле возвращает к карточке, не поднимая событие к шести
+        // существующим глобальным подписчикам на Escape
+        document.getElementById('client-search-input')?.addEventListener('keydown', (event) => {
+            if (event.key !== 'Escape') return;
+            event.stopPropagation();
+            event.currentTarget.blur();
         });
         if (paymentInfoForm) paymentInfoForm.addEventListener('submit', loadPaymentInfo);
         if (referralAntifraudForm) referralAntifraudForm.addEventListener('submit', submitReferralAntifraud);
@@ -13713,7 +13873,6 @@
             const data = typeof item === 'string' ? {domain: item} : (item || {});
             const domain = data.domain || '';
             const safeDomain = escapeHtml(domain);
-            const clientSnis = data.client_snis || [];
             const wireSnis = (data.snis && data.snis.length) ? data.snis : [domain];
             const banned = blockedSnis || new Set();
             const hitNames = wireSnis.filter((name) => banned.has(name));
@@ -13721,23 +13880,8 @@
             const blockedBadge = hitNames.length
                 ? `<div class="infra-domain-badges"><span class="infra-badge infra-badge-offline" title="Вердикт диагностики${diagAt ? ' от ' + escapeHtml(diagAt) : ''}. На DNS это не влияет: адрес меняется как обычно. Менять надо ACL haproxy и serverNames инбаунда на ноде плюс хосты Remnawave">ИМЯ В БАНЕ${diagAt ? ' (' + escapeHtml(diagAt.slice(0, 10)) + ')' : ''}: ${escapeHtml(hitNames.join(', '))}</span>${cleanNames.length ? `<span class="infra-badge infra-badge-online" title="Эти имена в той же диагностике прошли">работают: ${escapeHtml(cleanNames.join(', '))}</span>` : ''}</div>`
                 : '';
-            // В поле показываем то, что РЕАЛЬНО уходит в эфир, а не только
-            // явно заданное: у домена старой схемы это он сам. Иначе не видно,
-            // что при добавлении маски домен надо оставить в списке, если он
-            // тоже используется (de.monkora.org + example.org)
-            // В поле — ТОЛЬКО явно заданные имена: подстановка производного
-            // значения превращала соседнюю кнопку «Всем» в мину, она разослала
-            // бы имя одного домена всем остальным. Что реально уходит в эфир,
-            // показано отдельной строкой. name нужен infraSnapshotDirtyFields:
-            // без него несохранённый ввод стирался автообновлением карточки
-            const sniRow = pending ? '' : `
-                    <div class="infra-domain-sni-row">
-                        <span class="infra-domain-sni-hint" title="Имена, которые клиенты шлют в ClientHello, через запятую — по одному на протокол haproxy. Если сам домен тоже уходит в эфир, впишите его в список. Пусто — в эфир уходит только сам домен">SNI</span>
-                        <input class="infra-domain-sni-input" type="text" name="infra-sni-${safeDomain}" value="${escapeHtml(clientSnis.join(', '))}" placeholder="как домен (${safeDomain})" autocomplete="off" spellcheck="false" data-infra-sni-input="${safeDomain}">
-                        <button type="button" class="infra-mini-btn" data-infra-save-sni="${safeDomain}">Сохранить</button>
-                        <button type="button" class="infra-mini-btn" title="Записать содержимое поля ВСЕМ доменам сервера: haproxy разводит по SNI на общем адресе, набор обычно один на ноду" data-infra-save-sni-all="${safeDomain}">Всем</button>
-                    </div>
-                    <div class="infra-domain-wire">в эфир уходит: ${wireSnis.map((name) => `<code>${escapeHtml(name)}</code>`).join(', ')}</div>`;
+            // Имена SNI живут у сервера (вкладка «SNI»), у домена — только
+            // вердикт по ним из последней диагностики
             return `
                 <div class="infra-domain-manage-item${pending ? ' is-pending' : ''}" data-infra-domain-item="${safeDomain}">
                     <div class="infra-domain-manage-head">
@@ -13747,7 +13891,6 @@
                             : `<button type="button" class="infra-mini-btn danger" data-infra-delete-domain="${safeDomain}">Удалить</button>`}
                     </div>
                     ${blockedBadge}
-                    ${sniRow}
                 </div>`;
         }
 
@@ -13779,43 +13922,44 @@
             const snis = clientSnis.filter(Boolean);
             pendingRow.insertAdjacentHTML('beforebegin', infraDomainRowHtml({
                 domain,
-                client_snis: snis,
                 snis: snis.length ? snis : [domain],
                 own_name: !snis.length || snis.includes(domain),
             }));
             const savedRow = pendingRow.previousElementSibling;
             pendingRow.remove();
             infraWireDomainDeleteButton(savedRow?.querySelector('[data-infra-delete-domain]'), server);
-            infraWireDomainSniButton(savedRow?.querySelector('[data-infra-save-sni]'), server);
-            infraWireDomainSniButton(savedRow?.querySelector('[data-infra-save-sni-all]'), server, true);
             infraSyncDomainEmptyState(container.querySelector('#infra-domains-list'));
         }
 
-        function infraWireDomainSniButton(button, server, applyAll = false) {
-            if (!button) return;
-            button.addEventListener('click', async () => {
-                const domain = applyAll ? button.dataset.infraSaveSniAll : button.dataset.infraSaveSni;
-                const row = button.closest('[data-infra-domain-item]');
-                const input = row?.querySelector('[data-infra-sni-input]');
-                const value = (input?.value || '').trim();
-                if (applyAll) {
-                    const total = document.querySelectorAll('[data-infra-domain-item]').length;
-                    const what = value
-                        ? `имена «${value}»`
-                        : 'ПУСТОЙ список (в эфир будет уходить сам домен)';
-                    if (!confirm(`Записать ${what} всем доменам сервера (${total} шт.)? Их текущие имена будут перезаписаны.`)) return;
-                }
-                const ok = value
-                    ? (applyAll ? `Имена сохранены всем доменам сервера` : `Имена сохранены: ${value}`)
-                    : (applyAll ? 'Имена сняты у всех доменов сервера' : 'Имена сняты — в эфир уходит сам домен');
-                await infraAction(
-                    {action: 'set_domain_snis', id: server.id, domain, client_snis: value, apply_all: applyAll ? '1' : ''},
-                    ok,
-                    // Сервер нормализует список (регистр, дубли, «список из
-                    // одного домена» = не задано) — показываем то, что легло
-                    {busyTarget: button, pendingLabel: 'Сохраняем…', refreshDetail: true},
-                );
-            });
+        function infraServerSnisPanelHtml(detail, blockedSnis, diagAt) {
+            // Список сервера — то, с чем диагностика проверяет каждый адрес.
+            // Пустой список не значит «ничего не проверяем»: тогда имена
+            // берутся из доменов A-записей, и это показано явно
+            const explicit = (detail.client_snis || []).filter(Boolean);
+            const wire = (detail.probe_snis || []).filter(Boolean);
+            const banned = blockedSnis || new Set();
+            const names = wire.map((name) => `<code class="${banned.has(name) ? 'is-banned' : ''}">${escapeHtml(name)}</code>`).join(', ');
+            const hits = wire.filter((name) => banned.has(name));
+            const source = explicit.length
+                ? 'список сервера'
+                : (wire.length ? 'список не задан — взяты имена доменов' : 'список не задан, доменов нет — проверять нечем');
+            const verdict = hits.length
+                ? `<div class="infra-domain-badges"><span class="infra-badge infra-badge-offline" title="Вердикт диагностики${diagAt ? ' от ' + escapeHtml(diagAt) : ''}. На DNS это не влияет: адрес меняется как обычно. Менять надо ACL haproxy и serverNames инбаунда на ноде плюс хосты Remnawave">ИМЯ В БАНЕ${diagAt ? ' (' + escapeHtml(diagAt.slice(0, 10)) + ')' : ''}: ${escapeHtml(hits.join(', '))}</span></div>`
+                : '';
+            return `
+                <form id="infra-server-snis-form" class="infra-form infra-snis-form">
+                    <label class="infra-form-field">
+                        <span class="infra-form-label">Имена через запятую</span>
+                        <span class="infra-form-hint">По одному на протокол, который haproxy разводит по SNI: de.monkora.org, example.org, example.com. Пусто — проверяем сами домены A-записей</span>
+                        <span class="infra-control-wrap">
+                            <i class="fas fa-mask infra-control-icon"></i>
+                            <input class="infra-control" type="text" name="client_snis" value="${escapeHtml(explicit.join(', '))}" placeholder="как домены сервера" autocomplete="off" spellcheck="false">
+                        </span>
+                    </label>
+                    <button class="btn infra-form-submit" type="submit"><i class="fas fa-save"></i>Сохранить</button>
+                </form>
+                <div class="infra-domain-wire infra-snis-wire" data-infra-snis-wire>адреса проверяются с именами: ${names || '—'} <span class="infra-snis-source">· ${source}</span></div>
+                ${verdict}`;
         }
 
         function infraWireDomainDeleteButton(button, server) {
@@ -13848,6 +13992,7 @@
             parameters: 'infra-detail-parameters',
             ips: 'infra-detail-ips',
             domains: 'infra-detail-domains',
+            snis: 'infra-detail-snis',
         });
 
         function infraSetManagementTab(container, tab, options = {}) {
@@ -14490,6 +14635,7 @@
                         <button type="button" class="infra-detail-management-tab" id="infra-management-tab-parameters" role="tab" aria-controls="infra-detail-parameters" aria-selected="${infraDetailManagementTab === 'parameters'}" tabindex="${infraDetailManagementTab === 'parameters' ? '0' : '-1'}" data-infra-management-tab="parameters"><i class="fas fa-sliders"></i>Параметры</button>
                         <button type="button" class="infra-detail-management-tab" id="infra-management-tab-ips" role="tab" aria-controls="infra-detail-ips" aria-selected="${infraDetailManagementTab === 'ips'}" tabindex="${infraDetailManagementTab === 'ips' ? '0' : '-1'}" data-infra-management-tab="ips"><i class="fas fa-network-wired"></i>IP-адреса <span>${(detail.ips || []).length}</span></button>
                         <button type="button" class="infra-detail-management-tab" id="infra-management-tab-domains" role="tab" aria-controls="infra-detail-domains" aria-selected="${infraDetailManagementTab === 'domains'}" tabindex="${infraDetailManagementTab === 'domains' ? '0' : '-1'}" data-infra-management-tab="domains"><i class="fas fa-link"></i>Домены <span data-infra-management-count="domains">${(detail.domains || []).length}</span></button>
+                        <button type="button" class="infra-detail-management-tab" id="infra-management-tab-snis" role="tab" aria-controls="infra-detail-snis" aria-selected="${infraDetailManagementTab === 'snis'}" tabindex="${infraDetailManagementTab === 'snis' ? '0' : '-1'}" data-infra-management-tab="snis"><i class="fas fa-mask"></i>SNI <span data-infra-management-count="snis">${(detail.client_snis || []).length}</span></button>
                     </div>
                     <div class="infra-detail-management-panels">
                     <section class="card infra-detail-card infra-detail-management-panel" id="infra-detail-server-info" role="tabpanel" aria-labelledby="infra-management-tab-server" data-infra-management-panel="server" ${infraDetailManagementTab === 'server' ? '' : 'hidden'}>
@@ -14565,17 +14711,14 @@
                                     <input class="infra-control" type="text" name="domain" placeholder="de.example.xyz" inputmode="url" autocomplete="off" spellcheck="false">
                                 </span>
                             </label>
-                            <label class="infra-form-field">
-                                <span class="infra-form-label">SNI (необязательно)</span>
-                                <span class="infra-form-hint">Имена из ClientHello через запятую — по одному на протокол haproxy. Если домен тоже уходит в эфир, впишите и его: de.monkora.org, example.org. Пусто — проверяем сам домен</span>
-                                <span class="infra-control-wrap">
-                                    <i class="fas fa-mask infra-control-icon"></i>
-                                    <input class="infra-control" type="text" name="client_snis" placeholder="как домен" autocomplete="off" spellcheck="false">
-                                </span>
-                            </label>
                             <button class="btn infra-form-submit" type="submit"><i class="fas fa-plus"></i>Привязать домен</button>
                         </form>
                         ${detail.cloudflare_enabled ? '' : '<div class="help-block infra-domain-warning">⚠️ CLOUDFLARE_API_TOKEN не настроен — автозамена IP не сможет переключить DNS</div>'}
+                    </section>
+                    <section class="card infra-detail-card infra-detail-management-panel" id="infra-detail-snis" role="tabpanel" aria-labelledby="infra-management-tab-snis" data-infra-management-panel="snis" ${infraDetailManagementTab === 'snis' ? '' : 'hidden'}>
+                        <h4>SNI для замеров ТСПУ</h4>
+                        <p class="infra-snis-copy">Имена, которые клиенты шлют в ClientHello — по одному на каждый протокол ноды. С каждым из них диагностика проверяет каждый адрес сервера: адрес считается забаненным, только если не проходит ни с одним именем, а забаненное имя показывается отдельно и на DNS не влияет.</p>
+                        ${infraServerSnisPanelHtml(detail, diagBlockedSnis, diagAt)}
                     </section>
 
                 <section class="card infra-detail-card infra-detail-management-panel" id="infra-detail-ips" role="tabpanel" aria-labelledby="infra-management-tab-ips" data-infra-management-panel="ips" ${infraDetailManagementTab === 'ips' ? '' : 'hidden'}>
@@ -14749,37 +14892,42 @@
                 const form = event.target;
                 if (form.getAttribute('aria-busy') === 'true') return;
                 const input = form.domain;
-                const sniInput = form.client_snis;
                 const originalDomain = input.value.trim();
                 const domain = originalDomain.replace(/^\.+|\.+$/g, '').toLowerCase();
-                const clientSnisRaw = (sniInput?.value || '').trim();
-                const clientSnis = clientSnisRaw
-                    .split(/[,\s]+/)
-                    .map((name) => name.replace(/^\.+|\.+$/g, '').toLowerCase())
-                    .filter(Boolean);
                 if (!domain) return;
                 const pendingRow = infraAppendPendingDomain(container, domain);
                 input.value = '';
-                if (sniInput) sniInput.value = '';
                 input.focus({preventScroll: true});
                 await infraAction(
-                    {action: 'add_domain', id: server.id, domain, client_snis: clientSnisRaw},
+                    {action: 'add_domain', id: server.id, domain},
                     'Домен привязан',
                     {
                         busyTarget: form,
                         pendingLabel: 'Привязываем…',
                         refreshDetail: false,
-                        onSuccess: () => infraConfirmPendingDomain(container, pendingRow, domain, server, clientSnis),
+                        onSuccess: () => infraConfirmPendingDomain(container, pendingRow, domain, server),
                         onError: () => {
                             const list = pendingRow?.parentElement;
                             pendingRow?.remove();
                             infraSyncDomainEmptyState(list);
                             if (!input.value.trim()) input.value = originalDomain;
-                            if (sniInput && !sniInput.value.trim()) sniInput.value = clientSnisRaw;
                             input.focus({preventScroll: true});
                             input.setSelectionRange(0, input.value.length);
                         },
                     },
+                );
+            });
+            container.querySelector('#infra-server-snis-form')?.addEventListener('submit', async (event) => {
+                event.preventDefault();
+                const form = event.target;
+                if (form.getAttribute('aria-busy') === 'true') return;
+                const value = (form.client_snis.value || '').trim();
+                await infraAction(
+                    {action: 'set_server_snis', id: server.id, client_snis: value},
+                    value ? `Имена сохранены: ${value}` : 'Список снят — адреса проверяются с именами доменов',
+                    // Сервер нормализует список (регистр, дубли) — после
+                    // сохранения показываем то, что легло
+                    {busyTarget: form, pendingLabel: 'Сохраняем…', refreshDetail: true},
                 );
             });
             container.querySelectorAll('[data-infra-ensure-ip]').forEach((button) => {
@@ -14828,12 +14976,6 @@
             });
             container.querySelectorAll('[data-infra-delete-domain]').forEach((button) => {
                 infraWireDomainDeleteButton(button, server);
-            });
-            container.querySelectorAll('[data-infra-save-sni]').forEach((button) => {
-                infraWireDomainSniButton(button, server);
-            });
-            container.querySelectorAll('[data-infra-save-sni-all]').forEach((button) => {
-                infraWireDomainSniButton(button, server, true);
             });
         }
 

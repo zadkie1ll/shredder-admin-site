@@ -806,13 +806,18 @@ def server_detail_payload(db_session, server_id) -> dict:
         },
         "ips": [_ip_payload(row) for row in ips],
         "domains": [row.domain for row in domains],
+        # Список имён сервера (вкладка «SNI») и то, с чем реально идёт
+        # проверка адресов: без списка — имена доменов (старая схема)
+        "client_snis": server_client_snis(server),
+        "probe_snis": server_wire_names(server, domains),
+        "snis_source": "server" if server_client_snis(server) else "domains",
         "domains_detail": [
             {
                 "domain": row.domain,
                 "client_snis": list(row.client_snis or []),
-                "snis": domain_client_snis(row),
-                "own_name": domain_own_name_on_wire(row),
-                "custom_sni": bool(row.client_snis),
+                "snis": _domain_wire_names(server, row),
+                "own_name": row.domain in _domain_wire_names(server, row),
+                "custom_sni": bool(server_client_snis(server) or row.client_snis),
             }
             for row in domains
         ],
@@ -1506,6 +1511,48 @@ def set_domain_snis(
     return rows
 
 
+def server_client_snis(server) -> list[str]:
+    """Явно заданный список имён сервера (вкладка «SNI»). Пусто -> []."""
+    names = list(getattr(server, "client_snis", None) or [])
+    return [str(n).strip().lower() for n in names if str(n).strip()]
+
+
+def _domain_wire_names(server, row) -> list[str]:
+    """Имена, которыми проверяется адрес для этого домена.
+
+    Список сервера общий для всех его доменов: haproxy разводит
+    протоколы по SNI на одном адресе, а не по доменам. Без списка —
+    старая схема связки (client_snis домена или сам домен).
+    """
+    return server_client_snis(server) or domain_client_snis(row)
+
+
+def server_wire_names(server, domain_rows) -> list[str]:
+    """Все имена, с которыми диагностика проверяет адреса сервера.
+
+    Пустой только у сервера без доменов: без списка «SNI» имена берутся
+    из доменов, и пустой набор означал бы вердикт по адресу вслепую.
+    """
+    explicit = server_client_snis(server)
+    if explicit:
+        return list(explicit)
+    ordered: list[str] = []
+    for row in domain_rows:
+        for name in domain_client_snis(row):
+            if name not in ordered:
+                ordered.append(name)
+    return ordered
+
+
+def set_server_snis(db_session, server_id, client_snis) -> InfraServer:
+    """Задаёт (или снимает — пустым значением) список SNI сервера."""
+    server = get_server(db_session, server_id)
+    snis = normalize_client_snis(client_snis)
+    server.client_snis = list(snis) or None
+    db_session.flush()
+    return server
+
+
 def delete_domain(db_session, server_id, domain: str) -> None:
     server = get_server(db_session, server_id)
     row = (
@@ -2133,8 +2180,12 @@ def server_probe_targets(db_session, server) -> tuple:
         .order_by(InfraServerDomain.domain)
         .all()
     ]
-    ordered: list[str] = []
-    for index in range(max((len(items) for items in per_domain), default=0)):
+    # Список сервера (вкладка «SNI») — единственный источник, если задан:
+    # имена относятся к ноде, а не к отдельному домену
+    ordered: list[str] = list(server_client_snis(server))
+    for index in range(
+        0 if ordered else max((len(items) for items in per_domain), default=0)
+    ):
         for items in per_domain:
             if index < len(items) and items[index] not in ordered:
                 ordered.append(items[index])
@@ -2157,8 +2208,9 @@ def server_domain_targets(db_session, server_id) -> list[dict]:
     (классификатор, решение о смене DNS) отличают схемы по тому, входит ли
     домен в собственный список имён.
     """
+    server = get_server(db_session, server_id)
     return [
-        {"domain": row.domain, "snis": domain_client_snis(row)}
+        {"domain": row.domain, "snis": _domain_wire_names(server, row)}
         for row in db_session.query(InfraServerDomain)
         .filter(InfraServerDomain.server_id == server_id)
         .order_by(InfraServerDomain.domain)
@@ -2453,16 +2505,13 @@ def force_tspu_check(db_session, server: InfraServer, reason: str) -> dict:
             target_ips.append(row.ip)
     # Для авто-строки замера нужен SNI, а не домен: в ClientHello уходит
     # клиентское имя связки, и их у связки может быть несколько
-    domains = []
-    for row in (
+    domains = server_wire_names(
+        server,
         db_session.query(InfraServerDomain)
         .filter(InfraServerDomain.server_id == server.id)
         .order_by(InfraServerDomain.domain)
-        .all()
-    ):
-        for name in domain_client_snis(row):
-            if name not in domains:
-                domains.append(name)
+        .all(),
+    )
 
     run_ids: list[int] = []
     errors: list[str] = []

@@ -48,4 +48,4 @@ class AdminMobileLayoutTests(SimpleTestCase):
         self.assertIn("grid-column: 2;", self.css)
 
     def test_admin_css_cache_version_is_bumped(self):
-        self.assertIn("admin_dashboard.css' %}?v=6", self.template)
+        self.assertIn("admin_dashboard.css' %}?v=9", self.template)

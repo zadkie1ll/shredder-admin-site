@@ -848,6 +848,52 @@ class MutationTests(InfraDbTestCase):
         with self.assertRaises(infra.InfraError):
             infra.set_domain_snis(self.session, server.id, "nope.example", "x")
 
+    def test_server_snis_override_domain_names(self):
+        # Имена относятся к ноде, а не к домену: список сервера — единственный
+        # источник для замеров, старые client_snis доменов игнорируются
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "a.example.xyz", client_snis=["stale.example"])
+        self.make_domain(server, "b.example.xyz")
+
+        infra.set_server_snis(
+            self.session, server.id, "Example.ORG, b.example.xyz , example.org"
+        )
+        self.assertEqual(server.client_snis, ["example.org", "b.example.xyz"])
+        _ips, names, dropped = infra.server_probe_targets(self.session, server)
+        self.assertEqual(names, ["example.org", "b.example.xyz"])
+        self.assertEqual(dropped, [])
+        targets = infra.server_domain_targets(self.session, server.id)
+        self.assertEqual(
+            targets,
+            [
+                {"domain": "a.example.xyz", "snis": ["example.org", "b.example.xyz"]},
+                {"domain": "b.example.xyz", "snis": ["example.org", "b.example.xyz"]},
+            ],
+        )
+        payload = infra.server_detail_payload(self.session, server.id)
+        self.assertEqual(payload["client_snis"], ["example.org", "b.example.xyz"])
+        self.assertEqual(payload["probe_snis"], ["example.org", "b.example.xyz"])
+        self.assertEqual(payload["snis_source"], "server")
+        by_domain = {d["domain"]: d for d in payload["domains_detail"]}
+        self.assertFalse(by_domain["a.example.xyz"]["own_name"])
+        self.assertTrue(by_domain["b.example.xyz"]["own_name"])
+
+        # Пустое значение снимает список: снова старая схема по доменам
+        infra.set_server_snis(self.session, server.id, "")
+        self.assertIsNone(server.client_snis)
+        _ips, names, _dropped = infra.server_probe_targets(self.session, server)
+        self.assertEqual(names, ["stale.example", "b.example.xyz"])
+        payload = infra.server_detail_payload(self.session, server.id)
+        self.assertEqual(payload["client_snis"], [])
+        self.assertEqual(payload["probe_snis"], ["stale.example", "b.example.xyz"])
+        self.assertEqual(payload["snis_source"], "domains")
+
+        with self.assertRaises(infra.InfraError):
+            infra.set_server_snis(self.session, server.id, "a/b")
+        with self.assertRaises(infra.InfraError):
+            infra.set_server_snis(self.session, 10**9, "example.org")
+
     def test_set_domain_snis_apply_all(self):
         # haproxy разводит по SNI на общем адресе — набор имён обычно один
         # на ноду, вбивать его в каждый домен руками значит опечататься
@@ -4867,6 +4913,40 @@ class InfraViewTests(InfraDbTestCase):
                     "action": "set_domain_snis", "id": server.id,
                     "domain": "de.monkora.org", "client_snis": "a/b",
                 },
+            )
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_server_sni_action(self):
+        server = self.make_server()
+        response = self.views.support_admin_api_infra_servers(
+            self.factory.post(
+                "/support-admin/api/infra-servers/",
+                {
+                    "action": "set_server_snis", "id": server.id,
+                    "client_snis": "Example.org, localhost",
+                },
+            )
+        )
+        self.assertEqual(response.status_code, 200)
+        import json as json_module
+
+        self.assertEqual(
+            json_module.loads(response.content)["client_snis"],
+            ["example.org", "localhost"],
+        )
+        check_session = self.Session()
+        try:
+            row = check_session.get(InfraServer, server.id)
+            self.assertEqual(row.client_snis, ["example.org", "localhost"])
+        finally:
+            check_session.close()
+
+        # Мусор в поле не должен уехать в Atlas одним именем
+        response = self.views.support_admin_api_infra_servers(
+            self.factory.post(
+                "/support-admin/api/infra-servers/",
+                {"action": "set_server_snis", "id": server.id, "client_snis": "a/b"},
             )
         )
         self.assertEqual(response.status_code, 400)

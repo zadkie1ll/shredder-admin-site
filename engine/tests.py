@@ -518,7 +518,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         rule = stylesheet[rule_start:stylesheet.index("}", rule_start)]
         self.assertIn("flex: 0 0 auto;", rule)
         self.assertIn("height: auto;", rule)
-        self.assertIn("@import url('./admin-concept-infrastructure.css?v=5');", concept_index)
+        self.assertIn("@import url('./admin-concept-infrastructure.css?v=7');", concept_index)
 
     def test_censor_checks_allow_selecting_rows_and_deleting_them(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
@@ -4976,13 +4976,23 @@ class NodeTrafficTemplateTests(SimpleTestCase):
         self.assertNotIn('class="card info-card" style="margin-bottom:10px;"', template)
 
     def test_admin_dashboard_has_node_traffic_tab(self):
-        # «Трафик нод» — теперь вкладка раздела «Инфраструктура»
+        # «Трафик нод» — самостоятельный раздел сайдбара под «Системой»:
+        # это отчёт, за которым ходят напрямую, а не по пути к установке нод
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
+        self.assertIn('data-tab="node-traffic"', template)
+        # `.infra-legacy-panel { display:block }` beats `.tab-panel { display:none }`:
+        # the panel must stay a plain tab-panel or it shows on every tab.
+        self.assertIn('<section id="panel-node-traffic" class="tab-panel">', template)
+        self.assertNotIn('id="panel-node-traffic" class="tab-panel infra-legacy-panel"', template)
+        self.assertIn('.sidebar .tab-btn[data-tab="node-traffic"] i { --admin-nav-icon:', Path('engine/static/css/admin-concept.css').read_text())
+        self.assertIn('id="panel-node-traffic" class="tab-panel', template)
+        self.assertIn("if (tabId === 'node-traffic') initNodeTrafficTab();", template)
+        # Из подвкладок инфраструктуры раздел убран без следов
+        self.assertNotIn('data-subtab="inf-traffic"', template)
+        self.assertNotIn('id="subpanel-inf-traffic"', template)
+        self.assertNotIn("'inf-traffic'", template)
         self.assertIn('data-tab="infrastructure"', template)
-        self.assertIn('data-subtab="inf-traffic"', template)
-        self.assertIn('id="subpanel-inf-traffic"', template)
-        self.assertIn('id="panel-node-traffic"', template)
         self.assertIn('id="node-traffic-form"', template)
         self.assertIn("data-traffic-nodes-url", template)
         self.assertIn("data-node-traffic-url", template)
@@ -6300,7 +6310,7 @@ class AdminClientWorkspaceTests(SimpleTestCase):
         self.assertIn("#panel-user-payments .client-action-registry .client-action-controls { display: grid; grid-template-columns: var(--client-action-btn) var(--client-action-btn);", css)
         self.assertIn(".client-action-button.is-primary { grid-column: 2; }", css)
         self.assertIn(".client-action-pair { grid-column: 1 / -1;", css)
-        self.assertIn("@import url('./admin-concept-customers.css?v=4');", Path("engine/static/css/admin-concept.css").read_text())
+        self.assertIn("@import url('./admin-concept-customers.css?v=6');", Path("engine/static/css/admin-concept.css").read_text())
 
 
 class AdminMoscowTimeTests(SimpleTestCase):
@@ -9219,13 +9229,14 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
             "function infraAppendPendingDomain(container, domain)",
             "function infraConfirmPendingDomain(container, pendingRow, domain, server, clientSnis = [])",
             "function infraWireDomainDeleteButton(button, server)",
-            "function infraWireDomainSniButton(button, server, applyAll = false)",
-            "action: 'set_domain_snis'",
+            "function infraServerSnisPanelHtml(detail, blockedSnis, diagAt)",
+            "action: 'set_server_snis'",
+            'id="infra-server-snis-form"',
+            'data-infra-management-tab="snis"',
+            "snis: 'infra-detail-snis',",
             "function infraAgeLabel(minutes)",
             "class=\"infra-diag-stale-note\"",
             ".infra-diag.is-stale .infra-diag-card { --tone: var(--panel-border); opacity: .62; }",
-            'data-infra-sni-input="${safeDomain}"',
-            'data-infra-save-sni-all="${safeDomain}"',
             "pendingLabel: 'Привязываем…'",
             "refreshDetail: false",
             "infraSyncDomainEmptyState(list);",
@@ -9239,18 +9250,17 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
         for marker in (
             ".infra-domain-manage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 440px)); align-content: start; align-items: start; gap: 10px; }",
             ".infra-domain-wire { color: var(--muted); font-size: 10px;",
-            'name="infra-sni-${safeDomain}"',
-            'placeholder="как домен (${safeDomain})"',
+            'placeholder="как домены сервера"',
             ".infra-domain-manage-item { display: flex; flex-direction: column; align-items: stretch; gap: 9px; min-height: 50px;",
             ".infra-domain-manage-head { display: flex; align-items: center; justify-content: space-between;",
-            ".infra-domain-sni-row { display: flex; align-items: center; gap: 8px; }",
+            ".infra-snis-form { grid-template-columns: minmax(260px, 620px) auto;",
             ".infra-detail-management-panel#infra-detail-domains { display: block; min-height: 0; }",
             'id="infra-add-domain-form" class="infra-form infra-domain-add-form"',
-            ".infra-domain-add-form { grid-template-columns: minmax(220px, 360px) minmax(180px, 300px) auto;",
+            ".infra-domain-add-form { grid-template-columns: minmax(220px, 420px) auto;",
             'name="client_snis"',
             ".infra-domain-add-form .infra-form-submit { width: auto; min-width: 180px;",
             ".infra-domain-manage-list { grid-template-columns: 1fr; }",
-            ".infra-domain-add-form { grid-template-columns: 1fr; max-width: none; }",
+            ".infra-domain-add-form, .infra-snis-form { grid-template-columns: 1fr; max-width: none; }",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)
@@ -11597,8 +11607,8 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             ".antiabuse-bulk-row",
             ".client-summary-stat.is-limited",
             '[data-antiabuse-substate="on"]',
-            ".client-summary-stat.is-managed",
-            ".client-summary-stat.is-manual",
+            ".client-summary-note.is-managed",
+            ".client-summary-note.is-manual",
         ):
             self.assertIn(needle, css, needle)
         # Селекты без «— без изменений —»: форма предзаполнена актуальным значением.
@@ -12431,34 +12441,105 @@ const escapeHtml = (v) => String(v ?? '').replace(/[&<>"]/g,
   (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
 """ + region + """
 const banned = new Set(['de.monkora.org']);
-// Старая схема: имён не задано. В поле ПУСТО — подстановка производного
-// значения превратила бы соседнюю кнопку «Всем» в мину; что уходит в эфир,
-// сказано отдельной строкой
+// Имена SNI живут у сервера: у домена нет поля ввода, только вердикт
 let html = infraDomainRowHtml(
-  {domain: 'de.monkora.org', client_snis: [], snis: ['de.monkora.org'], own_name: true},
+  {domain: 'de.monkora.org', snis: ['de.monkora.org'], own_name: true},
   false, banned, '2026-09-09 10:00:00');
-if (!html.includes('value=""')) { console.error('в поле подставлено производное значение'); process.exit(1); }
-if (!html.includes('placeholder="как домен (de.monkora.org)"')) { console.error('нет подсказки'); process.exit(1); }
-if (!html.includes('в эфир уходит: <code>de.monkora.org</code>')) { console.error('нет строки «в эфир»'); process.exit(1); }
+if (html.includes('<input')) { console.error('у домена осталось поле SNI'); process.exit(1); }
 if (!html.includes('ИМЯ В БАНЕ')) { console.error('нет пометки бана'); process.exit(1); }
-// name обязателен: без него несохранённый ввод стирает автообновление карточки
-if (!html.includes('name="infra-sni-de.monkora.org"')) { console.error('нет name у поля SNI'); process.exit(1); }
 // Несколько имён: забаненное названо поимённо, рабочие перечислены отдельно
 html = infraDomainRowHtml(
-  {domain: 'de.monkora.org', client_snis: ['de.monkora.org', 'example.org'],
-   snis: ['de.monkora.org', 'example.org'], own_name: true},
+  {domain: 'de.monkora.org', snis: ['de.monkora.org', 'example.org'], own_name: true},
   false, banned, '2026-09-09 10:00:00');
-if (!html.includes('value="de.monkora.org, example.org"')) { console.error('список не подставлен'); process.exit(1); }
 if (!html.includes('работают: example.org')) { console.error('нет рабочих имён'); process.exit(1); }
 // Устаревший вердикт: пометок нет
 html = infraDomainRowHtml(
-  {domain: 'de.monkora.org', client_snis: [], snis: ['de.monkora.org'], own_name: true},
+  {domain: 'de.monkora.org', snis: ['de.monkora.org'], own_name: true},
   false, new Set(), '');
 if (html.includes('В БАНЕ')) { console.error('пометка на устаревшем вердикте'); process.exit(1); }
 // Строка «привязываем» и вызов старой формой (строкой вместо объекта)
 html = infraDomainRowHtml('new.example.xyz', true);
 if (!html.includes('Привязываем')) { console.error('pending сломан'); process.exit(1); }
-if (html.includes('data-infra-save-sni=')) { console.error('у pending есть кнопки'); process.exit(1); }
+console.log('ok');
+"""
+        self.assertIn("ok", self._run_node(source))
+
+    def test_infra_server_snis_panel_renders(self):
+        region = self._region(
+            "        function infraServerSnisPanelHtml(detail",
+            "        function infraWireDomainDeleteButton",
+        )
+        source = """
+const escapeHtml = (v) => String(v ?? '').replace(/[&<>"]/g,
+  (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+""" + region + """
+// Список задан: в поле — он, в строке проверки — он же, бан назван поимённо
+let html = infraServerSnisPanelHtml(
+  {client_snis: ['example.org', 'de.monkora.org'], probe_snis: ['example.org', 'de.monkora.org'], snis_source: 'server'},
+  new Set(['de.monkora.org']), '2026-09-09 10:00:00');
+if (!html.includes('value="example.org, de.monkora.org"')) { console.error('список не подставлен'); process.exit(1); }
+if (!html.includes('name="client_snis"')) { console.error('нет name — автообновление сотрёт ввод'); process.exit(1); }
+if (!html.includes('список сервера')) { console.error('нет источника'); process.exit(1); }
+if (!html.includes('<code class="is-banned">de.monkora.org</code>')) { console.error('бан не подсвечен'); process.exit(1); }
+if (!html.includes('ИМЯ В БАНЕ (2026-09-09): de.monkora.org')) { console.error('нет вердикта'); process.exit(1); }
+// Список не задан: поле пустое, проверяем именами доменов — и это сказано
+html = infraServerSnisPanelHtml({client_snis: [], probe_snis: ['de.monkora.org'], snis_source: 'domains'}, new Set(), '');
+if (!html.includes('value=""')) { console.error('в поле подставлено производное'); process.exit(1); }
+if (!html.includes('взяты имена доменов')) { console.error('нет пометки об источнике'); process.exit(1); }
+if (html.includes('В БАНЕ')) { console.error('вердикт без диагностики'); process.exit(1); }
+// Ни списка, ни доменов
+html = infraServerSnisPanelHtml({}, null, '');
+if (!html.includes('проверять нечем')) { console.error('нет пустого состояния'); process.exit(1); }
+console.log('ok');
+"""
+        self.assertIn("ok", self._run_node(source))
+
+    def test_client_summary_renders_three_groups(self):
+        region = self._region(
+            "        function clientSummaryHtml(result) {",
+            "        function clientOverviewSectionHtml",
+        )
+        source = """
+const escapeHtml = (v) => String(v ?? '').replace(/[&<>"]/g,
+  (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const money = (v) => `${new Intl.NumberFormat('ru-RU').format(v || 0)} \u20bd`;
+""" + region + """
+// Триал из карточки, на которую жаловался владелец: имени нет, платежей нет
+const trial = clientSummaryHtml({
+  user: {username: '', email: '', telegram_id: '6337455795', expire_at: '16.09.2026',
+         is_active: true, days_left: 7, id: 42},
+  ltv: 0, autopay: {yk: true, wata: false}, first_seen: '09.09.2026', history: [],
+});
+// Все хуки, через которые в карточку доливаются данные RWMS, должны уцелеть:
+// без них загрузка молча не находит куда писать
+for (const marker of ['data-client-traffic-value', 'data-client-traffic-meta',
+                      'data-client-traffic-stat', 'data-client-traffic-limit-stat',
+                      'data-client-traffic-limit-value', 'data-client-traffic-limit-meta',
+                      'data-client-first-connected-value', 'data-client-rwms-status',
+                      'data-client-hwid', 'data-client-traffic-meter',
+                      'data-client-traffic-meter-fill']) {
+  if (!trial.includes(marker)) { console.error('потерян хук ' + marker); process.exit(1); }
+}
+// Три группы по решению админа, а не семь равнозначных плиток
+for (const marker of ['client-summary-head', 'client-summary-groups',
+                      '>Подписка<', '>Деньги<', 'осталось 7 дней', 'платежей не было']) {
+  if (!trial.includes(marker)) { console.error('нет ' + marker); process.exit(1); }
+}
+const expired = clientSummaryHtml({
+  user: {username: 'andrey_p', email: 'a@example.com', telegram_id: '128374551',
+         expire_at: '01.09.2026', is_active: false, days_left: -8},
+  ltv: 4470, autopay: {yk: false, wata: false}, first_seen: '14.02.2026',
+  history: [{success: true}, {success: true}, {success: false}, {success: true}],
+});
+if (!expired.includes('истекла 8 дней назад')) { console.error('склонение дней'); process.exit(1); }
+if (!expired.includes('3 успешных платежа')) { console.error('склонение платежей'); process.exit(1); }
+if (!expired.includes('is-expired')) { console.error('состояние подписки'); process.exit(1); }
+// Отсутствующий срок не должен давать «осталось undefined»
+const noDate = clientSummaryHtml({
+  user: {telegram_id: '1', expire_at: '', is_active: false}, ltv: 0,
+  autopay: {}, first_seen: 'Нет данных', history: [],
+});
+if (noDate.includes('undefined') || noDate.includes('NaN')) { console.error('пустой срок'); process.exit(1); }
 console.log('ok');
 """
         self.assertIn("ok", self._run_node(source))

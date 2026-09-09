@@ -15355,6 +15355,21 @@ def support_admin_api_infra_servers(request):
                 db_session.commit()
                 return JsonResponse({"status": "ok"})
 
+            if action == "set_server_snis":
+                server = infra.set_server_snis(
+                    db_session, server_id, request.POST.get("client_snis") or "",
+                )
+                admin_audit_write(
+                    db_session, request, "infra_server_snis",
+                    target=server.node_name, server_id=int(server_id or 0),
+                    value=", ".join(server.client_snis or []),
+                )
+                db_session.commit()
+                return JsonResponse({
+                    "status": "ok",
+                    "client_snis": list(server.client_snis or []),
+                })
+
             if action == "set_domain_snis":
                 apply_all = str(
                     request.POST.get("apply_all") or ""

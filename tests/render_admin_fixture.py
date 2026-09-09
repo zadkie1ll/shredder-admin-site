@@ -134,7 +134,7 @@ def without_presentation_changes(text):
             assert count == 1, f'Rendering boundary changed for {name}'
             return updated
         text = re.sub(function_pattern, mask_rendering, text, flags=re.M|re.S)
-    return re.sub(r'^        (?:async )?function (?:configTemplateCard|acqDraw|loadPatterns|paymentJournalRowsHtml|clientSummaryHtml|clientOverviewSectionHtml|clientPaymentsSectionHtml|clientReferralControlHtml|clientReferralsSectionHtml)\b.*?(?=^        (?:async )?function |\Z)', '', text, flags=re.M|re.S)
+    return re.sub(r'^        (?:async )?function (?:configTemplateCard|acqDraw|loadPatterns|paymentJournalRowsHtml|clientSummaryHtml|loadClientTraffic|clientOverviewSectionHtml|clientPaymentsSectionHtml|clientReferralControlHtml|clientReferralsSectionHtml)\b.*?(?=^        (?:async )?function |\Z)', '', text, flags=re.M|re.S)
 assert without_presentation_changes(source) == without_presentation_changes(control), 'Unexpected change outside reviewed presentation renderers'
 print('PASS: forms, permissions, API bindings and action handlers unchanged outside reviewed presentation renderers and isolated Win-back editor.')
 print('Rendered six admin fixtures without connecting to databases or services.')

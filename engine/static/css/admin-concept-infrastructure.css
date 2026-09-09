@@ -72,19 +72,35 @@ html[data-admin-theme="light"] {
     box-shadow: none;
 }
 #panel-censor-checks .censor-keys-card > summary,
-#panel-censor-checks .censor-bulk-summary { padding: 20px 20px 34px; font-size: 14px; line-height: 1.5; font-weight: 600; }
+#panel-censor-checks .censor-bulk-summary { font-size: 14px; line-height: 1.5; font-weight: 600; }
 #panel-censor-checks .censor-bulk-card { border-color: var(--concept-infra-warning-line); }
 #panel-censor-checks .censor-bulk-summary-copy strong { color: var(--brand-gold); font-size: 14px; font-weight: 600; }
 #panel-censor-checks .censor-bulk-summary-copy > span,
 #panel-censor-checks .censor-bulk-description { font-size: 12px; font-weight: 400; line-height: 1.5; }
-#panel-censor-checks .censor-bulk-body { padding: 20px; }
-#panel-censor-checks .censor-bulk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
-#panel-censor-checks .censor-bulk-field { padding: 12px; background: var(--concept-infra-field); }
-#panel-censor-checks .censor-check-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; padding: 20px; }
-#panel-censor-checks .censor-check-form .input { width: 100%; min-width: 0; }
-#panel-censor-checks .censor-alerts-toggle { min-height: 44px; gap: 8px; font-size: 13px; font-weight: 500; }
-#panel-censor-checks .censor-form-actions { grid-column: 1 / -1; flex-wrap: wrap; gap: 8px; margin-top: 2px; }
-#panel-censor-checks .censor-check-form .censor-form-actions { margin: 14px 0; }
+#panel-censor-checks .censor-bulk-grid { grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
+#panel-censor-checks .censor-bulk-field { background: var(--concept-infra-field); }
+/* Форма проверки компактна: пять полей в две колонки с высокими отступами
+ * занимали почти весь первый экран, а сам список проверок — ради которого на
+ * страницу и приходят — уезжал под сгиб. Три колонки по 220 px укладывают
+ * поля в два ряда, переключатель и кнопки встают в тот же ряд. Типографика и
+ * цвета концепта не меняются — сжата только геометрия. */
+#panel-censor-checks .censor-check-form {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 12px 14px; padding: 16px; margin: 16px 0; align-items: end;
+}
+#panel-censor-checks .censor-check-form .infra-concept-field { margin: 0; gap: 5px; }
+#panel-censor-checks .censor-check-form .infra-concept-field > span { font-size: 12px; line-height: 1.35; }
+#panel-censor-checks .censor-check-form .input { width: 100%; min-width: 0; min-height: 38px; padding: 8px 11px; }
+#panel-censor-checks .censor-alerts-toggle { min-height: 38px; gap: 8px; margin: 0; font-size: 13px; font-weight: 500; }
+#panel-censor-checks .censor-form-actions { flex-wrap: wrap; gap: 8px; }
+#panel-censor-checks .censor-check-form .censor-form-actions { margin: 0; }
+#panel-censor-checks .censor-check-form .btn { min-height: 38px; }
+/* Шапки сворачиваемых карточек над формой тоже дышали на 34 px снизу */
+#panel-censor-checks .censor-keys-card > summary,
+#panel-censor-checks .censor-bulk-summary { padding: 14px 16px; }
+#panel-censor-checks .censor-bulk-body { padding: 16px; }
+#panel-censor-checks .censor-bulk-grid { gap: 12px 14px; }
+#panel-censor-checks .censor-bulk-field { padding: 10px; }
 #panel-censor-checks .censor-alerts-toggle input { width: 18px; height: 18px; accent-color: var(--brand-gold); }
 #panel-censor-checks .input,
 #panel-node-provision .input,
@@ -159,7 +175,9 @@ html[data-admin-theme="light"] {
 #panel-node-provision .node-provision-editor-footer { padding: 0; }
 #panel-node-provision .node-provision-editor-head { border: 0; margin-bottom: 16px; gap: 16px; }
 #panel-node-provision .node-provision-editor-footer { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 18px; padding-top: 16px; }
-#panel-node-provision .node-provision-editor-actions { justify-content: flex-start; }
+#panel-node-provision .node-provision-editor-footer > .node-provision-field { margin: 0; }
+#panel-node-provision .node-provision-editor-actions { justify-content: flex-start; align-self: end; }
+#panel-node-provision .node-provision-editor-actions .btn { min-height: 47px; }
 #panel-node-provision .node-provision-editor-body { border: 0; }
 #panel-node-provision .node-provision-editor-version { font-size: 14px; font-weight: 400; color: var(--green); }
 #panel-node-provision .node-provision-code-label { font-size: 12px; font-weight: 400; }
@@ -182,7 +200,8 @@ html[data-admin-theme="light"] {
 /* ix-filters / ix-track: the reporting period has its own full-width row. */
 #panel-node-traffic .node-traffic-form { gap: 12px; grid-template-columns: 2fr 2fr 1fr 1fr auto; }
 #panel-node-traffic .node-traffic-form { padding: 0; margin-bottom: 24px; border: 0; border-radius: 0; background: transparent; align-items: end; box-shadow: none; }
-#panel-node-traffic .node-traffic-form > .btn { margin-bottom: 10px; }
+#panel-node-traffic .node-traffic-form > .infra-concept-field { margin: 0; }
+#panel-node-traffic .node-traffic-form > .btn { margin: 0; min-height: 47px; align-self: end; }
 #panel-node-traffic .node-traffic-report { gap: 24px; }
 #panel-node-traffic .node-traffic-summary-card,
 #panel-node-traffic .node-traffic-table-card { padding: 22px; border: 0; background: var(--admin-surface); border-radius: 10px; }
@@ -358,7 +377,7 @@ html[data-admin-theme="light"] #subpanel-inf-servers .infra-detail-stat.is-olive
     #panel-config-templates .config-template-list,
     #panel-node-traffic .node-traffic-form,
     .config-template-modal-card .config-form-grid { grid-template-columns: 1fr; }
-    #panel-censor-checks .censor-check-form { padding: 20px; }
+    #panel-censor-checks .censor-check-form { padding: 16px; }
     #panel-node-provision .node-provision-code-lines,
     #panel-node-provision .node-provision-editor-highlight,
     #panel-node-provision .node-provision-script-editor { font-size: 16px; }
