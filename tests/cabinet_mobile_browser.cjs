@@ -12,6 +12,8 @@ fs.mkdirSync(shots, {recursive:true});
  const context = await browser.newContext({viewport:{width:390,height:844}, reducedMotion:'reduce'});
  let mode='normal', mutations=0;
  const devices = Array.from({length:6}, (_,i)=>({hwid:'fixture-'+i,platform:i?'macOS':'iOS',device_model:i?'MacBook Pro '+i:'iPhone 17 Pro Max',created_at:'2026-09-02T12:00:00Z',updated_at:'2026-09-07T12:00:00Z'}));
+ const activityTimes=[2,45,180,2880].map(minutes=>new Date(Date.now()-minutes*60000).toISOString());
+ devices.forEach((device,i)=>{device.updated_at=i<4?activityTimes[i]:i===4?null:'invalid-date';});
  await context.addInitScript(() => {
    window.Telegram = { WebApp:{ready(){},expand(){},disableVerticalSwipes(){},platform:'ios',
      isVersionAtLeast(){return false},BackButton:{show(){},hide(){},onClick(fn){window.testTgBack=fn}}} };
@@ -57,6 +59,11 @@ fs.mkdirSync(shots, {recursive:true});
  const sheet=page.locator('#mi3-devices-sheet');
  await sheet.locator('.mi3-device-row').first().waitFor();
  assert.equal(await sheet.locator('.mi3-device-row').count(),6);
+ const activity=sheet.locator('summary .mi3-device-meta');
+ assert.deepEqual(await activity.allTextContents(),['В сети сейчас','Был в сети 45 мин назад','Был в сети 3 ч назад','Был в сети 2 дн назад','Нет данных об активности','Нет данных об активности']);
+ for(let i=0;i<6;i++) assert.equal(await activity.nth(i).isVisible(),true,'activity visible without expanding device');
+ assert.equal(await sheet.locator('details[open]').count(),0);
+ assert.equal(await sheet.locator('.mi3-device-meta.is-online').count(),1);
  assert.equal(await page.locator('#app-container').evaluate(e=>e.inert),true);
  await page.waitForFunction(()=>[...document.querySelectorAll('#mi3-devices-list svg use')].every(e=>e.getBBox().width>0));
  await page.screenshot({path:path.join(shots,'devices-390.png'),fullPage:true});

@@ -8888,8 +8888,9 @@
         }
 
         function deviceMeta(d) {
-            if (!d.updated_at) return { text: d.platform || '', online: false };
-            const diffMin = Math.max(0, Math.round((Date.now() - new Date(d.updated_at).getTime()) / 60000));
+            const updated = d.updated_at ? new Date(d.updated_at).getTime() : NaN;
+            if (!Number.isFinite(updated)) return { text: 'Нет данных об активности', online: false };
+            const diffMin = Math.max(0, Math.round((Date.now() - updated) / 60000));
             if (diffMin < 10) return { text: 'В сети сейчас', online: true };
             if (diffMin < 60) return { text: 'Был в сети ' + diffMin + ' мин назад', online: false };
             if (diffMin < 60 * 24) return { text: 'Был в сети ' + Math.round(diffMin / 60) + ' ч назад', online: false };
@@ -9035,8 +9036,7 @@
                 return;
             }
             list.innerHTML = data.devices.map((d) => {
-                const added = d.created_at ? new Date(d.created_at) : null;
-                const meta = { online: false, text: added && !Number.isNaN(added.getTime()) ? 'Добавлен ' + added.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' }) : (d.platform || 'Устройство подписки') };
+                const meta = deviceMeta(d);
                 return `
                     <details class="mi3-device-row"><summary>
                         <svg class="cabinet-icon mi3-device-icon" aria-hidden="true"><use href="#cabinet-${/mac|windows|linux/i.test(d.platform || '') ? 'laptop' : 'phone'}"></use></svg>

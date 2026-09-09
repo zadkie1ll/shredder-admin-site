@@ -183,6 +183,7 @@ def classify(
     control_name: str = "",
     external_sni_results: dict | None = None,
     known_good_snis: set | None = None,
+    control_name_set: set | None = None,
 ) -> dict:
     """Раздельные вердикты по адресам и именам.
 
@@ -256,7 +257,14 @@ def classify(
     # замеров, в этом прогоне или у соседа по волне. Только отказ такого
     # имени что-то доказывает; отказ имени, не проходившего никогда, с
     # равной вероятностью означает опечатку в карточке
-    proven_names = set(known_good_snis or set())
+    # Контрольные имена — свидетели по АДРЕСУ, а не клиентские имена: они
+    # чужие, на ноде не попадают ни под один ACL и уходят в default_backend.
+    # Вердикт «имя забанено» по ним не выносится (менять их в конфигах ноды
+    # нечего), но их проход доказывает, что адрес принимает соединения.
+    controls = {n for n in (control_name_set or set()) if n}
+    if control_name:
+        controls.add(control_name)
+    proven_names = set(known_good_snis or set()) | controls
     for names in live_by_sni.values():
         proven_names.update(names)
     for (_ip, sni), item in (external_sni_results or {}).items():
@@ -469,7 +477,7 @@ def classify(
     passes: dict[str, list[str]] = {}
     fails: dict[str, list[str]] = {}
     for (ip, sni), probe in sni_probes.items():
-        if ips.get(ip) != IP_OK or probe is None:
+        if ips.get(ip) != IP_OK or probe is None or sni in controls:
             continue
         total = probe.get("total_probes") or 0
         if total and total < MIN_PROBES_HIGH_CONFIDENCE:
@@ -486,6 +494,9 @@ def classify(
     pair_blocked: list[dict] = []
     unproven: list[str] = []
     for (ip, sni), probe in sni_probes.items():
+        if sni in controls:
+            # Контрольное имя проверяет адрес, а не себя
+            continue
         if ips.get(ip) != IP_OK:
             # На мёртвом адресе падает всё; вывод об имени был бы ложным
             evidence.append(
@@ -669,11 +680,11 @@ def domains_with_blocked_sni(domains: list, blocked_snis: list) -> list:
     """Домены, у которых под фильтр попало хотя бы одно имя.
 
     Возвращает [{"domain", "blocked": [...], "clean": [...], "own": bool}].
-    Их A-записи меняются как обычно (кроме случая, когда домен уходит в эфир
-    сам и чистых имён не осталось), но клиенты соответствующих протоколов не
-    заработают, пока имя не заменят в конфигах: об этом нужен отдельный
-    алерт, и называть он обязан ИМЕННО забаненное имя, а не первое из
-    списка — иначе владелец пойдёт менять работающий протокол.
+    A-записи при этом меняются как обычно — вердикт по имени на DNS не
+    влияет, — но клиенты соответствующих протоколов не заработают, пока имя
+    не заменят в конфигах: об этом нужен отдельный алерт, и называть он
+    обязан ИМЕННО забаненное имя, а не первое из списка, иначе владелец
+    пойдёт менять работающий протокол.
     """
     blocked = set(blocked_snis or [])
     result = []

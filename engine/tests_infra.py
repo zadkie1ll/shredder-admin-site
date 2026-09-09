@@ -2405,9 +2405,12 @@ class ProcessAnomalyTests(InfraDbTestCase):
                     for ip in ("185.10.0.20", "185.10.0.30")
                     for name in ("a.example.xyz", "b.example.xyz")
                 ]
-                # плюс один свидетель на подозрительном адресе: без него
-                # вердикт «забанен» держался бы на одном контрольном имени
-                + [("185.10.0.10", "a.example.xyz")]
+                # плюс свидетель на подозрительном адресе: без него вердикт
+                # «забанен» держался бы на одном контрольном имени. Свидетель
+                # — СЛЕДУЮЩЕЕ контрольное имя: оно чужое, уходит в
+                # default_backend ноды и отвечает всегда, пока адрес жив, а
+                # клиентское имя на инбаунде Reality не отвечает никогда
+                + [("185.10.0.10", "www.microsoft.com")]
             ),
         )
         self.assertEqual(
@@ -2901,6 +2904,61 @@ class ProcessAnomalyTests(InfraDbTestCase):
         self.assertIn("185.10.0.20", text)
         self.assertIn("example.org", text)
         self.assertIn("example.com", text)
+
+    def test_second_control_name_is_the_witness(self):
+        # Клиентские имена на инбаунде Reality не отвечают на обычный
+        # ClientHello зонда НИКОГДА (Reality пересылает соединение в dest).
+        # Свидетелем такое имя быть не может — берётся следующее контрольное
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        run = self.make_run("185.10.0.10", ok_probes=0, blocked_probes=20)
+        anomaly = self.make_anomaly(server, {"185.10.0.10|ya.ru": run.id})
+
+        with mock.patch.object(
+            infra, "start_sni_diagnosis",
+            return_value={"runs": {"185.10.0.10|www.microsoft.com": 5},
+                          "errors": [], "witness_names": ["www.microsoft.com"]},
+        ) as started:
+            with mock.patch.object(
+                infra_worker, "_send_alert", return_value=True
+            ):
+                infra_worker.process_anomalies(self.session)
+        self.session.commit()
+
+        self.assertEqual(started.call_args[1]["suspect_ips"], ["185.10.0.10"])
+        self.session.refresh(anomaly)
+        self.assertEqual(anomaly.status, "checking_sni")
+
+    def test_control_witness_pass_saves_the_address(self):
+        # Контроль №1 упал, контроль №2 на том же адресе прошёл: адрес жив,
+        # вердикта «забанен» нет — ровно случай 2.58.66.180 с google.ru
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        anomaly = self.make_anomaly(
+            server,
+            {"185.10.0.10|ya.ru": self.make_run(
+                "185.10.0.10", ok_probes=0, blocked_probes=20).id},
+            {"185.10.0.10|www.microsoft.com": self.make_run(
+                "185.10.0.10", ok_probes=19, blocked_probes=1,
+                sni="www.microsoft.com").id},
+            status="checking_sni",
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ):
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        verdict = anomaly.details["verdict"]
+        self.assertEqual(verdict["blocked_ips"], [])
+        self.assertEqual(verdict["control_burn"], "proven")
+        # Контрольное имя не получает вердикта «имя забанено»
+        self.assertEqual(verdict["blocked_snis"], [])
+        self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
 
     def test_all_names_banned_cancels_replacement(self):
         # Все имена сервера под фильтром: новый адрес ничего не починит,
@@ -4515,6 +4573,38 @@ class PayloadTests(InfraDbTestCase):
         self.assertEqual(diagnosis["confidence"], "high")
         self.assertTrue(diagnosis["actionable"])
         self.assertEqual(len(diagnosis["evidence"]), 1)
+        self.assertFalse(diagnosis["stale"])
+        self.assertLess(diagnosis["age_minutes"], 5)
+
+    def test_old_diagnosis_is_marked_stale(self):
+        # Вердикт — снимок момента, а не свойство домена: бан пары
+        # «адрес + имя» снимался сам за пару часов (2026-09-02). Недельной
+        # давности вердикт, показанный как текущий, дезинформирует
+        server = self.make_server()
+        old_at = utcnow() - timedelta(days=7)
+        self.session.add(
+            InfraAnomaly(
+                server_id=server.id,
+                status="confirmed",
+                details={
+                    "verdict": {
+                        "blocked_ips": [], "blocked_snis": ["de.example.xyz"],
+                        "confidence": "high", "actionable": True,
+                    },
+                },
+                created_at=old_at,
+                resolved_at=old_at,
+            )
+        )
+        self.session.commit()
+
+        diagnosis = infra.server_detail_payload(
+            self.session, server.id
+        )["diagnosis"]
+        self.assertTrue(diagnosis["stale"])
+        self.assertGreater(diagnosis["age_minutes"], infra.DIAGNOSIS_FRESH_MINUTES)
+        # Сам вердикт остаётся в карточке как история
+        self.assertEqual(diagnosis["blocked_snis"], ["de.example.xyz"])
 
     def test_diagnosis_payload_skips_anomalies_without_verdict(self):
         # Аномалия ещё проверяется — вердикта нет, показывать нечего

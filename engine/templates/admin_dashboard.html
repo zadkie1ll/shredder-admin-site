@@ -259,14 +259,17 @@
         html[data-admin-theme="light"] .infra-mini-btn:hover { border-color: rgba(154,113,0,.38); background: rgba(181,139,0,.07); color: #242a34; }
         html[data-admin-theme="light"] .infra-mini-btn.danger:hover { border-color: rgba(197,54,69,.4); background: rgba(211,65,78,.06); color: #b52f3e; }
         html[data-admin-theme="light"] .infra-mini-btn:focus-visible { border-color: rgba(154,113,0,.5); box-shadow: 0 0 0 3px rgba(181,139,0,.1); color: #242a34; }
-        .infra-domain-manage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 420px)); align-content: start; align-items: start; gap: 10px; }
+        .infra-domain-manage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 440px)); align-content: start; align-items: start; gap: 10px; }
         .infra-domain-manage-item { display: flex; flex-direction: column; align-items: stretch; gap: 9px; min-height: 50px; padding: 10px 12px; border: 1px solid var(--panel-border); border-radius: 11px; background: var(--inner-card-bg); transition: opacity .16s, border-color .16s, background .16s, transform .16s; }
         .infra-domain-manage-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
         .infra-domain-sni-row { display: flex; align-items: center; gap: 8px; }
         .infra-domain-sni-row .infra-domain-sni-input { flex: 1 1 auto; min-width: 0; height: 30px; padding: 0 9px; border: 1px solid var(--panel-border); border-radius: 8px; background: var(--panel-bg); color: var(--text-main); font-family: inherit; font-size: 11.5px; }
         .infra-domain-sni-row .infra-mini-btn { flex: 0 0 auto; }
-        .infra-domain-manage-copy .infra-badge { flex: 0 0 auto; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .infra-domain-badges { display: flex; flex-wrap: wrap; gap: 6px; }
+        .infra-domain-badges .infra-badge { max-width: 100%; white-space: normal; text-align: left; line-height: 1.35; }
         .infra-domain-sni-hint { color: var(--muted); font-size: 9.5px; font-weight: 700; white-space: nowrap; }
+        .infra-domain-wire { color: var(--muted); font-size: 10px; line-height: 1.4; overflow-wrap: anywhere; }
+        .infra-domain-wire code { color: var(--text-main); font-weight: 700; }
         .infra-domain-manage-copy { display: flex; align-items: center; gap: 7px; min-width: 0; }
         .infra-domain-manage-copy i { color: var(--brand-gold); font-size: 9px; }
         .infra-domain-manage-copy code { overflow: hidden; color: var(--text-main); font-size: 12.5px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
@@ -398,6 +401,13 @@
         .infra-diag-card { padding: 12px 14px; border: 1px solid var(--panel-border); border-left: 3px solid var(--tone, var(--muted)); border-radius: 9px; background: rgba(0,0,0,.14); }
         .infra-diag-card.is-bad { --tone: var(--red); }
         .infra-diag-card.is-good { --tone: var(--green); }
+        /* Устаревший диагноз — история, а не текущее состояние: гасим цвет,
+           иначе недельной давности вердикт читается как «горит сейчас» */
+        .infra-diag.is-stale .infra-diag-card { --tone: var(--panel-border); opacity: .62; }
+        .infra-diag.is-stale .infra-diag-evidence { opacity: .62; }
+        .infra-diag-stale-note { display: flex; align-items: flex-start; gap: 9px; margin-bottom: 12px; padding: 11px 13px; border: 1px dashed var(--panel-border); border-radius: 9px; color: var(--muted); font-size: 11px; line-height: 1.45; }
+        .infra-diag-stale-note i { margin-top: 2px; color: var(--brand-gold); }
+        .infra-diag-stale-note b { color: var(--text-main); }
         .infra-diag-card-label { color: var(--muted); font-size: 9.5px; font-weight: 850; letter-spacing: .06em; text-transform: uppercase; }
         .infra-diag-card-value { margin-top: 6px; font-size: 13px; font-weight: 800; line-height: 1.4; word-break: break-all; }
         .infra-diag-card-note { margin-top: 5px; color: var(--muted); font-size: 10.5px; line-height: 1.4; }
@@ -778,7 +788,14 @@
         .censor-key-row { grid-template-columns: minmax(140px, 1fr) minmax(120px, .7fr) minmax(120px, .6fr) minmax(200px, auto); min-width: 640px; }
         .censor-key-row.table-head { background: rgba(255,255,255,.04); }
         .censor-key-default-badge { color: #22c55e; font-weight: 600; }
-        .censor-check-row { grid-template-columns: minmax(130px, .8fr) minmax(150px, 1fr) minmax(110px, .6fr) minmax(110px, .6fr) minmax(190px, 1.2fr) minmax(230px, auto); min-width: 1020px; }
+        .censor-check-row { grid-template-columns: 34px minmax(130px, .8fr) minmax(150px, 1fr) minmax(110px, .6fr) minmax(110px, .6fr) minmax(190px, 1.2fr) minmax(230px, auto); min-width: 1054px; }
+        /* Вся ячейка — зона нажатия: на телефоне прицеливаться в 15 px нельзя,
+           а проверок в списке десятки */
+        .censor-check-row .censor-pick { display: flex; align-items: center; justify-content: center; min-height: 34px; cursor: pointer; }
+        .censor-check-row .censor-pick input { width: 16px; height: 16px; accent-color: var(--brand-gold); cursor: pointer; }
+        .censor-bulkbar { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin: 12px; padding: 10px 13px; border: 1px solid var(--panel-border); border-radius: 10px; background: var(--inner-card-bg); }
+        .censor-bulkbar[hidden] { display: none; }
+        .censor-bulkbar-count { color: var(--text-main); font-size: 12px; font-weight: 800; }
         .censor-check-row.table-head { background: rgba(255,255,255,.04); }
         .censor-run-row { grid-template-columns: 170px minmax(190px, 1fr) minmax(0, 1.6fr) 28px; min-width: 560px; }
         .censor-run-row.table-head { background: rgba(255,255,255,.04); }
@@ -2867,10 +2884,18 @@
                 border-radius: 12px;
                 background: #171d25;
             }
-            #panel-censor-checks .censor-key-row.table-head,
-            #panel-censor-checks .censor-check-row.table-head { display: none; }
+            #panel-censor-checks .censor-key-row.table-head { display: none; }
+            /* Шапку прячем, кроме ячейки «выделить все»: иначе на телефоне
+               выделить весь список одним касанием нечем */
+            #panel-censor-checks .censor-check-row.table-head {
+                grid-template-columns: minmax(0, 1fr);
+                margin: 12px 12px 0;
+                border-radius: 12px 12px 0 0;
+            }
+            #panel-censor-checks .censor-check-row.table-head > span:not(.censor-pick) { display: none; }
             #panel-censor-checks .censor-key-row > span,
-            #panel-censor-checks .censor-check-row > span {
+            #panel-censor-checks .censor-check-row > span,
+            #panel-censor-checks .censor-check-row > .censor-pick {
                 min-width: 0;
                 display: grid;
                 grid-template-columns: 104px minmax(0, 1fr);
@@ -2882,8 +2907,10 @@
             }
             #panel-censor-checks .censor-key-row > span:last-child,
             #panel-censor-checks .censor-check-row > span:last-child { border-bottom: 0; }
+            #panel-censor-checks .censor-check-row.table-head > .censor-pick { border-bottom: 0; }
             #panel-censor-checks .censor-key-row > span::before,
-            #panel-censor-checks .censor-check-row > span::before {
+            #panel-censor-checks .censor-check-row > span::before,
+            #panel-censor-checks .censor-check-row > .censor-pick::before {
                 content: attr(data-label);
                 color: var(--muted);
                 font-size: 11px;
@@ -2900,6 +2927,7 @@
                 grid-template-columns: repeat(3, minmax(0, 1fr));
             }
             #panel-censor-checks .censor-row-actions::before { grid-column: 1 / -1; }
+            #panel-censor-checks .censor-check-row > .censor-pick { grid-template-columns: 104px minmax(0, 1fr); justify-items: start; }
             #panel-censor-checks .censor-row-actions .btn {
                 min-width: 0;
                 min-height: 40px;
@@ -8978,7 +9006,7 @@
             row.querySelector('.broadcast-btn-remove').addEventListener('click', () => {
                 row.remove();
                 syncBroadcastPromoAudience();
-                renderBroadcadPreviewSafe();
+                renderBroadcastPreview();
             });
             container.appendChild(row);
             sync();
@@ -9767,8 +9795,22 @@
             try {
                 const query = new URLSearchParams(params);
                 const response = await fetch(`${main.dataset.promoCohortUrl}?${query.toString()}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+                // Раньше любой исход — сеть, 400, 500, битый JSON, падение
+                // отрисовки — давал одну плашку «проверьте соединение», и
+                // диагностика уходила не туда: 500 из-за TypeError в вью
+                // выглядел как проблемы с сетью
+                if (!response.ok) {
+                    let message = `Сервер ответил ${response.status}`;
+                    try {
+                        const body = await response.json();
+                        if (body && body.message) message += `: ${body.message}`;
+                    } catch (parseError) {
+                        if (response.status >= 500) message += ' — ошибка на сервере, смотрите лог сайта';
+                    }
+                    throw new Error(message);
+                }
                 const payload = await response.json();
-                if (payload.status !== 'ok') throw new Error();
+                if (payload.status !== 'ok') throw new Error(payload.message || 'Сервер вернул отказ');
                 const result = payload.result || {};
                 const subject = result.subject || {};
                 if (title) title.textContent = subject.label || label;
@@ -9785,7 +9827,8 @@
                 }));
             } catch (error) {
                 if (headerMeta) headerMeta.innerHTML = '';
-                body.innerHTML = '<div class="promo-empty"><div><i class="fas fa-triangle-exclamation"></i><b>Не удалось построить когорту</b><span>Проверьте соединение и попробуйте ещё раз.</span></div></div>';
+                const reason = (error && error.message) ? error.message : 'Проверьте соединение и попробуйте ещё раз.';
+                body.innerHTML = `<div class="promo-empty"><div><i class="fas fa-triangle-exclamation"></i><b>Не удалось построить когорту</b><span>${escapeHtml(reason)}</span></div></div>`;
             }
         }
 
@@ -11904,6 +11947,9 @@
                 renderCensorKeys();
                 populateCensorKeySelect();
                 renderCensorChecks(target);
+                // Промежуточное состояние «выделено не всё» рендер не
+                // проставляет — только checked; синхронизируем после вставки
+                censorSyncBulkBar(target);
                 updateCensorBulkFormState();
                 scheduleCensorAutoRefresh();
             } catch (error) {
@@ -12123,6 +12169,7 @@
                     : `<span>${censorRunStatusHtml(null)}</span>`;
                 return `
                     <div class="admin-table-row censor-check-row">
+                        <label class="censor-pick" data-label="Выбор"><input type="checkbox" data-censor-select="${check.id}" ${censorSelectedChecks.has(check.id) ? 'checked' : ''} aria-label="Выделить проверку ${escapeHtml(check.target_ip)} / ${escapeHtml(check.sni)}"></label>
                         <span data-label="IP">${escapeHtml(check.target_ip)}${check.port !== 443 ? `:${check.port}` : ''}${enabledBadge}</span>
                         <span data-label="SNI">${escapeHtml(check.sni)}</span>
                         <span data-label="Расписание">${schedule}</span>
@@ -12137,15 +12184,75 @@
                         </span>
                     </div>`;
             }).join('');
+            // Выделение переживает перерисовку списка, но только для строк,
+            // которые в нём остались: иначе «удалить выделенные» однажды
+            // унесло бы проверку, которой админ уже не видит
+            const visibleIds = new Set(censorChecksCache.map((check) => check.id));
+            [...censorSelectedChecks].forEach((id) => {
+                if (!visibleIds.has(id)) censorSelectedChecks.delete(id);
+            });
+            const allChecked = censorChecksCache.length > 0
+                && censorChecksCache.every((check) => censorSelectedChecks.has(check.id));
             target.innerHTML = `
                 <section class="card sources-table-card">
+                    <div class="censor-bulkbar" data-censor-bulkbar ${censorSelectedChecks.size ? '' : 'hidden'}>
+                        <span class="censor-bulkbar-count" data-censor-bulk-count>Выделено: ${censorSelectedChecks.size}</span>
+                        <span class="censor-row-actions">
+                            <button class="btn btn-secondary" type="button" data-censor-bulk-clear>Снять выделение</button>
+                            <button class="btn btn-secondary" type="button" data-censor-bulk-delete><i class="fas fa-trash"></i> Удалить выделенные</button>
+                        </span>
+                    </div>
                     <div class="data-table">
                         <div class="admin-table-row censor-check-row table-head">
+                            <label class="censor-pick" data-label="Выделить все"><input type="checkbox" data-censor-select-all ${allChecked ? 'checked' : ''} aria-label="Выделить все проверки"> все</label>
                             <span>IP</span><span>SNI</span><span>Расписание</span><span>Ключ</span><span>Последний замер</span><span>Действия</span>
                         </div>
                         ${rowsHtml}
                     </div>
                 </section>`;
+        }
+
+        // Идентификаторы отмеченных проверок; живёт между перерисовками списка
+        const censorSelectedChecks = new Set();
+
+        function censorSyncBulkBar(container) {
+            const bar = container.querySelector('[data-censor-bulkbar]');
+            if (!bar) return;
+            bar.hidden = censorSelectedChecks.size === 0;
+            const count = bar.querySelector('[data-censor-bulk-count]');
+            if (count) count.textContent = `Выделено: ${censorSelectedChecks.size}`;
+            const boxes = [...container.querySelectorAll('[data-censor-select]')];
+            const all = container.querySelector('[data-censor-select-all]');
+            if (all) {
+                all.checked = boxes.length > 0 && boxes.every((box) => box.checked);
+                all.indeterminate = !all.checked && boxes.some((box) => box.checked);
+            }
+        }
+
+        async function censorDeleteSelected() {
+            const ids = [...censorSelectedChecks];
+            if (!ids.length) return;
+            const body = new FormData();
+            body.append('csrfmiddlewaretoken', csrfToken);
+            body.append('action', 'delete_many');
+            ids.forEach((id) => body.append('check_ids', String(id)));
+            try {
+                const response = await fetch(main.dataset.censorChecksUrl, {
+                    method: 'POST',
+                    headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'},
+                    body,
+                });
+                const payload = await response.json();
+                if (payload.status !== 'ok') {
+                    showAdminToast(payload.message || 'Не удалось удалить', 'error');
+                    return;
+                }
+                censorSelectedChecks.clear();
+                showAdminToast(`Удалено проверок: ${payload.deleted ?? ids.length}`);
+                loadCensorChecks();
+            } catch (error) {
+                showAdminToast('Сеть недоступна', 'error');
+            }
         }
 
         async function censorCheckAction(checkId, action) {
@@ -12414,6 +12521,37 @@
                     form.elements.q.value = recentClientButton.dataset.clientRecentQuery;
                     form.requestSubmit();
                 }
+            }
+
+            const selectBox = event.target.closest('[data-censor-select]');
+            if (selectBox) {
+                const id = Number(selectBox.dataset.censorSelect);
+                if (selectBox.checked) censorSelectedChecks.add(id);
+                else censorSelectedChecks.delete(id);
+                censorSyncBulkBar(selectBox.closest('.sources-table-card') || document);
+            }
+            const selectAllBox = event.target.closest('[data-censor-select-all]');
+            if (selectAllBox) {
+                const container = selectAllBox.closest('.sources-table-card') || document;
+                container.querySelectorAll('[data-censor-select]').forEach((box) => {
+                    box.checked = selectAllBox.checked;
+                    const id = Number(box.dataset.censorSelect);
+                    if (box.checked) censorSelectedChecks.add(id);
+                    else censorSelectedChecks.delete(id);
+                });
+                censorSyncBulkBar(container);
+            }
+
+            const bulkDeleteButton = event.target.closest('[data-censor-bulk-delete]');
+            if (bulkDeleteButton && confirm(`Удалить выделенные проверки (${censorSelectedChecks.size}) вместе со всей их историей?`)) {
+                censorDeleteSelected();
+            }
+            const bulkClearButton = event.target.closest('[data-censor-bulk-clear]');
+            if (bulkClearButton) {
+                censorSelectedChecks.clear();
+                const container = bulkClearButton.closest('.sources-table-card') || document;
+                container.querySelectorAll('[data-censor-select]').forEach((box) => { box.checked = false; });
+                censorSyncBulkBar(container);
             }
 
             const runButton = event.target.closest('[data-censor-run]');
@@ -13410,7 +13548,16 @@
         // haproxy слушает общий :443 и разводит протоколы по req.ssl_sni, так
         // что имён у связки столько, сколько развели протоколов (xhttp / tcp
         // reality / grpc / ...). Пустое поле = старая схема «имя = домен».
-        function infraDomainRowHtml(item, pending = false, blockedSnis = null) {
+        // «7 дней назад» вместо голой даты: возраст диагноза важнее самой даты
+        function infraAgeLabel(minutes) {
+            if (minutes === null || minutes === undefined) return '';
+            if (minutes < 60) return `${Math.max(0, Math.round(minutes))} мин назад`;
+            const hours = Math.round(minutes / 60);
+            if (hours < 48) return `${hours} ч назад`;
+            return `${Math.round(hours / 24)} дн назад`;
+        }
+
+        function infraDomainRowHtml(item, pending = false, blockedSnis = null, diagAt = '') {
             const data = typeof item === 'string' ? {domain: item} : (item || {});
             const domain = data.domain || '';
             const safeDomain = escapeHtml(domain);
@@ -13418,28 +13565,36 @@
             const wireSnis = (data.snis && data.snis.length) ? data.snis : [domain];
             const banned = blockedSnis || new Set();
             const hitNames = wireSnis.filter((name) => banned.has(name));
-            const ownName = data.own_name ?? !clientSnis.length;
-            const frozen = hitNames.length && ownName && hitNames.length === wireSnis.length;
+            const cleanNames = wireSnis.filter((name) => !banned.has(name));
             const blockedBadge = hitNames.length
-                ? (frozen
-                    ? `<span class="infra-badge infra-badge-offline" title="Рабочих имён не осталось, и домен уходит в эфир сам: A-запись не меняется намеренно — новый адрес под фильтруемым именем рискует уйти в бан следом">ИМЯ В БАНЕ: ${escapeHtml(hitNames.join(', '))}</span>`
-                    : `<span class="infra-badge infra-badge-offline" title="Эти имена под фильтром ТСПУ. A-запись домена меняется как обычно — менять надо ACL haproxy и serverNames инбаунда на ноде плюс хосты Remnawave">SNI В БАНЕ: ${escapeHtml(hitNames.join(', '))}</span>`)
+                ? `<div class="infra-domain-badges"><span class="infra-badge infra-badge-offline" title="Вердикт диагностики${diagAt ? ' от ' + escapeHtml(diagAt) : ''}. На DNS это не влияет: адрес меняется как обычно. Менять надо ACL haproxy и serverNames инбаунда на ноде плюс хосты Remnawave">ИМЯ В БАНЕ${diagAt ? ' (' + escapeHtml(diagAt.slice(0, 10)) + ')' : ''}: ${escapeHtml(hitNames.join(', '))}</span>${cleanNames.length ? `<span class="infra-badge infra-badge-online" title="Эти имена в той же диагностике прошли">работают: ${escapeHtml(cleanNames.join(', '))}</span>` : ''}</div>`
                 : '';
+            // В поле показываем то, что РЕАЛЬНО уходит в эфир, а не только
+            // явно заданное: у домена старой схемы это он сам. Иначе не видно,
+            // что при добавлении маски домен надо оставить в списке, если он
+            // тоже используется (de.monkora.org + example.org)
+            // В поле — ТОЛЬКО явно заданные имена: подстановка производного
+            // значения превращала соседнюю кнопку «Всем» в мину, она разослала
+            // бы имя одного домена всем остальным. Что реально уходит в эфир,
+            // показано отдельной строкой. name нужен infraSnapshotDirtyFields:
+            // без него несохранённый ввод стирался автообновлением карточки
             const sniRow = pending ? '' : `
                     <div class="infra-domain-sni-row">
-                        <span class="infra-domain-sni-hint" title="Имена, которые клиенты шлют в ClientHello, через запятую — по одному на протокол. Пусто: в эфир уходит сам домен">SNI</span>
-                        <input class="infra-domain-sni-input" type="text" value="${escapeHtml(clientSnis.join(', '))}" placeholder="как домен (${safeDomain})" autocomplete="off" spellcheck="false" data-infra-sni-input="${safeDomain}">
+                        <span class="infra-domain-sni-hint" title="Имена, которые клиенты шлют в ClientHello, через запятую — по одному на протокол haproxy. Если сам домен тоже уходит в эфир, впишите его в список. Пусто — в эфир уходит только сам домен">SNI</span>
+                        <input class="infra-domain-sni-input" type="text" name="infra-sni-${safeDomain}" value="${escapeHtml(clientSnis.join(', '))}" placeholder="как домен (${safeDomain})" autocomplete="off" spellcheck="false" data-infra-sni-input="${safeDomain}">
                         <button type="button" class="infra-mini-btn" data-infra-save-sni="${safeDomain}">Сохранить</button>
-                        <button type="button" class="infra-mini-btn" title="Записать этот же набор имён всем доменам сервера: haproxy разводит по SNI на общем адресе, набор обычно один на ноду" data-infra-save-sni-all="${safeDomain}">Всем</button>
-                    </div>`;
+                        <button type="button" class="infra-mini-btn" title="Записать содержимое поля ВСЕМ доменам сервера: haproxy разводит по SNI на общем адресе, набор обычно один на ноду" data-infra-save-sni-all="${safeDomain}">Всем</button>
+                    </div>
+                    <div class="infra-domain-wire">в эфир уходит: ${wireSnis.map((name) => `<code>${escapeHtml(name)}</code>`).join(', ')}</div>`;
             return `
                 <div class="infra-domain-manage-item${pending ? ' is-pending' : ''}" data-infra-domain-item="${safeDomain}">
                     <div class="infra-domain-manage-head">
-                        <div class="infra-domain-manage-copy"><i class="fas fa-link"></i><code>${safeDomain}</code>${blockedBadge}</div>
+                        <div class="infra-domain-manage-copy"><i class="fas fa-link"></i><code>${safeDomain}</code></div>
                         ${pending
                             ? '<span class="infra-inline-state"><span class="infra-action-spinner" aria-hidden="true"></span>Привязываем</span>'
                             : `<button type="button" class="infra-mini-btn danger" data-infra-delete-domain="${safeDomain}">Удалить</button>`}
                     </div>
+                    ${blockedBadge}
                     ${sniRow}
                 </div>`;
         }
@@ -13491,14 +13646,22 @@
                 const row = button.closest('[data-infra-domain-item]');
                 const input = row?.querySelector('[data-infra-sni-input]');
                 const value = (input?.value || '').trim();
-                if (applyAll && !confirm(`Записать имена «${value || '(пусто)'}» ВСЕМ доменам сервера?`)) return;
+                if (applyAll) {
+                    const total = document.querySelectorAll('[data-infra-domain-item]').length;
+                    const what = value
+                        ? `имена «${value}»`
+                        : 'ПУСТОЙ список (в эфир будет уходить сам домен)';
+                    if (!confirm(`Записать ${what} всем доменам сервера (${total} шт.)? Их текущие имена будут перезаписаны.`)) return;
+                }
                 const ok = value
                     ? (applyAll ? `Имена сохранены всем доменам сервера` : `Имена сохранены: ${value}`)
                     : (applyAll ? 'Имена сняты у всех доменов сервера' : 'Имена сняты — в эфир уходит сам домен');
                 await infraAction(
                     {action: 'set_domain_snis', id: server.id, domain, client_snis: value, apply_all: applyAll ? '1' : ''},
                     ok,
-                    {busyTarget: button, pendingLabel: 'Сохраняем…', refreshDetail: applyAll},
+                    // Сервер нормализует список (регистр, дубли, «список из
+                    // одного домена» = не задано) — показываем то, что легло
+                    {busyTarget: button, pendingLabel: 'Сохраняем…', refreshDetail: true},
                 );
             });
         }
@@ -13565,8 +13728,17 @@
             const diagnosis = detail.diagnosis || null;
             const blockedIps = diagnosis ? (diagnosis.blocked_ips || []) : [];
             const blockedSnis = diagnosis ? (diagnosis.blocked_snis || []) : [];
-            const diagBlockedIps = new Set(blockedIps);
-            const diagBlockedSnis = new Set(blockedSnis);
+            // Вердикт — снимок момента, а не свойство домена: бан пары
+            // «адрес + имя» снимается сам за часы. Пометки на доменах гаснут,
+            // когда диагноз перестаёт описывать текущее состояние
+            const diagStale = diagnosis ? Boolean(diagnosis.stale) : true;
+            const diagBlockedSnis = diagStale ? new Set() : new Set(blockedSnis);
+            // Пометки по адресам гаснут по тому же правилу: иначе на плитках
+            // IP горело бы «ТСПУ» в настоящем времени по недельному вердикту,
+            // в той же карточке, где панель ниже называет его историей
+            const diagBlockedIps = diagStale ? new Set() : new Set(blockedIps);
+            const diagAt = diagnosis ? (diagnosis.at || '') : '';
+            const diagAgo = infraAgeLabel(diagnosis ? diagnosis.age_minutes : null);
             const summary = telemetry.summary || {};
             const util = server.utilization_pct;
             const periodButtons = ['3h', '24h', '7d', '30d'].map((period) =>
@@ -13633,7 +13805,7 @@
             const domainItems = detail.domains_detail
                 || (detail.domains || []).map((domain) => ({domain}));
             const domainsHtml = domainItems.map((item) => infraDomainRowHtml(
-                item, false, diagBlockedSnis,
+                item, false, diagBlockedSnis, diagAt,
             )).join('')
                 || '<div class="help-block" data-infra-domains-empty>Домены не привязаны — автозамена IP не сможет переключить DNS</div>';
 
@@ -13742,24 +13914,29 @@
             // Состояния не хранятся отдельными полями — источником истины
             // остаётся сам диагноз, привязанный ко времени.
             const confidenceLabels = {high: 'высокая', medium: 'средняя', low: 'низкая'};
-            const evidenceMark = {pass: '✓', fail: '✗', skipped: '–', inconclusive: '?', warn: '!'};
-            const evidenceTone = {pass: 'is-pass', fail: 'is-fail', warn: 'is-warn', inconclusive: 'is-warn'};
+            const evidenceMark = {pass: '✓', fail: '✗', skipped: '–', inconclusive: '?', warn: '!', pair: '≠'};
+            const evidenceTone = {pass: 'is-pass', fail: 'is-fail', warn: 'is-warn', inconclusive: 'is-warn', pair: 'is-warn'};
             const diagHtml = !diagnosis ? '' : `
-                <section class="card infra-detail-card infra-diag" id="infra-detail-diagnosis">
+                <section class="card infra-detail-card infra-diag${diagnosis.stale ? ' is-stale' : ''}" id="infra-detail-diagnosis">
                     <div class="infra-diag-head">
-                        <h4>Диагностика ТСПУ</h4>
-                        <span class="infra-diag-when">${escapeHtml(diagnosis.at || '—')} · уверенность: ${escapeHtml(confidenceLabels[diagnosis.confidence] || diagnosis.confidence || '—')}${diagnosis.control_name ? ` · контрольное имя ${escapeHtml(diagnosis.control_name)}` : ''}</span>
+                        <h4>Диагностика ТСПУ${diagnosis.stale ? ' · история' : ''}</h4>
+                        <span class="infra-diag-when">${escapeHtml(diagnosis.at || '—')}${diagAgo ? ` · ${escapeHtml(diagAgo)}` : ''} · уверенность: ${escapeHtml(confidenceLabels[diagnosis.confidence] || diagnosis.confidence || '—')}${diagnosis.control_name ? ` · контрольное имя ${escapeHtml(diagnosis.control_name)}` : ''}</span>
                     </div>
+                    ${diagnosis.stale ? `
+                        <div class="infra-diag-stale-note">
+                            <i class="fas fa-clock-rotate-left"></i>
+                            <span>Это <b>снимок ${escapeHtml(diagAgo || 'давнего момента')}</b>, а не текущее состояние. Вердикт по имени и бан пары «адрес + имя» снимаются сами за часы, поэтому перечисленное ниже сейчас, скорее всего, уже неверно. Пометки на доменах по этому диагнозу погашены. Нужна актуальная картина — запустите её кнопкой «Проверить ТСПУ» в меню сервера.</span>
+                        </div>` : ''}
                     <div class="infra-diag-verdicts">
                         <div class="infra-diag-card ${blockedIps.length ? 'is-bad' : 'is-good'}">
                             <div class="infra-diag-card-label">Адреса</div>
                             <div class="infra-diag-card-value">${blockedIps.length ? blockedIps.map((ip) => escapeHtml(ip)).join('<br>') : 'заблокированных нет'}</div>
-                            <div class="infra-diag-card-note">${blockedIps.length ? 'Заменяются автоматически — но только в доменах с чистым именем' : 'Все проверенные адреса отвечают'}</div>
+                            <div class="infra-diag-card-note">${blockedIps.length ? 'Заменяются автоматически: A-записи всех доменов сервера переезжают на живой адрес' : 'Все проверенные адреса отвечают'}</div>
                         </div>
                         <div class="infra-diag-card ${blockedSnis.length ? 'is-bad' : 'is-good'}">
                             <div class="infra-diag-card-label">Имена</div>
                             <div class="infra-diag-card-value">${blockedSnis.length ? blockedSnis.map((sni) => escapeHtml(sni)).join('<br>') : 'заблокированных нет'}</div>
-                            <div class="infra-diag-card-note">${blockedSnis.length ? 'A-записи не меняются намеренно: новый адрес под фильтруемым именем рискует уйти в бан следом. Нужен новый домен и правка хостов в Remnawave' : 'Все проверенные имена проходят'}</div>
+                            <div class="infra-diag-card-note">${blockedSnis.length ? 'На DNS не влияет: адрес меняется как обычно. Имя меняется в конфигурации ноды (ACL haproxy, serverNames инбаунда) и в хостах Remnawave' : 'Все проверенные имена проходят'}</div>
                         </div>
                         <div class="infra-diag-card ${diagnosis.actionable ? 'is-good' : 'is-bad'}">
                             <div class="infra-diag-card-label">Автоматика</div>
@@ -14238,7 +14415,7 @@
                             </label>
                             <label class="infra-form-field">
                                 <span class="infra-form-label">SNI (необязательно)</span>
-                                <span class="infra-form-hint">Имена из ClientHello через запятую — по одному на протокол haproxy: example.org, example.com, localhost. Пусто — проверяем сам домен</span>
+                                <span class="infra-form-hint">Имена из ClientHello через запятую — по одному на протокол haproxy. Если домен тоже уходит в эфир, впишите и его: de.monkora.org, example.org. Пусто — проверяем сам домен</span>
                                 <span class="infra-control-wrap">
                                     <i class="fas fa-mask infra-control-icon"></i>
                                     <input class="infra-control" type="text" name="client_snis" placeholder="как домен" autocomplete="off" spellcheck="false">

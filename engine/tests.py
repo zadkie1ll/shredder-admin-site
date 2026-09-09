@@ -1,11 +1,16 @@
 import hashlib
 import hmac
 import json
+import tempfile
+import subprocess
+import shutil
+import os
 import re
 import time
 from contextlib import ExitStack
 from datetime import date
 from datetime import datetime
+from datetime import timedelta
 from datetime import timezone
 from decimal import Decimal
 from pathlib import Path
@@ -14,6 +19,7 @@ from unittest import mock
 
 from django.conf import settings
 from django.test import RequestFactory
+from datetime import timezone as dt_timezone
 from django.test import SimpleTestCase
 from django.test import override_settings
 from sqlalchemy import create_engine
@@ -34,6 +40,7 @@ from common.models.settings import BOT_TARIFF_PRICE_THREEMONTHS_SETTING
 from common.models.settings import BOT_TARIFF_PRICE_YEAR_SETTING
 from common.models.db import ClientUaRule
 from common.models.db import CensorCheck
+from common.models.db import CensorCheckRun
 from common.models.db import CustomConfigTemplate
 from common.models.db import MagicToken
 from common.models.db import RipeApiKey
@@ -495,6 +502,22 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn("#panel-censor-checks .censor-key-row > span::before", template)
         self.assertIn('data-label="Последний замер"', template)
         self.assertIn('class="censor-row-actions" data-label="Действия"', template)
+
+    def test_censor_checks_allow_selecting_rows_and_deleting_them(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        for marker in (
+            'data-censor-select="${check.id}"',
+            "data-censor-select-all",
+            "data-censor-bulk-delete",
+            "data-censor-bulk-clear",
+            "body.append('action', 'delete_many');",
+            "function censorSyncBulkBar(container)",
+            '<label class="censor-pick" data-label="Выделить все">',
+            "#panel-censor-checks .censor-check-row.table-head > span:not(.censor-pick) { display: none; }",
+            ".censor-check-row { grid-template-columns: 34px minmax(130px, .8fr)",
+        ):
+            with self.subTest(marker=marker):
+                self.assertIn(marker, template)
 
     def test_censor_checks_offer_safe_bulk_settings_form(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
@@ -5196,6 +5219,49 @@ class AdminCensorBulkUpdateTests(SimpleTestCase):
         session.commit.assert_called_once_with()
         session.close.assert_called_once_with()
 
+    def test_delete_many_removes_selected_checks_with_their_runs(self):
+        request = RequestFactory().post(
+            "/support-admin/api/censor-checks/",
+            {"action": "delete_many", "check_ids": ["3", "5,7", "5", "мусор"]},
+        )
+        session = mock.MagicMock()
+        session.query.return_value.filter.return_value.delete.return_value = 3
+
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+            mock.patch("engine.views.admin_audit_write"),
+        ):
+            response = support_admin_api_censor_checks(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content)["deleted"], 3)
+        # Сначала прогоны, потом сами проверки: иначе останутся сироты
+        self.assertEqual(
+            [call.args[0] for call in session.query.call_args_list],
+            [CensorCheckRun, CensorCheck],
+        )
+        session.commit.assert_called_once_with()
+        session.close.assert_called_once_with()
+
+    def test_delete_many_without_selection_changes_nothing(self):
+        request = RequestFactory().post(
+            "/support-admin/api/censor-checks/",
+            {"action": "delete_many", "check_ids": ["", "мусор"]},
+        )
+        session = mock.MagicMock()
+
+        with (
+            mock.patch("engine.views.require_support_admin_role", return_value=None),
+            mock.patch("engine.views.session_factory", return_value=session),
+        ):
+            response = support_admin_api_censor_checks(request)
+
+        self.assertEqual(response.status_code, 400)
+        session.query.assert_not_called()
+        session.commit.assert_not_called()
+        session.close.assert_called_once_with()
+
     def test_bulk_update_requires_an_explicit_field_selection(self):
         request = RequestFactory().post(
             "/support-admin/api/censor-checks/",
@@ -7201,7 +7267,10 @@ class PromoCohortTests(SimpleTestCase):
         self.assertNotIn("commit", src)
         # Платежи считаются строго ПОСЛЕ активации промокода.
         self.assertIn("p.created_at > uses.created_at", src)
-        self.assertIn("t.payment_time > uses.created_at", src)
+        # timestamptz приводится к naive UTC прямо в SQL: иначе граница
+        # зависела бы от TimeZone сессии БД, а min() в питоне падал бы на
+        # смеси naive и aware
+        self.assertIn("t.payment_time AT TIME ZONE 'UTC' > uses.created_at", src)
         # Оба платёжных провайдера и судьба: статус, автоплатёж, блокировка.
         self.assertIn("yk_payments", src)
         self.assertIn("wata_transactions", src)
@@ -8977,6 +9046,9 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
             "function infraWireDomainDeleteButton(button, server)",
             "function infraWireDomainSniButton(button, server, applyAll = false)",
             "action: 'set_domain_snis'",
+            "function infraAgeLabel(minutes)",
+            "class=\"infra-diag-stale-note\"",
+            ".infra-diag.is-stale .infra-diag-card { --tone: var(--panel-border); opacity: .62; }",
             'data-infra-sni-input="${safeDomain}"',
             'data-infra-save-sni-all="${safeDomain}"',
             "pendingLabel: 'Привязываем…'",
@@ -8990,7 +9062,10 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
 
     def test_domain_management_uses_compact_tiles_and_inline_form(self):
         for marker in (
-            ".infra-domain-manage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 420px)); align-content: start; align-items: start; gap: 10px; }",
+            ".infra-domain-manage-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 440px)); align-content: start; align-items: start; gap: 10px; }",
+            ".infra-domain-wire { color: var(--muted); font-size: 10px;",
+            'name="infra-sni-${safeDomain}"',
+            'placeholder="как домен (${safeDomain})"',
             ".infra-domain-manage-item { display: flex; flex-direction: column; align-items: stretch; gap: 9px; min-height: 50px;",
             ".infra-domain-manage-head { display: flex; align-items: center; justify-content: space-between;",
             ".infra-domain-sni-row { display: flex; align-items: center; gap: 8px; }",
@@ -12069,3 +12144,220 @@ class AntiabuseSiteRegistrationMarkerTests(_AntiabuseSqliteMixin, SimpleTestCase
         self.session.commit()
         self.assertIsNone(self._marker_of(user2.id))
 
+
+class AdminInlineJsSmokeTests(SimpleTestCase):
+    """Рендер-функции админки реально выполняются, а не только парсятся.
+
+    Инлайн-JS админки живёт в шаблоне и питоновскими тестами не покрывается;
+    маркерные проверки ловят только наличие строк. 09.09.2026 так уехал в
+    прод ReferenceError (обращение к `checks` вместо `censorChecksCache`):
+    синтаксис валиден, `node --check` проходит, а вкладка «Замеры ТСПУ»
+    показывает только «Ошибка запроса списка проверок» — исключение глотал
+    try/catch загрузчика. Здесь функции вырезаются из шаблона и ВЫПОЛНЯЮТСЯ
+    в node с заглушками.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        cls.template = Path("engine/templates/admin_dashboard.html").read_text()
+
+    def _region(self, start_marker, end_marker):
+        start = self.template.index(start_marker)
+        end = self.template.index(end_marker, start)
+        return self.template[start:end]
+
+    def _run_node(self, source):
+        node = shutil.which("node")
+        if not node:
+            self.skipTest("node не установлен")
+        with tempfile.NamedTemporaryFile(
+            "w", suffix=".js", delete=False, encoding="utf-8"
+        ) as handle:
+            handle.write(source)
+            path = handle.name
+        try:
+            result = subprocess.run(
+                [node, path], capture_output=True, text=True, timeout=30
+            )
+        finally:
+            os.unlink(path)
+        self.assertEqual(
+            result.returncode, 0,
+            f"node упал:\n{result.stdout}\n{result.stderr}",
+        )
+        return result.stdout
+
+    def test_censor_checks_table_renders(self):
+        region = self._region(
+            "        function renderCensorChecks(target) {",
+            "        async function censorCheckAction",
+        )
+        source = """
+const escapeHtml = (v) => String(v ?? '');
+const CENSOR_INTERVAL_LABELS = {};
+const censorHasDefaultKey = true;
+const csrfToken = 'x';
+const main = {dataset: {censorChecksUrl: '/'}};
+function censorRunStatusHtml(run) { return run ? 'run' : 'нет'; }
+function showAdminToast() {}
+function loadCensorChecks() {}
+let censorChecksCache = [];
+const target = {
+  _v: '',
+  set innerHTML(v) { this._v = v; },
+  get innerHTML() { return this._v; },
+  querySelector() { return null; },
+  querySelectorAll() { return []; },
+};
+""" + region + """
+censorChecksCache = [
+  {id: 1, target_ip: '2.58.66.198', port: 443, sni: 'de.monkora.org',
+   is_enabled: true, geo_mode: false, light_mode: true, interval_minutes: null,
+   alerts_enabled: false, api_key_name: null, last_run: null},
+  {id: 2, target_ip: '2.58.66.143', port: 8443, sni: 'de.easyemploy.org',
+   is_enabled: false, geo_mode: true, light_mode: false, interval_minutes: 360,
+   alerts_enabled: true, api_key_name: 'main',
+   last_run: {id: 9, created_at: '2026-09-09 10:00'}},
+];
+renderCensorChecks(target);
+const html = target.innerHTML;
+for (const marker of ['data-censor-select="1"', 'data-censor-select="2"',
+                      'data-censor-select-all', 'data-censor-bulk-delete']) {
+  if (!html.includes(marker)) { console.error('нет маркера ' + marker); process.exit(1); }
+}
+// Выделение переживает перерисовку и отмечает нужную строку
+censorSelectedChecks.add(1);
+renderCensorChecks(target);
+if (!target.innerHTML.includes('data-censor-select="1" checked')) {
+  console.error('выделение потеряно'); process.exit(1);
+}
+// Пропавшая из списка строка выпадает из выделения: иначе «удалить
+// выделенные» однажды унесёт то, чего админ уже не видит
+censorChecksCache = censorChecksCache.filter((check) => check.id !== 1);
+renderCensorChecks(target);
+if (censorSelectedChecks.has(1)) { console.error('висит выделение'); process.exit(1); }
+censorChecksCache = [];
+renderCensorChecks(target);
+if (!target.innerHTML.includes('Проверок пока нет')) {
+  console.error('пустой список сломан'); process.exit(1);
+}
+console.log('ok');
+"""
+        self.assertIn("ok", self._run_node(source))
+
+    def test_infra_domain_row_renders(self):
+        region = self._region(
+            "        function infraDomainRowHtml(item",
+            "        function infraSyncDomainEmptyState",
+        )
+        source = """
+const escapeHtml = (v) => String(v ?? '').replace(/[&<>"]/g,
+  (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+""" + region + """
+const banned = new Set(['de.monkora.org']);
+// Старая схема: имён не задано. В поле ПУСТО — подстановка производного
+// значения превратила бы соседнюю кнопку «Всем» в мину; что уходит в эфир,
+// сказано отдельной строкой
+let html = infraDomainRowHtml(
+  {domain: 'de.monkora.org', client_snis: [], snis: ['de.monkora.org'], own_name: true},
+  false, banned, '2026-09-09 10:00:00');
+if (!html.includes('value=""')) { console.error('в поле подставлено производное значение'); process.exit(1); }
+if (!html.includes('placeholder="как домен (de.monkora.org)"')) { console.error('нет подсказки'); process.exit(1); }
+if (!html.includes('в эфир уходит: <code>de.monkora.org</code>')) { console.error('нет строки «в эфир»'); process.exit(1); }
+if (!html.includes('ИМЯ В БАНЕ')) { console.error('нет пометки бана'); process.exit(1); }
+// name обязателен: без него несохранённый ввод стирает автообновление карточки
+if (!html.includes('name="infra-sni-de.monkora.org"')) { console.error('нет name у поля SNI'); process.exit(1); }
+// Несколько имён: забаненное названо поимённо, рабочие перечислены отдельно
+html = infraDomainRowHtml(
+  {domain: 'de.monkora.org', client_snis: ['de.monkora.org', 'example.org'],
+   snis: ['de.monkora.org', 'example.org'], own_name: true},
+  false, banned, '2026-09-09 10:00:00');
+if (!html.includes('value="de.monkora.org, example.org"')) { console.error('список не подставлен'); process.exit(1); }
+if (!html.includes('работают: example.org')) { console.error('нет рабочих имён'); process.exit(1); }
+// Устаревший вердикт: пометок нет
+html = infraDomainRowHtml(
+  {domain: 'de.monkora.org', client_snis: [], snis: ['de.monkora.org'], own_name: true},
+  false, new Set(), '');
+if (html.includes('В БАНЕ')) { console.error('пометка на устаревшем вердикте'); process.exit(1); }
+// Строка «привязываем» и вызов старой формой (строкой вместо объекта)
+html = infraDomainRowHtml('new.example.xyz', true);
+if (!html.includes('Привязываем')) { console.error('pending сломан'); process.exit(1); }
+if (html.includes('data-infra-save-sni=')) { console.error('у pending есть кнопки'); process.exit(1); }
+console.log('ok');
+"""
+        self.assertIn("ok", self._run_node(source))
+
+    def test_age_label_is_human_readable(self):
+        region = self._region(
+            "        function infraAgeLabel(minutes) {",
+            "        function infraDomainRowHtml",
+        )
+        source = region + """
+const cases = [[null, ''], [3, '3 мин назад'], [90, '2 ч назад'], [10080, '7 дн назад']];
+for (const [input, expected] of cases) {
+  const got = infraAgeLabel(input);
+  if (got !== expected) {
+    console.error(`infraAgeLabel(${input}) = ${JSON.stringify(got)}, ждали ${JSON.stringify(expected)}`);
+    process.exit(1);
+  }
+}
+console.log('ok');
+"""
+        self.assertIn("ok", self._run_node(source))
+
+
+class PromoCohortTimeNormalisationTests(SimpleTestCase):
+    """Смешение naive и aware времени в отчёте по когорте промокода.
+
+    09.09.2026 отчёт падал в 500 на каждом промокоде, где хотя бы один
+    участник после активации платил и через ЮKassa, и через Wata:
+    yk_payments.created_at это TIMESTAMP (psycopg2 отдаёт naive), а
+    wata_transactions.payment_time — TIMESTAMP WITH TIME ZONE (aware), и
+    min() по ним бросал TypeError. Django отдавал HTML-страницу 500,
+    response.json() на клиенте бросал, и админ видел «Проверьте соединение».
+    """
+
+    def test_admin_naive_utc_converts_instead_of_stripping(self):
+        from engine.views import admin_naive_utc
+
+        self.assertIsNone(admin_naive_utc(None))
+        naive = datetime(2026, 9, 9, 12, 0)
+        self.assertEqual(admin_naive_utc(naive), naive)
+        # Срезать tzinfo нельзя: значение в TimeZone сессии БД уехало бы на
+        # смещение этой сессии
+        aware = datetime(2026, 9, 9, 15, 0, tzinfo=dt_timezone(timedelta(hours=3)))
+        self.assertEqual(admin_naive_utc(aware), datetime(2026, 9, 9, 12, 0))
+        self.assertIsNone(admin_naive_utc(aware).tzinfo)
+
+    def test_mixed_naive_and_aware_no_longer_raises(self):
+        from engine.views import admin_naive_utc
+
+        yk_first = datetime(2026, 8, 5, 12, 0)
+        wt_first = datetime(2026, 8, 20, 9, 0, tzinfo=dt_timezone.utc)
+        with self.assertRaises(TypeError):
+            min(value for value in (yk_first, wt_first) if value)
+        first_paid_at = min(
+            (admin_naive_utc(v) for v in (yk_first, wt_first) if v), default=None
+        )
+        self.assertEqual(first_paid_at, datetime(2026, 8, 5, 12, 0))
+
+    def test_cohort_sql_normalises_and_guards(self):
+        source = Path("engine/views.py").read_text()
+        start = source.index("def support_admin_api_promo_cohort")
+        body = source[start:start + 12000]
+        # Время Wata приводится к naive UTC в самом SQL: иначе граница «после
+        # активации» зависит от TimeZone сессии БД
+        self.assertIn("min(t.payment_time AT TIME ZONE 'UTC') AS first_at", body)
+        self.assertIn("t.payment_time AT TIME ZONE 'UTC' > uses.created_at", body)
+        # jsonb_array_elements роняет весь SELECT на строке, где buttons не
+        # массив, а условие сканирует все рассылки
+        self.assertIn("jsonb_typeof(b.buttons) = 'array'", body)
+        self.assertIn("btn->>'promo_id' ~ '^[0-9]+$'", body)
+
+    def test_client_reports_the_real_reason(self):
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        # Раньше 500 и обрыв сети давали одну и ту же плашку «проверьте
+        # соединение», и диагностика уходила не туда
+        self.assertIn("`Сервер ответил ${response.status}`", template)
+        self.assertIn("ошибка на сервере, смотрите лог сайта", template)

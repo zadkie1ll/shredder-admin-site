@@ -4811,6 +4811,21 @@ def admin_dt(value):
     return value
 
 
+def admin_naive_utc(value):
+    """Время к naive UTC — как хранится большинство колонок проекта.
+
+    В отличие от admin_dt, который просто срезает tzinfo, здесь значение
+    сначала переводится в UTC. Часть колонок (wata_transactions.payment_time)
+    объявлена timestamptz, и psycopg2 отдаёт их в TimeZone сессии БД: срезать
+    у такого значения tzinfo значит сдвинуть метку на смещение сессии.
+    """
+    if not value:
+        return None
+    if value.tzinfo:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
 # Админка работает по московскому времени (UTC+3, сезонных переходов нет).
 # В БД все таймстампы хранятся naive UTC; смещение применяется на границах:
 # в метках времени (admin_date_label), в разбиении на дни/недели/месяцы в
@@ -10023,7 +10038,7 @@ def support_admin_api_censor_checks(request):
     расписание работало даже без крона (пока админку кто-то открывает);
     основной путь для расписания — management-команда censor_checks по крону.
 
-    POST action=save|bulk_update|delete|toggle|run.
+    POST action=save|bulk_update|delete|delete_many|toggle|run.
     """
     auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
     if auth_response:
@@ -10242,6 +10257,53 @@ def support_admin_api_censor_checks(request):
                 check.updated_at = datetime.utcnow()
                 db_session.commit()
                 return JsonResponse({"status": "ok"})
+
+            if action == "delete_many":
+                # Массовое удаление отмеченных строк. Ограничение сверху —
+                # защита от случайного «удалить всё» одним запросом, а не
+                # бизнес-правило
+                ids: list[int] = []
+                for value in request.POST.getlist("check_ids") or []:
+                    for part in str(value).split(","):
+                        part = part.strip()
+                        # isdigit() пропускает не-десятичные юникод-цифры, на
+                        # которых int() падает необработанным ValueError (500
+                        # вместо 400); длина ограничена, чтобы огромное число
+                        # не уехало в драйвер БД
+                        if part.isascii() and part.isdigit() and len(part) <= 18:
+                            ids.append(int(part))
+                ids = list(dict.fromkeys(ids))
+                skipped = max(0, len(ids) - 500)
+                ids = ids[:500]
+                if not ids:
+                    return JsonResponse(
+                        {"status": "error",
+                         "message": "Не выбрано ни одной проверки"},
+                        status=400,
+                    )
+                db_session.query(CensorCheckRun).filter(
+                    CensorCheckRun.check_id.in_(ids)
+                ).delete(synchronize_session=False)
+                deleted = (
+                    db_session.query(CensorCheck)
+                    .filter(CensorCheck.id.in_(ids))
+                    .delete(synchronize_session=False)
+                )
+                # target обрезался бы посреди числа и оставлял в журнале
+                # чужой id — полный перечень идёт отдельным полем details
+                admin_audit_write(
+                    db_session, request, "censor_check_delete_many",
+                    target=f"{len(ids)} проверок",
+                    check_ids=ids,
+                    count=int(deleted or 0),
+                )
+                db_session.commit()
+                return JsonResponse({
+                    "status": "ok",
+                    "deleted": int(deleted or 0),
+                    # Молчаливая отсечка читалась бы как «удалено всё»
+                    "skipped": skipped,
+                })
 
             check = db_session.get(
                 CensorCheck, int(request.POST.get("check_id") or 0)
@@ -14060,14 +14122,20 @@ def support_admin_api_promo_cohort(request):
                       AND p.created_at > uses.created_at
                 ) yk ON TRUE
                 LEFT JOIN LATERAL (
+                    -- wata_transactions.payment_time это timestamptz, а
+                    -- promo_code_uses.created_at и yk_payments.created_at —
+                    -- naive UTC. Приводим здесь, а не в питоне: иначе граница
+                    -- «после активации» зависела бы от TimeZone сессии БД, а
+                    -- min() ниже сравнивал бы aware с naive и падал с
+                    -- TypeError — ровно это ломало отчёт по когорте
                     SELECT count(*) AS cnt,
                            coalesce(sum(t.amount), 0) AS total,
-                           min(t.payment_time) AS first_at
+                           min(t.payment_time AT TIME ZONE 'UTC') AS first_at
                     FROM wata_invoices i
                     JOIN wata_transactions t ON t.order_id = i.order_id
                      AND t.transaction_status = 'Paid'
                     WHERE i.user_id = uses.user_id
-                      AND t.payment_time > uses.created_at
+                      AND t.payment_time AT TIME ZONE 'UTC' > uses.created_at
                 ) wt ON TRUE
                 WHERE uses.promo_id = ANY(:promo_ids)
                 ORDER BY uses.created_at DESC
@@ -14097,8 +14165,14 @@ def support_admin_api_promo_cohort(request):
         for row in rows:
             paid_count = int(row.yk_cnt or 0) + int(row.wt_cnt or 0)
             revenue = admin_money(row.yk_total) + admin_money(row.wt_total)
+            # Страховка поверх нормализации в SQL: min() по смеси naive и
+            # aware падает с TypeError и роняет весь отчёт в 500
             first_paid_at = min(
-                (value for value in (row.yk_first, row.wt_first) if value),
+                (
+                    admin_naive_utc(value)
+                    for value in (row.yk_first, row.wt_first)
+                    if value
+                ),
                 default=None,
             )
             is_active = bool(row.expire_at and row.expire_at > now)
@@ -14129,15 +14203,8 @@ def support_admin_api_promo_cohort(request):
                 totals["with_autopay"] += 1
             if row.is_blocked:
                 totals["blocked"] += 1
-            naive_paid = None
+            naive_paid = first_paid_at
             if first_paid_at:
-                # payment_time (Wata) приходит timezone-aware — приводим к naive
-                # UTC, как хранятся activated_at/created_at.
-                naive_paid = (
-                    first_paid_at.astimezone(timezone.utc).replace(tzinfo=None)
-                    if first_paid_at.tzinfo
-                    else first_paid_at
-                )
                 paid_day = (naive_paid + ADMIN_TZ_OFFSET).date().isoformat()
                 first_payments_by_day[paid_day] = (
                     first_payments_by_day.get(paid_day, 0) + 1
@@ -14200,8 +14267,16 @@ def support_admin_api_promo_cohort(request):
                 FROM broadcasts b
                 WHERE b.test_telegram_id IS NULL
                   AND EXISTS (
+                      -- jsonb_array_elements роняет весь SELECT на строке,
+                      -- где buttons не массив (объект, скаляр, jsonb 'null'), а
+                      -- условие сканирует ВСЕ рассылки. Каст promo_id тоже
+                      -- защищаем: порядок вычисления AND в Postgres не
+                      -- гарантирован, и нечисловая строка дала бы
+                      -- ProgrammingError вместо отчёта
                       SELECT 1 FROM jsonb_array_elements(b.buttons) btn
-                      WHERE btn->>'type' = 'claim_promo'
+                      WHERE jsonb_typeof(b.buttons) = 'array'
+                        AND btn->>'type' = 'claim_promo'
+                        AND btn->>'promo_id' ~ '^[0-9]+$'
                         AND (btn->>'promo_id')::bigint = ANY(:promo_ids)
                   )
                 ORDER BY b.created_at DESC
@@ -15173,10 +15248,14 @@ def support_admin_api_infra_servers(request):
                     apply_all=apply_all,
                 )
                 db_session.commit()
+                # По строкам значения различаются: домену, совпавшему с
+                # единственным именем, пишется NULL. Отдаём состояние каждой
                 return JsonResponse({
                     "status": "ok",
                     "domains": [row.domain for row in rows],
-                    "client_snis": list(rows[0].client_snis or []) if rows else [],
+                    "client_snis": {
+                        row.domain: list(row.client_snis or []) for row in rows
+                    },
                 })
 
             if action == "delete_domain":

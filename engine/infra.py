@@ -183,6 +183,12 @@ SNI_PROBE_MAX_IPS = 2
 # Волна диагностик: результаты проб имени на живых адресах соседних
 # серверов не старше этого окна входят в вердикт по имени
 NAME_WAVE_WINDOW_MINUTES = 90
+# Сколько диагноз считается описывающим ТЕКУЩЕЕ состояние. Дальше он
+# остаётся в карточке как история, но пометки «имя в бане» на доменах
+# гаснут: вердикт — снимок момента, а не свойство домена. Бан пары
+# «адрес + имя» вообще снимался сам за пару часов (2026-09-02), и
+# недельной давности вердикт, показанный как текущий, дезинформирует.
+DIAGNOSIS_FRESH_MINUTES = 24 * 60
 REPLACEMENT_TERMINAL_STATUSES = (
     "done", "dns_cleanup", "manual_required", "failed")
 
@@ -591,10 +597,18 @@ def diagnosis_payload(anomaly_rows) -> dict | None:
         verdict = (row.details or {}).get("verdict")
         if not verdict:
             continue
+        at = row.resolved_at or row.created_at
+        age_minutes = (
+            int((utcnow() - at).total_seconds() // 60) if at else None
+        )
         return {
             "anomaly_id": row.id,
             "status": row.status,
-            "at": _dt(row.resolved_at or row.created_at),
+            "at": _dt(at),
+            "age_minutes": age_minutes,
+            "stale": (
+                age_minutes is None or age_minutes > DIAGNOSIS_FRESH_MINUTES
+            ),
             "control_name": (row.details or {}).get("control_name") or "",
             "blocked_ips": verdict.get("blocked_ips") or [],
             "blocked_snis": verdict.get("blocked_snis") or [],
@@ -2124,6 +2138,14 @@ def server_probe_targets(db_session, server) -> tuple:
         for items in per_domain:
             if index < len(items) and items[index] not in ordered:
                 ordered.append(items[index])
+    # Имена, которые уже наблюдались рабочими, идут первыми. Проба —
+    # обычный ClientHello, а инбаунд Reality на него не отвечает (пересылает
+    # в dest, и если там nginx с proxy_protocol — соединение рвётся). Такое
+    # имя не пройдёт НИКОГДА, сколько кредитов в него ни вложи, и вердикта
+    # по нему всё равно не будет: лимит должен тратиться на имена, которые
+    # способны дать ответ.
+    known_good = names_ever_seen_passing(db_session, ordered)
+    ordered.sort(key=lambda name: name not in known_good)
     limit = max_probe_names(db_session)
     return ips[:TSPU_MAX_TARGETS], ordered[:limit], ordered[limit:]
 
@@ -2252,18 +2274,36 @@ def start_manual_diagnosis(db_session, server, actor: str = "") -> dict:
     return dict(result, anomaly_id=anomaly.id)
 
 
-def corroborating_name(names: list, known_good: set) -> str:
-    """Каким одним именем перепроверять подозрительный адрес.
+def corroborating_names(
+    control_names: list, client_names: list, known_good: set
+) -> list[str]:
+    """Чем перепроверять подозрительный адрес, кроме контрольного имени №1.
 
-    Берём имя, которое уже наблюдалось рабочим: только его отказ что-то
-    доказывает. Если истории нет ни у одного — первое по порядку, чтобы
-    выбор оставался детерминированным и один и тот же инцидент, разобранный
-    дважды, давал одинаковые пробы.
+    Первый свидетель — СЛЕДУЮЩЕЕ контрольное имя. Оно чужое, а значит на
+    ноде не попадает ни под один ACL haproxy и уходит в default_backend, то
+    есть отвечает всегда, пока адрес жив. Клиентское имя такой гарантии не
+    даёт: имя, ведущее на инбаунд Reality, не отвечает на обычный
+    ClientHello зонда в принципе (Reality пересылает соединение в dest, а
+    там nginx с proxy_protocol рвёт его) — по такому имени вердикт не
+    вынести никогда, и свидетелем оно быть не может.
+
+    Второй свидетель — клиентское имя, которое уже наблюдалось рабочим.
+    Оно ценнее контрольного тем, что не является чужим доменом на нашем
+    адресе: сочетание «чужое имя + наш адрес» ТСПУ фильтрует само по себе,
+    и оба контрольных имени могут упасть по одной и той же причине.
+
+    Порядок детерминирован: один и тот же инцидент, разобранный дважды,
+    даёт одинаковые пробы.
     """
-    for name in names or []:
-        if name in (known_good or set()):
-            return name
-    return (names or [""])[0]
+    witnesses: list[str] = []
+    for name in (control_names or [])[1:2]:
+        if name:
+            witnesses.append(name)
+    for name in client_names or []:
+        if name in (known_good or set()) and name not in witnesses:
+            witnesses.append(name)
+            break
+    return witnesses
 
 
 def start_sni_diagnosis(
@@ -2299,11 +2339,17 @@ def start_sni_diagnosis(
     if not live_ips and not suspect_ips:
         return {"runs": {}, "errors": ["Нет адреса для проверки имён"]}
     pairs = [(ip, name) for ip in live_ips for name in names]
+    witnesses: list[str] = []
     if suspect_ips:
-        witness = corroborating_name(
-            names, names_ever_seen_passing(db_session, names)
+        cfg = get_settings(db_session)
+        witnesses = corroborating_names(
+            active_control_names(cfg),
+            names,
+            names_ever_seen_passing(db_session, names),
         )
-        pairs += [(ip, witness) for ip in suspect_ips]
+        pairs += [
+            (ip, witness) for ip in suspect_ips for witness in witnesses
+        ]
     started = start_diagnosis_probes(
         db_session,
         pairs,
@@ -2319,6 +2365,13 @@ def start_sni_diagnosis(
             "будут проверены на кандидате перед публикацией"
         ]
     started["dropped_names"] = dropped
+    started["witness_names"] = witnesses
+    if suspect_ips and not witnesses:
+        started["errors"] = list(started.get("errors") or []) + [
+            "Нечем перепроверить подозрительные адреса: в "
+            "infra_control_names только одно имя, а клиентские имена ни разу "
+            "не наблюдались рабочими. Вердикт по адресу вынесен не будет"
+        ]
     return started
 
 
