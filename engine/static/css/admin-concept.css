@@ -1,7 +1,7 @@
-@import url('./admin-concept-infrastructure.css?v=8');
-@import url('./admin-concept-customers.css?v=8');
-@import url('./admin-concept-client-details.css?v=5');
-@import url('./admin-concept-sections.css?v=5');
+@import url('./admin-concept-infrastructure.css?v=13');
+@import url('./admin-concept-customers.css?v=9');
+@import url('./admin-concept-client-details.css?v=6');
+@import url('./admin-concept-sections.css?v=7');
 
 /* Geometry and visual hierarchy from the approved admin-concept-pattern-hover.
  * Existing forms, data, actions, permissions and state stay in the real template.
@@ -237,11 +237,7 @@ html[data-admin-theme] .settings-list.has-settings .setting-row.is-dirty { backg
 /* Infrastructure retains capacity warnings, status colors and every metric. */
 .infra-server-card { background: var(--admin-surface); box-shadow: none; }
 .infra-server-card::after, .infra-summary-card::after { background: none; }
-.infra-server-card-name { font-weight: 650; }
-.infra-server-card-rx { font-weight: 600; letter-spacing: -.025em; }
-.infra-server-card-traffic { background: var(--admin-surface-soft); box-shadow: none; }
-.infra-server-card-host, .infra-server-card-kicker { color: var(--admin-text-muted); }
-.infra-server-card-open { box-shadow: none; }
+.infra-server-card-host { color: var(--admin-text-muted); }
 .node-provision-create-card, .node-provision-list-card,
 .node-provision-script-editor-panel { box-shadow: none; }
 

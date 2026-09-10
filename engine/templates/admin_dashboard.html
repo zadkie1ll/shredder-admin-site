@@ -120,76 +120,34 @@
         .infra-table-heading h3 { margin: 0; color: var(--text-main); font-size: 16px; font-weight: 850; }
         .infra-table-heading span { color: var(--muted); font-size: 11.5px; font-weight: 650; }
         .infra-table-heading-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; min-width: 0; }
-        .infra-view-switch { display: inline-flex; align-items: center; gap: 3px; padding: 3px; border: 1px solid var(--panel-border); border-radius: 10px; background: var(--inner-card-bg); }
-        .infra-view-switch button { min-height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 10.5px; font-weight: 800; cursor: pointer; transition: color .14s, background .14s, box-shadow .14s; }
-        .infra-view-switch button:hover { color: var(--text-main); background: rgba(255,255,255,.045); }
-        .infra-view-switch button.active { color: var(--brand-gold); background: rgba(255,199,0,.1); box-shadow: inset 0 0 0 1px rgba(255,199,0,.2); }
-        .infra-view-switch button:focus-visible { outline: 0; box-shadow: 0 0 0 3px rgba(255,199,0,.12); }
-        html[data-admin-theme="light"] .infra-view-switch button:hover { background: rgba(181,139,0,.075); color: #242a34; }
-        html[data-admin-theme="light"] .infra-view-switch button.active { background: rgba(181,139,0,.11); color: #8b6600; box-shadow: inset 0 0 0 1px rgba(154,113,0,.24); }
-        .infra-table-wrap { overflow-x: auto; }
-        .infra-server-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 16px; }
-        .infra-server-card { position: relative; min-width: 0; min-height: 286px; display: flex; flex-direction: column; gap: 15px; overflow: hidden; padding: 17px; border: 1px solid var(--panel-border); border-radius: 14px; background: linear-gradient(145deg, rgba(84,72,128,.18), rgba(255,255,255,.012) 52%), var(--inner-card-bg); color: var(--text-main); cursor: pointer; transition: transform .16s ease, border-color .16s ease, box-shadow .16s ease, background .16s ease; }
-        .infra-server-card:nth-child(3n + 2) { background: linear-gradient(145deg, rgba(48,114,128,.15), rgba(255,255,255,.012) 52%), var(--inner-card-bg); }
-        .infra-server-card:nth-child(3n + 3) { background: linear-gradient(145deg, rgba(142,112,42,.13), rgba(255,255,255,.012) 52%), var(--inner-card-bg); }
-        .infra-server-card::before { content: ""; position: absolute; inset: 0 auto 0 0; width: 3px; background: var(--green); opacity: .8; }
-        .infra-server-card::after { content: ""; position: absolute; width: 132px; height: 132px; top: -74px; right: -56px; border-radius: 50%; background: rgba(255,255,255,.035); pointer-events: none; }
-        .infra-server-card:hover { transform: translateY(-2px); border-color: rgba(255,199,0,.32); box-shadow: 0 15px 35px rgba(0,0,0,.18); }
-        .infra-server-card:focus-visible { outline: 0; border-color: rgba(255,199,0,.65); box-shadow: 0 0 0 3px rgba(255,199,0,.11), 0 15px 35px rgba(0,0,0,.18); }
-        .infra-server-card.needs-attention::before { background: var(--brand-gold); }
-        .infra-server-card.is-offline { border-color: rgba(255,92,103,.28); background: linear-gradient(145deg, rgba(153,49,64,.17), rgba(255,92,103,.025) 55%), var(--inner-card-bg); }
-        .infra-server-card.is-offline::before { background: var(--red); }
-        html[data-admin-theme="light"] .infra-server-card { background: linear-gradient(145deg, rgba(105,89,160,.08), rgba(255,255,255,.6) 55%), var(--inner-card-bg); }
-        html[data-admin-theme="light"] .infra-server-card:nth-child(3n + 2) { background: linear-gradient(145deg, rgba(48,114,128,.075), rgba(255,255,255,.6) 55%), var(--inner-card-bg); }
-        html[data-admin-theme="light"] .infra-server-card:nth-child(3n + 3) { background: linear-gradient(145deg, rgba(142,112,42,.07), rgba(255,255,255,.6) 55%), var(--inner-card-bg); }
-        html[data-admin-theme="light"] .infra-server-card.is-offline { background: linear-gradient(145deg, rgba(211,65,78,.08), rgba(255,255,255,.62) 55%), var(--inner-card-bg); }
-        .infra-server-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
-        .infra-server-card-identity { display: flex; align-items: center; gap: 11px; min-width: 0; }
-        .infra-server-card-identity .infra-server-icon { flex: 0 0 38px; width: 38px; height: 38px; }
-        .infra-server-card-copy { min-width: 0; }
-        .infra-server-card-name { overflow: hidden; color: var(--text-main); font-size: 17px; line-height: 1.2; font-weight: 900; text-overflow: ellipsis; white-space: nowrap; }
-        .infra-server-card-host { margin-top: 3px; overflow: hidden; color: var(--muted); font-size: 11.5px; line-height: 1.3; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; }
-        .infra-server-card-head-actions { display: flex; align-items: center; gap: 6px; flex: 0 0 auto; }
-        .infra-server-card-flags { min-height: 21px; display: flex; align-items: center; gap: 5px; flex-wrap: wrap; margin-top: -5px; }
-        .infra-server-card-traffic { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: end; gap: 12px; padding: 14px; border: 1px solid rgba(255,255,255,.055); border-radius: 11px; background: rgba(0,0,0,.15); }
-        html[data-admin-theme="light"] .infra-server-card-traffic { border-color: rgba(38,43,52,.08); background: rgba(255,255,255,.56); }
-        .infra-server-card-kicker { display: block; margin-bottom: 6px; color: var(--muted); font-size: 9.5px; font-weight: 800; letter-spacing: .055em; text-transform: uppercase; }
-        .infra-server-card-rx { color: var(--text-main); font-size: clamp(20px, 1.65vw, 27px); line-height: 1; font-weight: 900; font-variant-numeric: tabular-nums; white-space: nowrap; }
-        .infra-server-card-tx { color: var(--green); font-size: 11.5px; line-height: 1.3; font-weight: 800; font-variant-numeric: tabular-nums; text-align: right; white-space: nowrap; }
-        .infra-server-card-load { display: grid; gap: 7px; }
-        .infra-server-card-load .infra-load-value { margin: 0; font-size: 11px; }
-        .infra-server-card-load .infra-load-track { height: 6px; }
-        .infra-server-card-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-        .infra-server-card-stat { min-width: 0; }
-        .infra-server-card-stat span { display: block; margin-bottom: 4px; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-        .infra-server-card-stat b { display: block; overflow: hidden; color: var(--text-main); font-size: 11.5px; line-height: 1.35; font-weight: 800; text-overflow: ellipsis; white-space: nowrap; }
-        .infra-server-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 12px; border-top: 1px solid var(--panel-border); }
-        .infra-server-card-heartbeat { display: inline-flex; align-items: center; gap: 7px; min-width: 0; color: var(--muted); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
-        .infra-server-card-heartbeat::before { content: ""; flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 4px rgba(56,217,150,.09); }
-        .infra-server-card.is-offline .infra-server-card-heartbeat::before { background: var(--red); box-shadow: 0 0 0 4px rgba(255,92,103,.09); }
-        .infra-server-card-open { min-height: 30px; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 0 10px; border: 1px solid rgba(255,199,0,.22); border-radius: 8px; background: rgba(255,199,0,.075); color: var(--brand-gold); font: inherit; font-size: 10.5px; font-weight: 850; cursor: pointer; white-space: nowrap; transition: color .14s, border-color .14s, background .14s; }
-        .infra-server-card-open:hover { border-color: rgba(255,199,0,.48); background: rgba(255,199,0,.13); color: #ffd43b; }
-        html[data-admin-theme="light"] .infra-server-card-open:hover { border-color: rgba(154,113,0,.45); background: rgba(181,139,0,.11); color: #765600; }
-        .infra-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-        .infra-table th { padding: 12px 10px; border-bottom: 1px solid var(--panel-border); background: rgba(255,255,255,.018); color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: .045em; text-align: left; white-space: nowrap; }
-        .infra-table td { padding: 12px 10px; border-bottom: 1px solid var(--panel-border); color: var(--text-main); font-weight: 650; white-space: nowrap; vertical-align: middle; }
-        .infra-table tbody tr { cursor: pointer; transition: background .12s, box-shadow .12s; }
-        .infra-table tbody tr:last-child td { border-bottom: 0; }
-        .infra-table tbody tr:hover { background: rgba(255,255,255,.04); }
-        .infra-table tbody tr.is-selected { background: linear-gradient(90deg, rgba(255,199,0,.12), rgba(255,199,0,.035)); box-shadow: inset 3px 0 0 var(--brand-gold); }
-        .infra-table tbody tr.infra-row-offline:not(.is-selected) { background: rgba(255,92,103,.055); }
-        .infra-table tbody tr.infra-row-offline:hover { background: rgba(255,92,103,.1); }
-        html[data-admin-theme="light"] .infra-table tbody tr:not(.is-selected):hover { background: rgba(181,139,0,.075); box-shadow: inset 3px 0 0 rgba(154,113,0,.42); }
-        html[data-admin-theme="light"] .infra-table tbody tr.infra-row-offline:not(.is-selected):hover { background: rgba(211,65,78,.09); box-shadow: inset 3px 0 0 rgba(197,54,69,.46); }
-        .infra-server-link { appearance: none; display: inline-flex; align-items: center; gap: 10px; padding: 0; border: 0; background: transparent; color: var(--text-main); font: inherit; font-size: 13.5px; line-height: 1.25; font-weight: 850; cursor: pointer; text-align: left; }
-        .infra-server-link:hover { color: var(--brand-gold); }
+        .infra-server-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; padding: 14px; }
+        .infra-server-card { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 9px; padding: 13px 14px 11px; border: 1px solid var(--panel-border); border-radius: 10px; background: var(--inner-card-bg); color: var(--text-main); cursor: pointer; transition: border-color .16s ease, box-shadow .16s ease; }
+        .infra-server-card:hover { border-color: rgba(255,199,0,.35); }
+        .infra-server-card:focus-visible { outline: 0; border-color: rgba(255,199,0,.65); box-shadow: 0 0 0 3px rgba(255,199,0,.11); }
+        .infra-server-card.needs-attention { border-color: rgba(255,199,0,.3); }
+        .infra-server-card.is-offline { border-color: rgba(255,92,103,.3); background: linear-gradient(160deg, rgba(255,92,103,.06), var(--inner-card-bg) 55%); }
+        html[data-admin-theme="light"] .infra-server-card.is-offline { background: linear-gradient(160deg, rgba(211,65,78,.07), var(--inner-card-bg) 55%); }
+        .infra-server-card-head { display: flex; align-items: center; gap: 9px; min-width: 0; }
+        .infra-server-card-country { flex: 0 0 auto; color: var(--brand-gold); font-size: 17px; line-height: 1; }
+        .infra-server-card-dot { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+        .infra-server-card-dot.is-warn { background: var(--brand-gold); box-shadow: 0 0 0 4px rgba(255,199,0,.13); }
+        .infra-server-card-dot.is-off { background: var(--red); }
+        .infra-server-card-name { overflow: hidden; color: var(--text-main); font-size: 15px; line-height: 1.25; font-weight: 800; letter-spacing: -.01em; text-overflow: ellipsis; white-space: nowrap; }
+        .infra-server-card-host { flex: 1 1 auto; min-width: 0; overflow: hidden; color: var(--muted); font-size: 11px; line-height: 1.3; font-weight: 600; text-align: right; text-overflow: ellipsis; white-space: nowrap; }
+        .infra-server-card-flags { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+        .infra-server-card-traffic { display: flex; align-items: baseline; gap: 10px; font-variant-numeric: tabular-nums; }
+        .infra-server-card-traffic b { color: var(--text-main); font-size: 19px; line-height: 1.15; font-weight: 800; letter-spacing: -.02em; white-space: nowrap; }
+        .infra-server-card-traffic span { color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
+        .infra-server-card-load { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+        .infra-server-card-load > b { color: var(--muted); font-size: 11.5px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .infra-server-card-load .infra-load-track { height: 4px; }
+        .infra-server-card-load .infra-set-limit { grid-column: 1 / -1; justify-self: start; }
+        .infra-server-card-meta { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: auto; padding-top: 8px; border-top: 1px solid var(--panel-border); color: var(--muted); font-size: 11px; font-weight: 600; white-space: nowrap; }
+        .infra-server-card-meta b { color: var(--text-main); font-weight: 700; font-variant-numeric: tabular-nums; }
+        .infra-server-card-doms { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+        .infra-server-card-hb { flex: 0 0 auto; }
+        .infra-server-card.is-offline :is(.infra-server-card-traffic, .infra-server-card-load, .infra-server-card-meta b) { opacity: .55; }
         .infra-server-icon { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; border: 1px solid var(--panel-border); background: var(--inner-card-bg); color: var(--brand-gold); font-size: 12px; }
-        .infra-server-copy { display: grid; gap: 3px; }
-        .infra-server-host { color: rgba(255,255,255,.67); font-size: 11.5px; line-height: 1.3; font-weight: 650; }
-        html[data-admin-theme="light"] .infra-server-host { color: rgba(34,39,47,.68); }
-        .infra-network-cell { display: grid; gap: 2px; font-variant-numeric: tabular-nums; }
-        .infra-network-cell small { color: var(--muted); font-size: 9.5px; font-weight: 600; }
-        .infra-load-cell { min-width: 76px; }
         .infra-load-value { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 5px; font-size: 10px; }
         .infra-load-track { height: 4px; overflow: hidden; border-radius: 999px; background: rgba(255,255,255,.08); }
         .infra-load-fill { height: 100%; border-radius: inherit; background: var(--green); }
@@ -562,14 +520,11 @@
         #subpanel-inf-servers .infra-page-copy { font-size: 13.5px; }
         #subpanel-inf-servers .infra-table-heading h3 { font-size: 18px; font-weight: 800; }
         #subpanel-inf-servers .infra-table-heading span { font-size: 12px; font-weight: 600; }
-        #subpanel-inf-servers .infra-server-card-name { font-size: 19px; font-weight: 800; letter-spacing: -.018em; }
-        #subpanel-inf-servers .infra-server-card-host { font-size: 13px; font-weight: 600; }
-        #subpanel-inf-servers .infra-server-card-kicker { font-size: 10.5px; font-weight: 700; }
-        #subpanel-inf-servers .infra-server-card-rx { font-size: clamp(23px, 1.7vw, 29px); font-weight: 800; letter-spacing: -.02em; }
-        #subpanel-inf-servers .infra-server-card-tx { font-size: 12.5px; font-weight: 700; }
-        #subpanel-inf-servers .infra-server-card-stat span { font-size: 9.5px; font-weight: 700; }
-        #subpanel-inf-servers .infra-server-card-stat b { font-size: 12.5px; font-weight: 700; }
-        #subpanel-inf-servers .infra-server-card-heartbeat, #subpanel-inf-servers .infra-server-card-open { font-size: 11.5px; font-weight: 700; }
+        #subpanel-inf-servers .infra-server-card-name { font-size: 15px; font-weight: 800; letter-spacing: -.014em; }
+        #subpanel-inf-servers .infra-server-card-host { font-size: 11.5px; font-weight: 600; }
+        #subpanel-inf-servers .infra-server-card-traffic b { font-size: 19px; font-weight: 800; letter-spacing: -.02em; }
+        #subpanel-inf-servers .infra-server-card-traffic span { font-size: 12px; font-weight: 700; }
+        #subpanel-inf-servers .infra-server-card-meta { font-size: 11px; font-weight: 600; }
         .infra-detail-title-copy h2 { font-weight: 800; }
         .infra-detail-title-copy p { font-size: 13.5px; font-weight: 600; }
         .infra-detail-action, .infra-period-switch .infra-period-btn, .infra-detail-nav button { font-size: 11.5px; font-weight: 700; }
@@ -638,9 +593,6 @@
         .infra-detail-loading-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
         .infra-detail-loading-metrics .infra-skeleton { height: 120px; }
         .infra-detail-loading-chart { min-height: 340px; }
-        @media (min-width: 1800px) {
-            .infra-server-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-        }
         @media (max-width: 1450px) {
             .infra-page-head { align-items: stretch; flex-direction: column; }
             .infra-toolbar { justify-content: flex-start; }
@@ -650,7 +602,6 @@
         }
         @media (max-width: 1160px) {
             .infra-workspace { grid-template-columns: 1fr; }
-            .infra-server-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .infra-preview { position: relative; top: auto; min-height: 0; }
             .infra-detail-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .infra-detail-hero-head { flex-direction: column; }
@@ -666,11 +617,7 @@
             .infra-summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
             .infra-table-heading { align-items: flex-start; flex-direction: column; }
             .infra-table-heading-actions { width: 100%; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; }
-            .infra-server-grid { grid-template-columns: 1fr; padding: 10px; }
-            .infra-server-card { min-height: 0; padding: 15px; }
-            .infra-server-card-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
             .infra-ip-groups { grid-template-columns: 1fr; }
-            .infra-table td, .infra-table th { padding: 10px 8px; }
             .infra-preview { min-height: 0; }
             #infra-server-detail { padding-bottom: 20px; }
             .infra-server-screen-head { align-items: flex-start; flex-direction: column; }
@@ -1651,29 +1598,91 @@
         .payment-detail-label { margin-bottom: 4px; color: var(--muted); font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
         .payment-detail-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--text-main); font-size: 13px; font-weight: 700; }
         .payment-id { border-top: 1px solid rgba(255,255,255,.07); padding-top: 10px; color: var(--muted); font-size: 11px; line-height: 1.5; font-weight: 700; overflow-wrap: anywhere; font-family: ui-monospace, monospace; }
-        .referral-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 12px; }
-        .referral-card { padding: 18px; min-width: 0; overflow: hidden; background: radial-gradient(circle at 86% 10%, rgba(255,199,0,.09), transparent 10rem), var(--card-bg); border-color: rgba(255,199,0,.16); }
-        .referral-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
-        .referral-name { min-width: 0; color: var(--text-main); font-size: 18px; line-height: 1.15; font-weight: 800; overflow-wrap: anywhere; }
-        .referral-sub { margin-top: 4px; color: #a4a9b4; font-size: 12px; line-height: 1.3; font-weight: 600; overflow-wrap: anywhere; }
-        .referral-pill { flex: 0 0 auto; border-radius: 999px; padding: 6px 10px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.09); color: #d8dce4; font-size: 11px; font-weight: 700; }
-        .referral-pill.paid { color: var(--green); border-color: rgba(52,211,153,.20); background: rgba(52,211,153,.07); }
-        .referral-detail-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-        .referral-detail { min-width: 0; border-radius: 10px; padding: 12px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.08); }
-        .referral-detail-label { margin-bottom: 6px; color: #8a95a3; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
-        .referral-detail-value { color: var(--text-main); font-size: 20px; line-height: 1; font-weight: 800; overflow-wrap: anywhere; }
-        .referral-bonuses { margin-top: 10px; padding: 10px 12px; border-radius: 10px; background: rgba(0,0,0,.2); border: 1px solid rgba(148,163,184,.09); color: #c8ccd4; font-size: 12px; line-height: 1.6; font-weight: 600; }
-        .referral-graph { display: grid; gap: 14px; }
-        .referral-root-card { display: flex; align-items: center; justify-content: space-between; gap: 14px; border-radius: 12px; padding: 14px 16px; background: linear-gradient(135deg, rgba(255,199,0,.12), rgba(255,199,0,.04)); border: 1px solid rgba(255,199,0,.22); }
-        .graph-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #fff; font-size: 14px; font-weight: 800; }
-        .graph-label.root { color: var(--brand-gold); }
-        .graph-meta { margin-top: 3px; color: #8a95a3; font-size: 11px; font-weight: 600; }
-        .graph-count { flex: 0 0 auto; border-radius: 999px; padding: 6px 10px; background: rgba(0,0,0,.18); border: 1px solid rgba(255,255,255,.09); color: #fff; font-size: 11px; font-weight: 700; }
-        .referral-map-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
-        .referral-map-card { min-width: 0; border-radius: 10px; padding: 12px 14px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.08); }
-        .referral-map-card.has-children { border-color: rgba(255,199,0,.24); background: rgba(255,199,0,.07); }
-        .graph-child-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.07); }
-        .graph-child-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; border-radius: 999px; padding: 4px 8px; background: rgba(0,0,0,.2); border: 1px solid rgba(255,255,255,.08); color: #d0d4dc; font-size: 10px; font-weight: 700; }
+        .client-ref-state { display: flex; align-items: center; gap: 10px; min-width: 0; flex-wrap: wrap; }
+        .client-ref-dot { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+        .client-referral-manage-card.is-blocked .client-ref-dot { background: var(--red); }
+        .client-ref-summary { display: flex; flex-wrap: wrap; gap: 16px 36px; padding: 2px 4px 16px; }
+        .client-ref-sum b { display: block; color: var(--text-main); font-size: 22px; line-height: 1.2; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+        .client-ref-sum b small { margin-left: 6px; color: var(--brand-gold); font-size: 12px; font-weight: 600; }
+        .client-ref-sum span { color: var(--muted); font-size: 12px; }
+        .client-ref-sum.is-gold b { color: var(--brand-gold); }
+        .client-ref-tree-card { padding: 0; overflow: hidden; }
+        .client-ref-tree { min-width: 0; }
+        .client-ref-tree-head, .client-ref-row { display: grid; grid-template-columns: minmax(0, 1fr) 100px 84px 92px 34px; gap: 14px; align-items: center; padding: 12px 16px; }
+        .client-ref-tree-head { padding: 10px 16px; background: rgba(255,255,255,.03); color: var(--muted); font-size: 11px; font-weight: 600; }
+        .client-ref-tree-head .r { text-align: right; }
+        .client-ref-row { border-top: 1px solid var(--panel-border); cursor: pointer; }
+        .client-ref-row:not(.is-root):hover { background: rgba(255,255,255,.03); }
+        .client-ref-row:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px rgba(255,199,0,.4); }
+        .client-ref-row.is-root { background: linear-gradient(90deg, rgba(255,199,0,.1), transparent 55%); cursor: default; }
+        .client-ref-who { display: flex; align-items: center; gap: 10px; min-width: 0; }
+        .client-ref-branch { flex: 0 0 22px; color: var(--panel-border); font-size: 14px; text-align: center; user-select: none; }
+        .client-ref-id { min-width: 0; }
+        .client-ref-id b { display: block; color: var(--text-main); font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .client-ref-row.is-root .client-ref-id b { color: var(--brand-gold); font-size: 14px; }
+        .client-ref-id span { display: block; color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .client-ref-pill { flex: 0 0 auto; padding: 2px 8px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; color: var(--muted); font-size: 10.5px; font-weight: 700; white-space: nowrap; }
+        .client-ref-pill.is-paid { border-color: rgba(56,217,150,.35); background: rgba(56,217,150,.12); color: var(--green); }
+        .client-ref-col { text-align: right; color: var(--text-main); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .client-ref-col.is-zero { color: var(--muted); font-weight: 500; }
+        .client-ref-col.is-green { color: var(--green); }
+        .client-ref-chev { color: var(--muted); font-size: 11px; text-align: center; }
+        .client-ref-chev i { transition: transform .15s; }
+        .client-ref-row.is-open .client-ref-chev i { transform: rotate(180deg); }
+        .client-ref-sub { display: none; padding: 0 16px 14px 48px; }
+        .client-ref-row.is-open + .client-ref-sub { display: block; }
+        .client-ref-sub-inner { display: grid; gap: 10px; padding-top: 12px; border-top: 1px dashed var(--panel-border); }
+        .client-ref-bonus-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+        .client-ref-bonus-chip { display: inline-flex; align-items: baseline; gap: 7px; padding: 4px 10px; border: 1px solid var(--panel-border); border-radius: 7px; background: var(--inner-card-bg); color: #c8ccd4; font-size: 12px; }
+        .client-ref-bonus-chip b { color: var(--green); font-weight: 700; }
+        .client-ref-bonus-chip time { color: var(--muted); font-size: 11px; }
+        .client-ref-l2 { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; color: var(--muted); font-size: 12px; }
+        .client-ref-l2-chip { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 9px; border: 1px solid rgba(255,255,255,.14); border-radius: 999px; color: #d0d4dc; font-size: 11px; font-weight: 600; }
+        .client-ref-none { color: var(--muted); font-size: 12px; }
+        .analytics-referrers-more { min-height: 32px; padding: 0 12px; font-size: 12px; }
+        .referral-activity-form { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+        .referral-activity-form .date-presets { margin: 0; padding: 0; border: 0; }
+        .refact-card { padding: 22px; }
+        .refact-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+        .refact-head h3 { margin: 0; color: var(--text-main); font-size: 17px; font-weight: 700; }
+        .refact-period { color: var(--muted); font-size: 12px; }
+        .refact-pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid rgba(56,217,150,.3); border-radius: 999px; background: rgba(56,217,150,.12); color: var(--green); font-size: 12px; font-weight: 700; }
+        .refact-sub { margin: 6px 0 0; max-width: 80ch; color: var(--muted); font-size: 12px; }
+        .refact-sub b { color: #c8ccd4; }
+        .refact-lead { display: flex; flex-wrap: wrap; gap: 16px 36px; padding: 18px 4px; }
+        .refact-lead-item b { display: block; color: var(--text-main); font-size: 22px; line-height: 1.2; font-weight: 700; letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+        .refact-lead-item span { color: var(--muted); font-size: 12px; }
+        .refact-lead-item.is-green b { color: var(--green); }
+        .refact-lead-item.is-gold b { color: var(--brand-gold); }
+        .refact-tbl { border: 1px solid var(--panel-border); border-radius: 10px; overflow: hidden; }
+        .refact-thead, .refact-row { display: grid; grid-template-columns: 34px minmax(0, 1.4fr) 96px 110px 110px minmax(150px, 1fr) 130px; gap: 14px; align-items: center; padding: 11px 16px; }
+        .refact-thead { padding: 10px 16px; background: rgba(255,255,255,.03); color: var(--muted); font-size: 11px; font-weight: 600; }
+        .refact-thead .r { text-align: right; }
+        .refact-row { border-top: 1px solid var(--panel-border); cursor: pointer; }
+        .refact-row:hover { background: rgba(255,255,255,.03); }
+        .refact-row:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px rgba(255,199,0,.4); }
+        .refact-row.is-extra { display: none; }
+        .show-all .refact-row.is-extra { display: grid; }
+        .show-all [data-refact-show-all] { display: none; }
+        .refact-rank { color: var(--muted); font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .refact-rank.is-top { color: var(--brand-gold); }
+        .refact-who { min-width: 0; }
+        .refact-who b { display: block; color: var(--text-main); font-size: 13.5px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .refact-row:hover .refact-who b { color: var(--brand-gold); }
+        .refact-who span { display: block; color: var(--muted); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .refact-cell { text-align: right; color: var(--text-main); font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .refact-cell small { display: block; color: var(--muted); font-size: 10.5px; font-weight: 500; }
+        .refact-cell.is-zero { color: var(--muted); font-weight: 500; }
+        .refact-conv { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; }
+        .refact-bar { height: 4px; border-radius: 2px; background: rgba(255,255,255,.1); overflow: hidden; }
+        .refact-bar i { display: block; height: 100%; border-radius: 2px; background: var(--green); }
+        .refact-conv b { color: #c8ccd4; font-size: 11.5px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+        .refact-money { text-align: right; color: var(--green); font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .refact-money small { display: block; color: var(--brand-gold); font-size: 10.5px; font-weight: 600; }
+        .refact-money.is-zero { color: var(--muted); font-weight: 500; }
+        .refact-money.is-zero small { color: var(--muted); }
+        .refact-foot { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 11px 16px; border-top: 1px solid var(--panel-border); color: var(--muted); font-size: 12px; }
+        .refact-more { border: 0; background: transparent; color: #7fb2ff; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
         .chart-card { min-height: 260px; padding: 16px; }
         .sales-chart-card { display: grid; gap: 12px; }
         .sales-chart-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
@@ -1824,27 +1833,15 @@
         .config-library-head h2 { margin: 0; color: var(--text-main); font-size: 18px; line-height: 1.2; font-weight: 900; letter-spacing: -.01em; }
         .config-delivery-head p,
         .config-library-head p { margin: 4px 0 0; color: var(--muted); font-size: 12px; line-height: 1.45; font-weight: 600; }
-        .config-delivery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start; }
-        .config-delivery-card { width: 100%; min-width: 0; min-height: 82px; display: grid; grid-template-columns: 42px minmax(0, 1fr) auto 18px; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid rgba(127,143,163,.22); border-radius: var(--admin-radius); background: linear-gradient(145deg, rgba(28,34,44,.96), rgba(19,24,32,.94)); box-shadow: inset 0 1px 0 rgba(255,255,255,.03); color: inherit; font: inherit; text-align: left; appearance: none; cursor: pointer; user-select: none; transition: border-color .16s, background .16s, box-shadow .16s; }
-        .config-delivery-card:hover { border-color: rgba(var(--accent-rgb), .3); }
-        .config-delivery-card:focus-visible { outline: 0; border-color: rgba(var(--accent-rgb), .58); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .12); }
-        .config-delivery-card[aria-expanded="true"] { border-color: rgba(var(--accent-rgb), .3); background: rgba(var(--accent-rgb), .055); box-shadow: inset 0 1px 0 rgba(255,255,255,.035); }
-        .config-delivery-icon { width: 42px; height: 42px; display: inline-flex; align-items: center; justify-content: center; border: 1px solid rgba(var(--accent-rgb), .28); border-radius: 11px; background: rgba(var(--accent-rgb), .08); color: var(--brand-gold); font-size: 15px; }
-        .config-delivery-summary-copy { min-width: 0; display: grid; gap: 4px; }
-        .config-delivery-summary-copy strong { color: var(--text-main); font-size: 15px; line-height: 1.25; font-weight: 850; }
-        .config-delivery-summary-copy small { overflow: hidden; color: var(--muted); font-size: 11.5px; line-height: 1.35; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
-        .config-delivery-mode { min-height: 26px; display: inline-flex; align-items: center; justify-content: center; padding: 0 9px; border: 1px solid rgba(127,143,163,.2); border-radius: 999px; background: rgba(255,255,255,.035); color: var(--muted); font-size: 10px; font-weight: 850; white-space: nowrap; }
-        .config-delivery-chevron { color: var(--muted); font-size: 11px; transition: transform .16s; }
-        .config-delivery-card[aria-expanded="true"] .config-delivery-chevron { transform: rotate(180deg); }
-        .config-delivery-panels { display: grid; gap: 12px; margin-top: 12px; }
-        .config-delivery-body { min-width: 0; display: grid; gap: 14px; padding: 16px; border: 1px solid rgba(var(--accent-rgb), .24); border-radius: var(--admin-radius); background: linear-gradient(145deg, rgba(28,34,44,.96), rgba(19,24,32,.94)); box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 18px 46px rgba(0,0,0,.13); }
-        .config-delivery-body[hidden] { display: none; }
-        .config-delivery-intro { display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 11px; align-items: start; max-width: 920px; padding: 11px 13px; border: 1px solid rgba(127,143,163,.16); border-radius: 10px; background: rgba(255,255,255,.025); }
-        .config-delivery-intro > i { width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; border-radius: 9px; background: rgba(var(--accent-rgb), .08); color: var(--brand-gold); font-size: 12px; }
-        .config-delivery-intro strong { display: block; margin-bottom: 3px; color: var(--text-main); font-size: 12.5px; line-height: 1.35; font-weight: 800; }
-        .config-delivery-intro p { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.55; font-weight: 600; }
-        .config-delivery-intro code { padding: 1px 5px; border: 1px solid rgba(127,143,163,.18); border-radius: 5px; background: rgba(0,0,0,.16); color: var(--text-main); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10.5px; }
-        .config-pins-search { display: grid; grid-template-columns: minmax(260px, 460px) max-content; gap: 9px; align-items: end; justify-content: start; }
+        .config-delivery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }
+        .config-delivery-body { min-width: 0; display: grid; gap: 12px; align-content: start; padding: 16px; border: 1px solid rgba(127,143,163,.22); border-radius: var(--admin-radius); background: linear-gradient(145deg, rgba(28,34,44,.96), rgba(19,24,32,.94)); box-shadow: inset 0 1px 0 rgba(255,255,255,.03); }
+        .config-delivery-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+        .config-delivery-card-head h3 { margin: 0; color: var(--text-main); font-size: 15px; line-height: 1.25; font-weight: 850; }
+        .config-delivery-card-head p { margin: 3px 0 0; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+        .config-delivery-mode { min-height: 24px; display: inline-flex; align-items: center; padding: 0 9px; border: 1px solid rgba(127,143,163,.2); border-radius: 999px; background: rgba(255,255,255,.035); color: var(--muted); font-size: 10px; font-weight: 850; white-space: nowrap; }
+        .config-delivery-hint { margin: 0; color: var(--muted); font-size: 11.5px; line-height: 1.55; font-weight: 600; }
+        .config-delivery-hint code { padding: 1px 5px; border: 1px solid rgba(127,143,163,.18); border-radius: 5px; background: rgba(0,0,0,.16); color: var(--brand-gold); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 10.5px; }
+        .config-pins-search { display: grid; grid-template-columns: minmax(0, 1fr) max-content; gap: 9px; align-items: center; }
         .config-pins-search .btn { width: auto; justify-self: start; }
         .config-rule-field { min-width: 0; display: grid; gap: 6px; }
         .config-rule-field-label { color: var(--muted); font-size: 10px; line-height: 1.2; font-weight: 850; letter-spacing: .055em; text-transform: uppercase; }
@@ -1879,42 +1876,48 @@
         .config-template-card-actions { display: flex; flex-wrap: wrap; gap: 7px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,.07); align-self: end; }
         .config-template-card-actions .mini-btn { background: rgba(255,255,255,.065); border-color: rgba(255,255,255,.12); }
         .ua-rule-form { display: grid; gap: 10px; }
-        .ua-rule-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 9px; align-items: end; }
-        .ua-rule-active { min-height: 40px; display: inline-flex; align-items: center; gap: 8px; padding: 0 11px; border: 1px solid rgba(127,143,163,.18); border-radius: 9px; background: rgba(255,255,255,.025); color: var(--text-main); font-size: 11px; font-weight: 750; cursor: pointer; white-space: nowrap; }
+        .ua-rule-sentence { display: grid; grid-template-columns: minmax(110px, 1.2fr) auto minmax(80px, .7fr) auto minmax(90px, 1fr) 72px auto; gap: 8px; align-items: center; }
+        .ua-rule-word { color: var(--muted); font-size: 12px; text-align: center; white-space: nowrap; }
+        .ua-rule-word.is-eq { color: var(--brand-gold); font-weight: 800; }
+        .ua-rule-under { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        .ua-rule-active { display: inline-flex; align-items: center; gap: 8px; color: var(--text-main); font-size: 12px; font-weight: 700; cursor: pointer; }
         .ua-rule-active input { width: 16px; height: 16px; flex: 0 0 16px; accent-color: var(--brand-gold); }
-        .ua-rule-form-actions { display: flex; gap: 7px; }
-        .ua-rules-list { display: grid; gap: 8px; margin-top: 2px; }
-        .ua-rule-item { min-width: 0; display: grid; grid-template-columns: minmax(160px, 1.1fr) 24px minmax(190px, 1.1fr) auto auto; gap: 12px; align-items: center; min-height: 62px; padding: 10px 12px; border: 1px solid rgba(127,143,163,.17); border-radius: 10px; background: rgba(255,255,255,.025); transition: border-color .14s, background .14s; }
-        .ua-rule-item:hover { border-color: rgba(var(--accent-rgb), .26); background: rgba(var(--accent-rgb), .025); }
-        .ua-rule-item.inactive { opacity: .58; }
-        .ua-rule-step { min-width: 0; display: grid; gap: 4px; }
-        .ua-rule-step small { color: var(--muted); font-size: 9.5px; line-height: 1.2; font-weight: 850; letter-spacing: .055em; text-transform: uppercase; }
-        .ua-rule-step code { overflow: hidden; color: var(--text-main); font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.35; font-weight: 750; text-overflow: ellipsis; white-space: nowrap; }
+        .ua-rule-clear { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+        .ua-rule-clear:hover { color: var(--text-main); }
+        .ua-rules-list { display: grid; margin-top: 2px; border: 1px solid rgba(127,143,163,.17); border-radius: 10px; overflow: hidden; }
+        .ua-rules-head { display: grid; grid-template-columns: minmax(0, 1.1fr) 22px minmax(0, 1.3fr) 64px 30px; gap: 12px; padding: 8px 12px; background: rgba(255,255,255,.035); color: var(--muted); font-size: 10px; font-weight: 800; }
+        .ua-rules-head .r { text-align: right; }
+        .ua-rule-item { min-width: 0; display: grid; grid-template-columns: minmax(0, 1.1fr) 22px minmax(0, 1.3fr) 64px 30px; gap: 12px; align-items: center; padding: 10px 12px; border-top: 1px solid rgba(127,143,163,.14); cursor: pointer; transition: background .13s; }
+        .ua-rule-item:hover { background: rgba(255,255,255,.03); }
+        .ua-rule-item:focus-visible { outline: 0; box-shadow: inset 0 0 0 2px rgba(255,199,0,.4); }
+        .ua-rule-item.inactive { opacity: .55; }
+        .ua-rule-cond, .ua-rule-out { overflow: hidden; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
+        .ua-rule-cond { color: var(--text-main); font-weight: 750; }
+        .ua-rule-out { color: var(--muted); }
+        .ua-rule-out b { color: var(--green); font-weight: 750; }
         .ua-rule-flow-arrow { color: var(--brand-gold); font-size: 11px; text-align: center; }
-        .ua-rule-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-        .ua-rule-pill { min-height: 24px; display: inline-flex; align-items: center; gap: 5px; padding: 0 8px; border: 1px solid rgba(127,143,163,.18); border-radius: 999px; background: rgba(255,255,255,.03); color: var(--muted); font-size: 9.5px; font-weight: 800; white-space: nowrap; }
-        .ua-rule-pill.is-active { border-color: rgba(var(--green-rgb), .27); background: rgba(var(--green-rgb), .08); color: var(--green); }
-        .ua-rule-actions { display: flex; gap: 6px; justify-content: flex-end; }
-        .ua-rule-actions .mini-btn { width: 32px; min-width: 32px; padding: 0; }
+        .ua-rule-prio-wrap { display: flex; justify-content: flex-end; }
+        .ua-rule-prio { color: var(--muted); font-size: 11.5px; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .ua-rule-actions { display: none; gap: 4px; }
+        .ua-rule-item:hover .ua-rule-prio, .ua-rule-item:focus-within .ua-rule-prio { display: none; }
+        .ua-rule-item:hover .ua-rule-actions, .ua-rule-item:focus-within .ua-rule-actions { display: flex; }
+        .ua-rule-actions .mini-btn { width: 26px; min-width: 26px; height: 26px; min-height: 26px; padding: 0; }
+        .ua-rule-state { width: 8px; height: 8px; border-radius: 50%; background: var(--green); justify-self: center; }
+        .ua-rule-state.is-off { background: var(--muted); }
+        .ua-rules-note { padding: 8px 12px; border-top: 1px solid rgba(127,143,163,.14); color: var(--muted); font-size: 10.5px; font-weight: 600; }
         .ua-rules-empty { padding: 18px; border: 1px dashed rgba(127,143,163,.2); border-radius: 10px; color: var(--muted); font-size: 12px; line-height: 1.5; text-align: center; }
-        html[data-admin-theme="light"] .config-delivery-card,
-        html[data-admin-theme="light"] .config-delivery-body { border-color: rgba(26,31,42,.12); background: rgba(255,255,255,.88); box-shadow: 0 10px 26px rgba(34,39,52,.045); }
-        html[data-admin-theme="light"] .config-delivery-card[aria-expanded="true"],
-        html[data-admin-theme="light"] .config-delivery-intro,
+        html[data-admin-theme="light"] .config-delivery-card,        html[data-admin-theme="light"] .config-delivery-body { border-color: rgba(26,31,42,.12); background: rgba(255,255,255,.88); box-shadow: 0 10px 26px rgba(34,39,52,.045); }
         html[data-admin-theme="light"] .config-pins-user,
         html[data-admin-theme="light"] .config-pins-picker,
-        html[data-admin-theme="light"] .ua-rule-item,
+        html[data-admin-theme="light"] .ua-rules-list,
         html[data-admin-theme="light"] .ua-rule-active { border-color: rgba(26,31,42,.1); background: rgba(26,31,42,.025); }
-        html[data-admin-theme="light"] .config-delivery-intro code { border-color: rgba(26,31,42,.12); background: rgba(26,31,42,.045); }
-        .ua-rule-form-actions { justify-content: flex-start; }
+        html[data-admin-theme="light"] .config-delivery-hint code { border-color: rgba(26,31,42,.12); background: rgba(26,31,42,.045); }
         @media (max-width: 760px) {
             .config-delivery-head,
             .config-library-head { align-items: stretch; flex-direction: column; }
             .config-delivery-grid { grid-template-columns: 1fr; }
-            .config-delivery-card { grid-template-columns: 38px minmax(0, 1fr) 16px; min-height: 74px; padding: 12px; }
-            .config-delivery-icon { width: 38px; height: 38px; }
-            .config-delivery-mode { display: none; }
-            .config-delivery-summary-copy small { white-space: normal; }
+            .ua-rule-sentence { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+            .ua-rule-sentence .ua-rule-word { display: none; }
             .config-delivery-body { padding: 12px; }
             .config-pins-search,
             .ua-rule-form-grid { grid-template-columns: 1fr; }
@@ -2865,7 +2868,14 @@
             .modal-title { font-size: 20px; }
             .modal-body { padding: 14px; }
             .modal-footer { padding: 12px; }
-            .referral-cards { grid-template-columns: 1fr; }
+            .refact-thead { display: none; }
+            .refact-row { grid-template-columns: 24px minmax(0, 1fr) 110px; }
+            .refact-row > :nth-child(3), .refact-row > :nth-child(4), .refact-row > :nth-child(5), .refact-row > .refact-conv { display: none; }
+            .client-ref-tree-head { display: none; }
+            .client-ref-row { grid-template-columns: minmax(0, 1fr) 34px; }
+            .client-ref-col { display: none; }
+            .client-ref-sub { padding-left: 16px; }
+            .client-ref-summary { gap: 14px 24px; }
             #panel-censor-checks .censor-check-form { grid-template-columns: minmax(0, 1fr); }
             #panel-censor-checks .censor-key-form { padding: 12px; }
             #panel-censor-checks .censor-keys-card > summary {
@@ -3255,7 +3265,7 @@
     <link href="{% static 'css/admin_dashboard.css' %}?v=9" rel="stylesheet">
     {% include "includes/yandex_metrika.html" %}
     <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/admin-concept.css' %}?v=9">
+    <link rel="stylesheet" href="{% static 'css/admin-concept.css' %}?v=16">
 </head>
 <body>
     <div class="page-bg"></div>
@@ -3308,6 +3318,7 @@
         data-user-payments-url="{% url 'support_admin_api_user_payments' %}"
         data-user-traffic-url="{% url 'support_admin_api_user_traffic' %}"
         data-referrals-url="{% url 'support_admin_api_referrals' %}"
+        data-referral-activity-url="{% url 'support_admin_api_referral_activity' %}"
         data-payment-info-url="{% url 'support_admin_api_payment_info' %}"
         data-payments-url="{% url 'support_admin_api_payments' %}"
         data-subscription-manage-url="{% url 'support_admin_api_subscription_manage' %}"
@@ -3377,6 +3388,7 @@
                 <button type="button" class="subtab active" data-subtab="overview" role="tab"><i class="fas fa-chart-line"></i>Сквозной анализ</button>
                 <button type="button" class="subtab" data-subtab="cohort" role="tab"><i class="fas fa-users"></i>Когортный анализ</button>
                 <button type="button" class="subtab" data-subtab="promo-cohorts" role="tab"><i class="fas fa-ticket"></i>Когорты промокодов</button>
+                <button type="button" class="subtab" data-subtab="referrals" role="tab"><i class="fas fa-user-plus"></i>Рефералы</button>
             </div>
             <div id="subpanel-overview" class="subtab-panel active">
             <form id="stats-form" class="card form-card form-grid-stats">
@@ -3609,6 +3621,31 @@
                     </div>
                     <div class="promo-cohort-body" id="promo-cohort-body"></div>
                 </section>
+            </div>
+            <div id="subpanel-referrals" class="subtab-panel">
+                <form id="referral-activity-form" class="card form-card referral-activity-form">
+                    <div class="date-field" data-date-picker data-range-max-from='[name="end"]'>
+                        <input type="hidden" name="start">
+                        <button type="button" class="date-trigger" data-date-trigger><span data-date-label>Дата начала</span><i class="fas fa-calendar-days"></i></button>
+                        <div class="date-popover" data-date-popover></div>
+                    </div>
+                    <div class="date-field" data-date-picker data-range-min-from='[name="start"]'>
+                        <input type="hidden" name="end">
+                        <button type="button" class="date-trigger" data-date-trigger><span data-date-label>Дата конца</span><i class="fas fa-calendar-days"></i></button>
+                        <div class="date-popover" data-date-popover></div>
+                    </div>
+                    <button class="btn" type="submit"><i class="fas fa-rotate"></i>Обновить</button>
+                    <div class="date-presets" aria-label="Быстрый выбор периода">
+                        <button class="date-preset" type="button" data-refact-preset="this-week">Эта неделя</button>
+                        <button class="date-preset" type="button" data-refact-preset="this-month">Этот месяц</button>
+                        <button class="date-preset" type="button" data-refact-preset="last-month">Прошлый месяц</button>
+                        <button class="date-preset" type="button" data-refact-preset="7">7 дней</button>
+                        <button class="date-preset" type="button" data-refact-preset="30">30 дней</button>
+                        <button class="date-preset" type="button" data-refact-preset="90">90 дней</button>
+                        <button class="date-preset" type="button" data-refact-preset="history">История</button>
+                    </div>
+                </form>
+                <div id="referral-activity-result"><div class="infra-empty">Выберите период — покажем, кто приглашал рефералов и что они принесли.</div></div>
             </div>
         </section>
         {% endif %}
@@ -5220,95 +5257,52 @@
             <section class="config-delivery-section" aria-labelledby="config-delivery-title">
                 <header class="config-delivery-head">
                     <div class="config-delivery-heading">
-                        <span class="config-delivery-heading-icon"><i class="fas fa-code-branch"></i></span>
                         <div>
                             <h2 id="config-delivery-title">Логика выдачи</h2>
-                            <p>Определите, кому и какой вариант конфига должен достаться</p>
+                            <p>Кому и какой вариант конфига достанется</p>
                         </div>
                     </div>
                 </header>
 
                 <div class="config-delivery-grid">
-                    <button type="button" class="config-delivery-card" data-config-delivery-panel="pins" aria-expanded="false" aria-controls="config-delivery-pins-body">
-                        <span class="config-delivery-icon"><i class="fas fa-user-gear"></i></span>
-                        <span class="config-delivery-summary-copy">
-                            <strong>Персональные конфиги для пользователя</strong>
-                            <small>Закрепить выбранные шаблоны вместо общего round-robin</small>
-                        </span>
-                        <span class="config-delivery-mode">По пользователю</span>
-                        <i class="fas fa-chevron-down config-delivery-chevron"></i>
-                    </button>
-
-                    <button type="button" class="config-delivery-card" data-config-delivery-panel="ua" aria-expanded="false" aria-controls="config-delivery-ua-body">
-                        <span class="config-delivery-icon"><i class="fas fa-fingerprint"></i></span>
-                        <span class="config-delivery-summary-copy">
-                            <strong>Правила User-Agent</strong>
-                            <small>Определить приложение и передать переменную в Jinja-шаблон</small>
-                        </span>
-                        <span class="config-delivery-mode">По приложению</span>
-                        <i class="fas fa-chevron-down config-delivery-chevron"></i>
-                    </button>
-                </div>
-
-                <div class="config-delivery-panels">
-                    <section class="config-delivery-body" id="config-delivery-pins-body" aria-label="Персональные конфиги для пользователя" hidden>
-                        <div class="config-delivery-intro">
-                            <i class="fas fa-arrows-spin"></i>
-                            <div>
-                                <strong>По умолчанию работают все активные шаблоны по кругу</strong>
-                                <p>Найдите пользователя и отметьте только нужные конфиги. Если закреплённые шаблоны станут неактивными, выдача безопасно вернётся к общему round-robin.</p>
-                            </div>
-                        </div>
+                    <section class="config-delivery-body config-delivery-pins" aria-labelledby="config-delivery-pins-title">
+                        <header class="config-delivery-card-head">
+                            <div><h3 id="config-delivery-pins-title">Персональные конфиги</h3><p>вместо общего round-robin</p></div>
+                            <span class="config-delivery-mode">по пользователю</span>
+                        </header>
+                        <p class="config-delivery-hint">По умолчанию все активные шаблоны выдаются по кругу. Отметьте нужные — если закреплённые станут неактивными, выдача безопасно вернётся к round-robin.</p>
                         <form id="config-pins-form" class="config-pins-form config-pins-search">
                             {% csrf_token %}
-                            <label class="config-rule-field">
-                                <span class="config-rule-field-label">Пользователь</span>
-                                <span class="config-rule-input">
-                                    <i class="fas fa-magnifying-glass"></i>
-                                    <input class="input" name="q" placeholder="username, email или telegram_id" autocomplete="off">
-                                </span>
-                            </label>
-                            <button class="btn btn-secondary" type="submit"><i class="fas fa-magnifying-glass"></i>Найти пользователя</button>
+                            <span class="config-rule-input">
+                                <i class="fas fa-magnifying-glass"></i>
+                                <input class="input" name="q" placeholder="username, email или telegram_id" autocomplete="off" aria-label="Пользователь">
+                            </span>
+                            <button class="btn btn-secondary" type="submit">Найти</button>
                         </form>
                         <div id="config-pins-result"></div>
                     </section>
 
-                    <section class="config-delivery-body" id="config-delivery-ua-body" aria-label="Правила User-Agent" hidden>
-                        <div class="config-delivery-intro">
-                            <i class="fas fa-wand-magic-sparkles"></i>
-                            <div>
-                                <strong>Совпадение User-Agent превращается в переменную шаблона</strong>
-                                <p>Например, <code>incy</code> → <code>CLIENT=incy</code>. Правила идут по возрастанию приоритета; для каждой переменной применяется первое совпадение без учёта регистра.</p>
-                            </div>
-                        </div>
+                    <section class="config-delivery-body config-delivery-ua" aria-labelledby="config-delivery-ua-title">
+                        <header class="config-delivery-card-head">
+                            <div><h3 id="config-delivery-ua-title">Правила User-Agent</h3><p>переменная для Jinja-шаблона</p></div>
+                            <span class="config-delivery-mode">по приложению</span>
+                        </header>
+                        <p class="config-delivery-hint">Совпадение в UA превращается в переменную: <code>incy</code> → <code>CLIENT=incy</code>. Первое совпадение по возрастанию приоритета, без учёта регистра.</p>
                         <form id="ua-rule-form" class="ua-rule-form">
                             {% csrf_token %}
                             <input type="hidden" name="rule_id">
-                            <div class="ua-rule-form-grid">
-                                <label class="config-rule-field">
-                                    <span class="config-rule-field-label">Если UA содержит</span>
-                                    <input class="input" name="match_substring" maxlength="160" placeholder="Например, incy" required>
-                                </label>
-                                <label class="config-rule-field">
-                                    <span class="config-rule-field-label">Переменная</span>
-                                    <input class="input" name="variable_name" maxlength="64" placeholder="CLIENT" value="CLIENT">
-                                </label>
-                                <label class="config-rule-field">
-                                    <span class="config-rule-field-label">Значение</span>
-                                    <input class="input" name="value" maxlength="160" placeholder="Например, incy" required>
-                                </label>
-                                <label class="config-rule-field">
-                                    <span class="config-rule-field-label">Приоритет</span>
-                                    <input class="input" name="priority" type="number" step="1" placeholder="100">
-                                </label>
-                                <label class="ua-rule-active">
-                                    <input type="checkbox" name="is_active" checked>
-                                    Активно
-                                </label>
-                                <div class="ua-rule-form-actions">
-                                    <button class="btn" type="submit" data-ua-rule-submit><i class="fas fa-save"></i>Сохранить</button>
-                                    <button class="btn btn-secondary" type="button" id="ua-rule-reset">Очистить</button>
-                                </div>
+                            <div class="ua-rule-sentence">
+                                <input class="input" name="match_substring" maxlength="160" placeholder="если UA содержит…" aria-label="Если UA содержит" required>
+                                <span class="ua-rule-word" aria-hidden="true">→</span>
+                                <input class="input" name="variable_name" maxlength="64" placeholder="CLIENT" value="CLIENT" aria-label="Переменная">
+                                <span class="ua-rule-word is-eq" aria-hidden="true">=</span>
+                                <input class="input" name="value" maxlength="160" placeholder="значение" aria-label="Значение" required>
+                                <input class="input ua-rule-priority" name="priority" type="number" step="1" placeholder="100" aria-label="Приоритет" title="Приоритет: меньший применяется первым">
+                                <button class="btn" type="submit" data-ua-rule-submit><i class="fas fa-save"></i>Сохранить</button>
+                            </div>
+                            <div class="ua-rule-under">
+                                <label class="ua-rule-active"><input type="checkbox" name="is_active" checked>Активно</label>
+                                <button class="ua-rule-clear" type="button" id="ua-rule-reset">Очистить</button>
                             </div>
                         </form>
                         <div id="ua-rules-result"></div>
@@ -5366,10 +5360,6 @@
                             <h3>Парк серверов</h3>
                             <div class="infra-table-heading-actions">
                                 <span id="infra-server-count">Данные обновляются каждые 5 секунд</span>
-                                <div class="infra-view-switch" role="group" aria-label="Вид списка серверов">
-                                    <button type="button" class="active" data-infra-view="cards" aria-pressed="true"><i class="fas fa-grip"></i>Карточки</button>
-                                    <button type="button" data-infra-view="table" aria-pressed="false"><i class="fas fa-table-list"></i>Таблица</button>
-                                </div>
                             </div>
                         </div>
                         <div class="infra-table-wrap"><div id="infra-servers-table"><div class="infra-empty">Загрузка серверов…</div></div></div>
@@ -6207,7 +6197,7 @@
             }
 
             const uaRuleEditButton = event.target.closest('[data-ua-rule-edit]');
-            if (uaRuleEditButton) {
+            if (uaRuleEditButton && !event.target.closest('[data-ua-rule-delete]')) {
                 const rule = uaRulesCache.find((item) => String(item.id) === String(uaRuleEditButton.dataset.uaRuleEdit));
                 fillUaRuleForm(rule);
             }
@@ -6662,25 +6652,21 @@
         }
 
         function uaRuleRow(rule) {
+            // Строка читается как правило: условие -> ПЕРЕМЕННАЯ=значение.
+            // Иконки появляются по hover, клик по строке подставляет в форму
             return `
-                <article class="ua-rule-item ${rule.is_active ? '' : 'inactive'}" data-ua-rule-id="${rule.id}">
-                    <div class="ua-rule-step">
-                        <small>Если UA содержит</small>
-                        <code>${escapeHtml(rule.match_substring)}</code>
-                    </div>
+                <article class="ua-rule-item ${rule.is_active ? '' : 'inactive'}" data-ua-rule-id="${rule.id}" data-ua-rule-edit="${rule.id}" role="button" tabindex="0" title="Редактировать в форме выше">
+                    <code class="ua-rule-cond">${escapeHtml(rule.match_substring)}</code>
                     <i class="fas fa-arrow-right ua-rule-flow-arrow" aria-hidden="true"></i>
-                    <div class="ua-rule-step">
-                        <small>Передать в шаблон</small>
-                        <code>${escapeHtml(rule.variable_name)}=${escapeHtml(rule.value)}</code>
-                    </div>
-                    <div class="ua-rule-meta">
-                        <span class="ua-rule-pill"><i class="fas fa-arrow-down-1-9"></i>${rule.priority}</span>
-                        <span class="ua-rule-pill ${rule.is_active ? 'is-active' : ''}">${rule.is_active ? '<i class="fas fa-circle-check"></i>Активно' : '<i class="fas fa-circle-pause"></i>Выключено'}</span>
-                    </div>
-                    <div class="ua-rule-actions">
-                        <button type="button" class="mini-btn" data-ua-rule-edit="${rule.id}" aria-label="Редактировать правило" title="Редактировать"><i class="fas fa-pen"></i></button>
-                        <button type="button" class="mini-btn danger" data-ua-rule-delete="${rule.id}" aria-label="Удалить правило" title="Удалить"><i class="fas fa-trash"></i></button>
-                    </div>
+                    <code class="ua-rule-out">${escapeHtml(rule.variable_name)}=<b>${escapeHtml(rule.value)}</b></code>
+                    <span class="ua-rule-prio-wrap">
+                        <span class="ua-rule-prio" title="Приоритет">${rule.priority}</span>
+                        <span class="ua-rule-actions">
+                            <button type="button" class="mini-btn" data-ua-rule-edit="${rule.id}" aria-label="Редактировать правило" title="Редактировать"><i class="fas fa-pen"></i></button>
+                            <button type="button" class="mini-btn danger" data-ua-rule-delete="${rule.id}" aria-label="Удалить правило" title="Удалить"><i class="fas fa-trash"></i></button>
+                        </span>
+                    </span>
+                    <span class="ua-rule-state ${rule.is_active ? '' : 'is-off'}" title="${rule.is_active ? 'Активно' : 'Выключено'}"></span>
                 </article>
             `;
         }
@@ -6700,7 +6686,11 @@
             const payload = await response.json();
             uaRulesCache = payload.rules || [];
             target.innerHTML = uaRulesCache.length
-                ? `<div class="ua-rules-list">${uaRulesCache.map(uaRuleRow).join('')}</div>`
+                ? `<div class="ua-rules-list">
+                        <div class="ua-rules-head" aria-hidden="true"><span>Если UA содержит</span><span></span><span>В шаблон уйдёт</span><span class="r">Приор.</span><span></span></div>
+                        ${uaRulesCache.map(uaRuleRow).join('')}
+                        <div class="ua-rules-note">Правил: ${uaRulesCache.length} · клик по строке подставляет правило в форму</div>
+                    </div>`
                 : '<div class="ua-rules-empty"><i class="fas fa-fingerprint"></i> Правил пока нет. Добавьте первое соответствие User-Agent и переменной шаблона.</div>';
         }
 
@@ -7717,6 +7707,125 @@
             if (container) container.innerHTML = renderSourcesSection(lastStatsResult);
         }
 
+        function renderReferralActivity(result) {
+            // Утверждённый концепт «Топ рефереров периода» (10.09.2026)
+            const rows = result.rows || [];
+            const totals = result.totals || {};
+            const period = result.period || {};
+            const fmtNum = (value) => Number(value || 0).toLocaleString('ru-RU');
+            const fmtMoney = (value) => `${Number(value || 0).toLocaleString('ru-RU')} ₽`;
+            const periodLabel = [period.start, period.end]
+                .filter(Boolean)
+                .map((value) => displayDate(value) || value)
+                .join(' — ');
+            const avg = totals.referrers ? totals.referrals / totals.referrers : 0;
+            const head = `
+                <header class="refact-head">
+                    <h3>Топ рефереров</h3>
+                    <span class="refact-period">${escapeHtml(periodLabel)}${totals.referrals ? ` · <span class="refact-pill"><i class="fas fa-user-plus"></i>+${fmtNum(totals.referrals)} рефералов</span>` : ''}</span>
+                </header>
+                <p class="refact-sub">Считаются приглашённые, зарегистрировавшиеся <b>в выбранном периоде</b>. Выручка — успешные платежи этих рефералов за период; кликом по рефереру открывается его карточка с деревом приглашений.</p>`;
+            if (!rows.length) {
+                return `<section class="card refact-card">${head}<div class="infra-empty">За период приглашённых рефералов нет.</div></section>`;
+            }
+            const LIMIT = 10;
+            const rowsHtml = rows.map((row, index) => {
+                const conv = row.invited ? 100 * row.paid_users / row.invited : 0;
+                const convLabel = !row.paid_users ? '0%' : conv >= 1 ? `${Math.round(conv)}%` : `${conv.toFixed(1).replace('.', ',')}%`;
+                const connectedRate = row.invited ? Math.round(100 * row.connected / row.invited) : 0;
+                const label = row.user.username ? '@' + row.user.username : 'ID ' + row.user.id;
+                const contact = row.user.email || (row.user.telegram_id ? `tg ${row.user.telegram_id}` : 'контакты не указаны');
+                return `
+                    <div class="refact-row ${index >= LIMIT ? 'is-extra' : ''}" role="button" tabindex="0" data-refact-user="${escapeHtml(row.user.username || '')}" title="Открыть карточку клиента">
+                        <span class="refact-rank ${index < 3 ? 'is-top' : ''}">${index + 1}</span>
+                        <div class="refact-who"><b>${escapeHtml(label)}</b><span>${escapeHtml(contact)} · всего пригласил ${fmtNum(row.lifetime_invited)}</span></div>
+                        <div class="refact-cell">${fmtNum(row.invited)}</div>
+                        <div class="refact-cell">${fmtNum(row.connected)}<small>${connectedRate}%</small></div>
+                        <div class="refact-cell ${row.paid_users ? '' : 'is-zero'}">${fmtNum(row.paid_users)}</div>
+                        <div class="refact-conv"><span class="refact-bar"><i style="width:${Math.min(100, conv)}%"></i></span><b>${convLabel}</b></div>
+                        <div class="refact-money ${row.revenue ? '' : 'is-zero'}">${fmtMoney(row.revenue)}<small>+${fmtNum(row.bonus_days)} дн бонусов</small></div>
+                    </div>`;
+            }).join('');
+            return `
+                <section class="card refact-card">
+                    ${head}
+                    <div class="refact-lead">
+                        <div class="refact-lead-item"><b>${fmtNum(totals.referrers)}</b><span>рефереров активны</span></div>
+                        <div class="refact-lead-item"><b>${avg.toLocaleString('ru-RU', {minimumFractionDigits: 1, maximumFractionDigits: 1})}</b><span>рефералов на реферера</span></div>
+                        <div class="refact-lead-item is-green"><b>${fmtMoney(totals.revenue)}</b><span>выручка с рефералов периода</span></div>
+                        <div class="refact-lead-item is-gold"><b>${fmtNum(totals.bonus_days)}</b><span>бонусных дней начислено</span></div>
+                    </div>
+                    <div class="refact-tbl">
+                        <div class="refact-thead" aria-hidden="true"><span></span><span>Реферер</span><span class="r">Пригласил</span><span class="r">Подключились</span><span class="r">Оплатили</span><span>Конверсия в оплату</span><span class="r">Выручка</span></div>
+                        ${rowsHtml}
+                        <div class="refact-foot">
+                            <span>Показаны <span data-refact-shown>${fmtNum(Math.min(LIMIT, rows.length))}</span> из ${fmtNum(totals.referrers)} рефереров · сортировка по приглашённым${result.truncated ? ' · показаны первые 500' : ''}</span>
+                            ${rows.length > LIMIT ? `<button type="button" class="refact-more" data-refact-show-all>Показать всех <i class="fas fa-arrow-right"></i></button>` : ''}
+                        </div>
+                    </div>
+                </section>`;
+        }
+
+        let refActivityLoaded = false;
+
+        async function loadReferralActivity(event) {
+            if (event) event.preventDefault();
+            const target = document.getElementById('referral-activity-result');
+            const form = document.getElementById('referral-activity-form');
+            if (!target || !form) return;
+            refActivityLoaded = true;
+            setLoading(target);
+            const params = new URLSearchParams(new FormData(form));
+            const response = await fetch(`${main.dataset.referralActivityUrl}?${params}`, {headers: {'X-Requested-With': 'XMLHttpRequest'}});
+            if (!response.ok) return setError(target, 'Не удалось собрать реферальную активность');
+            const payload = await response.json();
+            if (payload.status !== 'ok') return setError(target, payload.message || 'Не удалось собрать реферальную активность');
+            target.classList.remove('show-all');
+            target.innerHTML = renderReferralActivity(payload.result);
+        }
+
+        function setRefActivityRange(startDate, endDate, activePreset = '') {
+            const form = document.getElementById('referral-activity-form');
+            if (!form) return;
+            setDateFieldValue(form.querySelector('[name="start"]').closest('[data-date-picker]'), isoFromLocalDate(startDate));
+            setDateFieldValue(form.querySelector('[name="end"]').closest('[data-date-picker]'), isoFromLocalDate(endDate));
+            form.querySelectorAll('[data-refact-preset]').forEach((button) => {
+                button.classList.toggle('active', button.dataset.refactPreset === activePreset);
+            });
+        }
+
+        function applyRefActivityPreset(preset) {
+            // Та же математика, что в applyStatsPreset — но своя форма
+            const todayDate = new Date();
+            const todayOnly = new Date(todayDate.getFullYear(), todayDate.getMonth(), todayDate.getDate());
+            let startDate = todayOnly;
+            let endDate = todayOnly;
+            if (preset === 'this-week') startDate = startOfIsoWeek(todayOnly);
+            else if (preset === 'this-month') startDate = new Date(todayOnly.getFullYear(), todayOnly.getMonth(), 1);
+            else if (preset === 'last-month') {
+                startDate = new Date(todayOnly.getFullYear(), todayOnly.getMonth() - 1, 1);
+                endDate = new Date(todayOnly.getFullYear(), todayOnly.getMonth(), 0);
+            } else if (preset === 'history') startDate = new Date(2020, 0, 1);
+            else if (/^\d+$/.test(preset)) startDate = addDays(todayOnly, -(Number(preset) - 1));
+            setRefActivityRange(startDate, endDate, preset);
+            loadReferralActivity();
+        }
+
+        function openReferralActivityFromStats() {
+            // «Подробнее» из «Итогов периода»: вкладка открывается на датах отчёта
+            const statsForm = document.getElementById('stats-form');
+            const form = document.getElementById('referral-activity-form');
+            if (statsForm && form) {
+                const start = statsForm.querySelector('[name="start"]')?.value;
+                const end = statsForm.querySelector('[name="end"]')?.value;
+                if (start) setDateFieldValue(form.querySelector('[name="start"]').closest('[data-date-picker]'), start);
+                if (end) setDateFieldValue(form.querySelector('[name="end"]').closest('[data-date-picker]'), end);
+                form.querySelectorAll('[data-refact-preset]').forEach((button) => button.classList.remove('active'));
+            }
+            showSubtab('panel-stats', 'referrals');
+            loadReferralActivity();
+        }
+
         async function loadStats(event) {
             if (event) event.preventDefault();
             const target = document.getElementById('stats-result');
@@ -7784,6 +7893,7 @@
                                 <div><h3>Итоги периода</h3><p>Конверсия и реферальная воронка</p></div>
                             </div>
                             <span class="analytics-insight-total"><i class="fas fa-user-plus"></i> ${num(referrals)} рефералов</span>
+                            <button type="button" class="btn btn-secondary analytics-referrers-more" data-open-referral-activity title="Кто пригласил рефералов за этот период и сколько денег они принесли">Подробнее <i class="fas fa-arrow-right"></i></button>
                         </header>
                         <div class="analytics-conversions">
                             <div class="analytics-conversion-card">
@@ -8175,6 +8285,15 @@
                 </section>`;
         }
 
+        function referralBonusTypeLabel(type) {
+            // Типы начислений в БД англоязычные (REGISTRATION/TRAFFIC/PURCHASE)
+            return ({
+                REGISTRATION: 'регистрация',
+                TRAFFIC: 'трафик',
+                PURCHASE: 'оплата',
+            })[type] || String(type || '').toLowerCase();
+        }
+
         function clientReferralControlHtml(refResult) {
             if (!refResult) return '';
             const block = refResult?.referral_block || {};
@@ -8189,16 +8308,18 @@
                         <button class="btn btn-danger client-action-button" type="button" data-client-referral-block-action="block">Заблокировать</button>
                     `)
                 : '';
+            // Строка статуса вместо баннера (концепт «Дерево», 10.09.2026):
+            // точка-состояние, заголовок и причина с датой — одной строкой;
+            // дерево ниже не перекрашивается, история остаётся читаемой
+            const meta = isBlocked
+                ? [block.reason, updatedAt].filter(Boolean).map((part) => escapeHtml(part)).join(' · ')
+                : 'за приглашённых пользователей';
             return `
                 <section class="card client-referral-manage-card client-detail-ref-strip ${isBlocked ? 'is-blocked' : ''}">
-                    <div class="client-referral-manage-copy">
-                        <div class="client-ref-control-title-row">
-                            <strong class="client-referral-manage-title">Реферальные бонусы ·</strong>
-                            <span class="client-ref-status ${isBlocked ? 'is-blocked' : 'is-active'}">${isBlocked ? 'Заблокированы' : 'Доступны'}</span>
-                        </div>
-                        <div class="client-referral-manage-desc">${isBlocked ? 'Новые бонусы за приглашённых пользователей не начисляются.' : 'Клиент может получать новые бонусы за приглашённых пользователей.'}</div>
-                        ${block.reason ? `<div class="client-ref-control-meta"><strong>Причина:</strong> ${escapeHtml(block.reason)}</div>` : ''}
-                        ${updatedAt ? `<div class="client-ref-control-meta"><strong>Обновлено:</strong> ${escapeHtml(updatedAt)}</div>` : ''}
+                    <div class="client-ref-state">
+                        <span class="client-ref-dot" aria-hidden="true"></span>
+                        <strong class="client-referral-manage-title">${isBlocked ? 'Бонусы заблокированы' : 'Бонусы начисляются'}</strong>
+                        <span class="client-referral-manage-desc">${meta}</span>
                     </div>
                     ${actionsHtml ? `<div class="client-ref-control-actions">${actionsHtml}</div>` : ''}
                 </section>
@@ -8208,53 +8329,84 @@
         function clientReferralsSectionHtml(refResult) {
             if (!refResult) return '<div class="card info-card muted">Данные по рефералам недоступны.</div>';
             const referrals = refResult.referrals || [];
+            const summary = refResult.summary || {};
+            const fmt = (value) => Number(value || 0).toLocaleString('ru-RU');
             const controlHtml = clientReferralControlHtml(refResult);
+            const paidShare = summary.referrals && summary.paid_referrals
+                ? Math.round(100 * summary.paid_referrals / summary.referrals)
+                : 0;
             const metricsHtml = `
-                <div class="metrics-grid three client-detail-metrics">
-                    ${metric('Рефералов', refResult.summary.referrals, 'fa-user-plus')}
-                    ${metric('Оплатили', refResult.summary.paid_referrals, 'fa-coins')}
-                    ${metric('Бонусных дней', refResult.summary.bonus_days, 'fa-gift')}
+                <div class="client-ref-summary" aria-label="Сводка по рефералам">
+                    <div class="client-ref-sum"><b>${fmt(summary.referrals)}</b><span>рефералов</span></div>
+                    <div class="client-ref-sum"><b>${fmt(summary.paid_referrals)}${paidShare ? `<small>${paidShare}%</small>` : ''}</b><span>оплатили</span></div>
+                    <div class="client-ref-sum is-gold"><b>${fmt(summary.bonus_days)}</b><span>бонусных дней начислено</span></div>
                 </div>`;
             if (!referrals.length) {
-                return `${controlHtml}${metricsHtml}<section class="card client-detail-panel client-referral-empty"><h2>Приглашённые пользователи</h2><p class="client-detail-note">У клиента пока нет приглашённых рефералов.</p></section>`;
+                return `${controlHtml}${metricsHtml}<section class="card client-detail-panel client-referral-empty"><h2>Приглашённые пользователи</h2><p class="client-detail-note">Клиент пока никого не пригласил.</p></section>`;
             }
+            // Подписи второго уровня берём из графа: рёбра «реферал -> его дети»
+            const nodeById = new Map((refResult.graph?.nodes || []).map((node) => [node.id, node]));
+            const childrenById = new Map();
+            (refResult.graph?.edges || []).forEach((edge) => {
+                if (!childrenById.has(edge.from)) childrenById.set(edge.from, []);
+                childrenById.get(edge.from).push(edge.to);
+            });
+            const rootUser = refResult.user || {};
+            const rootLabel = rootUser.username
+                ? '@' + rootUser.username
+                : 'ID ' + (rootUser.telegram_id || rootUser.id || '—');
+            const secondLevelTotal = referrals.reduce((acc, row) => acc + Number(row.children_count || 0), 0);
+            const rows = referrals.map((row, index) => {
+                const branch = index === referrals.length - 1 ? '└' : '├';
+                const label = row.user.username ? '@' + row.user.username : 'ID ' + (row.user.telegram_id || row.user.id);
+                const sub = row.user.email || row.user.telegram_id || 'Контакты не указаны';
+                const bonuses = row.bonuses || [];
+                const childLabels = (childrenById.get(row.user.id) || [])
+                    .map((childId) => nodeById.get(childId)?.label)
+                    .filter(Boolean);
+                return `
+                    <div class="client-ref-row" role="button" tabindex="0" aria-expanded="false" data-client-ref-row>
+                        <div class="client-ref-who">
+                            <span class="client-ref-branch" aria-hidden="true">${branch}</span>
+                            <div class="client-ref-id"><b>${escapeHtml(label)}</b><span>${escapeHtml(String(sub))}</span></div>
+                            <span class="client-ref-pill ${row.paid ? 'is-paid' : ''}">${row.paid ? 'Платил' : 'Без оплат'}</span>
+                        </div>
+                        <div class="client-ref-col ${row.bonus_days ? '' : 'is-zero'}">${fmt(row.bonus_days)}</div>
+                        <div class="client-ref-col ${row.payments_count ? 'is-green' : 'is-zero'}">${fmt(row.payments_count)}</div>
+                        <div class="client-ref-col ${row.children_count ? '' : 'is-zero'}">${fmt(row.children_count)}</div>
+                        <div class="client-ref-chev" aria-hidden="true"><i class="fas fa-chevron-down"></i></div>
+                    </div>
+                    <div class="client-ref-sub">
+                        <div class="client-ref-sub-inner">
+                            ${bonuses.length
+                                ? `<div class="client-ref-bonus-chips">${bonuses.map((bonus) => `<span class="client-ref-bonus-chip"><b>+${fmt(bonus.days)} дн</b>${escapeHtml(referralBonusTypeLabel(bonus.type))}<time>${escapeHtml(bonus.created_at)}</time></span>`).join('')}</div>`
+                                : '<div class="client-ref-none">Бонусов по этому рефералу нет.</div>'}
+                            ${childLabels.length ? `<div class="client-ref-l2">Пригласил(а): ${childLabels.map((childLabel) => `<span class="client-ref-l2-chip" title="${escapeHtml(childLabel)}">${escapeHtml(childLabel)}</span>`).join('')}</div>` : ''}
+                        </div>
+                    </div>`;
+            }).join('');
             return `
                 ${controlHtml}
                 ${metricsHtml}
-                <section class="card info-card"><h3 class="info-title">Граф приглашений</h3><div id="referral-graph"></div></section>
-                <section class="referral-cards">
-                    ${referrals.map((row) => `
-                        <article class="card referral-card">
-                            <div class="referral-card-head">
-                                <div>
-                                    <div class="referral-name">${escapeHtml(row.user.username ? '@' + row.user.username : 'ID ' + (row.user.telegram_id || row.user.id))}</div>
-                                    <div class="referral-sub">${escapeHtml(row.user.email || row.user.telegram_id || 'Контакты не указаны')}</div>
-                                </div>
-                                <div class="referral-pill ${row.paid ? 'paid' : ''}">${row.paid ? 'Платил' : 'Без оплат'}</div>
+                <section class="card client-detail-panel client-ref-tree-card">
+                    <div class="client-ref-tree">
+                        <div class="client-ref-tree-head" aria-hidden="true"><span>Приглашения</span><span class="r">Бонусные дни</span><span class="r">Платежи</span><span class="r">2-й уровень</span><span></span></div>
+                        <div class="client-ref-row is-root">
+                            <div class="client-ref-who">
+                                <div class="client-ref-id"><b>${escapeHtml(rootLabel)}</b><span>реферер · этот клиент</span></div>
+                                <span class="client-ref-pill">${fmt(referrals.length)} прямых</span>
                             </div>
-                            <div class="referral-detail-grid">
-                                <div class="referral-detail">
-                                    <div class="referral-detail-label">Бонусные дни</div>
-                                    <div class="referral-detail-value">${row.bonus_days}</div>
-                                </div>
-                                <div class="referral-detail">
-                                    <div class="referral-detail-label">Платежи</div>
-                                    <div class="referral-detail-value ${row.paid ? 'green' : ''}">${row.payments_count}</div>
-                                </div>
-                                <div class="referral-detail">
-                                    <div class="referral-detail-label">Второй уровень</div>
-                                    <div class="referral-detail-value">${row.children_count}</div>
-                                </div>
-                            </div>
-                            <div class="referral-bonuses">
-                                ${(row.bonuses || []).map((bonus) => `${escapeHtml(bonus.created_at)} · ${escapeHtml(bonus.type)} · +${bonus.days} дн.`).join('<br>') || 'Бонусов по этому рефералу нет.'}
-                            </div>
-                        </article>
-                    `).join('')}
+                            <div class="client-ref-col">${fmt(summary.bonus_days)}</div>
+                            <div class="client-ref-col is-zero">—</div>
+                            <div class="client-ref-col ${secondLevelTotal ? '' : 'is-zero'}">${fmt(secondLevelTotal)}</div>
+                            <div></div>
+                        </div>
+                        ${rows}
+                    </div>
                 </section>`;
         }
 
-        // ---------- Быстрая карточка подписки из «Трафика нод» ----------
+        // ---------- Быстрая карточка подписки из «Трафика нод» ----------        // ---------- Быстрая карточка подписки из «Трафика нод» ----------
 
         function closeNodeTrafficUserModal() {
             const modal = document.getElementById('node-traffic-user-modal');
@@ -8785,9 +8937,18 @@
             if (section === 'timeline') loadClientTimeline();
             if (section === 'rwmssync') loadClientRwmsSync();
             if (section === 'message') loadClientDirectMessages();
-            if (refPayload?.result?.graph) {
-                drawReferralGraph(document.getElementById('referral-graph'), refPayload.result.graph);
-            }
+            // Дерево приглашений: клик/Enter по строке раскрывает журнал
+            // начислений и второй уровень
+            document.querySelectorAll('#panel-user-payments [data-client-ref-row]').forEach((row) => {
+                const toggleRow = () => {
+                    const open = row.classList.toggle('is-open');
+                    row.setAttribute('aria-expanded', open ? 'true' : 'false');
+                };
+                row.addEventListener('click', toggleRow);
+                row.addEventListener('keydown', (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleRow(); }
+                });
+            });
         }
 
         function showClientSection(sectionName) {
@@ -10553,56 +10714,6 @@
             target.innerHTML = paymentJournalRowsHtml(payments, {showUser: true, context: 'all'});
             if (summaryState) summaryState.innerHTML = paymentJournalSummaryHtml(payments);
             if (count) count.innerHTML = `Показано операций: <strong>${payments.length}</strong>`;
-        }
-
-        function drawReferralGraph(container, graph) {
-            if (!container) return;
-            const nodes = graph.nodes || [];
-            const edges = graph.edges || [];
-            if (!nodes.length) {
-                container.innerHTML = '<div class="muted">Нет данных для графа.</div>';
-                return;
-            }
-            const nodeById = new Map(nodes.map((node) => [node.id, node]));
-            const childrenById = new Map();
-            edges.forEach((edge) => {
-                if (!childrenById.has(edge.from)) childrenById.set(edge.from, []);
-                childrenById.get(edge.from).push(edge.to);
-            });
-            const root = nodes.find((node) => node.root) || nodes[0];
-            const firstLevelIds = (childrenById.get(root.id) || []).filter((childId) => nodeById.has(childId));
-            const renderFirstLevel = (nodeId) => {
-                const node = nodeById.get(nodeId);
-                const childIds = (childrenById.get(nodeId) || []).filter((childId) => nodeById.has(childId));
-                return `
-                    <article class="referral-map-card ${childIds.length ? 'has-children' : ''}">
-                        <div class="graph-label" title="${escapeHtml(node.label)}">${escapeHtml(node.label)}</div>
-                        <div class="graph-meta">1 уровень${childIds.length ? ` · ${childIds.length} приглаш.` : ''}</div>
-                        ${childIds.length ? `
-                            <div class="graph-child-list">
-                                ${childIds.map((childId) => {
-                                    const child = nodeById.get(childId);
-                                    return `<span class="graph-child-chip" title="${escapeHtml(child.label)}">${escapeHtml(child.label)}</span>`;
-                                }).join('')}
-                            </div>
-                        ` : ''}
-                    </article>
-                `;
-            };
-            container.innerHTML = `
-                <div class="referral-graph">
-                    <div class="referral-root-card">
-                        <div class="min-w-0">
-                            <div class="graph-label root" title="${escapeHtml(root.label)}">${escapeHtml(root.label)}</div>
-                            <div class="graph-meta">Реферер</div>
-                        </div>
-                        <div class="graph-count">${firstLevelIds.length} прямых</div>
-                    </div>
-                    <div class="referral-map-grid">
-                        ${firstLevelIds.map(renderFirstLevel).join('') || '<div class="muted">Прямых рефералов нет.</div>'}
-                    </div>
-                </div>
-            `;
         }
 
         function settingInputType(setting) {
@@ -12943,6 +13054,15 @@
             if (ntUserButton) openNodeTrafficUserModal(ntUserButton.dataset.nodeTrafficUser);
             const ntUserOpenCard = event.target.closest('[data-nt-user-open-card]');
             if (ntUserOpenCard) openClientCardFromNodeTraffic(ntUserOpenCard.dataset.ntUserOpenCard);
+            if (event.target.closest('[data-open-referral-activity]')) openReferralActivityFromStats();
+            const refactRow = event.target.closest('[data-refact-user]');
+            if (refactRow && refactRow.dataset.refactUser) openClientCardFromNodeTraffic(refactRow.dataset.refactUser);
+            if (event.target.closest('[data-refact-show-all]')) {
+                const box = document.getElementById('referral-activity-result');
+                box?.classList.add('show-all');
+                const shown = box?.querySelector('[data-refact-shown]');
+                if (shown) shown.textContent = String(box.querySelectorAll('.refact-row').length.toLocaleString('ru-RU'));
+            }
             if (event.target.closest('[data-nt-user-modal-close]')) closeNodeTrafficUserModal();
             if (event.target === document.getElementById('node-traffic-user-modal')) closeNodeTrafficUserModal();
             const clientSubActionButton = event.target.closest('[data-client-sub-action]');
@@ -12990,17 +13110,6 @@
         if (referralAntifraudForm) referralAntifraudForm.addEventListener('submit', submitReferralAntifraud);
         if (replyTemplateForm) replyTemplateForm.addEventListener('submit', submitReplyTemplate);
         if (configTemplateForm) configTemplateForm.addEventListener('submit', submitConfigTemplate);
-        function toggleConfigDeliveryPanel(button) {
-            const panelId = button.getAttribute('aria-controls');
-            const panel = panelId ? document.getElementById(panelId) : null;
-            if (!panel) return;
-            const shouldOpen = button.getAttribute('aria-expanded') !== 'true';
-            button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
-            panel.hidden = !shouldOpen;
-        }
-        document.querySelectorAll('[data-config-delivery-panel][aria-controls]').forEach((button) => {
-            button.addEventListener('click', () => toggleConfigDeliveryPanel(button));
-        });
         document.getElementById('node-traffic-form')?.addEventListener('submit', loadNodeTraffic);
         document.getElementById('censor-check-form')?.addEventListener('submit', submitCensorCheck);
         document.getElementById('censor-check-reset')?.addEventListener('click', resetCensorCheckForm);
@@ -13046,11 +13155,6 @@
         let infraLoadThreshold = 85;
         let infraPreviewRequestSeq = 0;
         const infraPreviewCache = new Map();
-        const INFRA_SERVERS_VIEW_STORAGE_KEY = 'monkey_island_infra_servers_view_v1';
-        let infraServersView = 'cards';
-        try {
-            if (localStorage.getItem(INFRA_SERVERS_VIEW_STORAGE_KEY) === 'table') infraServersView = 'table';
-        } catch (error) { /* localStorage может быть запрещён политикой браузера */ }
 
         function infraServersActive() {
             return activeAdminTab === 'infrastructure' && activeInfraSubtab() === 'inf-servers';
@@ -13134,31 +13238,9 @@
             document.getElementById('infra-settings-open')?.focus();
         }
 
-        function syncInfraServersViewControls() {
-            document.querySelectorAll('[data-infra-view]').forEach((button) => {
-                const active = button.dataset.infraView === infraServersView;
-                button.classList.toggle('active', active);
-                button.setAttribute('aria-pressed', active ? 'true' : 'false');
-            });
-        }
-
-        function setInfraServersView(view, persist = true) {
-            const nextView = view === 'table' ? 'table' : 'cards';
-            infraServersView = nextView;
-            if (persist) {
-                try { localStorage.setItem(INFRA_SERVERS_VIEW_STORAGE_KEY, nextView); } catch (error) { /* noop */ }
-            }
-            syncInfraServersViewControls();
-            renderInfraServers(infraServersResult);
-        }
-
         function initInfraServersTab() {
             if (!infraServersInited) {
                 infraServersInited = true;
-                syncInfraServersViewControls();
-                document.querySelectorAll('[data-infra-view]').forEach((button) => {
-                    button.addEventListener('click', () => setInfraServersView(button.dataset.infraView));
-                });
                 document.getElementById('infra-show-archived')?.addEventListener('change', () => {
                     infraSelectedServerId = null;
                     infraPreviewCache.clear();
@@ -13277,9 +13359,6 @@
         }
 
         function infraServerPresentation(server) {
-            const status = server.online
-                ? '<span class="infra-badge infra-badge-online">Онлайн</span>'
-                : '<span class="infra-badge infra-badge-offline">Оффлайн</span>';
             const flags = [
                 server.xray_down ? '<span class="infra-badge infra-badge-offline" title="Процесс rw-core не найден или в crash-loop: клиенты не обслуживаются, детектор аномалий приостановлен">XRAY DOWN</span>' : '',
                 server.checking ? '<span class="infra-badge infra-badge-warn" title="Идёт проверка ТСПУ по аномалии">ТСПУ</span>' : '',
@@ -13293,7 +13372,10 @@
             const utilValue = util !== null && util !== undefined ? Math.max(0, Math.min(100, util)) : 0;
             const utilTone = utilValue >= 95 ? 'crit' : utilValue >= infraLoadThreshold ? 'warn' : '';
             const ips = server.ips || {};
-            const ipsLabel = `${ips.active || 0}${ips.reserve ? ` +${ips.reserve} рез` : ''}${ips.blocked ? ` / ${ips.blocked} блок` : ''}`;
+            // Компактно, как в утверждённом макете: «2+1р», «2/1б»;
+            // полная расшифровка — в title у плитки
+            const ipsLabel = `${ips.active || 0}${ips.reserve ? `+${ips.reserve}р` : ''}${ips.blocked ? `/${ips.blocked}б` : ''}`;
+            const ipsTitle = `Активных адресов: ${ips.active || 0}` + (ips.reserve ? `, резервных: ${ips.reserve}` : '') + (ips.blocked ? `, заблокированных: ${ips.blocked}` : '');
             const domains = server.domains || [];
             const domainsLabel = domains.length
                 ? escapeHtml(domains[0]) + (domains.length > 1 ? ` +${domains.length - 1}` : '')
@@ -13303,96 +13385,66 @@
             const limitLabel = server.effective_limit_mbps
                 ? `${server.effective_limit_mbps} M`
                 : server.detected_link_speed_mbps ? `линк ${server.detected_link_speed_mbps} M` : 'не задан';
+            // Плитке хватает полосы и одной подписи «18% · 1000 M»
             const loadHtml = util !== null && util !== undefined
-                ? `<div class="infra-load-value"><span>Загрузка канала</span><b>${util.toFixed(0)}%</b></div><div class="infra-load-track"><div class="infra-load-fill ${utilTone}" style="width:${utilValue}%"></div></div>`
+                ? `<div class="infra-load-track"><div class="infra-load-fill ${utilTone}" style="width:${utilValue}%"></div></div><b>${util.toFixed(0)}% · ${escapeHtml(limitLabel)}</b>`
                 : server.online && !server.effective_limit_mbps
                     ? `<button type="button" class="infra-set-limit" data-infra-open-detail="${server.id}" title="Лимит канала не задан — проценты загрузки не считаются. Открыть параметры сервера">${server.detected_link_speed_mbps ? 'линк ' + server.detected_link_speed_mbps + ' M · задать лимит' : 'задать лимит канала'}</button>`
-                    : '<div class="infra-load-value"><span>Загрузка канала</span><b>—</b></div>';
-            return {status, flags, util, utilTone, utilValue, ipsLabel, domains, domainsLabel, tcpLabel, limitLabel, loadHtml};
+                    : `<div class="infra-load-track"></div><b>— · ${escapeHtml(limitLabel)}</b>`;
+            return {flags, util, utilTone, utilValue, ipsLabel, ipsTitle, domains, domainsLabel, tcpLabel, limitLabel, loadHtml};
         }
 
         function renderInfraServerCards(servers) {
+            // Компактная плитка (утверждённый концепт, 10.09.2026): шапка со
+            // страной, точкой статуса, именем и hostname; чипы только там, где
+            // есть что сказать; скорость одной строкой; полоса загрузки с
+            // подписью «% · лимит»; нижняя строка TCP · IP · домены · пульс.
+            // Кликабельна вся плитка, меню — кнопка ⋮ в шапке.
             const cards = servers.map((server) => {
                 const view = infraServerPresentation(server);
-                const cardTone = !server.online ? ' is-offline' : infraServerNeedsAttention(server) ? ' needs-attention' : '';
+                const attention = infraServerNeedsAttention(server);
+                const cardTone = !server.online ? ' is-offline' : attention ? ' needs-attention' : '';
+                const dotTone = !server.online ? ' is-off' : attention ? ' is-warn' : '';
                 const name = escapeHtml(server.name);
                 const host = escapeHtml(server.hostname || server.node_name || 'hostname не передан');
-                const heartbeat = infraFmtAge(server.last_seen_age);
+                const heartbeat = infraFmtAge(server.last_seen_age).replace(' назад', '');
+                // Юнит скорости не повторяем: «↓ 183 Mbit/s ↑ 183», как в макете
+                const rxLabel = server.online ? infraFmtBps(server.rx_bps) : '—';
+                const txFull = server.online ? infraFmtBps(server.tx_bps) : '—';
+                const rxUnit = rxLabel.replace(/^[\d\s.,]+/, '');
+                const txLabel = rxUnit && txFull.endsWith(rxUnit) && txFull !== rxUnit
+                    ? txFull.slice(0, -rxUnit.length).trim()
+                    : txFull;
+                const flagsRow = [
+                    server.online ? '' : '<span class="infra-badge infra-badge-offline">Оффлайн</span>',
+                    view.flags,
+                ].filter(Boolean).join(' ');
                 return `
                     <article class="infra-server-card${cardTone}" data-infra-server="${server.id}" role="button" tabindex="0" aria-label="Открыть сервер ${name}">
                         <header class="infra-server-card-head">
-                            <div class="infra-server-card-identity">
-                                ${server.country_code ? `<span class="infra-server-card-country" role="img" aria-label="Страна: ${escapeHtml(server.country_code)}">${infraCountryFlag(server.country_code)}</span>` : '<span class="infra-server-icon"><i class="fas fa-server"></i></span>'}
-                                <div class="infra-server-card-copy">
-                                    <div class="infra-server-card-name">${name}</div>
-                                    ${server.country_code ? `<div class="infra-server-card-country-code">${escapeHtml(server.country_code)}</div>` : ''}
-                                </div>
-                            </div>
-                            <div class="infra-server-card-head-actions">
-                                ${view.status}
-                                <button type="button" class="infra-mini-btn infra-row-action" data-infra-menu="${server.id}" title="Быстрые действия" aria-haspopup="menu" aria-label="Быстрые действия ${name}"><i class="fas fa-ellipsis-vertical"></i></button>
-                            </div>
+                            ${server.country_code ? `<span class="infra-server-card-country" role="img" aria-label="Страна: ${escapeHtml(server.country_code)}">${infraCountryFlag(server.country_code)}</span>` : '<span class="infra-server-card-country" aria-hidden="true"><i class="fas fa-server"></i></span>'}
+                            <span class="infra-server-card-dot${dotTone}" role="img" aria-label="${server.online ? 'Онлайн' : 'Оффлайн'}" title="${server.online ? 'Онлайн' : 'Оффлайн'}"></span>
+                            <span class="infra-server-card-name">${name}</span>
+                            <span class="infra-server-card-host" title="${host}">${host}</span>
+                            <button type="button" class="infra-mini-btn infra-row-action" data-infra-menu="${server.id}" title="Быстрые действия" aria-haspopup="menu" aria-label="Быстрые действия ${name}"><i class="fas fa-ellipsis-vertical"></i></button>
                         </header>
-                        <div class="infra-server-card-host" title="${host}">${host}</div>
-                        ${view.flags ? `<div class="infra-server-card-flags">${view.flags}</div>` : ''}
-                        <div class="infra-server-card-traffic">
-                            <div>
-                                <span class="infra-server-card-kicker">Скорость сейчас · приём</span>
-                                <div class="infra-server-card-rx">↓ ${server.online ? infraFmtBps(server.rx_bps) : '—'}</div>
-                            </div>
-                            <div class="infra-server-card-tx">↑ ${server.online ? infraFmtBps(server.tx_bps) : '—'}</div>
-                        </div>
+                        ${flagsRow ? `<div class="infra-server-card-flags">${flagsRow}</div>` : ''}
+                        <div class="infra-server-card-traffic"><b>↓ ${rxLabel}</b><span>↑ ${txLabel}</span></div>
                         <div class="infra-server-card-load ${infraLoadClass(view.util)}">${view.loadHtml}</div>
-                        <div class="infra-server-card-stats">
-                            <div class="infra-server-card-stat"><span>Лимит</span><b>${escapeHtml(view.limitLabel)}</b></div>
-                            <div class="infra-server-card-stat"><span>TCP</span><b>${view.tcpLabel}</b></div>
-                            <div class="infra-server-card-stat"><span>IP-адреса</span><b>${view.ipsLabel}</b></div>
-                            <div class="infra-server-card-stat" title="${escapeHtml(view.domains.join(', '))}"><span>Домены</span><b>${view.domainsLabel}</b></div>
+                        <div class="infra-server-card-meta">
+                            <span><b>${view.tcpLabel}</b> TCP</span>
+                            <span title="${escapeHtml(view.ipsTitle)}"><b>${view.ipsLabel}</b> IP</span>
+                            <span class="infra-server-card-doms" title="${escapeHtml(view.domains.join(', '))}">${view.domainsLabel}</span>
+                            <span class="infra-server-card-hb">${heartbeat}</span>
                         </div>
-                        <footer class="infra-server-card-footer">
-                            <span class="infra-server-card-heartbeat">${heartbeat}</span>
-                            <button type="button" class="infra-server-card-open" data-infra-open-detail="${server.id}">Управление и графики <i class="fas fa-arrow-right"></i></button>
-                        </footer>
                     </article>`;
             }).join('');
             return `<div class="infra-server-grid" role="list">${cards}</div>`;
         }
 
-        function renderInfraServerTable(servers) {
-            const rows = servers.map((server) => {
-                const view = infraServerPresentation(server);
-                return `
-                    <tr class="${server.online ? '' : 'infra-row-offline'}" data-infra-server="${server.id}" tabindex="0" title="Открыть карточку сервера">
-                        <td>
-                            <button type="button" class="infra-server-link" data-infra-open-detail="${server.id}" title="Открыть экран управления и графики">
-                                <span class="infra-server-icon"><i class="fas fa-server"></i></span>
-                                <span class="infra-server-copy"><span>${server.country_code ? infraCountryFlag(server.country_code) + ' ' : ''}${escapeHtml(server.name)}</span><span class="infra-server-host">${escapeHtml(server.hostname || server.node_name || '')}</span></span>
-                            </button>
-                        </td>
-                        <td><div style="display:flex;gap:4px;align-items:center;flex-wrap:wrap;">${view.status} ${view.flags}</div></td>
-                        <td><div class="infra-network-cell"><span>↓ ${server.online ? infraFmtBps(server.rx_bps) : '—'}</span><small>↑ ${server.online ? infraFmtBps(server.tx_bps) : '—'}</small></div></td>
-                        <td class="infra-load-cell ${infraLoadClass(view.util)}">${view.loadHtml}</td>
-                        <td>${view.tcpLabel}</td>
-                        <td>${view.ipsLabel}</td>
-                        <td title="${escapeHtml(view.domains.join(', '))}">${view.domainsLabel}</td>
-                        <td>${infraFmtAge(server.last_seen_age)}</td>
-                        <td><button type="button" class="infra-mini-btn infra-row-action" data-infra-menu="${server.id}" title="Быстрые действия" aria-haspopup="menu" aria-label="Быстрые действия ${escapeHtml(server.name)}"><i class="fas fa-ellipsis-vertical"></i></button></td>
-                    </tr>`;
-            }).join('');
-            return `
-                <table class="infra-table">
-                    <thead><tr>
-                        <th>Сервер</th><th>Статус</th><th>Трафик</th><th>Нагрузка</th>
-                        <th>TCP</th><th>IP-адреса</th><th>Домены</th><th>Heartbeat</th><th></th>
-                    </tr></thead>
-                    <tbody>${rows}</tbody>
-                </table>`;
-        }
-
         function renderInfraServers(result) {
             const container = document.getElementById('infra-servers-table');
             if (!container) return;
-            syncInfraServersViewControls();
             const allServers = result?.servers || [];
             const servers = infraFilteredServers(result);
             const focusedServerId = container.contains(document.activeElement)
@@ -13408,10 +13460,7 @@
                 container.innerHTML = '<div class="infra-empty">По выбранным фильтрам серверы не найдены.</div>';
                 return;
             }
-            container.dataset.view = infraServersView;
-            container.innerHTML = infraServersView === 'table'
-                ? renderInfraServerTable(servers)
-                : renderInfraServerCards(servers);
+            container.innerHTML = renderInfraServerCards(servers);
             const serversById = new Map(allServers.map((server) => [server.id, server]));
             container.querySelectorAll('[data-infra-server]').forEach((serverElement) => {
                 serverElement.addEventListener('click', () => openInfraServer(Number(serverElement.dataset.infraServer)));
@@ -15257,6 +15306,16 @@
         document.querySelectorAll('#panel-infrastructure .subtab[data-subtab]').forEach((button) => {
             button.addEventListener('click', () => showInfraSubtab(button.dataset.subtab));
         });
+        const refactForm = document.getElementById('referral-activity-form');
+        if (refactForm) {
+            refactForm.addEventListener('submit', loadReferralActivity);
+            refactForm.querySelectorAll('[data-refact-preset]').forEach((button) => {
+                button.addEventListener('click', () => applyRefActivityPreset(button.dataset.refactPreset));
+            });
+            document.querySelector('#panel-stats .subtab[data-subtab="referrals"]')?.addEventListener('click', () => {
+                if (!refActivityLoaded) applyRefActivityPreset('this-month');
+            });
+        }
         const cohortForm = document.getElementById('cohort-form');
         if (cohortForm) {
             cohortForm.addEventListener('submit', loadCohortStats);

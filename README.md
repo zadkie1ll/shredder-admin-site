@@ -2928,6 +2928,10 @@ payload'ы, admin-API).
 `apple_recommended_app = incy` — тот же энкодер, что в телеграм-боте. При
 недоступности энкодера кабинет молча откатывается на Happ.
 
+Ссылки установки (Happ/Incy) шифруют базовый `subscription_url` без суффикса
+`/custom-json`: основная подписка в панели отдаёт тот же конфиг, что раньше
+отдавался по `/custom-json` (поведение согласовано с телеграм-ботом).
+
 Конфиги: `docker/website/docker-compose.yml` + `nginx.conf.template`.
 Origin deploy и renew сертификата не должны выполнять `docker compose down`, чтобы ошибка certbot или загрузки образа не оставляла сайт выключенным и не удаляла compose-логи.
 

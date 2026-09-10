@@ -243,10 +243,10 @@ html[data-admin-theme="light"] #panel-user-payments {
     #panel-user-payments .client-action-registry .client-action-group-head small { display: none; }
     #panel-user-payments .client-action-registry .client-action-registry-foot { flex-direction: column; align-items: flex-start; padding: 12px 14px; }
 }
-#panel-user-payments :is(.client-referral-summary-row, .client-referral-manage-card) { padding: 18px; gap: 14px; border-color: var(--workspace-success-line); background: var(--workspace-success-bg); }
-#panel-user-payments :is(.client-referral-summary-row, .client-referral-manage-card).is-blocked { border-color: var(--workspace-danger-line); background: var(--workspace-danger-bg); }
-#panel-user-payments :is(.client-referral-summary-copy strong, .client-referral-manage-title) { font-size: 14px; color: var(--admin-text); }
-#panel-user-payments :is(.client-referral-summary-copy > span, .client-referral-manage-desc, .client-last-action > span:last-child) { font-size: 12px; line-height: 1.5; color: var(--workspace-caption); }
+#panel-user-payments .client-referral-summary-row { padding: 18px; gap: 14px; border-color: var(--workspace-success-line); background: var(--workspace-success-bg); }
+#panel-user-payments .client-referral-summary-row.is-blocked { border-color: var(--workspace-danger-line); background: var(--workspace-danger-bg); }
+#panel-user-payments .client-referral-summary-copy strong { font-size: 14px; color: var(--admin-text); }
+#panel-user-payments :is(.client-referral-summary-copy > span, .client-last-action > span:last-child) { font-size: 12px; line-height: 1.5; color: var(--workspace-caption); }
 #panel-user-payments .client-text-button { font-size: 13px; color: var(--workspace-success); }
 #panel-user-payments .client-last-action { padding: 16px 18px; background: var(--admin-surface); }
 #panel-user-payments .client-last-action > strong { color: var(--admin-text); font-size: 13px; }

@@ -29,11 +29,11 @@
 /* The original filters remain intact, in the separate query surface used by
  * the approved concept. Month shortcuts and custom date popovers are retained.
  */
-#stats-form, #cohort-form, #panel-acquisition .admin-section-query {
+#stats-form, #cohort-form, #referral-activity-form, #panel-acquisition .admin-section-query {
     padding: 18px 20px; margin: 0 0 26px; border: 1px solid var(--admin-border);
     border-radius: 10px; background: var(--admin-surface); box-shadow: none;
 }
-html:not([data-admin-theme="light"]) :is(#stats-form, #cohort-form, #panel-acquisition .admin-section-query) {
+html:not([data-admin-theme="light"]) :is(#stats-form, #cohort-form, #referral-activity-form, #panel-acquisition .admin-section-query) {
     background: #15181d; border-color: #30353e;
 }
 #stats-form { gap: 12px; }
@@ -169,7 +169,7 @@ html[data-admin-theme] #panel-system .settings-list.has-settings .setting-row.is
 #panel-system .antifraud-row-name { font-size: 14px; font-weight: 400; }
 #panel-system :is(.antifraud-row-desc, .antiabuse-bulk-copy > span) { font-size: 12px; font-weight: 400; line-height: 1.5; }
 #panel-system .antiabuse-bulk-row { padding: 18px 0; background: transparent; }
-#panel-system .referral-settings-stack, #panel-system .antiabuse-stack { gap: 0; }
+#panel-system .referral-settings-stack, #panel-system .antiabuse-stack { gap: 0; max-width: none; }
 
 /* Payment journal: plain table rows, with expandable full ID/provider/result.
  * User, timestamps, mixed currencies and pending/cancelled states are retained.
@@ -342,7 +342,7 @@ html[data-admin-theme="light"] #panel-system [data-winback-status].is-error { co
     #panel-reply-templates #reply-template-form, #panel-reply-templates .admin-template-library,
     #panel-support .ticket-list, #panel-payment-info #payments-history-details { padding: 14px; }
     #panel-acquisition .subtab-panel > .card, #panel-bulk-actions > .card { padding: 14px !important; }
-    #stats-form, #cohort-form, #panel-acquisition .admin-section-query { padding: 14px; }
+    #stats-form, #cohort-form, #referral-activity-form, #panel-acquisition .admin-section-query { padding: 14px; }
     #panel-acquisition .admin-section-query > :is(select, .ui-select, .date-field) { flex-basis: 42%; }
     #panel-system .system-card-title, #panel-acquisition .chart-title-wrap > strong,
     #panel-payment-info .payment-history-summary-copy > strong { font-size: 17px; }

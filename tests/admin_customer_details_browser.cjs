@@ -99,8 +99,8 @@ const timeline = [{ts: '01.09.2026 20:51', category: 'Платежи', title: '�
         await tab('referrals');
         assert.equal(await page.locator('[data-client-referral-block-action="block"]').count(), 1);
         assert.match(await page.locator('.client-referral-empty').textContent(), /Приглашённые пользователи/);
-        assert.equal(await page.locator('.client-detail-metrics .metric').first().evaluate(element => getComputedStyle(element).borderTopWidth), '0px');
-        assert.equal(await page.locator('.client-referrals-workspace .client-detail-metrics').evaluate(element => getComputedStyle(element).gridTemplateColumns.split(' ').filter(track => parseFloat(track) > 0).length), width === 390 ? 2 : 3);
+        assert.equal(await page.locator('.client-referrals-workspace .client-ref-sum').count(), 3);
+        assert.equal(await page.locator('.client-ref-summary').evaluate(element => getComputedStyle(element).display), 'flex');
         assert.equal(await page.locator('.client-ref-control-actions').evaluate(element => getComputedStyle(element).justifyContent), 'flex-start');
         await shot('real-user-referrals', width);
 
@@ -138,8 +138,12 @@ const timeline = [{ts: '01.09.2026 20:51', category: 'Платежи', title: '�
                 await openClient();
                 await tab('referrals');
                 if (state === 'referrals-populated') {
-                    assert.equal(await page.locator('#referral-graph .referral-map-card').count(), 1);
-                    assert.match(await page.locator('.referral-card').textContent(), /invited_client.*first_payment/s);
+                    assert.equal(await page.locator('[data-client-ref-row]').count(), 1);
+                    assert.match(await page.locator('.client-ref-row.is-root').textContent(), /demo_client.*1 прямых/s);
+                    assert.equal(await page.locator('.client-ref-sub').first().isVisible(), false);
+                    await page.locator('[data-client-ref-row]').first().click();
+                    assert.match(await page.locator('.client-ref-bonus-chip').textContent(), /\+7 дн.*first_payment.*08\.09\.2026/s);
+                    assert.match(await page.locator('.client-ref-tree').textContent(), /invited_client/);
                 } else {
                     assert.match(await page.locator('.client-referral-manage-card').textContent(), /Повторные активации.*09.09.2026 12:00/s);
                     assert.equal(await page.locator('[data-client-referral-block-action="unblock"]').count(), 1);

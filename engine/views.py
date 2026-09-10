@@ -1013,19 +1013,20 @@ def apple_recommended_app_from_db(db_session):
 def build_apple_subscription_link(db_session, subscription_url):
     """(приложение, ссылка добавления подписки) для iOS/macOS в кабинете.
 
-    Как в боте: INCY получает шифрованную incy://crypt1/-ссылку на
-    subscription_url + /custom-json. Если энкодер недоступен (нет node в
-    образе и т.п.) — молча откатываемся на Happ, кабинет ломать нельзя.
+    Как в боте: INCY получает шифрованную incy://crypt1/-ссылку на базовый
+    subscription_url (панель отдаёт по нему тот же конфиг, что раньше был на
+    /custom-json). Если энкодер недоступен (нет node в образе и т.п.) — молча
+    откатываемся на Happ, кабинет ломать нельзя.
     """
     recommended = apple_recommended_app_from_db(db_session)
-    happ_link = encrypt_happ_url1(subscription_url + "/custom-json")
+    happ_link = encrypt_happ_url1(subscription_url)
     if recommended != APPLE_RECOMMENDED_APP_INCY:
         return APPLE_RECOMMENDED_APP_HAPP, happ_link
 
     try:
         return (
             APPLE_RECOMMENDED_APP_INCY,
-            encrypt_incy_url(subscription_url + "/custom-json"),
+            encrypt_incy_url(subscription_url),
         )
     except IncyEncoderError:
         logging.exception("incy link encoding failed, falling back to Happ")
@@ -3399,7 +3400,7 @@ def dashboard(request):
         subscription.subscription_url if has_panel_data else ""
     )
     happ_subscription_url = (
-        encrypt_happ_url1(subscription.subscription_url + "/custom-json")
+        encrypt_happ_url1(subscription.subscription_url)
         if has_panel_data
         else ""
     )
@@ -6869,6 +6870,202 @@ def build_admin_cohort_retention_stats(
         "sources": sources,
         "sales_series": sales_series,
     }
+
+
+def admin_referral_activity(db_session, start_date, end_date):
+    """Реферальная активность периода: кто пригласил и что это принесло.
+
+    «Приглашённый в периоде» — реферал, чья ПЕРВАЯ подписка (первое событие
+    subscription_created, ровно как когорта сквозного анализа) попала в
+    выбранные даты; поэтому сумма «пригласил» бьётся с пилюлей «+N рефералов»
+    в итогах. Выручка — успешные платежи этих рефералов за тот же период
+    (не LTV). Бонусные дни — начисления рефереру за период.
+    """
+    start_datetime = datetime.combine(start_date, time.min) - ADMIN_TZ_OFFSET
+    end_datetime = datetime.combine(end_date, time.max) - ADMIN_TZ_OFFSET
+    empty = {
+        "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+        "totals": {
+            "referrers": 0, "referrals": 0, "connected": 0,
+            "paid_users": 0, "revenue": 0, "bonus_days": 0,
+        },
+        "rows": [],
+        "truncated": False,
+    }
+
+    first_sub = (
+        db_session.query(
+            EventLog.user_id.label("user_id"),
+            EventLog.timestamp.label("timestamp"),
+            func.row_number()
+            .over(
+                partition_by=EventLog.user_id,
+                order_by=(EventLog.timestamp, EventLog.id),
+            )
+            .label("rn"),
+        )
+        .filter(EventLog.event_type == "subscription_created")
+        .filter(EventLog.timestamp <= end_datetime)
+        .subquery()
+    )
+    pairs = (
+        db_session.query(User.id, User.referred_by_id)
+        .join(first_sub, first_sub.c.user_id == User.id)
+        .filter(first_sub.c.rn == 1)
+        .filter(first_sub.c.timestamp >= start_datetime)
+        .filter(User.referred_by_id.isnot(None))
+        .all()
+    )
+    if not pairs:
+        return empty
+
+    referral_ids = [referral_id for referral_id, _ in pairs]
+    invited_by: dict = {}
+    for referral_id, referrer_id in pairs:
+        invited_by.setdefault(referrer_id, []).append(referral_id)
+    referrer_ids = list(invited_by)
+
+    connected_ids = {
+        row[0]
+        for row in db_session.query(UserTrafficProgress.user_id)
+        .filter(
+            UserTrafficProgress.user_id.in_(referral_ids),
+            UserTrafficProgress.passed_5mb.is_(True),
+        )
+        .all()
+    }
+
+    # Платежи рефералов за период — по обоим шлюзам, в рублях
+    pay_by_user: dict = {}
+    yk_time = func.coalesce(YkPayment.captured_at, YkPayment.created_at)
+    for user_id, amount in (
+        db_session.query(
+            YkPayment.user_id, func.coalesce(func.sum(YkPayment.amount), 0)
+        )
+        .filter(
+            YkPayment.user_id.in_(referral_ids),
+            YkPayment.status == "succeeded",
+            yk_time >= start_datetime,
+            yk_time <= end_datetime,
+        )
+        .group_by(YkPayment.user_id)
+        .all()
+    ):
+        pay_by_user[user_id] = pay_by_user.get(user_id, 0) + admin_money(amount)
+    for user_id, amount in (
+        db_session.query(
+            WataInvoice.user_id,
+            func.coalesce(func.sum(WataTransaction.amount), 0),
+        )
+        .select_from(WataInvoice)
+        .join(WataTransaction, WataTransaction.order_id == WataInvoice.order_id)
+        .filter(
+            WataInvoice.user_id.in_(referral_ids),
+            WataTransaction.transaction_status == "Paid",
+            WataTransaction.payment_time >= start_datetime,
+            WataTransaction.payment_time <= end_datetime,
+        )
+        .group_by(WataInvoice.user_id)
+        .all()
+    ):
+        pay_by_user[user_id] = pay_by_user.get(user_id, 0) + admin_money(amount)
+
+    bonus_by_referrer = dict(
+        db_session.query(
+            ReferralBonus.referrer_id,
+            func.coalesce(func.sum(ReferralBonus.days_added), 0),
+        )
+        .filter(
+            ReferralBonus.referrer_id.in_(referrer_ids),
+            ReferralBonus.created_at >= start_datetime,
+            ReferralBonus.created_at <= end_datetime,
+        )
+        .group_by(ReferralBonus.referrer_id)
+        .all()
+    )
+    lifetime_by_referrer = dict(
+        db_session.query(User.referred_by_id, func.count(User.id))
+        .filter(User.referred_by_id.in_(referrer_ids))
+        .group_by(User.referred_by_id)
+        .all()
+    )
+    users_by_id = {
+        user.id: user
+        for user in db_session.query(User).filter(User.id.in_(referrer_ids)).all()
+    }
+
+    rows = []
+    for referrer_id, invited_ids in invited_by.items():
+        user = users_by_id.get(referrer_id)
+        if user is None:
+            continue
+        paid_users = sum(1 for rid in invited_ids if pay_by_user.get(rid))
+        rows.append(
+            {
+                "user": {
+                    "id": user.id,
+                    "username": user.username,
+                    "email": user.email or "",
+                    "telegram_id": str(user.telegram_id or ""),
+                },
+                "invited": len(invited_ids),
+                "connected": sum(1 for rid in invited_ids if rid in connected_ids),
+                "paid_users": paid_users,
+                "revenue": sum(pay_by_user.get(rid, 0) for rid in invited_ids),
+                "bonus_days": admin_money(bonus_by_referrer.get(referrer_id)),
+                "lifetime_invited": int(lifetime_by_referrer.get(referrer_id, 0)),
+            }
+        )
+    rows.sort(key=lambda row: (-row["invited"], -row["revenue"], row["user"]["id"]))
+    truncated = len(rows) > 500
+    rows = rows[:500]
+    totals = {
+        "referrers": len(invited_by),
+        "referrals": len(referral_ids),
+        "connected": sum(row["connected"] for row in rows),
+        "paid_users": sum(row["paid_users"] for row in rows),
+        "revenue": sum(row["revenue"] for row in rows),
+        "bonus_days": sum(row["bonus_days"] for row in rows),
+    }
+    return {
+        "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
+        "totals": totals,
+        "rows": rows,
+        "truncated": truncated,
+    }
+
+
+def support_admin_api_referral_activity(request):
+    auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
+    if auth_response:
+        return auth_response
+    try:
+        today = admin_msk_today()
+        start_date = (
+            admin_parse_date(request.GET.get("start"))
+            if request.GET.get("start")
+            else today - timedelta(days=30)
+        )
+        end_date = (
+            admin_parse_date(request.GET.get("end"))
+            if request.GET.get("end")
+            else today
+        )
+    except ValueError:
+        return JsonResponse(
+            {"status": "error", "message": "Неверный формат даты"}, status=400
+        )
+    if start_date > end_date:
+        return JsonResponse(
+            {"status": "error", "message": "Начальная дата больше конечной"},
+            status=400,
+        )
+    db_session = session_factory()
+    try:
+        result = admin_referral_activity(db_session, start_date, end_date)
+    finally:
+        db_session.close()
+    return JsonResponse({"status": "ok", "result": result})
 
 
 def support_admin_api_stats(request):

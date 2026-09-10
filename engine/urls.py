@@ -99,6 +99,11 @@ urlpatterns = [
         name="support_admin_api_referrals",
     ),
     path(
+        "support-admin/api/referral-activity/",
+        views.support_admin_api_referral_activity,
+        name="support_admin_api_referral_activity",
+    ),
+    path(
         "support-admin/api/payment-info/",
         views.support_admin_api_payment_info,
         name="support_admin_api_payment_info",

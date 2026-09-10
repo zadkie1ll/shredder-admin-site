@@ -99,7 +99,9 @@ const script = {key: 'install.sh', label: 'install.sh', active_version: 2, has_a
         }
         const result={id,width,grid:{actual:await sample(page,realGrid),reference:await sample(reference,refGrid)},type:{actual:await sample(page,realType),reference:await sample(reference,refType)}};
         samples.push(result);
-        if(process.env.ADMIN_ASSERT_CONCEPT==='1'){
+        // inf-servers перерисован по компактному концепту (10.09.2026) и от
+        // мока .mi-node-grid намеренно отличается
+        if(process.env.ADMIN_ASSERT_CONCEPT==='1'&&id!=='inf-servers'){
           assert.equal(result.type.actual.fontSize,result.type.reference.fontSize,`${id}/${width} concept heading size`);
           assert.equal(result.type.actual.fontWeight,result.type.reference.fontWeight,`${id}/${width} concept heading weight`);
           assert.equal(result.grid.actual.gridTemplateColumns.split(' ').length,result.grid.reference.gridTemplateColumns.split(' ').length,`${id}/${width} concept grid column count`);
@@ -137,8 +139,8 @@ const script = {key: 'install.sh', label: 'install.sh', active_version: 2, has_a
         }
         if(id==='inf-traffic')assert.equal(await page.locator('.node-traffic-row.table-head > span').count(),9);
         if(id==='inf-servers'){
-          assert.equal(await page.locator('.infra-server-card-head .infra-badge-online').first().evaluate(e=>getComputedStyle(e).color),'rgb(114, 218, 173)','Online status remains green');
-          assert.equal(await page.locator('.infra-server-card-head .infra-badge-offline').first().evaluate(e=>getComputedStyle(e).color),'rgb(242, 152, 162)','Offline status remains red');
+          assert.ok(await page.locator('.infra-server-card-dot:not(.is-off)').count()>0,'Online dot present');
+          assert.equal(await page.locator('.infra-server-card-flags .infra-badge-offline').first().evaluate(e=>getComputedStyle(e).color),'rgb(242, 152, 162)','Offline status remains red');
           assert.equal(await page.locator('.infra-set-limit').count(),1);
           assert.equal(await page.locator('.infra-server-control-field').count(),2);
           const initial=await page.locator('.infra-server-card').count();

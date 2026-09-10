@@ -518,7 +518,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         rule = stylesheet[rule_start:stylesheet.index("}", rule_start)]
         self.assertIn("flex: 0 0 auto;", rule)
         self.assertIn("height: auto;", rule)
-        self.assertIn("@import url('./admin-concept-infrastructure.css?v=8');", concept_index)
+        self.assertIn("@import url('./admin-concept-infrastructure.css?v=13');", concept_index)
 
     def test_censor_checks_allow_selecting_rows_and_deleting_them(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
@@ -2163,6 +2163,32 @@ class AdminCohortStatsEndpointTests(SimpleTestCase):
         self.assertEqual(args[3], date(2025, 1, 1))
         self.assertEqual(args[4], date(2025, 1, 31))
         self.assertEqual(args[5], "month")
+
+
+class AdminReferralActivityEndpointTests(SimpleTestCase):
+    def test_requires_analytics_role(self):
+        request = RequestFactory().get(
+            "/support-admin/api/referral-activity/",
+            {"start": "2026-09-01", "end": "2026-09-10"},
+        )
+        request.session = {}
+        with mock.patch("engine.views.admin_referral_activity") as builder:
+            response = views.support_admin_api_referral_activity(request)
+        self.assertNotEqual(response.status_code, 200)
+        self.assertFalse(builder.called)
+
+    def test_invalid_period_returns_400(self):
+        request = RequestFactory().get(
+            "/support-admin/api/referral-activity/",
+            {"start": "2026-09-10", "end": "2026-09-01"},
+        )
+        request.session = {}
+        with mock.patch(
+            "engine.views.require_support_admin_any", return_value=None
+        ), mock.patch("engine.views.admin_referral_activity") as builder:
+            response = views.support_admin_api_referral_activity(request)
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(builder.called)
 
 
 class AdminStatsSalesModeTests(SimpleTestCase):
@@ -4562,7 +4588,7 @@ class ConfigPinsAdminTemplateTests(SimpleTestCase):
         self.assertIn("saveConfigPins", template)
         self.assertIn("data-config-pins-save", template)
         self.assertIn("data-config-pins-clear", template)
-        self.assertIn("Персональные конфиги для пользователя", template)
+        self.assertIn("Персональные конфиги", template)
 
 
 class ConfigPinsCleanupTests(SimpleTestCase):
@@ -4662,55 +4688,77 @@ class ConfigModalScrollLockTests(SimpleTestCase):
         self.assertIn(".config-template-modal-card .modal-body { overflow: visible", template)
 
 
+class AdminCssBraceBalanceTests(SimpleTestCase):
+    def test_inline_styles_and_static_css_have_balanced_braces(self):
+        # 10.09.2026 незакрытая `{` в инлайн-CSS уехала в прод и «съела» все
+        # правила после себя (развалился топбар и полстраницы). CSS не падает
+        # с ошибкой — единственная защита от такого выстрела — этот тест.
+        import re
+
+        template = Path("engine/templates/admin_dashboard.html").read_text()
+        for index, block in enumerate(re.findall(r"<style>(.*?)</style>", template, re.S)):
+            with self.subTest(style_block=index):
+                self.assertEqual(
+                    block.count("{"), block.count("}"),
+                    f"незакрытая скобка в <style> №{index} admin_dashboard.html",
+                )
+        for css_path in sorted(Path("engine/static/css").glob("*.css")):
+            content = css_path.read_text()
+            with self.subTest(css=css_path.name):
+                self.assertEqual(
+                    content.count("{"), content.count("}"),
+                    f"незакрытая скобка в {css_path.name}",
+                )
+
+
 class ConfigTemplatesAdminUiTests(SimpleTestCase):
     def test_config_delivery_rules_share_one_responsive_workspace(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
-        # Пиннинг и UA-правила — два равноправных сценария одной логики выдачи,
-        # а не два визуально оторванных полноширинных accordion-блока.
+        # Утверждённый концепт (10.09.2026): пиннинг и UA-правила — два
+        # постоянных равноправных инструмента рядом; аккордеона и выпадающих
+        # «окон снизу под обеими плашками» больше нет.
         self.assertIn('class="config-delivery-section"', template)
-        self.assertIn('data-config-delivery-panel="pins"', template)
-        self.assertIn('data-config-delivery-panel="ua"', template)
         self.assertIn('<h2 id="config-delivery-title">Логика выдачи</h2>', template)
         delivery_markup = template.split('<section class="config-delivery-section"', 1)[1].split(
             '<div id="config-templates-result"', 1
         )[0]
-        self.assertNotIn('class="card admin-collapse"', delivery_markup)
-
-        # Шапки обоих сценариев остаются рядом, а их доступные кнопки управляют
-        # отдельными полноширинными панелями под сеткой. Так раскрытие справа не
-        # оставляет пустую левую половину рабочей области.
-        self.assertIn('class="config-delivery-panels"', template)
-        self.assertIn('aria-controls="config-delivery-pins-body"', delivery_markup)
-        self.assertIn('aria-controls="config-delivery-ua-body"', delivery_markup)
-        self.assertIn('id="config-delivery-pins-body"', delivery_markup)
-        self.assertIn('id="config-delivery-ua-body"', delivery_markup)
-        self.assertIn('.config-delivery-panels { display: grid;', template)
-        self.assertIn('.config-delivery-body[hidden] { display: none; }', template)
-        self.assertIn('.config-delivery-card[aria-expanded="true"]', template)
-        self.assertIn('.config-delivery-grid { grid-template-columns: 1fr;', template)
-        self.assertIn('function toggleConfigDeliveryPanel(button)', template)
-        self.assertIn("button.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');", template)
-        self.assertIn('panel.hidden = !shouldOpen;', template)
-        self.assertNotIn('<details class="config-delivery-card"', delivery_markup)
-        self.assertIn('grid-template-columns: minmax(260px, 460px) max-content', template)
-        self.assertIn('.ua-rule-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));', template)
-        self.assertNotIn('Не изменяет подписки и серверные профили', delivery_markup)
+        for gone in (
+            "data-config-delivery-panel",
+            "config-delivery-panels",
+            "config-delivery-chevron",
+            "config-delivery-intro",
+            "aria-expanded",
+        ):
+            with self.subTest(gone=gone):
+                self.assertNotIn(gone, delivery_markup)
+        self.assertNotIn("function toggleConfigDeliveryPanel(button)", template)
+        self.assertIn('class="config-delivery-body config-delivery-pins"', delivery_markup)
+        self.assertIn('class="config-delivery-body config-delivery-ua"', delivery_markup)
+        self.assertNotIn("hidden>", delivery_markup)
+        self.assertIn(
+            ".config-delivery-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; align-items: start; }",
+            template,
+        )
         self.assertIn('id="config-pins-form"', delivery_markup)
         self.assertIn('id="ua-rule-form"', delivery_markup)
+        self.assertIn('class="ua-rule-sentence"', delivery_markup)
         for field_name in ("match_substring", "variable_name", "value", "priority", "is_active"):
             self.assertIn(f'name="{field_name}"', delivery_markup)
 
     def test_ua_rules_render_as_readable_condition_flow(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
 
+        # Строка правила читается как «условие -> CLIENT=значение»; статус —
+        # точка, действия появляются по hover, клик по строке — редактирование
         self.assertIn('class="ua-rule-item', template)
-        self.assertIn('<small>Если UA содержит</small>', template)
-        self.assertIn('<small>Передать в шаблон</small>', template)
-        self.assertIn('class="ua-rules-list"', template)
-        self.assertNotIn('class="admin-table-row ua-rule-row', template)
-        self.assertIn('data-ua-rule-edit=', template)
-        self.assertIn('data-ua-rule-delete=', template)
+        self.assertIn('class="ua-rules-head"', template)
+        self.assertIn('class="ua-rule-cond"', template)
+        self.assertIn("${escapeHtml(rule.variable_name)}=<b>${escapeHtml(rule.value)}</b>", template)
+        self.assertIn("data-ua-rule-edit=", template)
+        self.assertIn("data-ua-rule-delete=", template)
+        self.assertIn("!event.target.closest('[data-ua-rule-delete]')", template)
+        self.assertNotIn("<small>Если UA содержит</small>", template)
 
     def test_json_editor_selection_is_visible(self):
         template = Path("engine/templates/admin_dashboard.html").read_text()
@@ -4755,7 +4803,6 @@ class ConfigTemplatesAdminUiTests(SimpleTestCase):
         self.assertIn("+ заголовки", template)
         card_rule = template.split(".config-template-card {", 1)[1].split("}", 1)[0]
         self.assertNotIn("min-height: 440px", card_rule)
-
 
 class NodeTrafficReportTests(SimpleTestCase):
     """Агрегация трафика нод для вкладки «Трафик нод» (engine/node_traffic.py)."""
@@ -5835,6 +5882,57 @@ class SetupWizardTests(SimpleTestCase):
             inspect.getsource(build_apple_subscription_link),
         )
 
+    def test_install_links_use_base_subscription_url(self):
+        """Ссылки установки шифруют базовый subscription_url без /custom-json.
+
+        Основная подписка в панели теперь отдаёт тот же конфиг, что раньше
+        отдавался по /custom-json, поэтому суффикс убран (как в боте).
+        """
+        import inspect
+
+        from engine.views import build_apple_subscription_link, dashboard
+
+        self.assertNotIn(
+            '"/custom-json"', inspect.getsource(build_apple_subscription_link)
+        )
+        self.assertNotIn('"/custom-json"', inspect.getsource(dashboard))
+
+    def test_build_apple_subscription_link_encrypts_plain_url(self):
+        from unittest import mock
+
+        from engine import views as _views
+
+        with (
+            mock.patch.object(
+                _views, "apple_recommended_app_from_db", return_value="incy"
+            ),
+            mock.patch.object(
+                _views, "encrypt_happ_url1", side_effect=lambda url: f"happ:{url}"
+            ),
+            mock.patch.object(
+                _views, "encrypt_incy_url", side_effect=lambda url: f"incy:{url}"
+            ),
+        ):
+            app, link = _views.build_apple_subscription_link(
+                None, "https://sub.example/abc"
+            )
+        self.assertEqual(app, "incy")
+        self.assertEqual(link, "incy:https://sub.example/abc")
+
+        with (
+            mock.patch.object(
+                _views, "apple_recommended_app_from_db", return_value="happ"
+            ),
+            mock.patch.object(
+                _views, "encrypt_happ_url1", side_effect=lambda url: f"happ:{url}"
+            ),
+        ):
+            app, link = _views.build_apple_subscription_link(
+                None, "https://sub.example/abc"
+            )
+        self.assertEqual(app, "happ")
+        self.assertEqual(link, "happ:https://sub.example/abc")
+
     def test_apple_recommended_app_from_db_normalizes_values(self):
         from types import SimpleNamespace
         from unittest.mock import MagicMock
@@ -6310,7 +6408,7 @@ class AdminClientWorkspaceTests(SimpleTestCase):
         self.assertIn("#panel-user-payments .client-action-registry .client-action-controls { display: grid; grid-template-columns: var(--client-action-btn) var(--client-action-btn);", css)
         self.assertIn(".client-action-button.is-primary { grid-column: 2; }", css)
         self.assertIn(".client-action-pair { grid-column: 1 / -1;", css)
-        self.assertIn("@import url('./admin-concept-customers.css?v=8');", Path("engine/static/css/admin-concept.css").read_text())
+        self.assertIn("@import url('./admin-concept-customers.css?v=9');", Path("engine/static/css/admin-concept.css").read_text())
 
 
 class AdminMoscowTimeTests(SimpleTestCase):
@@ -8857,20 +8955,17 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
         # Серверы регистрирует node-agent: UI не должен обещать ручное создание.
         self.assertNotIn("+ Добавить сервер", self.template)
 
-    def test_server_cards_are_primary_and_table_view_remains_available(self):
+    def test_server_tiles_are_the_only_view(self):
+        # Утверждённый компактный концепт (10.09.2026): один вид — плитки;
+        # табличный рендер и переключатель видов удалены
         for marker in (
-            'data-infra-view="cards"',
-            'data-infra-view="table"',
             'class="infra-server-grid"',
             'class="infra-server-card${cardTone}"',
+            'class="infra-server-card-dot${dotTone}"',
             'class="infra-server-card-traffic"',
-            'class="infra-server-card-stats"',
-            'class="infra-server-card-open"',
+            'class="infra-server-card-meta"',
             "function infraServerPresentation(server)",
             "function renderInfraServerCards(servers)",
-            "function renderInfraServerTable(servers)",
-            "let infraServersView = 'cards';",
-            "infraServersView === 'table'",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)
@@ -8886,12 +8981,18 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
             with self.subTest(metric=metric):
                 self.assertIn(metric, self.template)
 
+        for gone in (
+            "renderInfraServerTable",
+            "data-infra-view",
+            "infraServersView",
+            "INFRA_SERVERS_VIEW_STORAGE_KEY",
+            "infra-view-switch",
+        ):
+            with self.subTest(gone=gone):
+                self.assertNotIn(gone, self.template)
+
     def test_server_view_preference_and_card_interactions_are_preserved(self):
         for marker in (
-            "const INFRA_SERVERS_VIEW_STORAGE_KEY",
-            "localStorage.getItem(INFRA_SERVERS_VIEW_STORAGE_KEY)",
-            "localStorage.setItem(INFRA_SERVERS_VIEW_STORAGE_KEY, nextView)",
-            "button.setAttribute('aria-pressed', active ? 'true' : 'false')",
             "event.target !== serverElement",
             "focus({preventScroll: true})",
             'data-infra-menu="${server.id}"',
@@ -8901,12 +9002,9 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
                 self.assertIn(marker, self.template)
 
         for css_marker in (
-            ".infra-server-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));",
-            ".infra-server-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }",
-            ".infra-server-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }",
+            ".infra-server-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));",
             ".infra-server-card:hover",
             'html[data-admin-theme="light"] .infra-server-card',
-            ".infra-server-grid { grid-template-columns: 1fr; padding: 10px; }",
         ):
             with self.subTest(css_marker=css_marker):
                 self.assertIn(css_marker, self.template)
@@ -8951,7 +9049,7 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
         for marker in (
             "#subpanel-inf-servers { width: 100%; max-width: 1520px; margin-inline: auto; }",
             ".infra-summary-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }",
-            ".infra-server-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; padding: 16px; }",
+            ".infra-server-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; padding: 14px; }",
             ".infra-detail-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }",
             ".infra-detail-stat-sub { margin-top: 8px; color: var(--muted); font-size: 10.5px; line-height: 1.35; font-weight: 700; overflow-wrap: anywhere; }",
             ".infra-detail-chart-card { margin-bottom: 20px;",
@@ -9393,11 +9491,9 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
                 self.assertIn(marker, self.template)
 
     def test_server_rows_keep_visible_hover_in_light_theme(self):
+        # Табличный вид удалён (10.09.2026); hover живёт на плитке
         for marker in (
-            'html[data-admin-theme="light"] .infra-table tbody tr:not(.is-selected):hover',
-            "background: rgba(181,139,0,.075); box-shadow: inset 3px 0 0 rgba(154,113,0,.42);",
-            'html[data-admin-theme="light"] .infra-table tbody tr.infra-row-offline:not(.is-selected):hover',
-            "background: rgba(211,65,78,.09); box-shadow: inset 3px 0 0 rgba(197,54,69,.46);",
+            ".infra-server-card:hover { border-color: rgba(255,199,0,.35); }",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)
@@ -9407,8 +9503,8 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
             "#subpanel-inf-servers { font-family: 'Manrope'",
             "#infra-server-detail, .infra-server-screen-head { font-family: 'Inter'",
             "font-optical-sizing: auto; font-synthesis: none;",
-            "#subpanel-inf-servers .infra-server-card-name { font-size: 19px; font-weight: 800;",
-            "#subpanel-inf-servers .infra-server-card-host { font-size: 13px; font-weight: 600; }",
+            "#subpanel-inf-servers .infra-server-card-name { font-size: 15px; font-weight: 800;",
+            "#subpanel-inf-servers .infra-server-card-host { font-size: 11.5px; font-weight: 600; }",
             ".infra-detail-stat-label { font-size: 12px; font-weight: 700; }",
             ".infra-detail-stat-value { font-size: clamp(25px, 1.7vw, 34px); font-weight: 800; }",
             "#infra-server-detail .infra-detail-card h4 { font-size: 17px; line-height: 1.2; font-weight: 700;",
@@ -9417,11 +9513,6 @@ class InfraServersDashboardTemplateTests(SimpleTestCase):
             'class="infra-machine-id"',
             "#infra-server-detail .infra-control { font-size: 12.5px; font-weight: 600; }",
             ".infra-table-heading h3 { margin: 0; color: var(--text-main); font-size: 16px;",
-            ".infra-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }",
-            "font-size: 13.5px; line-height: 1.25; font-weight: 850;",
-            ".infra-server-host { color: rgba(255,255,255,.67); font-size: 11.5px;",
-            'html[data-admin-theme="light"] .infra-server-host { color: rgba(34,39,47,.68); }',
-            ".infra-table td, .infra-table th { padding: 10px 8px; }",
         ):
             with self.subTest(marker=marker):
                 self.assertIn(marker, self.template)
@@ -12460,6 +12551,87 @@ if (html.includes('В БАНЕ')) { console.error('пометка на уста�
 // Строка «привязываем» и вызов старой формой (строкой вместо объекта)
 html = infraDomainRowHtml('new.example.xyz', true);
 if (!html.includes('Привязываем')) { console.error('pending сломан'); process.exit(1); }
+console.log('ok');
+"""
+        self.assertIn("ok", self._run_node(source))
+
+    def test_referral_activity_leaderboard_renders(self):
+        region = self._region(
+            "        function renderReferralActivity(result) {",
+            "        let refActivityLoaded = false;",
+        )
+        source = """
+const escapeHtml = (v) => String(v ?? '').replace(/[&<>"]/g,
+  (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const displayDate = (iso) => iso ? iso.split('-').reverse().join('.') : '';
+""" + region + """
+const row = (i, extra = {}) => ({user: {id: i, username: 'ref' + i, email: '', telegram_id: String(1000 + i)},
+  invited: 50 - i, connected: 30 - i, paid_users: i === 4 ? 0 : 5, revenue: i === 4 ? 0 : 1000 - i,
+  bonus_days: 10 + i, lifetime_invited: 100 + i, ...extra});
+const result = {period: {start: '2026-09-01', end: '2026-09-10'},
+  totals: {referrers: 12, referrals: 300, revenue: 18320, bonus_days: 1604},
+  rows: Array.from({length: 12}, (_, i) => row(i)), truncated: false};
+// toLocaleString в node вставляет узкий неразрывный пробел — нормализуем
+const html = renderReferralActivity(result).replace(/[\u202f\u00a0]/g, ' ');
+for (const marker of ['@ref0', 'tg 1000', 'всего пригласил 100', '01.09.2026 — 10.09.2026',
+                      '+300 рефералов', '18 320 ₽', '+10 дн бонусов', 'data-refact-user="ref0"',
+                      'data-refact-show-all', 'из 12 рефереров']) {
+  if (!html.includes(marker)) { console.error('нет: ' + marker); process.exit(1); }
+}
+// Первые 10 видимы, остальные спрятаны до «Показать всех»
+if ((html.match(/refact-row is-extra/g) || []).length !== 2) { console.error('is-extra != 2'); process.exit(1); }
+// Конверсия ниже процента — с десятой, ноль — гаснет
+if (!html.includes('10%')) { console.error('нет конверсии'); process.exit(1); }
+if (!/refact-money is-zero/.test(html)) { console.error('нулевая выручка не погашена'); process.exit(1); }
+// Пусто
+const empty = renderReferralActivity({period: {}, totals: {referrers: 0, referrals: 0}, rows: []});
+if (!empty.includes('рефералов нет')) { console.error('нет пустого состояния'); process.exit(1); }
+console.log('ok');
+"""
+        self.assertIn("ok", self._run_node(source))
+
+    def test_client_referrals_tree_renders(self):
+        region = self._region(
+            "        function referralBonusTypeLabel(type) {",
+            "        // ---------- Быстрая карточка подписки из «Трафика нод» ----------",
+        )
+        source = """
+const escapeHtml = (v) => String(v ?? '').replace(/[&<>"]/g,
+  (c) => ({'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;'}[c]));
+const main = {dataset: {fullAdmin: '1'}};
+""" + region + """
+const payload = {
+  user: {id: 1, username: 'demo_client'},
+  referral_block: {blocked: false},
+  summary: {referrals: 2, paid_referrals: 1, bonus_days: 17},
+  referrals: [
+    {user: {id: 2, username: 'marina_k', email: 'm@x.io'}, paid: true, bonus_days: 17,
+     payments_count: 4, children_count: 1,
+     bonuses: [{type: 'TRAFFIC', days: 7, created_at: '08.06.2026 14:00'}]},
+    {user: {id: 3, telegram_id: 555}, paid: false, bonus_days: 0, payments_count: 0,
+     children_count: 0, bonuses: []},
+  ],
+  graph: {nodes: [{id: 1, label: 'demo_client', root: true}, {id: 2, label: '@marina_k'},
+                  {id: 3, label: 'ID 555'}, {id: 4, label: '@stepan_v'}],
+          edges: [{from: 1, to: 2}, {from: 1, to: 3}, {from: 2, to: 4}]},
+};
+let html = clientReferralsSectionHtml(payload);
+for (const marker of ['@demo_client', '2 прямых', 'data-client-ref-row', '@marina_k',
+                      'Платил', 'Без оплат', '+7 дн', 'трафик', '@stepan_v', '├', '└',
+                      'Бонусов по этому рефералу нет.']) {
+  if (!html.includes(marker)) { console.error('нет: ' + marker); process.exit(1); }
+}
+if (html.includes('TRAFFIC')) { console.error('тип не переведён'); process.exit(1); }
+if (!html.includes('<small>50%</small>')) { console.error('нет доли оплативших'); process.exit(1); }
+// Пусто: строка статуса + сводка + пустое состояние, дерева нет
+html = clientReferralsSectionHtml({user: {id: 1}, referral_block: {blocked: false},
+  summary: {referrals: 0, paid_referrals: 0, bonus_days: 0}, referrals: []});
+if (!html.includes('никого не пригласил')) { console.error('нет пустого состояния'); process.exit(1); }
+if (html.includes('client-ref-tree-card')) { console.error('дерево в пустом состоянии'); process.exit(1); }
+// Блокировка: причина и дата в строке статуса, поле ввода спрятано
+html = clientReferralControlHtml({referral_block: {blocked: true, reason: 'Накрутка', updated_at: '07.09.2026 10:00'}});
+if (!html.includes('Бонусы заблокированы') || !html.includes('Накрутка · 07.09.2026 10:00')) { console.error('нет причины'); process.exit(1); }
+if (html.includes('data-client-referral-block-reason')) { console.error('поле причины при блокировке'); process.exit(1); }
 console.log('ok');
 """
         self.assertIn("ok", self._run_node(source))
