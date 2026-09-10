@@ -1,0 +1,44 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "dark-glow",
+        "value": "*",
+        "files": [
+          "docs/cabinet-desktop/cabinet-concept.html"
+        ],
+        "createdAt": "2026-09-10T00:57:52.989Z",
+        "reason": "brief pinned: gold glow is verbatim incumbent landing grammar (index_vpn.html .btn-gold), user pinned landing world for cabinet"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "files": [
+          "docs/cabinet-desktop/cabinet-concept.html"
+        ],
+        "createdAt": "2026-09-10T01:17:18.370Z",
+        "reason": "brief pinned: Inter is the incumbent landing's face (index_vpn.html), user pinned landing world for the cabinet"
+      },
+      {
+        "rule": "codex-grid-background",
+        "value": "*",
+        "files": [
+          "docs/cabinet-desktop/cabinet-concept.html"
+        ],
+        "createdAt": "2026-09-10T01:17:18.404Z",
+        "reason": "brief pinned: .grid-bg is verbatim incumbent landing grammar (index_vpn.html:43-49)"
+      },
+      {
+        "rule": "codex-grid-background",
+        "value": "*",
+        "files": [
+          "engine/static/css/cabinet-desktop.css"
+        ],
+        "createdAt": "2026-09-10T01:50:04.417Z",
+        "reason": "brief pinned: grid overlay is verbatim incumbent landing grammar (index_vpn.html .grid-bg), user approved cabinet skin in the landing world"
+      }
+    ]
+  }
+}

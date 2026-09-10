@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#090a0f">
+<title>Monkey Island VPN — личный кабинет (концепт ПК)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css">
+<style>
+    :root {
+        --hold: #090a0f;
+        --gold: #ffc700;
+        --mint: #38d996;
+        --ink: #e9edf3;
+        --line: rgba(233, 237, 243, .09);
+        --font: 'Inter', -apple-system, system-ui, 'Segoe UI', Roboto, sans-serif;
+        --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', monospace;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+
+    /* вкладки: контент страницы меняется по пункту навигации */
+    .tab-panel { display: none; }
+    .tab-panel.active { display: block; animation: tab-in .35s ease; }
+    @keyframes tab-in { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+    @media (prefers-reduced-motion: reduce) { .tab-panel.active { animation: none; } }
+    ::-webkit-scrollbar { width: 10px; }
+    ::-webkit-scrollbar-track { background: var(--hold); }
+    ::-webkit-scrollbar-thumb { background: rgba(233, 237, 243, .14); border-radius: 100px; border: 2px solid var(--hold); }
+    ::-webkit-scrollbar-thumb:hover { background: rgba(255, 199, 0, .45); }
+
+    body {
+        background:
+            radial-gradient(circle at 50% 0%, rgba(255, 199, 0, .06), transparent 40rem),
+            radial-gradient(circle at 90% 60%, rgba(255, 168, 0, .035), transparent 34rem),
+            var(--hold);
+        color: var(--ink);
+        font-family: var(--font);
+        overflow-x: hidden;
+        /* короткие вкладки: контент растягивается, футер прижат к низу окна */
+        min-height: 100vh; display: flex; flex-direction: column;
+    }
+    .wrap { flex: 1 0 auto; width: 100%; }
+    .mi-footer { flex-shrink: 0; }
+    ::selection { background: rgba(255, 199, 0, .85); color: #090a0f; }
+
+    .grid-bg {
+        position: fixed; inset: 0; pointer-events: none; z-index: 0;
+        background-image:
+            linear-gradient(rgba(233, 237, 243, .011) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(233, 237, 243, .011) 1px, transparent 1px);
+        background-size: 72px 72px;
+    }
+    #cursor-glow {
+        position: fixed; width: 520px; height: 520px; border-radius: 50%;
+        pointer-events: none; z-index: 1;
+        background: radial-gradient(circle, rgba(255, 199, 0, .09) 0%, rgba(56, 217, 150, .045) 40%, transparent 70%);
+        transform: translate(-50%, -50%);
+    }
+
+    .wrap { position: relative; z-index: 2; max-width: 1200px; margin: 0 auto; padding: 0 24px; }
+
+    /* ── навигация: как на лендинге ── */
+    .mi-nav {
+        position: sticky; top: 0; z-index: 50;
+        display: flex; align-items: center; justify-content: space-between; gap: 18px;
+        padding: 14px 32px;
+        background: rgba(9, 10, 15, .78); backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(233, 237, 243, .07);
+    }
+    .mi-logo { display: flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); }
+    .mi-logo-mark { width: 42px; height: 42px; border-radius: 10px; display: block; }
+    .mi-logo-name { font-weight: 800; font-size: 15px; letter-spacing: -.01em; }
+    .mi-logo-name span { color: var(--gold); }
+    .mi-nav-links { display: flex; gap: 26px; align-items: center; }
+    .mi-nav-links a { color: rgba(233, 237, 243, .72); text-decoration: none; font-size: 14px; font-weight: 600; transition: color .2s; }
+    .mi-nav-links a:hover, .mi-nav-links a.active { color: var(--gold); }
+    .mi-account { display: flex; align-items: center; gap: 14px; }
+    .mi-account .email {
+        font-family: var(--mono); font-size: 12px; color: rgba(233, 237, 243, .6);
+        border: 1px solid var(--line); border-radius: 100px; padding: 8px 14px;
+    }
+    .mi-account .logout {
+        color: rgba(233, 237, 243, .55); font-size: 13px; font-weight: 600; text-decoration: none;
+        display: inline-flex; align-items: center; gap: 8px; transition: color .2s;
+    }
+    .mi-account .logout:hover { color: var(--gold); }
+
+    .btn {
+        display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+        font-family: var(--font); font-weight: 700; font-size: 15px;
+        padding: 14px 28px; border-radius: 12px; text-decoration: none; border: 0; cursor: pointer;
+        transition: transform .2s, box-shadow .2s, border-color .2s, color .2s;
+    }
+    .btn-gold { background: var(--gold); color: #090a0f !important; box-shadow: 0 0 24px rgba(255, 199, 0, .25); }
+    .btn-gold:hover { transform: translateY(-2px); box-shadow: 0 6px 32px rgba(255, 199, 0, .4); }
+    .btn-ghost { border: 1px solid rgba(233, 237, 243, .25); color: var(--ink); background: transparent; }
+    .btn-ghost:hover { border-color: var(--gold); color: var(--gold); }
+
+    /* ── первый экран: доступ ── */
+    .access-grid {
+        display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
+        gap: 20px; padding: 44px 0 12px; align-items: stretch;
+    }
+    .access-card {
+        position: relative; overflow: hidden;
+        border: 1px solid rgba(255, 199, 0, .28); border-radius: 18px;
+        padding: 38px 40px 36px;
+        background: linear-gradient(160deg, rgba(255, 199, 0, .05), rgba(9, 10, 15, 0) 55%), rgba(9, 10, 15, .72);
+        box-shadow: 0 0 60px rgba(255, 199, 0, .07);
+    }
+    .access-card::after {
+        content: ""; position: absolute; right: -60px; bottom: -70px; width: 320px; height: 260px;
+        background: url("bay-lighthouse.svg") no-repeat center / cover;
+        opacity: .18; pointer-events: none;
+        -webkit-mask-image: linear-gradient(115deg, transparent 8%, #000 55%);
+                mask-image: linear-gradient(115deg, transparent 8%, #000 55%);
+    }
+    .chip {
+        display: inline-flex; align-items: center; gap: 8px;
+        font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase;
+        color: var(--gold); border: 1px solid rgba(255, 199, 0, .3);
+        padding: 8px 16px; border-radius: 100px; margin-bottom: 26px;
+        background: rgba(9, 10, 15, .6);
+    }
+    .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 8px var(--mint); animation: pulse 2s infinite; }
+    @keyframes pulse { 50% { opacity: .4; } }
+
+    .access-card h1 { font-weight: 800; font-size: 30px; letter-spacing: -.02em; color: #fff; }
+    .access-days {
+        display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap;
+        margin: 18px 0 8px;
+    }
+    .access-days .num {
+        font-family: var(--mono); font-weight: 700; font-size: 76px; line-height: 1;
+        letter-spacing: -.04em; color: var(--gold); text-shadow: 0 0 50px rgba(255, 199, 0, .3);
+        font-variant-numeric: tabular-nums;
+    }
+    .access-days .unit { font-weight: 800; font-size: 26px; color: #fff; letter-spacing: -.01em; }
+    .access-until { font-size: 15px; color: rgba(233, 237, 243, .65); }
+    .access-until b { color: #fff; font-weight: 600; font-family: var(--mono); font-size: 14px; }
+
+    .access-progress { margin: 26px 0 30px; max-width: 520px; }
+    .access-progress .track {
+        height: 8px; border-radius: 100px; background: rgba(233, 237, 243, .08); overflow: hidden;
+    }
+    .access-progress .fill {
+        height: 100%; width: 100%; border-radius: 100px;
+        background: linear-gradient(90deg, #ffda45, var(--gold));
+        box-shadow: 0 0 14px rgba(255, 199, 0, .5);
+        transform: scaleX(0); transform-origin: left;
+        transition: transform 1.1s cubic-bezier(.16, 1, .3, 1);
+    }
+    .access-progress .scale {
+        display: flex; justify-content: space-between; margin-top: 10px;
+        font-family: var(--mono); font-size: 11px; color: rgba(233, 237, 243, .4);
+        letter-spacing: .06em;
+    }
+    .access-cta { display: flex; gap: 14px; flex-wrap: wrap; align-items: center; }
+    .access-note {
+        margin-top: 20px; display: flex; gap: 18px; flex-wrap: wrap;
+        font-size: 13px; color: rgba(233, 237, 243, .55);
+    }
+    .access-note i { color: var(--mint); margin-right: 7px; }
+
+    /* правая колонка статов — грамматика .stats лендинга */
+    .stat-col { display: grid; grid-template-rows: repeat(3, 1fr); gap: 1px; background: var(--line); border-radius: 16px; overflow: hidden; }
+    .stat-cell { background: rgba(9, 10, 15, .92); padding: 22px 26px; display: flex; flex-direction: column; justify-content: center; gap: 6px; transition: background .25s; }
+    .stat-cell:hover { background: rgba(255, 255, 255, .03); }
+    .stat-cell .stat-num { font-weight: 800; font-size: 28px; letter-spacing: -.02em; color: var(--gold); font-variant-numeric: tabular-nums; }
+    .stat-cell .stat-num small { font-size: 15px; font-weight: 700; color: rgba(233, 237, 243, .45); }
+    .stat-cell .stat-num .mint { color: var(--mint); }
+    .stat-cell .stat-label { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: rgba(233, 237, 243, .5); }
+    .stat-cell .stat-sub { font-family: var(--mono); font-size: 11px; color: rgba(233, 237, 243, .38); }
+
+    /* баннеры привязки аккаунтов (грамматика known-banner лендинга) */
+    .bind-banner {
+        display: flex; align-items: center; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+        border: 1px solid var(--line); border-radius: 18px; padding: 20px 28px;
+        background: rgba(255, 255, 255, .03); margin-top: 20px;
+    }
+    .bind-banner .bb-left { display: flex; align-items: center; gap: 16px; min-width: 0; }
+    .bind-banner .bb-ico {
+        flex: 0 0 auto; width: 44px; height: 44px; border-radius: 12px;
+        display: grid; place-items: center; font-size: 19px;
+        color: #4db8ff; background: rgba(0, 136, 204, .12); border: 1px solid rgba(0, 136, 204, .3);
+    }
+    .bind-banner .bb-ico.mail { color: var(--gold); background: rgba(255, 199, 0, .07); border-color: rgba(255, 199, 0, .3); }
+    .bind-banner b { display: block; color: #fff; font-size: 15px; font-weight: 700; letter-spacing: -.01em; }
+    .bind-banner p { font-size: 13px; color: rgba(233, 237, 243, .6); margin-top: 5px; line-height: 1.5; }
+    .bind-banner .bonus { color: var(--mint); font-weight: 600; }
+
+    /* полоса «доступ истекает» — грамматика ip-topbar лендинга */
+    .expire-topbar {
+        display: flex; align-items: center; justify-content: center; gap: 10px; flex-wrap: wrap;
+        padding: 12px 16px; border: 1px solid rgba(199, 80, 46, .45); border-radius: 12px;
+        background: #0d0a09; margin-bottom: 20px;
+        color: rgba(233, 237, 243, .75); font-size: 13.5px; font-weight: 500; text-align: center;
+    }
+    .expire-topbar .warn-txt { color: #ff8a63; font-weight: 700; }
+    .expire-topbar a {
+        color: var(--gold); font-weight: 700;
+        text-decoration: underline; text-underline-offset: 3px;
+    }
+    .expire-topbar a:hover { color: #ffe066; }
+
+    /* ── секции ── */
+    section { padding: 58px 0 26px; }
+    .sec-head { display: flex; align-items: baseline; gap: 20px; margin-bottom: 34px; }
+    .sec-num { font-weight: 800; font-size: 15px; color: var(--hold); background: var(--gold); padding: 6px 14px; border-radius: 8px; flex: 0 0 auto; }
+    .sec-title { min-width: 0; font-weight: 800; font-size: clamp(24px, 3vw, 34px); letter-spacing: -.02em; line-height: 1.1; color: #fff; }
+    .sec-title small {
+        display: block; font-family: var(--mono); font-size: 11px; font-weight: 500;
+        letter-spacing: .22em; text-transform: uppercase; color: var(--mint); margin-top: 12px; overflow-wrap: anywhere;
+    }
+    .sec-title small::before { content: "// "; }
+    .sec-side { margin-left: auto; flex: 0 0 auto; }
+
+    /* устройства */
+    .device-list { display: flex; flex-direction: column; gap: 12px; }
+    .device {
+        display: grid; grid-template-columns: 46px minmax(0, 1.4fr) minmax(0, 1fr) auto auto;
+        gap: 18px; align-items: center;
+        border: 1px solid var(--line); border-radius: 14px; padding: 18px 22px;
+        background: rgba(255, 255, 255, .02);
+        transition: border-color .25s, background .25s;
+    }
+    .device:hover { border-color: rgba(255, 199, 0, .35); background: rgba(255, 255, 255, .03); }
+    .device-ico {
+        width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center;
+        border: 1px solid var(--line); color: var(--gold); font-size: 18px; background: rgba(255, 199, 0, .05);
+    }
+    .device-name { font-weight: 700; font-size: 15px; color: #fff; letter-spacing: -.01em; }
+    .device-app { font-size: 12.5px; color: rgba(233, 237, 243, .5); margin-top: 4px; }
+    .device-seen { font-family: var(--mono); font-size: 12px; color: rgba(233, 237, 243, .5); }
+    .device-status { font-size: 11px; font-weight: 700; letter-spacing: .1em; color: var(--mint); white-space: nowrap; }
+    .device-status::before { content: "● "; }
+    .device-status.idle { color: rgba(233, 237, 243, .35); }
+    .device-remove {
+        border: 0; background: transparent; color: rgba(233, 237, 243, .35);
+        font-size: 15px; cursor: pointer; padding: 10px; border-radius: 10px; transition: color .2s, background .2s;
+    }
+    .device-remove:hover { color: #ff6b57; background: rgba(255, 107, 87, .08); }
+    .device-foot {
+        display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+        margin-top: 18px; font-size: 13px; color: rgba(233, 237, 243, .5);
+    }
+    .device-foot .cap { font-family: var(--mono); font-size: 12px; }
+    .device-foot .cap b { color: var(--gold); font-weight: 700; }
+
+    /* установка */
+    .setup-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+    .platform-row { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 28px; }
+    .platform-chip {
+        display: inline-flex; align-items: center; gap: 9px;
+        font-family: var(--font); font-size: 13px; font-weight: 600; color: rgba(233, 237, 243, .7);
+        border: 1px solid var(--line); border-radius: 100px; padding: 10px 18px;
+        background: transparent; cursor: pointer; transition: color .2s, border-color .2s, background .2s;
+    }
+    .platform-chip:hover { border-color: rgba(255, 199, 0, .4); color: var(--gold); }
+    .platform-chip.active { border-color: var(--gold); color: var(--gold); background: rgba(255, 199, 0, .07); }
+
+    .steps-col { counter-reset: step; display: flex; flex-direction: column; }
+    .step-row {
+        display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 20px;
+        padding: 22px 0; border-top: 1px solid var(--line);
+    }
+    .step-row:last-child { border-bottom: 1px solid var(--line); }
+    .step-row::before {
+        counter-increment: step; content: "0" counter(step);
+        font-family: var(--mono); font-weight: 700; font-size: 24px;
+        color: rgba(255, 199, 0, .55); letter-spacing: -.02em; padding-top: 2px;
+    }
+    .step-row h4 { font-size: 16px; font-weight: 700; color: #fff; letter-spacing: -.01em; margin-bottom: 8px; }
+    .step-row p { font-size: 14px; line-height: 1.65; color: rgba(233, 237, 243, .6); }
+    .step-row p a { color: var(--gold); font-weight: 600; text-decoration: none; }
+    .step-row p a:hover { color: #ffe066; }
+
+    .key-field {
+        display: flex; align-items: center; gap: 12px; margin-top: 14px;
+        border: 1px solid var(--line); border-radius: 12px; padding: 13px 16px;
+        background: rgba(255, 255, 255, .03); max-width: 560px;
+    }
+    .key-field code {
+        font-family: var(--mono); font-size: 12.5px; color: var(--mint);
+        overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1; min-width: 0;
+    }
+    .copy-btn {
+        flex: 0 0 auto; display: inline-flex; align-items: center; gap: 8px;
+        border: 1px solid rgba(255, 199, 0, .35); background: rgba(255, 199, 0, .07);
+        color: var(--gold); font-family: var(--font); font-size: 12.5px; font-weight: 700;
+        border-radius: 9px; padding: 9px 14px; cursor: pointer; transition: background .2s, transform .15s;
+    }
+    .copy-btn:hover { background: rgba(255, 199, 0, .14); }
+    .copy-btn:active { transform: scale(.96); }
+    .copy-btn.done { border-color: rgba(56, 217, 150, .5); color: var(--mint); background: rgba(56, 217, 150, .08); }
+
+    .qr-card {
+        border: 1px solid var(--line); border-radius: 18px; padding: 30px 26px; text-align: center;
+        background: linear-gradient(160deg, rgba(255, 255, 255, .04), rgba(9, 10, 15, 0) 55%);
+    }
+    .qr-box {
+        width: 190px; height: 190px; margin: 0 auto 20px; border-radius: 14px;
+        background:
+            repeating-linear-gradient(0deg, rgba(9,10,15,.92) 0 6px, transparent 6px 12px),
+            repeating-linear-gradient(90deg, rgba(9,10,15,.92) 0 6px, #fff 6px 12px);
+        border: 8px solid #fff; position: relative;
+    }
+    .qr-box::after {
+        content: ""; position: absolute; inset: 0; margin: auto; width: 44px; height: 44px;
+        background: url("monkey-island-logo-animated.webp") no-repeat center / cover;
+        border-radius: 10px; border: 3px solid #fff;
+    }
+    .qf {
+        position: absolute; width: 36px; height: 36px;
+        background: #fff; border: 6px solid #0a0b10; box-shadow: inset 0 0 0 5px #fff;
+    }
+    .qf::after { content: ""; position: absolute; inset: 5px; background: #0a0b10; }
+    .qf.tl { top: 6px; left: 6px; }
+    .qf.tr { top: 6px; right: 6px; }
+    .qf.bl { bottom: 6px; left: 6px; }
+    .qr-card h4 { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+    .qr-card p { font-size: 13px; line-height: 1.6; color: rgba(233, 237, 243, .55); }
+
+    /* рефералы */
+    .ref-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(0, 1fr); gap: 20px; align-items: stretch; }
+    .ref-card {
+        border: 1px solid var(--line); border-radius: 18px; padding: 30px 32px;
+        background: linear-gradient(160deg, rgba(56, 217, 150, .05), rgba(9, 10, 15, 0) 55%);
+        display: flex; flex-direction: column; justify-content: center;
+    }
+    .ref-card h3 { font-weight: 800; font-size: 22px; letter-spacing: -.015em; color: #fff; margin-bottom: 10px; }
+    .ref-card h3 b { color: var(--mint); }
+    .ref-card > p { font-size: 14px; line-height: 1.65; color: rgba(233, 237, 243, .6); max-width: 480px; }
+    .ref-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: var(--line); border-radius: 16px; overflow: hidden; }
+    .ref-stat { background: rgba(9, 10, 15, .92); padding: 26px; display: flex; flex-direction: column; gap: 8px; justify-content: center; }
+    .ref-stat .n { font-family: var(--mono); font-weight: 700; font-size: 34px; letter-spacing: -.02em; color: var(--mint); font-variant-numeric: tabular-nums; }
+    .ref-stat .l { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: rgba(233, 237, 243, .5); }
+
+    /* шаги реферальной программы — грамматика .steps лендинга */
+    .ref-steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; counter-reset: refstep; margin-top: 20px; }
+    .ref-step { border-left: 2px solid rgba(56, 217, 150, .4); padding: 8px 0 8px 24px; }
+    .ref-step::before {
+        counter-increment: refstep; content: "0" counter(refstep);
+        font-family: var(--mono); font-weight: 700; font-size: 26px; color: rgba(56, 217, 150, .55);
+        display: block; margin-bottom: 12px; letter-spacing: -.02em;
+    }
+    .ref-step h4 { font-size: 15px; font-weight: 700; margin-bottom: 8px; color: #fff; letter-spacing: -.01em; }
+    .ref-step p { font-size: 13.5px; line-height: 1.6; color: rgba(233, 237, 243, .6); }
+    .ref-share { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 16px; }
+
+    /* поддержка */
+    .support-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .support-card {
+        border: 1px solid var(--line); border-radius: 18px; padding: 30px 32px;
+        background: linear-gradient(160deg, rgba(255, 255, 255, .04), rgba(9, 10, 15, 0) 55%);
+        transition: transform .3s, border-color .3s;
+    }
+    .support-card:hover { transform: translateY(-4px); border-color: rgba(255, 199, 0, .4); }
+    .support-card .ico { font-size: 24px; color: var(--gold); margin-bottom: 18px; }
+    .support-card h3 { font-weight: 700; font-size: 17px; color: #fff; letter-spacing: -.01em; margin-bottom: 10px; }
+    .support-card p { font-size: 14px; line-height: 1.65; color: rgba(233, 237, 243, .6); margin-bottom: 20px; }
+
+    /* профиль */
+    .profile-list { display: flex; flex-direction: column; gap: 12px; max-width: 760px; }
+    .profile-row {
+        display: grid; grid-template-columns: 46px minmax(0, 1fr) auto; gap: 18px; align-items: center;
+        border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px;
+        background: rgba(255, 255, 255, .02); color: inherit; text-decoration: none;
+        transition: border-color .25s, background .25s;
+    }
+    .profile-row:hover { border-color: rgba(255, 199, 0, .35); background: rgba(255, 255, 255, .03); }
+    .profile-ico {
+        width: 46px; height: 46px; border-radius: 12px; display: grid; place-items: center;
+        border: 1px solid var(--line); color: var(--gold); font-size: 17px; background: rgba(255, 199, 0, .05);
+    }
+    .profile-ico.tg { color: #4db8ff; background: rgba(0, 136, 204, .1); border-color: rgba(0, 136, 204, .3); }
+    .profile-title { font-weight: 700; font-size: 15px; color: #fff; letter-spacing: -.01em; }
+    .profile-sub { font-size: 12.5px; color: rgba(233, 237, 243, .5); margin-top: 4px; }
+    .profile-sub.ok { color: var(--mint); }
+    .profile-action { font-size: 13.5px; font-weight: 700; color: var(--gold); text-decoration: none; white-space: nowrap; }
+    .profile-action:hover { color: #ffe066; }
+    .profile-chev { color: rgba(233, 237, 243, .35); font-size: 13px; }
+    details.profile-fold { border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, .02); transition: border-color .25s; }
+    details.profile-fold[open] { border-color: rgba(255, 199, 0, .3); }
+    details.profile-fold > summary { list-style: none; cursor: pointer; }
+    details.profile-fold > summary::-webkit-details-marker { display: none; }
+    details.profile-fold > summary .profile-row { border: 0; background: transparent; }
+    details.profile-fold[open] > summary .profile-chev { transform: rotate(90deg); }
+    .profile-chev { transition: transform .25s; }
+    .fold-body { padding: 4px 20px 18px 84px; }
+
+    .pay-list { display: flex; flex-direction: column; }
+    .pay-row {
+        display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto; gap: 16px;
+        padding: 13px 0; border-top: 1px solid var(--line); align-items: baseline;
+    }
+    .pay-row .d { font-family: var(--mono); font-size: 12.5px; color: rgba(233, 237, 243, .6); }
+    .pay-row .t { font-size: 13.5px; color: rgba(233, 237, 243, .75); }
+    .pay-row .s { font-family: var(--mono); font-size: 13px; font-weight: 700; color: #fff; }
+    .pay-row .s i { color: var(--mint); font-size: 11px; margin-left: 7px; }
+    .quiet-link {
+        display: inline-block; margin-top: 16px;
+        font-size: 12px; color: rgba(233, 237, 243, .4); text-decoration: underline; text-underline-offset: 3px;
+    }
+    .quiet-link:hover { color: #ff8a63; }
+
+    .faq-item { border-top: 1px solid var(--line); padding: 12px 0; }
+    .faq-item summary { list-style: none; cursor: pointer; font-size: 13.5px; font-weight: 600; color: rgba(233, 237, 243, .8); }
+    .faq-item summary::-webkit-details-marker { display: none; }
+    .faq-item summary::before { content: "+ "; color: var(--gold); font-weight: 700; }
+    .faq-item[open] summary::before { content: "− "; }
+    .faq-item p { font-size: 13px; line-height: 1.6; color: rgba(233, 237, 243, .55); padding: 8px 0 2px 16px; }
+
+    /* статус-полоса поддержки */
+    .status-strip {
+        display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+        border: 1px solid rgba(56, 217, 150, .3); border-radius: 14px; padding: 16px 22px;
+        background: rgba(56, 217, 150, .04); margin-bottom: 20px; max-width: 100%;
+    }
+    .status-strip .st { color: var(--mint); font-weight: 700; font-size: 14px; }
+    .status-strip .st::before { content: "● "; }
+    .status-strip .eta { font-size: 13px; color: rgba(233, 237, 243, .6); }
+
+    /* демо-состояния карточки доступа (только для концепта) */
+    .states-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .state-card {
+        border: 1px solid var(--line); border-radius: 18px; padding: 28px 30px;
+        background: rgba(9, 10, 15, .72);
+    }
+    .state-card .chip { margin-bottom: 18px; }
+    .state-card.warn { border-color: rgba(199, 80, 46, .45); }
+    .state-card.warn .chip { color: #ff8a63; border-color: rgba(199, 80, 46, .5); }
+    .state-card.warn .chip .dot { background: #ff8a63; box-shadow: 0 0 8px #ff8a63; animation: none; }
+    .state-card.off .chip { color: rgba(233, 237, 243, .5); border-color: rgba(233, 237, 243, .18); }
+    .state-card.off .chip .dot { background: rgba(233, 237, 243, .35); box-shadow: none; animation: none; }
+    .state-days { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+    .state-days .num {
+        font-family: var(--mono); font-weight: 700; font-size: 44px; line-height: 1;
+        letter-spacing: -.04em; font-variant-numeric: tabular-nums;
+    }
+    .state-card.warn .state-days .num { color: #ff8a63; }
+    .state-card.off .state-days .num { color: rgba(233, 237, 243, .35); }
+    .state-days .unit { font-weight: 800; font-size: 18px; color: #fff; }
+    .state-card p { font-size: 13.5px; line-height: 1.6; color: rgba(233, 237, 243, .6); margin-bottom: 20px; }
+    .state-card .track { height: 6px; border-radius: 100px; background: rgba(233, 237, 243, .08); overflow: hidden; margin-bottom: 20px; }
+    .state-card .track i { display: block; height: 100%; border-radius: 100px; }
+    .state-card.warn .track i { width: 7%; background: linear-gradient(90deg, #ff8a63, #c7502e); }
+    .state-card.off .track i { width: 0; }
+
+    /* финал */
+    .final {
+        position: relative; border-radius: 24px; overflow: hidden; margin: 46px 0 70px;
+        min-height: 240px; display: flex; flex-direction: column; justify-content: center; padding: 52px 60px;
+        border: 1px solid var(--line);
+    }
+    .final .bg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 78%; z-index: -1; opacity: .8; }
+    .final::after { content: ""; position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(9,10,15,.85), rgba(9,10,15,.2)); }
+    .final h2 { font-weight: 800; font-size: clamp(24px, 3vw, 38px); letter-spacing: -.02em; line-height: 1.1; max-width: 520px; color: #fff; }
+    .final h2 span { color: var(--gold); }
+    .final p { margin-top: 12px; font-size: 14px; color: rgba(233, 237, 243, .65); max-width: 440px; }
+    .final .btn { margin-top: 26px; align-self: flex-start; }
+
+    /* футер */
+    .mi-footer {
+        border-top: 1px solid rgba(233, 237, 243, .07);
+        padding: 40px 32px; position: relative; z-index: 2;
+        display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap;
+        font-size: 11px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase;
+        color: rgba(233, 237, 243, .4);
+    }
+    .mi-footer .foot-links { display: flex; gap: 22px; flex-wrap: wrap; }
+    .mi-footer .foot-links a { color: rgba(233, 237, 243, .5); text-decoration: none; transition: color .2s; }
+    .mi-footer .foot-links a:hover { color: var(--gold); }
+
+    /* фокус и reveal */
+    a:focus-visible, button:focus-visible {
+        outline: 2px solid var(--gold); outline-offset: 3px; border-radius: 8px;
+    }
+    .reveal { opacity: 0; transform: translateY(30px); transition: opacity .7s ease, transform .7s ease; }
+    .reveal.visible { opacity: 1; transform: none; }
+    @media (prefers-reduced-motion: reduce) {
+        .reveal { opacity: 1; transform: none; transition: none; }
+        .access-progress .fill { transition: none; }
+        .chip .dot { animation: none; }
+    }
+
+    /* ── адаптив ── */
+    @media (max-width: 1024px) {
+        .access-grid { grid-template-columns: 1fr; }
+        .stat-col { grid-template-rows: none; grid-template-columns: repeat(3, 1fr); }
+        .setup-grid, .ref-grid { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 760px) {
+        .mi-nav { padding: 12px 16px; flex-wrap: wrap; }
+        .mi-nav-links {
+            order: 3; flex: 1 1 100%; gap: 18px;
+            overflow-x: auto; padding: 8px 2px 2px; scrollbar-width: none;
+        }
+        .mi-nav-links::-webkit-scrollbar { display: none; }
+        .mi-nav-links a { white-space: nowrap; font-size: 13px; }
+        .mi-account .email { display: none; }
+        .access-card { padding: 28px 24px; }
+        .access-days .num { font-size: 56px; }
+        .chip { font-size: 10.5px; padding: 7px 13px; letter-spacing: .06em; }
+        .stat-col { grid-template-columns: 1fr; }
+        .device { grid-template-columns: 46px minmax(0, 1fr) auto; }
+        .device-seen, .device-status { display: none; }
+        .support-grid, .states-grid, .ref-steps { grid-template-columns: 1fr; }
+        .final { padding: 36px 26px; }
+        .sec-side { display: none; }
+    }
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div id="cursor-glow"></div>
+
+<nav class="mi-nav">
+    <a class="mi-logo" href="/" aria-label="Monkey Island VPN">
+        <img class="mi-logo-mark" src="monkey-island-logo-animated.webp" alt="" width="42" height="42">
+        <span class="mi-logo-name">MONKEY ISLAND<span> VPN</span></span>
+    </a>
+    <div class="mi-nav-links" id="section-nav">
+        <a href="#home" class="active" data-tab="home" onclick="return showTab('home')">Главная</a>
+        <a href="#devices" data-tab="devices" onclick="return showTab('devices')">Устройства</a>
+        <a href="#setup" data-tab="setup" onclick="return showTab('setup')">Установка</a>
+        <a href="#referrals" data-tab="referrals" onclick="return showTab('referrals')">Рефералы</a>
+        <a href="#support" data-tab="support" onclick="return showTab('support')">Поддержка</a>
+        <a href="#profile" data-tab="profile" onclick="return showTab('profile')">Профиль</a>
+        <a href="#states" data-tab="states" onclick="return showTab('states')" title="Служебная вкладка концепта">Демо</a>
+    </div>
+    <div class="mi-account">
+        <span class="email">user@example.com</span>
+        <a class="logout" href="#"><i class="fas fa-right-from-bracket"></i> Выйти</a>
+    </div>
+</nav>
+
+<div class="wrap">
+
+    <!-- ГЛАВНАЯ -->
+    <div class="tab-panel active" id="tab-home">
+
+    <!-- первый экран: доступ -->
+    <div class="access-grid">
+        <div class="access-card">
+            <div class="chip"><span class="dot"></span> Остров на связи · Доступ активен</div>
+            <h1>Ваш доступ</h1>
+            <div class="access-days">
+                <span class="num" id="days-num">23</span>
+                <span class="unit">дня</span>
+            </div>
+            <p class="access-until">Подписка действует до <b>3 октября 2026, 12:40</b></p>
+            <div class="access-progress">
+                <div class="track"><div class="fill" id="days-fill" data-progress="77%"></div></div>
+                <div class="scale"><span>3 СЕН</span><span>ОСТАЛОСЬ 77%</span><span>3 ОКТ</span></div>
+            </div>
+            <div class="access-cta">
+                <a href="#" class="btn btn-gold"><i class="fas fa-bolt"></i> Продлить доступ</a>
+                <a href="#" class="btn btn-ghost">Сменить тариф</a>
+            </div>
+            <div class="access-note">
+                <span><i class="fas fa-infinity"></i>Безлимитный трафик</span>
+                <span><i class="fas fa-rotate"></i>Автоплатёж включён — продлится сам</span>
+            </div>
+        </div>
+
+        <div class="stat-col">
+            <div class="stat-cell">
+                <div class="stat-num">3<small> / 15</small></div>
+                <div class="stat-label">Устройств подключено</div>
+                <div class="stat-sub">iPhone · MacBook · Keenetic</div>
+            </div>
+            <div class="stat-cell">
+                <div class="stat-num">&infin;</div>
+                <div class="stat-label">Трафик за сентябрь</div>
+                <div class="stat-sub">без ограничений скорости</div>
+            </div>
+            <div class="stat-cell">
+                <div class="stat-num"><span class="mint">ВКЛ</span></div>
+                <div class="stat-label">Автоплатёж</div>
+                <div class="stat-sub">следующее списание 3 окт · 299 ₽</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- баннер привязки Telegram: показывается, только если telegram_id пуст -->
+    <div class="bind-banner reveal">
+        <div class="bb-left">
+            <span class="bb-ico"><i class="fab fa-telegram-plane"></i></span>
+            <div>
+                <b>Привяжите Telegram — <span class="bonus">+7 дней в подарок</span></b>
+                <p>Бот напомнит о продлении, пришлёт чек об оплате и поможет с настройкой. Подписка станет доступна и в боте, и на сайте.</p>
+            </div>
+        </div>
+        <a href="#" class="btn btn-gold" style="font-size:14px;padding:12px 24px"><i class="fab fa-telegram-plane"></i> Привязать Telegram</a>
+    </div>
+
+    <!-- финал -->
+    <div class="final" id="final-band">
+        <img class="bg" src="flagship.svg" alt="">
+        <h2>Продлите заранее — <span>и не думайте об этом</span></h2>
+        <p>С автоплатежом доступ продлевается сам. Отключить можно в один клик в любой момент.</p>
+        <a href="#" class="btn btn-gold">Продлить доступ</a>
+    </div>
+    </div>
+
+    <!-- УСТРОЙСТВА -->
+    <div class="tab-panel" id="tab-devices">
+    <section id="devices">
+        <div class="sec-head">
+            <div class="sec-num">01</div>
+            <div class="sec-title">Мои устройства<small>Подключено 3 из 15 — место ещё есть</small></div>
+            <div class="sec-side"><a href="#setup" onclick="return showTab('setup')" class="btn btn-ghost" style="font-size:13px;padding:11px 20px"><i class="fas fa-plus"></i> Подключить ещё</a></div>
+        </div>
+        <div class="device-list">
+            <div class="device">
+                <div class="device-ico"><i class="fas fa-mobile-screen"></i></div>
+                <div>
+                    <div class="device-name">iPhone 15 Pro</div>
+                    <div class="device-app">Happ · iOS 18</div>
+                </div>
+                <div class="device-seen">сегодня, 02:14</div>
+                <div class="device-status">ONLINE</div>
+                <button type="button" class="device-remove" aria-label="Отключить iPhone 15 Pro" title="Отключить устройство"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div class="device">
+                <div class="device-ico"><i class="fas fa-laptop"></i></div>
+                <div>
+                    <div class="device-name">MacBook Pro 14&Prime;</div>
+                    <div class="device-app">Happ · macOS 15</div>
+                </div>
+                <div class="device-seen">вчера, 23:02</div>
+                <div class="device-status">ONLINE</div>
+                <button type="button" class="device-remove" aria-label="Отключить MacBook Pro" title="Отключить устройство"><i class="fas fa-xmark"></i></button>
+            </div>
+            <div class="device">
+                <div class="device-ico"><i class="fas fa-wifi"></i></div>
+                <div>
+                    <div class="device-name">Keenetic Giga</div>
+                    <div class="device-app">Роутер · вся квартира</div>
+                </div>
+                <div class="device-seen">3 дня назад</div>
+                <div class="device-status idle">НЕАКТИВНО</div>
+                <button type="button" class="device-remove" aria-label="Отключить Keenetic Giga" title="Отключить устройство"><i class="fas fa-xmark"></i></button>
+            </div>
+        </div>
+        <div class="device-foot">
+            <span>Неактивное устройство не занимает канал — отключайте только то, чем больше не пользуетесь.</span>
+            <span class="cap">СВОБОДНО <b>12</b> СЛОТОВ</span>
+        </div>
+    </section>
+    </div>
+
+    <!-- УСТАНОВКА -->
+    <div class="tab-panel" id="tab-setup">
+    <section id="setup">
+        <div class="sec-head">
+            <div class="sec-num">02</div>
+            <div class="sec-title">Установка<small>Ключ, приложение, готово — обычно 3 минуты</small></div>
+        </div>
+        <div class="platform-row" role="group" aria-label="Выбор платформы">
+            <button type="button" class="platform-chip active"><i class="fab fa-apple"></i> iOS</button>
+            <button type="button" class="platform-chip"><i class="fab fa-apple"></i> macOS</button>
+            <button type="button" class="platform-chip"><i class="fab fa-android"></i> Android</button>
+            <button type="button" class="platform-chip"><i class="fab fa-windows"></i> Windows</button>
+            <button type="button" class="platform-chip"><i class="fas fa-tv"></i> Smart TV</button>
+        </div>
+        <div class="setup-grid">
+            <div class="steps-col">
+                <div class="step-row">
+                    <div>
+                        <h4>Установите Happ из App Store</h4>
+                        <p>Бесплатное приложение для подключения. <a href="#">Открыть в App Store&nbsp;→</a></p>
+                    </div>
+                </div>
+                <div class="step-row">
+                    <div>
+                        <h4>Скопируйте ключ подписки</h4>
+                        <p>Один ключ работает на всех ваших устройствах и обновляется сам.</p>
+                        <div class="key-field">
+                            <code id="sub-key">https://sub.monkeyislandvpn.com/k/7f3a91c2-d84b-4e1a-9f27-a6c05b8d14e9</code>
+                            <button type="button" class="copy-btn" id="copy-key"><i class="far fa-copy"></i> Скопировать</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="step-row">
+                    <div>
+                        <h4>Вставьте ключ в Happ и включите VPN</h4>
+                        <p>Приложение само подтянет серверы. Выберите локацию — и остров на связи.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="qr-card">
+                <div class="qr-box" role="img" aria-label="QR-код с ключом подписки"><span class="qf tl"></span><span class="qf tr"></span><span class="qf bl"></span></div>
+                <h4>Или наведите камеру</h4>
+                <p>Откройте камеру телефона и наведите на QR — ключ добавится в Happ автоматически.</p>
+            </div>
+        </div>
+    </section>
+    </div>
+
+    <!-- РЕФЕРАЛЫ -->
+    <div class="tab-panel" id="tab-referrals">
+    <section id="referrals">
+        <div class="sec-head">
+            <div class="sec-num">03</div>
+            <div class="sec-title">Рефералы<small>Дарите VPN — получайте дни</small></div>
+        </div>
+        <div class="ref-grid">
+            <div class="ref-card">
+                <h3>Дарите друзьям VPN. <b>Получайте дни доступа.</b></h3>
+                <p>Друг получает 7 дней бесплатно, а вы — +7 дней к подписке после его первой оплаты. Приглашать можно сколько угодно.</p>
+                <div class="key-field" style="margin-top:18px">
+                    <code id="ref-link">https://monkeyislandvpn.com/r/7K2M9X</code>
+                    <button type="button" class="copy-btn" id="copy-ref"><i class="far fa-copy"></i> Скопировать</button>
+                </div>
+                <div class="ref-share">
+                    <a href="#" class="btn btn-ghost" style="font-size:13px;padding:11px 20px"><i class="fab fa-telegram-plane"></i> Отправить в Telegram</a>
+                    <a href="#" class="btn btn-ghost" style="font-size:13px;padding:11px 20px"><i class="fas fa-qrcode"></i> Показать QR</a>
+                </div>
+            </div>
+            <div class="ref-stats">
+                <div class="ref-stat"><span class="n">4</span><span class="l">Друга приглашено</span></div>
+                <div class="ref-stat"><span class="n">+28</span><span class="l">Дней начислено</span></div>
+            </div>
+        </div>
+        <div class="ref-steps">
+            <div class="ref-step">
+                <h4>Отправьте ссылку другу</h4>
+                <p>Скопируйте или поделитесь прямо в Telegram — ссылка персональная и не сгорает.</p>
+            </div>
+            <div class="ref-step">
+                <h4>Друг получает 7 дней бесплатно</h4>
+                <p>Он переходит по ссылке, и пробный период начинается сразу — карта не нужна.</p>
+            </div>
+            <div class="ref-step">
+                <h4>Вам +7 дней после его оплаты</h4>
+                <p>Как только друг оплатит подписку, дни автоматически прибавятся к вашей.</p>
+            </div>
+        </div>
+    </section>
+    </div>
+
+    <!-- ПОДДЕРЖКА -->
+    <div class="tab-panel" id="tab-support">
+    <section id="support">
+        <div class="sec-head">
+            <div class="sec-num">04</div>
+            <div class="sec-title">Поддержка<small>Мы рядом, если что-то не так</small></div>
+        </div>
+        <div class="status-strip">
+            <span class="st">Все системы работают</span>
+            <span class="eta">Ответим примерно за 3 минуты</span>
+        </div>
+        <div class="support-grid">
+            <div class="support-card">
+                <div class="ico"><i class="fab fa-telegram-plane"></i></div>
+                <h3>Поддержка в Telegram</h3>
+                <p>Самый быстрый способ: живой человек ответит и поможет с настройкой. Обычно отвечаем в течение часа.</p>
+                <a href="#" class="btn btn-gold" style="font-size:14px;padding:12px 22px">Написать в Telegram</a>
+            </div>
+            <div class="support-card">
+                <div class="ico"><i class="fas fa-circle-question"></i></div>
+                <h3>Частые вопросы</h3>
+                <p>Не подключается, пропала скорость, как оплатить или вернуть деньги — короткие ответы прямо в кабинете.</p>
+                <a href="#" class="btn btn-ghost" style="font-size:14px;padding:12px 22px">Открыть вопросы</a>
+            </div>
+        </div>
+    </section>
+    </div>
+
+    <!-- ПРОФИЛЬ -->
+    <div class="tab-panel" id="tab-profile">
+    <section id="profile">
+        <div class="sec-head">
+            <div class="sec-num">05</div>
+            <div class="sec-title">Профиль<small>Аккаунт, документы и управление подпиской</small></div>
+        </div>
+        <div class="profile-list">
+            <div class="profile-row">
+                <span class="profile-ico tg"><i class="fab fa-telegram-plane"></i></span>
+                <div>
+                    <div class="profile-title">Telegram</div>
+                    <div class="profile-sub">Не привязан — уведомления о продлении приходят в бота</div>
+                </div>
+                <a href="#" class="profile-action"><i class="fab fa-telegram-plane"></i> Привязать</a>
+            </div>
+            <div class="profile-row">
+                <span class="profile-ico"><i class="fas fa-envelope"></i></span>
+                <div>
+                    <div class="profile-title">Почта</div>
+                    <div class="profile-sub">user@example.com</div>
+                </div>
+                <a href="#" class="profile-action">Сменить</a>
+            </div>
+            <div class="profile-row">
+                <span class="profile-ico"><i class="fas fa-rotate"></i></span>
+                <div>
+                    <div class="profile-title">Автоплатёж</div>
+                    <div class="profile-sub ok">Включён · следующее списание 3 октября · 299 ₽</div>
+                </div>
+                <span class="profile-chev"><i class="fas fa-chevron-right"></i></span>
+            </div>
+            <details class="profile-fold">
+                <summary>
+                    <div class="profile-row">
+                        <span class="profile-ico"><i class="fas fa-receipt"></i></span>
+                        <div>
+                            <div class="profile-title">История платежей</div>
+                            <div class="profile-sub">Все ваши оплаты подписки</div>
+                        </div>
+                        <span class="profile-chev"><i class="fas fa-chevron-right"></i></span>
+                    </div>
+                </summary>
+                <div class="fold-body">
+                    <div class="pay-list">
+                        <div class="pay-row"><span class="d">03.09.2026</span><span class="t">1 месяц · автоплатёж</span><span class="s">299 ₽<i class="fas fa-check"></i></span></div>
+                        <div class="pay-row"><span class="d">03.08.2026</span><span class="t">1 месяц · автоплатёж</span><span class="s">299 ₽<i class="fas fa-check"></i></span></div>
+                        <div class="pay-row"><span class="d">03.07.2026</span><span class="t">1 месяц · карта</span><span class="s">299 ₽<i class="fas fa-check"></i></span></div>
+                    </div>
+                    <a href="#" class="quiet-link">Отключить автопродление</a>
+                </div>
+            </details>
+            <details class="profile-fold">
+                <summary>
+                    <div class="profile-row">
+                        <span class="profile-ico"><i class="fas fa-circle-question"></i></span>
+                        <div>
+                            <div class="profile-title">Часто задаваемые вопросы</div>
+                            <div class="profile-sub">Подключение, оплата, безопасность</div>
+                        </div>
+                        <span class="profile-chev"><i class="fas fa-chevron-right"></i></span>
+                    </div>
+                </summary>
+                <div class="fold-body">
+                    <details class="faq-item"><summary>Не подключается VPN — что делать?</summary><p>Обновите подписку в приложении, выберите другую локацию и проверьте, что ключ добавлен целиком. Если не помогло — напишите в поддержку.</p></details>
+                    <details class="faq-item"><summary>Как оплатить и когда придёт доступ?</summary><p>Оплата картой Visa · MC · Mir · СБП. Доступ продлевается сразу после оплаты, чек приходит на почту.</p></details>
+                    <details class="faq-item"><summary>Храните ли вы историю посещений?</summary><p>Нет. Мы не продаём данные и не добавляем рекламные трекеры в подключение.</p></details>
+                </div>
+            </details>
+            <div class="profile-row">
+                <span class="profile-ico"><i class="fas fa-display"></i></span>
+                <div>
+                    <div class="profile-title">Добавить на рабочий стол</div>
+                    <div class="profile-sub">Кабинет откроется как отдельное приложение</div>
+                </div>
+                <span class="profile-chev"><i class="fas fa-chevron-right"></i></span>
+            </div>
+            <a href="/terms/" class="profile-row">
+                <span class="profile-ico"><i class="fas fa-file-contract"></i></span>
+                <div>
+                    <div class="profile-title">Пользовательское соглашение</div>
+                </div>
+                <span class="profile-chev"><i class="fas fa-arrow-up-right-from-square"></i></span>
+            </a>
+            <a href="/privacy/" class="profile-row">
+                <span class="profile-ico"><i class="fas fa-shield-halved"></i></span>
+                <div>
+                    <div class="profile-title">Политика конфиденциальности</div>
+                </div>
+                <span class="profile-chev"><i class="fas fa-arrow-up-right-from-square"></i></span>
+            </a>
+        </div>
+    </section>
+    </div>
+
+    <!-- ДЕМО: состояния и баннеры (только для концепта) -->
+    <div class="tab-panel" id="tab-states">
+    <section id="states">
+        <div class="sec-head">
+            <div class="sec-num">06</div>
+            <div class="sec-title">Состояния и баннеры<small>Служебная вкладка концепта — в боевом кабинете это варианты Главной</small></div>
+        </div>
+        <div class="expire-topbar">
+            <span>Доступ <span class="warn-txt">истекает через 2 дня</span> — устройства отключатся 12 сентября.</span>
+            <a href="#">Продлить за 299 ₽</a>
+            <span style="flex-basis:100%;font-size:11px;color:rgba(233,237,243,.4)">Полоса показывается над навигацией на всех вкладках, когда осталось ≤ 3 дней — как ip-topbar на лендинге</span>
+        </div>
+        <div class="states-grid">
+            <div class="state-card warn">
+                <div class="chip"><span class="dot"></span> Доступ истекает</div>
+                <div class="state-days"><span class="num">2</span><span class="unit">дня</span></div>
+                <p>Подписка закончится 12 сентября. Продлите сейчас — устройства не заметят паузы.</p>
+                <div class="track"><i></i></div>
+                <a href="#" class="btn btn-gold" style="font-size:14px;padding:12px 22px"><i class="fas fa-bolt"></i> Продлить за 299 ₽</a>
+            </div>
+            <div class="state-card off">
+                <div class="chip"><span class="dot"></span> Доступ не оплачен</div>
+                <div class="state-days"><span class="num">0</span><span class="unit">дней</span></div>
+                <p>Подписка закончилась 2 сентября. Ключи сохранены — после оплаты всё заработает на тех же устройствах.</p>
+                <div class="track"><i></i></div>
+                <a href="#" class="btn btn-gold" style="font-size:14px;padding:12px 22px">Оплатить доступ</a>
+                <a href="#" class="btn btn-ghost" style="font-size:14px;padding:12px 22px;margin-left:10px">Выбрать тариф</a>
+            </div>
+        </div>
+
+        <!-- вариант для пользователя из бота: telegram_id есть, email пуст -->
+        <div class="bind-banner" style="margin-top:20px">
+            <div class="bb-left">
+                <span class="bb-ico mail"><i class="fas fa-envelope"></i></span>
+                <div>
+                    <b>Привяжите email</b>
+                    <p>Вход в кабинет по ссылке из письма и чеки об оплате на почту. Показывается вместо Telegram-баннера, когда пользователь пришёл из бота и email пуст.</p>
+                </div>
+            </div>
+            <a href="#" class="btn btn-ghost" style="font-size:14px;padding:12px 24px"><i class="fas fa-envelope"></i> Привязать email</a>
+        </div>
+    </section>
+    </div>
+
+</div>
+
+<footer class="mi-footer">
+    <div>&copy; 2026 MONKEY ISLAND VPN &middot; ИНН 616617872421</div>
+    <div class="foot-links">
+        <a href="#devices" onclick="return showTab('devices')">Устройства</a>
+        <a href="#setup" onclick="return showTab('setup')">Установка</a>
+        <a href="#support" onclick="return showTab('support')">Поддержка</a>
+        <a href="#profile" onclick="return showTab('profile')">Профиль</a>
+        <a href="/offer/">Оферта</a>
+    </div>
+</footer>
+
+<script>
+    (function () {
+        var glow = document.getElementById('cursor-glow');
+        if (glow && matchMedia('(pointer: fine)').matches) {
+            addEventListener('mousemove', function (e) {
+                glow.style.left = e.clientX + 'px';
+                glow.style.top = e.clientY + 'px';
+            });
+        } else if (glow) { glow.style.display = 'none'; }
+
+        if ('IntersectionObserver' in window) {
+            var io = new IntersectionObserver(function (entries) {
+                entries.forEach(function (en) {
+                    if (en.isIntersecting) { en.target.classList.add('visible'); io.unobserve(en.target); }
+                });
+            }, { threshold: .1 });
+            document.querySelectorAll('.reveal').forEach(function (el) { io.observe(el); });
+        } else {
+            document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('visible'); });
+        }
+
+        // прогресс-бар оставшихся дней
+        var fill = document.getElementById('days-fill');
+        if (fill) { setTimeout(function () { fill.style.transform = 'scaleX(' + (parseFloat(fill.dataset.progress) / 100) + ')'; }, 200); }
+
+        // подсветка активной секции в навигации
+        // переключение вкладок: контент страницы меняется по пункту навигации
+        var navLinks = document.querySelectorAll('#section-nav a[data-tab]');
+        window.showTab = function (name) {
+            document.querySelectorAll('.tab-panel').forEach(function (p) {
+                p.classList.toggle('active', p.id === 'tab-' + name);
+            });
+            navLinks.forEach(function (a) {
+                a.classList.toggle('active', a.dataset.tab === name);
+            });
+            window.scrollTo({ top: 0 });
+            if (history.replaceState) { history.replaceState(null, '', '#' + name); }
+            document.querySelectorAll('#tab-' + name + ' .reveal').forEach(function (el) { el.classList.add('visible'); });
+            return false;
+        };
+        var initTab = location.hash.slice(1);
+        if (initTab && document.getElementById('tab-' + initTab)) { showTab(initTab); }
+
+        // копирование ключа и реферальной ссылки
+        function bindCopy(btnId, srcId) {
+            var btn = document.getElementById(btnId);
+            var src = document.getElementById(srcId);
+            if (!btn || !src) return;
+            btn.addEventListener('click', function () {
+                var text = src.textContent.trim();
+                var done = function () {
+                    btn.classList.add('done');
+                    btn.innerHTML = '<i class="fas fa-check"></i> Скопировано';
+                    setTimeout(function () {
+                        btn.classList.remove('done');
+                        btn.innerHTML = '<i class="far fa-copy"></i> Скопировать';
+                    }, 1800);
+                };
+                if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, done); } else { done(); }
+            });
+        }
+        bindCopy('copy-key', 'sub-key');
+        bindCopy('copy-ref', 'ref-link');
+
+        // платформенные чипы (демо-состояние)
+        document.querySelectorAll('.platform-chip').forEach(function (chip) {
+            chip.addEventListener('click', function () {
+                document.querySelectorAll('.platform-chip').forEach(function (c) { c.classList.remove('active'); });
+                chip.classList.add('active');
+            });
+        });
+    })();
+</script>
+</body>
+</html>

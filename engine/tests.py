@@ -23,6 +23,7 @@ from datetime import timezone as dt_timezone
 from django.test import SimpleTestCase
 from django.test import override_settings
 from sqlalchemy import create_engine
+from sqlalchemy import event as sa_event
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -405,6 +406,215 @@ class DashboardPwaLayoutTemplateTests(SimpleTestCase):
         template = Path("engine/templates/dashboard.html").read_text()
 
         self.assertNotIn("Оплатить и получить доступ", template)
+
+
+class DashboardDesktopSkinTemplateTests(SimpleTestCase):
+    """Десктопный скин кабинета в мире island-лендинга (docs/cabinet-desktop/).
+
+    Скин действует только на >=1025px вне Telegram Mini App; мобильная
+    вёрстка и Mini App сохраняют систему docs/mobile-cabinet/DESIGN.md.
+    """
+
+    def test_desktop_skin_assets_are_scoped_to_desktop_only(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Скин подключается вне Mini App; CSS — без media-атрибута, чтобы
+        # его мобильный блок прятал .dt-элементы и на узких экранах.
+        self.assertIn("{% if not tg_webapp_mode %}", template)
+        self.assertIn("{% static 'css/cabinet-desktop.css' %}?v=6\">", template)
+        self.assertNotIn(
+            "cabinet-desktop.css' %}?v=6\" media=",
+            template,
+        )
+        # Десктопные шрифты не применяются на мобильных.
+        self.assertIn(
+            "family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono",
+            template,
+        )
+        self.assertIn('media="(min-width: 1025px)"', template)
+
+    def test_desktop_skin_css_never_touches_mobile_or_miniapp(self):
+        css = Path("engine/static/css/cabinet-desktop.css").read_text()
+
+        # Все правила скина завёрнуты в десктопный media-запрос и
+        # исключают Telegram Mini App.
+        self.assertIn("@media (min-width: 1025px)", css)
+        self.assertIn("body.dashboard-v2:not(.tg-webapp)", css)
+        self.assertNotIn(".tg-mini-", css)
+        self.assertNotIn(".mi3-", css)
+        self.assertNotIn(".nav-mobile", css)
+        # Новые элементы скрыты вне десктопа.
+        self.assertIn("@media (max-width: 1024.98px)", css)
+        mobile_hide_block = css.split("@media (max-width: 1024.98px)")[1]
+        for selector in (".dt-expire-topbar", ".dt-cabinet-footer", ".dt-access-grid", ".dt-final", ".dt-qr-card"):
+            self.assertIn(selector, mobile_hide_block)
+        self.assertIn("display: none !important;", mobile_hide_block)
+        # Мир лендинга: золото, мята, моно-счётчик, чип статуса.
+        self.assertIn("--dt-gold: #ffc700;", css)
+        self.assertIn("--dt-mint: #38d996;", css)
+        self.assertIn(".dt-days-num", css)
+        self.assertIn("'JetBrains Mono'", css)
+
+    def test_expire_topbar_sells_renewal_with_price(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Полоса истечения показывается только при истекающем оплаченном
+        # доступе, вне Mini App, и ведёт в существующий выбор тарифов.
+        self.assertIn(
+            "{% if show_expiring_banner and has_subscription_access and not tg_webapp_mode %}",
+            template,
+        )
+        self.assertIn('class="dt-expire-topbar" role="status"', template)
+        self.assertIn(
+            "{% if tariffs %}Продлить за {{ tariffs.0.price }} ₽{% else %}Продлить доступ{% endif %}",
+            template,
+        )
+        self.assertIn(
+            '<div class="dt-expire-topbar" role="status">\n                <span>Доступ <span class="warn-txt">истекает',
+            template,
+        )
+
+    def test_desktop_footer_reuses_landing_links(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        self.assertIn('class="dt-cabinet-footer"', template)
+        self.assertIn("{% url 'offer' %}", template)
+        self.assertIn("{% url 'terms' %}", template)
+        self.assertIn("{% url 'privacy' %}", template)
+        # Футер не рендерится в Mini App.
+        footer_index = template.index('class="dt-cabinet-footer"')
+        guard_index = template.rindex("{% if not tg_webapp_mode %}", 0, footer_index)
+        self.assertLess(footer_index - guard_index, 300)
+
+    def test_secnum_plates_number_the_tabs_like_landing(self):
+        css = Path("engine/static/css/cabinet-desktop.css").read_text()
+
+        self.assertIn('.dt-devices-tab .desktop-devices-header h2::before { content: "01"; }', css)
+        self.assertIn('#setup-flat-header h1::before { content: "02"; }', css)
+        self.assertIn('#tab-profile .referral-mobile-header h1::before { content: "03"; }', css)
+        self.assertIn('#tab-support > header h1::before { content: "04"; }', css)
+        self.assertIn('#settings-header h1::before { content: "05"; }', css)
+
+    def test_concept_compositions_are_wired_to_existing_functionality(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Главная: карточка доступа 2:1 со счётчиком и прогрессом на старых id.
+        self.assertIn('class="dt-access-card"', template)
+        self.assertIn('id="days-left-count" class="dt-days-num"', template)
+        self.assertIn('<div id="subscription-progress-bar" class="status-progress-bar"></div>', template)
+        self.assertIn('id="dt-stat-devices"', template)
+        # Финальный призыв с брендовым SVG лендинга.
+        self.assertIn("{% static 'brand/flagship.svg' %}", template)
+        # Вкладка «Устройства» — только десктоп, панель со старыми id переехала в неё.
+        self.assertIn('<div id="tab-devices" class="tab-content">', template)
+        self.assertIn('data-tab="devices"', template)
+        self.assertIn('id="desktop-devices-list"', template)
+        # Установка: этапный мастер с QR на шаге подписки.
+        self.assertIn('id="dt-setup-wizard"', template)
+        # Рефералы: карточка + плитки + шаги, существующие share/copy-механизмы.
+        self.assertIn('class="dt-ref-grid"', template)
+        self.assertIn('data-mi3-copy="{{ referral_link }}"', template)
+        self.assertIn("openRefShare('tg')", template)
+        # Поддержка: статус-полоса и две карточки, FAQ через существующий суб-экран.
+        self.assertIn('class="dt-status-strip"', template)
+        self.assertIn('class="dt-support-grid"', template)
+        self.assertIn('onclick="openSettingsFaq()" class="desktop-secondary-action"', template)
+        # Быстрые действия Главной: установка, текущее устройство, платежи.
+        self.assertIn('class="dt-quick-grid"', template)
+        self.assertIn('class="dt-quick-card" onclick="quickAccessInstall()"', template)
+        self.assertIn('class="dt-quick-card" onclick="openPaymentsHistorySheet()"', template)
+        # Этапный мастер установки (UX мобильного визарда): платформа →
+        # приложение → установка → подписка с QR → готово; данные installData.
+        self.assertIn('id="dt-setup-wizard"', template)
+        self.assertIn("dtSetupWizard", template)
+        self.assertIn('id="dt-wiz-body"', template)
+        self.assertIn("ШАГ ' + state.step + ' ИЗ ' + TOTAL", template)
+        self.assertIn("Подключиться в 1 клик", template)
+        self.assertIn('id="dt-wiz-qr"', template)
+        self.assertIn("copyInputValueBtn(event, \\'dt-wiz-key\\')", template)
+        self.assertIn("showTab(\\'devices\\')", template)
+        # Логотип шапки с маркой лендинга и подсветка курсора.
+        self.assertIn('class="dt-brand-mark"', template)
+        self.assertIn("{% static 'icons/monkey-island-logo-animated.webp' %}", template)
+        self.assertIn('id="dt-cursor-glow"', template)
+
+    def test_home_status_uses_rwms_panel_data(self):
+        template = Path("engine/templates/dashboard.html").read_text()
+
+        # Статус панели говорит прямо: DISABLED — подписка отключена,
+        # LIMITED — достигнут лимит трафика (+ когда сбросится автоматически).
+        self.assertIn('{% if rw_status == "DISABLED" %}Подписка отключена', template)
+        self.assertIn("ваша подписка отключена", template)
+        self.assertIn("Достигнут лимит трафика", template)
+        self.assertIn("Лимит сбросится автоматически {{ rw_traffic_reset_at|date:\"j E\" }}", template)
+        self.assertIn("Автосброса нет — лимит снимется после оплаты подписки.", template)
+        # Стат-плитки: трафик (лимит/всего), email-аккаунт.
+        self.assertIn("{{ rw_traffic_limit_used_gb|floatformat:1 }}", template)
+        self.assertIn("использовано всего {{ rw_traffic_total_gb|floatformat:1 }} ГБ", template)
+        self.assertIn('class="dt-stat-num dt-stat-email"', template)
+
+    def test_traffic_limit_next_reset_math(self):
+        from engine.views import traffic_limit_next_reset
+
+        now = datetime(2026, 9, 10, 12, 0, tzinfo=dt_timezone.utc)  # четверг
+
+        self.assertIsNone(traffic_limit_next_reset("no_reset", now=now))
+        self.assertIsNone(traffic_limit_next_reset(None, now=now))
+        self.assertEqual(
+            traffic_limit_next_reset("day", now=now).date(), date(2026, 9, 11)
+        )
+        # Ближайший понедельник.
+        self.assertEqual(
+            traffic_limit_next_reset("week", now=now).date(), date(2026, 9, 14)
+        )
+        self.assertEqual(
+            traffic_limit_next_reset("month", now=now).date(), date(2026, 10, 1)
+        )
+        # month_rolling: по числу даты создания; 31-е клампится к концу месяца.
+        self.assertEqual(
+            traffic_limit_next_reset(
+                "month_rolling", created_at_date=date(2026, 1, 15), now=now
+            ).date(),
+            date(2026, 9, 15),
+        )
+        self.assertEqual(
+            traffic_limit_next_reset(
+                "month_rolling", created_at_date=date(2026, 1, 5), now=now
+            ).date(),
+            date(2026, 10, 5),
+        )
+        self.assertEqual(
+            traffic_limit_next_reset(
+                "month_rolling",
+                created_at_date=date(2026, 1, 31),
+                now=datetime(2026, 2, 10, tzinfo=dt_timezone.utc),
+            ).date(),
+            date(2026, 2, 28),
+        )
+
+    def test_desktop_footer_sticks_to_viewport_bottom(self):
+        css = Path("engine/static/css/cabinet-desktop.css").read_text()
+
+        wrapper_rule = css.split("#interface-wrapper {")[1].split("}")[0]
+        self.assertIn("min-height: 100vh", wrapper_rule)
+        # hideTariffs снимает inline-display (''), а не ставит 'block' —
+        # инлайновый block перебивал десктопный flex и отклеивал футер.
+        template = Path("engine/templates/dashboard.html").read_text()
+        self.assertIn(
+            "document.getElementById('interface-wrapper').style.display = '';",
+            template,
+        )
+        self.assertNotIn(
+            "document.getElementById('interface-wrapper').style.display = 'block';",
+            template,
+        )
+        self.assertIn("flex-direction: column", wrapper_rule)
+        self.assertIn(".dt-cabinet-footer { margin-top: auto;", css)
+        # На десктопе плоский флоу установки скрыт — работает этапный мастер.
+        self.assertIn("#setup-logic-placeholder { display: none !important; }", css)
+        self.assertIn(".dt-wiz-shell", css)
+        self.assertIn(".dt-wiz-chip.is-active", css)
+        self.assertIn("#dt-cursor-glow", css)
 
 
 class AdminDashboardTemplateTests(SimpleTestCase):
@@ -4070,7 +4280,7 @@ class SettingsTabTemplateTests(SimpleTestCase):
         self.assertIn('id="tab-settings"', template)
         # Пользовательское название и иконка соответствуют содержимому раздела;
         # внутренний settings-id сохраняется для обратной совместимости ссылок.
-        self.assertIn('<i class="far fa-user"></i><span>Профиль</span>', template)
+        self.assertIn('<use href="#cabinet-user"></use></svg><span>Профиль</span>', template)
         self.assertIn('tracking-tighter mb-3">Профиль</h1>', template)
         self.assertNotIn('<i class="fas fa-cog"></i><span>Настройки</span>', template)
         self.assertIn("Отключить автопродление", template)
@@ -4215,19 +4425,28 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
 
         # Компактная главная всегда есть в DOM: на сайте её включает mobile
         # breakpoint, а Mini App использует её независимо от ширины.
-        self.assertIn('<div class="tg-mini-home">', template)
+        self.assertIn('<div class="tg-mini-home cabinet-home">', template)
         self.assertIn("body.tg-webapp .tg-mini-home", template)
         self.assertIn("{% if not tg_webapp_mode %}", template)
         self.assertIn('<div class="standard-dashboard-home">', template)
-        self.assertIn('class="mi3-card" aria-label="Статус подписки"', template)
-        self.assertIn('До {{ user.expire_at|date:"j E Y" }}', template)
-        self.assertIn('class="tg-mini-primary"', template)
-        self.assertIn("Подключить VPN", template)
-        self.assertIn("Продлить подписку", template)
-        self.assertIn("Купить подписку", template)
-        self.assertIn('class="tg-mini-action-list"', template)
-        # На главном экране вместо «Автопродление» — «История платежей»
-        self.assertIn('onclick="openPaymentsHistorySheet()" class="tg-mini-action-row"', template)
+        # Карточка статуса подписки (редизайн b95ea64: cabinet-access).
+        self.assertIn('<section class="cabinet-access" aria-labelledby="cabinet-access-title">', template)
+        self.assertIn("<dt>Подписка до</dt>", template)
+        self.assertIn('{{ user.expire_at|date:"j E Y" }}', template)
+        # Главная CTA зависит от состояния подписки/рекуррента.
+        self.assertIn('onclick="showTariffs()" class="cabinet-renew"', template)
+        self.assertIn(
+            "{% if not has_subscription_access %}Купить подписку"
+            "{% elif has_recurrent %}Продлить заранее"
+            "{% else %}Продлить подписку{% endif %}",
+            template,
+        )
+        self.assertIn('onclick="mi3OpenConnect()" class="cabinet-connect"', template)
+        self.assertIn("<span>Подключить устройство</span>", template)
+        self.assertIn('<section class="cabinet-actions" aria-label="Управление подпиской">', template)
+        # На главном экране вместо «Автопродление» — «Платежи и подписка»
+        self.assertIn('class="cabinet-action" onclick="openPaymentsHistorySheet()"', template)
+        self.assertIn("<span>Платежи и подписка</span>", template)
 
     def test_mobile_home_has_restrained_visual_hierarchy(self):
         template = Path("engine/templates/dashboard.html").read_text()
@@ -4264,7 +4483,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("Отправьте ссылку другу — бонусы начислятся автоматически", template)
         self.assertIn("Как получить до {{ max_referral_bonus_days|default:\"40\" }} дней", template)
         self.assertIn("Друг подключился", template)
-        self.assertIn("Использовал 100 МБ", template)
+        self.assertIn("Стал активным пользователем", template)
         self.assertIn("Оплатил подписку", template)
         self.assertIn('aria-label="Статистика приглашений"', template)
         self.assertIn('id="ref-desktop-telegram-link"', template)
@@ -4274,6 +4493,18 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("Бонусы начисляются автоматически после выполнения условий", template)
         self.assertIn("body.dashboard-v2 #ref-sheet #ref-content", template)
         self.assertIn("body.dashboard-v2 .ref-desktop-dialog.is-open", template)
+
+    def test_referral_texts_do_not_expose_traffic_threshold(self):
+        """Порог «100 МБ трафика от друга» — внутренняя механика начисления,
+        в пользовательских текстах кабинета он не раскрывается («активный
+        пользователь»), как и в текстах бота. Админка (admin_dashboard.html)
+        порог показывает — это ожидаемо."""
+        template = Path("engine/templates/dashboard.html").read_text().lower()
+
+        self.assertNotIn("100 мб", template)
+        self.assertNotIn("100мб", template)
+        self.assertNotIn("100 mb", template)
+        self.assertNotIn("трафика от друга", template)
 
     def test_mobile_referral_bottom_sheet_is_preserved(self):
         template = Path("engine/templates/dashboard.html").read_text()
@@ -4393,7 +4624,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn('id="referral-terms-title">Условия программы</h2>', template)
         self.assertIn("До {{ max_referral_bonus_days|default:\"40\" }} дней за одного друга", template)
         self.assertIn("Друг зарегистрировался и начал пользоваться сервисом", template)
-        self.assertIn("Друг использовал 100 МБ трафика", template)
+        self.assertIn("Друг стал активным пользователем сервиса", template)
         self.assertIn("Друг оплатил подписку от 1 месяца", template)
         self.assertNotIn('id="referral-terms-content"', template)
         self.assertNotIn("openQuickAccessModal", open_terms_source)
@@ -4439,7 +4670,11 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("document.getElementById('referral-terms-close')?.focus();", template)
         self.assertIn("appContainer?.setAttribute('inert', '');", template)
         self.assertIn("appContainer?.removeAttribute('inert');", template)
-        self.assertIn("if (referralTermsOpen || setupActive) back.show();", template)
+        self.assertIn(
+            "if (document.querySelector('.mi3-sheet.is-open') || referralTermsOpen || setupActive) "
+            "back.show(); else back.hide();",
+            template,
+        )
         self.assertIn("closeReferralTerms();\n            } else if (newSetupStep", template)
         self.assertIn("function initReferralTermsSwipe()", template)
         self.assertIn("window.matchMedia('(max-width: 1024px)').matches", template)
@@ -6113,9 +6348,12 @@ class CabinetPaymentsHistoryTests(SimpleTestCase):
     def test_cancel_autopay_is_buried_in_payments_sheet(self):
         template = Path("engine/templates/dashboard.html").read_text()
 
-        # Главный экран mini app: вместо «Автопродление» — «История платежей»
+        # Главный экран mini app: вместо «Автопродление» — «Платежи и подписка»
+        # (редизайн b95ea64: строки-действия стали cabinet-action).
         self.assertNotIn('tg-mini-action-label">Автопродление', template)
-        self.assertIn('tg-mini-action-label">История платежей', template)
+        self.assertNotIn(">Автопродление</span>", template)
+        self.assertIn('class="cabinet-action" onclick="openPaymentsHistorySheet()"', template)
+        self.assertIn("<span>Платежи и подписка</span>", template)
         # Профиль: заметной карточки отмены больше нет
         self.assertNotIn(
             '<div class="text-white font-black">Отключить автопродление</div>',
@@ -6408,7 +6646,7 @@ class AdminClientWorkspaceTests(SimpleTestCase):
         self.assertIn("#panel-user-payments .client-action-registry .client-action-controls { display: grid; grid-template-columns: var(--client-action-btn) var(--client-action-btn);", css)
         self.assertIn(".client-action-button.is-primary { grid-column: 2; }", css)
         self.assertIn(".client-action-pair { grid-column: 1 / -1;", css)
-        self.assertIn("@import url('./admin-concept-customers.css?v=9');", Path("engine/static/css/admin-concept.css").read_text())
+        self.assertIn("@import url('./admin-concept-customers.css?v=10');", Path("engine/static/css/admin-concept.css").read_text())
 
 
 class AdminMoscowTimeTests(SimpleTestCase):
@@ -6486,6 +6724,10 @@ class AdminPaymentJournalTests(SimpleTestCase):
         компонент; сам <select> остаётся в DOM для форм, слушателей и тестов."""
         template = Path("engine/templates/admin_dashboard.html").read_text()
         script = Path("engine/static/js/admin-select.js").read_text()
+        # Прокси-селект кастомного пикера сегмента не должен оборачиваться
+        # в ui-select — иначе рядом с «Выберите сегмент» появляется второй
+        # «Сегмент…» со своим меню (баг 10.09.2026)
+        self.assertIn('<select id="broadcast-segment" tabindex="-1" aria-hidden="true" data-native-select>', template)
         css = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn("{% static 'js/admin-select.js' %}", template)
@@ -7347,7 +7589,11 @@ class AdminStage5PromoTests(SimpleTestCase):
 
         self.assertIn('data-tab="promocodes"', template)
         self.assertIn('id="promo-create"', template)
-        self.assertIn('id="batch-create"', template)
+        # Один конструктор с режимом (концепт 10.09.2026) — отдельной
+        # кнопки партии больше нет
+        self.assertNotIn('id="batch-create"', template)
+        self.assertIn('data-promo-mode="batch"', template)
+        self.assertIn("function setPromoBuilderMode(mode)", template)
         self.assertIn("start=promo_", Path("engine/views.py").read_text())
 
     def test_promocode_editor_explains_effects_and_audiences(self):
@@ -7357,10 +7603,13 @@ class AdminStage5PromoTests(SimpleTestCase):
         self.assertIn("Скидка на следующую оплату", template)
         self.assertIn("Без даты она доступна 72 часа", template)
         self.assertIn('data-promo-type-picker="promo"', template)
-        self.assertIn('data-promo-type-picker="batch"', template)
+        # Пикер один: партия использует общие эффект/срок/аудиторию
+        self.assertNotIn('data-promo-type-picker="batch"', template)
         self.assertIn('id="promo-first-only"', template)
-        self.assertIn('id="batch-first-only"', template)
-        self.assertIn('id="batch-valid-until"', template)
+        self.assertNotIn('id="batch-first-only"', template)
+        self.assertIn('data-promo-mode-only="batch"', template)
+        self.assertIn('id="batch-name"', template)
+        self.assertIn('id="batch-count"', template)
         self.assertIn("renderPromoCodes", template)
         self.assertIn("renderPromoBatches", template)
         self.assertNotIn('<select id="promo-type"', template)
@@ -9571,6 +9820,22 @@ class _AntiabuseSqliteMixin:
         self.session = self.Session()
         self.addCleanup(self.session.close)
         self._next_row_id = 100
+        # На SQLite users.id (BIGINT PK) не rowid-алиас и не автоинкрементится,
+        # а Sequence("users_id_seq") игнорируется — INSERT прод-кода
+        # (create_site_user) без явного id падает по NOT NULL. Подставляем id
+        # на flush; счётчик далеко от явных id тестов, чтобы не пересекаться.
+        self._next_auto_user_id = 900_000
+
+        def _assign_sqlite_user_ids(session, flush_context, instances):
+            for obj in session.new:
+                if isinstance(obj, User) and obj.id is None:
+                    self._next_auto_user_id += 1
+                    obj.id = self._next_auto_user_id
+
+        sa_event.listen(self.session, "before_flush", _assign_sqlite_user_ids)
+        self.addCleanup(
+            sa_event.remove, self.session, "before_flush", _assign_sqlite_user_ids
+        )
 
     # --- маркеры managed_traffic_limits (антиабьюз v2) ---------------------
 

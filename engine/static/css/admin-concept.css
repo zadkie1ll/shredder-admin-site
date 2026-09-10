@@ -1,5 +1,5 @@
 @import url('./admin-concept-infrastructure.css?v=13');
-@import url('./admin-concept-customers.css?v=9');
+@import url('./admin-concept-customers.css?v=10');
 @import url('./admin-concept-client-details.css?v=6');
 @import url('./admin-concept-sections.css?v=7');
 
@@ -184,6 +184,10 @@ html:not([data-admin-theme="light"]) .tab-panel > .subtabs > .subtab.active { co
 .btn:disabled { cursor: not-allowed; }
 input, select, textarea, .date-trigger { border-radius: 7px; }
 .input, .date-trigger { min-height: 40px; padding: 10px 12px; color: var(--admin-text); font-size: 14px; font-weight: 400; box-shadow: none; }
+/* Нативный date-инпут: внутренний datetime-edit добавляет ~2px к высоте и
+ * поле выходит выше соседнего текстового. 1lh прижимает его к строке. */
+input.input[type="date"]::-webkit-datetime-edit,
+input.input[type="datetime-local"]::-webkit-datetime-edit { max-height: 1lh; overflow: hidden; }
 .date-presets { gap: 8px; }
 .date-preset { min-height: 30px; padding: 6px 8px; font-size: 11px; font-weight: 500; border-radius: 6px; box-shadow: none; }
 .date-presets-caption { font-size: 11px; font-weight: 400; }

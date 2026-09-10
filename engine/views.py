@@ -3197,6 +3197,40 @@ def terms(request):
     return render(request, "terms.html", {"site_role": get_site_role(request)})
 
 
+def _days_in_month(year, month):
+    first_next = date(year + (month == 12), 1 if month == 12 else month + 1, 1)
+    return (first_next - timedelta(days=1)).day
+
+
+def traffic_limit_next_reset(strategy_key, created_at_date=None, now=None):
+    """Ближайший автоматический сброс трафика панелью Remnawave (полночь UTC).
+
+    day — каждый день, week — по понедельникам, month — 1-го числа,
+    month_rolling — по числу даты создания подписки. no_reset/None → None:
+    автосброса нет, лимит снимается вручную или оплатой.
+    """
+    now = now or datetime.now(timezone.utc)
+    today = now.date()
+    key = (str(strategy_key or "")).lower()
+    if key == "day":
+        base = today + timedelta(days=1)
+    elif key == "week":
+        days_ahead = (7 - today.weekday()) % 7 or 7
+        base = today + timedelta(days=days_ahead)
+    elif key == "month":
+        base = date(today.year + (today.month == 12), 1 if today.month == 12 else today.month + 1, 1)
+    elif key == "month_rolling" and created_at_date is not None:
+        target_day = created_at_date.day
+        base = date(today.year, today.month, min(target_day, _days_in_month(today.year, today.month)))
+        if base <= today:
+            year = today.year + (today.month == 12)
+            month = 1 if today.month == 12 else today.month + 1
+            base = date(year, month, min(target_day, _days_in_month(year, month)))
+    else:
+        return None
+    return datetime.combine(base, time.min, tzinfo=timezone.utc)
+
+
 @login_required(login_url="/login/")
 def dashboard(request):
     user = request.user
@@ -3324,6 +3358,37 @@ def dashboard(request):
         subscription is not None or rwms_unavailable
     ) and seconds_left > 0
     days_left = int((seconds_left + 86399) // 86400) if seconds_left > 0 else 0
+
+    # Статус подписки и трафик из RWMS для десктопной Главной — те же данные,
+    # что показывает «Мой профиль» в боте: статус панели (ACTIVE/DISABLED/
+    # LIMITED/EXPIRED), использованный трафик за всё время, лимит и стратегия
+    # его автосброса. При деградации RWMS всё остаётся None — шаблон молчит.
+    rw_status = None
+    rw_traffic_total_gb = None
+    rw_traffic_limit_gb = None
+    rw_traffic_limit_used_gb = None
+    rw_traffic_strategy_label = None
+    rw_traffic_reset_at = None
+    if subscription is not None:
+        rw_status = admin_user_status_name(get_proto_optional(subscription, "status"))
+        rw_traffic_total_gb = (
+            getattr(subscription, "lifetime_used_traffic_bytes", 0) or 0
+        ) / (1024 ** 3)
+        rw_limit_bytes = get_proto_optional(subscription, "traffic_limit_bytes") or 0
+        if rw_limit_bytes:
+            rw_traffic_limit_gb = rw_limit_bytes / (1024 ** 3)
+            rw_traffic_limit_used_gb = (
+                getattr(subscription, "used_traffic_bytes", 0) or 0
+            ) / (1024 ** 3)
+            rw_strategy_key = admin_traffic_limit_strategy_key(
+                get_proto_optional(subscription, "traffic_limit_strategy")
+            )
+            rw_traffic_strategy_label = admin_traffic_limit_strategy_label(rw_strategy_key)
+            rw_created_at = get_proto_optional(subscription, "created_at")
+            rw_traffic_reset_at = traffic_limit_next_reset(
+                rw_strategy_key,
+                rw_created_at.ToDatetime().date() if rw_created_at is not None else None,
+            )
     expiring_banner_threshold_seconds = 3 * 24 * 60 * 60
     show_expiring_banner = 0 < seconds_left <= expiring_banner_threshold_seconds
     show_telegram_bind_banner = not user.telegram_id
@@ -3449,6 +3514,12 @@ def dashboard(request):
             "show_telegram_bind_banner": show_telegram_bind_banner,
             "show_email_bind_banner": show_email_bind_banner,
             "show_expiring_banner": show_expiring_banner,
+            "rw_status": rw_status,
+            "rw_traffic_total_gb": rw_traffic_total_gb,
+            "rw_traffic_limit_gb": rw_traffic_limit_gb,
+            "rw_traffic_limit_used_gb": rw_traffic_limit_used_gb,
+            "rw_traffic_strategy_label": rw_traffic_strategy_label,
+            "rw_traffic_reset_at": rw_traffic_reset_at,
             "show_not_connected_banner": show_not_connected_banner,
             "email_bind_modal": email_bind_modal,
             "use_new_setup_flow": settings.USE_NEW_SETUP_FLOW,

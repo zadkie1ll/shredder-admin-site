@@ -4664,6 +4664,11 @@
     {% include "includes/yandex_metrika.html" %}
     <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
     <link rel="stylesheet" href="{% static 'css/cabinet-mobile.css' %}?v=2">
+    {% if not tg_webapp_mode %}
+    {# Десктопный скин в мире island-лендинга. Шрифты применяются только на >=1025px; сам CSS подключается без media-атрибута, потому что содержит и десктопные правила, и мобильный блок, прячущий .dt-элементы (полоса истечения, футер) вне десктопа. #}
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" media="(min-width: 1025px)">
+    <link rel="stylesheet" href="{% static 'css/cabinet-desktop.css' %}?v=6">
+    {% endif %}
 </head>
 <body class="dashboard-v2{% if tg_webapp_mode %} tg-webapp{% endif %}" style="--dashboard-bg-image: url('{% static 'img/bg6.png' %}');">
 
@@ -4674,6 +4679,8 @@
     </div>
 
     <div id="app-container">
+        {# Подсветка курсора как на лендинге — только десктоп (см. dtCursorGlow) #}
+        <div id="dt-cursor-glow" aria-hidden="true"></div>
         {% if not has_subscription_access %}
         <section class="plans-only-view">
             <div class="plans-topbar">
@@ -4750,11 +4757,15 @@
 
         <div id="interface-wrapper" class="{% if not has_subscription_access %}hidden{% endif %}">
         <aside class="sidebar-desktop">
-            <div class="mb-12 px-4">
-                <a href="/" class="text-xl font-black tracking-tighter uppercase">MONKEY <span class="text-[#ffc700]">ISLAND</span></a>
+            <div class="mb-12 px-4 dt-brand">
+                <a href="/" class="text-xl font-black tracking-tighter uppercase">
+                    <img class="dt-brand-mark" src="{% static 'icons/monkey-island-logo-animated.webp' %}" alt="" width="38" height="38" decoding="async">
+                    <span class="dt-brand-name">MONKEY <span class="text-[#ffc700]">ISLAND</span></span>
+                </a>
             </div>
             <nav>
                 <button type="button" onclick="showTab('home')" class="nav-btn active" data-tab="home"><i class="fas fa-th-large"></i> Главная</button>
+                <button type="button" onclick="showTab('devices')" class="nav-btn" data-tab="devices"><i class="fas fa-mobile-screen"></i> Устройства</button>
                 <button type="button" onclick="showTab('setup')" class="nav-btn" data-tab="setup"><i class="fas fa-bolt"></i> Установка</button>
                 <button type="button" onclick="showTab('profile')" class="nav-btn" data-tab="profile"><i class="fas fa-user-friends"></i> Рефералы</button>
                 <button type="button" onclick="showTab('support')" class="nav-btn" data-tab="support"><i class="fas fa-headset"></i> Поддержка</button>
@@ -4775,7 +4786,14 @@
         </nav>
 
         <main class="main-content">
-                
+            {% if show_expiring_banner and has_subscription_access and not tg_webapp_mode %}
+            {# Десктопная полоса истечения (грамматика ip-topbar лендинга); на мобильных скрыта стилями. #}
+            <div class="dt-expire-topbar" role="status">
+                <span>Доступ <span class="warn-txt">истекает — осталось {{ time_left_value }} {{ time_left_unit }}</span>. Устройства отключатся {{ user.expire_at|date:"j E" }}.</span>
+                <button type="button" onclick="showTariffs()">{% if tariffs %}Продлить за {{ tariffs.0.price }} ₽{% else %}Продлить доступ{% endif %}</button>
+            </div>
+            {% endif %}
+
             <div id="tab-home" class="tab-content active">
                 <div id="main-dashboard-view">
                     <div class="tg-mini-home cabinet-home">
@@ -4813,36 +4831,87 @@
                     {% if not tg_webapp_mode %}
                     <div class="standard-dashboard-home">
                     <div class="desktop-cabinet-home">
-                    <header class="desktop-home-heading">
-                        <div>
+
+                    {# Первый экран концепта: карточка доступа 2/3 + колонка статов 1/3 #}
+                    <div class="dt-access-grid">
+                        <section class="dt-access-card" aria-label="Состояние подписки">
                             {% if not has_subscription_access %}
-                                <h1>Нет активной подписки</h1>
-                                <p>Оформите доступ — ключи и инструкции появятся в этом кабинете.</p>
-                            {% elif show_not_connected_banner %}
-                                <h1>Подписка готова</h1>
-                                <p>Подключите первое устройство и включите VPN в приложении.</p>
+                                <div class="dt-chip is-off"><span class="dot"></span> Доступ не оплачен</div>
+                                <h1>Ваш доступ</h1>
+                                <div class="dt-days"><span class="dt-days-num">0</span><span class="dt-days-unit">дней</span></div>
+                                <p class="dt-until">Ключи и устройства откроются сразу после оплаты.</p>
+                                <div class="dt-track"><div id="subscription-progress-bar" class="status-progress-bar"></div></div>
+                                <div class="dt-cta">
+                                    <button type="button" onclick="showTariffs()" class="desktop-primary-action dt-cta-main">Купить подписку</button>
+                                </div>
                             {% else %}
-                                <h1>Привет!</h1>
-                                <p>Подписка и устройства — на одном экране.</p>
+                                <div class="dt-chip{% if rw_status == "DISABLED" %} is-off{% elif rw_status == "LIMITED" or show_expiring_banner %} is-warning{% endif %}">
+                                    <span class="dot"></span>
+                                    {% if rw_status == "DISABLED" %}Подписка отключена{% elif rw_status == "LIMITED" %}Достигнут лимит трафика{% elif show_expiring_banner %}Остров на связи · Доступ истекает{% else %}Остров на связи · Доступ активен{% endif %}
+                                </div>
+                                <h1>Ваш доступ</h1>
+                                <div class="dt-days">
+                                    <span id="days-left-count" class="dt-days-num" data-seconds-left="{{ seconds_left|floatformat:0 }}" data-time-left-value="{{ time_left_value }}" data-time-left-label="{{ time_left_label }}">—</span>
+                                    <span class="dt-days-unit">{{ time_left_unit }}</span>
+                                </div>
+                                <p class="dt-until">Подписка действует до <b>{{ user.expire_at|date:"j E Y, H:i" }}</b></p>
+                                {% if rw_status == "DISABLED" %}
+                                <p class="dt-status-note is-off">Статус в панели — DISABLED: ваша подписка отключена, устройства не подключатся. Продлите доступ или напишите в поддержку — включим обратно.</p>
+                                {% elif rw_status == "LIMITED" %}
+                                <p class="dt-status-note is-warn">Статус LIMITED — достигнут лимит трафика{% if rw_traffic_limit_gb %} ({{ rw_traffic_limit_used_gb|floatformat:1 }} из {{ rw_traffic_limit_gb|floatformat:0 }} ГБ){% endif %}.{% if rw_traffic_reset_at %} Лимит сбросится автоматически {{ rw_traffic_reset_at|date:"j E" }}.{% else %} Автосброса нет — лимит снимется после оплаты подписки.{% endif %}</p>
+                                {% endif %}
+                                <div class="dt-track"><div id="subscription-progress-bar" class="status-progress-bar"></div></div>
+                                <div class="dt-cta">
+                                    <button type="button" onclick="showTariffs()" class="desktop-primary-action dt-cta-main">
+                                        <i class="fas fa-bolt" aria-hidden="true"></i>
+                                        {% if has_recurrent %}Продлить заранее{% else %}Продлить доступ{% endif %}
+                                    </button>
+                                    <button type="button" onclick="showTariffs()" class="desktop-secondary-action">Сменить тариф</button>
+                                </div>
+                                <div class="dt-access-note">
+                                    {% if rw_traffic_limit_gb %}
+                                    <span><i class="fas fa-gauge-high" aria-hidden="true"></i>Лимит трафика {{ rw_traffic_limit_gb|floatformat:0 }} ГБ</span>
+                                    {% else %}
+                                    <span><i class="fas fa-infinity" aria-hidden="true"></i>Безлимитный трафик</span>
+                                    {% endif %}
+                                    {% if has_recurrent %}
+                                        <span><i class="fas fa-rotate" aria-hidden="true"></i>Автоплатёж включён — продлится сам</span>
+                                    {% else %}
+                                        <span><i class="fas fa-rotate" aria-hidden="true"></i>Автопродление не подключено</span>
+                                    {% endif %}
+                                </div>
                             {% endif %}
-                        </div>
-                        {% if has_subscription_access %}
-                            <div class="desktop-home-actions">
-                                <button type="button" onclick="quickAccessInstall()" class="desktop-secondary-action">
-                                    <i class="fas fa-bolt" aria-hidden="true"></i>
-                                    Быстрый доступ
-                                </button>
-                                <button type="button" onclick="showTab('setup')" class="desktop-primary-action">
-                                    <i class="fas fa-plus" aria-hidden="true"></i>
-                                    Подключить устройство
-                                </button>
+                        </section>
+
+                        <div class="dt-stat-col">
+                            <div class="dt-stat-cell">
+                                <div class="dt-stat-num"><span id="dt-stat-devices">—</span><small id="dt-stat-devices-limit"></small></div>
+                                <div class="dt-stat-label">Устройств подключено</div>
+                                <div class="dt-stat-sub" id="dt-stat-devices-sub">Загружаем устройства…</div>
                             </div>
-                        {% else %}
-                            <button type="button" onclick="showTariffs()" class="desktop-primary-action">
-                                Купить подписку
-                            </button>
-                        {% endif %}
-                    </header>
+                            <div class="dt-stat-cell">
+                                {% if rw_traffic_limit_gb %}
+                                    <div class="dt-stat-num{% if rw_status == "LIMITED" %} is-warn{% endif %}">{{ rw_traffic_limit_used_gb|floatformat:1 }}<small> / {{ rw_traffic_limit_gb|floatformat:0 }} ГБ</small></div>
+                                    <div class="dt-stat-label">Трафик до сброса</div>
+                                    <div class="dt-stat-sub">сброс: {{ rw_traffic_strategy_label|lower }}{% if rw_traffic_reset_at %} · {{ rw_traffic_reset_at|date:"j E" }}{% endif %} · всего {{ rw_traffic_total_gb|floatformat:1 }} ГБ</div>
+                                {% else %}
+                                    <div class="dt-stat-num">&infin;</div>
+                                    <div class="dt-stat-label">Трафик</div>
+                                    <div class="dt-stat-sub">{% if rw_traffic_total_gb is not None %}использовано всего {{ rw_traffic_total_gb|floatformat:1 }} ГБ{% else %}без ограничений скорости{% endif %}</div>
+                                {% endif %}
+                            </div>
+                            <div class="dt-stat-cell">
+                                <div class="dt-stat-num">{% if has_recurrent %}<span class="mint">ВКЛ</span>{% else %}ВЫКЛ{% endif %}</div>
+                                <div class="dt-stat-label">Автоплатёж</div>
+                                <div class="dt-stat-sub">{% if has_recurrent %}следующее списание {{ user.expire_at|date:"j E" }}{% else %}продление вручную{% endif %}</div>
+                            </div>
+                            <div class="dt-stat-cell">
+                                <div class="dt-stat-num dt-stat-email">{{ user.email|default:"—" }}</div>
+                                <div class="dt-stat-label">Аккаунт</div>
+                                <div class="dt-stat-sub">Telegram {% if user.telegram_id %}привязан{% else %}не привязан{% endif %}{% if not user.email %} · почта не указана{% endif %}</div>
+                            </div>
+                        </div>
+                    </div>
 
                     <div class="desktop-cabinet-stack">
                         {% if show_telegram_bind_banner and has_subscription_access %}
@@ -4875,135 +4944,96 @@
                             </section>
                         {% endif %}
 
-                        <section class="desktop-subscription-card" aria-label="Состояние подписки">
-                            {% if not has_subscription_access %}
-                                <div class="desktop-subscription-main">
-                                    <div>
-                                        <span class="desktop-subscription-status is-off">Подписка не активна</span>
-                                        <div class="desktop-subscription-title">
-                                            <h2>Доступ не оплачен</h2>
-                                            <span>Ключи откроются сразу после оплаты</span>
-                                        </div>
-                                    </div>
-                                    <button type="button" onclick="showTariffs()" class="desktop-primary-action">
-                                        Купить подписку
-                                    </button>
-                                </div>
-                            {% else %}
-                                <div class="desktop-subscription-main">
-                                    <div>
-                                        <span class="desktop-subscription-status{% if show_expiring_banner %} is-warning{% endif %}">
-                                            {% if show_expiring_banner %}Скоро закончится{% else %}Подписка активна{% endif %}
-                                        </span>
-                                        <div class="desktop-subscription-title">
-                                            <h2>
-                                                <span id="days-left-count" data-seconds-left="{{ seconds_left|floatformat:0 }}" data-time-left-value="{{ time_left_value }}" data-time-left-label="{{ time_left_label }}">—</span>
-                                                {{ time_left_unit }} доступа
-                                            </h2>
-                                            <span>до {{ user.expire_at|date:"d.m.Y" }}</span>
-                                        </div>
-                                    </div>
-                                    <button type="button" onclick="showTariffs()" class="desktop-primary-action">
-                                        <i class="fas fa-rotate" aria-hidden="true"></i>
-                                        Продлить
-                                    </button>
-                                </div>
-                                <div class="desktop-subscription-track">
-                                    <div id="subscription-progress-bar" class="status-progress-bar"></div>
-                                </div>
-                                <div class="desktop-subscription-footer">
-                                    <span>
-                                        Автопродление:
-                                        {% if has_recurrent %}
-                                            <strong style="color:#52df8e">включено</strong>
-                                        {% else %}
-                                            <strong>не подключено</strong>
-                                        {% endif %}
-                                    </span>
-                                    <div class="desktop-subscription-footer-actions">
-                                        <button type="button" onclick="openPaymentsHistorySheet()" class="desktop-secondary-action">
-                                            <i class="fas fa-receipt" aria-hidden="true"></i>
-                                            История платежей
-                                        </button>
-                                    </div>
-                                </div>
-                            {% endif %}
-                        </section>
-
-                        {% if has_subscription_access %}
-                            <section class="desktop-devices-panel" aria-labelledby="desktop-devices-title">
-                                <header class="desktop-devices-header">
-                                    <div>
-                                        <h2 id="desktop-devices-title">Мои устройства</h2>
-                                        <p id="desktop-devices-note">Загружаем подключённые устройства…</p>
-                                    </div>
-                                    <button type="button" onclick="showTab('setup')" class="desktop-secondary-action">
-                                        <i class="fas fa-plus" aria-hidden="true"></i>
-                                        Добавить
-                                    </button>
-                                </header>
-                                <div class="desktop-device-filters" role="group" aria-label="Фильтр устройств">
-                                    <button type="button" class="desktop-device-filter" data-desktop-device-filter="all" aria-pressed="true">
-                                        Все <span id="desktop-devices-all-count">0</span>
-                                    </button>
-                                    <button type="button" class="desktop-device-filter" data-desktop-device-filter="online" aria-pressed="false">
-                                        Активные <span id="desktop-devices-online-count">0</span>
-                                    </button>
-                                    <button type="button" class="desktop-device-filter" data-desktop-device-filter="idle" aria-pressed="false">
-                                        Неактивные <span id="desktop-devices-idle-count">0</span>
-                                    </button>
-                                </div>
-                                <div id="desktop-devices-list" class="desktop-device-list" aria-live="polite">
-                                    <div class="desktop-devices-empty">Загружаем устройства…</div>
-                                </div>
-                            </section>
-                        {% endif %}
-
-                        <section class="desktop-referral-strip" aria-label="Реферальная программа">
-                            <span class="desktop-referral-icon" aria-hidden="true">
-                                <i class="fas fa-user-friends"></i>
-                            </span>
-                            <div class="desktop-referral-copy">
-                                <h3>Пригласите друга — получите до {{ max_referral_bonus_days }} дней</h3>
-                                <p>Друг получит бонус к подписке, а вам начислим дни за подключение, трафик и покупку.</p>
-                            </div>
-                            <button type="button" class="desktop-referral-btn" onclick="toggleRefSheet()">
-                                <i class="fas fa-user-plus" aria-hidden="true"></i>
-                                Пригласить
-                            </button>
-                        </section>
-
-                        <section class="desktop-quick-actions" aria-label="Быстрые действия">
-                            <button type="button" class="desktop-quick-action" onclick="showTab('setup')">
-                                <span class="desktop-quick-action-icon"><i class="fas fa-bolt" aria-hidden="true"></i></span>
-                                <span>
-                                    <strong>Установить VPN</strong>
-                                    <small>Инструкция для любого устройства</small>
-                                </span>
-                                <i class="fas fa-chevron-right" aria-hidden="true"></i>
-                            </button>
-                            <button type="button" class="desktop-quick-action" onclick="showTab('support')">
-                                <span class="desktop-quick-action-icon"><i class="fas fa-headset" aria-hidden="true"></i></span>
-                                <span>
-                                    <strong>Поддержка</strong>
-                                    <small>Ответим и поможем подключиться</small>
-                                </span>
-                                <i class="fas fa-chevron-right" aria-hidden="true"></i>
-                            </button>
-                            <button type="button" class="desktop-quick-action" onclick="openSettingsFaq()">
-                                <span class="desktop-quick-action-icon"><i class="far fa-circle-question" aria-hidden="true"></i></span>
-                                <span>
-                                    <strong>Частые вопросы</strong>
-                                    <small>Короткие ответы без ожидания</small>
-                                </span>
-                                <i class="fas fa-chevron-right" aria-hidden="true"></i>
-                            </button>
-                        </section>
-
                     </div>
+
+                    {# Быстрые действия: устройство, установка на текущем, платежи #}
+                    {% if has_subscription_access %}
+                    <div class="dt-quick-grid">
+                        <button type="button" class="dt-quick-card" onclick="showTab('setup')">
+                            <span class="dt-quick-ico"><i class="fas fa-plus" aria-hidden="true"></i></span>
+                            <span class="dt-quick-copy">
+                                <strong>Добавить устройство</strong>
+                                <small>Телефон, ноутбук, планшет или роутер — до 15 на одной подписке</small>
+                            </span>
+                            <i class="fas fa-chevron-right dt-quick-chev" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="dt-quick-card" onclick="quickAccessInstall()">
+                            <span class="dt-quick-ico"><i class="fas fa-bolt" aria-hidden="true"></i></span>
+                            <span class="dt-quick-copy">
+                                <strong>Установить VPN на этом устройстве</strong>
+                                <small>Быстрый доступ: приложение и ключ для текущего устройства</small>
+                            </span>
+                            <i class="fas fa-chevron-right dt-quick-chev" aria-hidden="true"></i>
+                        </button>
+                        <button type="button" class="dt-quick-card" onclick="openPaymentsHistorySheet()">
+                            <span class="dt-quick-ico"><i class="fas fa-receipt" aria-hidden="true"></i></span>
+                            <span class="dt-quick-copy">
+                                <strong>История платежей</strong>
+                                <small>Все ваши оплаты подписки</small>
+                            </span>
+                            <i class="fas fa-chevron-right dt-quick-chev" aria-hidden="true"></i>
+                        </button>
+                    </div>
+                    {% endif %}
+
+                    {# Финальный призыв концепта #}
+                    {% if has_subscription_access %}
+                    <div class="dt-final">
+                        <img class="dt-final-bg" src="{% static 'brand/flagship.svg' %}" alt="">
+                        <h2>Продлите заранее — <span>и не думайте об этом</span></h2>
+                        <p>С автоплатежом доступ продлевается сам. Отключить можно в один клик в любой момент.</p>
+                        <button type="button" onclick="showTariffs()" class="desktop-primary-action dt-cta-main">Продлить доступ</button>
+                    </div>
+                    {% endif %}
+
                     </div>
                     </div>
                     {% endif %}
+                </div>
+            </div>
+
+            {# Вкладка «Устройства» — только десктоп (в мобильной навигации устройства открываются листом) #}
+            <div id="tab-devices" class="tab-content">
+                <div class="standard-dashboard-home">
+                <div class="desktop-cabinet-home">
+                    {% if has_subscription_access %}
+                    <section class="desktop-devices-panel dt-devices-tab" aria-labelledby="desktop-devices-title">
+                        <header class="desktop-devices-header">
+                            <div>
+                                <h2 id="desktop-devices-title">Мои устройства</h2>
+                                <p id="desktop-devices-note">Загружаем подключённые устройства…</p>
+                            </div>
+                            <button type="button" onclick="showTab('setup')" class="desktop-secondary-action">
+                                <i class="fas fa-plus" aria-hidden="true"></i>
+                                Подключить ещё
+                            </button>
+                        </header>
+                        <div class="desktop-device-filters" role="group" aria-label="Фильтр устройств">
+                            <button type="button" class="desktop-device-filter" data-desktop-device-filter="all" aria-pressed="true">
+                                Все <span id="desktop-devices-all-count">0</span>
+                            </button>
+                            <button type="button" class="desktop-device-filter" data-desktop-device-filter="online" aria-pressed="false">
+                                Активные <span id="desktop-devices-online-count">0</span>
+                            </button>
+                            <button type="button" class="desktop-device-filter" data-desktop-device-filter="idle" aria-pressed="false">
+                                Неактивные <span id="desktop-devices-idle-count">0</span>
+                            </button>
+                        </div>
+                        <div id="desktop-devices-list" class="desktop-device-list" aria-live="polite">
+                            <div class="desktop-devices-empty">Загружаем устройства…</div>
+                        </div>
+                        <div class="dt-devices-foot">
+                            <span>Неактивное устройство не занимает канал — отключайте только то, чем больше не пользуетесь.</span>
+                        </div>
+                    </section>
+                    {% else %}
+                    <section class="setup-shell p-6 md:p-8">
+                        <h2 class="text-2xl font-black mb-3">Сначала оформите подписку</h2>
+                        <p class="text-gray-500 text-sm font-bold mb-6">После оплаты здесь появятся подключённые устройства.</p>
+                        <button type="button" onclick="showTariffs()" class="desktop-primary-action dt-cta-main">Купить подписку</button>
+                    </section>
+                    {% endif %}
+                </div>
                 </div>
             </div>
 
@@ -5075,6 +5105,21 @@
 
                         <div id="full-instructions-container"></div>
                     </div>
+
+                    {% comment %}Десктопный этапный мастер установки (UX мобильного визарда, UI лендинга): платформа → приложение → установка → подписка с QR → готово. Плоский флоу выше остаётся для планшетов (<1025px) и как источник данных.{% endcomment %}
+                    <div id="dt-setup-wizard" class="standard-dashboard-home">
+                        <section class="dt-wiz-shell" aria-label="Мастер установки">
+                            <div class="dt-wiz-progress">
+                                <span class="dt-wiz-stepnum" id="dt-wiz-stepnum">ШАГ 1 ИЗ 4</span>
+                                <div class="dt-wiz-bar"><i id="dt-wiz-bar-fill"></i></div>
+                            </div>
+                            <div id="dt-wiz-body"></div>
+                            <div class="dt-wiz-nav">
+                                <button type="button" id="dt-wiz-back" class="desktop-secondary-action" hidden><i class="fas fa-arrow-left" aria-hidden="true"></i> Назад</button>
+                                <button type="button" id="dt-wiz-next" class="desktop-primary-action dt-cta-main">Далее <i class="fas fa-arrow-right" aria-hidden="true"></i></button>
+                            </div>
+                        </section>
+                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -5125,63 +5170,45 @@
                     <div class="mi3-note"><i class="fas fa-shield-halved"></i> Бонусы начисляются автоматически после выполнения условий.</div>
                 </div>
                 <header class="mb-7 referral-mobile-header">
-                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Приглашения и бонусы</h1>
+                    <h1 class="text-3xl md:text-4xl font-black uppercase tracking-tighter mb-2">Рефералы</h1>
+                    <p class="dt-sec-sub">Дарите VPN — получайте дни</p>
                 </header>
-                <div class="overview-grid space-y-5">
-                    <section class="setup-shell p-5 md:p-6 referral-link-card">
-                        <div class="flex flex-col gap-5">
-                            <div>
-                                <h3 class="text-lg font-black mb-2">Пригласительная ссылка</h3>
-                                <p class="text-gray-500 text-sm font-bold leading-relaxed">Покажите другу QR-код или скопируйте ссылку — бонусы начислятся автоматически.</p>
+                <div class="overview-grid dt-ref-layout">
+                    <div class="dt-ref-grid">
+                        <section class="setup-shell dt-ref-card">
+                            <h3>Дарите друзьям VPN. <b>Получайте дни доступа.</b></h3>
+                            <p>Друг получает бонус к подписке, а вам начислим до {{ max_referral_bonus_days }} дней за его подключение, трафик и покупку.
+                                <a href="#" onclick="openReferralTerms(); return false" class="dt-ref-terms">Условия начисления</a></p>
+                            <div class="dt-key-field">
+                                <code>{{ referral_link }}</code>
+                                <button type="button" class="dt-copy-btn" data-mi3-copy="{{ referral_link }}"><i class="far fa-copy"></i> Скопировать</button>
                             </div>
-                            <div class="grid grid-cols-2 gap-3">
-                                <button type="button" onclick="openRefShare('tg')"
-                                        class="flex items-center justify-between gap-2 px-4 py-3.5 rounded-full border border-white/10 bg-white/5 hover:border-[#ffc700]/30 transition-colors text-left">
-                                    <span class="flex items-center gap-2 min-w-0">
-                                        <i class="fab fa-telegram-plane text-[#ffc700]"></i>
-                                        <span class="text-white font-semibold text-sm truncate">Telegram</span>
-                                    </span>
-                                    <i class="fas fa-qrcode text-gray-500"></i>
-                                </button>
-                                <button type="button" onclick="openRefShare('site')"
-                                        class="flex items-center justify-between gap-2 px-4 py-3.5 rounded-full border border-white/10 bg-white/5 hover:border-[#ffc700]/30 transition-colors text-left">
-                                    <span class="flex items-center gap-2 min-w-0">
-                                        <i class="fas fa-globe text-[#ffc700]"></i>
-                                        <span class="text-white font-semibold text-sm truncate">Вебсайт</span>
-                                    </span>
-                                    <i class="fas fa-qrcode text-gray-500"></i>
-                                </button>
+                            <div class="dt-ref-share">
+                                <button type="button" onclick="openRefShare('tg')" class="desktop-secondary-action"><i class="fab fa-telegram-plane" aria-hidden="true"></i> QR для Telegram</button>
+                                <button type="button" onclick="openRefShare('site')" class="desktop-secondary-action"><i class="fas fa-globe" aria-hidden="true"></i> QR для сайта</button>
                             </div>
+                        </section>
+                        <div class="dt-ref-stats">
+                            <div class="dt-ref-stat"><span class="n">{{ ref_invited_count|default:"0" }}</span><span class="l">Приглашено</span></div>
+                            <div class="dt-ref-stat is-mint"><span class="n">{{ ref_connected_count|default:"0" }}</span><span class="l">Активных</span></div>
+                            <div class="dt-ref-stat"><span class="n">{{ ref_purchased_count|default:"0" }}</span><span class="l">Покупок</span></div>
+                            <div class="dt-ref-stat is-gold"><span class="n">+{{ bonus_days|default:"0" }}</span><span class="l">Дней начислено</span></div>
                         </div>
-                    </section>
-
-                    <section class="setup-shell !p-0 overflow-hidden">
-                        <div class="flex items-center justify-between px-5 py-4 border-b border-white/5">
-                            <h3 class="text-[15px] font-bold text-white">Статистика</h3>
-                            <button type="button" onclick="openReferralTerms()"
-                                    class="flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-white/5 border border-white/10 text-gray-400 hover:text-[#ffc700] hover:border-[#ffc700]/30 font-semibold text-xs transition-colors">
-                                <i class="fas fa-info-circle"></i> Условия
-                            </button>
+                    </div>
+                    <div class="dt-ref-steps">
+                        <div class="dt-ref-step">
+                            <h4>Отправьте ссылку другу</h4>
+                            <p>Скопируйте или покажите QR — ссылка персональная и не сгорает.</p>
                         </div>
-                        <div class="divide-y divide-white/5">
-                            <div class="flex items-center justify-between px-5 py-3.5">
-                                <span class="text-gray-400 text-sm font-medium">Приглашено</span>
-                                <span class="text-white font-bold">{{ ref_invited_count|default:"0" }}</span>
-                            </div>
-                            <div class="flex items-center justify-between px-5 py-3.5">
-                                <span class="text-gray-400 text-sm font-medium">Активных</span>
-                                <span class="text-[#00ff88] font-bold">{{ ref_connected_count|default:"0" }}</span>
-                            </div>
-                            <div class="flex items-center justify-between px-5 py-3.5">
-                                <span class="text-gray-400 text-sm font-medium">Покупок</span>
-                                <span class="text-white font-bold">{{ ref_purchased_count|default:"0" }}</span>
-                            </div>
-                            <div class="flex items-center justify-between px-5 py-3.5">
-                                <span class="text-gray-400 text-sm font-medium">Бонусных дней</span>
-                                <span class="text-[#ffc700] font-bold">+{{ bonus_days|default:"0" }}</span>
-                            </div>
+                        <div class="dt-ref-step">
+                            <h4>Друг получает бонус</h4>
+                            <p>Он переходит по ссылке, и пробный период начинается сразу — карта не нужна.</p>
                         </div>
-                    </section>
+                        <div class="dt-ref-step">
+                            <h4>Вам начисляются дни</h4>
+                            <p>За подключение, трафик и покупку друга дни автоматически прибавятся к вашей подписке.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -5210,23 +5237,28 @@
                         Напишите нам в Telegram, мы поможем с оплатой, подключением и настройкой устройств.
                     </p>
                 </header>
-                <section class="setup-shell max-w-2xl">
-                    <div class="w-16 h-16 rounded-2xl bg-[#ffc700]/10 border border-[#ffc700]/20 flex items-center justify-center text-[#ffc700] mb-5">
-                        <i class="fab fa-telegram-plane text-2xl"></i>
+                <section class="setup-shell dt-support-shell">
+                    <div class="dt-status-strip">
+                        <span class="st">Все системы работают</span>
+                        <span class="eta">Ответим примерно за 3 минуты</span>
                     </div>
-                    <h2 class="text-2xl md:text-3xl font-black mb-3">Поддержка в Telegram</h2>
-                    <p class="text-gray-500 text-sm font-bold leading-relaxed max-w-xl mb-7">
-                        Откройте бота поддержки и напишите нам. Обычно отвечаем быстрее всего именно там.
-                    </p>
-                    <a href="{{ support_telegram_url }}" target="_blank" rel="noopener" class="setup-cta-btn !w-auto !mb-0 !mr-0 px-10">
-                        <i class="fab fa-telegram-plane mr-2"></i>
-                        Написать в поддержку
-                    </a>
-                    <button type="button" onclick="openSettingsFaq()" class="tg-mini-action-row mi3-support-faq-row" style="border:1px solid rgba(255,255,255,.1);border-radius:14px;background:rgba(255,255,255,.03)">
-                        <i class="far fa-circle-question" aria-hidden="true"></i>
-                        <span class="tg-mini-action-label">Часто задаваемые вопросы</span>
-                        <i class="fas fa-chevron-right tg-mini-action-chevron" aria-hidden="true"></i>
-                    </button>
+                    <div class="dt-support-grid">
+                        <div class="dt-support-card">
+                            <div class="dt-support-ico"><i class="fab fa-telegram-plane"></i></div>
+                            <h2>Поддержка в Telegram</h2>
+                            <p>Самый быстрый способ: живой человек ответит и поможет с оплатой, подключением и настройкой устройств.</p>
+                            <a href="{{ support_telegram_url }}" target="_blank" rel="noopener" class="desktop-primary-action dt-cta-main">
+                                <i class="fab fa-telegram-plane" aria-hidden="true"></i>
+                                Написать в Telegram
+                            </a>
+                        </div>
+                        <div class="dt-support-card">
+                            <div class="dt-support-ico"><i class="far fa-circle-question"></i></div>
+                            <h2>Частые вопросы</h2>
+                            <p>Не подключается, пропала скорость, как оплатить или вернуть деньги — короткие ответы прямо в кабинете.</p>
+                            <button type="button" onclick="openSettingsFaq()" class="desktop-secondary-action">Открыть вопросы</button>
+                        </div>
+                    </div>
                 </section>
                 <div class="hidden" data-support-ticket-ui-hidden>
                     {% if support_ticket and support_ticket.status == support_status_open %}
@@ -5399,6 +5431,18 @@
                 </section>
             </div>
 
+            {% if not tg_webapp_mode %}
+            {# Десктопный футер кабинета в стиле лендинга; на мобильных скрыт стилями. #}
+            <footer class="dt-cabinet-footer">
+                <div>&copy; {% now "Y" %} MONKEY ISLAND VPN &middot; ИНН 616617872421</div>
+                <div class="dt-foot-links">
+                    <a href="{% url 'offer' %}" target="_blank" rel="noopener">Оферта</a>
+                    <a href="{% url 'terms' %}" target="_blank" rel="noopener">Пользовательское соглашение</a>
+                    <a href="{% url 'privacy' %}" target="_blank" rel="noopener">Конфиденциальность</a>
+                    <a href="{{ support_telegram_url }}" target="_blank" rel="noopener">Поддержка</a>
+                </div>
+            </footer>
+            {% endif %}
         </main>
     </div>
 
@@ -5742,7 +5786,7 @@
                     <p class="referral-terms-reward">+{{ traffic_referrer_bonus_days|default:"7" }} дней</p>
                     <div class="referral-terms-detail">
                         <strong>Активность</strong>
-                        <p>Друг использовал 100 МБ трафика</p>
+                        <p>Друг стал активным пользователем сервиса</p>
                     </div>
                 </li>
                 <li class="referral-terms-step">
@@ -5798,7 +5842,7 @@
                         <span class="ref-desktop-step-icon" aria-hidden="true"><i class="fas fa-chart-line"></i></span>
                         <div>
                             <strong>+{{ traffic_referrer_bonus_days|default:"7" }} дней</strong>
-                            <span>Использовал 100 МБ</span>
+                            <span>Стал активным пользователем</span>
                         </div>
                     </div>
                     <span class="ref-desktop-connector" aria-hidden="true"></span>
@@ -5900,8 +5944,8 @@
                         <i class="fas fa-user-plus text-sm"></i>
                     </div>
                     <div>
-                        <h5 class="text-sm font-black mb-1">+{{ traffic_referrer_bonus_days|default:"7" }} дней за трафик</h5>
-                        <p class="text-gray-500 text-xs font-bold leading-relaxed">после 100 МБ трафика</p>
+                        <h5 class="text-sm font-black mb-1">+{{ traffic_referrer_bonus_days|default:"7" }} дней за активность</h5>
+                        <p class="text-gray-500 text-xs font-bold leading-relaxed">когда друг станет активным пользователем</p>
                     </div>
                 </div>
                 <div class="setup-step-card !p-4 !mb-0 flex items-start gap-3">
@@ -7824,8 +7868,11 @@
         }
 
         function hideTariffs() {
-            // Показываем интерфейс обратно
-            document.getElementById('interface-wrapper').style.display = 'block';
+            // Показываем интерфейс обратно. Снимаем inline-display (''), а не
+            // ставим 'block': инлайновый block перебивал десктопный
+            // display:flex у #interface-wrapper (cabinet-desktop.css), из-за
+            // чего футер переставал прижиматься к низу окна.
+            document.getElementById('interface-wrapper').style.display = '';
             // Прячем тарифы
             document.getElementById('tariff-selection-view').classList.add('hidden');
         }
@@ -8640,7 +8687,7 @@
             <span>
                 <span class="mi3-bonus-days">+{{ traffic_referrer_bonus_days }} дн.</span>
                 <span class="mi3-bonus-name" style="display:block">Активность</span>
-                <span class="mi3-bonus-desc" style="display:block">Друг использовал 100 МБ трафика</span>
+                <span class="mi3-bonus-desc" style="display:block">Друг стал активным пользователем сервиса</span>
             </span>
         </div>
         <div class="mi3-bonus-step">
@@ -8978,6 +9025,18 @@
             if (onlineCountNode) onlineCountNode.textContent = onlineCount;
             if (idleCountNode) idleCountNode.textContent = idleCount;
 
+            // Зеркало для стат-плитки на десктопной Главной (концепт «Продолжение лендинга»)
+            const dtStatNum = document.getElementById('dt-stat-devices');
+            if (dtStatNum) dtStatNum.textContent = data.total;
+            const dtStatLimit = document.getElementById('dt-stat-devices-limit');
+            if (dtStatLimit) dtStatLimit.textContent = data.limit ? ' / ' + data.limit : '';
+            const dtStatSub = document.getElementById('dt-stat-devices-sub');
+            if (dtStatSub) {
+                dtStatSub.textContent = devices.length
+                    ? devices.slice(0, 3).map((device) => deviceTitle(device)).join(' · ')
+                    : 'Пока нет подключённых устройств';
+            }
+
             const visibleDevices = devices.filter((device) => {
                 if (desktopDeviceFilter === 'all') return true;
                 const online = deviceMeta(device).online;
@@ -9129,6 +9188,198 @@
                 restoreTimer = setTimeout(() => { this.innerHTML = original; }, 2000);
             });
         });
+
+        // Десктопный этапный мастер установки (UX мобильного визарда, UI лендинга):
+        // платформа → приложение → установка → подписка (1 клик + ключ + QR) → готово.
+        // Работает на данных installData/newSetupPlatforms; плоский флоу с select
+        // остаётся для планшетов (<1025px) и скрыт на десктопе стилями.
+        (function dtSetupWizard() {
+            const wizard = document.getElementById('dt-setup-wizard');
+            const body = document.getElementById('dt-wiz-body');
+            const stepNum = document.getElementById('dt-wiz-stepnum');
+            const barFill = document.getElementById('dt-wiz-bar-fill');
+            const backBtn = document.getElementById('dt-wiz-back');
+            const nextBtn = document.getElementById('dt-wiz-next');
+            if (!wizard || !body || !nextBtn || typeof installData === 'undefined') return;
+
+            const select = document.getElementById('platform-select');
+            const state = {
+                step: 1,
+                platform: (select && installData[select.value]) ? select.value : 'android',
+                appIndex: 0,
+            };
+            const TOTAL = 4;
+
+            function platformMeta(id) {
+                return newSetupPlatforms.find((p) => p.id === id)
+                    || { id: id, label: id, icon: 'fas fa-mobile-screen' };
+            }
+
+            function currentApp() {
+                const apps = installData[state.platform] || [];
+                return apps[Math.min(state.appIndex, apps.length - 1)] || null;
+            }
+
+            function renderStep1() {
+                let html = '<h3 class="dt-wiz-title">Выберите устройство</h3>'
+                    + '<p class="dt-wiz-sub">На чём будете пользоваться VPN — остальные устройства добавите позже.</p>'
+                    + '<div class="dt-wiz-chips">';
+                newSetupPlatforms.forEach((p) => {
+                    if (!installData[p.id] || !installData[p.id].length) return;
+                    html += '<button type="button" class="dt-wiz-chip' + (p.id === state.platform ? ' is-active' : '')
+                        + '" data-platform="' + p.id + '"><i class="' + p.icon + '" aria-hidden="true"></i> ' + p.label + '</button>';
+                });
+                html += '</div>';
+                body.innerHTML = html;
+                body.querySelectorAll('[data-platform]').forEach((chip) => {
+                    chip.addEventListener('click', () => {
+                        state.platform = chip.dataset.platform;
+                        state.appIndex = 0;
+                        render();
+                    });
+                });
+            }
+
+            function renderStep2() {
+                const apps = installData[state.platform] || [];
+                let html = '<h3 class="dt-wiz-title">Выберите приложение</h3>'
+                    + '<p class="dt-wiz-sub">Первое — рекомендуем: с ним подключение занимает пару минут.</p>'
+                    + '<div class="dt-wiz-chips">';
+                apps.forEach((app, index) => {
+                    html += '<button type="button" class="dt-wiz-chip' + (index === state.appIndex ? ' is-active' : '')
+                        + '" data-app="' + index + '">'
+                        + (index === 0 ? '<span class="dt-wiz-dot" aria-hidden="true"></span>' : '')
+                        + app.name + '</button>';
+                });
+                html += '</div>';
+                body.innerHTML = html;
+                body.querySelectorAll('[data-app]').forEach((chip) => {
+                    chip.addEventListener('click', () => {
+                        state.appIndex = Number(chip.dataset.app);
+                        render();
+                    });
+                });
+            }
+
+            function renderStep3() {
+                const app = currentApp();
+                if (!app) { body.innerHTML = ''; return; }
+                const installStep = app.steps.find((s) => s.title === 'Установка приложения')
+                    || app.steps.find((s) => s.links);
+                let html = '<h3 class="dt-wiz-title">Установите ' + app.name + '</h3>'
+                    + '<p class="dt-wiz-sub">Скачайте и установите приложение, затем возвращайтесь и жмите «Далее».</p>';
+                if (installStep && installStep.links && installStep.links.length) {
+                    html += '<div class="dt-wiz-links">';
+                    installStep.links.forEach((link) => {
+                        html += '<a href="' + link.url + '" target="_blank" rel="noopener" class="desktop-secondary-action">'
+                            + '<i class="fas fa-download" aria-hidden="true"></i> '
+                            + formatInstallLinkLabel(app.name, link.text) + '</a>';
+                    });
+                    html += '</div>';
+                } else if (installStep && installStep.content) {
+                    html += '<p class="dt-wiz-text">' + installStep.content + '</p>';
+                }
+                html += '<p class="dt-wiz-hint">Уже установлено? Просто нажмите «Далее».</p>';
+                body.innerHTML = html;
+            }
+
+            function renderStep4() {
+                const app = currentApp();
+                if (!app) { body.innerHTML = ''; return; }
+                const buttonStep = app.steps.find((s) => s.type === 'button');
+                const subKey = buttonStep ? buttonStep.url : '';
+                let html = '<h3 class="dt-wiz-title">Добавьте подписку в ' + app.name + '</h3>'
+                    + '<p class="dt-wiz-sub">Нажмите кнопку — приложение откроется и подхватит ключ само.</p>'
+                    + '<div class="dt-wiz-connect"><div class="dt-wiz-connect-main">';
+                if (buttonStep) {
+                    html += '<a href="' + buttonStep.url + '" class="desktop-primary-action dt-cta-main dt-wiz-oneclick">'
+                        + '<i class="fas fa-bolt" aria-hidden="true"></i> Подключиться в 1 клик</a>';
+                }
+                if (subKey) {
+                    html += '<p class="dt-wiz-keylabel">Не сработало? Скопируйте ключ и вставьте в приложение вручную:</p>'
+                        + '<div class="dt-key-field"><input type="text" readonly value="' + subKey + '" id="dt-wiz-key">'
+                        + '<button type="button" onclick="copyInputValueBtn(event, \'dt-wiz-key\')" class="dt-copy-btn">'
+                        + '<i class="far fa-copy" aria-hidden="true"></i> Скопировать</button></div>';
+                }
+                html += '</div>';
+                if (subKey) {
+                    html += '<div class="dt-wiz-qr-card"><div class="dt-qr-box" id="dt-wiz-qr" role="img" aria-label="QR-код с ключом подписки"></div>'
+                        + '<h4>Или наведите камеру</h4><p>Откройте камеру телефона и наведите на QR — ключ добавится автоматически.</p></div>';
+                }
+                html += '</div>';
+                body.innerHTML = html;
+                const qrBox = document.getElementById('dt-wiz-qr');
+                if (qrBox && subKey && window.QRCode) {
+                    new QRCode(qrBox, {
+                        text: subKey,
+                        width: 168,
+                        height: 168,
+                        colorDark: '#0a0b10',
+                        colorLight: '#ffffff',
+                        correctLevel: QRCode.CorrectLevel.M,
+                    });
+                }
+            }
+
+            function renderDone() {
+                body.innerHTML = '<div class="dt-wiz-done">'
+                    + '<div class="dt-chip"><span class="dot"></span> Остров на связи · Подписка добавлена</div>'
+                    + '<h3 class="dt-wiz-title">Готово — включайте VPN</h3>'
+                    + '<p class="dt-wiz-sub">Откройте приложение и нажмите кнопку подключения. Устройство появится в списке в течение пары минут.</p>'
+                    + '<div class="dt-wiz-links">'
+                    + '<button type="button" class="desktop-primary-action dt-cta-main" onclick="showTab(\'devices\')">Мои устройства</button>'
+                    + '<button type="button" class="desktop-secondary-action" id="dt-wiz-restart">Подключить ещё устройство</button>'
+                    + '</div></div>';
+                const restart = document.getElementById('dt-wiz-restart');
+                if (restart) {
+                    restart.addEventListener('click', () => { state.step = 1; render(); });
+                }
+            }
+
+            function render() {
+                const done = state.step > TOTAL;
+                if (stepNum) stepNum.textContent = done ? 'ГОТОВО' : 'ШАГ ' + state.step + ' ИЗ ' + TOTAL;
+                if (barFill) barFill.style.transform = 'scaleX(' + (done ? 1 : state.step / TOTAL) + ')';
+                if (backBtn) backBtn.hidden = state.step <= 1 || done;
+                nextBtn.hidden = done;
+                nextBtn.innerHTML = state.step === TOTAL
+                    ? 'Готово <i class="fas fa-check" aria-hidden="true"></i>'
+                    : 'Далее <i class="fas fa-arrow-right" aria-hidden="true"></i>';
+                if (done) { renderDone(); return; }
+                if (state.step === 1) renderStep1();
+                else if (state.step === 2) renderStep2();
+                else if (state.step === 3) renderStep3();
+                else renderStep4();
+            }
+
+            nextBtn.addEventListener('click', () => { state.step += 1; render(); });
+            if (backBtn) backBtn.addEventListener('click', () => { state.step = Math.max(1, state.step - 1); render(); });
+
+            // Автоопределённая платформа из плоского флоу (select синхронизируется setPlatform)
+            window.addEventListener('load', () => {
+                if (state.step === 1 && select && installData[select.value] && select.value !== state.platform) {
+                    state.platform = select.value;
+                    render();
+                }
+            });
+
+            render();
+        })();
+
+        // Подсветка курсора как на лендинге (index_vpn.html #cursor-glow):
+        // только точный указатель; на мобильных элемент скрыт стилями.
+        (function dtCursorGlow() {
+            const glow = document.getElementById('dt-cursor-glow');
+            if (!glow) return;
+            if (!matchMedia('(pointer: fine)').matches) {
+                glow.style.display = 'none';
+                return;
+            }
+            addEventListener('mousemove', function (event) {
+                glow.style.left = event.clientX + 'px';
+                glow.style.top = event.clientY + 'px';
+            });
+        })();
     })();
     </script>
 

@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1920 1080">
+  <!-- Флагманский баннер: справа сцена, слева чистое место под заголовок -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#090A0F"/><stop offset="1" stop-color="#0b0c12"/>
+    </linearGradient>
+    <radialGradient id="moon" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#FFC700" stop-opacity=".2"/><stop offset="1" stop-color="#FFC700" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="1920" height="1080" fill="url(#bg)"/>
+  <!-- тонкая сетка -->
+  <g stroke="#E9EDF3" stroke-width="1" opacity=".01">
+    <path d="M240 0V1080 M480 0V1080 M720 0V1080 M960 0V1080 M1200 0V1080 M1440 0V1080 M1680 0V1080"/>
+    <path d="M0 216H1920 M0 432H1920 M0 648H1920 M0 864H1920"/>
+  </g>
+  <!-- звёзды -->
+  <g fill="#E9EDF3">
+    <circle cx="1240" cy="140" r="2" opacity=".5"/><circle cx="1420" cy="90" r="1.6" opacity=".4"/>
+    <circle cx="1650" cy="180" r="2" opacity=".5"/><circle cx="1800" cy="100" r="1.5" opacity=".35"/>
+    <circle cx="1330" cy="260" r="1.5" opacity=".3"/><circle cx="1740" cy="320" r="1.6" opacity=".4"/>
+  </g>
+  <!-- луна -->
+  <circle cx="1560" cy="220" r="300" fill="url(#moon)"/>
+  <circle cx="1560" cy="220" r="80" fill="#FFC700" opacity=".9"/>
+  <circle cx="1536" cy="196" r="16" fill="#090A0F" opacity=".12"/>
+  <!-- остров -->
+  <path fill="#5A4820" d="M1160 810 Q1180 760 1230 742 Q1250 700 1300 692 Q1330 640 1400 630 Q1470 624 1510 664 Q1560 672 1586 712 Q1640 726 1668 770 Q1700 786 1716 810 Z"/>
+  <!-- пальма -->
+  <g fill="none" stroke="#FFC700" stroke-width="10" stroke-linecap="round">
+    <path d="M1400 640 Q1394 560 1408 500"/>
+    <path d="M1408 500 Q1360 478 1312 496"/>
+    <path d="M1408 500 Q1390 448 1342 434"/>
+    <path d="M1408 500 Q1436 448 1490 442"/>
+    <path d="M1408 500 Q1460 480 1502 506"/>
+  </g>
+  <circle cx="1388" cy="516" r="9" fill="#FFC700"/>
+  <circle cx="1424" cy="522" r="9" fill="#FFC700"/>
+  <!-- маскот на гребне острова: силуэт против неба, золотой контур -->
+  <g transform="translate(56,-96)">
+    <path d="M1560 792 Q1562 726 1608 722 Q1652 726 1656 792 Z" fill="#7C5330" stroke="#FFC700" stroke-width="4"/>
+    <circle cx="1596" cy="676" r="46" fill="#7C5330" stroke="#FFC700" stroke-width="4"/>
+    <circle cx="1642" cy="676" r="15" fill="#7C5330" stroke="#FFC700" stroke-width="4"/>
+    <path d="M1558 690 Q1552 672 1562 664 Q1576 676 1574 694 Z" fill="#E9EDF3" opacity=".9"/>
+    <circle cx="1572" cy="670" r="4" fill="#090A0F"/>
+    <path d="M1552 656 Q1558 626 1596 622 Q1628 624 1638 652 Q1616 640 1594 642 Q1570 644 1552 656 Z" fill="#C7502E"/>
+    <path d="M1554 650 Q1534 642 1522 648 Q1534 656 1550 658 Z" fill="#C7502E"/>
+    <!-- хвост-кабель свисает с гребня -->
+    <path d="M1656 780 Q1700 776 1712 744 Q1720 720 1700 714" fill="none" stroke="#FFC700" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <!-- вода -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M1020 850 Q1130 834 1240 850 T1460 850 T1680 850 T1900 850" stroke="#38D996" stroke-width="4" opacity=".4"/>
+    <path d="M1080 910 Q1190 896 1300 910 T1520 910 T1740 910" stroke="#5A4820" stroke-width="4" opacity=".5"/>
+    <path d="M1140 966 Q1250 954 1360 966 T1580 966 T1800 966" stroke="#38D996" stroke-width="3" opacity=".25"/>
+  </g>
+  <ellipse cx="1560" cy="880" rx="120" ry="5" fill="#FFC700" opacity=".15"/>
+  <!-- левая половина остаётся чистой под заголовок: только маркер зоны -->
+</svg>

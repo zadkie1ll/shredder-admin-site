@@ -2,50 +2,10 @@
   "version": "0.0.1",
   "configurations": [
     {
-      "name": "website-fake-rwms",
-      "runtimeExecutable": "/private/tmp/claude-501/-Users-apugachev-Work-projects-monkeyislandvpn-monkey-island-website/ed3d83b8-06ff-4eaa-9b2e-efd17954a9c3/scratchpad/run_site_fake.sh",
-      "runtimeArgs": [],
-      "port": 8124
-    },
-    {
-      "name": "website-infra-preview",
-      "runtimeExecutable": "/private/tmp/claude-501/-Users-apugachev-Work-projects-monkeyislandvpn-monkey-island-website/e02b407e-7f35-4d36-876f-0b023b56abd4/scratchpad/run_site_infra_preview.sh",
-      "runtimeArgs": [],
-      "port": 8125
-    },
-    {
-      "name": "website-infra-check",
-      "runtimeExecutable": "/private/tmp/claude-501/-Users-apugachev-Work-projects-monkeyislandvpn-monkey-island-website/6f92a736-b3a6-4a2c-9911-dcf95804a00e/scratchpad/run_site_infra_check.sh",
-      "runtimeArgs": [],
-      "port": 8127
-    },
-    {
-      "name": "website",
-      "runtimeExecutable": "./.venv/bin/python",
-      "runtimeArgs": [
-        "manage.py",
-        "runserver",
-        "8123"
-      ],
-      "port": 8123
-    },
-    {
-      "name": "concept-preview",
+      "name": "cabinet-concept",
       "runtimeExecutable": "python3",
-      "runtimeArgs": [
-        "-m",
-        "http.server",
-        "8899",
-        "--directory",
-        "/Users/apugachev/Desktop/monkey-island-vpn-assets"
-      ],
-      "port": 8899
-    },
-    {
-      "name": "website-vps-preview",
-      "runtimeExecutable": "/private/tmp/claude-501/-Users-apugachev-Work-projects-monkeyislandvpn-monkey-island-website/492d0cc9-f35c-4ad5-b1ad-ea6915503fbc/scratchpad/run_site_vps_preview.sh",
-      "runtimeArgs": [],
-      "port": 8126
+      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "docs/cabinet-desktop"],
+      "port": 8765
     }
   ]
 }

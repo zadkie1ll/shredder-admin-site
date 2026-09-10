@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900">
+  <!-- Окружение: ночная бухта с маяком-антенной (секция «локации») -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#090A0F"/><stop offset="1" stop-color="#0b0c12"/>
+    </linearGradient>
+    <linearGradient id="beam" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#FFC700" stop-opacity=".22"/><stop offset="1" stop-color="#FFC700" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <g fill="#E9EDF3">
+    <circle cx="500" cy="110" r="2" opacity=".5"/><circle cx="700" cy="70" r="1.6" opacity=".4"/>
+    <circle cx="900" cy="150" r="1.8" opacity=".45"/><circle cx="1100" cy="90" r="1.5" opacity=".35"/>
+    <circle cx="1300" cy="180" r="1.8" opacity=".4"/><circle cx="1480" cy="80" r="1.6" opacity=".4"/>
+    <circle cx="620" cy="230" r="1.4" opacity=".3"/><circle cx="1000" cy="260" r="1.4" opacity=".3"/>
+  </g>
+  <!-- скала -->
+  <path fill="#5A4820" d="M0 640 Q60 600 120 596 Q160 560 220 566 Q280 570 320 620 Q360 660 380 700 L380 900 L0 900 Z" opacity=".9"/>
+  <!-- маяк-антенна -->
+  <g>
+    <path d="M196 566 L216 566 L230 380 L182 380 Z" fill="#090A0F" stroke="#FFC700" stroke-width="4"/>
+    <!-- полосы -->
+    <path d="M188 470 L224 470 M185 520 L227 520" stroke="#FFC700" stroke-width="4"/>
+    <!-- фонарь -->
+    <rect x="188" y="344" width="36" height="36" rx="6" fill="none" stroke="#FFC700" stroke-width="4"/>
+    <circle cx="206" cy="362" r="9" fill="#FFC700"/>
+    <!-- антенна над фонарём -->
+    <path d="M206 344 L206 300" stroke="#FFC700" stroke-width="4" stroke-linecap="round"/>
+    <path d="M192 316 L220 316 M196 302 L216 302" stroke="#38D996" stroke-width="3.5" stroke-linecap="round"/>
+    <circle cx="206" cy="292" r="4.5" fill="#38D996"/>
+    <!-- луч -->
+    <path d="M224 350 L820 260 L820 470 Z" fill="url(#beam)"/>
+    <!-- сигнальные дуги -->
+    <g fill="none" stroke="#38D996" stroke-width="3" opacity=".5" stroke-linecap="round">
+      <path d="M236 270 Q260 292 236 314"/>
+      <path d="M256 252 Q292 292 256 332"/>
+    </g>
+  </g>
+  <!-- море -->
+  <g fill="none" stroke-linecap="round">
+    <path d="M380 700 Q500 686 620 700 T860 700 T1100 700 T1340 700 T1580 700 L1600 700" stroke="#38D996" stroke-width="3.5" opacity=".35"/>
+    <path d="M300 760 Q420 748 540 760 T780 760 T1020 760 T1260 760 T1500 760 L1600 760" stroke="#5A4820" stroke-width="3.5" opacity=".45"/>
+    <path d="M360 830 Q480 818 600 830 T840 830 T1080 830 T1320 830 T1560 830 L1600 830" stroke="#38D996" stroke-width="3" opacity=".2"/>
+  </g>
+  <!-- дорожка от маяка -->
+  <ellipse cx="700" cy="730" rx="130" ry="4" fill="#FFC700" opacity=".14"/>
+  <ellipse cx="760" cy="790" rx="170" ry="5" fill="#FFC700" opacity=".1"/>
+  <!-- буйки-ноды с огнями -->
+  <g>
+    <path d="M980 690 L980 660" stroke="#5A4820" stroke-width="5"/><circle cx="980" cy="652" r="7" fill="#38D996"/>
+    <path d="M1240 750 L1240 722" stroke="#5A4820" stroke-width="5"/><circle cx="1240" cy="714" r="7" fill="#38D996"/>
+    <path d="M1460 700 L1460 674" stroke="#5A4820" stroke-width="5"/><circle cx="1460" cy="666" r="7" fill="#FFC700"/>
+  </g>
+</svg>

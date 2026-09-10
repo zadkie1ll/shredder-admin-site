@@ -1127,6 +1127,15 @@
         .promo-batch-note-item i { width: 20px; margin-top: 2px; color: var(--brand-gold); font-size: 11px; text-align: center; }
         #promo-batches:empty { display: none; }
         .promo-batches-list { display: grid; gap: 8px; padding: 0 15px 15px; }
+        .promo-mode { display: inline-flex; gap: 3px; padding: 3px; border: 1px solid var(--broadcast-line, rgba(127,143,163,.22)); border-radius: 9px; background: rgba(255,255,255,.03); }
+        .promo-mode button { display: inline-flex; align-items: center; gap: 6px; min-height: 34px; padding: 0 13px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); font: inherit; font-size: 12px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+        .promo-mode button small { font-weight: 600; opacity: .7; }
+        .promo-mode button[aria-pressed="true"] { background: rgba(255,199,0,.1); color: var(--brand-gold); box-shadow: inset 0 0 0 1px rgba(255,199,0,.3); }
+        .promo-mode-tag { margin-left: 8px; padding: 1px 8px; border-radius: 999px; background: rgba(127,178,255,.14); color: #9cc3f7; font-size: 10px; font-style: normal; font-weight: 700; vertical-align: 1px; }
+        [data-promo-mode-only][hidden] { display: none !important; }
+        .promo-batches-subhead { display: flex; align-items: center; gap: 8px; margin: 0 15px 10px; color: var(--text-main); font-size: 13px; font-weight: 850; }
+        .promo-batches-subhead i { color: var(--brand-gold); font-size: 11px; }
+        .promo-batches-block { margin-top: 4px; padding-top: 14px; border-top: 1px solid var(--promo-line); }
         .promo-batch-row { display: grid; grid-template-columns: minmax(180px, 1.15fr) minmax(210px, 1fr) minmax(170px, .8fr) auto; gap: 12px; align-items: center; padding: 11px 12px; border: 1px solid var(--promo-line); border-radius: 11px; background: var(--promo-soft); }
         .promo-batch-title b, .promo-batch-title small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .promo-batch-title b { margin-bottom: 3px; color: var(--text-main); font-size: 12px; font-weight: 800; }
@@ -3265,7 +3274,7 @@
     <link href="{% static 'css/admin_dashboard.css' %}?v=9" rel="stylesheet">
     {% include "includes/yandex_metrika.html" %}
     <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
-    <link rel="stylesheet" href="{% static 'css/admin-concept.css' %}?v=16">
+    <link rel="stylesheet" href="{% static 'css/admin-concept.css' %}?v=17">
 </head>
 <body>
     <div class="page-bg"></div>
@@ -4192,7 +4201,7 @@
                                         </div>
                                         <div class="broadcast-segment-list" id="broadcast-segment-list" role="listbox" aria-label="Сегменты получателей"></div>
                                     </div>
-                                    <select id="broadcast-segment" tabindex="-1" aria-hidden="true"><option value="">Сегмент…</option></select>
+                                    <select id="broadcast-segment" tabindex="-1" aria-hidden="true" data-native-select><option value="">Сегмент…</option></select>
                                 </div>
                                 <div id="broadcast-segment-hint" aria-live="polite"></div>
                             </div>
@@ -4313,9 +4322,12 @@
                     <div class="promo-card-head">
                         <div class="promo-card-heading">
                             <span class="promo-card-icon"><i class="fas fa-ticket"></i></span>
-                            <div><h2>Новый промокод</h2><p>Настройте эффект, аудиторию и ограничения</p></div>
+                            <div><h2>Создание промокода</h2><p>Эффект, аудитория и ограничения</p></div>
                         </div>
-                        <span class="promo-step-chip">Один код</span>
+                        <div class="promo-mode" role="group" aria-label="Режим создания">
+                            <button type="button" data-promo-mode="single" aria-pressed="true">Один код</button>
+                            <button type="button" data-promo-mode="batch" aria-pressed="false">Партия купонов <small>· до 500</small></button>
+                        </div>
                     </div>
                     <div class="promo-form">
                         <div class="promo-field">
@@ -4332,17 +4344,25 @@
                             </div>
                         </div>
                         <div class="promo-fields-row">
-                            <label class="promo-field">
+                            <label class="promo-field" data-promo-mode-only="single">
                                 <span class="promo-field-label">Код <span>пусто — сгенерируем</span></span>
                                 <input class="input" id="promo-code" maxlength="64" spellcheck="false" placeholder="Например, WELCOME20">
+                            </label>
+                            <label class="promo-field" data-promo-mode-only="batch" hidden>
+                                <span class="promo-field-label">Название партии<i class="promo-mode-tag">партия</i> <span>для команды</span></span>
+                                <input class="input" id="batch-name" maxlength="128" placeholder="Например, Blogger August">
                             </label>
                             <label class="promo-field">
                                 <span class="promo-field-label" data-promo-value-label="promo">Сколько дней <span>от 1 до 365</span></span>
                                 <input class="input" id="promo-value" type="number" min="1" max="365" placeholder="Например, 7">
                             </label>
-                            <label class="promo-field">
+                            <label class="promo-field" data-promo-mode-only="single">
                                 <span class="promo-field-label">Общий лимит <span>0 — без лимита</span></span>
                                 <input class="input" id="promo-max-uses" type="number" min="0" placeholder="Например, 100">
+                            </label>
+                            <label class="promo-field" data-promo-mode-only="batch" hidden>
+                                <span class="promo-field-label">Количество<i class="promo-mode-tag">партия</i> <span>от 1 до 500</span></span>
+                                <input class="input" id="batch-count" type="number" min="1" max="500" placeholder="Например, 50">
                             </label>
                         </div>
                         <div class="promo-fields-row is-two">
@@ -4367,7 +4387,7 @@
                             </div>
                         </div>
                         <div class="promo-form-footer">
-                            <div class="promo-form-note"><i class="fas fa-circle-info"></i><span>Выключение скидочного кода отключит и уже выданную по нему, но ещё не использованную скидку.</span></div>
+                            <div class="promo-form-note"><i class="fas fa-circle-info"></i><span id="promo-form-note">Выключение скидочного кода отключит и уже выданную по нему, но ещё не использованную скидку.</span></div>
                             <button class="btn promo-submit" type="button" id="promo-create"><i class="fas fa-plus"></i>Создать промокод</button>
                         </div>
                     </div>
@@ -4387,73 +4407,25 @@
                         </div>
                         <div class="promo-rule-list">
                             <div class="promo-rule"><span class="promo-rule-icon"><i class="fas fa-user-check"></i></span><div><b>Аудитория</b><span id="promo-live-audience">Любой пользователь, который ещё не применял этот код</span></div></div>
-                            <div class="promo-rule"><span class="promo-rule-icon"><i class="fas fa-fingerprint"></i></span><div><b>Повторная активация</b><span>Один и тот же пользователь может применить код только один раз</span></div></div>
-                            <div class="promo-rule"><span class="promo-rule-icon"><i class="fas fa-paper-plane"></i></span><div><b>Как отправить</b><span>Скопируйте deep-link из реестра или добавьте код кнопкой в рассылку</span></div></div>
+                            <div class="promo-rule" data-promo-mode-only="single"><span class="promo-rule-icon"><i class="fas fa-fingerprint"></i></span><div><b>Повторная активация</b><span>Один и тот же пользователь может применить код только один раз</span></div></div>
+                            <div class="promo-rule" data-promo-mode-only="single"><span class="promo-rule-icon"><i class="fas fa-paper-plane"></i></span><div><b>Как отправить</b><span>Скопируйте deep-link из реестра или добавьте код кнопкой в рассылку</span></div></div>
+                            <div class="promo-rule" data-promo-mode-only="batch" hidden><span class="promo-rule-icon"><i class="fas fa-fingerprint"></i></span><div><b>Одноразовый купон</b><span>Один купон сможет забрать только один человек; повторно раздать этот же код нельзя</span></div></div>
+                            <div class="promo-rule" data-promo-mode-only="batch" hidden><span class="promo-rule-icon"><i class="fas fa-file-arrow-down"></i></span><div><b>Скачать TXT</b><span>После создания скачайте TXT: в каждой строке будет код и готовая Telegram-ссылка</span></div></div>
                         </div>
                     </div>
                 </aside>
             </div>
 
-            <section class="card promo-batch-card">
-                <div class="promo-card-head">
-                    <div class="promo-card-heading">
-                        <span class="promo-card-icon"><i class="fas fa-layer-group"></i></span>
-                        <div><h2>Партия одноразовых купонов</h2><p>Для блогеров, розыгрышей и офлайн-раздач</p></div>
-                    </div>
-                    <span class="promo-step-chip">До 500 кодов</span>
-                </div>
-                <div class="promo-batch-layout">
-                    <div class="promo-form promo-batch-form">
-                        <div class="promo-field">
-                            <input type="hidden" id="batch-type" value="days">
-                            <div class="promo-type-picker" data-promo-type-picker="batch" role="group" aria-label="Эффект каждого купона — все коды партии одинаковые" title="Эффект каждого купона — все коды партии одинаковые">
-                                <button type="button" class="promo-type-option" data-value="days" aria-pressed="true">
-                                    <span class="promo-type-option-icon"><i class="fas fa-calendar-plus"></i></span>
-                                    <span><b>Дни подписки</b><small>Добавятся сразу</small></span><i class="fas fa-check"></i>
-                                </button>
-                                <button type="button" class="promo-type-option" data-value="discount" aria-pressed="false">
-                                    <span class="promo-type-option-icon"><i class="fas fa-percent"></i></span>
-                                    <span><b>Скидка на оплату</b><small>На ближайший платёж</small></span><i class="fas fa-check"></i>
-                                </button>
-                            </div>
-                        </div>
-                        <div class="promo-fields-row">
-                            <label class="promo-field"><span class="promo-field-label">Название партии <span>для команды</span></span><input class="input" id="batch-name" maxlength="128" placeholder="Например, Blogger August"></label>
-                            <label class="promo-field"><span class="promo-field-label" data-promo-value-label="batch">Сколько дней <span>от 1 до 365</span></span><input class="input" id="batch-value" type="number" min="1" max="365" placeholder="Например, 7"></label>
-                            <label class="promo-field"><span class="promo-field-label">Количество <span>от 1 до 500</span></span><input class="input" id="batch-count" type="number" min="1" max="500" placeholder="Например, 50"></label>
-                        </div>
-                        <div class="promo-fields-row is-two">
-                            <label class="promo-field"><span class="promo-field-label">Активировать до <span>пусто — без срока</span></span><input class="input" id="batch-valid-until" type="date" title="Купоны перестанут активироваться с начала выбранной даты"></label>
-                            <label class="promo-field"><span class="promo-field-label">Комментарий <span>виден только команде</span></span><input class="input" id="batch-comment" maxlength="512" placeholder="Кому и зачем передана партия"></label>
-                        </div>
-                        <div class="promo-audience">
-                            <label class="promo-switch"><input type="checkbox" id="batch-first-only"><span class="promo-switch-track" aria-hidden="true"></span><span class="promo-switch-copy"><b>Только пользователям без оплат</b><small>Платившие не смогут активировать купон</small></span></label>
-                            <div class="promo-rule"><span class="promo-rule-icon"><i class="fas fa-users"></i></span><div><b>Кому доступна партия</b><span id="batch-audience-summary">Всем пользователям: новым, на триале и уже платившим</span></div></div>
-                        </div>
-                        <div class="promo-form-footer">
-                            <div class="promo-form-note"><i class="fas fa-shield-halved"></i><span>Каждый код партии имеет общий лимит ровно в одну активацию.</span></div>
-                            <button class="btn promo-submit" type="button" id="batch-create"><i class="fas fa-layer-group"></i>Сгенерировать купоны</button>
-                        </div>
-                    </div>
-                    <aside class="promo-batch-note">
-                        <h3>Как сработает</h3>
-                        <div class="promo-batch-effect"><span id="batch-effect-summary">Дни добавятся к подписке сразу после активации купона.</span></div>
-                        <div class="promo-batch-note-item"><b>Одноразовый купон</b><span>Один купон сможет забрать только один человек; повторно раздать этот же код нельзя.</span></div>
-                        <div class="promo-batch-note-item"><b>Скачать TXT</b><span>После создания скачайте TXT: в каждой строке будет код и готовая Telegram-ссылка.</span></div>
-                    </aside>
-                </div>
-                <div id="promo-batches"></div>
-            </section>
-
             <section class="card promo-registry-card">
                 <div class="promo-card-head">
                     <div class="promo-card-heading">
                         <span class="promo-card-icon"><i class="fas fa-list-check"></i></span>
-                        <div><h2>Реестр промокодов</h2><p>Правила, аудитория, срок и расход каждого кода</p></div>
+                        <div><h2>Реестр промокодов</h2><p>Правила, аудитория, срок и расход каждого кода — включая партии купонов</p></div>
                     </div>
                     <button type="button" class="promo-refresh" id="promo-refresh"><i class="fas fa-rotate"></i><span>Обновить</span></button>
                 </div>
                 <div id="promo-table"></div>
+                <div id="promo-batches"></div>
             </section>
         </section>
 
@@ -9876,6 +9848,49 @@
             return compact ? 'Все пользователи' : 'Новые, на триале, действующие и уже платившие';
         }
 
+        let promoBuilderMode = 'single';
+
+        function syncPromoSubmitLabel() {
+            const button = document.getElementById('promo-create');
+            if (!button) return;
+            if (promoBuilderMode === 'batch') {
+                const count = parseInt(document.getElementById('batch-count')?.value, 10) || 0;
+                button.innerHTML = `<i class="fas fa-layer-group"></i>Сгенерировать ${count ? `${num(count)} ${pluralRu(count, 'купон', 'купона', 'купонов')}` : 'купоны'}`;
+            } else {
+                button.innerHTML = '<i class="fas fa-plus"></i>Создать промокод';
+            }
+        }
+
+        function setPromoBuilderMode(mode) {
+            // Утверждённый концепт (10.09.2026): общие поля живут один раз,
+            // режим меняет только «Код + Общий лимит» <-> «Название + Количество»,
+            // подсказки и кнопку
+            promoBuilderMode = mode === 'batch' ? 'batch' : 'single';
+            document.querySelectorAll('[data-promo-mode]').forEach((button) => {
+                button.setAttribute('aria-pressed', button.dataset.promoMode === promoBuilderMode ? 'true' : 'false');
+            });
+            document.querySelectorAll('[data-promo-mode-only]').forEach((element) => {
+                element.hidden = element.dataset.promoModeOnly !== promoBuilderMode;
+            });
+            const comment = document.getElementById('promo-comment');
+            if (comment) comment.placeholder = promoBuilderMode === 'batch'
+                ? 'Кому и зачем передана партия'
+                : 'Кампания, блогер или получатель';
+            const note = document.getElementById('promo-form-note');
+            if (note) note.textContent = promoBuilderMode === 'batch'
+                ? 'Каждый код партии — ровно одна активация. После создания скачайте TXT: код и готовая ссылка в каждой строке.'
+                : 'Выключение скидочного кода отключит и уже выданную по нему, но ещё не использованную скидку.';
+            syncPromoSubmitLabel();
+        }
+
+        function pluralRu(count, one, few, many) {
+            const mod10 = count % 10;
+            const mod100 = count % 100;
+            if (mod10 === 1 && mod100 !== 11) return one;
+            if (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return few;
+            return many;
+        }
+
         function setPromoType(scope, type) {
             const safeType = type === 'discount' ? 'discount' : 'days';
             const hidden = document.getElementById(`${scope}-type`);
@@ -9977,7 +9992,9 @@
 
         function renderPromoBatches(batchRows) {
             if (!batchRows.length) return '';
-            return `<div class="promo-batches-list">${batchRows.map((batch) => {
+            // Партии живут в реестре отдельной группой — единственное место,
+            // где лежит всё выпущенное (концепт 10.09.2026)
+            return `<div class="promo-batches-block"><div class="promo-batches-subhead"><i class="fas fa-layer-group"></i>Партии купонов</div><div class="promo-batches-list">${batchRows.map((batch) => {
                 const type = promoTypeInfo(batch.promo_type, batch.value);
                 const codes = parseInt(batch.codes, 10) || 0;
                 const used = parseInt(batch.used, 10) || 0;
@@ -9989,7 +10006,7 @@
                     ${promoUsageMarkup(used, codes, 'Купоны')}
                     <a class="promo-download" href="${main.dataset.promocodesUrl}?action=batch_links&amp;batch_id=${batch.id}"><i class="fas fa-file-arrow-down"></i>Скачать TXT</a>
                 </article>`;
-            }).join('')}</div>`;
+            }).join('')}</div></div>`;
         }
 
         function promoCohortCount(value) {
@@ -10416,7 +10433,8 @@
                     } else {
                         document.getElementById('batch-name').value = '';
                         document.getElementById('batch-count').value = '';
-                        document.getElementById('batch-comment').value = '';
+                        document.getElementById('promo-comment').value = '';
+                        syncPromoSubmitLabel();
                     }
                     loadPromocodes();
                 } else {
@@ -10434,30 +10452,37 @@
                 setPromoType(picker.dataset.promoTypePicker, button.dataset.value);
             }));
         });
-        ['promo', 'batch'].forEach((scope) => {
-            document.getElementById(`${scope}-first-only`)?.addEventListener('change', () => syncPromoAudience(scope));
-            setPromoType(scope, document.getElementById(`${scope}-type`)?.value || 'days');
-            syncPromoAudience(scope);
+        document.getElementById('promo-first-only')?.addEventListener('change', () => syncPromoAudience('promo'));
+        setPromoType('promo', document.getElementById('promo-type')?.value || 'days');
+        syncPromoAudience('promo');
+        document.querySelectorAll('[data-promo-mode]').forEach((button) => {
+            button.addEventListener('click', () => setPromoBuilderMode(button.dataset.promoMode));
         });
+        document.getElementById('batch-count')?.addEventListener('input', syncPromoSubmitLabel);
+        setPromoBuilderMode('single');
         document.getElementById('promo-refresh')?.addEventListener('click', loadPromocodes);
-        document.getElementById('promo-create')?.addEventListener('click', (event) => submitPromoForm('create', {
-            code: document.getElementById('promo-code').value,
-            promo_type: document.getElementById('promo-type').value,
-            value: document.getElementById('promo-value').value,
-            max_uses: document.getElementById('promo-max-uses').value || '0',
-            valid_until: document.getElementById('promo-valid-until').value,
-            first_purchase_only: document.getElementById('promo-first-only').checked ? '1' : '0',
-            comment: document.getElementById('promo-comment').value,
-        }, event.currentTarget));
-        document.getElementById('batch-create')?.addEventListener('click', (event) => submitPromoForm('create_batch', {
-            name: document.getElementById('batch-name').value,
-            promo_type: document.getElementById('batch-type').value,
-            value: document.getElementById('batch-value').value,
-            count: document.getElementById('batch-count').value,
-            valid_until: document.getElementById('batch-valid-until').value,
-            first_purchase_only: document.getElementById('batch-first-only').checked ? '1' : '0',
-            comment: document.getElementById('batch-comment').value,
-        }, event.currentTarget));
+        document.getElementById('promo-create')?.addEventListener('click', (event) => {
+            const shared = {
+                promo_type: document.getElementById('promo-type').value,
+                value: document.getElementById('promo-value').value,
+                valid_until: document.getElementById('promo-valid-until').value,
+                first_purchase_only: document.getElementById('promo-first-only').checked ? '1' : '0',
+                comment: document.getElementById('promo-comment').value,
+            };
+            if (promoBuilderMode === 'batch') {
+                submitPromoForm('create_batch', {
+                    ...shared,
+                    name: document.getElementById('batch-name').value,
+                    count: document.getElementById('batch-count').value,
+                }, event.currentTarget);
+                return;
+            }
+            submitPromoForm('create', {
+                ...shared,
+                code: document.getElementById('promo-code').value,
+                max_uses: document.getElementById('promo-max-uses').value || '0',
+            }, event.currentTarget);
+        });
 
 
         // --- Сотрудники -------------------------------------------------------

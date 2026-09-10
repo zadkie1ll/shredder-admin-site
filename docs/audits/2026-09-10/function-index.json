@@ -1,0 +1,6944 @@
+{
+  "commit": "7e4ea2284bead9f5a26faa53db0a3abf16f0b43e",
+  "note": "Static inventory, not a benchmark or proof of complete manual review. Flags are syntactic candidates; wrappers and indirect I/O need tracing. No tests/migrations.",
+  "functions": [
+    {
+      "file": "engine/auth_backend.py",
+      "function": "authenticate",
+      "line": 7,
+      "end_line": 11,
+      "lines": 5,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/auth_backend.py",
+      "function": "get_user",
+      "line": 13,
+      "end_line": 17,
+      "lines": 5,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/bot_push.py",
+      "function": "bot_queues",
+      "line": 21,
+      "end_line": 23,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/bot_push.py",
+      "function": "is_enabled",
+      "line": 26,
+      "end_line": 27,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/bot_push.py",
+      "function": "_redis_client",
+      "line": 30,
+      "end_line": 41,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/bot_push.py",
+      "function": "push_to_bots",
+      "line": 44,
+      "end_line": 62,
+      "lines": 19,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/bot_push.py",
+      "function": "push_admin_temporary_ban",
+      "line": 65,
+      "end_line": 73,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/censor_worker.py",
+      "function": "_run_maintenance",
+      "line": 31,
+      "end_line": 39,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/censor_worker.py",
+      "function": "_simple_loop",
+      "line": 42,
+      "end_line": 54,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/censor_worker.py",
+      "function": "_leader_loop",
+      "line": 57,
+      "end_line": 92,
+      "lines": 36,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/censor_worker.py",
+      "function": "start",
+      "line": 95,
+      "end_line": 118,
+      "lines": 24,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/cloudflare_dns.py",
+      "function": "is_enabled",
+      "line": 35,
+      "end_line": 36,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/cloudflare_dns.py",
+      "function": "_request",
+      "line": 39,
+      "end_line": 68,
+      "lines": 30,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/cloudflare_dns.py",
+      "function": "find_zone_id",
+      "line": 71,
+      "end_line": 94,
+      "lines": 24,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/cloudflare_dns.py",
+      "function": "list_a_records",
+      "line": 97,
+      "end_line": 113,
+      "lines": 17,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/cloudflare_dns.py",
+      "function": "ensure_a_record",
+      "line": 116,
+      "end_line": 139,
+      "lines": 24,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/cloudflare_dns.py",
+      "function": "delete_a_records",
+      "line": 142,
+      "end_line": 153,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/encrypt_happ_url.py",
+      "function": "encrypt_happ_url1",
+      "line": 15,
+      "end_line": 18,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_lookup.py",
+      "function": "_normalize_region_alias",
+      "line": 29,
+      "end_line": 33,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_lookup.py",
+      "function": "_warn_once",
+      "line": 227,
+      "end_line": 231,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_lookup.py",
+      "function": "configured_database",
+      "line": 234,
+      "end_line": 268,
+      "lines": 35,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_lookup.py",
+      "function": "_reader_for",
+      "line": 271,
+      "end_line": 295,
+      "lines": 25,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_lookup.py",
+      "function": "_localized_name",
+      "line": 298,
+      "end_line": 300,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_lookup.py",
+      "function": "_region_identity",
+      "line": 303,
+      "end_line": 323,
+      "lines": 21,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_lookup.py",
+      "function": "_lookup_cached",
+      "line": 327,
+      "end_line": 361,
+      "lines": 35,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_lookup.py",
+      "function": "lookup_ip",
+      "line": 364,
+      "end_line": 380,
+      "lines": 17,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_lookup.py",
+      "function": "reset_caches",
+      "line": 383,
+      "end_line": 396,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "_database_path",
+      "line": 34,
+      "end_line": 36,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "_interval_seconds",
+      "line": 39,
+      "end_line": 44,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "_mtime",
+      "line": 47,
+      "end_line": 51,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "_touch",
+      "line": 54,
+      "end_line": 56,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "_is_due",
+      "line": 59,
+      "end_line": 72,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "_release_months",
+      "line": 75,
+      "end_line": 80,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "download_url",
+      "line": 83,
+      "end_line": 84,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "_download_archive",
+      "line": 87,
+      "end_line": 116,
+      "lines": 30,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "_extract_database",
+      "line": 119,
+      "end_line": 130,
+      "lines": 12,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "_validate_database",
+      "line": 133,
+      "end_line": 138,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "_replace_database",
+      "line": 141,
+      "end_line": 175,
+      "lines": 35,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "update_if_due",
+      "line": 178,
+      "end_line": 223,
+      "lines": 46,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/geoip_updater.py",
+      "function": "reset_state_for_tests",
+      "line": 226,
+      "end_line": 227,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/incy.py",
+      "function": "_encoder_failure_message",
+      "line": 37,
+      "end_line": 41,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/incy.py",
+      "function": "encrypt_incy_url",
+      "line": 45,
+      "end_line": 74,
+      "lines": 30,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "utcnow",
+      "line": 69,
+      "end_line": 70,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "get_settings",
+      "line": 196,
+      "end_line": 219,
+      "lines": 24,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "validate_setting",
+      "line": 222,
+      "end_line": 251,
+      "lines": 30,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "parse_control_names",
+      "line": 254,
+      "end_line": 272,
+      "lines": 19,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "active_control_names",
+      "line": 275,
+      "end_line": 287,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "mark_control_name_burned",
+      "line": 290,
+      "end_line": 315,
+      "lines": 26,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "server_country_code",
+      "line": 339,
+      "end_line": 353,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "effective_bandwidth_mbps",
+      "line": 356,
+      "end_line": 360,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "utilization_pct",
+      "line": 363,
+      "end_line": 371,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "is_online",
+      "line": 374,
+      "end_line": 378,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "server_title",
+      "line": 381,
+      "end_line": 382,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_dt",
+      "line": 388,
+      "end_line": 389,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_age_seconds",
+      "line": 392,
+      "end_line": 395,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "server_list_payload",
+      "line": 398,
+      "end_line": 514,
+      "lines": 117,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_cloudflare_enabled",
+      "line": 517,
+      "end_line": 520,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_ip_payload",
+      "line": 523,
+      "end_line": 534,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_command_payload",
+      "line": 537,
+      "end_line": 548,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_anomaly_payload",
+      "line": 551,
+      "end_line": 564,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_replacement_payload",
+      "line": 567,
+      "end_line": 579,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "get_server",
+      "line": 582,
+      "end_line": 586,
+      "lines": 5,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "diagnosis_payload",
+      "line": 589,
+      "end_line": 619,
+      "lines": 31,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "capacity_payload",
+      "line": 622,
+      "end_line": 637,
+      "lines": 16,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "server_entry_payload",
+      "line": 640,
+      "end_line": 692,
+      "lines": 53,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "server_detail_payload",
+      "line": 695,
+      "end_line": 832,
+      "lines": 138,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_analytics_cache_seconds",
+      "line": 835,
+      "end_line": 846,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "who_connects_payload",
+      "line": 849,
+      "end_line": 871,
+      "lines": 23,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "node_interface_ips",
+      "line": 874,
+      "end_line": 914,
+      "lines": 41,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_who_connects_criteria",
+      "line": 917,
+      "end_line": 930,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_who_connects_payload_uncached",
+      "line": 933,
+      "end_line": 989,
+      "lines": 57,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_who_connects_geo_payload",
+      "line": 992,
+      "end_line": 1125,
+      "lines": 134,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "reset_geo_analytics_cache",
+      "line": 1128,
+      "end_line": 1134,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "telemetry_series_payload",
+      "line": 1148,
+      "end_line": 1219,
+      "lines": 72,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_series_summary",
+      "line": 1222,
+      "end_line": 1280,
+      "lines": 59,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "update_server",
+      "line": 1286,
+      "end_line": 1315,
+      "lines": 30,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "add_manual_ip",
+      "line": 1318,
+      "end_line": 1359,
+      "lines": 42,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "delete_ip",
+      "line": 1362,
+      "end_line": 1369,
+      "lines": 8,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "set_ip_blocked",
+      "line": 1372,
+      "end_line": 1378,
+      "lines": 7,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "normalize_client_snis",
+      "line": 1381,
+      "end_line": 1414,
+      "lines": 34,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "domain_client_snis",
+      "line": 1417,
+      "end_line": 1427,
+      "lines": 11,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "domain_own_name_on_wire",
+      "line": 1430,
+      "end_line": 1432,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "add_domain",
+      "line": 1435,
+      "end_line": 1462,
+      "lines": 28,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_stored_snis",
+      "line": 1465,
+      "end_line": 1474,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "set_domain_snis",
+      "line": 1477,
+      "end_line": 1511,
+      "lines": 35,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "server_client_snis",
+      "line": 1514,
+      "end_line": 1517,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_domain_wire_names",
+      "line": 1520,
+      "end_line": 1527,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "server_wire_names",
+      "line": 1530,
+      "end_line": 1544,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "set_server_snis",
+      "line": 1547,
+      "end_line": 1553,
+      "lines": 7,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "delete_domain",
+      "line": 1556,
+      "end_line": 1568,
+      "lines": 13,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "create_ensure_ip_command",
+      "line": 1571,
+      "end_line": 1603,
+      "lines": 33,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "fresh_dns_snapshot_ips",
+      "line": 1606,
+      "end_line": 1629,
+      "lines": 24,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "server_is_in_dns",
+      "line": 1632,
+      "end_line": 1654,
+      "lines": 23,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "snooze_anomaly_detector",
+      "line": 1657,
+      "end_line": 1668,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "unsnooze_anomaly_detector",
+      "line": 1671,
+      "end_line": 1674,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "set_tspu_checks_enabled",
+      "line": 1677,
+      "end_line": 1687,
+      "lines": 11,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "request_replacement",
+      "line": 1690,
+      "end_line": 1793,
+      "lines": 104,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_plural_records",
+      "line": 1810,
+      "end_line": 1820,
+      "lines": 11,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "evaluate_capacity",
+      "line": 1823,
+      "end_line": 1984,
+      "lines": 162,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "ensure_probe_check",
+      "line": 1995,
+      "end_line": 2022,
+      "lines": 28,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "probe_key",
+      "line": 2025,
+      "end_line": 2027,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "start_diagnosis_probes",
+      "line": 2030,
+      "end_line": 2084,
+      "lines": 55,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "probe_from_run",
+      "line": 2087,
+      "end_line": 2099,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "collect_probes",
+      "line": 2102,
+      "end_line": 2123,
+      "lines": 22,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "max_probe_names",
+      "line": 2126,
+      "end_line": 2132,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "server_probe_targets",
+      "line": 2135,
+      "end_line": 2201,
+      "lines": 67,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "server_domain_targets",
+      "line": 2204,
+      "end_line": 2218,
+      "lines": 15,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "names_ever_seen_passing",
+      "line": 2221,
+      "end_line": 2249,
+      "lines": 29,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "start_ip_diagnosis",
+      "line": 2252,
+      "end_line": 2278,
+      "lines": 27,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "start_manual_diagnosis",
+      "line": 2281,
+      "end_line": 2326,
+      "lines": 46,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "corroborating_names",
+      "line": 2329,
+      "end_line": 2358,
+      "lines": 30,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "start_sni_diagnosis",
+      "line": 2361,
+      "end_line": 2427,
+      "lines": 67,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "recent_name_results",
+      "line": 2430,
+      "end_line": 2474,
+      "lines": 45,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "force_tspu_check",
+      "line": 2480,
+      "end_line": 2640,
+      "lines": 161,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_floor_dt",
+      "line": 2646,
+      "end_line": 2652,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_upsert_agg",
+      "line": 2655,
+      "end_line": 2669,
+      "lines": 15,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "aggregate_telemetry",
+      "line": 2672,
+      "end_line": 2684,
+      "lines": 13,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_aggregate_minutes_for_server",
+      "line": 2687,
+      "end_line": 2763,
+      "lines": 77,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "_aggregate_quarters_for_server",
+      "line": 2766,
+      "end_line": 2833,
+      "lines": 68,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "prune_telemetry",
+      "line": 2836,
+      "end_line": 2856,
+      "lines": 21,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "compute_baseline",
+      "line": 2862,
+      "end_line": 2907,
+      "lines": 46,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "current_minute_metrics",
+      "line": 2910,
+      "end_line": 2954,
+      "lines": 45,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "evaluate_network_drop",
+      "line": 2957,
+      "end_line": 2999,
+      "lines": 43,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "__init__",
+      "line": 63,
+      "end_line": 66,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "add",
+      "line": 1043,
+      "end_line": 1055,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "ranking",
+      "line": 1092,
+      "end_line": 1103,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "escalate",
+      "line": 1841,
+      "end_line": 1845,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "avg",
+      "line": 2798,
+      "end_line": 2800,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "peak",
+      "line": 2802,
+      "end_line": 2804,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra.py",
+      "function": "avg",
+      "line": 1195,
+      "end_line": 1197,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "probe_passed",
+      "line": 66,
+      "end_line": 70,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "availability_pct",
+      "line": 73,
+      "end_line": 77,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "dominant_stage",
+      "line": 80,
+      "end_line": 86,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "_stage_note",
+      "line": 89,
+      "end_line": 101,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "_probe_label",
+      "line": 104,
+      "end_line": 109,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "is_hard_block",
+      "line": 112,
+      "end_line": 118,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "sni_passes_by_ip",
+      "line": 121,
+      "end_line": 132,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "sni_tested_by_ip",
+      "line": 135,
+      "end_line": 141,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "control_burn_state",
+      "line": 144,
+      "end_line": 175,
+      "lines": 32,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "classify",
+      "line": 178,
+      "end_line": 634,
+      "lines": 457,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "domain_snis",
+      "line": 637,
+      "end_line": 644,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "domain_own_name",
+      "line": 647,
+      "end_line": 654,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "domains_safe_to_repoint",
+      "line": 657,
+      "end_line": 676,
+      "lines": 20,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "domains_with_blocked_sni",
+      "line": 679,
+      "end_line": 702,
+      "lines": 24,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_diagnosis.py",
+      "function": "evidence_text",
+      "line": 705,
+      "end_line": 714,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_fmt_mbps",
+      "line": 61,
+      "end_line": 64,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_fmt_age_minutes",
+      "line": 67,
+      "end_line": 70,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_send_alert",
+      "line": 73,
+      "end_line": 76,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_names_line",
+      "line": 82,
+      "end_line": 90,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "check_offline",
+      "line": 93,
+      "end_line": 204,
+      "lines": 112,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "check_xray",
+      "line": 210,
+      "end_line": 294,
+      "lines": 85,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "check_capacity",
+      "line": 300,
+      "end_line": 370,
+      "lines": 71,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "check_load",
+      "line": 376,
+      "end_line": 462,
+      "lines": 87,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "watch_dns_changes",
+      "line": 468,
+      "end_line": 608,
+      "lines": 141,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "detect_anomalies",
+      "line": 614,
+      "end_line": 775,
+      "lines": 162,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_anomaly_probe_maps",
+      "line": 778,
+      "end_line": 797,
+      "lines": 20,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_handle_control_burn",
+      "line": 800,
+      "end_line": 855,
+      "lines": 56,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_live_summary",
+      "line": 858,
+      "end_line": 890,
+      "lines": 33,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_finalize_anomaly",
+      "line": 893,
+      "end_line": 1184,
+      "lines": 292,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "process_anomalies",
+      "line": 1187,
+      "end_line": 1273,
+      "lines": 87,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_rlog",
+      "line": 1278,
+      "end_line": 1295,
+      "lines": 18,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_rlog_last",
+      "line": 1298,
+      "end_line": 1303,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "process_replacements",
+      "line": 1306,
+      "end_line": 1325,
+      "lines": 20,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_fail_replacement",
+      "line": 1328,
+      "end_line": 1352,
+      "lines": 25,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_process_replacement",
+      "line": 1355,
+      "end_line": 1394,
+      "lines": 40,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_replacement_step_pending",
+      "line": 1397,
+      "end_line": 1495,
+      "lines": 99,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_pick_replacement_candidate",
+      "line": 1498,
+      "end_line": 1557,
+      "lines": 60,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_replacement_no_reserve",
+      "line": 1560,
+      "end_line": 1642,
+      "lines": 83,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_replacement_step_installing",
+      "line": 1645,
+      "end_line": 1675,
+      "lines": 31,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_start_candidate_verification",
+      "line": 1678,
+      "end_line": 1742,
+      "lines": 65,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_replacement_step_verifying",
+      "line": 1745,
+      "end_line": 1802,
+      "lines": 58,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_banned_names",
+      "line": 1805,
+      "end_line": 1808,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_domain_snis",
+      "line": 1811,
+      "end_line": 1825,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_sni_banned_names",
+      "line": 1828,
+      "end_line": 1844,
+      "lines": 17,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_names_to_publish",
+      "line": 1847,
+      "end_line": 1851,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_published_names",
+      "line": 1854,
+      "end_line": 1865,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_start_names_verification",
+      "line": 1868,
+      "end_line": 1938,
+      "lines": 71,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_replacement_step_verifying_names",
+      "line": 1941,
+      "end_line": 2039,
+      "lines": 99,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_replacement_step_dns_add",
+      "line": 2042,
+      "end_line": 2064,
+      "lines": 23,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_replacement_step_dns_remove",
+      "line": 2067,
+      "end_line": 2106,
+      "lines": 40,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_start_replacement_confirmation",
+      "line": 2109,
+      "end_line": 2170,
+      "lines": 62,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_replacement_step_confirming",
+      "line": 2173,
+      "end_line": 2258,
+      "lines": 86,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_finish_replacement",
+      "line": 2261,
+      "end_line": 2364,
+      "lines": 104,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_mark_ip_blocked",
+      "line": 2367,
+      "end_line": 2380,
+      "lines": 14,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_mark_old_ip_blocked",
+      "line": 2383,
+      "end_line": 2384,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_infra_tables_ready",
+      "line": 2390,
+      "end_line": 2408,
+      "lines": 19,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_step_statement_timeout_ms",
+      "line": 2411,
+      "end_line": 2417,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_run_step",
+      "line": 2420,
+      "end_line": 2442,
+      "lines": 23,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "run_maintenance",
+      "line": 2445,
+      "end_line": 2480,
+      "lines": 36,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_simple_loop",
+      "line": 2483,
+      "end_line": 2490,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "_leader_loop",
+      "line": 2493,
+      "end_line": 2523,
+      "lines": 31,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "start",
+      "line": 2526,
+      "end_line": 2547,
+      "lines": 22,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/infra_worker.py",
+      "function": "eligible",
+      "line": 1532,
+      "end_line": 1546,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/management/commands/censor_checks.py",
+      "function": "handle",
+      "line": 22,
+      "end_line": 35,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "generate_token",
+      "line": 67,
+      "end_line": 68,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "hash_token",
+      "line": 71,
+      "end_line": 72,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "script_sha256",
+      "line": 75,
+      "end_line": 76,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "normalize_script_name",
+      "line": 79,
+      "end_line": 88,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "script_display_name",
+      "line": 91,
+      "end_line": 93,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "_script_name_exists",
+      "line": 96,
+      "end_line": 101,
+      "lines": 6,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "create_script_group",
+      "line": 104,
+      "end_line": 119,
+      "lines": 16,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "rename_script_group",
+      "line": 122,
+      "end_line": 140,
+      "lines": 19,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "delete_script_group",
+      "line": 143,
+      "end_line": 167,
+      "lines": 25,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "active_script",
+      "line": 170,
+      "end_line": 179,
+      "lines": 10,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "script_warnings",
+      "line": 182,
+      "end_line": 200,
+      "lines": 19,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "save_script_version",
+      "line": 203,
+      "end_line": 244,
+      "lines": 42,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "activate_script_version",
+      "line": 247,
+      "end_line": 263,
+      "lines": 17,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "create_request",
+      "line": 266,
+      "end_line": 315,
+      "lines": 50,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "find_request_by_token",
+      "line": 318,
+      "end_line": 333,
+      "lines": 16,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "check_claimed_ip",
+      "line": 336,
+      "end_line": 345,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "set_stage",
+      "line": 348,
+      "end_line": 365,
+      "lines": 18,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "claim_request",
+      "line": 368,
+      "end_line": 429,
+      "lines": 62,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "check_stage_allowed",
+      "line": 432,
+      "end_line": 435,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "record_progress",
+      "line": 438,
+      "end_line": 454,
+      "lines": 17,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "complete_request",
+      "line": 457,
+      "end_line": 477,
+      "lines": 21,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "refresh_connect_status",
+      "line": 480,
+      "end_line": 498,
+      "lines": 19,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "revoke_request",
+      "line": 501,
+      "end_line": 508,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_provisioning.py",
+      "function": "__init__",
+      "line": 62,
+      "end_line": 64,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_traffic.py",
+      "function": "excluded_usernames",
+      "line": 39,
+      "end_line": 43,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_traffic.py",
+      "function": "_to_ts",
+      "line": 62,
+      "end_line": 67,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_traffic.py",
+      "function": "list_nodes",
+      "line": 70,
+      "end_line": 75,
+      "lines": 6,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/node_traffic.py",
+      "function": "_fetch_node_usage",
+      "line": 78,
+      "end_line": 93,
+      "lines": 16,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/node_traffic.py",
+      "function": "collect_usage",
+      "line": 96,
+      "end_line": 133,
+      "lines": 38,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_traffic.py",
+      "function": "fetch_details",
+      "line": 136,
+      "end_line": 143,
+      "lines": 8,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/node_traffic.py",
+      "function": "build_report",
+      "line": 146,
+      "end_line": 232,
+      "lines": 87,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_traffic.py",
+      "function": "top_node",
+      "line": 55,
+      "end_line": 59,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_traffic.py",
+      "function": "fetch",
+      "line": 111,
+      "end_line": 112,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/node_traffic.py",
+      "function": "fetch",
+      "line": 139,
+      "end_line": 140,
+      "lines": 2,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/notify.py",
+      "function": "alert_chat_ids",
+      "line": 16,
+      "end_line": 18,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/notify.py",
+      "function": "send_admin_telegram_alert",
+      "line": 21,
+      "end_line": 55,
+      "lines": 35,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/payments.py",
+      "function": "build_receipt",
+      "line": 18,
+      "end_line": 31,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/payments.py",
+      "function": "create_yk_payment_sync",
+      "line": 41,
+      "end_line": 89,
+      "lines": 49,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/payments.py",
+      "function": "create_wata_payment_sync",
+      "line": 92,
+      "end_line": 130,
+      "lines": 39,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/payments.py",
+      "function": "fetch_wata_transaction_status",
+      "line": 133,
+      "end_line": 187,
+      "lines": 55,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "federal_district",
+      "line": 80,
+      "end_line": 95,
+      "lines": 16,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "provider_name",
+      "line": 153,
+      "end_line": 156,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "default_api_key",
+      "line": 159,
+      "end_line": 165,
+      "lines": 7,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "resolve_key_row",
+      "line": 168,
+      "end_line": 174,
+      "lines": 7,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "resolve_api_key",
+      "line": 177,
+      "end_line": 182,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "resolve_public_flag",
+      "line": 185,
+      "end_line": 188,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "fetch_connected_probe_ids",
+      "line": 197,
+      "end_line": 225,
+      "lines": 29,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "_explicit_probes_spec",
+      "line": 228,
+      "end_line": 235,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "resolve_probe_ids",
+      "line": 238,
+      "end_line": 253,
+      "lines": 16,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "_probes_spec",
+      "line": 256,
+      "end_line": 301,
+      "lines": 46,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "expected_probe_total",
+      "line": 304,
+      "end_line": 308,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "create_measurement",
+      "line": 311,
+      "end_line": 380,
+      "lines": 70,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "fetch_results",
+      "line": 387,
+      "end_line": 409,
+      "lines": 23,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "fetch_scheduled_probes",
+      "line": 412,
+      "end_line": 431,
+      "lines": 20,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "fetch_probe_geo",
+      "line": 434,
+      "end_line": 461,
+      "lines": 28,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "classify_stage",
+      "line": 473,
+      "end_line": 502,
+      "lines": 30,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "summarize_results",
+      "line": 505,
+      "end_line": 558,
+      "lines": 54,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "run_availability_percent",
+      "line": 561,
+      "end_line": 564,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "_blocked_summary_text",
+      "line": 567,
+      "end_line": 571,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "maybe_send_alert",
+      "line": 574,
+      "end_line": 661,
+      "lines": 88,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "start_run",
+      "line": 664,
+      "end_line": 696,
+      "lines": 33,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "finalize_run",
+      "line": 699,
+      "end_line": 761,
+      "lines": 63,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "finalize_pending_runs",
+      "line": 764,
+      "end_line": 775,
+      "lines": 12,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/ripe_atlas.py",
+      "function": "schedule_due_checks",
+      "line": 778,
+      "end_line": 820,
+      "lines": 43,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "normalize_email",
+      "line": 81,
+      "end_line": 83,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "deterministic_username",
+      "line": 86,
+      "end_line": 95,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "get_proto_optional",
+      "line": 98,
+      "end_line": 111,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "assert_subscription_owned_by_email",
+      "line": 114,
+      "end_line": 147,
+      "lines": 34,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "assert_subscription_owned_by_telegram_id",
+      "line": 150,
+      "end_line": 180,
+      "lines": 31,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "_setting_value",
+      "line": 209,
+      "end_line": 211,
+      "lines": 3,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "trial_traffic_limit_enabled",
+      "line": 214,
+      "end_line": 218,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "trial_traffic_limit_configured",
+      "line": 221,
+      "end_line": 240,
+      "lines": 20,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "trial_traffic_limit_for_new_trial",
+      "line": 243,
+      "end_line": 252,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "trial_traffic_limit_for_user",
+      "line": 255,
+      "end_line": 263,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "managed_limits_table_available",
+      "line": 279,
+      "end_line": 295,
+      "lines": 17,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "record_trial_limit_marker",
+      "line": 298,
+      "end_line": 332,
+      "lines": 35,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "panel_limit_matches",
+      "line": 335,
+      "end_line": 350,
+      "lines": 16,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "adopted_trial_limit",
+      "line": 353,
+      "end_line": 362,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "add_traffic_limit_event",
+      "line": 365,
+      "end_line": 380,
+      "lines": 16,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "_internal_squads_uuids",
+      "line": 383,
+      "end_line": 396,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "create_user_until",
+      "line": 399,
+      "end_line": 435,
+      "lines": 37,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "create_user",
+      "line": 438,
+      "end_line": 463,
+      "lines": 26,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "__init__",
+      "line": 71,
+      "end_line": 78,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/rwms_helpers.py",
+      "function": "strategy",
+      "line": 205,
+      "end_line": 206,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/sql_helpers.py",
+      "function": "lock_registration_email",
+      "line": 14,
+      "end_line": 36,
+      "lines": 23,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/sql_helpers.py",
+      "function": "lock_registration_telegram_id",
+      "line": 39,
+      "end_line": 55,
+      "lines": 17,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/sql_helpers.py",
+      "function": "user_never_paid",
+      "line": 58,
+      "end_line": 76,
+      "lines": 19,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/sql_helpers.py",
+      "function": "save_wata_invoice",
+      "line": 79,
+      "end_line": 110,
+      "lines": 32,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/templatetags/pricing.py",
+      "function": "floor_div",
+      "line": 7,
+      "end_line": 16,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/user_block.py",
+      "function": "is_user_blocked",
+      "line": 15,
+      "end_line": 31,
+      "lines": 17,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/user_block_middleware.py",
+      "function": "__init__",
+      "line": 15,
+      "end_line": 16,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/user_block_middleware.py",
+      "function": "__call__",
+      "line": 18,
+      "end_line": 47,
+      "lines": 30,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "normalize_host",
+      "line": 262,
+      "end_line": 263,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "is_known_site_host",
+      "line": 266,
+      "end_line": 273,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_site_role",
+      "line": 276,
+      "end_line": 286,
+      "lines": 11,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_current_base_url",
+      "line": 289,
+      "end_line": 297,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_telegram_auth_bot",
+      "line": 300,
+      "end_line": 312,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_all_telegram_auth_bots",
+      "line": 315,
+      "end_line": 347,
+      "lines": 33,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_telegram_web_login_start_code",
+      "line": 350,
+      "end_line": 352,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_telegram_bot_id",
+      "line": 355,
+      "end_line": 356,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_pwa_context",
+      "line": 359,
+      "end_line": 362,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "format_days_ru",
+      "line": 365,
+      "end_line": 370,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_display_trial_period_days_for_request",
+      "line": 373,
+      "end_line": 378,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "parse_int",
+      "line": 381,
+      "end_line": 389,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "capture_tracking_params",
+      "line": 392,
+      "end_line": 400,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "set_tracking_cookies",
+      "line": 403,
+      "end_line": 415,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_tracking_params",
+      "line": 418,
+      "end_line": 425,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "append_query_params",
+      "line": 428,
+      "end_line": 433,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_tracking_value",
+      "line": 436,
+      "end_line": 453,
+      "lines": 18,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_registration_context",
+      "line": 456,
+      "end_line": 475,
+      "lines": 20,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "add_user_to_traffic_progress",
+      "line": 478,
+      "end_line": 486,
+      "lines": 9,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "add_event_log",
+      "line": 489,
+      "end_line": 496,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "add_event_log_once",
+      "line": 499,
+      "end_line": 512,
+      "lines": 14,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "create_invoice_event_for_tariff",
+      "line": 515,
+      "end_line": 525,
+      "lines": 11,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "dashboard_support_redirect",
+      "line": 528,
+      "end_line": 529,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_support_ticket_for_user",
+      "line": 532,
+      "end_line": 537,
+      "lines": 6,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "add_support_message",
+      "line": 540,
+      "end_line": 552,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "attach_support_attachments",
+      "line": 555,
+      "end_line": 596,
+      "lines": 42,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "load_support_messages_with_attachments",
+      "line": 599,
+      "end_line": 626,
+      "lines": 28,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "is_image_attachment",
+      "line": 629,
+      "end_line": 630,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "is_video_attachment",
+      "line": 633,
+      "end_line": 634,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_attachment_payload",
+      "line": 637,
+      "end_line": 651,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_message_payload",
+      "line": 654,
+      "end_line": 666,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_messages_payload",
+      "line": 669,
+      "end_line": 673,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "is_ajax",
+      "line": 676,
+      "end_line": 677,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_reply_template_payload",
+      "line": 680,
+      "end_line": 687,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "form_bool_enabled",
+      "line": 690,
+      "end_line": 694,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "custom_config_template_payload",
+      "line": 697,
+      "end_line": 710,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "validate_config_template_json",
+      "line": 724,
+      "end_line": 750,
+      "lines": 27,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "load_client_ua_rules",
+      "line": 753,
+      "end_line": 757,
+      "lines": 5,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "client_ua_rule_scenarios",
+      "line": 760,
+      "end_line": 766,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "client_ua_rule_payload",
+      "line": 769,
+      "end_line": 777,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "validate_client_ua_rule_fields",
+      "line": 780,
+      "end_line": 791,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "load_custom_config_templates",
+      "line": 794,
+      "end_line": 803,
+      "lines": 10,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "load_support_reply_templates",
+      "line": 806,
+      "end_line": 814,
+      "lines": 9,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "delete_support_ticket_with_files",
+      "line": 817,
+      "end_line": 859,
+      "lines": 43,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_is_authenticated",
+      "line": 862,
+      "end_line": 863,
+      "lines": 2,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_role",
+      "line": 866,
+      "end_line": 872,
+      "lines": 7,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_is_full_admin",
+      "line": 875,
+      "end_line": 876,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_is_marketer",
+      "line": 879,
+      "end_line": 880,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "require_support_admin_any",
+      "line": 883,
+      "end_line": 896,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "require_support_admin",
+      "line": 902,
+      "end_line": 917,
+      "lines": 16,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "require_support_admin_role",
+      "line": 920,
+      "end_line": 934,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_last_traffic_source",
+      "line": 937,
+      "end_line": 955,
+      "lines": 19,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "sync_existing_user_tracking",
+      "line": 958,
+      "end_line": 973,
+      "lines": 16,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "runtime_bool_from_db",
+      "line": 976,
+      "end_line": 988,
+      "lines": 13,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "apple_recommended_app_from_db",
+      "line": 995,
+      "end_line": 1010,
+      "lines": 16,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "build_apple_subscription_link",
+      "line": 1013,
+      "end_line": 1033,
+      "lines": 21,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "site_trial_registration_enabled",
+      "line": 1036,
+      "end_line": 1041,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "should_create_trial_for_channel",
+      "line": 1044,
+      "end_line": 1045,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "unknown_site_account_error",
+      "line": 1048,
+      "end_line": 1052,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "rwms_expire_at",
+      "line": 1097,
+      "end_line": 1102,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "find_rwms_user_by_identity",
+      "line": 1105,
+      "end_line": 1121,
+      "lines": 17,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "sync_local_user_from_rwms",
+      "line": 1124,
+      "end_line": 1237,
+      "lines": 114,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "create_local_site_user_without_rwms",
+      "line": 1240,
+      "end_line": 1268,
+      "lines": 29,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "site_registration_username",
+      "line": 1271,
+      "end_line": 1294,
+      "lines": 24,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "resolve_existing_site_subscription",
+      "line": 1297,
+      "end_line": 1329,
+      "lines": 33,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "resolve_existing_telegram_subscription",
+      "line": 1332,
+      "end_line": 1356,
+      "lines": 25,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "create_site_user",
+      "line": 1359,
+      "end_line": 1591,
+      "lines": 233,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "render_login",
+      "line": 1594,
+      "end_line": 1674,
+      "lines": 81,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "render_collect_email",
+      "line": 1677,
+      "end_line": 1687,
+      "lines": 11,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "authorize_user_session",
+      "line": 1690,
+      "end_line": 1701,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "hash_telegram_login_token",
+      "line": 1704,
+      "end_line": 1706,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "hash_purchase_login_token",
+      "line": 1709,
+      "end_line": 1711,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "create_purchase_login_token",
+      "line": 1714,
+      "end_line": 1722,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "build_purchase_login_link",
+      "line": 1725,
+      "end_line": 1726,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "build_payment_status_url",
+      "line": 1729,
+      "end_line": 1730,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "build_payment_retry_url",
+      "line": 1733,
+      "end_line": 1734,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "site_apply_first_purchase_discount",
+      "line": 1737,
+      "end_line": 1806,
+      "lines": 70,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "payment_session_url_key",
+      "line": 1809,
+      "end_line": 1810,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "create_purchase_login_link",
+      "line": 1813,
+      "end_line": 1815,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "verify_telegram_widget_auth",
+      "line": 1818,
+      "end_line": 1850,
+      "lines": 33,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "decode_telegram_auth_result",
+      "line": 1853,
+      "end_line": 1867,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "verify_telegram_webapp_init_data",
+      "line": 1870,
+      "end_line": 1908,
+      "lines": 39,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_telegram_webapp_user_id",
+      "line": 1911,
+      "end_line": 1916,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "send_magic_link_email",
+      "line": 1919,
+      "end_line": 1955,
+      "lines": 37,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "send_login_code_email",
+      "line": 1958,
+      "end_line": 1991,
+      "lines": 34,
+      "static_io_flags": [
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "build_email_confirmation_token",
+      "line": 1994,
+      "end_line": 2001,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "load_email_confirmation_token",
+      "line": 2004,
+      "end_line": 2009,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "send_email_confirmation_email",
+      "line": 2012,
+      "end_line": 2024,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "send_magic_link",
+      "line": 2027,
+      "end_line": 2118,
+      "lines": 92,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_google_oauth_redirect_uri",
+      "line": 2121,
+      "end_line": 2125,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "login_with_google",
+      "line": 2128,
+      "end_line": 2159,
+      "lines": 32,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "auth_by_google_callback",
+      "line": 2162,
+      "end_line": 2273,
+      "lines": 112,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_yandex_oauth_redirect_uri",
+      "line": 2276,
+      "end_line": 2280,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "login_with_yandex",
+      "line": 2283,
+      "end_line": 2312,
+      "lines": 30,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "auth_by_yandex_callback",
+      "line": 2315,
+      "end_line": 2430,
+      "lines": 116,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "network_process_or_mail_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "auth_by_magic_link",
+      "line": 2433,
+      "end_line": 2469,
+      "lines": 37,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "auth_by_telegram_link",
+      "line": 2472,
+      "end_line": 2507,
+      "lines": 36,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "auth_by_purchase_link",
+      "line": 2510,
+      "end_line": 2572,
+      "lines": 63,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_purchase_login_token",
+      "line": 2575,
+      "end_line": 2587,
+      "lines": 13,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "is_wata_invoice_expired",
+      "line": 2598,
+      "end_line": 2607,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_purchase_wata_invoice",
+      "line": 2610,
+      "end_line": 2623,
+      "lines": 14,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "has_paid_wata_transaction",
+      "line": 2626,
+      "end_line": 2652,
+      "lines": 27,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "wata_transaction_purchase_status",
+      "line": 2658,
+      "end_line": 2680,
+      "lines": 23,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_purchase_payment_status",
+      "line": 2683,
+      "end_line": 2747,
+      "lines": 65,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "active_wata_status_for_token",
+      "line": 2756,
+      "end_line": 2804,
+      "lines": 49,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "payment_status_payload",
+      "line": 2807,
+      "end_line": 2852,
+      "lines": 46,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "payment_retry",
+      "line": 2855,
+      "end_line": 2872,
+      "lines": 18,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "payment_status",
+      "line": 2875,
+      "end_line": 2894,
+      "lines": 20,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "payment_status_json",
+      "line": 2897,
+      "end_line": 2898,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "payment_status_active_json",
+      "line": 2901,
+      "end_line": 2906,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "auth_by_telegram_widget",
+      "line": 2909,
+      "end_line": 2986,
+      "lines": 78,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "telegram_webapp_entry",
+      "line": 2989,
+      "end_line": 3000,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "auth_by_telegram_webapp",
+      "line": 3003,
+      "end_line": 3083,
+      "lines": 81,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "landing_client_ip_context",
+      "line": 3086,
+      "end_line": 3103,
+      "lines": 18,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "index",
+      "line": 3106,
+      "end_line": 3146,
+      "lines": 41,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "vps_direct_sale",
+      "line": 3149,
+      "end_line": 3152,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "render_vps_direct_sale",
+      "line": 3155,
+      "end_line": 3166,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "offer",
+      "line": 3169,
+      "end_line": 3189,
+      "lines": 21,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "privacy",
+      "line": 3192,
+      "end_line": 3193,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "terms",
+      "line": 3196,
+      "end_line": 3197,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "dashboard",
+      "line": 3201,
+      "end_line": 3465,
+      "lines": 265,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "update_email",
+      "line": 3468,
+      "end_line": 3533,
+      "lines": 66,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "cabinet_payments_history",
+      "line": 3536,
+      "end_line": 3602,
+      "lines": 67,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "cancel_autopay",
+      "line": 3605,
+      "end_line": 3656,
+      "lines": 52,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "confirm_email",
+      "line": 3659,
+      "end_line": 3758,
+      "lines": 100,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_hwid_device_to_dict",
+      "line": 3761,
+      "end_line": 3778,
+      "lines": 18,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_cabinet_rw_subscription",
+      "line": 3781,
+      "end_line": 3789,
+      "lines": 9,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_cabinet_rwms_unavailable_response",
+      "line": 3792,
+      "end_line": 3799,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_panel_hwid_fallback_limit",
+      "line": 3808,
+      "end_line": 3825,
+      "lines": 18,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_cabinet_device_limit",
+      "line": 3828,
+      "end_line": 3839,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "cabinet_devices",
+      "line": 3843,
+      "end_line": 3869,
+      "lines": 27,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "cabinet_device_delete",
+      "line": 3873,
+      "end_line": 3921,
+      "lines": 49,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "create_support_ticket",
+      "line": 3925,
+      "end_line": 3967,
+      "lines": 43,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "create_support_ticket_message",
+      "line": 3971,
+      "end_line": 4009,
+      "lines": 39,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "close_support_ticket",
+      "line": 4013,
+      "end_line": 4028,
+      "lines": 16,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_ticket_messages_json",
+      "line": 4032,
+      "end_line": 4047,
+      "lines": 16,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_attachment",
+      "line": 4051,
+      "end_line": 4084,
+      "lines": 34,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_login",
+      "line": 4087,
+      "end_line": 4173,
+      "lines": 87,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_logout",
+      "line": 4176,
+      "end_line": 4180,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_tickets",
+      "line": 4183,
+      "end_line": 4204,
+      "lines": 22,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_reply_templates",
+      "line": 4207,
+      "end_line": 4275,
+      "lines": 69,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_config_templates",
+      "line": 4278,
+      "end_line": 4432,
+      "lines": 155,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "collect_ua_rule_template_warnings",
+      "line": 4435,
+      "end_line": 4449,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_ua_rules",
+      "line": 4452,
+      "end_line": 4538,
+      "lines": 87,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "config_pin_setting_key",
+      "line": 4549,
+      "end_line": 4550,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "load_user_pinned_template_ids",
+      "line": 4553,
+      "end_line": 4561,
+      "lines": 9,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "remove_config_template_id_from_pins",
+      "line": 4564,
+      "end_line": 4588,
+      "lines": 25,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "config_pins_payload",
+      "line": 4591,
+      "end_line": 4615,
+      "lines": 25,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_config_pins",
+      "line": 4618,
+      "end_line": 4681,
+      "lines": 64,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_ticket_payload",
+      "line": 4684,
+      "end_line": 4696,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "load_support_admin_tickets",
+      "line": 4699,
+      "end_line": 4734,
+      "lines": 36,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_tickets_json",
+      "line": 4737,
+      "end_line": 4751,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_parse_date",
+      "line": 4754,
+      "end_line": 4755,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_money",
+      "line": 4758,
+      "end_line": 4759,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "runtime_int_from_db",
+      "line": 4762,
+      "end_line": 4774,
+      "lines": 13,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_runtime_actual_tariffs",
+      "line": 4777,
+      "end_line": 4778,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_runtime_offer_tariffs",
+      "line": 4781,
+      "end_line": 4785,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_runtime_tariffs",
+      "line": 4788,
+      "end_line": 4804,
+      "lines": 17,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_dt",
+      "line": 4807,
+      "end_line": 4812,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_naive_utc",
+      "line": 4815,
+      "end_line": 4827,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_msk_today",
+      "line": 4838,
+      "end_line": 4839,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_date_label",
+      "line": 4842,
+      "end_line": 4847,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_tariff_display_name",
+      "line": 4850,
+      "end_line": 4860,
+      "lines": 11,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "get_tariff_order",
+      "line": 4863,
+      "end_line": 4873,
+      "lines": 11,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_stats_normalize_granularity",
+      "line": 4880,
+      "end_line": 4900,
+      "lines": 21,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_stats_bucket_start",
+      "line": 4903,
+      "end_line": 4908,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_stats_next_bucket_start",
+      "line": 4911,
+      "end_line": 4918,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_stats_bucket_label",
+      "line": 4921,
+      "end_line": 4926,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_stats_msk_sql",
+      "line": 4929,
+      "end_line": 4932,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_stats_bucket_sql",
+      "line": 4935,
+      "end_line": 4941,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_stats_row_bucket_key",
+      "line": 4944,
+      "end_line": 4948,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_stats_source_key",
+      "line": 4951,
+      "end_line": 4952,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_stats_sales_series_totals",
+      "line": 4955,
+      "end_line": 4971,
+      "lines": 17,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_stats_apply_sales_mode",
+      "line": 4974,
+      "end_line": 4989,
+      "lines": 16,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "build_admin_cohort_table",
+      "line": 4997,
+      "end_line": 5064,
+      "lines": 68,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "drop_admin_cohort_table",
+      "line": 5067,
+      "end_line": 5069,
+      "lines": 3,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "build_admin_sales_series",
+      "line": 5072,
+      "end_line": 5290,
+      "lines": 219,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_find_user",
+      "line": 5293,
+      "end_line": 5303,
+      "lines": 11,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_user_payload",
+      "line": 5306,
+      "end_line": 5322,
+      "lines": 17,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_mask_setting_value",
+      "line": 5325,
+      "end_line": 5330,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_runtime_setting_type",
+      "line": 5333,
+      "end_line": 5346,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_validate_runtime_setting",
+      "line": 5360,
+      "end_line": 5437,
+      "lines": 78,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_validate_traffic_usage_threshold_pair",
+      "line": 5440,
+      "end_line": 5472,
+      "lines": 33,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_traffic_limit_strategy_key",
+      "line": 5527,
+      "end_line": 5539,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_traffic_limit_strategy_label",
+      "line": 5542,
+      "end_line": 5545,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_user_status_name",
+      "line": 5548,
+      "end_line": 5557,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_safe_int",
+      "line": 5560,
+      "end_line": 5565,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_format_gib",
+      "line": 5568,
+      "end_line": 5569,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_traffic_limit_label",
+      "line": 5572,
+      "end_line": 5576,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_ipguard_threshold_value",
+      "line": 5579,
+      "end_line": 5587,
+      "lines": 9,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_validate_ipguard_threshold_pair",
+      "line": 5590,
+      "end_line": 5608,
+      "lines": 19,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_validate_antiabuse_setting_pair",
+      "line": 5611,
+      "end_line": 5684,
+      "lines": 74,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_runtime_setting_payload",
+      "line": 5687,
+      "end_line": 5699,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_upsert_system_setting",
+      "line": 5702,
+      "end_line": 5710,
+      "lines": 9,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_referral_block_payload",
+      "line": 5713,
+      "end_line": 5721,
+      "lines": 9,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_traffic_status_payload",
+      "line": 5724,
+      "end_line": 5733,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_rwms_traffic_payload",
+      "line": 5736,
+      "end_line": 5823,
+      "lines": 88,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_rwms_apply_trial_limit",
+      "line": 5829,
+      "end_line": 5855,
+      "lines": 27,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_rwms_remove_traffic_limit",
+      "line": 5858,
+      "end_line": 5890,
+      "lines": 33,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_applied_by",
+      "line": 5911,
+      "end_line": 5913,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_bytes_label",
+      "line": 5916,
+      "end_line": 5923,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_panel_limit_label",
+      "line": 5926,
+      "end_line": 5934,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_marker_snapshot",
+      "line": 5937,
+      "end_line": 5951,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_managed_limit_payload",
+      "line": 5954,
+      "end_line": 6017,
+      "lines": 64,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_panel_limit_is_manual",
+      "line": 6020,
+      "end_line": 6032,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_panel_admin_limit_marker",
+      "line": 6035,
+      "end_line": 6051,
+      "lines": 17,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_admin_limit_label",
+      "line": 6054,
+      "end_line": 6056,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_apply_trial_limit_refusal",
+      "line": 6059,
+      "end_line": 6103,
+      "lines": 45,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_apply_managed_trial_limit",
+      "line": 6106,
+      "end_line": 6170,
+      "lines": 65,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_release_managed_limit",
+      "line": 6173,
+      "end_line": 6201,
+      "lines": 29,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_payment_history",
+      "line": 6204,
+      "end_line": 6302,
+      "lines": 99,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_user_payments",
+      "line": 6305,
+      "end_line": 6319,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_user_traffic",
+      "line": 6322,
+      "end_line": 6353,
+      "lines": 32,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "build_admin_interval_stats",
+      "line": 6356,
+      "end_line": 6611,
+      "lines": 256,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_clamp_cohort_window",
+      "line": 6614,
+      "end_line": 6630,
+      "lines": 17,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "build_admin_cohort_retention_stats",
+      "line": 6633,
+      "end_line": 6872,
+      "lines": 240,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_referral_activity",
+      "line": 6875,
+      "end_line": 7035,
+      "lines": 161,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_referral_activity",
+      "line": 7038,
+      "end_line": 7068,
+      "lines": 31,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_stats",
+      "line": 7071,
+      "end_line": 7113,
+      "lines": 43,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_stats_source_users",
+      "line": 7116,
+      "end_line": 7280,
+      "lines": 165,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_cohort_stats",
+      "line": 7283,
+      "end_line": 7346,
+      "lines": 64,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_payment_info",
+      "line": 7349,
+      "end_line": 7397,
+      "lines": 49,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_payments",
+      "line": 7400,
+      "end_line": 7479,
+      "lines": 80,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_payment_info_payload",
+      "line": 7482,
+      "end_line": 7569,
+      "lines": 88,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_referrals",
+      "line": 7572,
+      "end_line": 7591,
+      "lines": 20,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_referral_top",
+      "line": 7594,
+      "end_line": 7617,
+      "lines": 24,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_successful_payment_count",
+      "line": 7620,
+      "end_line": 7635,
+      "lines": 16,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_referral_payload",
+      "line": 7638,
+      "end_line": 7704,
+      "lines": 67,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_referral_graph_node",
+      "line": 7707,
+      "end_line": 7716,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_subscription_manage",
+      "line": 7719,
+      "end_line": 8182,
+      "lines": 464,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_runtime_settings",
+      "line": 8185,
+      "end_line": 8281,
+      "lines": 97,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_referral_antifraud",
+      "line": 8284,
+      "end_line": 8344,
+      "lines": 61,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_antiabuse_effective",
+      "line": 8350,
+      "end_line": 8396,
+      "lines": 47,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_antiabuse_payload",
+      "line": 8399,
+      "end_line": 8422,
+      "lines": 24,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_antiabuse_save_setting",
+      "line": 8425,
+      "end_line": 8445,
+      "lines": 21,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_antiabuse_save_settings",
+      "line": 8448,
+      "end_line": 8465,
+      "lines": 18,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_antiabuse",
+      "line": 8468,
+      "end_line": 8555,
+      "lines": 88,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "antiabuse_bulk_where_sql",
+      "line": 8576,
+      "end_line": 8578,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_antiabuse_bulk",
+      "line": 8581,
+      "end_line": 8798,
+      "lines": 218,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_antiabuse_backfill",
+      "line": 8825,
+      "end_line": 8991,
+      "lines": 167,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_ipguard_resolve_panel_ids",
+      "line": 9000,
+      "end_line": 9021,
+      "lines": 22,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_ipguard_alert_nodes",
+      "line": 9024,
+      "end_line": 9065,
+      "lines": 42,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_ipguard_alerts",
+      "line": 9068,
+      "end_line": 9122,
+      "lines": 55,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_referral_block",
+      "line": 9125,
+      "end_line": 9170,
+      "lines": 46,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_recurrents",
+      "line": 9173,
+      "end_line": 9215,
+      "lines": 43,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_ticket_detail",
+      "line": 9218,
+      "end_line": 9254,
+      "lines": 37,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_create_message",
+      "line": 9257,
+      "end_line": 9301,
+      "lines": 45,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_ticket_messages_json",
+      "line": 9304,
+      "end_line": 9331,
+      "lines": 28,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_close_ticket",
+      "line": 9334,
+      "end_line": 9355,
+      "lines": 22,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_reopen_ticket",
+      "line": 9358,
+      "end_line": 9379,
+      "lines": 22,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_delete_ticket",
+      "line": 9382,
+      "end_line": 9401,
+      "lines": 20,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_attachment",
+      "line": 9404,
+      "end_line": 9430,
+      "lines": 27,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "login",
+      "line": 9433,
+      "end_line": 9437,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "logout",
+      "line": 9440,
+      "end_line": 9442,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "should_send_payment_login_email",
+      "line": 9445,
+      "end_line": 9446,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "wants_payment_launch_json",
+      "line": 9449,
+      "end_line": 9454,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "pay",
+      "line": 9457,
+      "end_line": 9932,
+      "lines": 476,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "robots_txt",
+      "line": 9935,
+      "end_line": 9946,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "dynamic_manifest",
+      "line": 9949,
+      "end_line": 9977,
+      "lines": 29,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_traffic_nodes",
+      "line": 9980,
+      "end_line": 10009,
+      "lines": 30,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_node_traffic",
+      "line": 10012,
+      "end_line": 10066,
+      "lines": 55,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_censor_run_payload",
+      "line": 10069,
+      "end_line": 10087,
+      "lines": 19,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_mask_api_key",
+      "line": 10090,
+      "end_line": 10093,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_ripe_key_payload",
+      "line": 10096,
+      "end_line": 10103,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_censor_check_payload",
+      "line": 10106,
+      "end_line": 10125,
+      "lines": 20,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_ripe_keys",
+      "line": 10128,
+      "end_line": 10227,
+      "lines": 100,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_censor_checks",
+      "line": 10230,
+      "end_line": 10603,
+      "lines": 374,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_censor_check_runs",
+      "line": 10606,
+      "end_line": 10669,
+      "lines": 64,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_rows",
+      "line": 10739,
+      "end_line": 10740,
+      "lines": 2,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_new_repeat",
+      "line": 10743,
+      "end_line": 10776,
+      "lines": 34,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_renew45",
+      "line": 10779,
+      "end_line": 10844,
+      "lines": 66,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_funnel",
+      "line": 10847,
+      "end_line": 10915,
+      "lines": 69,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_ads",
+      "line": 10918,
+      "end_line": 11025,
+      "lines": 108,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_ads_summary",
+      "line": 11028,
+      "end_line": 11146,
+      "lines": 119,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_ads_daily",
+      "line": 11149,
+      "end_line": 11256,
+      "lines": 108,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_parse_direct_number",
+      "line": 11265,
+      "end_line": 11277,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_parse_yandex_direct_csv",
+      "line": 11280,
+      "end_line": 11333,
+      "lines": 54,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_cohorts",
+      "line": 11336,
+      "end_line": 11409,
+      "lines": 74,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_trials",
+      "line": 11418,
+      "end_line": 11451,
+      "lines": 34,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_pushes",
+      "line": 11454,
+      "end_line": 11553,
+      "lines": 100,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_patterns",
+      "line": 11556,
+      "end_line": 11608,
+      "lines": 53,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_trial_timing",
+      "line": 11639,
+      "end_line": 11707,
+      "lines": 69,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_renewal_ladder",
+      "line": 11710,
+      "end_line": 11761,
+      "lines": 52,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_tariff_paths",
+      "line": 11764,
+      "end_line": 11838,
+      "lines": 75,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_recurrent_dynamics",
+      "line": 11884,
+      "end_line": 11981,
+      "lines": 98,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_mrr",
+      "line": 11984,
+      "end_line": 12099,
+      "lines": 116,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_acq_payment_health",
+      "line": 12102,
+      "end_line": 12211,
+      "lines": 110,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_acquisition",
+      "line": 12250,
+      "end_line": 12264,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_ad_spends",
+      "line": 12267,
+      "end_line": 12434,
+      "lines": 168,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_actor",
+      "line": 12440,
+      "end_line": 12447,
+      "lines": 8,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_client_ip",
+      "line": 12450,
+      "end_line": 12454,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_audit_write",
+      "line": 12457,
+      "end_line": 12471,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_audit_log",
+      "line": 12474,
+      "end_line": 12553,
+      "lines": 80,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_user_timeline",
+      "line": 12572,
+      "end_line": 12709,
+      "lines": 138,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_user_timeline",
+      "line": 12712,
+      "end_line": 12742,
+      "lines": 31,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_rwms_diff",
+      "line": 12748,
+      "end_line": 12791,
+      "lines": 44,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_rwms_sync",
+      "line": 12794,
+      "end_line": 12937,
+      "lines": 144,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_direct_message",
+      "line": 12943,
+      "end_line": 13025,
+      "lines": 83,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_segments",
+      "line": 13040,
+      "end_line": 13085,
+      "lines": 46,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_broadcast_parse_buttons",
+      "line": 13102,
+      "end_line": 13174,
+      "lines": 73,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_broadcast_parse_media",
+      "line": 13177,
+      "end_line": 13191,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_broadcast_funnel",
+      "line": 13194,
+      "end_line": 13250,
+      "lines": 57,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_broadcast_progress",
+      "line": 13253,
+      "end_line": 13264,
+      "lines": 12,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_broadcast_exclude_promo_code",
+      "line": 13267,
+      "end_line": 13277,
+      "lines": 11,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_broadcast_payload",
+      "line": 13280,
+      "end_line": 13311,
+      "lines": 32,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_broadcasts",
+      "line": 13314,
+      "end_line": 13542,
+      "lines": 229,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_bulk_find_users",
+      "line": 13558,
+      "end_line": 13577,
+      "lines": 20,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_bulk_extend",
+      "line": 13580,
+      "end_line": 13608,
+      "lines": 29,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_account_block_payload",
+      "line": 13611,
+      "end_line": 13618,
+      "lines": 8,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_block_account",
+      "line": 13621,
+      "end_line": 13669,
+      "lines": 49,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_unblock_account",
+      "line": 13672,
+      "end_line": 13702,
+      "lines": 31,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_bulk_block",
+      "line": 13705,
+      "end_line": 13719,
+      "lines": 15,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_bulk_unblock",
+      "line": 13722,
+      "end_line": 13736,
+      "lines": 15,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_bulk_apply_trial_limit",
+      "line": 13739,
+      "end_line": 13755,
+      "lines": 17,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_bulk_remove_traffic_limit",
+      "line": 13758,
+      "end_line": 13769,
+      "lines": 12,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_bulk",
+      "line": 13775,
+      "end_line": 13957,
+      "lines": 183,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "generate_promo_code",
+      "line": 13966,
+      "end_line": 13970,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_promo_payload",
+      "line": 13973,
+      "end_line": 13989,
+      "lines": 17,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_promo_batch_payload",
+      "line": 13992,
+      "end_line": 14005,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_promocodes",
+      "line": 14008,
+      "end_line": 14282,
+      "lines": 275,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "admin_promo_cohort_tariffs",
+      "line": 14285,
+      "end_line": 14352,
+      "lines": 68,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_promo_cohort",
+      "line": 14358,
+      "end_line": 14663,
+      "lines": 306,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_accounts",
+      "line": 14671,
+      "end_line": 14795,
+      "lines": 125,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_node_bootstrap_reject_host",
+      "line": 14805,
+      "end_line": 14815,
+      "lines": 11,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_node_bootstrap_token",
+      "line": 14818,
+      "end_line": 14822,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_node_bootstrap_error",
+      "line": 14825,
+      "end_line": 14829,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_node_bootstrap_find",
+      "line": 14832,
+      "end_line": 14838,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "node_bootstrap_runner",
+      "line": 14841,
+      "end_line": 14850,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "node_bootstrap_claim",
+      "line": 14854,
+      "end_line": 14876,
+      "lines": 23,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "node_bootstrap_script",
+      "line": 14879,
+      "end_line": 14895,
+      "lines": 17,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "node_bootstrap_progress",
+      "line": 14899,
+      "end_line": 14931,
+      "lines": 33,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "node_bootstrap_complete",
+      "line": 14935,
+      "end_line": 14961,
+      "lines": 27,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_admin_node_script_payload",
+      "line": 14964,
+      "end_line": 14978,
+      "lines": 15,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_admin_node_script_groups",
+      "line": 14981,
+      "end_line": 15011,
+      "lines": 31,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_node_scripts",
+      "line": 15014,
+      "end_line": 15155,
+      "lines": 142,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_admin_provision_request_payload",
+      "line": 15158,
+      "end_line": 15183,
+      "lines": 26,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_node_provision",
+      "line": 15186,
+      "end_line": 15372,
+      "lines": 187,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_node_provision_detail",
+      "line": 15375,
+      "end_line": 15426,
+      "lines": 52,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_infra_error_response",
+      "line": 15432,
+      "end_line": 15436,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_infra_servers",
+      "line": 15439,
+      "end_line": 15695,
+      "lines": 257,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_infra_server_detail",
+      "line": 15698,
+      "end_line": 15713,
+      "lines": 16,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_infra_telemetry",
+      "line": 15716,
+      "end_line": 15733,
+      "lines": 18,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "support_admin_api_infra_settings",
+      "line": 15736,
+      "end_line": 15780,
+      "lines": 45,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "ts_iso",
+      "line": 3762,
+      "end_line": 3768,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "safe_bytes",
+      "line": 5768,
+      "end_line": 5775,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "raw",
+      "line": 8354,
+      "end_line": 8356,
+      "lines": 3,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "engine/views.py",
+      "function": "ratio",
+      "line": 11095,
+      "end_line": 11096,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "bucket",
+      "line": 11214,
+      "end_line": 11220,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "ratio",
+      "line": 11236,
+      "end_line": 11237,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "_matured",
+      "line": 11392,
+      "end_line": 11398,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "cumulative",
+      "line": 11586,
+      "end_line": 11591,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "month_back",
+      "line": 11915,
+      "end_line": 11921,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "active_base",
+      "line": 11923,
+      "end_line": 11948,
+      "lines": 26,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "series",
+      "line": 12151,
+      "end_line": 12164,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "totals",
+      "line": 12166,
+      "end_line": 12173,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "parse_id",
+      "line": 14372,
+      "end_line": 14376,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "cell",
+      "line": 11314,
+      "end_line": 11316,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "parse_common",
+      "line": 14123,
+      "end_line": 14139,
+      "lines": 17,
+      "static_io_flags": []
+    },
+    {
+      "file": "engine/views.py",
+      "function": "csv_cell",
+      "line": 12507,
+      "end_line": 12512,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/auth.py",
+      "function": "hash_auth_code",
+      "line": 37,
+      "end_line": 39,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/auth.py",
+      "function": "hash_access_token",
+      "line": 42,
+      "end_line": 44,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/auth.py",
+      "function": "hash_email_code",
+      "line": 47,
+      "end_line": 51,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/auth.py",
+      "function": "register_auth_code",
+      "line": 54,
+      "end_line": 65,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/auth.py",
+      "function": "_issue_access_token",
+      "line": 68,
+      "end_line": 80,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/auth.py",
+      "function": "exchange_code",
+      "line": 83,
+      "end_line": 103,
+      "lines": 21,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "mobile_api/auth.py",
+      "function": "register_email_code",
+      "line": 106,
+      "end_line": 131,
+      "lines": 26,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "mobile_api/auth.py",
+      "function": "verify_email_code",
+      "line": 134,
+      "end_line": 161,
+      "lines": 28,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "mobile_api/auth.py",
+      "function": "lock_email",
+      "line": 164,
+      "end_line": 177,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/auth.py",
+      "function": "bearer_token",
+      "line": 180,
+      "end_line": 185,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/auth.py",
+      "function": "authenticate",
+      "line": 188,
+      "end_line": 206,
+      "lines": 19,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "mobile_api/provisioning.py",
+      "function": "assert_local_row_free_for_email",
+      "line": 74,
+      "end_line": 109,
+      "lines": 36,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "mobile_api/provisioning.py",
+      "function": "provision_trial_user",
+      "line": 112,
+      "end_line": 213,
+      "lines": 102,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "mobile_api/subscription.py",
+      "function": "rwms_client",
+      "line": 15,
+      "end_line": 19,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/subscription.py",
+      "function": "get_rwms_user",
+      "line": 22,
+      "end_line": 36,
+      "lines": 15,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "mobile_api/tariffs.py",
+      "function": "serialize_tariff",
+      "line": 14,
+      "end_line": 20,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "_normalize_email",
+      "line": 50,
+      "end_line": 51,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "_is_valid_email",
+      "line": 54,
+      "end_line": 55,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "_serialize_user",
+      "line": 58,
+      "end_line": 63,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "_expire_fields",
+      "line": 66,
+      "end_line": 75,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "_status_name",
+      "line": 78,
+      "end_line": 81,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "_client_ip",
+      "line": 84,
+      "end_line": 88,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "_exchange_rate_limited",
+      "line": 91,
+      "end_line": 103,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "auth_exchange",
+      "line": 108,
+      "end_line": 147,
+      "lines": 40,
+      "static_io_flags": [
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "_email_rate_limited",
+      "line": 150,
+      "end_line": 172,
+      "lines": 23,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "auth_email_request",
+      "line": 177,
+      "end_line": 222,
+      "lines": 46,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "auth_email_verify",
+      "line": 227,
+      "end_line": 300,
+      "lines": 74,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "me",
+      "line": 305,
+      "end_line": 340,
+      "lines": 36,
+      "static_io_flags": [
+        "direct_rpc_candidate",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "tariffs",
+      "line": 344,
+      "end_line": 345,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "logout",
+      "line": 350,
+      "end_line": 360,
+      "lines": 11,
+      "static_io_flags": [
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "mobile_api/views.py",
+      "function": "auth_redirect",
+      "line": 364,
+      "end_line": 385,
+      "lines": 22,
+      "static_io_flags": []
+    },
+    {
+      "file": "web_app/settings.py",
+      "function": "csv_list",
+      "line": 25,
+      "end_line": 26,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "web_app/settings.py",
+      "function": "normalize_domain_entry",
+      "line": 29,
+      "end_line": 38,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "web_app/settings.py",
+      "function": "csv_domains",
+      "line": 41,
+      "end_line": 46,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "web_app/settings.py",
+      "function": "telegram_auth_bots",
+      "line": 49,
+      "end_line": 89,
+      "lines": 41,
+      "static_io_flags": []
+    },
+    {
+      "file": "web_app/settings.py",
+      "function": "telegram_web_login_start_codes",
+      "line": 92,
+      "end_line": 128,
+      "lines": 37,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/fixed_width_formatter.py",
+      "function": "format",
+      "line": 5,
+      "end_line": 8,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "applied_by_bot_admin",
+      "line": 124,
+      "end_line": 133,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "normalize_strategy_name",
+      "line": 136,
+      "end_line": 149,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "is_managed",
+      "line": 152,
+      "end_line": 173,
+      "lines": 22,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "releasable_on_payment",
+      "line": 176,
+      "end_line": 182,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "marker_event_payload",
+      "line": 185,
+      "end_line": 197,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "index_by_user_id",
+      "line": 200,
+      "end_line": 202,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "is_missing_table_error",
+      "line": 205,
+      "end_line": 222,
+      "lines": 18,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "_utcnow_naive",
+      "line": 225,
+      "end_line": 226,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "_naive_utc",
+      "line": 229,
+      "end_line": 236,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "_clip",
+      "line": 239,
+      "end_line": 242,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "_marker_values",
+      "line": 245,
+      "end_line": 281,
+      "lines": 37,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "_normalize_user_ids",
+      "line": 284,
+      "end_line": 297,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "_warn_missing_table",
+      "line": 300,
+      "end_line": 317,
+      "lines": 18,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "_reset_missing_table_warning",
+      "line": 320,
+      "end_line": 323,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "_run_degradable",
+      "line": 331,
+      "end_line": 339,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "upsert_managed_limit",
+      "line": 342,
+      "end_line": 372,
+      "lines": 31,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "get_managed_limit",
+      "line": 375,
+      "end_line": 380,
+      "lines": 6,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "delete_managed_limit",
+      "line": 383,
+      "end_line": 393,
+      "lines": 11,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "list_managed_limits",
+      "line": 396,
+      "end_line": 418,
+      "lines": 23,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "resolve_managed_limit",
+      "line": 421,
+      "end_line": 455,
+      "lines": 35,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "_run_degradable_async",
+      "line": 463,
+      "end_line": 471,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "upsert_managed_limit_async",
+      "line": 474,
+      "end_line": 502,
+      "lines": 29,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "get_managed_limit_async",
+      "line": 505,
+      "end_line": 512,
+      "lines": 8,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "delete_managed_limit_async",
+      "line": 515,
+      "end_line": 525,
+      "lines": 11,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "list_managed_limits_async",
+      "line": 528,
+      "end_line": 544,
+      "lines": 17,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "resolve_managed_limit_async",
+      "line": 547,
+      "end_line": 577,
+      "lines": 31,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "operation",
+      "line": 361,
+      "end_line": 370,
+      "lines": 10,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "operation",
+      "line": 387,
+      "end_line": 391,
+      "lines": 5,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "operation",
+      "line": 403,
+      "end_line": 416,
+      "lines": 14,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "operation",
+      "line": 491,
+      "end_line": 500,
+      "lines": 10,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "mutation_or_commit_candidate"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "operation",
+      "line": 509,
+      "end_line": 510,
+      "lines": 2,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "operation",
+      "line": 519,
+      "end_line": 523,
+      "lines": 5,
+      "static_io_flags": [
+        "direct_orm_or_db_call"
+      ]
+    },
+    {
+      "file": "common/managed_traffic_limits.py",
+      "function": "operation",
+      "line": 534,
+      "end_line": 542,
+      "lines": 9,
+      "static_io_flags": [
+        "direct_orm_or_db_call",
+        "materializes_all_rows_or_items"
+      ]
+    },
+    {
+      "file": "common/models/db.py",
+      "function": "time_until_expiration",
+      "line": 148,
+      "end_line": 156,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/db.py",
+      "function": "is_authenticated",
+      "line": 159,
+      "end_line": 160,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/db.py",
+      "function": "is_active",
+      "line": 163,
+      "end_line": 164,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/db.py",
+      "function": "is_anonymous",
+      "line": 167,
+      "end_line": 168,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/db.py",
+      "function": "get_username",
+      "line": 170,
+      "end_line": 171,
+      "lines": 2,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/db.py",
+      "function": "is_valid",
+      "line": 452,
+      "end_line": 455,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/segments.py",
+      "function": "user_has_payment_sql",
+      "line": 50,
+      "end_line": 57,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/segments.py",
+      "function": "user_never_paid_from_row",
+      "line": 60,
+      "end_line": 72,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/segments.py",
+      "function": "segment_where_sql",
+      "line": 168,
+      "end_line": 176,
+      "lines": 9,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/segments.py",
+      "function": "segment_count_sql",
+      "line": 190,
+      "end_line": 196,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/segments.py",
+      "function": "segment_user_ids_sql",
+      "line": 199,
+      "end_line": 203,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/segments.py",
+      "function": "segments_counts_sql",
+      "line": 288,
+      "end_line": 298,
+      "lines": 11,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/settings.py",
+      "function": "parse_bool_setting",
+      "line": 406,
+      "end_line": 416,
+      "lines": 11,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/settings.py",
+      "function": "parse_positive_int_setting",
+      "line": 419,
+      "end_line": 426,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/settings.py",
+      "function": "parse_positive_float_setting",
+      "line": 429,
+      "end_line": 438,
+      "lines": 10,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/settings.py",
+      "function": "parse_enum_setting",
+      "line": 441,
+      "end_line": 448,
+      "lines": 8,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/settings.py",
+      "function": "normalize_ipguard_alert_segment",
+      "line": 451,
+      "end_line": 454,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/settings.py",
+      "function": "normalize_trial_traffic_limit_strategy",
+      "line": 457,
+      "end_line": 462,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/settings.py",
+      "function": "trial_traffic_limit_strategy_proto_name",
+      "line": 465,
+      "end_line": 471,
+      "lines": 7,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/settings.py",
+      "function": "trial_traffic_limit_bytes",
+      "line": 474,
+      "end_line": 476,
+      "lines": 3,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/settings.py",
+      "function": "ipguard_warning_threshold_is_valid",
+      "line": 479,
+      "end_line": 494,
+      "lines": 16,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/tariff.py",
+      "function": "str_to_tariff",
+      "line": 91,
+      "end_line": 103,
+      "lines": 13,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/tariff.py",
+      "function": "is_short_tariff",
+      "line": 106,
+      "end_line": 109,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/tariff.py",
+      "function": "tariff_to_human_str",
+      "line": 112,
+      "end_line": 125,
+      "lines": 14,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/models/tariff.py",
+      "function": "check_period",
+      "line": 13,
+      "end_line": 24,
+      "lines": 12,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "__init__",
+      "line": 24,
+      "end_line": 28,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "__init__",
+      "line": 32,
+      "end_line": 35,
+      "lines": 4,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "close",
+      "line": 37,
+      "end_line": 42,
+      "lines": 6,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "add_user",
+      "line": 44,
+      "end_line": 52,
+      "lines": 9,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "delete_user",
+      "line": 54,
+      "end_line": 60,
+      "lines": 7,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "update_user",
+      "line": 62,
+      "end_line": 70,
+      "lines": 9,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "get_user_by_uuid",
+      "line": 72,
+      "end_line": 80,
+      "lines": 9,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "get_user_by_username",
+      "line": 82,
+      "end_line": 101,
+      "lines": 20,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "get_user_by_username_strict",
+      "line": 103,
+      "end_line": 126,
+      "lines": 24,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "get_user_by_id",
+      "line": 130,
+      "end_line": 140,
+      "lines": 11,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "get_all_users",
+      "line": 142,
+      "end_line": 156,
+      "lines": 15,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "get_inbounds",
+      "line": 158,
+      "end_line": 164,
+      "lines": 7,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "get_user_hwid_devices",
+      "line": 170,
+      "end_line": 180,
+      "lines": 11,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client.py",
+      "function": "get_hwid_settings",
+      "line": 182,
+      "end_line": 193,
+      "lines": 12,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "__init__",
+      "line": 15,
+      "end_line": 19,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "close",
+      "line": 21,
+      "end_line": 25,
+      "lines": 5,
+      "static_io_flags": []
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "add_user",
+      "line": 27,
+      "end_line": 32,
+      "lines": 6,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "update_user",
+      "line": 34,
+      "end_line": 41,
+      "lines": 8,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "get_user_by_uuid",
+      "line": 43,
+      "end_line": 48,
+      "lines": 6,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "get_user_by_username",
+      "line": 50,
+      "end_line": 67,
+      "lines": 18,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "get_user_by_username_strict",
+      "line": 69,
+      "end_line": 90,
+      "lines": 22,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "get_user_by_id",
+      "line": 96,
+      "end_line": 104,
+      "lines": 9,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "get_all_users",
+      "line": 106,
+      "end_line": 120,
+      "lines": 15,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "get_inbounds",
+      "line": 122,
+      "end_line": 127,
+      "lines": 6,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "get_nodes",
+      "line": 129,
+      "end_line": 134,
+      "lines": 6,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "get_node_users_usage",
+      "line": 136,
+      "end_line": 145,
+      "lines": 10,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "get_user_hwid_devices",
+      "line": 147,
+      "end_line": 156,
+      "lines": 10,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "delete_user_hwid_device",
+      "line": 158,
+      "end_line": 169,
+      "lines": 12,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "get_hwid_settings",
+      "line": 171,
+      "end_line": 176,
+      "lines": 6,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "get_node_secret",
+      "line": 178,
+      "end_line": 184,
+      "lines": 7,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/rwms_client_sync.py",
+      "function": "create_node",
+      "line": 186,
+      "end_line": 193,
+      "lines": 8,
+      "static_io_flags": [
+        "direct_rpc_candidate"
+      ]
+    },
+    {
+      "file": "common/setup_logger.py",
+      "function": "setup_logger",
+      "line": 9,
+      "end_line": 24,
+      "lines": 16,
+      "static_io_flags": []
+    }
+  ]
+}

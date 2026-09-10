@@ -1,0 +1,37 @@
+{
+  "python_ast_files": 183,
+  "syntax_errors": 0,
+  "existing_template_tests_passed": 8,
+  "browser_geometry_checks": 24,
+  "onboarding_checks": 20,
+  "onboarding_blocked_centers": 11,
+  "runtime": "local Python 3.14.5; production Docker Python 3.12",
+  "live_db_or_provider_calls": false,
+  "isolated_proofs": [
+    "cross-gateway status for same user",
+    "blocked mobile email identity receives secret",
+    "invalid JSON types raise unhandled exception",
+    "protobuf squads TypeError",
+    "stale admin session permissions",
+    "personal-admin gate503 and stale audit identity",
+    "RWMS and YooKassa request omit timeout",
+    "stale provisioning details",
+    "worker reconnect exception escapes",
+    "mismatched node accepted READY",
+    "zero-payment spend week omitted",
+    "onboarding pointer interception",
+    "private PWA cache offline",
+    "unknown tab blank cabinet",
+    "modal focus missing"
+  ],
+  "root": {
+    "admin_permission_from_stale_session": true,
+    "client_ip_selected_from_untrusted_first_hop": "198.51.100.123",
+    "account_identity_survives_logout": "disabled-fixture",
+    "personal_login_without_shared_password": 503,
+    "rwms_rpc_keyword_args": {},
+    "yookassa_request_has_timeout": false,
+    "django_default_smtp_timeout": null,
+    "django_default_cache": "django.core.cache.backends.locmem.LocMemCache"
+  }
+}

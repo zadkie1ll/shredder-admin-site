@@ -163,7 +163,11 @@ function measure({selector, properties}) {
                 assert.equal(await actions.locator('[data-promo-delete="1"]').getAttribute('data-promo-uses'), '0');
                 const off = await page.evaluate(code => renderPromoCodes([{...code, is_active: false}]), codes[0]);
                 assert.ok(off.includes('aria-label="Включить промокод DEMO50">Включить</button>'));
-                await shot(page, '.promo-batch-card', `real-promo-batch-${width}`);
+                await page.locator('[data-promo-mode="batch"]').click();
+                assert.equal(await page.locator('#batch-name').isVisible(), true);
+                assert.equal(await page.locator('#promo-code').isVisible(), false);
+                await shot(page, '.promo-compose-grid', `real-promo-batch-${width}`);
+                await page.locator('[data-promo-mode="single"]').click();
                 await shot(page, '.promo-registry-card', `real-promo-registry-${width}`);
                 await shot(reference, '.pc-concept > .mi-panel:last-child', `reference-promo-registry-${width}`);
                 await page.locator('[data-promo-type-picker="promo"] [data-value="discount"]').click();
