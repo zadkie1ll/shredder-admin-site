@@ -1,6 +1,7 @@
 import hashlib
 import os
 import logging
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from datetime import timezone
@@ -78,9 +79,90 @@ class RwmsSubscriptionOwnershipError(Exception):
         )
 
 
+# Формат email, пригодного для панели и для чека 54-ФЗ. Те же строки продублированы в payment,
+# на сайте и в боте обоих проектов — общий модуль в common сознательно не
+# заводился, чтобы не бампать submodule ради валидатора; при изменении
+# править синхронно во всех шести местах.
+#
+# ЧТО ЭТО НА САМОМ ДЕЛЕ ДАЁТ. Панель валидирует email через pydantic EmailStr
+# (Create/UpdateUserRequestDto), а email_validator в этих сервисах не
+# установлен, поэтому побайтовым зеркалом EmailStr регэксп быть не может.
+# Он проверен против настоящего EmailStr из SDK и закрывает весь реалистичный
+# класс опечаток — 'ivan@mail.ru.', 'ivan@mail..ru', '.ivan@mail.ru',
+# 'ivan@-mail.ru', 'ivan@mail_box.ru' и т.п.; на 40k случайных адресов
+# расхождений «я разрешил, панель отвергнет» осталось 9, и все они — строки
+# вида 'xx--yy.tld' (псевдо-punycode), которых пользователь не наберёт.
+# Это фильтр, а не гарантия.
+#
+# ВАЖНО про INVALID_ARGUMENT: RWMS с 2026-09-10 отвечает им на невалидный
+# запрос, НО ни один клиент парка этот код пока не различает — strict-варианты
+# RwmsClient.update_user/add_user живут в common и отложены до планового
+# бампа submodule. Пока их нет, терминальная ошибка по-прежнему уходит в
+# бесконечный ретрай, поэтому не полагайся на неё как на страховку.
+# Локальная часть: точки допустимы только МЕЖДУ символами (ведущая,
+# хвостовая и сдвоенная точки — самые частые опечатки, и EmailStr их
+# отвергает). Домен: метки не начинаются и не заканчиваются дефисом, без
+# подчёркиваний, минимум одна точка, TLD от двух букв.
+_EMAIL_LOCAL = r"[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[A-Za-z0-9!#$%&'*+/=?^_`{|}~-]+)*"
+_EMAIL_LABEL = r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?"
+EMAIL_RE = re.compile(rf"^{_EMAIL_LOCAL}@(?:{_EMAIL_LABEL}\.)+[A-Za-z]{{2,}}$")
+EMAIL_MAX_LENGTH = 254
+
+
+def is_valid_email(email) -> bool:
+    """Похоже ли значение на пригодный адрес. Работает по НОРМАЛИЗОВАННОМУ
+    виду, чтобы '  User@Example.COM ' не отвергался из-за регистра/пробелов."""
+    normalized = normalize_email(email)
+    return bool(EMAIL_RE.fullmatch(normalized)) and len(normalized) <= EMAIL_MAX_LENGTH
+
+
 def normalize_email(email) -> str:
     """Единая нормализация email для сравнения и хеширования."""
     return (email or "").strip().lower()
+
+
+def usable_panel_email(email, username: str, operation: str) -> Optional[str]:
+    """email для запроса к панели, либо None — если класть его туда нельзя.
+
+    Инцидент 2026-09-10 в Village, код общий. Сайт принимает email без
+    серверной проверки формата (браузерная проверка ``type="email"``
+    пропускает домен без точки — по спецификации WHATWG такой адрес валиден),
+    и адрес вида ``milenapanowa@yandex`` попадал в ``users.email``. Панель
+    Remnawave валидирует email через ``pydantic.EmailStr`` в
+    ``CreateUserRequestDto``/``UpdateUserRequestDto``, поэтому запрос падал
+    ещё до похода в Remnawave.
+
+    Последствие на сайте было тихим и уже наступило в проде:
+    ``RwmsClientSync.add_user`` глотает любой ``grpc.RpcError`` и возвращает
+    ``None``, после чего регистрация уходит в
+    ``create_local_site_user_without_rwms`` — пользователь «зарегистрирован»,
+    magic link ушёл, а подписки в панели нет вовсе.
+
+    Поэтому невалидный адрес просто не попадает в запрос: поле остаётся
+    незаданным (``HasField=False``), RWMS передаёт ``None``, ``exclude_none``
+    убирает его из PATCH — email в панели остаётся прежним, а не затирается,
+    и подписка создаётся/продлевается. email в панели — метаданные для
+    админки: чеки 54-ФЗ выставляются по ``users.email`` в момент создания
+    счёта, письма шлёт отдельный сервис.
+    """
+    if not email:
+        return None
+    # Возвращается именно НОРМАЛИЗОВАННОЕ значение: проверять одно, а
+    # отправлять в панель другое — это ровно та дыра, которую мы чиним.
+    # Панельные и БД-адреса и так хранятся нормализованными, так что на
+    # практике значение не меняется.
+    normalized = normalize_email(email)
+    if is_valid_email(normalized):
+        return normalized
+    logging.warning(
+        "email %r of %s is not a valid address and is left out of the %s request "
+        "to the panel: the panel keeps its current email, the subscription "
+        "operation itself proceeds (fix the address in users.email)",
+        email,
+        username,
+        operation,
+    )
+    return None
 
 
 def deterministic_username(email: str) -> str:
@@ -412,6 +494,15 @@ def create_user_until(
 
     request = proto.AddUserRequest(
         username=username,
+        # email здесь НЕ метаданные, а ИДЕНТИЧНОСТЬ: adoption после краха
+        # между AddUser и commit'ом сверяет панельный email с запрошенным
+        # (assert_subscription_owned_by_email), и подписка, созданная с
+        # пустым email, не может быть принята НИКОГДА — гард сочтёт её
+        # чужой и навсегда остановит провижининг этого пользователя.
+        # Поэтому здесь usable_panel_email НЕ применяется: формат адреса
+        # проверяется на входе (pay / send_magic_link / update_email /
+        # confirm_email), а если невалидный адрес всё же дойдёт сюда,
+        # честнее уронить AddUser, чем создать неусыновляемую подписку.
         email=email,
         telegram_id=telegram_id,
         expire_at=expire_at,

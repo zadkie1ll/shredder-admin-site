@@ -70,6 +70,7 @@ from engine.views import create_site_user
 from engine.views import get_purchase_payment_status
 from engine.views import resolve_existing_site_subscription
 from engine.views import send_magic_link
+from engine.views import update_email
 from engine.views import site_registration_username
 from engine.views import custom_config_template_payload
 from engine.views import form_bool_enabled
@@ -13076,3 +13077,335 @@ class PromoCohortTimeNormalisationTests(SimpleTestCase):
         # соединение», и диагностика уходила не туда
         self.assertIn("`Сервер ответил ${response.status}`", template)
         self.assertIn("ошибка на сервере, смотрите лог сайта", template)
+
+
+class MalformedEmailGuardTests(SimpleTestCase):
+    """Битый email не должен ни ронять запросы к панели, ни попадать в БД.
+
+    Инцидент 2026-09-10. Пользователь впервые вошёл в кабинет и на форме
+    оплаты ввёл 'milenapanowa@yandex' — адрес без точки в домене. Браузерная
+    проверка type="email" такое пропускает (по спецификации WHATWG домен без
+    точки валиден), серверной проверки не было, и сайт привязал адрес к
+    аккаунту. Через две минуты пришла оплата, а панель Remnawave валидирует
+    email через pydantic EmailStr — UpdateUser падал, RWMS отдавал INTERNAL,
+    payment считал это блипом панели и крутил оплаченное продление в ретраях
+    больше трёх часов.
+
+    Второе, более тихое последствие уже наступило в проде: регистрация с
+    битым адресом «успешна» (magic link уходит), но подписки в панели нет —
+    AddUser падает, RwmsClientSync.add_user глотает ошибку, и пользователь
+    уходит в create_local_site_user_without_rwms.
+    """
+
+    BROKEN = "milenapanowa@yandex"
+
+    def test_validator_rejects_the_address_from_the_incident(self):
+        from engine.rwms_helpers import is_valid_email
+
+        self.assertFalse(is_valid_email(self.BROKEN))
+
+    def test_validator_accepts_ordinary_addresses(self):
+        from engine.rwms_helpers import is_valid_email
+
+        for email in (
+            "milenapanowa@yandex.ru",
+            "u@example.com",
+            "first.last+tag@sub.example.co.uk",
+            "79132077119@mail.ru",
+        ):
+            with self.subTest(email=email):
+                self.assertTrue(is_valid_email(email))
+
+    def test_validator_normalises_before_checking(self):
+        from engine.rwms_helpers import is_valid_email
+
+        # Форма может прислать адрес с пробелами и в другом регистре —
+        # отвергать его из-за этого нельзя.
+        self.assertTrue(is_valid_email("  User@Example.COM "))
+
+    def test_validator_rejects_garbage(self):
+        from engine.rwms_helpers import is_valid_email
+
+        for email in (
+            None,
+            "",
+            "no-at-sign",
+            "@example.com",
+            "user@",
+            "user@host",
+            "user@host.x",
+            "with space@example.com",
+        ):
+            with self.subTest(email=email):
+                self.assertFalse(is_valid_email(email))
+
+    def test_invalid_email_is_left_out_of_the_panel_request(self):
+        from engine.rwms_helpers import usable_panel_email
+
+        with self.assertLogs(level="WARNING") as logs:
+            result = usable_panel_email(self.BROKEN, "m123", "AddUser")
+
+        self.assertIsNone(result)
+        joined = "\n".join(logs.output)
+        self.assertIn(self.BROKEN, joined)
+        self.assertIn("m123", joined)
+
+    def test_valid_email_still_reaches_the_panel_request(self):
+        from engine.rwms_helpers import usable_panel_email
+
+        self.assertEqual(
+            usable_panel_email("u@example.com", "m123", "AddUser"), "u@example.com"
+        )
+
+    def test_add_user_keeps_the_email_because_it_is_identity_not_metadata(self):
+        """AddUser НЕ фильтрует email — здесь он идентичность, а не метаданные.
+
+        Подписка, созданная с пустым email, не может быть принята никогда:
+        assert_subscription_owned_by_email сверяет панельный email с
+        запрошенным и при пустом поле считает запись чужой, навсегда
+        останавливая провижининг пользователя. Поэтому «тихо выбросить»
+        битый адрес здесь опаснее, чем уронить AddUser: формат проверяется
+        на входе (pay / send_magic_link / update_email / confirm_email).
+        """
+        from engine import rwms_helpers
+
+        client = mock.Mock()
+        client.add_user.return_value = "created"
+
+        with mock.patch.object(
+            rwms_helpers, "_internal_squads_uuids", return_value=["squad-1"]
+        ):
+            rwms_helpers.create_user_until(
+                rwms_client=client,
+                username="m123",
+                expire_at=datetime.now(dt_timezone.utc) + timedelta(days=7),
+                email=self.BROKEN,
+            )
+
+        request = client.add_user.call_args.args[0]
+        self.assertTrue(request.HasField("email"))
+        self.assertEqual(request.email, self.BROKEN)
+        self.assertEqual(request.username, "m123")
+
+    def test_adoption_guard_still_requires_a_panel_email(self):
+        """Инвариант, из-за которого предыдущий тест выглядит именно так."""
+        from engine.rwms_helpers import (
+            RwmsSubscriptionOwnershipError,
+            assert_subscription_owned_by_email,
+        )
+
+        class _PanelUserWithoutEmail:
+            username = "m123"
+            email = ""
+
+            def HasField(self, name):
+                return False
+
+        with self.assertRaises(RwmsSubscriptionOwnershipError):
+            assert_subscription_owned_by_email(
+                _PanelUserWithoutEmail(), "u@example.com", flow="test"
+            )
+
+    def test_add_user_request_keeps_a_valid_email(self):
+        from engine import rwms_helpers
+
+        client = mock.Mock()
+        client.add_user.return_value = "created"
+
+        with mock.patch.object(
+            rwms_helpers, "_internal_squads_uuids", return_value=["squad-1"]
+        ):
+            rwms_helpers.create_user_until(
+                rwms_client=client,
+                username="m123",
+                expire_at=datetime.now(dt_timezone.utc) + timedelta(days=7),
+                email="u@example.com",
+            )
+
+        request = client.add_user.call_args.args[0]
+        self.assertTrue(request.HasField("email"))
+        self.assertEqual(request.email, "u@example.com")
+
+    def test_weak_at_sign_check_is_gone_from_panel_updates(self):
+        """Раньше два места фильтровали email проверкой «есть @», которая
+        пропускает ровно тот адрес, что сломал прод."""
+        source = Path("engine/views.py").read_text()
+        self.assertNotIn('"@" in rwms_user.email', source)
+        # username берётся защитным getattr: у части объектов панели (и у
+        # дублёров в тестах) этого атрибута нет, а падать на формировании
+        # текста warning'а нельзя — это путь продления подписки.
+        self.assertEqual(
+            source.count(
+                'rwms_user.email, getattr(rwms_user, "username", "?"), "UpdateUser"'
+            ),
+            2,
+        )
+
+    # --- Поведенческие тесты вьюх ---------------------------------------
+    #
+    # Проверяют реальный вызов вьюхи, а не наличие подстроки в исходнике:
+    # грепающий тест остаётся зелёным при любой логической ошибке.
+
+    class _SessionDict(dict):
+        modified = False
+
+    def _magic_link_request(self, email):
+        request = RequestFactory().post("/magic/", {"email": email})
+        request.session = {}
+        return request
+
+    def _fake_session_returning(self, user):
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return user
+
+        class FakeBegin:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        class FakeSession:
+            def begin(self):
+                return FakeBegin()
+
+            def query(self, *args, **kwargs):
+                return FakeQuery()
+
+            def add(self, obj):
+                if isinstance(obj, MagicToken):
+                    obj.token = "magic-token"
+
+            def commit(self):
+                return None
+
+            def rollback(self):
+                return None
+
+            def flush(self):
+                return None
+
+            def close(self):
+                return None
+
+        return FakeSession()
+
+    def test_magic_link_rejects_new_registration_with_malformed_email(self):
+        """Новая регистрация с опечаткой отклоняется, аккаунт не создаётся."""
+        with mock.patch(
+            "engine.views.session_factory",
+            return_value=self._fake_session_returning(None),
+        ), mock.patch("engine.views.create_site_user") as create_site, mock.patch(
+            "engine.views.send_magic_link_email"
+        ) as send_email:
+            response = send_magic_link(self._magic_link_request(self.BROKEN))
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(json.loads(response.content)["status"], "error")
+        create_site.assert_not_called()
+        send_email.assert_not_called()
+
+    def test_magic_link_still_works_for_existing_user_with_malformed_email(self):
+        """Ключевой инвариант: владельца уже записанного битого адреса нельзя
+        запереть снаружи кабинета — другого входа у него фактически нет."""
+        broken_user = SimpleNamespace(id=42, email=self.BROKEN, username="m123")
+
+        with mock.patch(
+            "engine.views.session_factory",
+            return_value=self._fake_session_returning(broken_user),
+        ), mock.patch("engine.views.create_site_user") as create_site, mock.patch(
+            "engine.views.get_registration_context",
+            return_value={"referrer": None, "traffic_source": None, "ymid": None},
+        ), mock.patch("engine.views.sync_existing_user_tracking"), mock.patch(
+            "engine.views.send_magic_link_email"
+        ) as send_email:
+            response = send_magic_link(self._magic_link_request(self.BROKEN))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content), {"status": "ok"})
+        create_site.assert_not_called()
+        send_email.assert_called_once()
+
+    def _pay_request(self, email):
+        request = RequestFactory().post(
+            "/pay/",
+            {"email": email, "tariff_id": "month"},
+            HTTP_HOST="example.com",
+            HTTP_X_PAYMENT_LAUNCH="new-tab",
+        )
+        request.user = SimpleNamespace(is_authenticated=False, id=None)
+        request.session = self._SessionDict()
+        return request
+
+    def test_pay_rejects_unknown_malformed_email(self):
+        tariff = SimpleNamespace(price=100, db_tariff_id="month", description="1 месяц")
+
+        with mock.patch(
+            "engine.views.session_factory",
+            return_value=self._fake_session_returning(None),
+        ), mock.patch(
+            "engine.views.get_runtime_actual_tariffs", return_value=[tariff]
+        ), mock.patch("engine.views.create_site_user") as create_site, mock.patch(
+            "engine.views.create_wata_payment_sync"
+        ) as create_invoice:
+            response = pay(self._pay_request(self.BROKEN))
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(json.loads(response.content)["status"], "error")
+        create_site.assert_not_called()
+        create_invoice.assert_not_called()
+
+    @override_settings(PAYMENT_GATEWAY="wata")
+    def test_pay_lets_a_stored_malformed_email_through(self):
+        """Дедушкина оговорка. Форма кабинета шлёт привязанный email скрытым
+        полем, а ниже стоит проверка «email не совпадает с аккаунтом»: без
+        оговорки владелец битого адреса не смог бы заплатить ничем."""
+        tariff = SimpleNamespace(price=100, db_tariff_id="month", description="1 месяц")
+        known = SimpleNamespace(id=42, email=self.BROKEN, username="m123")
+
+        with mock.patch(
+            "engine.views.session_factory",
+            return_value=self._fake_session_returning(known),
+        ), mock.patch(
+            "engine.views.get_runtime_actual_tariffs", return_value=[tariff]
+        ), mock.patch(
+            "engine.views.get_registration_context",
+            return_value={"referrer": None, "traffic_source": None, "ymid": None},
+        ), mock.patch("engine.views.sync_existing_user_tracking"), mock.patch(
+            "engine.views.create_wata_payment_sync"
+        ), self.assertLogs(level="WARNING") as logs:
+            response = pay(self._pay_request(self.BROKEN))
+
+        # Оговорка сработала и сказала об этом громко.
+        self.assertTrue(
+            any("already stored" in line for line in logs.output),
+            "дедушкина оговорка должна громко логироваться",
+        )
+        # И платёж НЕ отклонён из-за формата адреса: причина отказа, если он
+        # вообще есть, уже другая. Это и есть инвариант — владелец
+        # записанного битого адреса не заперт без возможности заплатить.
+        self.assertFalse(
+            any("invalid email format" in line for line in logs.output),
+            "платёж отклонён валидатором, хотя адрес уже привязан к аккаунту",
+        )
+        if response.status_code == 400:
+            self.assertNotIn(
+                "опечатка", json.loads(response.content).get("message", "")
+            )
+
+    def test_update_email_rejects_malformed_address(self):
+        request = RequestFactory().post("/update-email/", {"email": self.BROKEN})
+        request.user = SimpleNamespace(is_authenticated=True, id=42)
+        request.session = self._SessionDict()
+
+        with mock.patch("engine.views.session_factory") as session_factory:
+            response = update_email(request)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertIn("опечатка", request.session["email_bind_modal"]["error"])
+        # До БД дело не дошло: невалидный адрес отвергнут раньше.
+        session_factory.assert_not_called()

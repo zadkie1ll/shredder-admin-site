@@ -213,7 +213,9 @@ from .rwms_helpers import create_user
 from .rwms_helpers import create_user_until
 from .rwms_helpers import deterministic_username
 from .rwms_helpers import get_proto_optional
+from .rwms_helpers import is_valid_email
 from .rwms_helpers import normalize_email
+from .rwms_helpers import usable_panel_email
 from .encrypt_happ_url import encrypt_happ_url1
 from .incy import IncyEncoderError
 from .incy import encrypt_incy_url
@@ -2042,6 +2044,45 @@ def send_magic_link(request):
                 user = db_session.query(User).filter(User.email == email).first()
 
                 if not user:
+                    # Формат проверяется ТОЛЬКО для новой регистрации.
+                    # Существующего пользователя нашли точным совпадением выше,
+                    # и до этой ветки он не доходит — поэтому владелец уже
+                    # записанного битого адреса не окажется заперт снаружи
+                    # кабинета. Это важно: другого входа у него фактически нет,
+                    # а OAuth не спас бы, а навредил — он дал бы валидный
+                    # адрес, поиск по users его не нашёл бы, и создались бы
+                    # второй аккаунт и вторая подписка в панели.
+                    #
+                    # Регистрация с битым адресом сегодня «успешна», но
+                    # подписки в панели нет: AddUser падает на EmailStr, а
+                    # RwmsClientSync.add_user глотает ошибку, и пользователь
+                    # уходит в create_local_site_user_without_rwms. Такие
+                    # аккаунты в проде уже есть (инцидент 2026-09-10).
+                    #
+                    # Осознанный размен: вьюха специально всегда отвечает
+                    # «ok» ради анти-энумерации, а этот 400 отличает «такого
+                    # аккаунта нет» от «есть» — но ТОЛЬКО для адресов, которые
+                    # не проходят формат. Перебирать такие адреса
+                    # бессмысленно: аккаунт с битым email может появиться лишь
+                    # как наследие (валидация на входе теперь его не создаст),
+                    # а внятная ошибка на опечатку важнее.
+                    if not is_valid_email(email):
+                        logging.warning(
+                            "magic link registration rejected: invalid email "
+                            "format email=%s",
+                            email,
+                        )
+                        return JsonResponse(
+                            {
+                                "status": "error",
+                                "message": (
+                                    "Проверьте адрес электронной почты: "
+                                    "похоже, в нём опечатка."
+                                ),
+                            },
+                            status=400,
+                        )
+
                     user = create_site_user(
                         db_session,
                         email,
@@ -3550,6 +3591,24 @@ def update_email(request):
         request.session.modified = True
         return redirect("dashboard")
 
+    # Привязка НОВОГО адреса — дедушкина оговорка здесь не нужна: человек
+    # вводит адрес прямо сейчас и может его исправить. Раньше проверялась
+    # только непустота, и в users.email попадал мусор, который потом ронял
+    # запросы к панели (инцидент 2026-09-10).
+    if not is_valid_email(new_email):
+        logging.warning(
+            "email binding rejected: invalid email format email=%s user_id=%s",
+            new_email,
+            request.user.id,
+        )
+        request.session["email_bind_modal"] = {
+            "open": True,
+            "error": "Проверьте адрес: похоже, в нём опечатка.",
+            "email": new_email,
+        }
+        request.session.modified = True
+        return redirect("dashboard")
+
     session = session_factory()
     try:
         db_user = session.query(User).filter(User.id == request.user.id).first()
@@ -3751,6 +3810,23 @@ def confirm_email(request, token):
         request.session["email_bind_modal"] = {
             "open": True,
             "error": "Ссылка подтверждения неверна. Введите email еще раз.",
+        }
+        request.session.modified = True
+        return redirect("dashboard" if request.user.is_authenticated else "login")
+
+    # Токен подтверждения живёт 15 минут, поэтому ссылки, выпущенные ДО выката
+    # валидации в update_email, ещё какое-то время донесли бы битый адрес и до
+    # users.email, и до запроса к панели. Проверяем и здесь.
+    if not is_valid_email(new_email):
+        logging.warning(
+            "email confirmation rejected: invalid email format email=%s user_id=%s",
+            new_email,
+            user_id,
+        )
+        request.session["email_bind_modal"] = {
+            "open": True,
+            "error": "Проверьте адрес: похоже, в нём опечатка.",
+            "email": new_email,
         }
         request.session.modified = True
         return redirect("dashboard" if request.user.is_authenticated else "login")
@@ -8184,8 +8260,11 @@ def support_admin_api_subscription_manage(request):
             )
         rwms_updated = False
         if rwms_user:
-            user_email = (
-                rwms_user.email if rwms_user.email and "@" in rwms_user.email else None
+            # Проверка «есть @» пропускала домен без точки, а панель валидирует
+            # email через EmailStr — такой запрос падал целиком (инцидент
+            # 2026-09-10). Невалидный адрес не задаём: панель оставит свой.
+            user_email = usable_panel_email(
+                rwms_user.email, getattr(rwms_user, "username", "?"), "UpdateUser"
             )
             active_squads = [squad.uuid for squad in rwms_user.active_internal_squads]
             # Антиабьюз: traffic_limit_bytes/traffic_limit_strategy НЕ передаём —
@@ -9595,6 +9674,50 @@ def pay(request):
                     email,
                 )
                 return HttpResponse("Выбранный тариф не найден", status=400)
+
+            # Формат email. Раньше проверялась только непустота, и адрес без
+            # точки в домене ('milenapanowa@yandex' — браузерный type="email"
+            # такое пропускает) привязывался к аккаунту прямо здесь, а потом
+            # ломал запрос к панели (инцидент 2026-09-10 в Village).
+            #
+            # ДЕДУШКИНА ОГОВОРКА: у существующих пользователей битый адрес уже
+            # лежит в users.email, и форма кабинета отправляет его СКРЫТЫМ
+            # полем (dashboard.html), а ниже стоит проверка «email не совпадает
+            # с аккаунтом». Отклонять такой адрес нельзя — человек не смог бы
+            # заплатить вообще ничем: битый отверг бы валидатор, валидный —
+            # проверка совпадения. Поэтому строго проверяются только НОВЫЕ
+            # адреса: если строка users с таким email уже есть, платёж идёт
+            # как раньше, а адрес чинится отдельно.
+            if not is_valid_email(email):
+                known_user = (
+                    db_session.query(User).filter(User.email == email).first()
+                )
+                if known_user is None:
+                    logging.warning(
+                        "payment request rejected: invalid email format email=%s "
+                        "tariff_id=%s",
+                        email,
+                        tariff_id,
+                    )
+                    invalid_email_message = (
+                        "Проверьте адрес электронной почты: похоже, в нём "
+                        "опечатка. Он нужен для чека и входа в личный кабинет."
+                    )
+                    if payment_launch_json:
+                        return JsonResponse(
+                            {"status": "error", "message": invalid_email_message},
+                            status=400,
+                        )
+                    return HttpResponse(invalid_email_message, status=400)
+
+                logging.warning(
+                    "payment with a malformed email that is already stored: "
+                    "email=%s user_id=%s tariff_id=%s — payment is allowed so the "
+                    "user is not locked out, the address needs fixing in users",
+                    email,
+                    known_user.id,
+                    tariff_id,
+                )
 
             logging.info(
                 "payment request accepted: email=%s tariff_id=%s price=%s",
@@ -13657,8 +13780,11 @@ def admin_bulk_extend(db_session, user, days):
     rwms_user = rwms_client.get_user_by_username(user.username)
     if rwms_user is None:
         return "продлено в БД; подписки нет в RWMS (панель не тронута)"
-    user_email = (
-        rwms_user.email if rwms_user.email and "@" in rwms_user.email else None
+    # Проверка «есть @» пропускала домен без точки, а панель валидирует email
+    # через EmailStr — такой запрос падал целиком (инцидент 2026-09-10).
+    # Невалидный адрес не задаём: панель оставит свой.
+    user_email = usable_panel_email(
+        rwms_user.email, getattr(rwms_user, "username", "?"), "UpdateUser"
     )
     # Лимит трафика и стратегию сброса не трогаем (антиабьюз): поля не заданы
     # → RWMS оставляет их в панели как есть.
