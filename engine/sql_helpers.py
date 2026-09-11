@@ -1,11 +1,8 @@
-import logging
 from datetime import datetime
 
-from sqlalchemy import select
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from common.models.db import User
 from common.models.db import WataInvoice
 from common.models.segments import user_has_payment_sql
 from common.models.segments import user_never_paid_from_row
@@ -77,14 +74,13 @@ def user_never_paid(db_session, user_id) -> bool | None:
 
 
 def save_wata_invoice(
-    session: Session, invoice_json: dict, tariff_id: str, email: str
+    session: Session, invoice_json: dict, tariff_id: str, user_id: int
 ) -> None:
-    user_id = session.scalar(select(User.id).where(User.email == email).limit(1))
+    """Persist the invoice for the already resolved account owner.
 
-    if user_id is None:
-        logging.error(f"not found user id for email {email}")
-        return
-
+    Receipt email is provider metadata and must never be used to resolve account
+    identity. The caller obtains ``user_id`` before creating the payment.
+    """
     session.add(
         WataInvoice(
             user_id=user_id,

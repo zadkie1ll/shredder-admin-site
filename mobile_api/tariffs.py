@@ -1,14 +1,13 @@
-"""Tariffs for the mobile paywall. Same source as the cabinet/bot (the shared
-``common.models.tariff`` classes).
-
-TODO(parity): use ``engine.views.get_runtime_actual_tariffs`` for DB-overridden
-runtime prices instead of the static class defaults, once the import is decoupled
-from ``engine.views`` module-level side effects.
-"""
+"""Runtime tariffs for the mobile paywall and the website cabinet."""
 
 from common.models.tariff import OneMonthTariff, OneYearTariff, ThreeMonthsTariff
+from common.runtime_tariffs import resolve_runtime_tariffs
 
 MOBILE_TARIFFS = [OneMonthTariff(), ThreeMonthsTariff(), OneYearTariff()]
+
+
+def get_mobile_tariffs(db_session):
+    return resolve_runtime_tariffs(db_session, MOBILE_TARIFFS)
 
 
 def serialize_tariff(tariff):

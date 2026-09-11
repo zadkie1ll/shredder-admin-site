@@ -18,15 +18,19 @@ node_install_scripts), выполняет установку и шлёт про�
 """
 
 import hashlib
+import ipaddress
 import logging
 import secrets
 from datetime import datetime
 from datetime import timedelta
 
+from django.conf import settings
+
 from common.models.db import NodeInstallScript
 from common.models.db import NodeProvisionRequest
 from common.models.db import NodeProvisionStage
 from common.models.db import NodeProvisionStatus
+from engine.request_ip import is_trusted_proxy_address
 
 import proto.rwmanager_pb2 as rw_proto
 
@@ -315,14 +319,15 @@ def create_request(
     return provision_request, token
 
 
-def find_request_by_token(db_session, token):
+def find_request_by_token(db_session, token, *, for_update=False):
     if not token:
         raise ProvisionError("Нет токена", http_status=401)
-    provision_request = (
-        db_session.query(NodeProvisionRequest)
-        .filter(NodeProvisionRequest.token_hash == hash_token(token))
-        .first()
+    query = db_session.query(NodeProvisionRequest).filter(
+        NodeProvisionRequest.token_hash == hash_token(token)
     )
+    if for_update:
+        query = query.with_for_update()
+    provision_request = query.first()
     if provision_request is None:
         raise ProvisionError("Неизвестный токен", http_status=403)
     if provision_request.status not in TOKEN_ALIVE_STATUSES:
@@ -365,12 +370,95 @@ def set_stage(db_session, provision_request, stage, status, message=None):
     return row
 
 
+def node_matches_request(node, provision_request, client_ip):
+    """A CreateNode retry is safe only for the exact immutable request identity."""
+    return (
+        bool(getattr(node, "uuid", ""))
+        and getattr(node, "name", "") == provision_request.node_name
+        and getattr(node, "address", "") == client_ip
+        and getattr(node, "config_profile_uuid", "")
+        == (provision_request.config_profile_uuid or "")
+        and sorted(getattr(node, "active_inbound_uuids", []) or [])
+        == sorted(provision_request.inbound_uuids or [])
+    )
+
+
+def ensure_node_matches_request(node, provision_request, client_ip):
+    if node_matches_request(node, provision_request, client_ip):
+        return
+    logger.error(
+        "node bootstrap: CreateNode identity conflict request=%s returned_uuid=%s "
+        "returned_name=%s returned_address=%s",
+        provision_request.id,
+        getattr(node, "uuid", ""),
+        getattr(node, "name", ""),
+        getattr(node, "address", ""),
+    )
+    raise ProvisionError(
+        "В панели уже есть нода с совпадающим именем или адресом, но другими "
+        "параметрами. Существующая нода не изменена.",
+        http_status=409,
+    )
+
+
+def node_address_unusable(client_ip):
+    """Адрес не годится как публичный адрес ноды.
+
+    Пустой или не IP, приватный, loopback, link-local (а также unspecified,
+    multicast, reserved) либо входящий в TRUSTED_PROXY_NETWORKS — то есть
+    адрес edge/nginx/docker, а не сервера. Такой IP означает, что настоящий
+    адрес ноды за прокси определить не удалось.
+    """
+    try:
+        address = ipaddress.ip_address((client_ip or "").strip())
+    except ValueError:
+        return True
+    mapped = getattr(address, "ipv4_mapped", None)
+    if mapped is not None:
+        address = mapped
+    if (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_unspecified
+        or address.is_multicast
+        or address.is_reserved
+    ):
+        return True
+    return is_trusted_proxy_address(str(address)) or is_trusted_proxy_address(
+        client_ip
+    )
+
+
+def ensure_claim_ip_usable(provision_request, client_ip):
+    """Не создавать в Remnawave ноду с адресом прокси или приватной сети."""
+    if not node_address_unusable(client_ip):
+        return
+    logger.error(
+        "node bootstrap: claim rejected request=%s: client ip %r is empty, "
+        "non-public or a trusted proxy; check TRUSTED_PROXY_NETWORKS and "
+        "ORIGIN_ALLOWED_PROXY_CIDRS",
+        provision_request.id,
+        (client_ip or "")[:64],
+    )
+    raise ProvisionError(
+        "Не удалось определить публичный IP сервера: запрос пришёл с адреса "
+        "прокси или из приватной сети. Нода не создана. Проверьте "
+        "TRUSTED_PROXY_NETWORKS и ORIGIN_ALLOWED_PROXY_CIDRS на сайте.",
+        http_status=409,
+    )
+
+
 def claim_request(db_session, provision_request, client_ip, rwms_client):
     """Первый вызов с сервера: фиксация IP, выдача SECRET_KEY, создание ноды.
 
     Идемпотентен: повторный claim с того же IP заново собирает payload
     (CreateNode на стороне RWMS дубликатов не создаёт).
     """
+    # До любых изменений заявки и обращений к RWMS: адрес прокси в CreateNode
+    # дал бы в панели ноду, к которой Remnawave не подключится.
+    ensure_claim_ip_usable(provision_request, client_ip)
+
     if provision_request.status == NodeProvisionStatus.CREATED:
         if datetime.now() > provision_request.expires_at:
             raise ProvisionError("Токен истёк — создай новую заявку", http_status=410)
@@ -396,10 +484,14 @@ def claim_request(db_session, provision_request, client_ip, rwms_client):
             country_code=provision_request.country_code,
             config_profile_uuid=provision_request.config_profile_uuid,
             inbound_uuids=list(provision_request.inbound_uuids or []),
-        )
+        ),
+        # CreateNode на стороне RWMS — выгрузка нод панели и создание ноды
+        # двумя запросами, поэтому массовый дедлайн, а не точечный.
+        timeout=settings.RWMS_BULK_RPC_TIMEOUT_SECONDS,
     )
     if node is None or not node.uuid:
         raise ProvisionError("RWMS недоступен (create node)", http_status=502)
+    ensure_node_matches_request(node, provision_request, client_ip)
 
     provision_request.status = (
         NodeProvisionStatus.CLAIMED
@@ -488,7 +580,27 @@ def refresh_connect_status(db_session, provision_request, rwms_client):
     if nodes_response is None:
         return
     for node in nodes_response.nodes:
-        if node.uuid == provision_request.remnawave_node_uuid and node.is_connected:
+        if node.uuid != provision_request.remnawave_node_uuid:
+            continue
+        if not node_matches_request(node, provision_request, provision_request.claimed_ip):
+            provision_request.status = NodeProvisionStatus.FAILED
+            provision_request.error = (
+                "Нода в панели больше не соответствует параметрам заявки; READY не выставлен"
+            )
+            set_stage(
+                db_session,
+                provision_request,
+                "connect",
+                "failed",
+                provision_request.error,
+            )
+            logger.error(
+                "node bootstrap: refusing READY for identity mismatch request=%s node=%s",
+                provision_request.id,
+                node.uuid,
+            )
+            return
+        if node.is_connected:
             provision_request.status = NodeProvisionStatus.READY
             set_stage(db_session, provision_request, "connect", "ok")
             logger.info(

@@ -23,6 +23,7 @@ import ipaddress
 import logging
 import statistics
 import threading
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
@@ -57,6 +58,7 @@ _geo_analytics_lock = threading.Lock()
 # тик и при большой таблице занимал всех gunicorn-воркеров (сайт отвечал 504).
 _who_connects_cache: dict[tuple, dict] = {}
 _who_connects_lock = threading.Lock()
+_who_connects_compute_locks = [threading.Lock() for _ in range(32)]
 
 
 class InfraError(Exception):
@@ -861,14 +863,19 @@ def who_connects_payload(db_session, node_name: str, now: datetime) -> dict:
     if cached is not None:
         return cached
 
-    payload = _who_connects_payload_uncached(db_session, node_name, now)
-    with _who_connects_lock:
-        # Храним только свежий bucket каждой ноды (как в geo-кэше)
-        stale_keys = [key for key in _who_connects_cache if key[0] == node_name]
-        for stale_key in stale_keys:
-            _who_connects_cache.pop(stale_key, None)
-        _who_connects_cache[cache_key] = payload
-    return payload
+    # Equal requests share a computation; unrelated nodes use different stripes.
+    with _who_connects_compute_locks[hash(node_name) % len(_who_connects_compute_locks)]:
+        with _who_connects_lock:
+            cached = _who_connects_cache.get(cache_key)
+        if cached is not None:
+            return cached
+        payload = _who_connects_payload_uncached(db_session, node_name, now)
+        with _who_connects_lock:
+            stale_keys = [key for key in _who_connects_cache if key[0] == node_name]
+            for stale_key in stale_keys:
+                _who_connects_cache.pop(stale_key, None)
+            _who_connects_cache[cache_key] = payload
+        return payload
 
 
 def node_interface_ips(db_session) -> frozenset[str]:
@@ -2669,6 +2676,26 @@ def _upsert_agg(db_session, row_values: dict) -> None:
             setattr(existing, key, value)
 
 
+def _upsert_agg_batch(db_session, rows):
+    if not rows:
+        return
+    if db_session.get_bind().dialect.name != "postgresql":
+        for row in rows:
+            _upsert_agg(db_session, row)
+        db_session.flush()
+        return
+    keys = ("server_id", "bucket_seconds", "bucket_start")
+    # Stay well below PostgreSQL parameter limits, including large backfills.
+    for offset in range(0, len(rows), 500):
+        batch = rows[offset:offset+500]
+        statement = pg_insert(InfraTelemetryAgg).values(batch)
+        statement = statement.on_conflict_do_update(
+            index_elements=list(keys),
+            set_={key: getattr(statement.excluded, key) for key in batch[0] if key not in keys},
+        )
+        db_session.execute(statement)
+
+
 def aggregate_telemetry(db_session, now: datetime | None = None) -> int:
     """Сворачивает сырые сэмплы в минутные бакеты, минутные — в 15-минутные.
 
@@ -2718,7 +2745,7 @@ def _aggregate_minutes_for_server(db_session, server_id: int, now: datetime) -> 
     for sample in samples:
         buckets.setdefault(_floor_dt(sample.ts, 60), []).append(sample)
 
-    updated = 0
+    batch_rows = []
     for bucket_start, rows in buckets.items():
         rx_values = [r.rx_bps for r in rows if r.rx_bps is not None]
         tx_values = [r.tx_bps for r in rows if r.tx_bps is not None]
@@ -2731,8 +2758,7 @@ def _aggregate_minutes_for_server(db_session, server_id: int, now: datetime) -> 
         ]
         rx_avg = int(sum(rx_values) / len(rx_values)) if rx_values else None
         tx_avg = int(sum(tx_values) / len(tx_values)) if tx_values else None
-        _upsert_agg(
-            db_session,
+        batch_rows.append(
             {
                 "server_id": server_id,
                 "bucket_seconds": 60,
@@ -2759,8 +2785,8 @@ def _aggregate_minutes_for_server(db_session, server_id: int, now: datetime) -> 
                 "sample_count": len(rows),
             },
         )
-        updated += 1
-    return updated
+    _upsert_agg_batch(db_session, batch_rows)
+    return len(batch_rows)
 
 
 def _aggregate_quarters_for_server(db_session, server_id: int, now: datetime) -> int:
@@ -2793,7 +2819,7 @@ def _aggregate_quarters_for_server(db_session, server_id: int, now: datetime) ->
     for row in minute_rows:
         buckets.setdefault(_floor_dt(row.bucket_start, 900), []).append(row)
 
-    updated = 0
+    batch_rows = []
     for bucket_start, rows in buckets.items():
         def avg(values):
             values = [v for v in values if v is not None]
@@ -2806,8 +2832,7 @@ def _aggregate_quarters_for_server(db_session, server_id: int, now: datetime) ->
         load_values = [
             float(r.cpu_load_avg) for r in rows if r.cpu_load_avg is not None
         ]
-        _upsert_agg(
-            db_session,
+        batch_rows.append(
             {
                 "server_id": server_id,
                 "bucket_seconds": 900,
@@ -2829,8 +2854,8 @@ def _aggregate_quarters_for_server(db_session, server_id: int, now: datetime) ->
                 "sample_count": sum(r.sample_count or 0 for r in rows),
             },
         )
-        updated += 1
-    return updated
+    _upsert_agg_batch(db_session, batch_rows)
+    return len(batch_rows)
 
 
 def prune_telemetry(db_session, now: datetime | None = None) -> None:

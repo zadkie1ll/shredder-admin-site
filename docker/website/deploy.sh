@@ -21,10 +21,12 @@ usage() {
 Usage: $(basename "$0") [options]
 
 Build the amd64 website image locally, upload runtime files to ${SSH_HOST}:${REMOTE_DIR},
-then load the image and restart the website stack on the server.
+then load the image, verify the common (Alembic) schema with the new image
+(manage.py check_common_schema) and restart the website stack on the server.
+If the schema check fails, the deploy stops and running containers are left untouched.
 
 Options:
-  --dry-run     Show upload plan without changing the server
+  --dry-run     Show upload plan without changing the server (no schema check)
   --skip-build  Do not rebuild the local image tar before upload
   -h, --help    Show this help
 
@@ -158,7 +160,24 @@ chmod +x update-origin-allowlist.sh issue-certs.sh renew-certs.sh install-renew-
 ./issue-certs.sh
 ./install-renew-cron.sh
 docker load -i '${IMAGE_TAR_NAME}'
+# Запоминаем образ, на котором работает текущий стек: если проверка схемы не
+# пройдёт, тег вернётся на него и следующий compose up (например, из cron
+# renew-certs.sh) не выкатит непроверенный образ.
+PREVIOUS_IMAGE_ID=\$(docker image inspect --format '{{.Id}}' '${REMOTE_IMAGE_TAG}' 2>/dev/null || true)
 docker image tag '${LOCAL_IMAGE_TAG}' '${REMOTE_IMAGE_TAG}'
+# Схема common (Alembic) проверяется НОВЫМ образом до пересоздания контейнеров.
+# Команда только читает схему; --entrypoint python не запускает entrypoint.sh.
+echo "Checking common (Alembic) schema with the new image..."
+if ! docker compose -f docker-compose.yml run --rm --no-deps -T --entrypoint python app manage.py check_common_schema; then
+    echo "Alembic-миграция common не применена: деплой прерван, работающие контейнеры не тронуты." >&2
+    echo "Причина — в выводе check_common_schema выше (нет таблиц/колонок или нет доступа к БД)." >&2
+    if [ -n "\${PREVIOUS_IMAGE_ID}" ]; then
+        docker image tag "\${PREVIOUS_IMAGE_ID}" '${REMOTE_IMAGE_TAG}'
+        echo "Тег ${REMOTE_IMAGE_TAG} возвращён на предыдущий образ." >&2
+    fi
+    echo "Примените миграцию common и повторите деплой (можно с --skip-build)." >&2
+    exit 1
+fi
 docker compose -f docker-compose.yml up -d --no-build --force-recreate
 docker ps
 EOF

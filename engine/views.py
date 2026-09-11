@@ -9,6 +9,8 @@ import base64
 import json
 import resend
 import secrets
+import warnings
+from PIL import Image, UnidentifiedImageError
 import httpx
 import jinja2
 from time import monotonic
@@ -21,6 +23,7 @@ from datetime import timezone
 from urllib.parse import parse_qsl
 from urllib.parse import urlencode
 from urllib.parse import urlsplit
+from urllib.parse import quote
 from django.http import HttpResponse
 from django.http import JsonResponse
 from django.http import FileResponse
@@ -35,6 +38,7 @@ from django.contrib.auth import SESSION_KEY
 from django.contrib.auth import BACKEND_SESSION_KEY
 from django.contrib.auth import HASH_SESSION_KEY
 from django.contrib.auth.decorators import login_required
+from django.middleware.csrf import rotate_token
 from django.core.mail import send_mail
 from django.core import signing
 from django.core.signing import BadSignature
@@ -44,7 +48,9 @@ from django.templatetags.static import static
 from django.template.loader import render_to_string
 from django.utils.text import get_valid_filename
 from django.utils.html import strip_tags
+from django.utils.cache import parse_etags
 from sqlalchemy import func
+from sqlalchemy import and_
 from sqlalchemy import Integer
 from sqlalchemy import update
 from sqlalchemy import delete as sa_delete
@@ -60,6 +66,7 @@ from sqlalchemy import Text
 from sqlalchemy import TIMESTAMP
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import ProgrammingError
 from common.managed_traffic_limits import APPLIED_BY_BACKFILL
 from common.managed_traffic_limits import APPLIED_BY_SITE_ADMIN_PREFIX
 from common.managed_traffic_limits import APPLIED_BY_SITE_BULK
@@ -74,6 +81,7 @@ from common.managed_traffic_limits import releasable_on_payment
 from common.managed_traffic_limits import resolve_managed_limit
 from common.managed_traffic_limits import upsert_managed_limit
 from common.models.db import User
+from engine.email_change import issue_email_change, consume_email_change, sync_email_change, email_change_already_applied, has_fresh_unused_email_change
 from common.models.db import TemporarySquadBan
 from common.models.db import EventLog
 from common.models.db import ReferralBonus
@@ -86,7 +94,9 @@ from common.models.db import WataInvoice
 from common.models.db import WataTransaction
 from common.models.db import MagicToken
 from common.models.db import TelegramLoginToken
-from common.models.db import PurchaseLoginToken
+from common.models.db import PurchaseLoginToken, WebsitePaymentAttempt
+from engine.report_cache import report_response
+from engine.checkout_attempts import fingerprint_for, find_reusable_attempt, persist_before_send, finish_attempt, mark_attempt_failed
 from common.models.db import ClientUaRule
 from common.models.db import CustomConfigTemplate
 from common.models.db import SupportTicket
@@ -171,6 +181,12 @@ from common.models.settings import IPGUARD_WINDOW_HOURS_SETTING
 from common.models.settings import IPGUARD_WARNINGS_ENABLED_SETTING
 from common.models.settings import IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING
 from common.models.settings import ipguard_warning_threshold_is_valid
+from common.runtime_tariffs import resolve_runtime_tariffs
+from engine.request_ip import client_ip
+from engine.rate_limit import rate_limit_exceeded
+from engine.rate_limit import rate_limit_hit
+from engine.rate_limit import rate_limit_log_digest
+from engine.rate_limit import rate_limit_peek
 from common.models.settings import TRIAL_TRAFFIC_LIMIT_ENABLED_SETTING
 from common.models.settings import TRIAL_TRAFFIC_LIMIT_GB_SETTING
 from common.models.settings import TRIAL_TRAFFIC_LIMIT_STRATEGY_DAY
@@ -228,6 +244,7 @@ from database import session_factory
 from engine.payments import create_yk_payment_sync
 from engine.payments import create_wata_payment_sync
 from engine.payments import fetch_wata_transaction_status
+from engine.payments import ProviderRejected
 import proto.rwmanager_pb2 as proto
 
 ACTUAL_TARIFFS: list[Tariff] = [
@@ -249,16 +266,47 @@ YANDEX_OAUTH_AUTH_URL = "https://oauth.yandex.com/authorize"
 YANDEX_OAUTH_TOKEN_URL = "https://oauth.yandex.com/token"
 YANDEX_OAUTH_USERINFO_URL = "https://login.yandex.ru/info"
 
-rwms_client = RwmsClientSync(settings.RWMS_HOST, settings.RWMS_PORT)
+# Дедлайн по умолчанию для каждого RPC сайта; массовые вызовы (GetAllUsers,
+# CreateNode) передают RWMS_BULK_RPC_TIMEOUT_SECONDS явно.
+rwms_client = RwmsClientSync(
+    settings.RWMS_HOST,
+    settings.RWMS_PORT,
+    timeout=settings.RWMS_RPC_TIMEOUT_SECONDS,
+)
 SUPPORT_ADMIN_SESSION_KEY = "support_admin_authenticated"
 SUPPORT_ADMIN_ROLE_SESSION_KEY = "support_admin_role"
 SUPPORT_ADMIN_ROLE_ADMIN = "admin"
 SUPPORT_ADMIN_ROLE_SUPPORT = "support"
 SUPPORT_ADMIN_ROLE_MARKETER = "marketer"
 SUPPORT_ADMIN_ACCOUNT_SESSION_KEY = "support_admin_account"
-SUPPORT_ATTACHMENT_ALLOWED_PREFIXES = ("image/", "video/")
+SUPPORT_ADMIN_AUTH_HASH_SESSION_KEY = "support_admin_auth_hash"
+SUPPORT_ATTACHMENT_IMAGE_TYPES = {
+    "image/gif",
+    "image/jpeg",
+    "image/png",
+    "image/webp",
+}
+SUPPORT_ATTACHMENT_VIDEO_TYPES = {
+    "video/mp4",
+    "video/quicktime",
+    "video/webm",
+}
+SUPPORT_ATTACHMENT_ALLOWED_TYPES = (
+    SUPPORT_ATTACHMENT_IMAGE_TYPES | SUPPORT_ATTACHMENT_VIDEO_TYPES
+)
 EMAIL_CONFIRMATION_SALT = "dashboard-email-confirmation"
 EMAIL_CONFIRMATION_MAX_AGE_SECONDS = 15 * 60
+SITE_REGISTRATION_CONFIRMATION_SALT = "site-registration-confirmation"
+SITE_REGISTRATION_CONFIRMATION_MAX_AGE_SECONDS = 15 * 60
+TELEGRAM_BIND_TOKEN_MAX_AGE_SECONDS = 15 * 60
+# Ссылку из сессии показываем повторно только первые 5 минут: TTL у бота —
+# 15 минут (TELEGRAM_BIND_TOKEN_TTL_MINUTES), поэтому любая показанная в
+# кабинете ссылка проживёт в боте ещё не меньше 10 минут.
+TELEGRAM_BIND_TOKEN_REUSE_SECONDS = 5 * 60
+TELEGRAM_BIND_SESSION_TOKEN_KEY = "telegram_bind_token"
+TELEGRAM_BIND_SESSION_CREATED_KEY = "telegram_bind_token_created_at"
+PURCHASE_LOGIN_TOKEN_PREFIX = "plogin_"
+PURCHASE_STATUS_TOKEN_PREFIX = "pstatus_"
 
 
 def normalize_host(host):
@@ -566,7 +614,7 @@ def attach_support_attachments(db_session, support_message, uploaded_files):
 
     for uploaded_file in uploaded_files:
         content_type = uploaded_file.content_type or "application/octet-stream"
-        if not content_type.startswith(SUPPORT_ATTACHMENT_ALLOWED_PREFIXES):
+        if content_type not in SUPPORT_ATTACHMENT_ALLOWED_TYPES:
             logging.warning(
                 "unsupported support attachment content type %s", content_type
             )
@@ -574,6 +622,14 @@ def attach_support_attachments(db_session, support_message, uploaded_files):
 
         if uploaded_file.size > settings.SUPPORT_ATTACHMENT_MAX_BYTES:
             logging.warning("support attachment %s is too large", uploaded_file.name)
+            continue
+
+        if not support_attachment_signature_matches(uploaded_file, content_type):
+            logging.warning(
+                "support attachment signature does not match content type: name=%s type=%s",
+                uploaded_file.name,
+                content_type,
+            )
             continue
 
         safe_name = get_valid_filename(uploaded_file.name) or "attachment"
@@ -596,6 +652,95 @@ def attach_support_attachments(db_session, support_message, uploaded_files):
         saved_attachments.append(attachment)
 
     return saved_attachments
+
+
+def validate_support_attachments(uploaded_files):
+    """Return a user-facing validation error before opening a DB transaction."""
+    files = list(uploaded_files or [])
+    max_files = max(0, settings.SUPPORT_ATTACHMENT_MAX_FILES)
+    if len(files) > max_files:
+        return f"Можно прикрепить не больше {max_files} файлов."
+
+    total_size = sum(max(0, int(getattr(item, "size", 0) or 0)) for item in files)
+    if total_size > settings.SUPPORT_ATTACHMENT_TOTAL_MAX_BYTES:
+        total_limit_mb = settings.SUPPORT_ATTACHMENT_TOTAL_MAX_BYTES // (1024 * 1024)
+        return f"Общий размер вложений превышает {total_limit_mb} МБ."
+
+    for uploaded_file in files:
+        content_type = uploaded_file.content_type or "application/octet-stream"
+        if content_type not in SUPPORT_ATTACHMENT_ALLOWED_TYPES:
+            return f"Формат файла «{uploaded_file.name}» не поддерживается."
+        if uploaded_file.size > settings.SUPPORT_ATTACHMENT_MAX_BYTES:
+            file_limit_mb = settings.SUPPORT_ATTACHMENT_MAX_BYTES // (1024 * 1024)
+            return f"Файл «{uploaded_file.name}» превышает {file_limit_mb} МБ."
+        if not support_attachment_signature_matches(uploaded_file, content_type):
+            return f"Содержимое файла «{uploaded_file.name}» не соответствует формату."
+    return None
+
+
+def support_attachment_validation_response(request, message):
+    if is_ajax(request):
+        return JsonResponse({"status": "error", "message": message}, status=400)
+    return HttpResponse(message, status=400, content_type="text/plain; charset=utf-8")
+
+
+def support_attachment_signature_matches(uploaded_file, content_type):
+    """Verify the small set of media signatures accepted by support uploads."""
+    try:
+        position = uploaded_file.tell()
+    except (AttributeError, OSError):
+        position = 0
+    try:
+        header = uploaded_file.read(16)
+        uploaded_file.seek(position)
+    except (AttributeError, OSError):
+        return False
+
+    if content_type.startswith("image/"):
+        expected = {"image/png": "PNG", "image/jpeg": "JPEG", "image/gif": "GIF", "image/webp": "WEBP"}.get(content_type)
+        if not expected:
+            return False
+        try:
+            uploaded_file.seek(0)
+            with warnings.catch_warnings():
+                warnings.simplefilter("error", Image.DecompressionBombWarning)
+                with Image.open(uploaded_file) as picture:
+                    width, height = picture.size
+                    if picture.format != expected or width <= 0 or height <= 0 or width * height > 20_000_000:
+                        return False
+                    picture.verify()
+                # verify() alone is a no-op for some decoders (including JPEG).
+                uploaded_file.seek(0)
+                with Image.open(uploaded_file) as picture:
+                    frames = getattr(picture, "n_frames", 1)
+                    if frames > 200 or width * height * frames > 80_000_000:
+                        return False
+                    for index in range(frames):
+                        picture.seek(index)
+                        if picture.width * picture.height > 20_000_000:
+                            return False
+                        picture.load()
+            return True
+        except (OSError, ValueError, SyntaxError, UnidentifiedImageError, Image.DecompressionBombError, Image.DecompressionBombWarning):
+            return False
+        except Exception as error:
+            # Повреждённый файл роняет декодеры Pillow и другими исключениями
+            # (у GIF — IndexError/struct.error из n_frames/seek). Это битый
+            # файл, а не сбой сервера: отклоняем с понятной ошибкой 400.
+            logging.warning(
+                "support attachment rejected: image decoder failed "
+                "content_type=%s error=%s",
+                content_type,
+                type(error).__name__,
+            )
+            return False
+        finally:
+            uploaded_file.seek(position)
+    if content_type in {"video/mp4", "video/quicktime"}:
+        return len(header) >= 12 and header[4:8] == b"ftyp"
+    if content_type == "video/webm":
+        return header.startswith(b"\x1aE\xdf\xa3")
+    return False
 
 
 def load_support_messages_with_attachments(db_session, ticket_id):
@@ -629,11 +774,42 @@ def load_support_messages_with_attachments(db_session, ticket_id):
 
 
 def is_image_attachment(attachment):
-    return attachment.content_type.startswith("image/")
+    return attachment.content_type in SUPPORT_ATTACHMENT_IMAGE_TYPES
 
 
 def is_video_attachment(attachment):
-    return attachment.content_type.startswith("video/")
+    return attachment.content_type in SUPPORT_ATTACHMENT_VIDEO_TYPES
+
+
+def support_attachment_file_response(attachment, path):
+    """Serve known media inline and force legacy/unknown files to download."""
+    is_safe_inline = attachment.content_type in SUPPORT_ATTACHMENT_ALLOWED_TYPES
+    if is_safe_inline and settings.SUPPORT_ATTACHMENT_X_ACCEL_REDIRECT:
+        response = HttpResponse(content_type=attachment.content_type)
+        # Путь кодируется: не-ASCII заголовок Django MIME-кодирует
+        # (=?utf-8?b?…?=), а latin-1 уходит сырыми байтами — nginx в обоих
+        # случаях отдаёт 404. %XX nginx раскодирует сам; get_valid_filename
+        # вырезает '%', '?' и '/', так что двойного раскодирования нет.
+        response["X-Accel-Redirect"] = "/_protected_support_media/" + quote(
+            attachment.storage_path.lstrip("/"), safe="/"
+        )
+        response["Content-Disposition"] = "inline"
+        response["X-Content-Type-Options"] = "nosniff"
+        response["Cross-Origin-Resource-Policy"] = "same-origin"
+        return response
+    response = FileResponse(
+        path.open("rb"),
+        as_attachment=not is_safe_inline,
+        content_type=(
+            attachment.content_type if is_safe_inline else "application/octet-stream"
+        ),
+        filename=attachment.file_name,
+    )
+    response["X-Content-Type-Options"] = "nosniff"
+    response["Cross-Origin-Resource-Policy"] = "same-origin"
+    if not is_safe_inline:
+        response["Content-Security-Policy"] = "default-src 'none'; sandbox"
+    return response
 
 
 def support_attachment_payload(attachment, admin=False):
@@ -870,7 +1046,7 @@ def support_admin_role(request):
         return None
     return request.session.get(
         SUPPORT_ADMIN_ROLE_SESSION_KEY,
-        SUPPORT_ADMIN_ROLE_ADMIN,
+        SUPPORT_ADMIN_ROLE_SUPPORT,
     )
 
 
@@ -899,21 +1075,126 @@ def require_support_admin_any(request, roles):
 
 
 ANALYTICS_ROLES = {SUPPORT_ADMIN_ROLE_ADMIN, SUPPORT_ADMIN_ROLE_MARKETER}
+SUPPORT_ADMIN_ACCOUNT_ROLE_MAP = {
+    "full": SUPPORT_ADMIN_ROLE_ADMIN,
+    "marketer": SUPPORT_ADMIN_ROLE_MARKETER,
+    "support": SUPPORT_ADMIN_ROLE_SUPPORT,
+}
+
+
+def support_admin_auth_fingerprint(identity, credential):
+    return hmac.new(
+        settings.SECRET_KEY.encode(),
+        f"{identity}:{credential}".encode(),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def clear_support_admin_session(request):
+    for key in (
+        SUPPORT_ADMIN_SESSION_KEY,
+        SUPPORT_ADMIN_ROLE_SESSION_KEY,
+        SUPPORT_ADMIN_ACCOUNT_SESSION_KEY,
+        SUPPORT_ADMIN_AUTH_HASH_SESSION_KEY,
+    ):
+        request.session.pop(key, None)
+    request.session.modified = True
+
+
+class SupportAdminSessionCheckUnavailable(Exception):
+    """Сессию админки не удалось проверить (БД недоступна) — это не отзыв прав."""
+
+
+def support_admin_unavailable_response(request):
+    message = "База данных временно недоступна. Обновите страницу через минуту."
+    path = getattr(request, "path", "") or ""
+    headers = getattr(request, "headers", None) or {}
+    wants_json = (
+        "/api/" in path
+        or path.endswith("-json/")
+        or headers.get("X-Requested-With") == "XMLHttpRequest"
+        or "application/json" in (headers.get("Accept") or "")
+    )
+    if wants_json:
+        response = JsonResponse({"status": "error", "message": message}, status=503)
+    else:
+        response = HttpResponse(
+            message, status=503, content_type="text/plain; charset=utf-8"
+        )
+    response["Retry-After"] = "30"
+    return response
+
+
+def validate_support_admin_session(request):
+    """Refresh role/active state and revoke sessions after credential changes.
+
+    Raises SupportAdminSessionCheckUnavailable when the account cannot be read.
+    """
+    account_login = request.session.get(SUPPORT_ADMIN_ACCOUNT_SESSION_KEY)
+    stored_fingerprint = request.session.get(SUPPORT_ADMIN_AUTH_HASH_SESSION_KEY, "")
+    if account_login:
+        db_session = session_factory()
+        try:
+            account = (
+                db_session.query(AdminAccount)
+                .filter(AdminAccount.login == account_login)
+                .first()
+            )
+        except Exception:
+            logging.exception("failed to validate admin session for %s", account_login)
+            raise SupportAdminSessionCheckUnavailable()
+        finally:
+            db_session.close()
+
+        if not account or not account.is_active:
+            return False
+        expected = support_admin_auth_fingerprint(
+            f"account:{account.login}", account.password_hash
+        )
+        if not stored_fingerprint or not hmac.compare_digest(
+            stored_fingerprint, expected
+        ):
+            return False
+        request.session[SUPPORT_ADMIN_ROLE_SESSION_KEY] = (
+            SUPPORT_ADMIN_ACCOUNT_ROLE_MAP.get(
+                account.role, SUPPORT_ADMIN_ROLE_SUPPORT
+            )
+        )
+        return True
+
+    role = support_admin_role(request)
+    credential = {
+        SUPPORT_ADMIN_ROLE_ADMIN: settings.SUPPORT_ADMIN_PASSWORD,
+        SUPPORT_ADMIN_ROLE_SUPPORT: settings.SUPPORT_STAFF_PASSWORD,
+    }.get(role, "")
+    if not credential:
+        return False
+    expected = support_admin_auth_fingerprint(f"shared:{role}", credential)
+    return bool(stored_fingerprint) and hmac.compare_digest(
+        stored_fingerprint, expected
+    )
 
 
 def require_support_admin(request):
-    if not settings.SUPPORT_ADMIN_PASSWORD and not settings.SUPPORT_STAFF_PASSWORD:
-        logging.warning("support admin requested but no support password is configured")
-        return render(
-            request,
-            "support_admin_login.html",
-            {
-                "error": "Админка поддержки не настроена: задайте SUPPORT_ADMIN_PASSWORD или SUPPORT_STAFF_PASSWORD.",
-            },
-            status=503,
-        )
-
     if not support_admin_is_authenticated(request):
+        return redirect("support_admin_login")
+
+    try:
+        session_is_valid = validate_support_admin_session(request)
+    except SupportAdminSessionCheckUnavailable:
+        # Сбой БД — не отзыв прав: сессию не очищаем, иначе короткий блип
+        # Postgres или исчерпание пула разлогинивает всех операторов разом.
+        # Очищаем только при подтверждённом отсутствии/деактивации аккаунта
+        # или несовпадении fingerprint (validate вернул False).
+        return support_admin_unavailable_response(request)
+
+    if not session_is_valid:
+        logging.warning(
+            "support admin session revoked: account=%s role=%s",
+            request.session.get(SUPPORT_ADMIN_ACCOUNT_SESSION_KEY),
+            request.session.get(SUPPORT_ADMIN_ROLE_SESSION_KEY),
+        )
+        clear_support_admin_session(request)
         return redirect("support_admin_login")
 
     return None
@@ -1012,7 +1293,9 @@ def apple_recommended_app_from_db(db_session):
     return APPLE_RECOMMENDED_APP_HAPP
 
 
-def build_apple_subscription_link(db_session, subscription_url):
+def build_apple_subscription_link(
+    db_session, subscription_url, recommended_app=None
+):
     """(приложение, ссылка добавления подписки) для iOS/macOS в кабинете.
 
     Как в боте: INCY получает шифрованную incy://crypt1/-ссылку на базовый
@@ -1020,7 +1303,11 @@ def build_apple_subscription_link(db_session, subscription_url):
     /custom-json). Если энкодер недоступен (нет node в образе и т.п.) — молча
     откатываемся на Happ, кабинет ломать нельзя.
     """
-    recommended = apple_recommended_app_from_db(db_session)
+    recommended = (
+        recommended_app
+        if recommended_app is not None
+        else apple_recommended_app_from_db(db_session)
+    )
     happ_link = encrypt_happ_url1(subscription_url)
     if recommended != APPLE_RECOMMENDED_APP_INCY:
         return APPLE_RECOMMENDED_APP_HAPP, happ_link
@@ -1104,11 +1391,36 @@ def rwms_expire_at(rw_user):
     return expire_at.ToDatetime().replace(tzinfo=None)
 
 
-def find_rwms_user_by_identity(email=None, telegram_id=None):
+def find_rwms_user_by_identity(email=None, telegram_id=None, username=None):
     normalized_email = (email or "").lower().strip()
-    users_reply = rwms_client.get_all_users()
-    if users_reply is None:
+    if username:
+        # Current site identities have a deterministic panel username. One
+        # indexed lookup replaces the former full subscription-list download.
+        rw_user = rwms_client.get_user_by_username_strict(username)
+        if rw_user is not None:
+            return rw_user
+
+    if not settings.SITE_LEGACY_RWMS_IDENTITY_SCAN_ENABLED:
         return None
+
+    logging.warning(
+        "legacy RWMS identity scan enabled for email_present=%s telegram_present=%s",
+        bool(normalized_email),
+        telegram_id is not None,
+    )
+    users_reply = rwms_client.get_all_users(
+        timeout=settings.RWMS_BULK_RPC_TIMEOUT_SECONDS
+    )
+    if users_reply is None:
+        # None — панель не ответила (RpcError, дедлайн), а не «подписки нет».
+        # Считать это отсутствием нельзя: пользователь получил бы второй
+        # аккаунт, а после оплаты — вторую подписку в Remnawave на тот же
+        # email. Регистрацию откладываем, повтор пройдёт тот же путь.
+        logging.error(
+            "legacy RWMS identity scan got no reply from GetAllUsers; "
+            "site registration postponed as ambiguous"
+        )
+        raise SiteRegistrationUnavailable("legacy RWMS identity scan unavailable")
 
     for rw_user in users_reply.users:
         rw_email = (get_proto_optional(rw_user, "email", "") or "").lower().strip()
@@ -1364,7 +1676,14 @@ def create_site_user(
     request,
     telegram_id=None,
     creation_channel="site",
+    allow_trial=True,
 ):
+    # allow_trial=False: вызывающий код ещё не проверил владение email
+    # (анонимная покупка с лендинга, B12) — пробная подписка в панели не
+    # создаётся даже при включённом site trial; дальше тот же путь, что при
+    # выключенном trial (strict-поиск существующей подписки или локальный
+    # аккаунт без подписки).
+    #
     # Лок берём ПЕРВЫМ делом — до чтения контекста и до любых обращений к
     # панели: две параллельные регистрации на один email иначе обе дойдут до
     # AddUser, и подписка проигравшего останется сиротой.
@@ -1410,26 +1729,54 @@ def create_site_user(
     referrer = context["referrer"]
     username = site_registration_username(email, telegram_id)
     user_label = email or f"telegram_id={telegram_id}"
-    create_trial_subscription = should_create_trial_for_channel(
+    create_trial_subscription = allow_trial and should_create_trial_for_channel(
         db_session,
         creation_channel,
     )
 
     if not create_trial_subscription:
         logging.info(
-            "site trial subscription disabled for channel=%s, "
+            "site trial subscription disabled for channel=%s (allow_trial=%s), "
             "creating local account without RWMS subscription",
             creation_channel,
+            allow_trial,
         )
         try:
-            rw_user = find_rwms_user_by_identity(email=email, telegram_id=telegram_id)
+            rw_user = find_rwms_user_by_identity(
+                email=email,
+                telegram_id=telegram_id,
+                username=username,
+            )
+        except RwmsUnavailableError:
+            # FINAL-PAY-01. Регистрация с входом (magic link, OAuth, Telegram)
+            # и включённый legacy-скан — fail-closed, как раньше. Анонимная
+            # покупка (allow_trial=False) в панель не пишет вовсе: задача
+            # payment сходится по детерминированному username (найдёт подписку
+            # и продлит или создаст), поэтому, как в HEAD, аккаунт без подписки
+            # создаётся, а недоступность панели не блокирует оплату.
+            if allow_trial or settings.SITE_LEGACY_RWMS_IDENTITY_SCAN_ENABLED:
+                logging.exception(
+                    "failed to recover existing RWMS subscription for site user %s; "
+                    "registration stopped to avoid a duplicate local identity",
+                    user_label,
+                )
+                raise SiteRegistrationUnavailable from None
+            logging.error(
+                "ALERT: RWMS unavailable during anonymous purchase for %s: "
+                "local account %s created without panel lookup, payment will "
+                "converge the subscription by this username",
+                user_label,
+                username,
+                exc_info=True,
+            )
+            rw_user = None
         except Exception:
             logging.exception(
                 "failed to recover existing RWMS subscription for site user %s; "
-                "continuing with local account",
+                "registration stopped to avoid a duplicate local identity",
                 user_label,
             )
-            rw_user = None
+            raise SiteRegistrationUnavailable from None
 
         if rw_user is not None:
             return sync_local_user_from_rwms(
@@ -1520,31 +1867,23 @@ def create_site_user(
 
     if rw_user is None:
         logging.warning(
-            "creating RWMS subscription for site user %s failed, "
-            "trying to recover existing RWMS subscription",
+            "RWMS AddUser returned an unknown result for site user %s; "
+            "checking the deterministic username before deciding",
             user_label,
         )
-        try:
-            rw_user = find_rwms_user_by_identity(email=email, telegram_id=telegram_id)
-        except Exception:
-            logging.exception(
-                "failed to recover existing RWMS subscription for site user %s",
-                user_label,
-            )
-            rw_user = None
+        if email:
+            rw_user = resolve_existing_site_subscription(username, email)
+        else:
+            rw_user = resolve_existing_telegram_subscription(username, telegram_id)
 
         if rw_user is None:
             logging.warning(
-                "creating local account for site user %s after RWMS trial creation failed",
+                "RWMS subscription was not confirmed after AddUser for %s; "
+                "aborting the trial registration so it can be retried safely",
                 user_label,
             )
-            return create_local_site_user_without_rwms(
-                db_session,
-                email,
-                telegram_id,
-                username,
-                context,
-                creation_channel,
+            raise SiteRegistrationUnavailable(
+                f"rwms trial creation was not confirmed for {username}"
             )
         return sync_local_user_from_rwms(
             db_session,
@@ -1692,12 +2031,31 @@ def render_collect_email(request, user, error=None, email="", info=None):
 def authorize_user_session(request, user):
     # Вручную авторизуем пользователя в сессии Django
     # (Это то, что делает login(), но без проверки _meta)
+    # Rotate the session before elevating it to an authenticated one. Without
+    # this, an attacker who fixed an anonymous session key could keep using the
+    # same key after the victim opened a magic/login link.
+    current_principal = request.session.get(SESSION_KEY)
+    if current_principal and str(current_principal) != str(user.id):
+        preserved_tracking = {
+            f"tracking_{key}": request.session.get(f"tracking_{key}")
+            for key in TRACKING_PARAM_KEYS
+            if request.session.get(f"tracking_{key}") is not None
+        }
+        flush = getattr(request.session, "flush", None)
+        if callable(flush):
+            flush()
+            request.session.update(preserved_tracking)
+    else:
+        cycle_key = getattr(request.session, "cycle_key", None)
+        if callable(cycle_key):
+            cycle_key()
     request.session[SESSION_KEY] = str(user.id)
     request.session[BACKEND_SESSION_KEY] = "engine.auth_backend.SQLAlchemyBackend"
 
     # Хэш пароля нам не нужен, так как вход по ссылке,
     # но если Django будет его требовать, можно поставить заглушку:
     request.session[HASH_SESSION_KEY] = ""
+    rotate_token(request)
 
     # Важно: после ручного обновления сессии ее нужно сохранить
     request.session.modified = True
@@ -1708,17 +2066,126 @@ def hash_telegram_login_token(token):
     return hashlib.sha256(payload).hexdigest()
 
 
+def hash_telegram_bind_token(token):
+    # Отдельное пространство хэшей для одноразовых bind-токенов. Они лежат в
+    # той же таблице telegram_login_tokens, а вход /login/telegram/<token>/
+    # проверяет только hash и revoked_at: с префиксом telegram-login
+    # непогашенный bind-токен после появления у аккаунта telegram_id стал бы
+    # бессрочной ссылкой входа. Контракт с ботом: тот же префикс и SECRET_KEY
+    # (monkey-island-vpn-bot handlers/menu.py::hash_telegram_bind_token).
+    payload = f"telegram-bind:{token}:{settings.SECRET_KEY}".encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
+def get_or_create_telegram_bind_link(request, db_session, user, bot_username):
+    """Return a strong, expiring, single-use account-bind link.
+
+    The session link is reused only within TELEGRAM_BIND_TOKEN_REUSE_SECONDS,
+    so a shown link keeps at least 10 minutes of the bot's 15-minute TTL.
+    """
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    raw_token = request.session.get(TELEGRAM_BIND_SESSION_TOKEN_KEY)
+    created_timestamp = request.session.get(TELEGRAM_BIND_SESSION_CREATED_KEY)
+    try:
+        created_at = datetime.fromtimestamp(
+            float(created_timestamp), timezone.utc
+        ).replace(tzinfo=None)
+    except (TypeError, ValueError, OverflowError):
+        created_at = None
+
+    # Rotate links produced by the previous overlong format, even before TTL.
+    payload_fits = len(f"bind_{user.id}_{raw_token or ''}") <= 64
+    if raw_token and created_at and payload_fits:
+        fresh_after = now - timedelta(seconds=TELEGRAM_BIND_TOKEN_REUSE_SECONDS)
+        token_row = (
+            db_session.query(TelegramLoginToken.id)
+            .filter(
+                TelegramLoginToken.user_id == user.id,
+                TelegramLoginToken.token_hash == hash_telegram_bind_token(raw_token),
+                TelegramLoginToken.created_at >= fresh_after,
+                TelegramLoginToken.last_used_at.is_(None),
+                TelegramLoginToken.revoked_at.is_(None),
+            )
+            .first()
+        )
+        if token_row is not None:
+            return f"https://t.me/{bot_username}?start=bind_{user.id}_{raw_token}"
+
+    # 152 random bits; with a signed BIGINT user id the payload is at most
+    # 64 characters. Hex preserves compatibility with the bot's delimiters.
+    raw_token = secrets.token_hex(19)
+    db_session.add(
+        TelegramLoginToken(
+            user_id=user.id,
+            token_hash=hash_telegram_bind_token(raw_token),
+        )
+    )
+    request.session[TELEGRAM_BIND_SESSION_TOKEN_KEY] = raw_token
+    request.session[TELEGRAM_BIND_SESSION_CREATED_KEY] = now.timestamp()
+    request.session.modified = True
+    return f"https://t.me/{bot_username}?start=bind_{user.id}_{raw_token}"
+
+
+def issue_dashboard_telegram_bind_link(request, user, bot_username):
+    """Bind-ссылка для кабинета в отдельной короткой транзакции.
+
+    Кабинет обязан рендериться и без неё: сбой записи (read-only при
+    failover, lock/statement timeout) означает отсутствие баннера привязки,
+    а не 500 на странице с подпиской и оплатой.
+    """
+    db_session = session_factory()
+    try:
+        link = get_or_create_telegram_bind_link(
+            request, db_session, user, bot_username
+        )
+        db_session.commit()
+        return link
+    except Exception:
+        try:
+            db_session.rollback()
+        except Exception:
+            pass
+        # Токен без закоммиченной строки в сессии не держим.
+        request.session.pop(TELEGRAM_BIND_SESSION_TOKEN_KEY, None)
+        request.session.pop(TELEGRAM_BIND_SESSION_CREATED_KEY, None)
+        request.session.modified = True
+        logging.exception(
+            "dashboard: telegram bind link was not issued user_id=%s",
+            getattr(user, "id", None),
+        )
+        return None
+    finally:
+        db_session.close()
+
+
 def hash_purchase_login_token(token):
     payload = f"purchase-login:{token}:{settings.SECRET_KEY}".encode()
     return hashlib.sha256(payload).hexdigest()
 
 
+def hash_purchase_status_token(token):
+    payload = f"purchase-status:{token}:{settings.SECRET_KEY}".encode()
+    return hashlib.sha256(payload).hexdigest()
+
+
 def create_purchase_login_token(db_session, user):
-    raw_token = secrets.token_urlsafe(48)
+    raw_token = f"{PURCHASE_LOGIN_TOKEN_PREFIX}{secrets.token_urlsafe(48)}"
     db_session.add(
         PurchaseLoginToken(
             user_id=user.id,
             token_hash=hash_purchase_login_token(raw_token),
+        )
+    )
+    return raw_token
+
+
+def create_purchase_status_token(db_session, user):
+    """Create a browser-visible token that can only inspect this payment."""
+    raw_token = f"{PURCHASE_STATUS_TOKEN_PREFIX}{secrets.token_urlsafe(48)}"
+    db_session.add(
+        PurchaseLoginToken(
+            user_id=user.id,
+            token_hash=hash_purchase_status_token(raw_token),
         )
     )
     return raw_token
@@ -1937,6 +2404,9 @@ def send_magic_link_email(email, link, *, subject=None, template_context=None):
 
     if settings.EMAIL_PROVIDER.lower() == "resend":
         resend.api_key = settings.RESEND_API_KEY
+        resend.default_http_client = resend.RequestsClient(
+            timeout=settings.EMAIL_TIMEOUT
+        )
         resend.Emails.send(
             {
                 "from": settings.RESEND_FROM_EMAIL,
@@ -1973,6 +2443,9 @@ def send_login_code_email(email, code, *, ttl_minutes=10):
 
     if settings.EMAIL_PROVIDER.lower() == "resend":
         resend.api_key = settings.RESEND_API_KEY
+        resend.default_http_client = resend.RequestsClient(
+            timeout=settings.EMAIL_TIMEOUT
+        )
         resend.Emails.send(
             {
                 "from": settings.RESEND_FROM_EMAIL,
@@ -1993,11 +2466,13 @@ def send_login_code_email(email, code, *, ttl_minutes=10):
         )
 
 
-def build_email_confirmation_token(user_id, email):
+def build_email_confirmation_token(user_id, email, previous_email, nonce=None):
     return signing.dumps(
         {
             "user_id": user_id,
             "email": email,
+            "previous_email": previous_email or "",
+            "nonce": nonce,
         },
         salt=EMAIL_CONFIRMATION_SALT,
     )
@@ -2008,6 +2483,26 @@ def load_email_confirmation_token(token):
         token,
         salt=EMAIL_CONFIRMATION_SALT,
         max_age=EMAIL_CONFIRMATION_MAX_AGE_SECONDS,
+    )
+
+
+def build_site_registration_token(email, tracking_params):
+    safe_tracking = {
+        key: str(value)[:512]
+        for key, value in (tracking_params or {}).items()
+        if key in TRACKING_PARAM_KEYS and value not in (None, "")
+    }
+    return signing.dumps(
+        {"email": email, "tracking": safe_tracking},
+        salt=SITE_REGISTRATION_CONFIRMATION_SALT,
+    )
+
+
+def load_site_registration_token(token):
+    return signing.loads(
+        token,
+        salt=SITE_REGISTRATION_CONFIRMATION_SALT,
+        max_age=SITE_REGISTRATION_CONFIRMATION_MAX_AGE_SECONDS,
     )
 
 
@@ -2026,137 +2521,159 @@ def send_email_confirmation_email(email, link):
     )
 
 
-def send_magic_link(request):
-    if request.method == "POST":
-        capture_tracking_params(request)
-        email_raw = request.POST.get("email", "")
-        email = email_raw.lower().strip()
-        auth_base_url = get_current_base_url(request)
-        entry_host = normalize_host(request.get_host())
+def magic_link_rate_limited_response(retry_after):
+    response = JsonResponse(
+        {
+            "status": "error",
+            "message": "Слишком много попыток. Подождите и попробуйте снова.",
+        },
+        status=429,
+    )
+    response["Retry-After"] = str(retry_after)
+    return response
 
-        if not email:
+
+def send_magic_link(request):
+    if request.method != "POST":
+        return JsonResponse({"status": "error"}, status=405)
+
+    capture_tracking_params(request)
+    email = request.POST.get("email", "").lower().strip()
+    auth_base_url = get_current_base_url(request)
+    entry_host = normalize_host(request.get_host())
+
+    if not email:
+        return JsonResponse({"status": "ok"})
+
+    # Лимиты по порядку: IP → email → общий. Отбитый запрос следующие
+    # счётчики не расходует, иначе один IP выбивал бы вход всем.
+    limited, retry_after = rate_limit_exceeded(
+        "magic-link",
+        (
+            (
+                "ip",
+                client_ip(request) or "unknown",
+                settings.MAGIC_LINK_IP_RATE_LIMIT,
+                settings.MAGIC_LINK_RATE_WINDOW_SECONDS,
+            ),
+        ),
+    )
+    if limited:
+        return magic_link_rate_limited_response(retry_after)
+
+    # Бакеты email и global считают только адреса валидного формата: мусорные
+    # адреса не расходуют общий лимит и лимит чужого email. Битый адрес идёт
+    # прежним путём и ограничен только IP-бакетом: владелец уже записанного
+    # адреса получает ссылку, новая регистрация отклоняется 400 ниже.
+    if is_valid_email(email):
+        email_limited, _ = rate_limit_exceeded(
+            "magic-link",
+            (
+                (
+                    "email",
+                    email,
+                    settings.MAGIC_LINK_EMAIL_RATE_LIMIT,
+                    settings.MAGIC_LINK_RATE_WINDOW_SECONDS,
+                ),
+            ),
+        )
+        if email_limited:
+            # Не 429: адресная атака не должна показывать жертве блокировку,
+            # а ответ не отличается от обычной отправки. Новое письмо не
+            # уходит, уже выданные ссылки продолжают действовать.
+            logging.warning(
+                "magic link email rate limit reached, letter not sent "
+                "(email_digest=%s)",
+                rate_limit_log_digest(email),
+            )
             return JsonResponse({"status": "ok"})
 
-        db_session = session_factory()
+        limited, retry_after = rate_limit_exceeded(
+            "magic-link",
+            (
+                (
+                    "global",
+                    "all",
+                    settings.MAGIC_LINK_GLOBAL_RATE_LIMIT,
+                    settings.MAGIC_LINK_GLOBAL_RATE_WINDOW_SECONDS,
+                ),
+            ),
+        )
+        if limited:
+            logging.warning(
+                "magic link global rate limit reached (limit=%s window=%ss)",
+                settings.MAGIC_LINK_GLOBAL_RATE_LIMIT,
+                settings.MAGIC_LINK_GLOBAL_RATE_WINDOW_SECONDS,
+            )
+            return magic_link_rate_limited_response(retry_after)
 
-        try:
-            with db_session.begin():
-                user = db_session.query(User).filter(User.email == email).first()
-
-                if not user:
-                    # Формат проверяется ТОЛЬКО для новой регистрации.
-                    # Существующего пользователя нашли точным совпадением выше,
-                    # и до этой ветки он не доходит — поэтому владелец уже
-                    # записанного битого адреса не окажется заперт снаружи
-                    # кабинета. Это важно: другого входа у него фактически нет,
-                    # а OAuth не спас бы, а навредил — он дал бы валидный
-                    # адрес, поиск по users его не нашёл бы, и создались бы
-                    # второй аккаунт и вторая подписка в панели.
-                    #
-                    # Регистрация с битым адресом сегодня «успешна», но
-                    # подписки в панели нет: AddUser падает на EmailStr, а
-                    # RwmsClientSync.add_user глотает ошибку, и пользователь
-                    # уходит в create_local_site_user_without_rwms. Такие
-                    # аккаунты в проде уже есть (инцидент 2026-09-10).
-                    #
-                    # Осознанный размен: вьюха специально всегда отвечает
-                    # «ok» ради анти-энумерации, а этот 400 отличает «такого
-                    # аккаунта нет» от «есть» — но ТОЛЬКО для адресов, которые
-                    # не проходят формат. Перебирать такие адреса
-                    # бессмысленно: аккаунт с битым email может появиться лишь
-                    # как наследие (валидация на входе теперь его не создаст),
-                    # а внятная ошибка на опечатку важнее.
-                    if not is_valid_email(email):
-                        logging.warning(
-                            "magic link registration rejected: invalid email "
-                            "format email=%s",
-                            email,
-                        )
-                        return JsonResponse(
-                            {
-                                "status": "error",
-                                "message": (
-                                    "Проверьте адрес электронной почты: "
-                                    "похоже, в нём опечатка."
-                                ),
-                            },
-                            status=400,
-                        )
-
-                    user = create_site_user(
-                        db_session,
-                        email,
-                        request,
-                        creation_channel="site_magic_link",
-                    )
-                else:
-                    registration_context = get_registration_context(request, db_session)
-                    sync_existing_user_tracking(
-                        db_session,
-                        user,
-                        registration_context["traffic_source"],
-                        registration_context["ymid"],
-                    )
-                    logging.info(
-                        f"Found user with username {user.username} and email {email} to authorize"
-                    )
-
-                logging.info(
-                    f"Authorizing user with username {user.username} and email {email}"
+    db_session = session_factory()
+    try:
+        with db_session.begin():
+            user = db_session.query(User).filter(User.email == email).first()
+            if user:
+                registration_context = get_registration_context(request, db_session)
+                sync_existing_user_tracking(
+                    db_session,
+                    user,
+                    registration_context["traffic_source"],
+                    registration_context["ymid"],
                 )
-
-                # Создаем токен
                 magic = MagicToken(user_id=user.id)
                 db_session.add(magic)
+                link = f"{auth_base_url}/login/magic/{magic.token}/"
+            else:
+                # Existing malformed addresses remain reachable for their owner,
+                # but a new account may only be requested for a valid address.
+                if not is_valid_email(email):
+                    logging.warning(
+                        "magic link registration rejected: invalid email "
+                        "format email=%s",
+                        email,
+                    )
+                    return JsonResponse(
+                        {
+                            "status": "error",
+                            "message": (
+                                "Проверьте адрес электронной почты: "
+                                "похоже, в нём опечатка."
+                            ),
+                        },
+                        status=400,
+                    )
 
-            # Возвращаем пользователя в кабинет на том же домене, где он начал вход.
-            link = f"{auth_base_url}/login/magic/{magic.token}/"
+                # The recipient must prove ownership before a DB account or an
+                # RWMS trial subscription is created.
+                registration_token = build_site_registration_token(
+                    email,
+                    get_tracking_params(request),
+                )
+                link = (
+                    f"{auth_base_url}"
+                    f"{reverse('registration_auth', args=[registration_token])}"
+                )
 
-            logging.info(
-                "Magic link requested from host %s, target auth host is %s for %s",
-                entry_host,
-                auth_base_url,
-                email,
-            )
+        logging.info(
+            "Magic link requested from host %s, target auth host is %s for %s",
+            entry_host,
+            auth_base_url,
+            email,
+        )
+        send_magic_link_email(email, link)
+    except Exception as error:
+        logging.exception("failed to prepare or send login email for %s: %s", email, error)
+        return JsonResponse(
+            {
+                "status": "error",
+                "message": "Не удалось отправить письмо. Попробуйте ещё раз.",
+            },
+            status=503,
+        )
+    finally:
+        db_session.close()
 
-            send_magic_link_email(email, link)
-
-        except SiteRegistrationOwnershipConflict as e:
-            # Владелец не совпал: повтор выведет ТО ЖЕ имя и упрётся в тот же
-            # guard, поэтому «повторите через пару минут» было бы враньём.
-            # Отправляем к поддержке — ALERT в логе уже есть.
-            logging.warning("site registration ownership conflict for %s: %s", email, e)
-            return JsonResponse(
-                {
-                    "status": "error",
-                    "message": SITE_REGISTRATION_SUPPORT_MESSAGE,
-                },
-                status=409,
-            )
-
-        except SiteRegistrationUnavailable as e:
-            # Регистрация НЕ состоялась (панель недоступна) — письма не будет,
-            # поэтому обычный «status: ok» (анти-энумерация) здесь обманул бы
-            # пользователя. Отдаём внятное «попробуйте позже»; лик «этот email
-            # новый» возможен только пока панель лежит, и это меньшее зло, чем
-            # молчаливый провал входа.
-            logging.warning("site registration postponed for %s: %s", email, e)
-            return JsonResponse(
-                {
-                    "status": "error",
-                    "message": SITE_REGISTRATION_RETRY_MESSAGE,
-                },
-                status=503,
-            )
-
-        except Exception as e:
-            logging.error(f"Error during sign-up/login: {e}")
-
-        finally:
-            db_session.close()
-
-        # Мы всегда возвращаем успех, чтобы не "палить" наличие email в базе (защита от парсинга)
-        return JsonResponse({"status": "ok"})
+    # Do not disclose whether the address already exists.
+    return JsonResponse({"status": "ok"})
 
 
 def get_google_oauth_redirect_uri(request):
@@ -2490,7 +3007,7 @@ def auth_by_magic_link(request, token):
             user = session.query(User).filter(User.id == user_id).first()
             if not user:
                 session.rollback()
-                logging.warning(f"magic token {token} points to missing user {user_id}")
+                logging.warning("magic login points to missing user %s", user_id)
                 return render_login(request, {"error": "Ссылка истекла или неверна"})
 
             add_event_log_once(
@@ -2508,6 +3025,83 @@ def auth_by_magic_link(request, token):
         return render_login(request, {"error": "Ссылка истекла или неверна"})
     finally:
         session.close()
+
+
+def auth_by_registration_link(request, token):
+    try:
+        payload = load_site_registration_token(token)
+    except (BadSignature, SignatureExpired):
+        return render_login(request, {"error": "Ссылка истекла или неверна"})
+
+    email = (payload.get("email") or "").lower().strip()
+    tracking = payload.get("tracking") or {}
+    if not is_valid_email(email) or not isinstance(tracking, dict):
+        return render_login(request, {"error": "Ссылка истекла или неверна"})
+
+    tracking_restored = False
+    for key in TRACKING_PARAM_KEYS:
+        value = tracking.get(key)
+        if value not in (None, ""):
+            request.session[f"tracking_{key}"] = str(value)[:512]
+            tracking_restored = True
+    if tracking_restored:
+        request.session.modified = True
+
+    db_session = session_factory()
+    try:
+        with db_session.begin():
+            user = db_session.query(User).filter(User.email == email).first()
+            if user is None:
+                user = create_site_user(
+                    db_session,
+                    email,
+                    request,
+                    creation_channel="site_magic_link",
+                )
+            else:
+                registration_context = get_registration_context(request, db_session)
+                sync_existing_user_tracking(
+                    db_session,
+                    user,
+                    registration_context["traffic_source"],
+                    registration_context["ymid"],
+                )
+
+            add_event_log_once(
+                db_session,
+                user,
+                analytics_event.FirstSuccessfulLogin(login_method="magic_link"),
+            )
+
+        authorize_user_session(request, user)
+        return redirect("dashboard")
+    except SiteRegistrationOwnershipConflict as error:
+        logging.warning(
+            "confirmed site registration ownership conflict for %s: %s",
+            email,
+            error,
+        )
+        return render_login(
+            request,
+            {"error": SITE_REGISTRATION_SUPPORT_MESSAGE},
+            status=409,
+        )
+    except SiteRegistrationUnavailable as error:
+        logging.warning("confirmed site registration postponed for %s: %s", email, error)
+        return render_login(
+            request,
+            {"error": SITE_REGISTRATION_RETRY_MESSAGE},
+            status=503,
+        )
+    except Exception as error:
+        logging.exception("confirmed site registration failed for %s: %s", email, error)
+        return render_login(
+            request,
+            {"error": "Не удалось подготовить личный кабинет. Попробуйте ещё раз."},
+            status=503,
+        )
+    finally:
+        db_session.close()
 
 
 def auth_by_telegram_link(request, token):
@@ -2548,22 +3142,26 @@ def auth_by_telegram_link(request, token):
         session.close()
 
 
+LEGACY_PURCHASE_LOGIN_MESSAGE = (
+    "Ссылки для входа из писем об оплате больше не действуют. Введите email — "
+    "мы пришлём новую ссылку. Подписка продолжает работать."
+)
+
+
 def auth_by_purchase_link(request, token):
+    # Legacy unprefixed tokens cannot be distinguished from status links (they
+    # were the same browser-visible token) and therefore NEVER authenticate.
+    # Answer without touching the database: no validity oracle for old links.
+    if is_legacy_purchase_token(token):
+        logging.info("legacy purchase login link was used; asking for email login")
+        return render_login(request, {"error": LEGACY_PURCHASE_LOGIN_MESSAGE})
+
     session = session_factory()
     try:
-        token_hash = hash_purchase_login_token(token)
-        login_token = (
-            session.query(PurchaseLoginToken)
-            .filter(
-                PurchaseLoginToken.token_hash == token_hash,
-                PurchaseLoginToken.revoked_at.is_(None),
-            )
-            .first()
-        )
-        if not login_token or not hmac.compare_digest(
-            login_token.token_hash,
-            token_hash,
-        ):
+        # Status tokens are intentionally returned to the browser that starts a
+        # payment. Only the separately emailed plogin_ token may authenticate.
+        login_token = get_purchase_login_token(session, token)
+        if not login_token:
             logging.warning("invalid purchase login token was used")
             return render_login(request, {"error": "Ссылка истекла или неверна"})
 
@@ -2614,8 +3212,10 @@ def auth_by_purchase_link(request, token):
 
 
 def get_purchase_login_token(db_session, token):
+    if not token.startswith(PURCHASE_LOGIN_TOKEN_PREFIX):
+        return None
     token_hash = hash_purchase_login_token(token)
-    login_token = (
+    token_row = (
         db_session.query(PurchaseLoginToken)
         .filter(
             PurchaseLoginToken.token_hash == token_hash,
@@ -2623,9 +3223,64 @@ def get_purchase_login_token(db_session, token):
         )
         .first()
     )
-    if not login_token or not hmac.compare_digest(login_token.token_hash, token_hash):
+    if not token_row or not hmac.compare_digest(token_row.token_hash, token_hash):
         return None
-    return login_token
+    return token_row
+
+
+def get_purchase_status_token(db_session, token):
+    if not token.startswith(PURCHASE_STATUS_TOKEN_PREFIX):
+        return None
+    token_hash = hash_purchase_status_token(token)
+    token_row = (
+        db_session.query(PurchaseLoginToken)
+        .filter(
+            PurchaseLoginToken.token_hash == token_hash,
+            PurchaseLoginToken.revoked_at.is_(None),
+        )
+        .first()
+    )
+    if not token_row or not hmac.compare_digest(token_row.token_hash, token_hash):
+        return None
+    return token_row
+
+
+# Токены до введения префиксов (одна и та же строка была ссылкой статуса и
+# «постоянной» ссылкой входа). Для платежей, начатых до деплоя, страница
+# статуса ещё неделю показывает ТОЛЬКО статус оплаты: без входа и без retry.
+LEGACY_PURCHASE_STATUS_MAX_AGE = timedelta(days=7)
+LEGACY_PURCHASE_STATUS_NEUTRAL_MESSAGE = (
+    "Статус оплаты и подписку можно посмотреть в личном кабинете после входа"
+)
+
+
+def is_legacy_purchase_token(token):
+    return not token.startswith(
+        (PURCHASE_LOGIN_TOKEN_PREFIX, PURCHASE_STATUS_TOKEN_PREFIX)
+    )
+
+
+def get_legacy_purchase_status_token(db_session, token):
+    """Read-only lookup of a pre-prefix token by the HEAD hash formula.
+
+    The row is used ONLY to show payment status; it never authenticates (B01).
+    """
+    if not is_legacy_purchase_token(token):
+        return None
+    token_hash = hash_purchase_login_token(token)
+    token_row = (
+        db_session.query(PurchaseLoginToken)
+        .filter(
+            PurchaseLoginToken.token_hash == token_hash,
+            PurchaseLoginToken.revoked_at.is_(None),
+            PurchaseLoginToken.created_at
+            >= datetime.utcnow() - LEGACY_PURCHASE_STATUS_MAX_AGE,
+        )
+        .first()
+    )
+    if not token_row or not hmac.compare_digest(token_row.token_hash, token_hash):
+        return None
+    return token_row
 
 
 # Терминальный вебхук Wata по уже начатому платежу (СБП/3DS) приходит вторым
@@ -2648,17 +3303,19 @@ def is_wata_invoice_expired(invoice, grace=None):
     return datetime.now(timezone.utc) > expires_at
 
 
-def get_purchase_wata_invoice(db_session, login_token):
-    started_at = login_token.created_at - timedelta(minutes=5)
-    wata_filters = [WataInvoice.user_id == login_token.user_id]
-    if login_token.payment_gateway == "wata" and login_token.payment_reference:
-        wata_filters.append(WataInvoice.order_id == login_token.payment_reference)
-    else:
-        wata_filters.append(WataInvoice.creation_time >= started_at)
+def get_purchase_wata_invoice(db_session, purchase_token):
+    if (
+        purchase_token.payment_gateway != "wata"
+        or not purchase_token.payment_reference
+    ):
+        return None
 
     return (
         db_session.query(WataInvoice)
-        .filter(*wata_filters)
+        .filter(
+            WataInvoice.user_id == purchase_token.user_id,
+            WataInvoice.order_id == purchase_token.payment_reference,
+        )
         .order_by(WataInvoice.creation_time.desc())
         .first()
     )
@@ -2721,36 +3378,45 @@ def wata_transaction_purchase_status(wata_transaction):
     return PURCHASE_PENDING_STATUS
 
 
-def get_purchase_payment_status(db_session, login_token):
-    started_at = login_token.created_at - timedelta(minutes=5)
+def get_purchase_payment_status(db_session, purchase_token):
+    gateway = purchase_token.payment_gateway
+    reference = purchase_token.payment_reference
+    if not gateway or not reference:
+        return PURCHASE_PENDING_STATUS
 
-    yk_filters = [YkPayment.user_id == login_token.user_id]
-    if login_token.payment_gateway == "yookassa" and login_token.payment_reference:
-        yk_filters.append(YkPayment.payment_id == login_token.payment_reference)
-    else:
-        yk_filters.append(YkPayment.created_at >= started_at)
-
-    yk_payment = (
-        db_session.query(YkPayment)
-        .filter(*yk_filters)
-        .order_by(YkPayment.created_at.desc())
-        .first()
-    )
-    if yk_payment:
+    if gateway == "yookassa":
+        yk_payment = (
+            db_session.query(YkPayment)
+            .filter(
+                YkPayment.user_id == purchase_token.user_id,
+                YkPayment.payment_id == reference,
+            )
+            .first()
+        )
+        if not yk_payment:
+            return PURCHASE_PENDING_STATUS
         if yk_payment.status == "succeeded":
             return "succeeded", "Платеж прошел успешно"
         if yk_payment.status == "canceled":
             return "failed", "Платеж не прошел"
+        return PURCHASE_PENDING_STATUS
 
-    wata_invoice = get_purchase_wata_invoice(db_session, login_token)
+    if gateway != "wata":
+        logging.warning(
+            "purchase token has unsupported payment gateway: user_id=%s gateway=%s",
+            purchase_token.user_id,
+            gateway,
+        )
+        return PURCHASE_PENDING_STATUS
+
+    wata_invoice = get_purchase_wata_invoice(db_session, purchase_token)
 
     # ПЕРВЫМ делом — факт оплаты по заказам этой покупки. Только если Paid нет,
     # смотрим на «последнюю по времени» транзакцию (см. has_paid_wata_transaction).
     purchase_order_ids = []
     if wata_invoice:
         purchase_order_ids.append(wata_invoice.order_id)
-    if login_token.payment_gateway == "wata" and login_token.payment_reference:
-        purchase_order_ids.append(login_token.payment_reference)
+    purchase_order_ids.append(reference)
     if has_paid_wata_transaction(db_session, purchase_order_ids):
         return "succeeded", "Платеж прошел успешно"
 
@@ -2775,10 +3441,10 @@ def get_purchase_payment_status(db_session, login_token):
         if is_wata_invoice_expired(wata_invoice):
             return "failed", "Время оплаты истекло"
 
-    if login_token.payment_gateway == "wata" and login_token.payment_reference:
+    if not wata_invoice:
         wata_transaction = (
             db_session.query(WataTransaction)
-            .filter(WataTransaction.order_id == login_token.payment_reference)
+            .filter(WataTransaction.order_id == reference)
             .order_by(WataTransaction.payment_time.desc())
             .first()
         )
@@ -2845,6 +3511,26 @@ def active_wata_status_for_token(login_token):
     return None
 
 
+CHECKOUT_PREPARED_STATUS_MESSAGE = "Подготавливаем платёж"
+CHECKOUT_REVIEW_STATUS_MESSAGE = (
+    "Форма оплаты не была открыта, оплата по этому заказу не проводилась. "
+    "Можно попробовать снова."
+)
+CHECKOUT_FAILED_STATUS_MESSAGE = (
+    "Платёж не создан, деньги не списаны, попробуйте ещё раз"
+)
+# Успешная оплата без сессии владельца (анонимная покупка с лендинга, возврат
+# из YooKassa во внешний браузер): login_url не выдаётся, страница ведёт на
+# вход. Email плательщика в ответ не попадает.
+PAYMENT_SUCCEEDED_LOGIN_LINK_SENT_MESSAGE = (
+    "Оплата прошла. Ссылка для входа в личный кабинет отправлена на email, "
+    "указанный при оплате. Если письма нет, войдите по email на странице входа."
+)
+PAYMENT_SUCCEEDED_SIGN_IN_MESSAGE = (
+    "Оплата прошла. Войдите в личный кабинет по email или вернитесь в Telegram"
+)
+
+
 def payment_status_payload(request, token, allow_active_check=False):
     if request.GET.get("result") == "failed":
         return {
@@ -2856,8 +3542,34 @@ def payment_status_payload(request, token, allow_active_check=False):
 
     db_session = session_factory()
     try:
-        login_token = get_purchase_login_token(db_session, token)
-        if not login_token:
+        status_token = get_purchase_status_token(db_session, token)
+        if not status_token and is_legacy_purchase_token(token):
+            # Ссылка статуса, выданная до деплоя: только статус оплаты, без
+            # login_url и без retry; старше недели — нейтральный текст
+            # (не «failed», чтобы не подталкивать к повторной оплате).
+            legacy_token = get_legacy_purchase_status_token(db_session, token)
+            if legacy_token is None:
+                # FE-FINAL-02: исход по такой ссылке уже не узнать. terminal
+                # останавливает опрос страницы статуса и убирает «ожидаем
+                # подтверждение»; статус и текст остаются нейтральными.
+                return {
+                    "status": "pending",
+                    "message": LEGACY_PURCHASE_STATUS_NEUTRAL_MESSAGE,
+                    "login_url": "",
+                    "payment_url": "",
+                    "terminal": True,
+                }
+            status, message = get_purchase_payment_status(db_session, legacy_token)
+            if status == "succeeded":
+                # Legacy-ссылка никогда не авторизует: страница ведёт на вход.
+                message = PAYMENT_SUCCEEDED_SIGN_IN_MESSAGE
+            return {
+                "status": status,
+                "message": message,
+                "login_url": "",
+                "payment_url": "",
+            }
+        if not status_token:
             return {
                 "status": "failed",
                 "message": "Ссылка проверки платежа истекла или неверна",
@@ -2865,22 +3577,55 @@ def payment_status_payload(request, token, allow_active_check=False):
                 "payment_url": "",
             }
 
-        status, message = get_purchase_payment_status(db_session, login_token)
+        status, message = get_purchase_payment_status(db_session, status_token)
         # Если в БД ещё нет подтверждения (вебхук не дошёл), но это разрешено
         # вызывающим — спрашиваем статус напрямую у Wata, чтобы не ждать её
         # 10-секундный экран успеха.
         if status == "pending" and allow_active_check:
-            active = active_wata_status_for_token(login_token)
+            active = active_wata_status_for_token(status_token)
             if active:
                 status, message = active
-        wata_invoice = get_purchase_wata_invoice(db_session, login_token)
+        wata_invoice = get_purchase_wata_invoice(db_session, status_token)
         session_payment_url = request.session.get(payment_session_url_key(token), "")
+        attempt = None
+        try:
+            attempt = db_session.query(WebsitePaymentAttempt).filter_by(status_token_hash=status_token.token_hash).first()
+        except ProgrammingError:
+            # Код сайта выкачен раньше alembic-миграции common: страница
+            # статуса работает как до появления попыток, а не отдаёт 500.
+            db_session.rollback()
+            logging.error(
+                "payment status: website_payment_attempts is unavailable "
+                "(common migration not applied?)"
+            )
+        if attempt is not None:
+            session_payment_url = attempt.confirmation_url or session_payment_url
+            if status == "pending" and attempt.state == "review":
+                # Ссылка на оплату по такой попытке клиенту не выдавалась.
+                status, message = "failed", CHECKOUT_REVIEW_STATUS_MESSAGE
+            elif status == "pending" and attempt.state == "failed":
+                status, message = "failed", CHECKOUT_FAILED_STATUS_MESSAGE
+            elif status == "pending" and attempt.state == "prepared":
+                message = CHECKOUT_PREPARED_STATUS_MESSAGE
+        authenticated_for_purchase = (
+            getattr(request.user, "is_authenticated", False)
+            and str(getattr(request.user, "id", "")) == str(status_token.user_id)
+        )
+        if status == "succeeded" and not authenticated_for_purchase:
+            # Без сессии владельца login_url нет. Если ссылка входа ушла письмом
+            # (покупка без входа, R03), говорим об этом, не раскрывая адрес;
+            # иначе предлагаем войти по email или вернуться в Telegram.
+            message = (
+                PAYMENT_SUCCEEDED_LOGIN_LINK_SENT_MESSAGE
+                if getattr(attempt, "login_token_hash", None)
+                else PAYMENT_SUCCEEDED_SIGN_IN_MESSAGE
+            )
         return {
             "status": status,
             "message": message,
             "login_url": (
-                build_purchase_login_link(request, token)
-                if status == "succeeded"
+                reverse("dashboard")
+                if status == "succeeded" and authenticated_for_purchase
                 else ""
             ),
             "payment_url": (
@@ -2896,11 +3641,11 @@ def payment_status_payload(request, token, allow_active_check=False):
 def payment_retry(request, token):
     db_session = session_factory()
     try:
-        login_token = get_purchase_login_token(db_session, token)
-        if not login_token:
+        status_token = get_purchase_status_token(db_session, token)
+        if not status_token:
             return redirect("payment_status", token=token)
 
-        wata_invoice = get_purchase_wata_invoice(db_session, login_token)
+        wata_invoice = get_purchase_wata_invoice(db_session, status_token)
         if (
             not wata_invoice
             or not wata_invoice.url
@@ -2927,6 +3672,7 @@ def payment_status(request, token):
         {
             "initial_status": payload["status"],
             "initial_message": payload["message"],
+            "initial_terminal": bool(payload.get("terminal")),
             "login_url": payload["login_url"],
             "payment_url": payload["payment_url"],
             "status_api_url": reverse("payment_status_json", args=[token]),
@@ -3278,12 +4024,7 @@ def dashboard(request):
 
     tg_bot = settings.TG_BOT_USERNAME
 
-    # Если зашел по почте и ТГ еще не привязан — готовим ссылку для привязки
     tg_bind_link = None
-    if not user.telegram_id:
-        # Создаем короткую подпись на основе ID пользователя и SECRET_KEY
-        token = hashlib.md5(f"{user.id}{settings.SECRET_KEY}".encode()).hexdigest()[:8]
-        tg_bind_link = f"https://t.me/{tg_bot}?start=bind_{user.id}_{token}"
 
     session = session_factory()
     try:
@@ -3363,14 +4104,24 @@ def dashboard(request):
             )
             .scalar()
         )
+
+        bonus_days = (
+            session.query(func.coalesce(func.sum(ReferralBonus.days_added), 0))
+            .filter(ReferralBonus.referrer_id == user.id)
+            .scalar()
+        )
+        apple_recommended_app = apple_recommended_app_from_db(session)
+        runtime_tariffs = get_runtime_actual_tariffs(session)
     finally:
         session.close()
 
-    bonus_days = (
-        session.query(func.coalesce(func.sum(ReferralBonus.days_added), 0))
-        .filter(ReferralBonus.referrer_id == user.id)
-        .scalar()
-    )
+    # Выпуск bind-ссылки пишет в БД — отдельной транзакцией после закрытия
+    # основной сессии. commit в основной истекал бы загруженные выше ORM-
+    # объекты (traffic_progress, support_ticket), и обращение к ним после
+    # close падало бы DetachedInstanceError; а сбой записи ронял бы весь
+    # кабинет. Без ссылки кабинет рендерится без баннера привязки.
+    if not user.telegram_id:
+        tg_bind_link = issue_dashboard_telegram_bind_link(request, user, tg_bot)
 
     # Политика «БД — истина по времени, панель — истина по существованию ключа»:
     # - strict вернул None (достоверный NOT_FOUND) — подписки в панели нет,
@@ -3432,7 +4183,8 @@ def dashboard(request):
             )
     expiring_banner_threshold_seconds = 3 * 24 * 60 * 60
     show_expiring_banner = 0 < seconds_left <= expiring_banner_threshold_seconds
-    show_telegram_bind_banner = not user.telegram_id
+    # Без выпущенной ссылки (сбой записи в БД) баннер привязки не показываем.
+    show_telegram_bind_banner = not user.telegram_id and bool(tg_bind_link)
     show_email_bind_banner = not user.email
     show_not_connected_banner = False
 
@@ -3514,7 +4266,9 @@ def dashboard(request):
     # или incy — для INCY ссылка добавления подписки шифруется отдельно.
     if has_panel_data:
         apple_recommended_app, apple_subscription_url = build_apple_subscription_link(
-            session, subscription.subscription_url
+            None,
+            subscription.subscription_url,
+            recommended_app=apple_recommended_app,
         )
     else:
         apple_recommended_app, apple_subscription_url = (
@@ -3544,7 +4298,8 @@ def dashboard(request):
                 + traffic_referrer_bonus_days
                 + purchase_referrer_bonus_days
             ),
-            "tariffs": get_runtime_actual_tariffs(),
+            "tariffs": runtime_tariffs,
+            "pending_checkout_tariff_id": request.session.pop("pending_checkout_tariff_id", ""),
             "has_recurrent": has_recurrent,
             "has_subscription_access": has_subscription_access,
             "seconds_left": seconds_left,
@@ -3611,7 +4366,7 @@ def update_email(request):
 
     session = session_factory()
     try:
-        db_user = session.query(User).filter(User.id == request.user.id).first()
+        db_user = session.query(User).filter(User.id == request.user.id).with_for_update().first()
         if not db_user:
             logging.warning(f"user {request.user.id} not found while updating email")
             auth_logout(request)
@@ -3631,7 +4386,9 @@ def update_email(request):
             request.session.modified = True
             return redirect("dashboard")
 
-        token = build_email_confirmation_token(db_user.id, new_email)
+        nonce = issue_email_change(session, db_user, new_email)
+        token = build_email_confirmation_token(db_user.id, new_email, db_user.email, nonce)
+        session.commit()
         link = (
             f"{get_current_base_url(request)}{reverse('confirm_email', args=[token])}"
         )
@@ -3661,6 +4418,103 @@ def update_email(request):
         return redirect("dashboard")
     finally:
         session.close()
+
+
+# Повторный счёт в этом окне не перевыпускает только что отправленную ссылку
+# подтверждения на тот же адрес: иначе ссылка из первого письма стала бы
+# «устаревшей». Меньше срока жизни ссылки (EMAIL_CONFIRMATION_MAX_AGE_SECONDS).
+PAYMENT_EMAIL_CONFIRMATION_RESEND_SECONDS = 10 * 60
+# ZONE-EMAIL-01: не больше писем подтверждения из /pay/ на аккаунт за окно,
+# независимо от адреса (каждый новый email чека иначе давал бы новое письмо).
+PAYMENT_EMAIL_CONFIRMATION_RATE_LIMIT = 3
+PAYMENT_EMAIL_CONFIRMATION_RATE_WINDOW_SECONDS = 60 * 60
+
+
+def send_payment_email_confirmation(request, user_id, email):
+    """Предложить привязать email, введённый при оплате, штатным подтверждением.
+
+    Для авторизованного аккаунта без email (например, пришёл из Telegram).
+    users.email здесь НЕ меняется: email чека не доказывает владение адресом
+    (B23). Адрес привяжется только по ссылке из письма (confirm_email), тогда
+    же уйдёт в панель, а следующая оплата ЮKassa подключит автоплатёж.
+    Вызывается после commit счёта; любая ошибка только логируется, оплату не
+    ломает. Возвращает True, если письмо отправлено.
+    """
+    session = session_factory()
+    try:
+        db_user = (
+            session.query(User).filter(User.id == user_id).with_for_update().first()
+        )
+        if db_user is None or db_user.email:
+            return False
+        email_owner = (
+            session.query(User.id)
+            .filter(User.email == email, User.id != db_user.id)
+            .first()
+        )
+        if email_owner is not None:
+            logging.info(
+                "payment email confirmation skipped: email belongs to another "
+                "account user_id=%s",
+                user_id,
+            )
+            return False
+        if has_fresh_unused_email_change(
+            session, db_user.id, email, PAYMENT_EMAIL_CONFIRMATION_RESEND_SECONDS
+        ):
+            logging.info(
+                "payment email confirmation skipped: a recent link is still valid "
+                "user_id=%s",
+                user_id,
+            )
+            return False
+        # Лимит считается только перед реальным выпуском ссылки: пропуски выше
+        # его не расходуют. При превышении ссылку не перевыпускаем (иначе
+        # прежняя ссылка из письма стала бы устаревшей) и письмо не шлём.
+        limited, _ = rate_limit_exceeded(
+            "payment-email-confirmation",
+            (
+                (
+                    "user",
+                    str(user_id),
+                    PAYMENT_EMAIL_CONFIRMATION_RATE_LIMIT,
+                    PAYMENT_EMAIL_CONFIRMATION_RATE_WINDOW_SECONDS,
+                ),
+            ),
+        )
+        if limited:
+            logging.warning(
+                "payment email confirmation skipped: rate limit reached "
+                "user_id=%s email_digest=%s limit=%s window=%ss",
+                user_id,
+                rate_limit_log_digest(email),
+                PAYMENT_EMAIL_CONFIRMATION_RATE_LIMIT,
+                PAYMENT_EMAIL_CONFIRMATION_RATE_WINDOW_SECONDS,
+            )
+            return False
+        nonce = issue_email_change(session, db_user, email)
+        token = build_email_confirmation_token(db_user.id, email, db_user.email, nonce)
+        link = f"{get_current_base_url(request)}{reverse('confirm_email', args=[token])}"
+        session.commit()
+    except Exception:
+        try:
+            session.rollback()
+        except Exception:
+            pass
+        logging.exception(
+            "payment email confirmation was not issued user_id=%s", user_id
+        )
+        return False
+    finally:
+        session.close()
+
+    try:
+        send_email_confirmation_email(email, link)
+    except Exception:
+        logging.exception("payment email confirmation was not sent user_id=%s", user_id)
+        return False
+    logging.info("payment email confirmation sent user_id=%s", user_id)
+    return True
 
 
 def cabinet_payments_history(request):
@@ -3806,7 +4660,8 @@ def confirm_email(request, token):
 
     user_id = payload.get("user_id")
     new_email = (payload.get("email") or "").lower().strip()
-    if not user_id or not new_email:
+    previous_email = (payload.get("previous_email") or "").lower().strip()
+    if not user_id or not new_email or "previous_email" not in payload:
         request.session["email_bind_modal"] = {
             "open": True,
             "error": "Ссылка подтверждения неверна. Введите email еще раз.",
@@ -3834,10 +4689,41 @@ def confirm_email(request, token):
     session = session_factory()
     username = None
     try:
-        db_user = session.query(User).filter(User.id == user_id).first()
+        db_user = session.query(User).filter(User.id == user_id).with_for_update().first()
         if not db_user:
             logging.warning(f"missing user {user_id} while confirming email")
             return redirect("login")
+
+        # Повторный переход по уже применённой ссылке: почтовые сканеры и
+        # антифишинг открывают GET заранее, и пользователь видел бы «ссылка
+        # устарела» при уже сменённом адресе. Если это та же погашенная заявка
+        # (nonce и адреса совпадают, used_at в пределах TTL) и users.email уже
+        # равен запрошенному — тот же успех, что и при первом переходе.
+        if normalize_email(db_user.email) == new_email and email_change_already_applied(
+            session, db_user, payload, EMAIL_CONFIRMATION_MAX_AGE_SECONDS
+        ):
+            logging.info(
+                "repeated confirmation of an already applied email change user_id=%s",
+                user_id,
+            )
+            if request.user.is_authenticated and request.user.id == db_user.id:
+                request.user.email = new_email
+            else:
+                authorize_user_session(request, db_user)
+            return redirect("dashboard")
+
+        if normalize_email(db_user.email) != normalize_email(previous_email):
+            logging.warning(
+                "stale or replayed email confirmation rejected for user %s",
+                user_id,
+            )
+            request.session["email_bind_modal"] = {
+                "open": True,
+                "error": "Эта ссылка уже использована или устарела. Введите email ещё раз.",
+                "email": new_email,
+            }
+            request.session.modified = True
+            return redirect("dashboard" if request.user.is_authenticated else "login")
 
         existing_user = (
             session.query(User)
@@ -3853,6 +4739,11 @@ def confirm_email(request, token):
             request.session.modified = True
             return redirect("dashboard" if request.user.is_authenticated else "login")
 
+        if not consume_email_change(session, db_user, payload, EMAIL_CONFIRMATION_MAX_AGE_SECONDS):
+            request.session["email_bind_modal"] = {"open": True, "email": new_email,
+                "error": "Ссылка уже использована или устарела. Запросите новое письмо."}
+            request.session.modified = True
+            return redirect("dashboard" if request.user.is_authenticated else "login")
         db_user.email = new_email
         username = db_user.username
         session.commit()
@@ -3886,21 +4777,11 @@ def confirm_email(request, token):
     finally:
         session.close()
 
+    # The transaction above saved the outbox flag. A worker retries on failure.
     try:
-        # После привязки email нельзя терять активные internal squads в RWMS.
-        subscription = rwms_client.get_user_by_username(username)
-        if subscription:
-            response = rwms_client.update_user(
-                proto.UpdateUserRequest(
-                    uuid=subscription.uuid,
-                    email=new_email,
-                    active_internal_squads=subscription.active_internal_squads,
-                )
-            )
-            if response is None:
-                logging.warning(f"failed to update rwms email for user {user_id}")
-    except Exception as e:
-        logging.exception(f"failed to sync rwms email for user {user_id}: {e}")
+        sync_email_change(session_factory, rwms_client, user_id, proto.UpdateUserRequest)
+    except Exception:
+        logging.exception("email reconciliation deferred user_id=%s", user_id)
 
     return redirect("dashboard")
 
@@ -4075,9 +4956,14 @@ def create_support_ticket(request):
 
     subject = request.POST.get("subject", "").strip()
     message = request.POST.get("message", "").strip()
+    uploaded_files = request.FILES.getlist("attachments")
 
     if not message:
         return dashboard_support_redirect()
+
+    attachment_error = validate_support_attachments(uploaded_files)
+    if attachment_error:
+        return support_attachment_validation_response(request, attachment_error)
 
     if not subject:
         subject = message[:80]
@@ -4102,7 +4988,7 @@ def create_support_ticket(request):
             attach_support_attachments(
                 db_session,
                 support_message,
-                request.FILES.getlist("attachments"),
+                uploaded_files,
             )
             ticket_id = ticket.id
     finally:
@@ -4120,8 +5006,12 @@ def create_support_ticket_message(request, ticket_id):
         return dashboard_support_redirect()
 
     message = request.POST.get("message", "").strip()
+    uploaded_files = request.FILES.getlist("attachments")
     if not message:
         return dashboard_support_redirect()
+    attachment_error = validate_support_attachments(uploaded_files)
+    if attachment_error:
+        return support_attachment_validation_response(request, attachment_error)
 
     db_session = session_factory()
     try:
@@ -4145,7 +5035,7 @@ def create_support_ticket_message(request, ticket_id):
             attach_support_attachments(
                 db_session,
                 support_message,
-                request.FILES.getlist("attachments"),
+                uploaded_files,
             )
     finally:
         db_session.close()
@@ -4222,22 +5112,82 @@ def support_attachment(request, attachment_id):
         if media_root not in path.parents or not path.exists():
             raise Http404("Attachment not found")
 
-        return FileResponse(
-            path.open("rb"),
-            content_type=attachment.content_type,
-            filename=attachment.file_name,
-        )
+        return support_attachment_file_response(attachment, path)
     finally:
         db_session.close()
 
 
+def support_admin_login_rate_buckets(request, login_name):
+    """Блокирующие лимиты входа в админку: IP и пара «аккаунт+IP».
+
+    Бакет по аккаунту без IP не блокирует: иначе чужие неудачные попытки
+    (включая общий пароль с пустым логином) запирали бы вход сотрудникам.
+    """
+    address = client_ip(request) or "unknown"
+    window = settings.ADMIN_LOGIN_RATE_WINDOW_SECONDS
+    return (
+        ("ip", address, settings.ADMIN_LOGIN_IP_RATE_LIMIT, window),
+        (
+            "account-ip",
+            f"{login_name or 'shared'}|{address}",
+            settings.ADMIN_LOGIN_ACCOUNT_RATE_LIMIT,
+            window,
+        ),
+    )
+
+
+def record_support_admin_login_failure(login_buckets, login_name):
+    """Неудачная попытка расходует лимиты IP и «аккаунт+IP».
+
+    Общий счётчик аккаунта со всех IP только поднимает ALERT при первом
+    превышении ADMIN_LOGIN_ACCOUNT_ALERT_LIMIT в окне и вход не блокирует.
+    Логин и пароль в лог не пишутся, только ключевой отпечаток аккаунта.
+    """
+    account = login_name or "shared"
+    window = settings.ADMIN_LOGIN_RATE_WINDOW_SECONDS
+    alert_limit = settings.ADMIN_LOGIN_ACCOUNT_ALERT_LIMIT
+    counts = rate_limit_hit(
+        "admin-login",
+        tuple(login_buckets) + (("account", account, alert_limit, window),),
+    )
+    if alert_limit and alert_limit > 0 and counts.get("account") == alert_limit + 1:
+        logging.error(
+            "ALERT: support admin login failures for one account exceeded %s "
+            "within %ss from all IPs (account_digest=%s); login is not blocked",
+            alert_limit,
+            window,
+            rate_limit_log_digest(account),
+        )
+
+
 def support_admin_login(request):
     if support_admin_is_authenticated(request):
+        auth_response = require_support_admin(request)
+        if auth_response:
+            return auth_response
         return redirect("support_admin_tickets")
 
     if request.method == "POST":
         password = request.POST.get("password", "")
         login_name = (request.POST.get("login") or "").strip().lower()
+        login_buckets = support_admin_login_rate_buckets(request, login_name)
+        # До проверки пароля лимиты только читаются: успешный вход ничего не
+        # расходует, счётчики растут лишь на неудачных попытках ниже.
+        limited, retry_after = rate_limit_peek("admin-login", login_buckets)
+        if limited:
+            logging.warning(
+                "support admin login rate limited (account_digest=%s ip=%s)",
+                rate_limit_log_digest(login_name or "shared"),
+                admin_client_ip(request),
+            )
+            response = render(
+                request,
+                "support_admin_login.html",
+                {"error": "Слишком много попыток. Подождите и попробуйте снова."},
+                status=429,
+            )
+            response["Retry-After"] = str(retry_after)
+            return response
 
         # Персональные аккаунты сотрудников (этап 6 плана админки): если
         # указан логин — проверяем только по admin_accounts.
@@ -4253,16 +5203,21 @@ def support_admin_login(request):
                     .first()
                 )
                 if account and check_password(password, account.password_hash):
-                    role_map = {
-                        "full": SUPPORT_ADMIN_ROLE_ADMIN,
-                        "marketer": SUPPORT_ADMIN_ROLE_MARKETER,
-                        "support": SUPPORT_ADMIN_ROLE_SUPPORT,
-                    }
+                    cycle_key = getattr(request.session, "cycle_key", None)
+                    if callable(cycle_key):
+                        cycle_key()
                     request.session[SUPPORT_ADMIN_SESSION_KEY] = True
-                    request.session[SUPPORT_ADMIN_ROLE_SESSION_KEY] = role_map.get(
-                        account.role, SUPPORT_ADMIN_ROLE_SUPPORT
+                    request.session[SUPPORT_ADMIN_ROLE_SESSION_KEY] = (
+                        SUPPORT_ADMIN_ACCOUNT_ROLE_MAP.get(
+                            account.role, SUPPORT_ADMIN_ROLE_SUPPORT
+                        )
                     )
                     request.session[SUPPORT_ADMIN_ACCOUNT_SESSION_KEY] = account.login
+                    request.session[SUPPORT_ADMIN_AUTH_HASH_SESSION_KEY] = (
+                        support_admin_auth_fingerprint(
+                            f"account:{account.login}", account.password_hash
+                        )
+                    )
                     request.session.modified = True
                     account.last_login_at = datetime.utcnow()
                     db_session.add(
@@ -4278,7 +5233,11 @@ def support_admin_login(request):
                     return redirect("support_admin_tickets")
             finally:
                 db_session.close()
-            logging.warning("admin account login failed for %s", login_name)
+            record_support_admin_login_failure(login_buckets, login_name)
+            logging.warning(
+                "admin account login failed (account_digest=%s)",
+                rate_limit_log_digest(login_name),
+            )
             return render(
                 request,
                 "support_admin_login.html",
@@ -4290,8 +5249,18 @@ def support_admin_login(request):
             password,
             settings.SUPPORT_ADMIN_PASSWORD,
         ):
+            cycle_key = getattr(request.session, "cycle_key", None)
+            if callable(cycle_key):
+                cycle_key()
             request.session[SUPPORT_ADMIN_SESSION_KEY] = True
             request.session[SUPPORT_ADMIN_ROLE_SESSION_KEY] = SUPPORT_ADMIN_ROLE_ADMIN
+            request.session.pop(SUPPORT_ADMIN_ACCOUNT_SESSION_KEY, None)
+            request.session[SUPPORT_ADMIN_AUTH_HASH_SESSION_KEY] = (
+                support_admin_auth_fingerprint(
+                    f"shared:{SUPPORT_ADMIN_ROLE_ADMIN}",
+                    settings.SUPPORT_ADMIN_PASSWORD,
+                )
+            )
             request.session.modified = True
             return redirect("support_admin_tickets")
 
@@ -4299,11 +5268,22 @@ def support_admin_login(request):
             password,
             settings.SUPPORT_STAFF_PASSWORD,
         ):
+            cycle_key = getattr(request.session, "cycle_key", None)
+            if callable(cycle_key):
+                cycle_key()
             request.session[SUPPORT_ADMIN_SESSION_KEY] = True
             request.session[SUPPORT_ADMIN_ROLE_SESSION_KEY] = SUPPORT_ADMIN_ROLE_SUPPORT
+            request.session.pop(SUPPORT_ADMIN_ACCOUNT_SESSION_KEY, None)
+            request.session[SUPPORT_ADMIN_AUTH_HASH_SESSION_KEY] = (
+                support_admin_auth_fingerprint(
+                    f"shared:{SUPPORT_ADMIN_ROLE_SUPPORT}",
+                    settings.SUPPORT_STAFF_PASSWORD,
+                )
+            )
             request.session.modified = True
             return redirect("support_admin_tickets")
 
+        record_support_admin_login_failure(login_buckets, login_name)
         logging.warning(
             "Support admin login failed: admin_password_configured=%s, "
             "staff_password_configured=%s",
@@ -4321,10 +5301,12 @@ def support_admin_login(request):
 
 
 def support_admin_logout(request):
-    request.session.pop(SUPPORT_ADMIN_SESSION_KEY, None)
-    request.session.pop(SUPPORT_ADMIN_ROLE_SESSION_KEY, None)
-    request.session.modified = True
+    clear_support_admin_session(request)
     return redirect("support_admin_login")
+
+
+SUPPORT_ADMIN_TICKETS_PAGE_SIZE = 50
+SUPPORT_ADMIN_TICKETS_MAX_PAGE_SIZE = 200
 
 
 def support_admin_tickets(request):
@@ -4343,6 +5325,9 @@ def support_admin_tickets(request):
             "status_filter": tickets_data["status_filter"],
             "open_count": tickets_data["open_count"],
             "closed_count": tickets_data["closed_count"],
+            "support_tickets_has_more": tickets_data["has_more"],
+            "support_tickets_next_updated_at": tickets_data["next_updated_at"],
+            "support_tickets_next_id": tickets_data["next_id"],
             "support_status_open": SupportTicketStatus.OPEN,
             "support_admin_role": support_admin_role(request),
             "support_admin_is_full_admin": support_admin_is_full_admin(request),
@@ -4843,7 +5828,33 @@ def support_admin_ticket_payload(ticket, user):
     }
 
 
-def load_support_admin_tickets(status_filter):
+def _support_ticket_cursor(updated_at_value, ticket_id_value):
+    """Parse a stable `(updated_at, id)` keyset cursor from query params."""
+    if not updated_at_value and not ticket_id_value:
+        return None
+    if not updated_at_value or not ticket_id_value:
+        raise ValueError("Неполный курсор списка тикетов")
+    try:
+        updated_at = datetime.fromisoformat(str(updated_at_value))
+        ticket_id = int(ticket_id_value)
+    except (TypeError, ValueError, OverflowError) as error:
+        raise ValueError("Некорректный курсор списка тикетов") from error
+    if updated_at.tzinfo is not None:
+        updated_at = updated_at.astimezone(timezone.utc).replace(tzinfo=None)
+    if ticket_id < 1:
+        raise ValueError("Некорректный курсор списка тикетов")
+    return updated_at, ticket_id
+
+
+def load_support_admin_tickets(
+    status_filter,
+    *,
+    limit=SUPPORT_ADMIN_TICKETS_PAGE_SIZE,
+    before_updated_at=None,
+    before_id=None,
+):
+    limit = min(max(int(limit), 1), SUPPORT_ADMIN_TICKETS_MAX_PAGE_SIZE)
+    cursor = _support_ticket_cursor(before_updated_at, before_id)
     db_session = session_factory()
     try:
         query = db_session.query(SupportTicket, User).join(
@@ -4856,7 +5867,24 @@ def load_support_admin_tickets(status_filter):
             status_filter = "open"
             query = query.filter(SupportTicket.status == SupportTicketStatus.OPEN)
 
-        tickets = query.order_by(SupportTicket.updated_at.desc()).all()
+        if cursor is not None:
+            cursor_updated_at, cursor_id = cursor
+            query = query.filter(
+                or_(
+                    SupportTicket.updated_at < cursor_updated_at,
+                    and_(
+                        SupportTicket.updated_at == cursor_updated_at,
+                        SupportTicket.id < cursor_id,
+                    ),
+                )
+            )
+        rows = (
+            query.order_by(SupportTicket.updated_at.desc(), SupportTicket.id.desc())
+            .limit(limit + 1)
+            .all()
+        )
+        has_more = len(rows) > limit
+        tickets = rows[:limit]
         open_count = (
             db_session.query(func.count(SupportTicket.id))
             .filter(SupportTicket.status == SupportTicketStatus.OPEN)
@@ -4868,6 +5896,7 @@ def load_support_admin_tickets(status_filter):
             .scalar()
         )
 
+        last_ticket = tickets[-1][0] if tickets else None
         return {
             "tickets": tickets,
             "ticket_payloads": [
@@ -4876,6 +5905,13 @@ def load_support_admin_tickets(status_filter):
             "status_filter": status_filter,
             "open_count": open_count,
             "closed_count": closed_count,
+            "has_more": has_more,
+            "next_updated_at": (
+                last_ticket.updated_at.isoformat()
+                if has_more and last_ticket is not None
+                else ""
+            ),
+            "next_id": last_ticket.id if has_more and last_ticket is not None else None,
         }
     finally:
         db_session.close()
@@ -4886,16 +5922,48 @@ def support_admin_tickets_json(request):
     if auth_response:
         return auth_response
 
-    tickets_data = load_support_admin_tickets(request.GET.get("status", "open"))
-    return JsonResponse(
+    try:
+        limit = int(request.GET.get("limit") or SUPPORT_ADMIN_TICKETS_PAGE_SIZE)
+        tickets_data = load_support_admin_tickets(
+            request.GET.get("status", "open"),
+            limit=limit,
+            before_updated_at=request.GET.get("before_updated_at"),
+            before_id=request.GET.get("before_id"),
+        )
+    except (TypeError, ValueError, OverflowError) as error:
+        return JsonResponse(
+            {"status": "error", "message": str(error) or "Некорректная страница"},
+            status=400,
+        )
+
+    response = JsonResponse(
         {
             "status": "ok",
             "status_filter": tickets_data["status_filter"],
             "open_count": tickets_data["open_count"],
             "closed_count": tickets_data["closed_count"],
             "tickets": tickets_data["ticket_payloads"],
+            "has_more": tickets_data["has_more"],
+            "next_cursor": {
+                "updated_at": tickets_data["next_updated_at"],
+                "id": tickets_data["next_id"],
+            },
         }
     )
+    # Hash the representation actually sent: all rows, user fields and cursors.
+    etag = f'"{hashlib.sha256(response.content).hexdigest()}"'
+    # GZipMiddleware делает ETag слабым (W/"…"), и браузер присылает его в
+    # If-None-Match именно так; значений может быть и несколько. Для
+    # If-None-Match сравнение по RFC 9110 слабое.
+    client_etags = parse_etags(request.headers.get("If-None-Match", ""))
+    if client_etags == ["*"] or etag in {
+        value.removeprefix("W/") for value in client_etags
+    }:
+        response = HttpResponse(status=304)
+    response["Cache-Control"] = "private, no-cache"
+    response["Vary"] = "Cookie"
+    response["ETag"] = etag
+    return response
 
 
 def admin_parse_date(value):
@@ -4937,15 +6005,7 @@ def get_runtime_tariffs(tariffs, db_session=None):
     if should_close_session:
         db_session = session_factory()
     try:
-        runtime_tariffs = []
-        for tariff in tariffs:
-            key = TARIFF_PRICE_SETTINGS.get(tariff.db_tariff_id)
-            if key is None:
-                runtime_tariffs.append(tariff)
-                continue
-            price = runtime_int_from_db(db_session, key, tariff.price, min_value=1)
-            runtime_tariffs.append(tariff.model_copy(update={"price": price}))
-        return runtime_tariffs
+        return resolve_runtime_tariffs(db_session, tariffs)
     finally:
         if should_close_session:
             db_session.close()
@@ -7242,22 +8302,25 @@ def support_admin_api_stats(request):
             {"status": "error", "message": "Неверный формат даты"}, status=400
         )
 
-    db_session = session_factory()
-    try:
-        return JsonResponse(
-            {
-                "status": "ok",
-                "result": build_admin_interval_stats(
-                    db_session,
-                    start_date,
-                    end_date,
-                    request.GET.get("granularity", "week"),
-                    request.GET.get("sales_mode", "cohort"),
-                ),
-            }
-        )
-    finally:
-        db_session.close()
+    def build_response():
+        db_session = session_factory()
+        try:
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "result": build_admin_interval_stats(
+                        db_session,
+                        start_date,
+                        end_date,
+                        request.GET.get("granularity", "week"),
+                        request.GET.get("sales_mode", "cohort"),
+                    ),
+                }
+            )
+        finally:
+            db_session.close()
+
+    return report_response("support_admin_api_stats", [start_date, end_date, request.GET.get("granularity", "week"), request.GET.get("sales_mode", "cohort")], build_response)
 
 
 def support_admin_api_stats_source_users(request):
@@ -7474,23 +8537,26 @@ def support_admin_api_cohort_stats(request):
             {"status": "error", "message": cohort_error}, status=400
         )
 
-    db_session = session_factory()
-    try:
-        return JsonResponse(
-            {
-                "status": "ok",
-                "result": build_admin_cohort_retention_stats(
-                    db_session,
-                    period_start,
-                    period_end,
-                    cohort_start,
-                    cohort_end,
-                    request.GET.get("granularity", "month"),
-                ),
-            }
-        )
-    finally:
-        db_session.close()
+    def build_response():
+        db_session = session_factory()
+        try:
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "result": build_admin_cohort_retention_stats(
+                        db_session,
+                        period_start,
+                        period_end,
+                        cohort_start,
+                        cohort_end,
+                        request.GET.get("granularity", "month"),
+                    ),
+                }
+            )
+        finally:
+            db_session.close()
+
+    return report_response("support_admin_api_cohort_stats", [period_start, period_end, cohort_start, cohort_end, request.GET.get("granularity", "month")], build_response)
 
 
 def support_admin_api_payment_info(request):
@@ -9413,8 +10479,12 @@ def support_admin_create_message(request, ticket_id):
         return redirect("support_admin_ticket_detail", ticket_id=ticket_id)
 
     message = request.POST.get("message", "").strip()
+    uploaded_files = request.FILES.getlist("attachments")
     if not message:
         return redirect("support_admin_ticket_detail", ticket_id=ticket_id)
+    attachment_error = validate_support_attachments(uploaded_files)
+    if attachment_error:
+        return support_attachment_validation_response(request, attachment_error)
 
     db_session = session_factory()
     try:
@@ -9440,7 +10510,7 @@ def support_admin_create_message(request, ticket_id):
             attach_support_attachments(
                 db_session,
                 support_message,
-                request.FILES.getlist("attachments"),
+                uploaded_files,
             )
     finally:
         db_session.close()
@@ -9571,11 +10641,7 @@ def support_admin_attachment(request, attachment_id):
         if media_root not in path.parents or not path.exists():
             raise Http404("Attachment not found")
 
-        return FileResponse(
-            path.open("rb"),
-            content_type=attachment.content_type,
-            filename=attachment.file_name,
-        )
+        return support_attachment_file_response(attachment, path)
     finally:
         db_session.close()
 
@@ -9596,6 +10662,36 @@ def should_send_payment_login_email(request, user):
     return not (request.user.is_authenticated and str(request.user.id) == str(user.id))
 
 
+def purchase_login_email_content(request):
+    """Тема и контекст письма с постоянной ссылкой доступа (plogin_) после покупки.
+
+    Только из request, без БД: вызывается и после commit счёта, и в ветке
+    неизвестного исхода оплаты уже после rollback (FINAL-PAY-02), поэтому
+    письмо в обоих случаях одинаковое.
+    """
+    product_name = (
+        "Monkey Island VPS"
+        if get_site_role(request) in ("vps", "vps_direct_sale")
+        else "VPN Monkey Island"
+    )
+    return (
+        f"Ссылка доступа {product_name}",
+        {
+            "title": "Доступ готов",
+            "intro": f"Мы подготовили для вас доступ {product_name}.",
+            "note": (
+                "После оплаты зайдите по кнопке ниже: ссылка постоянная и "
+                "откроет оплаченный доступ, инструкции для устройств и поддержку."
+            ),
+            "button_text": "Открыть доступ",
+            "footer": (
+                f"Если вы не оформляли {product_name}, просто "
+                "проигнорируйте это письмо."
+            ),
+        },
+    )
+
+
 def wants_payment_launch_json(request):
     return (
         request.headers.get("X-Payment-Launch") == "new-tab"
@@ -9604,12 +10700,115 @@ def wants_payment_launch_json(request):
     )
 
 
+PAYMENT_RATE_LIMITED_MESSAGE = (
+    "Слишком много попыток оплаты. Подождите несколько минут и попробуйте снова."
+)
+
+
+def payment_error_response(message, status, payment_launch_json):
+    """Отказ в запуске оплаты: JSON с message для fetch-запуска, иначе текст."""
+    if payment_launch_json:
+        return JsonResponse({"status": "error", "message": message}, status=status)
+    return HttpResponse(message, status=status)
+
+
+def payment_rate_limited_response(retry_after, payment_launch_json):
+    response = payment_error_response(
+        PAYMENT_RATE_LIMITED_MESSAGE, 429, payment_launch_json
+    )
+    response["Retry-After"] = str(retry_after)
+    return response
+
+
+def anonymous_payment_rate_limited(request, email):
+    """Лимиты оплаты без входа. Возвращает ``(limited, retry_after)``.
+
+    Вызывается до обращения к БД. Порядок как в send_magic_link: IP → email →
+    общий; отбитый запрос следующие счётчики не расходует, иначе один IP
+    выбивал бы оплату всем. Email и общий бакет считают только адреса
+    валидного формата: мусор не расходует лимит чужого адреса и общий потолок
+    (битый адрес ограничен IP-бакетом, новый аккаунт на него не создаётся).
+    Пороги мягкие: у мобильных операторов много абонентов за одним IP (CGNAT).
+    IP и email в лог попадают только отпечатком.
+    """
+    ip = client_ip(request) or "unknown"
+    limited, retry_after = rate_limit_exceeded(
+        "payment-anonymous",
+        (
+            (
+                "ip",
+                ip,
+                settings.PAYMENT_ANON_IP_RATE_LIMIT,
+                settings.PAYMENT_ANON_RATE_WINDOW_SECONDS,
+            ),
+        ),
+    )
+    if limited:
+        logging.warning(
+            "anonymous payment IP rate limit reached "
+            "(ip_digest=%s limit=%s window=%ss)",
+            rate_limit_log_digest(ip),
+            settings.PAYMENT_ANON_IP_RATE_LIMIT,
+            settings.PAYMENT_ANON_RATE_WINDOW_SECONDS,
+        )
+        return True, retry_after
+
+    if not is_valid_email(email):
+        return False, 0
+
+    limited, retry_after = rate_limit_exceeded(
+        "payment-anonymous",
+        (
+            (
+                "email",
+                email,
+                settings.PAYMENT_ANON_EMAIL_RATE_LIMIT,
+                settings.PAYMENT_ANON_RATE_WINDOW_SECONDS,
+            ),
+        ),
+    )
+    if limited:
+        logging.warning(
+            "anonymous payment email rate limit reached "
+            "(email_digest=%s limit=%s window=%ss)",
+            rate_limit_log_digest(email),
+            settings.PAYMENT_ANON_EMAIL_RATE_LIMIT,
+            settings.PAYMENT_ANON_RATE_WINDOW_SECONDS,
+        )
+        return True, retry_after
+
+    limited, retry_after = rate_limit_exceeded(
+        "payment-anonymous",
+        (
+            (
+                "global",
+                "all",
+                settings.PAYMENT_ANON_GLOBAL_RATE_LIMIT,
+                settings.PAYMENT_ANON_GLOBAL_RATE_WINDOW_SECONDS,
+            ),
+        ),
+    )
+    if limited:
+        logging.warning(
+            "anonymous payment global rate limit reached (limit=%s window=%ss)",
+            settings.PAYMENT_ANON_GLOBAL_RATE_LIMIT,
+            settings.PAYMENT_ANON_GLOBAL_RATE_WINDOW_SECONDS,
+        )
+    return limited, retry_after
+
+
 def pay(request):
     if request.method == "POST":
         capture_tracking_params(request)
         email_raw = request.POST.get("email")
         tariff_id = request.POST.get("tariff_id")
-        raw_purchase_token = None
+        prepared_attempt = None
+        prepared_attempt_id = None
+        raw_status_token = None
+        raw_login_token = None
+        login_link = None
+        send_payment_login_email = False
+        payment_login_email_attempted = False
         use_permanent_purchase_link = False
         payment_status_url = None
         is_authenticated_payment = False
@@ -9645,7 +10844,9 @@ def pay(request):
             logging.warning(
                 "payment request rejected: missing email, tariff_id=%s", tariff_id
             )
-            return HttpResponse("Email обязателен", status=400)
+            return payment_error_response(
+                "Email обязателен", 400, payment_launch_json
+            )
 
         email = email_raw.lower().strip()
 
@@ -9655,7 +10856,26 @@ def pay(request):
                 bool(email),
                 tariff_id,
             )
-            return HttpResponse("Не указан email или тариф", status=400)
+            return payment_error_response(
+                "Не указан email или тариф", 400, payment_launch_json
+            )
+
+        # Прямая покупка с лендинга (решение владельца, R03): аноним вводит
+        # email и сразу платит, аккаунт по email создаётся до оплаты. Email чека
+        # не доказывает владение адресом, поэтому для анонима ниже: браузеру
+        # отдаётся только pstatus_-ссылка статуса (никогда не авторизует),
+        # ссылка входа (plogin_ или короткая magic) уходит только письмом на
+        # этот email, сессия не авторизуется, пробная подписка в панели не
+        # создаётся (allow_trial=False, B12). Лимиты частоты — до обращения к БД.
+        # Ответ confirmation_required прежнего потока больше не выдаётся; его
+        # обработка в JS лендингов и чтение pending_checkout_tariff_id кабинетом
+        # оставлены для закэшированных страниц и старых сессий.
+        if not getattr(request.user, "is_authenticated", False):
+            limited, retry_after = anonymous_payment_rate_limited(request, email)
+            if limited:
+                return payment_rate_limited_response(
+                    retry_after, payment_launch_json
+                )
 
         db_session = session_factory()
         try:
@@ -9673,7 +10893,9 @@ def pay(request):
                     tariff_id,
                     email,
                 )
-                return HttpResponse("Выбранный тариф не найден", status=400)
+                return payment_error_response(
+                    "Выбранный тариф не найден", 400, payment_launch_json
+                )
 
             # Формат email. Раньше проверялась только непустота, и адрес без
             # точки в домене ('milenapanowa@yandex' — браузерный type="email"
@@ -9729,7 +10951,7 @@ def pay(request):
             authenticated_user = None
             if request.user.is_authenticated:
                 authenticated_user = (
-                    db_session.query(User).filter(User.id == request.user.id).first()
+                    db_session.query(User).filter(User.id == request.user.id).with_for_update().first()
                 )
                 if not authenticated_user:
                     logging.warning(
@@ -9740,63 +10962,43 @@ def pay(request):
 
             # Ищем или создаем пользователя. Для авторизованного аккаунта используем
             # именно текущую запись, чтобы платеж не создал дубль по email.
+            payment_email_confirmation = None
             if authenticated_user:
                 user = authenticated_user
                 is_authenticated_payment = True
-                if user.email and user.email != email:
-                    logging.warning(
-                        "payment request rejected: email mismatch for authenticated user "
-                        "user_id=%s user_email=%s submitted_email=%s",
-                        user.id,
-                        user.email,
-                        email,
-                    )
-                    return HttpResponse(
-                        "Email не совпадает с текущим аккаунтом",
-                        status=400,
-                    )
-
-                if not user.email:
-                    email_owner = (
-                        db_session.query(User)
-                        .filter(User.email == email, User.id != user.id)
-                        .first()
-                    )
-                    if email_owner:
-                        logging.warning(
-                            "payment request rejected: email already belongs to another user "
-                            "email=%s current_user_id=%s owner_user_id=%s",
-                            email,
-                            user.id,
-                            email_owner.id,
-                        )
-                        return HttpResponse(
-                            "Этот email уже привязан к другому аккаунту",
-                            status=400,
-                        )
-                    user.email = email
-                    db_session.flush()
-                    logging.info(
-                        "payment email attached to authenticated user: "
-                        "email=%s user_id=%s username=%s tariff_id=%s",
-                        email,
-                        user.id,
-                        user.username,
-                        tariff.db_tariff_id,
-                    )
-
                 logging.info(
-                    "payment existing authenticated user tracking preserved: "
-                    "email=%s user_id=%s username=%s tariff_id=%s",
+                    "payment uses authenticated account and receipt email without "
+                    "changing account identity: receipt_email=%s user_id=%s "
+                    "username=%s tariff_id=%s",
                     email,
                     user.id,
                     user.username,
                     tariff.db_tariff_id,
                 )
+                # Email чека не доказывает владение адресом (B23): в users.email
+                # он здесь не пишется. Аккаунту без email после создания счёта
+                # отправим штатное письмо подтверждения (как update_email) —
+                # адрес привяжется только по ссылке из письма.
+                if not user.email and is_valid_email(email):
+                    payment_email_confirmation = (user.id, email)
             else:
-                user = db_session.query(User).filter(User.email == email).first()
+                # FOR UPDATE, как в авторизованной ветке: find_reusable_attempt
+                # рассчитан на лок users, иначе два одновременных анонимных POST
+                # на один email создали бы две попытки и два платежа
+                # (FINAL-PAY-03). Для нового email сериализует advisory-лок в
+                # create_site_user.
+                user = (
+                    db_session.query(User)
+                    .filter(User.email == email)
+                    .with_for_update()
+                    .first()
+                )
                 if not user:
-                    user = create_site_user(db_session, email, request)
+                    # Владение адресом ещё не подтверждено: аккаунт без пробной
+                    # подписки в панели (B12); оплата продлит его по webhook.
+                    user = create_site_user(
+                        db_session, email, request, allow_trial=False
+                    )
                     logging.info(
                         "payment user created: email=%s user_id=%s username=%s tariff_id=%s",
                         email,
@@ -9829,7 +11031,9 @@ def pay(request):
                     user.id,
                     email,
                 )
-                return HttpResponse(ACCOUNT_BLOCKED_MESSAGE, status=403)
+                return payment_error_response(
+                    ACCOUNT_BLOCKED_MESSAGE, 403, payment_launch_json
+                )
 
             use_permanent_purchase_link = (
                 request.POST.get("login_link_kind") == "purchase_permanent"
@@ -9838,9 +11042,26 @@ def pay(request):
             payment_success_redirect_url = f"{base_url}/dashboard/"
             payment_fail_redirect_url = f"{base_url}/"
             login_link = None
+            send_payment_login_email = should_send_payment_login_email(request, user)
 
-            if use_permanent_purchase_link:
-                raw_purchase_token = create_purchase_login_token(db_session, user)
+            raw_status_token = create_purchase_status_token(db_session, user)
+            status_token_row = get_purchase_status_token(db_session, raw_status_token)
+            if status_token_row is None:
+                raise RuntimeError("failed to persist purchase status token")
+            logging.info(
+                "created payment status token: email=%s user_id=%s tariff_id=%s",
+                email,
+                user.id,
+                tariff.db_tariff_id,
+            )
+
+            login_token_row = None
+            if use_permanent_purchase_link and send_payment_login_email:
+                raw_login_token = create_purchase_login_token(db_session, user)
+                login_token_row = get_purchase_login_token(db_session, raw_login_token)
+                if login_token_row is None:
+                    raise RuntimeError("failed to persist purchase login token")
+                login_link = build_purchase_login_link(request, raw_login_token)
                 logging.info(
                     "created permanent purchase login link: email=%s user_id=%s tariff_id=%s",
                     email,
@@ -9848,17 +11069,7 @@ def pay(request):
                     tariff.db_tariff_id,
                 )
 
-            if not raw_purchase_token:
-                raw_purchase_token = create_purchase_login_token(db_session, user)
-                logging.info(
-                    "created payment status token: email=%s user_id=%s tariff_id=%s",
-                    email,
-                    user.id,
-                    tariff.db_tariff_id,
-                )
-
-            login_link = build_purchase_login_link(request, raw_purchase_token)
-            payment_status_url = build_payment_status_url(request, raw_purchase_token)
+            payment_status_url = build_payment_status_url(request, raw_status_token)
             payment_success_redirect_url = payment_status_url
             payment_fail_redirect_url = append_query_params(
                 payment_status_url,
@@ -9868,6 +11079,51 @@ def pay(request):
             tariff, promo_discount_applied = site_apply_first_purchase_discount(
                 db_session, user, tariff
             )
+
+            gateway = "wata" if settings.PAYMENT_GATEWAY.lower() == "wata" else "yookassa"
+            # Цена и промо в отпечатке: после смены цены или активации скидки
+            # старая ссылка не переиспользуется.
+            fingerprint = fingerprint_for(
+                user.id, gateway, tariff.db_tariff_id, email,
+                price=tariff.price, promo=promo_discount_applied,
+            )
+            # username: после merge попытка ЮKassa с metadata проигравшего не
+            # переиспользуется (XSVC-01); для Wata ничего не меняется.
+            previous_attempt = find_reusable_attempt(
+                db_session, user.id, fingerprint, username=user.username
+            )
+            if previous_attempt is not None:
+                previous_status_url = previous_attempt.status_url
+                previous_payment_url = previous_attempt.confirmation_url or previous_status_url
+                db_session.rollback()  # Discard newly prepared, unused tokens.
+                if payment_launch_json:
+                    return JsonResponse({"status": "ok", "payment_url": previous_payment_url,
+                                         "payment_status_url": previous_status_url})
+                return redirect(previous_payment_url)
+            attempt = WebsitePaymentAttempt(
+                id=str(uuid.uuid4()), user_id=user.id, fingerprint=fingerprint,
+                gateway=gateway, tariff_id=tariff.db_tariff_id, state="prepared",
+                status_token_hash=status_token_row.token_hash,
+                login_token_hash=login_token_row.token_hash if login_token_row else None,
+                status_url=payment_status_url, created_at=datetime.utcnow(), attempts=0,
+            )
+            def before_provider_send(payload):
+                nonlocal prepared_attempt, prepared_attempt_id
+                # Wata orderId is known before network I/O; the payment callback
+                # can resolve its owner through this committed mapping.
+                if gateway == "wata":
+                    attempt.provider_reference = attempt.id
+                    status_token_row.payment_gateway = gateway
+                    status_token_row.payment_reference = attempt.id
+                    if login_token_row:
+                        login_token_row.payment_gateway = gateway
+                        login_token_row.payment_reference = attempt.id
+                # id читаем до commit: после него атрибуты ORM истекают, а в
+                # ветке ошибки соединение может быть уже мёртвым.
+                attempt_id = attempt.id
+                persist_before_send(db_session, attempt, payload)
+                prepared_attempt = attempt
+                prepared_attempt_id = attempt_id
 
             if settings.PAYMENT_GATEWAY.lower() == "wata":
                 logging.info(
@@ -9882,26 +11138,21 @@ def pay(request):
                     tariff=tariff,
                     success_redirect_url=payment_success_redirect_url,
                     fail_redirect_url=payment_fail_redirect_url,
+                    idempotency_key=attempt.id, before_send=before_provider_send,
                 )
 
                 confirmation_url = created_payment.confirmation_url
-                login_token = get_purchase_login_token(
-                    db_session,
-                    raw_purchase_token,
-                )
-                login_token.payment_gateway = "wata"
-                login_token.payment_reference = created_payment.reference
+                status_token_row.payment_gateway = "wata"
+                status_token_row.payment_reference = created_payment.reference
+                if login_token_row is not None:
+                    login_token_row.payment_gateway = "wata"
+                    login_token_row.payment_reference = created_payment.reference
 
-                save_wata_invoice(
-                    session=db_session,
-                    invoice_json=created_payment.payload,
-                    tariff_id=tariff.db_tariff_id,
-                    email=email,
-                )
+                finish_attempt(db_session, attempt, created_payment)
 
                 logging.info(
                     f"an invoice for the {tariff.db_tariff_id} tariff has been created for "
-                    f"{email}, confirmation url: {confirmation_url}"
+                    f"user_id={user.id}"
                 )
             else:
                 logging.info(
@@ -9919,36 +11170,29 @@ def pay(request):
                     return_url=payment_success_redirect_url,
                     email=email or user.email,
                     promo=promo_discount_applied,
+                    idempotency_key=attempt.id, before_send=before_provider_send,
+                    # Автоплатёж — только при email в аккаунте: yk-recurrent берёт
+                    # email чека из users.email и без него не спишет. Без
+                    # подтверждённого email платёж разовый.
+                    save_payment_method=bool(user.email),
+                    # metadata.email — email аккаунта, не чека (XSVC-01).
+                    account_email=user.email or None,
                 )
+                finish_attempt(db_session, attempt, created_payment)
                 confirmation_url = created_payment.confirmation_url
-                login_token = get_purchase_login_token(
-                    db_session,
-                    raw_purchase_token,
-                )
-                login_token.payment_gateway = "yookassa"
-                login_token.payment_reference = created_payment.reference
+                status_token_row.payment_gateway = "yookassa"
+                status_token_row.payment_reference = created_payment.reference
+                if login_token_row is not None:
+                    login_token_row.payment_gateway = "yookassa"
+                    login_token_row.payment_reference = created_payment.reference
 
             invoice_event = create_invoice_event_for_tariff(tariff.db_tariff_id)
             if invoice_event:
                 add_event_log(db_session, user, invoice_event)
 
             if use_permanent_purchase_link:
-                product_name = (
-                    "Monkey Island VPS"
-                    if get_site_role(request) in ("vps", "vps_direct_sale")
-                    else "VPN Monkey Island"
-                )
-                email_subject = f"Ссылка доступа {product_name}"
-                email_title = "Доступ готов"
-                email_intro = f"Мы подготовили для вас доступ {product_name}."
-                login_link_note = (
-                    "После оплаты зайдите по кнопке ниже: ссылка постоянная и "
-                    "откроет оплаченный доступ, инструкции для устройств и поддержку."
-                )
-                email_button_text = "Открыть доступ"
-                email_footer = (
-                    f"Если вы не оформляли {product_name}, просто "
-                    "проигнорируйте это письмо."
+                email_subject, email_template_context = (
+                    purchase_login_email_content(request)
                 )
             else:
                 magic = MagicToken(user_id=user.id)
@@ -9964,21 +11208,23 @@ def pay(request):
                     tariff.db_tariff_id,
                 )
                 email_subject = "Ссылка на личный кабинет Monkey Island"
-                email_title = "Кабинет уже готов"
-                email_intro = "Мы создали для вас личный кабинет Monkey Island."
-                login_link_note = (
-                    "После оплаты зайдите по кнопке ниже: ссылка действует "
-                    "15 минут и откроет VPN-подписку, инструкции для "
-                    "устройств и поддержку."
-                )
-                email_button_text = "Открыть кабинет"
-                email_footer = (
-                    "Если вы не оформляли VPN Monkey Island, просто "
-                    "проигнорируйте это письмо."
-                )
+                email_template_context = {
+                    "title": "Кабинет уже готов",
+                    "intro": "Мы создали для вас личный кабинет Monkey Island.",
+                    "note": (
+                        "После оплаты зайдите по кнопке ниже: ссылка действует "
+                        "15 минут и откроет VPN-подписку, инструкции для "
+                        "устройств и поддержку."
+                    ),
+                    "button_text": "Открыть кабинет",
+                    "footer": (
+                        "Если вы не оформляли VPN Monkey Island, просто "
+                        "проигнорируйте это письмо."
+                    ),
+                }
 
             db_session.commit()
-            request.session[payment_session_url_key(raw_purchase_token)] = (
+            request.session[payment_session_url_key(raw_status_token)] = (
                 confirmation_url
             )
             request.session.modified = True
@@ -9989,7 +11235,7 @@ def pay(request):
                 tariff.db_tariff_id,
             )
 
-            if not should_send_payment_login_email(request, user):
+            if not send_payment_login_email:
                 logging.info(
                     "payment login email skipped for authenticated user: "
                     "email=%s user_id=%s tariff_id=%s",
@@ -9998,18 +11244,13 @@ def pay(request):
                     tariff.db_tariff_id,
                 )
             else:
+                payment_login_email_attempted = True
                 try:
                     send_magic_link_email(
                         email,
                         login_link,
                         subject=email_subject,
-                        template_context={
-                            "title": email_title,
-                            "intro": email_intro,
-                            "note": login_link_note,
-                            "button_text": email_button_text,
-                            "footer": email_footer,
-                        },
+                        template_context=email_template_context,
                     )
                     logging.info(
                         "payment login email sent: email=%s user_id=%s tariff_id=%s permanent_link=%s",
@@ -10022,6 +11263,10 @@ def pay(request):
                     logging.exception(
                         f"failed to send payment magic link to {email}: {e}"
                     )
+
+            if payment_email_confirmation:
+                # Счёт уже создан и закоммичен; сбой письма оплату не ломает.
+                send_payment_email_confirmation(request, *payment_email_confirmation)
 
             logging.info(
                 "payment redirecting to confirmation_url: email=%s user_id=%s tariff_id=%s json=%s",
@@ -10086,7 +11331,73 @@ def pay(request):
 
         except Exception as e:
             db_session.rollback()
-            logging.exception("Pay error")
+            if prepared_attempt is not None and not isinstance(e, ProviderRejected):
+                # Таймаут, обрыв, 429/5xx, 202 после ретраев, неразборчивый
+                # ответ: платёж мог создаться — ждём сверку, новый POST нельзя.
+                logging.warning(
+                    "checkout result unknown; recovery scheduled attempt_id=%s",
+                    prepared_attempt_id,
+                    exc_info=True,
+                )
+                if (
+                    raw_login_token is not None
+                    and login_link
+                    and send_payment_login_email
+                    and not payment_login_email_attempted
+                ):
+                    # FINAL-PAY-02: plogin_-токен уже закоммичен вместе с
+                    # попыткой (persist_before_send), и после оплаты страница
+                    # статуса скажет, что ссылка отправлена. plogin_ авторизует
+                    # только после подтверждённой оплаты, поэтому письмо до
+                    # исхода безопасно. Атрибуты ORM после rollback не читаем.
+                    payment_login_email_attempted = True
+                    try:
+                        email_subject, email_template_context = (
+                            purchase_login_email_content(request)
+                        )
+                        send_magic_link_email(
+                            email,
+                            login_link,
+                            subject=email_subject,
+                            template_context=email_template_context,
+                        )
+                        logging.info(
+                            "payment login email sent after unknown checkout "
+                            "outcome attempt_id=%s",
+                            prepared_attempt_id,
+                        )
+                    except Exception:
+                        logging.exception(
+                            "failed to send payment login email after unknown "
+                            "checkout outcome attempt_id=%s",
+                            prepared_attempt_id,
+                        )
+                if payment_launch_json:
+                    return JsonResponse({"status": "ok", "payment_url": payment_status_url,
+                                         "payment_status_url": payment_status_url})
+                return redirect(payment_status_url)
+            if prepared_attempt is not None:
+                # Провайдер однозначно отказал (400/401/403/404, у Wata ещё
+                # 422): платёж не создан, попытка не должна блокировать повтор.
+                logging.error(
+                    "Pay error: payment provider rejected checkout attempt_id=%s",
+                    prepared_attempt_id,
+                    exc_info=e,
+                )
+                try:
+                    mark_attempt_failed(db_session, prepared_attempt_id)
+                except Exception:
+                    try:
+                        db_session.rollback()
+                    except Exception:
+                        pass
+                    logging.error(
+                        "checkout attempt could not be marked failed attempt_id=%s",
+                        prepared_attempt_id,
+                        exc_info=True,
+                    )
+            else:
+                logging.exception("Pay error")
             messages.error(request, "Ошибка платежной системы")
             error_message = (
                 "Не удалось открыть форму оплаты. Попробуйте еще раз "
@@ -10142,10 +11453,9 @@ def robots_txt(request):
 
 def dynamic_manifest(request):
     site_role = get_site_role(request)
-    app_name = (
-        "Monkey Island VPS" if site_role == "vps_direct_sale" else "VPN Monkey Island"
-    )
-    start_url = "/" if site_role == "vps_direct_sale" else "/dashboard/"
+    neutral_role = site_role in ("vps", "vps_direct_sale")
+    app_name = "Monkey Island VPS" if neutral_role else "VPN Monkey Island"
+    start_url = "/" if neutral_role else "/dashboard/"
     data = {
         "name": app_name,
         "short_name": app_name,
@@ -11182,12 +12492,16 @@ def _acq_ads(db_session, weeks):
         weeks=weeks,
     )
     weekly_conns = {r["week"].isoformat(): r["conns"] for r in conn_rows}
+    weekly_pays = {r["week"].isoformat(): r for r in pays}
     out = []
-    for r in pays:
-        wk = r["week"].isoformat()
+    # Weeks with spend and no sales are the rows that most need attention.
+    # Build the union of all series instead of using payments as the left side.
+    week_keys = set(weekly_spend) | set(weekly_pays) | set(weekly_subs) | set(weekly_conns)
+    for wk in sorted(week_keys):
+        pay_row = weekly_pays.get(wk, {})
         spend = weekly_spend.get(wk, 0.0)
-        new_payers = r["new_payers"]
-        new_rub = float(r["new_rub"])
+        new_payers = int(pay_row.get("new_payers", 0) or 0)
+        new_rub = float(pay_row.get("new_rub", 0) or 0)
         subs = weekly_subs.get(wk, 0)
         conns = weekly_conns.get(wk, 0)
         out.append({
@@ -12642,10 +13956,8 @@ def support_admin_actor(request):
 
 
 def admin_client_ip(request):
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR", "")
-    if forwarded:
-        return forwarded.split(",")[0].strip()[:64]
-    return (request.META.get("REMOTE_ADDR") or "")[:64] or None
+    value = client_ip(request)
+    return value[:64] if value else None
 
 
 def admin_audit_write(db_session, request, action, target=None, **details):
@@ -15060,7 +16372,7 @@ def node_bootstrap_claim(request):
     db_session = session_factory()
     try:
         provision_request = node_provisioning.find_request_by_token(
-            db_session, _node_bootstrap_token(request)
+            db_session, _node_bootstrap_token(request), for_update=True
         )
         payload = node_provisioning.claim_request(
             db_session, provision_request, admin_client_ip(request), rwms_client
@@ -15459,7 +16771,9 @@ def support_admin_api_node_provision(request):
 
                 provision_request = (
                     db_session.query(NodeProvisionRequest)
-                    .get(int(request.POST.get("id") or 0))
+                    .filter(NodeProvisionRequest.id == int(request.POST.get("id") or 0))
+                    .with_for_update()
+                    .first()
                 )
                 if provision_request is None:
                     return JsonResponse(

@@ -131,8 +131,7 @@
             padding: 8px 16px; border-radius: 100px; margin-bottom: 36px;
             background: rgba(9, 10, 15, .6);
         }
-        .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 8px var(--mint); animation: pulse 2s infinite; }
-        @keyframes pulse { 50% { opacity: .4; } }
+        .chip .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--mint); box-shadow: 0 0 8px var(--mint); }
 
         .hero-bg h1 {
             font-weight: 800; font-size: clamp(34px, 4.6vw, 66px); line-height: 1.08;
@@ -453,7 +452,7 @@
     <section id="prices" class="reveal">
         <div class="sec-head">
             <div class="sec-num">02</div>
-            <div class="sec-title">Тарифы<small>Выберите период, укажите email и оплатите картой — кабинет с ключами откроется сразу</small></div>
+            <div class="sec-title">Тарифы<small>Выберите период, укажите email и оплатите картой — ссылка на кабинет с ключами придёт на email</small></div>
         </div>
         <div class="trust">
             <div class="trust-item"><i class="fas fa-credit-card"></i><b>Оплата картой</b>Visa · MC · Mir · СБП</div>
@@ -501,7 +500,7 @@
         <p class="plans-legal">
             <i class="fas fa-lock" style="color:var(--gold)"></i>
             Безопасная оплата картой Visa · MC · Mir · СБП, данные карты не храним. Нажимая «Оплатить», вы принимаете
-            <a href="/offer/" target="_blank" style="color:var(--gold)">условия оферты</a>. После оплаты сразу откроется личный кабинет.
+            <a href="/offer/" target="_blank" style="color:var(--gold)">условия оферты</a>. После оплаты ссылка для входа в личный кабинет придёт на email.
             Уже есть подписка из Telegram-бота? <a href="/login/">Войти в кабинет</a>
         </p>
     </section>
@@ -846,9 +845,21 @@
 
                     const submitButton = form.querySelector('button[type="submit"]');
                     if (submitButton) submitButton.disabled = true;
+                    const paymentLaunchFallbackMessage = 'Не удалось открыть оплату. Обновите страницу и попробуйте ещё раз';
+                    let paymentTimeout = null;
 
                     try {
-                        const response = await fetch(form.action, {
+                        // AbortController есть не во всех старых браузерах/WebView:
+                        // без него запускаем оплату без таймаута, не ломая обработчик.
+                        const paymentController = typeof AbortController === 'function'
+                            ? new AbortController()
+                            : null;
+                        if (paymentController) {
+                            // 55 с: выше серверного бюджета /pay/ (RWMS, провайдер с
+                            // ретраями, письмо), ниже 60 с таймаута nginx и gunicorn.
+                            paymentTimeout = window.setTimeout(() => paymentController.abort(), 55000);
+                        }
+                        const paymentRequest = {
                             method: 'POST',
                             body: new FormData(form),
                             credentials: 'same-origin',
@@ -857,10 +868,30 @@
                                 'X-Requested-With': 'XMLHttpRequest',
                                 'X-Payment-Launch': 'new-tab',
                             },
-                        });
-                        const payload = await response.json();
-                        if (!response.ok || payload.status !== 'ok') {
-                            throw new Error(payload.message || 'payment launch failed');
+                        };
+                        if (paymentController) paymentRequest.signal = paymentController.signal;
+                        const response = await fetch(form.action, paymentRequest);
+                        // /pay/, CSRF-мидлварь и nginx могут ответить текстом или HTML:
+                        // JSON читаем только по content-type и внутри try, чтобы вместо
+                        // сообщения сервера не показать текст SyntaxError.
+                        const contentType = (response.headers && response.headers.get('content-type')) || '';
+                        let payload = null;
+                        if (contentType.indexOf('application/json') !== -1) {
+                            try {
+                                payload = await response.json();
+                            } catch (parseError) {
+                                payload = null;
+                            }
+                        }
+                        if (!response.ok || !payload || payload.status !== 'ok') {
+                            const launchError = new Error((payload && payload.message) || paymentLaunchFallbackMessage);
+                            launchError.isPaymentLaunchError = true;
+                            throw launchError;
+                        }
+                        if (payload.confirmation_required) {
+                            if (paymentWindow && !paymentWindow.closed) paymentWindow.close();
+                            window.location.href = payload.payment_url;
+                            return;
                         }
                         if (paymentWindow && payload.payment_url) {
                             paymentWindow.location.href = payload.payment_url;
@@ -868,7 +899,14 @@
                         window.location.href = payload.payment_status_url;
                     } catch (err) {
                         if (paymentWindow && !paymentWindow.closed) paymentWindow.close();
-                        form.submit();
+                        window.alert(
+                            err && err.name === 'AbortError'
+                                ? 'Сервис оплаты отвечает слишком долго. Попробуйте ещё раз.'
+                                : (err && err.isPaymentLaunchError ? err.message : paymentLaunchFallbackMessage),
+                        );
+                        if (submitButton) submitButton.disabled = false;
+                    } finally {
+                        if (paymentTimeout !== null) window.clearTimeout(paymentTimeout);
                     }
                 });
             });

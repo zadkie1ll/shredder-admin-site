@@ -33,5 +33,83 @@
     "yookassa_request_has_timeout": false,
     "django_default_smtp_timeout": null,
     "django_default_cache": "django.core.cache.backends.locmem.LocMemCache"
+  },
+  "implementation_verification_2026_09_11": {
+    "website_tests": 962,
+    "common_tests": 9,
+    "telegram_bot_tests": 43,
+    "git_diff_check": true,
+    "python_compileall": true,
+    "browser_viewports": [
+      "1440x900",
+      "320x568",
+      "390x844"
+    ],
+    "horizontal_overflow": false,
+    "short_onboarding_cta_visible": true,
+    "dialog_focus_lifecycle": null,
+    "live_db_or_provider_calls": false,
+    "dialog_focus_lifecycle_note": "Previous true was overstated: initial focus inside the open dialog was not confirmed; full keyboard lifecycle needs an end-to-end recheck."
+  },
+  "implementation_recheck_2026_09_11": {
+    "report": "implementation-recheck-2026-09-11.md",
+    "targeted_isolated_tests_passed": 20,
+    "git_diff_check": true,
+    "live_db_or_provider_calls": false,
+    "proofs": {
+      "telegram_start_payload_rejected_by_installed_aiogram_lengths": [
+        71,
+        72,
+        76
+      ],
+      "support_etag_after_nonfirst_row_email_change_http_status": 304
+    },
+    "completion_claim_retracted": true,
+    "application_code_changed_during_recheck": false
+  },
+  "implementation_fixes_2026_09_11": {
+    "report": "implementation-fixes-2026-09-11.md",
+    "website_pure_tests_passed": 617,
+    "new_regression_tests_passed": 21,
+    "database_fixture_classes_excluded": 51,
+    "javascript_tests_passed": 5,
+    "payment_tests_passed": 3,
+    "bot_merge_structural_tests_passed": 5,
+    "browser_fixture_viewports": [
+      "320x568",
+      "390x844",
+      "1440x900"
+    ],
+    "dialog_initial_focus": true,
+    "dialog_tab_trap": true,
+    "dialog_escape_restores_focus": true,
+    "horizontal_overflow": false,
+    "nginx_isolated_statuses": {
+      "direct_private": 404,
+      "authorized_x_accel": 200,
+      "denied": 403,
+      "range": 206
+    },
+    "static_manifest_entries": 210,
+    "extracted_assets": 8,
+    "python_3_12_syntax_files": 39,
+    "live_db_or_provider_calls": false,
+    "migration_generated": false,
+    "migration_applied": false,
+    "deployment_performed": false,
+    "required_new_tables": [
+      "website_payment_attempts",
+      "website_email_changes"
+    ],
+    "remaining": [
+      "video container decoding",
+      "frontend module splitting",
+      "message history pagination",
+      "distributed who_connects coordination",
+      "exact 24h ip-guard buckets",
+      "PostgreSQL concurrency integration",
+      "fresh production build/readiness",
+      "production Web Vitals and p95"
+    ]
   }
 }

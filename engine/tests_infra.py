@@ -40,6 +40,7 @@ from common.models.db import (
 )
 from engine import infra
 from engine import infra_worker
+from engine import censor_worker
 from engine import geoip_lookup
 from engine import geoip_updater
 
@@ -385,6 +386,29 @@ class GeoIpUpdaterTests(SimpleTestCase):
             infra_worker.run_maintenance()
 
         update.assert_called_once_with()
+
+    def test_workers_retry_when_initial_database_connect_fails(self):
+        class StopLoop(BaseException):
+            pass
+
+        for worker, args in (
+            (infra_worker, (30,)),
+            (censor_worker, (60, "fallback-key")),
+        ):
+            with self.subTest(worker=worker.__name__), mock.patch.object(
+                worker.engine.dialect, "name", "postgresql"
+            ), mock.patch.object(
+                worker.engine, "connect", side_effect=[RuntimeError("db down"), StopLoop()]
+            ) as connect, mock.patch.object(
+                worker.time, "sleep"
+            ) as sleep, mock.patch.object(
+                worker.random, "uniform", return_value=0
+            ), self.assertLogs(level="ERROR"):
+                with self.assertRaises(StopLoop):
+                    worker._leader_loop(*args)
+
+            self.assertEqual(connect.call_count, 2)
+            sleep.assert_called_once_with(1)
 
     def test_geo_update_failure_does_not_stop_other_infra_maintenance(self):
         with mock.patch.object(
@@ -3084,6 +3108,42 @@ class ProcessAnomalyTests(InfraDbTestCase):
         alert.assert_called_once()
         self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
 
+    def test_low_confidence_address_ban_alerts_without_crash(self):
+        # Бан адреса есть, но ответило меньше 5 зондов: автозамена запрещена,
+        # уходит алерт «уверенности мало». Раньше live_block читался в этой
+        # ветке до присваивания — UnboundLocalError откатывал шаг
+        # anomaly-process на каждом тике, аномалия не финализировалась
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "de.example.xyz")
+        run = self.make_run(
+            "185.10.0.10", ok_probes=0, blocked_probes=3, stage="tcp_fail"
+        )
+        anomaly = self.make_anomaly(
+            server, {"185.10.0.10|ya.ru": run.id}, status="checking_sni"
+        )
+
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(anomaly)
+
+        verdict = anomaly.details["verdict"]
+        self.assertEqual(verdict["blocked_ips"], ["185.10.0.10"])
+        self.assertFalse(verdict["actionable"])
+        self.assertEqual(anomaly.status, "confirmed")
+        low_confidence = [
+            call[0][0] for call in alert.call_args_list
+            if "уверенности мало" in call[0][0]
+        ]
+        self.assertEqual(len(low_confidence), 1)
+        self.assertIn("185.10.0.10", low_confidence[0])
+        self.assertIn("Автозамена не выполнена.", low_confidence[0])
+        self.assertIn("Живых адресов не найдено.", low_confidence[0])
+        self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
+
 
 class ReplacementFlowTests(InfraDbTestCase):
     def setUp(self):
@@ -4484,7 +4544,7 @@ class MaintenanceOrderTests(SimpleTestCase):
         try:
             # Следующий тик — чётный: детектор аномалий в него попадает
             infra_worker._tick_counter = infra_worker._ANOMALY_EVERY_TICKS - 1
-            with mock.patch.object(
+            with mock.patch.object(infra_worker.time, "monotonic", return_value=100.0), mock.patch.object(infra_worker, "_maintenance_due", {"anomaly-detect": 100.0}), mock.patch.object(
                 infra_worker, "_run_step", side_effect=fake_step
             ), mock.patch.object(
                 infra_worker, "_infra_tables_ready", return_value=True
@@ -4496,6 +4556,203 @@ class MaintenanceOrderTests(SimpleTestCase):
         self.assertEqual(names[0], "offline")
         self.assertLess(names.index("aggregate"), names.index("anomaly-detect"))
         self.assertIn("replacements", names)
+
+    def _simulate(self, durations, ticks, due=None, interval=30, budget=30):
+        """Настоящий run_maintenance на фейковых часах, шаги замоканы.
+
+        Пауза между тиками — та же, что у _leader_loop/_simple_loop
+        (_tick_sleep_seconds). Возвращает тики: старт, длительность, шаги
+        с моментом старта и то, что вернул run_maintenance.
+        """
+        clock = [1000.0]
+        log_ticks = []
+
+        def fake_step(name, fn, *args):
+            log_ticks[-1]["steps"].append((name, clock[0]))
+            clock[0] += durations.get(name, 1)
+            return True
+
+        with self.settings(
+            INFRA_WORKER_INTERVAL=interval,
+            INFRA_MAINTENANCE_BUDGET_SECONDS=budget,
+        ), mock.patch.object(
+            infra_worker.time, "monotonic", side_effect=lambda: clock[0]
+        ), mock.patch.object(
+            infra_worker, "_maintenance_due", dict(due or {})
+        ), mock.patch.object(
+            infra_worker, "_tick_counter", 0
+        ), mock.patch.object(
+            infra_worker, "_run_step", side_effect=fake_step
+        ), mock.patch.object(
+            infra_worker, "_infra_tables_ready", return_value=True
+        ), mock.patch(
+            "engine.geoip_updater.update_if_due"
+        ), mock.patch.object(
+            infra_worker.log, "warning"
+        ):
+            for _ in range(ticks):
+                started = clock[0]
+                log_ticks.append({"start": started, "steps": []})
+                deferred = infra_worker.run_maintenance()
+                log_ticks[-1]["duration"] = clock[0] - started
+                log_ticks[-1]["deferred"] = deferred
+                clock[0] += infra_worker._tick_sleep_seconds(interval, deferred)
+        return log_ticks
+
+    def test_offline_runs_first_even_when_other_steps_are_overdue_longer(self):
+        # INFRA-01: шаги идут по сроку. OFFLINE, отработавший в прошлом тике,
+        # не должен вставать в очередь за давно просроченными медленными
+        # шагами — иначе бюджет обрезает тик раньше, чем очередь дойдёт до него
+        names = []
+
+        def fake_step(name, fn, *args):
+            names.append(name)
+            return True
+
+        due = {"aggregate": 10.0, "replacements": 20.0, "offline": 90.0}
+        with mock.patch.object(
+            infra_worker.time, "monotonic", return_value=100.0
+        ), mock.patch.object(
+            infra_worker, "_maintenance_due", due
+        ), mock.patch.object(
+            infra_worker, "_tick_counter", 0
+        ), mock.patch.object(
+            infra_worker, "_run_step", side_effect=fake_step
+        ), mock.patch.object(
+            infra_worker, "_infra_tables_ready", return_value=True
+        ), mock.patch("engine.geoip_updater.update_if_due"):
+            deferred = infra_worker.run_maintenance()
+
+        self.assertEqual(names[:3], ["offline", "aggregate", "replacements"])
+        self.assertIs(deferred, False)
+
+    def test_slow_steps_do_not_push_offline_beyond_one_tick(self):
+        # INFRA-01, больная база (как 2026-09-02): три шага по 45 с при
+        # interval=30 и бюджете 30 с обрезают почти каждый тик. OFFLINE всё
+        # равно первый в каждом тике; между его запусками — не больше одного
+        # тика + interval и не меньше interval (короткая пауза не учащает его)
+        durations = {"aggregate": 45, "anomaly-process": 45, "replacements": 45}
+        ticks = self._simulate(durations, ticks=40)
+
+        for tick in ticks:
+            self.assertEqual(tick["steps"][0][0], "offline", tick)
+        starts = [tick["steps"][0][1] for tick in ticks]
+        gaps = [later - earlier for earlier, later in zip(starts, starts[1:])]
+        longest_tick = max(tick["duration"] for tick in ticks)
+        self.assertLessEqual(max(gaps), longest_tick + 30)
+        self.assertGreaterEqual(min(gaps), 30)
+
+        # Обрезанный тик доделывается после короткой паузы: медленные шаги
+        # идут не реже, чем при последовательном порядке без бюджета
+        # (все 10 шагов подряд + interval)
+        self.assertTrue(any(tick["deferred"] is True for tick in ticks))
+        sequential_tick = 45 * 3 + 7 * 1 + 30
+        for name in durations:
+            runs = [
+                started
+                for tick in ticks
+                for step_name, started in tick["steps"]
+                if step_name == name
+            ]
+            self.assertGreaterEqual(len(runs), 5, name)
+            step_gaps = [later - earlier for earlier, later in zip(runs, runs[1:])]
+            self.assertLessEqual(max(step_gaps), sequential_tick, name)
+
+    def test_slow_offline_does_not_starve_other_steps(self):
+        # OFFLINE сам дольше бюджета (база еле жива): он первый, но его срок —
+        # от конца прошлого запуска, поэтому продолжение тика после короткой
+        # паузы доходит до остальных шагов, а не гоняет OFFLINE по кругу
+        ticks = self._simulate({"offline": 40}, ticks=12)
+
+        ran = [name for tick in ticks for name, _ in tick["steps"]]
+        for name in (
+            "aggregate", "xray", "capacity", "load", "anomaly-process",
+            "replacements",
+        ):
+            self.assertGreaterEqual(ran.count(name), 3, name)
+        for tick in ticks:
+            names = [name for name, _ in tick["steps"]]
+            if "offline" in names:
+                self.assertEqual(names[0], "offline", tick)
+
+    def test_budget_cut_reports_deferred_only_when_steps_are_overdue(self):
+        # Бюджет кончился, просроченные шаги остались -> True (короткая пауза)
+        tick = self._simulate({"aggregate": 45}, ticks=1)[0]
+        self.assertEqual(
+            [name for name, _ in tick["steps"]], ["offline", "aggregate"]
+        )
+        self.assertIs(tick["deferred"], True)
+
+        # Все шаги уложились в бюджет -> False (полный interval)
+        tick = self._simulate({}, ticks=1)[0]
+        self.assertIn("replacements", [name for name, _ in tick["steps"]])
+        self.assertIs(tick["deferred"], False)
+
+        # Бюджет съел медленный OFFLINE, но остальные шаги ещё не созрели ->
+        # False: короткая пауза не нужна
+        not_due = {
+            name: 1_000_000.0
+            for name in (
+                "aggregate", "xray", "capacity", "load", "anomaly-detect",
+                "anomaly-process", "replacements", "dns-watch", "prune",
+            )
+        }
+        tick = self._simulate(
+            {"offline": 40}, ticks=1, due=dict(not_due, offline=1000.0)
+        )[0]
+        self.assertEqual([name for name, _ in tick["steps"]], ["offline"])
+        self.assertIs(tick["deferred"], False)
+
+    def test_leader_loop_sleeps_briefly_only_after_budget_cut(self):
+        class StopLoop(BaseException):
+            pass
+
+        conn = mock.MagicMock()
+        conn.execution_options.return_value = conn
+        conn.execute.return_value.scalar.return_value = True
+        with mock.patch.object(
+            infra_worker.engine.dialect, "name", "postgresql"
+        ), mock.patch.object(
+            infra_worker.engine, "connect", return_value=conn
+        ), mock.patch.object(
+            infra_worker,
+            "run_maintenance",
+            side_effect=[True, False, RuntimeError("boom"), None, StopLoop()],
+        ), mock.patch.object(
+            infra_worker.time, "sleep"
+        ) as sleep, self.assertLogs("infra-worker", level="ERROR"):
+            with self.assertRaises(StopLoop):
+                infra_worker._leader_loop(30)
+
+        # Короткая пауза — только после обрезанного бюджетом тика; обычный
+        # тик, упавший тик и None — полный interval
+        self.assertEqual(
+            [call.args[0] for call in sleep.call_args_list], [1, 30, 30, 30]
+        )
+        # SELECT 1 на lock-соединении — каждую итерацию, в том числе после
+        # короткой паузы
+        statements = [str(call.args[0]) for call in conn.execute.call_args_list]
+        self.assertIn("pg_try_advisory_lock", statements[0])
+        self.assertEqual(statements[1:], ["SELECT 1"] * 5)
+        conn.close.assert_called_once_with()
+
+    def test_simple_loop_sleeps_briefly_only_after_budget_cut(self):
+        class StopLoop(BaseException):
+            pass
+
+        with mock.patch.object(
+            infra_worker,
+            "run_maintenance",
+            side_effect=[True, False, RuntimeError("boom"), True, StopLoop()],
+        ), mock.patch.object(
+            infra_worker.time, "sleep"
+        ) as sleep, self.assertLogs("infra-worker", level="INFO"):
+            with self.assertRaises(StopLoop):
+                infra_worker._simple_loop(30)
+
+        self.assertEqual(
+            [call.args[0] for call in sleep.call_args_list], [1, 30, 30, 1]
+        )
 
 
 class LoadAlertTests(InfraDbTestCase):
@@ -4979,3 +5236,225 @@ class InfraViewTests(InfraDbTestCase):
             self.factory.get("/support-admin/api/infra-server-detail/?id=999")
         )
         self.assertEqual(response.status_code, 404)
+
+
+class CloudflareDnsClientTests(SimpleTestCase):
+    def setUp(self):
+        from engine import cloudflare_dns
+
+        cloudflare_dns.close_http_client()
+        cloudflare_dns._zone_cache.clear()
+        cloudflare_dns._resolved_zone_cache.clear()
+        cloudflare_dns._missing_zone_cache.clear()
+        cloudflare_dns._cache_token = None
+
+    def tearDown(self):
+        from engine import cloudflare_dns
+
+        cloudflare_dns.close_http_client()
+
+    @override_settings(CLOUDFLARE_API_TOKEN="test-token")
+    def test_requests_reuse_one_http_client(self):
+        from engine import cloudflare_dns
+
+        client = mock.Mock()
+        response = mock.Mock(status_code=200)
+        response.json.return_value = {"success": True, "result": []}
+        client.request.return_value = response
+
+        with mock.patch(
+            "engine.cloudflare_dns.httpx.Client", return_value=client
+        ) as constructor:
+            cloudflare_dns._request("GET", "/zones")
+            cloudflare_dns._request("GET", "/zones")
+
+        constructor.assert_called_once_with(timeout=cloudflare_dns.TIMEOUT_SECONDS)
+        self.assertEqual(client.request.call_count, 2)
+
+    @override_settings(CLOUDFLARE_API_TOKEN="test-token")
+    def test_resolved_parent_zone_is_cached_for_full_domain(self):
+        from engine import cloudflare_dns
+
+        looked_up = []
+
+        def fake_request(_method, _path, **kwargs):
+            candidate = kwargs["params"]["name"]
+            looked_up.append(candidate)
+            result = [{"id": "zone-1"}] if candidate == "example.com" else []
+            return {"success": True, "result": result}
+
+        with mock.patch("engine.cloudflare_dns._request", side_effect=fake_request):
+            self.assertEqual(cloudflare_dns.find_zone_id("vpn.example.com"), "zone-1")
+            self.assertEqual(cloudflare_dns.find_zone_id("vpn.example.com"), "zone-1")
+
+        self.assertEqual(looked_up, ["vpn.example.com", "example.com"])
+
+    @override_settings(CLOUDFLARE_API_TOKEN="test-token")
+    def test_missing_zone_is_negatively_cached(self):
+        from engine import cloudflare_dns
+
+        with mock.patch(
+            "engine.cloudflare_dns._request",
+            return_value={"success": True, "result": []},
+        ) as request_mock:
+            with self.assertRaises(cloudflare_dns.CloudflareError):
+                cloudflare_dns.find_zone_id("missing.invalid")
+            with self.assertRaises(cloudflare_dns.CloudflareError):
+                cloudflare_dns.find_zone_id("missing.invalid")
+
+        request_mock.assert_called_once()
+
+    @override_settings(CLOUDFLARE_API_TOKEN="test-token")
+    def test_zone_cache_expires(self):
+        from engine import cloudflare_dns
+
+        with mock.patch(
+            "engine.cloudflare_dns._request",
+            return_value={"success": True, "result": [{"id": "zone-1"}]},
+        ) as request_mock, mock.patch(
+            "engine.cloudflare_dns.monotonic", side_effect=[0, 301]
+        ):
+            self.assertEqual(cloudflare_dns.find_zone_id("example.com"), "zone-1")
+            self.assertEqual(cloudflare_dns.find_zone_id("example.com"), "zone-1")
+
+        self.assertEqual(request_mock.call_count, 2)
+
+    @override_settings(CLOUDFLARE_API_TOKEN="test-token")
+    def test_a_record_listing_reads_all_pages(self):
+        from engine import cloudflare_dns
+
+        page_one = [
+            {"id": f"record-{index}", "content": f"192.0.2.{index}", "ttl": 60}
+            for index in range(100)
+        ]
+        page_two = [{"id": "record-100", "content": "198.51.100.1", "ttl": 60}]
+
+        def fake_request(_method, _path, **kwargs):
+            page = kwargs["params"]["page"]
+            return {
+                "success": True,
+                "result": page_one if page == 1 else page_two,
+                "result_info": {"total_pages": 2},
+            }
+
+        with mock.patch(
+            "engine.cloudflare_dns.find_zone_id", return_value="zone-1"
+        ), mock.patch(
+            "engine.cloudflare_dns._request", side_effect=fake_request
+        ) as request_mock:
+            records = cloudflare_dns.list_a_records("vpn.example.com")
+
+        self.assertEqual(len(records), 101)
+        self.assertEqual(
+            [call.kwargs["params"]["page"] for call in request_mock.call_args_list],
+            [1, 2],
+        )
+
+    @override_settings(CLOUDFLARE_API_TOKEN="test-token")
+    def test_existing_record_is_forced_to_dns_only_expected_ttl(self):
+        from engine import cloudflare_dns
+
+        with mock.patch(
+            "engine.cloudflare_dns.list_a_records",
+            return_value=[
+                {"id": "record-1", "content": "192.0.2.5", "proxied": True, "ttl": 1}
+            ],
+        ), mock.patch(
+            "engine.cloudflare_dns.find_zone_id", return_value="zone-1"
+        ), mock.patch("engine.cloudflare_dns._request") as request_mock:
+            created = cloudflare_dns.ensure_a_record(
+                "vpn.example.com", "192.0.2.5", ttl=60
+            )
+
+        self.assertFalse(created)
+        request_mock.assert_called_once_with(
+            "PATCH",
+            "/zones/zone-1/dns_records/record-1",
+            json={"ttl": 60, "proxied": False},
+        )
+
+
+class NodeTrafficUsageRpcTimeoutTests(SimpleTestCase):
+    """ZONE-COMMON-F1: GetNodeUsersUsage тяжёлый, дедлайна клиента (8 с) ему
+    мало. Берётся RWMS_BULK_RPC_TIMEOUT_SECONDS, но не дольше остатка бюджета
+    отчёта и не меньше 1 с."""
+
+    def _nodes(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        return [
+            rw_proto.Node(uuid="n1", name="Германия"),
+            rw_proto.Node(uuid="n2", name="Швеция"),
+        ]
+
+    def _client(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        timeouts = []
+
+        class FakeRwms:
+            def get_node_users_usage(self, request, *, timeout=None):
+                timeouts.append(timeout)
+                return rw_proto.GetNodeUsersUsageResponse(items=[])
+
+        return FakeRwms(), timeouts
+
+    def test_timeout_is_bulk_deadline_capped_by_remaining_budget(self):
+        import time
+
+        from engine import node_traffic
+
+        with override_settings(RWMS_BULK_RPC_TIMEOUT_SECONDS=30.0):
+            self.assertEqual(node_traffic._usage_rpc_timeout(time.monotonic() + 1000), 30.0)
+            remaining = node_traffic._usage_rpc_timeout(time.monotonic() + 12)
+            self.assertLessEqual(remaining, 12.0)
+            self.assertGreater(remaining, 10.0)
+            self.assertEqual(node_traffic._usage_rpc_timeout(time.monotonic() + 0.2), 1.0)
+            self.assertEqual(node_traffic._usage_rpc_timeout(time.monotonic() - 5), 1.0)
+        with override_settings(RWMS_BULK_RPC_TIMEOUT_SECONDS=0.5):
+            self.assertEqual(node_traffic._usage_rpc_timeout(time.monotonic() - 5), 0.5)
+
+    def test_build_report_passes_timeout_within_report_budget(self):
+        from engine import node_traffic
+
+        end = datetime(2026, 7, 10, tzinfo=timezone.utc)
+        client, timeouts = self._client()
+        with override_settings(RWMS_BULK_RPC_TIMEOUT_SECONDS=30.0):
+            report = node_traffic.build_report(
+                client, self._nodes(), end - timedelta(days=90), end,
+                top=50, min_gib=0, with_details=False,
+            )
+
+        self.assertEqual(report["failed_nodes"], [])
+        self.assertEqual(len(timeouts), 2)
+        for value in timeouts:
+            # Бюджет отчёта (20 с) меньше массового дедлайна (30 с).
+            self.assertLessEqual(value, node_traffic.REPORT_BUDGET_SECONDS)
+            self.assertGreater(value, node_traffic.REPORT_BUDGET_SECONDS - 5)
+
+        client, timeouts = self._client()
+        with override_settings(RWMS_BULK_RPC_TIMEOUT_SECONDS=3.5):
+            node_traffic.build_report(
+                client, self._nodes(), end - timedelta(days=1), end,
+                top=50, min_gib=0, with_details=False,
+            )
+        self.assertEqual(timeouts, [3.5, 3.5])
+
+    def test_collect_usage_uses_remaining_part_of_given_deadline(self):
+        import time
+
+        from engine import node_traffic
+
+        end = datetime(2026, 7, 10, tzinfo=timezone.utc)
+        client, timeouts = self._client()
+        with override_settings(RWMS_BULK_RPC_TIMEOUT_SECONDS=30.0):
+            usage, failed = node_traffic.collect_usage(
+                client, self._nodes(), end - timedelta(days=1), end,
+                deadline=time.monotonic() + 6,
+            )
+
+        self.assertEqual((usage, failed), ({}, []))
+        self.assertEqual(len(timeouts), 2)
+        for value in timeouts:
+            self.assertLessEqual(value, 6.0)
+            self.assertGreaterEqual(value, 1.0)

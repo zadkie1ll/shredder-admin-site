@@ -1,7 +1,9 @@
 {% verbatim %}
-const CACHE_NAME = 'monkey-island-v2';
+const CACHE_PREFIX = 'monkey-island-';
+const CACHE_NAME = 'monkey-island-v3';
+const OFFLINE_URL = '/static/pwa/offline.html';
 const ASSETS = [
-    '/login/',
+    OFFLINE_URL,
     '/manifest.json',
     '/static/icons/icon-192x192.png',
     '/static/icons/icon-512x512.png'
@@ -14,6 +16,7 @@ self.addEventListener('install', (event) => {
             return cache.addAll(ASSETS);
         })
     );
+    self.skipWaiting();
 });
 
 // Активация: чистим старый кеш
@@ -22,7 +25,7 @@ self.addEventListener('activate', (event) => {
         caches.keys().then((cacheNames) =>
             Promise.all(
                 cacheNames
-                    .filter((cacheName) => cacheName !== CACHE_NAME)
+                    .filter((cacheName) => cacheName.startsWith(CACHE_PREFIX) && cacheName !== CACHE_NAME)
                     .map((cacheName) => caches.delete(cacheName))
             )
         )
@@ -33,15 +36,20 @@ self.addEventListener('activate', (event) => {
 
 // Перехват запросов (нужен для работы PWA офлайн)
 self.addEventListener('fetch', (event) => {
+    if (event.request.method !== 'GET') return;
+
     if (event.request.mode === 'navigate') {
         event.respondWith(
-            fetch(event.request).catch(() => caches.match('/login/'))
+            fetch(event.request).catch(() => caches.match(OFFLINE_URL))
         );
         return;
     }
 
-    event.respondWith(
-        fetch(event.request).catch(() => caches.match(event.request))
-    );
+    const url = new URL(event.request.url);
+    if (url.origin === self.location.origin && ASSETS.includes(url.pathname)) {
+        event.respondWith(
+            caches.match(event.request).then((cached) => cached || fetch(event.request))
+        );
+    }
 });
 {% endverbatim %}

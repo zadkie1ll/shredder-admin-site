@@ -9,6 +9,11 @@ services:
     environment:
       # Лидер-поток infra_worker сам скачивает MMDB в persistent volume.
       GEOIP_CITY_DB_PATH: /var/lib/monkey-island/geoip/DBIP-City-Lite.mmdb
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
     restart: unless-stopped
     expose:
       - "8000"
@@ -19,12 +24,35 @@ services:
     networks:
       - monkey-island-network
 
+  reconciliation:
+    image: monkey-island-website:prod
+    env_file:
+      - .env
+    entrypoint: ["python", "manage.py", "reconcile_website_operations"]
+    # tini как PID 1 передаёт SIGTERM в python: команда завершает текущий шаг
+    # и выходит сама, без SIGKILL посреди RPC/HTTP-запроса к провайдеру.
+    init: true
+    stop_grace_period: 40s
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
+    networks:
+      - monkey-island-network
+
   nginx:
     image: nginx:1.27-alpine
     env_file:
       - .env
     depends_on:
       - app
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "5"
     restart: unless-stopped
     ports:
       - "80:80"
@@ -32,6 +60,7 @@ services:
     volumes:
       - ./nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
       - staticfiles:/var/www/static:ro
+      - mediafiles:/var/www/media:ro
       - ./certbot-www:/var/www/certbot:ro
       - ./letsencrypt:/etc/letsencrypt:ro
       - ./origin-allowlist:/etc/nginx/origin:ro

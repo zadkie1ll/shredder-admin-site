@@ -1,3 +1,4 @@
+from engine.test_template_source import template_source
 import hashlib
 import hmac
 import json
@@ -220,7 +221,7 @@ class StaticAssetVersioningTests(SimpleTestCase):
 
 class DashboardSetupTemplateTests(SimpleTestCase):
     def test_compact_setup_uses_connection_hero(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn("Для подключения", template)
         self.assertIn("Подключиться в 1 клик!", template)
@@ -258,7 +259,7 @@ class DashboardSetupTemplateTests(SimpleTestCase):
         self.assertNotIn("showTab('subscription')", template)
 
     def test_setup_wizard_orb_returns_on_phones_and_miniapp(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Мастер с орбом-«крутилкой» включается клиентски на телефонах и в Mini App.
         self.assertIn("function shouldUseSetupWizard()", template)
@@ -280,7 +281,7 @@ class DashboardSetupTemplateTests(SimpleTestCase):
         self.assertIn("prefers-reduced-motion", template)
 
     def test_setup_wizard_follows_competitor_layout(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Старт: крутилка с иконкой платформы сверху, заголовок и две кнопки.
         self.assertIn("updateNewSetupHero('setup-hero-step-start', meta.icon, 0);", template)
@@ -331,7 +332,7 @@ class DashboardSetupTemplateTests(SimpleTestCase):
         self.assertNotIn("Не сработало? Скопировать ссылку подписки", template)
 
     def test_happ_app_store_recommendation_uses_single_ru_link(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Актуальная рекомендация на скачивание Happ (iOS/macOS) — только RU App Store.
         self.assertIn("https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6788279553", template)
@@ -341,7 +342,7 @@ class DashboardSetupTemplateTests(SimpleTestCase):
         self.assertNotIn("других регионов", template)
 
     def test_dashboard_customer_copy_uses_respectful_tone(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         informal_fragments = [
             "Управление твоей",
@@ -366,7 +367,7 @@ class DashboardSetupTemplateTests(SimpleTestCase):
 
 class DashboardReferralTemplateTests(SimpleTestCase):
     def test_referral_page_shows_registration_bonus(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Бонус типа REGISTRATION теперь начисляется за подключение
         # (первый трафик), а не за создание аккаунта.
@@ -392,7 +393,7 @@ class DashboardReferralTemplateTests(SimpleTestCase):
 
 class DashboardPwaLayoutTemplateTests(SimpleTestCase):
     def test_ios_standalone_pwa_uses_safe_area_layout_fix(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn("document.documentElement.classList.add('standalone-pwa')", template)
         self.assertIn("document.documentElement.classList.add('ios-device')", template)
@@ -404,7 +405,7 @@ class DashboardPwaLayoutTemplateTests(SimpleTestCase):
         self.assertIn("padding-bottom: 88px !important;", template)
 
     def test_mobile_renewal_cta_is_short(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertNotIn("Оплатить и получить доступ", template)
 
@@ -417,7 +418,7 @@ class DashboardDesktopSkinTemplateTests(SimpleTestCase):
     """
 
     def test_desktop_skin_assets_are_scoped_to_desktop_only(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Скин подключается вне Mini App; CSS — без media-атрибута, чтобы
         # его мобильный блок прятал .dt-элементы и на узких экранах.
@@ -457,7 +458,7 @@ class DashboardDesktopSkinTemplateTests(SimpleTestCase):
         self.assertIn("'JetBrains Mono'", css)
 
     def test_expire_topbar_sells_renewal_with_price(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Полоса истечения показывается только при истекающем оплаченном
         # доступе, вне Mini App, и ведёт в существующий выбор тарифов.
@@ -476,7 +477,7 @@ class DashboardDesktopSkinTemplateTests(SimpleTestCase):
         )
 
     def test_desktop_footer_reuses_landing_links(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn('class="dt-cabinet-footer"', template)
         self.assertIn("{% url 'offer' %}", template)
@@ -497,7 +498,7 @@ class DashboardDesktopSkinTemplateTests(SimpleTestCase):
         self.assertIn('#settings-header h1::before { content: "05"; }', css)
 
     def test_concept_compositions_are_wired_to_existing_functionality(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Главная: карточка доступа 2:1 со счётчиком и прогрессом на старых id.
         self.assertIn('class="dt-access-card"', template)
@@ -540,7 +541,7 @@ class DashboardDesktopSkinTemplateTests(SimpleTestCase):
         self.assertIn('id="dt-cursor-glow"', template)
 
     def test_home_status_uses_rwms_panel_data(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Статус панели говорит прямо: DISABLED — подписка отключена,
         # LIMITED — достигнут лимит трафика (+ когда сбросится автоматически).
@@ -600,7 +601,7 @@ class DashboardDesktopSkinTemplateTests(SimpleTestCase):
         self.assertIn("min-height: 100vh", wrapper_rule)
         # hideTariffs снимает inline-display (''), а не ставит 'block' —
         # инлайновый block перебивал десктопный flex и отклеивал футер.
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
         self.assertIn(
             "document.getElementById('interface-wrapper').style.display = '';",
             template,
@@ -620,7 +621,7 @@ class DashboardDesktopSkinTemplateTests(SimpleTestCase):
 
 class AdminDashboardTemplateTests(SimpleTestCase):
     def test_large_loading_state_uses_payment_status_orb_spinner(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn(".admin-loading-state", template)
         self.assertIn(".admin-loading-orb", template)
@@ -644,7 +645,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         )
 
     def test_apple_recommended_app_is_grouped_with_common_runtime_settings(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("'apple_recommended_app'", template)
         self.assertIn(
@@ -653,7 +654,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         )
 
     def test_admin_dashboard_loads_black_gold_control_skin(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn("family=Manrope", template)
@@ -704,7 +705,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         )
 
     def test_censor_checks_have_dedicated_mobile_layout(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn(
             "#panel-censor-checks .censor-check-form { grid-template-columns: minmax(0, 1fr); }",
@@ -720,7 +721,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         130-240 px для строчной раскладки; внутри колоночного label концепта
         это превращалось в высоту поля. Концептный CSS обязан это гасить."""
         stylesheet = Path("engine/static/css/admin-concept-infrastructure.css").read_text()
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         concept_index = Path("engine/static/css/admin-concept.css").read_text()
 
         self.assertIn('.censor-check-form .input[name="mode"] { flex: 2 1 240px;', template)
@@ -732,7 +733,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn("@import url('./admin-concept-infrastructure.css?v=13');", concept_index)
 
     def test_censor_checks_allow_selecting_rows_and_deleting_them(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         for marker in (
             'data-censor-select="${check.id}"',
             "data-censor-select-all",
@@ -748,7 +749,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
                 self.assertIn(marker, template)
 
     def test_censor_checks_offer_safe_bulk_settings_form(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
 
         censor_panel = template[template.index('<section id="panel-censor-checks"'):]
@@ -775,7 +776,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn(".censor-bulk-card[open] > .censor-bulk-summary", stylesheet)
 
     def test_runtime_setting_actions_use_modern_tonal_buttons(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn('class="setting-action setting-action-save"', template)
@@ -788,7 +789,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn(".setting-row .setting-action", stylesheet)
 
     def test_runtime_settings_use_responsive_cross_browser_property_grid(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn("function settingControlHtml(setting)", template)
@@ -819,7 +820,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn(".setting-value-editor {\n        padding-right: 0;", stylesheet)
 
     def test_payment_search_result_is_rendered_before_payment_history(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         # Порядок вкладки «Платежи»: форма поиска → результат поиска →
         # сворачиваемая история платежей (детали найденного платежа важнее
@@ -833,7 +834,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertLess(result_position, history_position)
 
     def test_expandable_controls_have_consistent_chevron_affordances(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
 
         for selector in (
@@ -855,7 +856,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn("background-image: url(\"data:image/svg+xml", stylesheet)
 
     def test_client_tab_has_session_only_start_state_and_recent_searches(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn("function renderClientStartState()", template)
@@ -885,7 +886,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
             self.assertIn(selector, stylesheet)
 
     def test_acquisition_explains_new_revenue_calculation(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('id="acq-new-revenue-help"', template)
         self.assertIn("Как считаются «Новые покупатели» и «Выручка новых»", template)
@@ -895,7 +896,7 @@ class AdminDashboardTemplateTests(SimpleTestCase):
         self.assertIn("Это сопоставление недельных итогов, а не строгая когортная конверсия", template)
 
     def test_winback_table_shows_conversion_segments(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("'Новые', 'Повторные', 'Медиана до оплаты', 'Выручка', 'Чеки'", template)
         self.assertIn("Last-touch атрибуция", template)
@@ -1005,7 +1006,7 @@ class AcquisitionTrialsTests(SimpleTestCase):
         self.assertEqual(result["days"][0]["conv_pct"], 0)
 
     def test_trials_window_selector_in_template(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('id="acq-trials-window"', template)
         self.assertIn('<option value="10" selected>', template)
@@ -1044,7 +1045,7 @@ class AcquisitionRenew45Tests(SimpleTestCase):
         self.assertIn("renew45", ACQ_SECTIONS)
 
     def test_template_has_renew45_chart_and_month_switcher(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('id="acq-renew45-chart"', template)
         self.assertIn("Отвал базы: % продливших в течение 45 дней", template)
@@ -1166,6 +1167,28 @@ class AcquisitionAdsDailyTests(SimpleTestCase):
         self.assertEqual(spend_row["impressions"], 5000)
         self.assertEqual(spend_row["clicks"], 200)
 
+    @mock.patch("engine.views._acq_rows")
+    def test_weekly_ads_keeps_spend_week_with_zero_sales(self, rows_mock):
+        rows_mock.side_effect = [
+            [{"id": 1, "day": date(2026, 7, 7), "channel": "yandex-direct",
+              "account": "default", "amount_rub": Decimal("1000"),
+              "impressions": 5000, "clicks": 200, "comment": ""}],
+            [{"account": "default"}],
+            [],
+            [{"week": date(2026, 7, 6), "subs": 10}],
+            [{"week": date(2026, 7, 6), "conns": 4}],
+        ]
+
+        result = _acq_ads(object(), 12)
+
+        self.assertEqual(len(result["weeks"]), 1)
+        row = result["weeks"][0]
+        self.assertEqual(row["spend"], 1000.0)
+        self.assertEqual(row["new_payers"], 0)
+        self.assertEqual(row["new_rub"], 0.0)
+        self.assertIsNone(row["cost_per_sale"])
+        self.assertIsNone(row["drr"])
+
 
 class AcquisitionAdsSummaryTests(SimpleTestCase):
     """Сводка рекламы за диапазон дат: расход по аккаунтам, суммарный
@@ -1246,7 +1269,7 @@ class AcquisitionAdsSummaryTests(SimpleTestCase):
         from engine.views import ACQ_SECTIONS
 
         self.assertIn("ads_summary", ACQ_SECTIONS)
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         css = Path("engine/static/css/admin-concept-sections.css").read_text()
         for marker in (
             'id="acq-ads-summary"', 'id="acq-ads-sum-start"', 'id="acq-ads-sum-end"',
@@ -1262,7 +1285,7 @@ class AcquisitionAdsSummaryTests(SimpleTestCase):
 
 class AcquisitionAdsTemplateTests(SimpleTestCase):
     def test_ads_tab_has_csv_import_and_daily_analytics(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         stylesheet = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn('id="acq-csv-form"', template)
@@ -1391,7 +1414,7 @@ class AdminRuntimeSettingsTests(SimpleTestCase):
 
 class OfferTemplateTests(SimpleTestCase):
     def test_offer_has_current_prices_and_gateway_autopay_terms(self):
-        template = Path("engine/templates/offer.html").read_text()
+        template = template_source("engine/templates/offer.html")
 
         self.assertIn("Дата вступления в силу: 01.08.2026", template)
         self.assertIn("{{ offer_tariffs.oneday.price }} ₽", template)
@@ -1424,7 +1447,7 @@ class OfferTemplateTests(SimpleTestCase):
         ids = [tariff.db_tariff_id for tariff in views.OFFER_TARIFFS]
         self.assertEqual(ids, ["threedays", "oneday", "month", "threemonths", "year"])
 
-        template = Path("engine/templates/offer.html").read_text()
+        template = template_source("engine/templates/offer.html")
         # 2.2 не дублирует таблицу ценой, а говорит, где какие тарифы доступны.
         self.assertIn("доступны для оплаты в Telegram-боте Сервиса", template)
         self.assertNotIn("также доступен тариф «Подписка на 1 день» стоимостью", template)
@@ -1433,7 +1456,7 @@ class OfferTemplateTests(SimpleTestCase):
         # Шапка оферты обязана подстраиваться под тип домена: на VPS-доменах
         # "MONKEY ISLAND VPS", на VPN/кабинетных — "MONKEY ISLAND VPN".
         # Регресс: бренд был захардкожен как VPS и светился на VPN-доменах.
-        template = Path("engine/templates/offer.html").read_text()
+        template = template_source("engine/templates/offer.html")
 
         self.assertIn(
             "{% if site_role == 'vps' or site_role == 'vps_direct_sale' %}"
@@ -1450,7 +1473,7 @@ class OfferTemplateTests(SimpleTestCase):
 
         self.assertEqual(reverse("terms"), "/terms/")
 
-        template = Path("engine/templates/terms.html").read_text()
+        template = template_source("engine/templates/terms.html")
         self.assertIn("Пользовательское соглашение", template)
         self.assertIn(
             "{% if site_role == 'vps' or site_role == 'vps_direct_sale' %}"
@@ -1468,22 +1491,31 @@ class OfferTemplateTests(SimpleTestCase):
             self.assertIn('href="/terms/"', template, name)
 
     def test_privacy_effective_date_is_current(self):
-        template = Path("engine/templates/privacy.html").read_text()
+        template = template_source("engine/templates/privacy.html")
         self.assertIn("Дата вступления в силу: 04.08.2026", template)
         self.assertNotIn("03.05.2026", template)
 
     def test_runtime_offer_tariffs_use_database_prices(self):
         class FakeSession:
-            def get(self, model, key):
-                values = {
+            values = {
                     BOT_TARIFF_PRICE_THREEDAYS_SETTING: "11",
                     BOT_TARIFF_PRICE_ONEDAY_SETTING: "19",
                     BOT_TARIFF_PRICE_MONTH_SETTING: "299",
                     BOT_TARIFF_PRICE_THREEMONTHS_SETTING: "609",
                     BOT_TARIFF_PRICE_YEAR_SETTING: "1809",
-                }
-                value = values.get(key)
-                return SimpleNamespace(value=value) if value is not None else None
+            }
+
+            def query(self, model):
+                return self
+
+            def filter(self, *args):
+                return self
+
+            def all(self):
+                return [
+                    SimpleNamespace(key=key, value=value)
+                    for key, value in self.values.items()
+                ]
 
         tariffs = get_runtime_offer_tariffs(FakeSession())
 
@@ -1516,10 +1548,10 @@ class WataPaymentFlowTests(SimpleTestCase):
         # У каждого лендинга свой класс логотипа: index_vpn после редизайна
         # использует .mi-logo-mark, index_vps — .landing-brand-mark с
         # уменьшением на узких экранах.
-        vpn_template = Path("engine/templates/index_vpn.html").read_text()
+        vpn_template = template_source("engine/templates/index_vpn.html")
         self.assertIn(".mi-logo-mark", vpn_template)
 
-        vps_template = Path("engine/templates/index_vps.html").read_text()
+        vps_template = template_source("engine/templates/index_vps.html")
         self.assertIn(".landing-brand-mark", vps_template)
         self.assertIn("@media (max-width: 380px)", vps_template)
 
@@ -1562,7 +1594,7 @@ class WataPaymentFlowTests(SimpleTestCase):
     def test_vps_landing_uses_redesigned_theme(self):
         # Редизайн 2026-08-28: структура подписочного лендинга (группы секций,
         # карточки, Golos Text), фирменная чёрно-жёлтая палитра.
-        template = Path("engine/templates/index_vps.html").read_text()
+        template = template_source("engine/templates/index_vps.html")
 
         self.assertIn("Golos+Text", template)
         self.assertIn("--island-accent: #ffc700;", template)
@@ -1597,7 +1629,7 @@ class WataPaymentFlowTests(SimpleTestCase):
     def test_vpn_landing_shows_client_ip_topbar_with_direct_wording(self):
         # На VPN-доменах подача прямая, поэтому топ-бар говорит «Вы не
         # защищены» — в отличие от нейтральных VPS-доменов.
-        template = Path("engine/templates/index_vpn.html").read_text()
+        template = template_source("engine/templates/index_vpn.html")
 
         self.assertIn('{% if client_ip %}', template)
         self.assertIn("ip-topbar", template)
@@ -1608,7 +1640,7 @@ class WataPaymentFlowTests(SimpleTestCase):
     def test_direct_sale_landing_sells_immediately_after_hero(self):
         # Смысл direct-sale-лендинга — сразу продавать: блок тарифов идёт
         # первым после hero, до всех остальных секций.
-        template = Path("engine/templates/index_vps_direct_sale.html").read_text()
+        template = template_source("engine/templates/index_vps_direct_sale.html")
 
         prices = template.index('<section id="prices"')
         self.assertLess(prices, template.index('<section id="features"'))
@@ -1649,7 +1681,7 @@ class WataPaymentFlowTests(SimpleTestCase):
                 self.assertIn("payload.payment_status_url", template)
 
     def test_payment_status_has_open_payment_button_for_pending_tab(self):
-        template = Path("engine/templates/payment_status.html").read_text()
+        template = template_source("engine/templates/payment_status.html")
 
         self.assertIn("Продолжить оплату", template)
         self.assertNotIn("Проверить статус вручную", template)
@@ -1657,7 +1689,7 @@ class WataPaymentFlowTests(SimpleTestCase):
         self.assertIn('target="_blank" rel="noopener"', template)
 
     def test_payment_status_can_return_to_cabinet_without_canceling_payment(self):
-        template = Path("engine/templates/payment_status.html").read_text()
+        template = template_source("engine/templates/payment_status.html")
 
         self.assertIn('id="cabinet-action" href="{% url \'dashboard\' %}"', template)
         self.assertIn("Вернуться в кабинет", template)
@@ -1667,10 +1699,10 @@ class WataPaymentFlowTests(SimpleTestCase):
         self.assertIn("tg.BackButton.hide()", template)
         # Возврат не вызывает API отмены и не останавливает polling платежа.
         self.assertNotIn("cancelPayment", template)
-        self.assertIn("window.setTimeout(pollStatus, 2500)", template)
+        self.assertTrue("setTimeout(pollStatus, delay)" in template)
 
     def test_payment_status_matches_mobile_dashboard_typography_and_buttons(self):
-        template = Path("engine/templates/payment_status.html").read_text()
+        template = template_source("engine/templates/payment_status.html")
 
         self.assertIn('font-family: -apple-system, BlinkMacSystemFont, "Segoe UI"', template)
         self.assertNotIn("fonts.googleapis.com", template)
@@ -1703,6 +1735,9 @@ class WataPaymentFlowTests(SimpleTestCase):
             def filter(self, *args, **kwargs):
                 return self
 
+            def with_for_update(self):
+                return self
+
             def first(self):
                 return user
 
@@ -1724,10 +1759,13 @@ class WataPaymentFlowTests(SimpleTestCase):
             {"email": "user@example.com", "tariff_id": "month"},
             HTTP_HOST="example.com",
         )
-        request.user = SimpleNamespace(is_authenticated=False, id=None)
+        request.user = SimpleNamespace(is_authenticated=True, id=42, email="user@example.com")
         request.session = SessionDict()
 
         with (
+            mock.patch("engine.views.find_reusable_attempt", return_value=None),
+            mock.patch("engine.views.site_apply_first_purchase_discount", return_value=(tariff, False)),
+            mock.patch("engine.views.finish_attempt"),
             mock.patch("engine.views.session_factory", return_value=FakeSession()),
             mock.patch("engine.views.is_user_blocked", return_value=True),
             mock.patch("engine.views.get_runtime_actual_tariffs", return_value=[tariff]),
@@ -1754,13 +1792,17 @@ class WataPaymentFlowTests(SimpleTestCase):
             username="user-42",
             telegram_id=None,
         )
-        login_token = SimpleNamespace(payment_gateway=None, payment_reference=None)
+        status_token = SimpleNamespace(token_hash="test-hash", payment_gateway=None, payment_reference=None)
+        login_token = SimpleNamespace(token_hash="test-hash", payment_gateway=None, payment_reference=None)
 
         class SessionDict(dict):
             modified = False
 
         class FakeQuery:
             def filter(self, *args, **kwargs):
+                return self
+
+            def with_for_update(self):
                 return self
 
             def first(self):
@@ -1798,7 +1840,7 @@ class WataPaymentFlowTests(SimpleTestCase):
             HTTP_X_PAYMENT_LAUNCH="new-tab",
             HTTP_HOST="example.com",
         )
-        request.user = SimpleNamespace(is_authenticated=False, id=None)
+        request.user = SimpleNamespace(is_authenticated=True, id=42, email="user@example.com")
         request.session = SessionDict()
 
         created_payment = SimpleNamespace(
@@ -1808,12 +1850,17 @@ class WataPaymentFlowTests(SimpleTestCase):
         )
 
         with (
+            mock.patch("engine.views.find_reusable_attempt", return_value=None),
+            mock.patch("engine.views.site_apply_first_purchase_discount", return_value=(tariff, False)),
+            mock.patch("engine.views.finish_attempt"),
             mock.patch("engine.views.session_factory", return_value=FakeSession()),
             mock.patch("engine.views.is_user_blocked", return_value=False),
             mock.patch("engine.views.get_runtime_actual_tariffs", return_value=[tariff]),
             mock.patch("engine.views.get_registration_context", return_value={"traffic_source": None, "ymid": None}),
             mock.patch("engine.views.sync_existing_user_tracking"),
-            mock.patch("engine.views.create_purchase_login_token", return_value="raw-token"),
+            mock.patch("engine.views.create_purchase_status_token", return_value="pstatus_token"),
+            mock.patch("engine.views.get_purchase_status_token", return_value=status_token),
+            mock.patch("engine.views.create_purchase_login_token", return_value="plogin_token"),
             mock.patch("engine.views.get_purchase_login_token", return_value=login_token),
             mock.patch("engine.views.create_wata_payment_sync", return_value=created_payment),
             mock.patch("engine.views.save_wata_invoice"),
@@ -1828,13 +1875,15 @@ class WataPaymentFlowTests(SimpleTestCase):
         self.assertEqual(payload["payment_url"], "https://wata.example/pay")
         self.assertTrue(
             payload["payment_status_url"].endswith(
-                "/payment/status/raw-token/"
+                "/payment/status/pstatus_token/"
             )
         )
-        self.assertEqual(login_token.payment_gateway, "wata")
-        self.assertEqual(login_token.payment_reference, "order-1")
+        self.assertEqual(status_token.payment_gateway, "wata")
+        self.assertEqual(status_token.payment_reference, "order-1")
+        self.assertIsNone(login_token.payment_gateway)
+        self.assertIsNone(login_token.payment_reference)
         self.assertEqual(
-            request.session[payment_session_url_key("raw-token")],
+            request.session[payment_session_url_key("pstatus_token")],
             "https://wata.example/pay",
         )
         self.assertTrue(request.session.modified)
@@ -1856,13 +1905,16 @@ class WataPaymentFlowTests(SimpleTestCase):
             username="user-42",
             telegram_id=None,
         )
-        login_token = SimpleNamespace(payment_gateway=None, payment_reference=None)
+        status_token = SimpleNamespace(token_hash="test-hash", payment_gateway=None, payment_reference=None)
 
         class SessionDict(dict):
             modified = False
 
         class FakeQuery:
             def filter(self, *args, **kwargs):
+                return self
+
+            def with_for_update(self):
                 return self
 
             def first(self):
@@ -1899,7 +1951,7 @@ class WataPaymentFlowTests(SimpleTestCase):
             HTTP_X_PAYMENT_LAUNCH="new-tab",
             HTTP_HOST="example.com",
         )
-        request.user = SimpleNamespace(is_authenticated=False, id=None)
+        request.user = SimpleNamespace(is_authenticated=True, id=42, email="user@example.com")
         request.session = SessionDict()
 
         created_payment = SimpleNamespace(
@@ -1908,6 +1960,9 @@ class WataPaymentFlowTests(SimpleTestCase):
         )
 
         with (
+            mock.patch("engine.views.find_reusable_attempt", return_value=None),
+            mock.patch("engine.views.site_apply_first_purchase_discount", return_value=(tariff, False)),
+            mock.patch("engine.views.finish_attempt"),
             mock.patch("engine.views.session_factory", return_value=FakeSession()),
             mock.patch("engine.views.is_user_blocked", return_value=False),
             mock.patch("engine.views.get_runtime_actual_tariffs", return_value=[tariff]),
@@ -1916,8 +1971,8 @@ class WataPaymentFlowTests(SimpleTestCase):
                 return_value={"traffic_source": None, "ymid": None},
             ),
             mock.patch("engine.views.sync_existing_user_tracking"),
-            mock.patch("engine.views.create_purchase_login_token", return_value="raw-token"),
-            mock.patch("engine.views.get_purchase_login_token", return_value=login_token),
+            mock.patch("engine.views.create_purchase_status_token", return_value="pstatus_token"),
+            mock.patch("engine.views.get_purchase_status_token", return_value=status_token),
             mock.patch("engine.views.create_yk_payment_sync", return_value=created_payment),
             mock.patch("engine.views.add_event_log"),
             mock.patch("engine.views.send_magic_link_email"),
@@ -1930,11 +1985,124 @@ class WataPaymentFlowTests(SimpleTestCase):
         self.assertEqual(payload["payment_url"], "https://yookassa.example/pay")
         self.assertTrue(
             payload["payment_status_url"].endswith(
-                "/payment/status/raw-token/"
+                "/payment/status/pstatus_token/"
             )
         )
-        self.assertEqual(login_token.payment_gateway, "yookassa")
-        self.assertEqual(login_token.payment_reference, "yk-payment-1")
+        self.assertEqual(status_token.payment_gateway, "yookassa")
+        self.assertEqual(status_token.payment_reference, "yk-payment-1")
+
+    def _authenticated_yookassa_pay(self, account_email, receipt_email):
+        tariff = SimpleNamespace(price=100, db_tariff_id="month", description="1 месяц")
+        user = SimpleNamespace(
+            id=42, email=account_email, username="user-42", telegram_id=777
+        )
+        status_token = SimpleNamespace(
+            token_hash="test-hash", payment_gateway=None, payment_reference=None
+        )
+        events = []
+
+        class SessionDict(dict):
+            modified = False
+
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def with_for_update(self):
+                return self
+
+            def first(self):
+                return user
+
+        class FakeSession:
+            def query(self, model):
+                return FakeQuery()
+
+            def add(self, obj):
+                if isinstance(obj, MagicToken):
+                    obj.token = "magic-token"
+
+            def flush(self):
+                return None
+
+            def commit(self):
+                events.append("commit")
+
+            def rollback(self):
+                return None
+
+            def close(self):
+                return None
+
+        request = RequestFactory().post(
+            "/pay/",
+            {"email": receipt_email, "tariff_id": "month"},
+            HTTP_ACCEPT="application/json",
+            HTTP_X_REQUESTED_WITH="XMLHttpRequest",
+            HTTP_HOST="example.com",
+        )
+        request.user = SimpleNamespace(is_authenticated=True, id=42, email=account_email)
+        request.session = SessionDict()
+        created_payment = SimpleNamespace(
+            confirmation_url="https://yookassa.example/pay", reference="yk-payment-1"
+        )
+
+        def confirmation_sent(*args):
+            events.append("confirmation")
+            return True
+
+        with (
+            override_settings(
+                PAYMENT_GATEWAY="yookassa",
+                YOOKASSA_SHOP_ID="shop",
+                YOOKASSA_SECRET_KEY="secret",
+            ),
+            mock.patch("engine.views.find_reusable_attempt", return_value=None),
+            mock.patch("engine.views.site_apply_first_purchase_discount", return_value=(tariff, False)),
+            mock.patch("engine.views.finish_attempt"),
+            mock.patch("engine.views.session_factory", return_value=FakeSession()),
+            mock.patch("engine.views.is_user_blocked", return_value=False),
+            mock.patch("engine.views.get_runtime_actual_tariffs", return_value=[tariff]),
+            mock.patch("engine.views.create_purchase_status_token", return_value="pstatus_token"),
+            mock.patch("engine.views.get_purchase_status_token", return_value=status_token),
+            mock.patch("engine.views.create_yk_payment_sync", return_value=created_payment) as create_payment,
+            mock.patch("engine.views.add_event_log"),
+            mock.patch("engine.views.send_magic_link_email"),
+            mock.patch(
+                "engine.views.send_payment_email_confirmation",
+                side_effect=confirmation_sent,
+            ) as confirmation,
+        ):
+            response = pay(request)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content)["status"], "ok")
+        return user, create_payment, confirmation, events
+
+    def test_authenticated_account_without_email_pays_one_off_and_gets_confirmation(self):
+        user, create_payment, confirmation, events = self._authenticated_yookassa_pay(
+            None, "receipt@example.com"
+        )
+
+        # Чек — на введённый адрес, но без email в аккаунте карта не сохраняется:
+        # yk-recurrent без users.email молча не списал бы автоплатёж.
+        self.assertEqual(create_payment.call_args.kwargs["email"], "receipt@example.com")
+        self.assertIs(create_payment.call_args.kwargs["save_payment_method"], False)
+        # Непроверенный адрес не пишется в аккаунт (B23) — только письмо подтверждения
+        # после commit счёта.
+        self.assertIsNone(user.email)
+        confirmation.assert_called_once()
+        self.assertEqual(confirmation.call_args.args[1:], (42, "receipt@example.com"))
+        self.assertLess(events.index("commit"), events.index("confirmation"))
+
+    def test_authenticated_account_with_email_keeps_autopay_without_confirmation(self):
+        user, create_payment, confirmation, _ = self._authenticated_yookassa_pay(
+            "user@example.com", "user@example.com"
+        )
+
+        self.assertIs(create_payment.call_args.kwargs["save_payment_method"], True)
+        confirmation.assert_not_called()
+        self.assertEqual(user.email, "user@example.com")
 
     def test_wata_payment_retry_redirects_to_hosted_invoice_url(self):
         request = RequestFactory().get("/pay/retry/token/")
@@ -1946,7 +2114,7 @@ class WataPaymentFlowTests(SimpleTestCase):
 
         with (
             mock.patch("engine.views.session_factory", return_value=FakeSession()),
-            mock.patch("engine.views.get_purchase_login_token", return_value=object()),
+            mock.patch("engine.views.get_purchase_status_token", return_value=object()),
             mock.patch("engine.views.get_purchase_wata_invoice", return_value=invoice),
             mock.patch("engine.views.is_wata_invoice_expired", return_value=False),
         ):
@@ -2465,7 +2633,7 @@ class AdminStatsSalesModeTests(SimpleTestCase):
 
 class AdminCohortDashboardTemplateTests(SimpleTestCase):
     def test_analytics_dense_views_use_readable_typography(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         def css_rule(selector):
             start = template.index(f"{selector} {{")
@@ -2513,7 +2681,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         )
 
     def test_sources_panel_has_totals_summary_above_rows(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("function sourceTotals(sources)", template)
         self.assertIn("function renderSourcesSummary(sources)", template)
@@ -2531,7 +2699,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
             self.assertIn(f"<span>{label}</span>", template)
 
     def test_cohort_analytics_section_is_present(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("data-cohort-stats-url", template)
         self.assertIn('id="cohort-form"', template)
@@ -2548,7 +2716,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn("bindSalesChartTooltip(\n                    chart,", template)
 
     def test_both_analytics_charts_use_acquisition_style_renderer(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("const acquisitionChartColors = Object.freeze", template)
         # Серии берут разнотонную палитру: серо-жёлтый вариант делал соседние
@@ -2569,7 +2737,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertNotIn("function bindCohortChartTooltip", template)
 
     def test_admin_theme_switch_defaults_dark_and_persists_light_choice(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         css = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn('<meta name="color-scheme" content="dark light">', template)
@@ -2578,7 +2746,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         # CDN нельзя — состав подключаемых стилей меняется.
         self.assertLess(
             template.index('monkey_island_admin_theme_v1'),
-            template.index('<link href="https://cdnjs.cloudflare.com'),
+            template.index('href="https://cdnjs.cloudflare.com'),
         )
         self.assertIn("let theme = 'dark'", template)
         self.assertIn("localStorage.getItem(storageKey) === 'light'", template)
@@ -2631,7 +2799,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn("background: #edf0f4;", css)
 
     def test_analytics_has_overview_and_cohort_subtabs(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('id="subpanel-overview"', template)
         self.assertIn('id="subpanel-cohort"', template)
@@ -2641,7 +2809,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn("setupSubtabs('panel-stats')", template)
 
     def test_cohort_form_groups_period_and_cohort_ranges(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('class="card form-card cohort-builder"', template)
         self.assertIn('aria-label="Диапазон графика"', template)
@@ -2662,7 +2830,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
     def test_system_tab_grouped_into_subtabs(self):
         # Вкладка «Система» организована подвкладками (как «Аналитика»),
         # вместо жёсткой двухколоночной сетки, вылезавшей за экран.
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         for slug in ("sys-tariffs", "sys-winback", "sys-payment", "sys-referral", "sys-alerts", "sys-antiabuse", "sys-general"):
             self.assertIn(f'data-subtab="{slug}"', template)
@@ -2703,7 +2871,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn(".system-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr)", template)
 
     def test_referral_block_management_is_part_of_found_client(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         css = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn("function clientReferralControlHtml", template)
@@ -2724,7 +2892,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn(".client-ref-control-actions", css)
 
     def test_referral_settings_match_standard_system_width_without_duplicate_antifraud_rows(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         css = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn("{slug: 'referral', keys: ['join_referrer_bonus_days', 'traffic_referrer_bonus_days', 'purchase_referrer_bonus_days', 'referral_bonus_days']}", template)
@@ -2740,7 +2908,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertNotIn(".referral-antifraud-stat {", css)
 
     def test_cohort_shows_invited_referrals_metrics(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("invited_referrals", template)
         self.assertIn("invited_referrals_active", template)
@@ -2748,7 +2916,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn("Привела рефералов", template)
 
     def test_cohort_all_time_preset_starts_at_business_start_not_2020(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         # «Всё время» в когорте отсчитывается от старта бизнеса (апрель 2025),
         # а не от условного 2020 года, по которому нет данных.
@@ -2756,13 +2924,13 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertNotIn("start = new Date(2020, 0, 1);\n                end = todayOnly;", template)
 
     def test_cohort_tooltip_shows_month_name_for_monthly_granularity(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("function cohortBucketLabel", template)
         self.assertIn("cohortBucketLabel(row.label, series.granularity)", template)
 
     def test_cohort_panel_has_metrics_legend(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('class="metrics-legend"', template)
         self.assertIn("Как читать показатели", template)
@@ -2771,7 +2939,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
             self.assertIn(term, template)
 
     def test_existing_stats_form_is_untouched(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         # Старый блок аналитики и его контракт остаются на месте.
         self.assertIn('id="stats-form"', template)
@@ -2781,7 +2949,7 @@ class AdminCohortDashboardTemplateTests(SimpleTestCase):
         self.assertIn('<option value="week">По неделям</option>', template)
 
     def test_stats_period_presets_are_grouped_and_include_calendar_ranges(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         for label in (
             "Текущие",
@@ -3215,9 +3383,160 @@ class PaymentRedirectTests(SimpleTestCase):
         self.assertIsNone(user.expire_at)
         self.assertEqual(user.ymid, 1001)
         self.assertIn(user, session.added)
-        find_rwms.assert_called_once_with(email="new@example.com", telegram_id=None)
+        find_rwms.assert_called_once_with(
+            email="new@example.com",
+            telegram_id=None,
+            username=site_registration_username("new@example.com", None),
+        )
         create_rwms_user.assert_not_called()
         add_event_log.assert_not_called()
+
+    def test_site_rwms_client_uses_configured_default_deadline(self):
+        from engine import views
+
+        self.assertEqual(
+            views.rwms_client._RwmsClientSync__timeout,
+            settings.RWMS_RPC_TIMEOUT_SECONDS,
+        )
+
+    @override_settings(SITE_LEGACY_RWMS_IDENTITY_SCAN_ENABLED=False)
+    def test_identity_lookup_without_legacy_scan_never_downloads_panel(self):
+        from engine import views
+
+        with mock.patch("engine.views.rwms_client") as rwms:
+            rwms.get_user_by_username_strict.return_value = None
+            self.assertIsNone(
+                views.find_rwms_user_by_identity(
+                    email="new@example.com", username="site-user"
+                )
+            )
+
+        rwms.get_all_users.assert_not_called()
+
+    @override_settings(
+        SITE_LEGACY_RWMS_IDENTITY_SCAN_ENABLED=True,
+        RWMS_BULK_RPC_TIMEOUT_SECONDS=31.0,
+    )
+    def test_legacy_scan_without_panel_reply_is_ambiguous_not_absent(self):
+        """TR-05: None от GetAllUsers — сбой панели, а не «подписки нет»."""
+        from engine import views
+
+        with mock.patch("engine.views.rwms_client") as rwms, self.assertLogs(
+            level="ERROR"
+        ):
+            rwms.get_user_by_username_strict.return_value = None
+            rwms.get_all_users.return_value = None
+            with self.assertRaises(SiteRegistrationUnavailable):
+                views.find_rwms_user_by_identity(
+                    email="legacy@example.com", username="site-user"
+                )
+
+        rwms.get_all_users.assert_called_once_with(timeout=31.0)
+
+    @override_settings(
+        SITE_TRIAL_REGISTRATION_ENABLED=False,
+        SITE_LEGACY_RWMS_IDENTITY_SCAN_ENABLED=True,
+    )
+    def test_create_site_user_postpones_registration_when_legacy_scan_fails(self):
+        session = _SiteRegistrationFakeSession()
+
+        with mock.patch(
+            "engine.views.get_registration_context",
+            return_value={"referrer": None, "traffic_source": None, "ymid": None},
+        ), mock.patch("engine.views.rwms_client") as rwms, mock.patch(
+            "engine.views.create_user"
+        ) as create_rwms_user, self.assertLogs(level="ERROR"):
+            rwms.get_user_by_username_strict.return_value = None
+            rwms.get_all_users.return_value = None
+            with self.assertRaises(SiteRegistrationUnavailable):
+                create_site_user(
+                    session,
+                    "legacy@example.com",
+                    SimpleNamespace(),
+                    creation_channel="site_magic_link",
+                )
+
+        # Ни локального аккаунта «без подписки», ни новой подписки в панели.
+        self.assertEqual(session.added, [])
+        create_rwms_user.assert_not_called()
+
+    def _create_with_rwms_outage(self, email, **kwargs):
+        session = _SiteRegistrationFakeSession()
+        with mock.patch(
+            "engine.views.get_registration_context",
+            return_value={"referrer": None, "traffic_source": None, "ymid": None},
+        ), mock.patch("engine.views.rwms_client") as rwms, mock.patch(
+            "engine.views.create_user"
+        ) as create_rwms_user, mock.patch(
+            "engine.views.add_user_to_traffic_progress"
+        ), self.assertLogs(level="ERROR") as logs:
+            rwms.get_user_by_username_strict.side_effect = RwmsUnavailableError(
+                deterministic_username(email), None, "deadline exceeded"
+            )
+            try:
+                user = create_site_user(session, email, SimpleNamespace(), **kwargs)
+            except SiteRegistrationUnavailable as error:
+                user = error
+        create_rwms_user.assert_not_called()
+        rwms.add_user.assert_not_called()
+        return session, user, rwms, logs
+
+    @override_settings(
+        SITE_TRIAL_REGISTRATION_ENABLED=False,
+        SITE_LEGACY_RWMS_IDENTITY_SCAN_ENABLED=False,
+    )
+    def test_anonymous_purchase_creates_local_account_when_rwms_is_unavailable(self):
+        """FINAL-PAY-01: анонимная покупка (allow_trial=False) при недоступной
+        панели, как в HEAD, получает локальный аккаунт без подписки и ALERT;
+        подписку по детерминированному username сведёт payment."""
+        email = "buyer@example.com"
+        session, user, rwms, logs = self._create_with_rwms_outage(
+            email, allow_trial=False
+        )
+
+        self.assertIsInstance(user, User)
+        self.assertEqual(session.added, [user])
+        self.assertEqual(
+            (user.email, user.username, user.expire_at),
+            (email, deterministic_username(email), None),
+        )
+        rwms.get_all_users.assert_not_called()
+        self.assertTrue(
+            any(
+                "ALERT: RWMS unavailable during anonymous purchase" in line
+                for line in logs.output
+            )
+        )
+
+    @override_settings(
+        SITE_TRIAL_REGISTRATION_ENABLED=False,
+        SITE_LEGACY_RWMS_IDENTITY_SCAN_ENABLED=False,
+    )
+    def test_magic_link_registration_still_fails_closed_when_rwms_is_unavailable(self):
+        """FINAL-PAY-01: регистрация с входом (magic link, OAuth, Telegram) при
+        недоступной панели по-прежнему отказывает, ничего не создавая."""
+        for channel in ("site_magic_link", "site_google_oauth"):
+            with self.subTest(channel=channel):
+                session, result, _, logs = self._create_with_rwms_outage(
+                    "reader@example.com", creation_channel=channel
+                )
+                self.assertIsInstance(result, SiteRegistrationUnavailable)
+                self.assertEqual(session.added, [])
+                self.assertFalse(any("ALERT" in line for line in logs.output))
+
+    @override_settings(
+        SITE_TRIAL_REGISTRATION_ENABLED=False,
+        SITE_LEGACY_RWMS_IDENTITY_SCAN_ENABLED=True,
+    )
+    def test_anonymous_purchase_fails_closed_when_legacy_scan_cannot_run(self):
+        """Включённый legacy-скан (TR-05) при недоступной панели выполнить
+        нельзя: локальный аккаунт не создаётся и для анонимной покупки."""
+        session, result, rwms, _ = self._create_with_rwms_outage(
+            "legacy@example.com", allow_trial=False
+        )
+        self.assertIsInstance(result, SiteRegistrationUnavailable)
+        self.assertEqual(session.added, [])
+        rwms.get_all_users.assert_not_called()
 
     @override_settings(SITE_TRIAL_REGISTRATION_ENABLED=True, SITE_TRIAL_PERIOD_DAYS=7)
     def test_create_site_user_with_trial_flag_keeps_rwms_trial_path(self):
@@ -3255,15 +3574,66 @@ class PaymentRedirectTests(SimpleTestCase):
         self.assertEqual(create_rwms_user.call_args.kwargs["trial_period_days"], 7)
         add_event_log.assert_called_once()
 
+    @override_settings(SITE_TRIAL_REGISTRATION_ENABLED=True, SITE_TRIAL_PERIOD_DAYS=7)
+    def test_create_site_user_without_email_confirmation_never_creates_trial(self):
+        """B12/R03: анонимная покупка с лендинга создаёт аккаунт до
+        подтверждения email — пробная подписка в панели не выдаётся даже при
+        включённом site trial; существующая подписка ищется тем же strict-путём."""
+        session = _SiteRegistrationFakeSession()
+
+        with mock.patch(
+            "engine.views.get_registration_context",
+            return_value={"referrer": None, "traffic_source": 42, "ymid": None},
+        ), mock.patch(
+            "engine.views.should_create_trial_for_channel", return_value=True
+        ), mock.patch(
+            "engine.views.find_rwms_user_by_identity", return_value=None
+        ) as find_rwms, mock.patch(
+            "engine.views.resolve_existing_site_subscription"
+        ) as resolve_for_trial, mock.patch(
+            "engine.views.create_user"
+        ) as create_rwms_user, mock.patch(
+            "engine.views.add_user_to_traffic_progress"
+        ), mock.patch(
+            "engine.views.add_event_log"
+        ) as add_event_log:
+            user = create_site_user(
+                session,
+                "buyer@example.com",
+                SimpleNamespace(),
+                allow_trial=False,
+            )
+
+        self.assertEqual(user.email, "buyer@example.com")
+        self.assertIsNone(user.expire_at)
+        self.assertIn(user, session.added)
+        find_rwms.assert_called_once_with(
+            email="buyer@example.com",
+            telegram_id=None,
+            username=site_registration_username("buyer@example.com", None),
+        )
+        resolve_for_trial.assert_not_called()
+        create_rwms_user.assert_not_called()
+        add_event_log.assert_not_called()
+
     def test_runtime_actual_tariffs_use_database_prices(self):
         class FakeSession:
-            def get(self, model, key):
-                values = {
+            values = {
                     BOT_TARIFF_PRICE_MONTH_SETTING: "199",
                     BOT_TARIFF_PRICE_YEAR_SETTING: "bad-value",
-                }
-                value = values.get(key)
-                return SimpleNamespace(value=value) if value is not None else None
+            }
+
+            def query(self, model):
+                return self
+
+            def filter(self, *args):
+                return self
+
+            def all(self):
+                return [
+                    SimpleNamespace(key=key, value=value)
+                    for key, value in self.values.items()
+                ]
 
         tariffs = {
             tariff.db_tariff_id: tariff
@@ -3350,6 +3720,31 @@ class PaymentRedirectTests(SimpleTestCase):
         self.assertEqual(item["vat_code"], 1)  # без НДС (УСН)
         self.assertEqual(item["payment_subject"], "service")
 
+    def test_yookassa_payment_saves_card_by_default_and_can_be_one_off(self):
+        tariff = SimpleNamespace(
+            price=100,
+            db_tariff_id="one_month",
+            description="1 месяц",
+        )
+        confirmation = SimpleNamespace(confirmation_url="https://yk.example/pay")
+        payment = SimpleNamespace(id="yk-payment-id", confirmation=confirmation)
+
+        for kwargs, expected in (({}, True), ({"save_payment_method": False}, False)):
+            with self.subTest(kwargs=kwargs), mock.patch(
+                "engine.payments.Payment.create", return_value=payment
+            ) as create:
+                create_yk_payment_sync(
+                    shop_id="shop-id",
+                    secret="secret",
+                    tariff=tariff,
+                    username="user-1",
+                    telegram_id=0,
+                    return_url="https://example.com/login/purchase/token/",
+                    email="user@example.com",
+                    **kwargs,
+                )
+                self.assertIs(create.call_args.args[0]["save_payment_method"], expected)
+
     def test_wata_payment_uses_success_and_fail_redirect_urls(self):
         tariff = SimpleNamespace(
             price=100,
@@ -3377,7 +3772,9 @@ class PaymentRedirectTests(SimpleTestCase):
                 captured["json"] = json
                 return FakeResponse()
 
-        with mock.patch("engine.payments.httpx.Client", return_value=FakeClient()):
+        with mock.patch(
+            "engine.payments.httpx.Client", return_value=FakeClient()
+        ) as client_class:
             created_payment = create_wata_payment_sync(
                 wata_host="https://wata.example",
                 wata_token="token",
@@ -3385,6 +3782,12 @@ class PaymentRedirectTests(SimpleTestCase):
                 success_redirect_url="https://example.com/login/purchase/token/",
                 fail_redirect_url="https://example.com/",
             )
+
+        from engine import payments
+
+        client_class.assert_called_once_with(
+            timeout=payments.PAYMENT_HTTP_TIMEOUT_SECONDS
+        )
 
         self.assertEqual(created_payment.confirmation_url, "https://wata.example/pay")
         self.assertEqual(created_payment.reference, "order-1")
@@ -3394,6 +3797,32 @@ class PaymentRedirectTests(SimpleTestCase):
             "https://example.com/login/purchase/token/",
         )
         self.assertEqual(captured["json"]["failRedirectUrl"], "https://example.com/")
+
+    def test_yookassa_transport_sets_network_timeout(self):
+        from engine import payments
+
+        response = SimpleNamespace(
+            content=b"{}",
+            headers={},
+        )
+        session = mock.Mock()
+        session.request.return_value = response
+        client = payments.TimeoutApiClient.__new__(payments.TimeoutApiClient)
+        client.endpoint = "https://api.yookassa.test"
+        client.configuration = SimpleNamespace(verify=True)
+        client.get_session = mock.Mock(return_value=session)
+        client.log_request = mock.Mock()
+        client.log_response = mock.Mock()
+        client.get_response_info = mock.Mock(return_value={})
+
+        result = client.execute({}, "POST", "/payments", None, {})
+
+        self.assertIs(result, response)
+        self.assertEqual(
+            session.request.call_args.kwargs["timeout"],
+            payments.PAYMENT_HTTP_TIMEOUT_SECONDS,
+        )
+        session.close.assert_called_once()
 
 
 class RegistrationAdvisoryLockTests(SimpleTestCase):
@@ -3859,7 +4288,7 @@ class SiteRegistrationViewFallbackTests(SimpleTestCase):
         request.session = {}
         return request
 
-    def test_magic_link_asks_to_retry_when_registration_unavailable(self):
+    def test_magic_link_defers_registration_until_email_link_is_opened(self):
         session = self._fake_session(None)
 
         with mock.patch(
@@ -3867,17 +4296,35 @@ class SiteRegistrationViewFallbackTests(SimpleTestCase):
         ), mock.patch(
             "engine.views.create_site_user",
             side_effect=SiteRegistrationUnavailable("rwms unavailable"),
-        ), mock.patch(
+        ) as create_site, mock.patch(
             "engine.views.send_magic_link_email"
         ) as send_email:
             response = send_magic_link(self._post("new@example.com"))
 
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content), {"status": "ok"})
+        create_site.assert_not_called()
+        sent_link = send_email.call_args.args[1]
+        self.assertIn("/login/register/", sent_link)
+        self.assertTrue(session.closed)
+
+    def test_confirmed_registration_asks_to_retry_when_rwms_is_unavailable(self):
+        session = self._fake_session(None)
+        request = RequestFactory().get("/login/register/token/")
+        request.session = {}
+        request.user = SimpleNamespace(is_authenticated=False)
+        token = views.build_site_registration_token("new@example.com", {})
+
+        with mock.patch(
+            "engine.views.session_factory", return_value=session
+        ), mock.patch(
+            "engine.views.create_site_user",
+            side_effect=SiteRegistrationUnavailable("rwms unavailable"),
+        ):
+            response = views.auth_by_registration_link(request, token)
+
         self.assertEqual(response.status_code, 503)
-        payload = json.loads(response.content)
-        self.assertEqual(payload["status"], "error")
-        self.assertEqual(payload["message"], SITE_REGISTRATION_RETRY_MESSAGE)
-        self.assertIn("попробуйте позже", payload["message"])
-        send_email.assert_not_called()
+        self.assertIn(SITE_REGISTRATION_RETRY_MESSAGE, response.content.decode())
         self.assertTrue(session.closed)
 
     def test_legacy_random_username_user_logs_in_unchanged(self):
@@ -3913,8 +4360,8 @@ class SiteRegistrationViewFallbackTests(SimpleTestCase):
 
     @override_settings(PAYMENT_GATEWAY="wata")
     def test_pay_asks_to_retry_instead_of_creating_orphan(self):
-        """Деньги: если аккаунт под оплату подготовить нельзя, форма оплаты не
-        открывается и в панели ничего не создаётся."""
+        """Деньги: если аккаунт под анонимную оплату подготовить нельзя, форма
+        оплаты не открывается и в панели ничего не создаётся."""
         tariff = SimpleNamespace(price=100, db_tariff_id="month", description="1 месяц")
 
         class SessionDict(dict):
@@ -3922,6 +4369,10 @@ class SiteRegistrationViewFallbackTests(SimpleTestCase):
 
         class FakeQuery:
             def filter(self, *args, **kwargs):
+                return self
+
+            def with_for_update(self, **kwargs):
+                # FINAL-PAY-03: анонимная ветка читает users FOR UPDATE.
                 return self
 
             def first(self):
@@ -3955,7 +4406,7 @@ class SiteRegistrationViewFallbackTests(SimpleTestCase):
             mock.patch(
                 "engine.views.create_site_user",
                 side_effect=SiteRegistrationUnavailable("rwms unavailable"),
-            ),
+            ) as create_site,
             mock.patch("engine.views.create_wata_payment_sync") as create_invoice,
         ):
             response = pay(request)
@@ -3965,6 +4416,8 @@ class SiteRegistrationViewFallbackTests(SimpleTestCase):
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["message"], SITE_REGISTRATION_RETRY_MESSAGE)
         create_invoice.assert_not_called()
+        # R03/B12: аккаунт под анонимную покупку — без пробной подписки в панели.
+        self.assertIs(create_site.call_args.kwargs["allow_trial"], False)
 
 
 class LoginOnboardingTests(SimpleTestCase):
@@ -4275,7 +4728,7 @@ class PricingFilterTests(SimpleTestCase):
 
 class SettingsTabTemplateTests(SimpleTestCase):
     def test_settings_tab_present_with_autopay_and_faq(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn('data-tab="settings"', template)
         self.assertIn('id="tab-settings"', template)
@@ -4310,7 +4763,7 @@ class SettingsTabTemplateTests(SimpleTestCase):
         self.assertIn("tg_webapp_mode", template)
 
     def test_autopay_button_always_clickable_with_nothing_to_cancel_sheet(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Отключение автопродления убрано с видных мест и живёт ссылкой
         # внутри листа «История платежей» (открывает прежний confirm-флоу).
@@ -4335,7 +4788,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
 
         from engine import views
 
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
         dashboard_source = inspect.getsource(views.dashboard)
 
         self.assertIn("@media (min-width: 1025px)", template)
@@ -4344,9 +4797,9 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("background: rgba(255, 255, 255, 0.065);", template)
         self.assertIn("background: #ffc700;", template)
         self.assertIn("border-radius: 8px !important;", template)
-        self.assertIn('class="desktop-referral-strip"', template)
-        self.assertIn("Пригласите друга — получите до {{ max_referral_bonus_days }} дней", template)
-        self.assertIn('class="desktop-referral-btn" onclick="toggleRefSheet()"', template)
+        self.assertIn("dt-ref-card", template)
+        self.assertIn("Получайте дни доступа", template)
+        self.assertIn("до {{ max_referral_bonus_days }} дней", template)
         self.assertNotIn('id="ref-pill"', template)
         self.assertIn('"max_referral_bonus_days": (', dashboard_source)
         self.assertIn("join_referrer_bonus_days", dashboard_source)
@@ -4354,7 +4807,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("purchase_referrer_bonus_days", dashboard_source)
 
     def test_desktop_home_uses_inline_devices_without_summary_or_detail_panel(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
         desktop_home = template[
             template.index('<div class="standard-dashboard-home">'):
             template.index("{% endif %}\n                </div>\n            </div>", template.index('<div class="standard-dashboard-home">'))
@@ -4369,23 +4822,20 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertNotIn("Переподключить", desktop_home)
         self.assertNotIn("desktop-renewal-card", desktop_home)
         self.assertNotIn("mi3-desktop-devices-note", desktop_home)
-        self.assertIn("desktop-subscription-card", desktop_home)
-        self.assertIn("desktop-devices-panel", desktop_home)
-        self.assertIn('id="desktop-devices-list"', desktop_home)
-        self.assertIn('data-desktop-device-filter="all"', desktop_home)
+        self.assertIn("dt-access-card", desktop_home)
+        self.assertIn("dt-stat-devices", desktop_home)
         self.assertIn('onclick="quickAccessInstall()"', desktop_home)
-        self.assertIn('class="desktop-home-actions"', desktop_home)
-        self.assertIn('onclick="quickAccessInstall()" class="desktop-secondary-action"', desktop_home)
+        self.assertIn('class="dt-quick-grid"', desktop_home)
+        self.assertIn('class="dt-quick-card" onclick="quickAccessInstall()"', desktop_home)
         self.assertIn("Быстрый доступ", desktop_home)
-        self.assertIn('onclick="showTab(\'setup\')" class="desktop-primary-action"', desktop_home)
-        self.assertIn('onclick="showTab(\'setup\')" class="desktop-secondary-action"', desktop_home)
-        self.assertIn("Подключить устройство", desktop_home)
+        self.assertIn('onclick="showTab(\'setup\')"', desktop_home)
+        self.assertIn("Добавить устройство", desktop_home)
         self.assertIn('onclick="openPaymentsHistorySheet()"', desktop_home)
         self.assertIn("История платежей", desktop_home)
         self.assertIn("fas fa-receipt", desktop_home)
 
     def test_mobile_home_uses_white_monkey_face_without_tint(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
         logo_styles = template[
             template.index(".tg-mini-brand-mark img {"):
             template.index("}", template.index(".tg-mini-brand-mark img {")) + 1
@@ -4396,7 +4846,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertNotIn("sepia", logo_styles)
 
     def test_desktop_home_uses_full_width_compact_surface_palette(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn(".desktop-cabinet-home", template)
         self.assertIn("width: min(100%, 1280px);", template)
@@ -4410,7 +4860,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn(".desktop-quick-actions", template)
 
     def test_desktop_devices_render_from_existing_api_and_delete_safely(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn("function renderDesktopDevices(data)", template)
         self.assertIn("function bindDeviceDeleteButtons(root)", template)
@@ -4422,7 +4872,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("desktopDeviceFilter === 'online'", template)
 
     def test_mobile_home_uses_compact_state_driven_layout(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Компактная главная всегда есть в DOM: на сайте её включает mobile
         # breakpoint, а Mini App использует её независимо от ширины.
@@ -4450,7 +4900,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("<span>Платежи и подписка</span>", template)
 
     def test_mobile_home_has_restrained_visual_hierarchy(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn("body.tg-webapp {", template)
         # Кабинет и Mini App используют фирменный Golos Text (как лендинги);
@@ -4467,7 +4917,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("background: transparent;", template)
 
     def test_mobile_breakpoint_replaces_standard_home_for_regular_website(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn("@media (max-width: 1024px)", template)
         self.assertIn(".tg-mini-home {\n                display: block;", template)
@@ -4476,7 +4926,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("body.dashboard-v2 .nav-mobile", template)
 
     def test_desktop_referral_dialog_matches_approved_concept(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn('id="ref-desktop-content" class="ref-desktop-dialog"', template)
         self.assertIn('role="dialog" aria-modal="true"', template)
@@ -4500,7 +4950,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         в пользовательских текстах кабинета он не раскрывается («активный
         пользователь»), как и в текстах бота. Админка (admin_dashboard.html)
         порог показывает — это ожидаемо."""
-        template = Path("engine/templates/dashboard.html").read_text().lower()
+        template = template_source("engine/templates/dashboard.html").lower()
 
         self.assertNotIn("100 мб", template)
         self.assertNotIn("100мб", template)
@@ -4508,7 +4958,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertNotIn("трафика от друга", template)
 
     def test_mobile_referral_bottom_sheet_is_preserved(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn('class="bottom-sheet-content fixed inset-x-0 bottom-0', template)
         self.assertIn('id="ref-content"', template)
@@ -4521,7 +4971,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
     def test_mobile_referral_copy_buttons_have_click_handler(self):
         """Кнопки «Скопировать» мобильного экрана рефералов (data-mi3-copy)
         должны иметь обработчик: раньше его не было и кнопки не кликались."""
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # В HTML-атрибуте работает автоэскейпинг Django; |escapejs здесь
         # портил ссылку литеральными =-последовательностями.
@@ -4536,7 +4986,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         """Шторка подключения: назад | прогресс шагов | закрыть, заголовок
         отдельной строкой (кнопки не смещают его). На шаге 1 «Назад»
         невидима, но держит место."""
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn('id="mi3-connect-back"', template)
         self.assertIn('onclick="mi3ConnectBack()"', template)
@@ -4554,7 +5004,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
     def test_quick_access_waits_for_deferred_install_prompt(self):
         """Первый клик по «Быстрому доступу» не должен сваливаться в
         инструкцию, если beforeinstallprompt ещё не успел прийти."""
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn("function waitForInstallPrompt(", template)
         self.assertIn("const installPrompt = await waitForInstallPrompt(1500);", template)
@@ -4563,7 +5013,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
     def test_faq_back_returns_to_origin_tab(self):
         """«Назад» из FAQ возвращает на вкладку, с которой FAQ открыли
         (например, «Поддержка»), а не всегда в «Профиль»."""
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn("let faqReturnTab = 'settings';", template)
         self.assertIn("faqReturnTab = activeTab ? activeTab.id.replace('tab-', '') : 'settings';", template)
@@ -4572,13 +5022,16 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn('onclick="backFromSettingsFaq()"', template)
 
     def test_referral_dialog_supports_escape_focus_and_safe_telegram_share(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn('aria-hidden="true"', template)
         self.assertIn("let refSheetTrigger = null;", template)
-        self.assertIn("appContainer?.setAttribute('inert', '');", template)
-        self.assertIn("appContainer?.removeAttribute('inert');", template)
-        self.assertIn("document.getElementById('ref-desktop-close')?.focus();", template)
+        # Inline-JS кабинета держим на ES2019 (без optional chaining), см.
+        # engine/tests_frontend_review.LegacyBrowserSyntaxGuardTests.
+        self.assertIn("if (appContainer) appContainer.setAttribute('inert', '');", template)
+        self.assertIn("if (appContainer) appContainer.removeAttribute('inert');", template)
+        self.assertIn("const refDesktopClose = document.getElementById('ref-desktop-close');", template)
+        self.assertIn("if (refDesktopClose) refDesktopClose.focus();", template)
         self.assertIn("event.key === 'Escape'", template)
         self.assertIn("function shareTelegramReferral()", template)
         self.assertIn("https://t.me/share/url?url=${encodeURIComponent(input.value)}", template)
@@ -4586,7 +5039,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("window.open(shareUrl, '_blank', 'noopener,noreferrer')", template)
 
     def test_desktop_referral_icons_stay_centered_and_links_have_no_input_bars(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Text rules must not override the inline-flex icon container.
         self.assertIn(".ref-desktop-step > div > strong", template)
@@ -4601,7 +5054,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("box-shadow: none !important;", template)
 
     def test_desktop_referral_earned_card_sits_below_close_button(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn("grid-template-columns: 50px minmax(0, 1fr);", template)
         self.assertIn("min-height: 96px;", template)
@@ -4613,7 +5066,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("position: absolute;\n                top: 24px;\n                right: 28px;", template)
 
     def test_referral_terms_use_dedicated_responsive_dialog(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
         open_terms_source = template[
             template.index("function openReferralTerms()"):
             template.index("function closeReferralTerms()")
@@ -4632,7 +5085,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("modal.classList.remove('hidden')", open_terms_source)
 
     def test_referral_terms_match_desktop_and_mobile_concept(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Mobile-first bottom sheet with drag handle, timeline and brand CTA.
         self.assertIn("align-items: flex-end;", template)
@@ -4650,7 +5103,7 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("color: rgba(255, 255, 255, 0.88);", template)
 
     def test_referral_surfaces_use_black_and_yellow_brand_palette(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn("body.dashboard-v2 .desktop-referral-icon", template)
         self.assertIn("body.dashboard-v2 .ref-desktop-share-row.is-recommended", template)
@@ -4663,14 +5116,15 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertNotIn("rgba(169, 109, 255", template)
 
     def test_referral_terms_support_accessible_close_telegram_back_and_mobile_swipe(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         self.assertIn("function referralTermsIsOpen()", template)
-        self.assertIn("modal?.classList.contains('is-open')", template)
+        self.assertIn("modal && modal.classList.contains('is-open')", template)
         self.assertIn("event.key === 'Escape' && referralTermsIsOpen()", template)
-        self.assertIn("document.getElementById('referral-terms-close')?.focus();", template)
-        self.assertIn("appContainer?.setAttribute('inert', '');", template)
-        self.assertIn("appContainer?.removeAttribute('inert');", template)
+        self.assertIn("const referralTermsClose = document.getElementById('referral-terms-close');", template)
+        self.assertIn("if (referralTermsClose) referralTermsClose.focus();", template)
+        self.assertIn("if (appContainer) appContainer.setAttribute('inert', '');", template)
+        self.assertIn("if (appContainer) appContainer.removeAttribute('inert');", template)
         self.assertIn(
             "if (document.querySelector('.mi3-sheet.is-open') || referralTermsOpen || setupActive) "
             "back.show(); else back.hide();",
@@ -4817,7 +5271,7 @@ class ConfigPinsAdminApiTests(SimpleTestCase):
 
 class ConfigPinsAdminTemplateTests(SimpleTestCase):
     def test_admin_dashboard_has_config_pins_ui(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         self.assertIn('data-config-pins-url', template)
         self.assertIn('id="config-pins-form"', template)
         self.assertIn("submitConfigPinsSearch", template)
@@ -4901,7 +5355,7 @@ class ConfigPinsCleanupTests(SimpleTestCase):
 
 class ConfigModalScrollLockTests(SimpleTestCase):
     def test_config_modal_locks_background_scroll(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         # Фон под модалкой фиксируется (iOS-safe), а инерционный скролл не пробрасывается.
         self.assertIn("html.modal-open body { position: fixed", template)
         self.assertIn("function lockBodyScroll", template)
@@ -4915,7 +5369,7 @@ class ConfigModalScrollLockTests(SimpleTestCase):
         self.assertIn("unlockBodyScroll()", close_fn)
 
     def test_config_modal_card_is_scroll_container_with_sticky_header(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         # Скроллится вся карточка (колесо/жест над шапкой тоже прокручивает к кнопке),
         # шапка закреплена сверху и непрозрачна.
         card_rule = template.split(".modal-card.config-template-modal-card {", 1)[1].split("}", 1)[0]
@@ -4931,7 +5385,7 @@ class AdminCssBraceBalanceTests(SimpleTestCase):
         # с ошибкой — единственная защита от такого выстрела — этот тест.
         import re
 
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         for index, block in enumerate(re.findall(r"<style>(.*?)</style>", template, re.S)):
             with self.subTest(style_block=index):
                 self.assertEqual(
@@ -4949,7 +5403,7 @@ class AdminCssBraceBalanceTests(SimpleTestCase):
 
 class ConfigTemplatesAdminUiTests(SimpleTestCase):
     def test_config_delivery_rules_share_one_responsive_workspace(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         # Утверждённый концепт (10.09.2026): пиннинг и UA-правила — два
         # постоянных равноправных инструмента рядом; аккордеона и выпадающих
@@ -4983,7 +5437,7 @@ class ConfigTemplatesAdminUiTests(SimpleTestCase):
             self.assertIn(f'name="{field_name}"', delivery_markup)
 
     def test_ua_rules_render_as_readable_condition_flow(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         # Строка правила читается как «условие -> CLIENT=значение»; статус —
         # точка, действия появляются по hover, клик по строке — редактирование
@@ -4997,7 +5451,7 @@ class ConfigTemplatesAdminUiTests(SimpleTestCase):
         self.assertNotIn("<small>Если UA содержит</small>", template)
 
     def test_json_editor_selection_is_visible(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         # Выделение текста в CodeMirror перекрывает блеклый фон темы material-darker,
         # иначе выделенный фрагмент почти не отличим от фона редактора.
         self.assertIn(".cm-s-material-darker div.CodeMirror-selected", template)
@@ -5005,7 +5459,7 @@ class ConfigTemplatesAdminUiTests(SimpleTestCase):
         self.assertIn(".cm-s-material-darker .CodeMirror-line::selection", template)
 
     def test_config_modal_does_not_close_on_backdrop_or_escape(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         # Клик по фону и Escape не закрывают модалку конфига: это теряло
         # несохранённый JSON. Закрытие — только кнопками «Отмена»/крестик.
         self.assertNotIn("if (event.target.id === 'config-template-modal') closeConfigTemplateModal();", template)
@@ -5018,7 +5472,7 @@ class ConfigTemplatesAdminUiTests(SimpleTestCase):
         self.assertIn("closeSourceUsersModal();", escape_handler)
 
     def test_config_pins_render_as_compact_chip_grid_with_filter(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         # Вместо вертикальной «колбасы» строк — сетка компактных чипов,
         # фильтр по названию, счётчик выбранных и свёрнутые неактивные конфиги.
         self.assertIn('class="config-pin-chip', template)
@@ -5032,7 +5486,7 @@ class ConfigTemplatesAdminUiTests(SimpleTestCase):
         self.assertIn(".config-pins-list input[type=\"checkbox\"]:checked", template)
 
     def test_config_template_cards_have_no_json_previews(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         # Превью template_json и additional_headers из карточек убраны — карточки
         # компактные; наличие заголовков видно по бейджу.
         self.assertNotIn("config-template-preview", template)
@@ -5055,7 +5509,7 @@ class NodeTrafficReportTests(SimpleTestCase):
         import proto.rwmanager_pb2 as rw_proto
 
         class FakeRwms:
-            def get_node_users_usage(self, request):
+            def get_node_users_usage(self, request, *, timeout=None):
                 rows = usage_by_node.get(request.node_uuid)
                 if rows is None:
                     return None
@@ -5234,7 +5688,7 @@ class NodeTrafficAdminApiTests(SimpleTestCase):
 
 class NodeTrafficTemplateTests(SimpleTestCase):
     def test_node_traffic_report_uses_current_admin_design_system(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         for marker in (
             'class="node-traffic-report"',
@@ -5261,7 +5715,7 @@ class NodeTrafficTemplateTests(SimpleTestCase):
     def test_admin_dashboard_has_node_traffic_tab(self):
         # «Трафик нод» — самостоятельный раздел сайдбара под «Системой»:
         # это отчёт, за которым ходят напрямую, а не по пути к установке нод
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('data-tab="node-traffic"', template)
         # `.infra-legacy-panel { display:block }` beats `.tab-panel { display:none }`:
@@ -5289,7 +5743,7 @@ class NodeTrafficTemplateTests(SimpleTestCase):
         """Страница использует иконки FA 6.1+ (fa-magnifying-glass-chart,
         fa-ranking-star, глиф \\e522); с FA 6.0.0 они рендерились пустыми
         квадратами, поэтому шаблоны обязаны подключать FA >= 6.1."""
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("font-awesome/6.7.2/css/all.min.css", template)
         self.assertIn('content: "\\e522"', template)  # fa-magnifying-glass-chart
@@ -5303,7 +5757,7 @@ class NodeTrafficTemplateTests(SimpleTestCase):
 
     def test_node_traffic_summary_icons_are_readable(self):
         """Иконки сводки были 11px muted-серым на тёмном фоне — почти невидимы."""
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         def css_rule(selector):
             start = template.index(f"{selector} {{")
@@ -5330,7 +5784,7 @@ class NodeTrafficTemplateTests(SimpleTestCase):
     def test_date_popover_is_kept_inside_viewport(self):
         # Календарь у правого края карточки не должен вылезать за экран:
         # после открытия/перелистывания/ресайза JS считает сдвиг и кладёт его в CSS-переменную.
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("function positionDatePopover(field)", template)
         self.assertIn("popover.style.setProperty('--date-popover-shift', `${Math.round(shift)}px`);", template)
@@ -5340,7 +5794,7 @@ class NodeTrafficTemplateTests(SimpleTestCase):
         self.assertIn("document.querySelectorAll('[data-date-picker].open').forEach(positionDatePopover);", template)
 
     def test_node_traffic_loads_today_report_on_first_tab_open(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('<option value="1" selected>Сегодня (с 03:00 МСК)</option>', template)
         self.assertIn('<option value="24">Вчера + сегодня</option>', template)
@@ -5353,7 +5807,7 @@ class NodeTrafficTemplateTests(SimpleTestCase):
 
 class NodeProvisionTemplateTests(SimpleTestCase):
     def setUp(self):
-        self.template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.template = template_source("engine/templates/admin_dashboard.html")
 
     def test_node_provision_separates_installations_and_scripts(self):
         for marker in (
@@ -5429,7 +5883,7 @@ class NodeTrafficDayGranularityTests(SimpleTestCase):
         captured = {}
 
         class FakeRwms:
-            def get_node_users_usage(self, request):
+            def get_node_users_usage(self, request, *, timeout=None):
                 captured["start"] = request.start.ToDatetime()
                 return rw_proto.GetNodeUsersUsageResponse(items=[])
 
@@ -5546,7 +6000,7 @@ class AcquisitionJourneyTests(SimpleTestCase):
         self.assertIn("tariff_id", ACQ_PAYS_TARIFF_CTE)
 
     def test_journey_subtab_present_in_template(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('data-subtab="acq-journey"', template)
         self.assertIn('id="subpanel-acq-journey"', template)
@@ -5563,7 +6017,7 @@ class AcquisitionFunnelTemplateTests(SimpleTestCase):
     def test_funnel_table_has_invoice_to_payment_percent(self):
         # В таблице воронки рядом с «Подписка→покупатель» есть колонка
         # «Инвойс→Оплата»: все оплаты недели ÷ инвойсы той же недели.
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("'Инвойс→Оплата'", template)
         self.assertIn("funnelPct(r.payments, r.invoice_clicks)", template)
@@ -5720,7 +6174,7 @@ class AdminChartPaletteTests(SimpleTestCase):
     """Расцветка серий на графиках админки."""
 
     def setUp(self):
-        self.template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.template = template_source("engine/templates/admin_dashboard.html")
         self.css = Path("engine/static/css/admin_dashboard.css").read_text()
 
     def test_dark_theme_keeps_historical_multi_hue_series_palette(self):
@@ -5826,7 +6280,7 @@ class AdminChartReadabilityTests(SimpleTestCase):
     """Читаемость графиков: сетка, подписи осей, легенда, тултипы."""
 
     def setUp(self):
-        self.template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.template = template_source("engine/templates/admin_dashboard.html")
         self.css = Path("engine/static/css/admin_dashboard.css").read_text()
 
     def test_axis_labels_are_compact_and_carry_units(self):
@@ -5874,7 +6328,7 @@ class ReferralAntifraudPanelTests(SimpleTestCase):
     """Блок антифрода: одна панель вместо статус-карточек и отдельной формы."""
 
     def setUp(self):
-        self.template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.template = template_source("engine/templates/admin_dashboard.html")
         self.css = Path("engine/static/css/admin_dashboard.css").read_text()
         # Проверки «этого быть не должно» по тексту ограничиваем самой
         # карточкой: в шаблоне на 14 тысяч строк те же слова встречаются
@@ -6003,7 +6457,7 @@ class AdSpendMultiAccountTests(SimpleTestCase):
         self.assertEqual(views_src.count("ON CONFLICT (day, channel, account)"), 2)
         self.assertNotIn("uq_ad_spends_day_channel\n", views_src)
 
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         self.assertIn('id="acq-account-select"', template)
         self.assertIn('id="acq-account-add"', template)
         self.assertIn('id="acq-account-rename"', template)
@@ -6045,7 +6499,7 @@ class AdminAnalyticsStage1Tests(SimpleTestCase):
         self.assertAlmostEqual(ACQ_MRR_RECURRENT_FACTORS["year"], 1.0 / 12.0)
 
     def test_admin_template_has_new_subtabs(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('data-subtab="acq-mrr"', template)
         self.assertIn('data-subtab="acq-payhealth"', template)
@@ -6074,7 +6528,7 @@ class AdminAnalyticsStage1Tests(SimpleTestCase):
         src = inspect.getsource(_acq_funnel)
         self.assertIn("traffic_threshold_reached", src)
         self.assertIn("mb100", src)
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         self.assertIn("Подкл.→100 МБ", template)
 
 
@@ -6082,7 +6536,7 @@ class SetupWizardTests(SimpleTestCase):
     """Мастер подключения в кабинете и Mini App."""
 
     def test_wizard_resets_to_start_after_finish(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Повторный вход в мастер после «Завершить» (шаг done) начинается с
         # первого шага — без сброса клиент видел бы последний экран.
@@ -6094,7 +6548,7 @@ class SetupWizardTests(SimpleTestCase):
         self.assertIn("renderNewSetupWizard()", showtab_src)
 
     def test_wizard_honors_apple_recommended_app(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Настройка apple_recommended_app из админки доезжает до кабинета:
         # мастер и плоский флоу переключаются на Incy с шифрованной ссылкой.
@@ -6195,7 +6649,7 @@ class AdminAdsCsvUxTests(SimpleTestCase):
     выбранный в другой карточке, — легко было залить в default)."""
 
     def test_csv_file_input_is_styled_button(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         # Нативный инпут скрыт внутри стилизованной кнопки-label
         self.assertIn('id="acq-csv-file-label"', template)
@@ -6207,7 +6661,7 @@ class AdminAdsCsvUxTests(SimpleTestCase):
         self.assertIn("сначала выберите CSV-файл", template)
 
     def test_csv_form_has_explicit_account_selector(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('id="acq-csv-account"', template)
         # Селекторы синхронизированы в обе стороны
@@ -6222,7 +6676,7 @@ class AdminAcqDatePickerTests(SimpleTestCase):
     вместо нативных input[type=date], плюс запрет «конец раньше начала»."""
 
     def test_newrep_period_uses_custom_date_picker(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         # Нативных date-инпутов у графика «новые vs повторные» больше нет —
         # только hidden внутри date-field.
@@ -6235,7 +6689,7 @@ class AdminAcqDatePickerTests(SimpleTestCase):
         self.assertIn("setAcqDateField('acq-newrep-start'", template)
 
     def test_date_range_cannot_invert(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         # Дни вне диапазона выключены: у конца min — это начало, у начала
         # max — это конец. Подключено и в «Привлечении», и в «Аналитике».
@@ -6247,7 +6701,7 @@ class AdminAcqDatePickerTests(SimpleTestCase):
         self.assertIn('data-range-min-from=\'[name="cohort_start"]\'', template)
 
     def test_month_selection_survives_programmatic_date_set(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         # setDateFieldValue шлёт input-событие; подстановка границ месяца
         # не должна сбрасывать сам селектор месяца.
@@ -6347,7 +6801,7 @@ class CabinetPaymentsHistoryTests(SimpleTestCase):
         self.assertEqual(cabinet_payments_history(post).status_code, 403)
 
     def test_cancel_autopay_is_buried_in_payments_sheet(self):
-        template = Path("engine/templates/dashboard.html").read_text()
+        template = template_source("engine/templates/dashboard.html")
 
         # Главный экран mini app: вместо «Автопродление» — «Платежи и подписка»
         # (редизайн b95ea64: строки-действия стали cabinet-action).
@@ -6504,7 +6958,7 @@ class AdminRecurrentDynamicsTests(SimpleTestCase):
         src = inspect.getsource(admin_payment_info_payload)
         self.assertIn("Автосписание", src)
         self.assertIn("cancellation_reason", src)
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         self.assertIn("Причина отмены", template)
 
 
@@ -6556,7 +7010,7 @@ class AdminClientWorkspaceTests(SimpleTestCase):
         """Клик по пользователю в «Трафике нод» открывает модалку с данными
         подписки (user-payments + user-traffic) и кнопкой перехода в полную
         карточку клиента с управлением подпиской."""
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('data-node-traffic-user="${escapeHtml(user.username)}"', template)
         self.assertIn('id="node-traffic-user-modal"', template)
@@ -6610,7 +7064,7 @@ class AdminClientWorkspaceTests(SimpleTestCase):
         self.assertIn("require_support_admin", src)
 
     def test_client_template_matches_compact_overview_concept(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         css = Path("engine/static/css/admin_dashboard.css").read_text()
 
         self.assertIn("data-user-traffic-url", template)
@@ -6629,7 +7083,7 @@ class AdminClientWorkspaceTests(SimpleTestCase):
     def test_client_overview_actions_use_registry_layout(self):
         """Действия с клиентом — один реестр: две группы, у строки справа две
         колонки одинаковой ширины, поле дней/часов прижато к своей кнопке."""
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         css = Path("engine/static/css/admin-concept-customers.css").read_text()
 
         overview = template[template.index("function clientOverviewSectionHtml"):template.index("function formatClientTrafficBytes")]
@@ -6693,7 +7147,7 @@ class AdminMoscowTimeTests(SimpleTestCase):
         self.assertIn("admin_msk_today()", inspect.getsource(views.support_admin_api_stats))
 
         # Явных подписей UTC в админке не осталось (кроме комментариев кода).
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         self.assertNotIn("Сегодня (UTC)", template)
         self.assertNotIn("} UTC<", template)
 
@@ -6702,7 +7156,7 @@ class AdminPaymentJournalTests(SimpleTestCase):
     """Единый современный журнал операций для двух списков платежей."""
 
     def test_client_and_global_payment_lists_use_expandable_journal(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("function paymentJournalRowsHtml", template)
         self.assertIn("function paymentStatusDescriptor", template)
@@ -6723,7 +7177,7 @@ class AdminPaymentJournalTests(SimpleTestCase):
     def test_admin_selects_are_enhanced_by_admin_select_script(self):
         """Нативные выпадающие списки в админке заменяет стилизованный
         компонент; сам <select> остаётся в DOM для форм, слушателей и тестов."""
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         script = Path("engine/static/js/admin-select.js").read_text()
         # Прокси-селект кастомного пикера сегмента не должен оборачиваться
         # в ui-select — иначе рядом с «Выберите сегмент» появляется второй
@@ -6743,7 +7197,7 @@ class AdminPaymentJournalTests(SimpleTestCase):
             self.assertIn(selector, css)
 
     def test_payment_journal_details_offer_copy_id_button(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         css = Path("engine/static/css/admin_dashboard.css").read_text()
         client_css = Path("engine/static/css/admin-concept-client-details.css").read_text()
 
@@ -6848,7 +7302,7 @@ class AdminStage3Tests(SimpleTestCase):
         )
 
     def test_client_card_has_new_subtabs(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         for subtab in ("timeline", "rwmssync", "message"):
             self.assertIn(f'data-client-subtab="{subtab}"', template)
@@ -6870,7 +7324,7 @@ class AdminStage4Tests(SimpleTestCase):
     """Этап 4: сегменты, рассылки, массовые операции."""
 
     def test_broadcast_title_and_segment_controls_align(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn(
             ".broadcast-primary-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(250px, .88fr); gap: 12px; align-items: start; }",
@@ -6879,7 +7333,7 @@ class AdminStage4Tests(SimpleTestCase):
         self.assertIn("#broadcast-segment-hint:empty { display: none; }", template)
 
     def test_zero_broadcast_funnel_metrics_do_not_repeat_zero_percent(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("claims > 0 && claimRate !== null", template)
         self.assertIn("buyers > 0 && buyerRate !== null", template)
@@ -6925,7 +7379,7 @@ class AdminStage4Tests(SimpleTestCase):
         self.assertIn("segments_counts_sql", src)
         self.assertIn("SEGMENTS_FAST_COUNT_TIMEOUT_MS", src)
 
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         # Фронт показывает «—» вместо нуля, если охват сегмента не посчитался.
         self.assertIn("function broadcastSegmentCountLabel", template)
         self.assertIn("broadcastSegmentCountLabel(segment)", template)
@@ -6952,7 +7406,7 @@ class AdminStage4Tests(SimpleTestCase):
         payload_src = inspect.getsource(views.admin_broadcast_payload)
         self.assertIn('"archived": bool(broadcast.archived_at)', payload_src)
 
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         self.assertIn('id="broadcasts-archive-toggle"', template)
         self.assertIn("data-broadcast-archive=", template)
         self.assertIn("data-broadcast-unarchive=", template)
@@ -6963,7 +7417,7 @@ class AdminStage4Tests(SimpleTestCase):
     def test_broadcast_history_polls_without_flicker(self):
         """Автообновление истории рассылок (раз в 5с при running) не должно
         подменять список спиннером — страница «моргала» на каждом тике."""
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("async function loadBroadcastsList(background = false)", template)
         self.assertIn("setTimeout(() => loadBroadcastsList(true), 5000)", template)
@@ -7009,7 +7463,7 @@ class AdminStage4Tests(SimpleTestCase):
         payload_src = inspect.getsource(views.admin_referral_payload)
         self.assertIn('"account_block": admin_account_block_payload(db_session, user)', payload_src)
 
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         self.assertIn('data-client-sub-action="block_account"', template)
         self.assertIn('data-client-sub-action="unblock_account"', template)
         self.assertNotIn('data-client-sub-action="disable_subscription"', template)
@@ -7060,7 +7514,7 @@ class AdminStage4Tests(SimpleTestCase):
         ), self.assertLogs(level="ERROR"):
             self.assertFalse(bot_push.push_admin_temporary_ban(42, 60))
 
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         self.assertIn("result.user_notified", template)
 
     def test_prepare_refund_removes_recurrent_payments(self):
@@ -7082,7 +7536,7 @@ class AdminStage4Tests(SimpleTestCase):
         self.assertIn('"removed_recurrents": removed_recurrents', src)
         self.assertIn("Возврат подготовлен: срок 1 час, автоплатёж отключён", src)
 
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         self.assertIn("Срок станет 1 час · автоплатёж отключится, рекуррент удалится", template)
         self.assertNotIn("автоплатёж не изменится", template)
         self.assertIn("автоплатёж будет отключён (рекуррент удалён)?", template)
@@ -7133,7 +7587,7 @@ class AdminStage4Tests(SimpleTestCase):
         self.assertNotIn("promo_code_uses", segment_count_sql("all"))
         self.assertIn("promo_code_uses", segment_count_sql("all", exclude_promo=True))
 
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         # Явный переключатель режима (всем / исключить активировавших),
         # по умолчанию — всем; без кнопки промокода радио неактивны.
         self.assertIn('id="broadcast-promo-audience" data-has-promo="false"', template)
@@ -7208,7 +7662,7 @@ class AdminStage4Tests(SimpleTestCase):
         self.assertNotIn('"price_overrides": overrides', src)
         self.assertNotIn("Некорректная цена тарифа", src)
 
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         # В форме не осталось ни поля с ценой, ни разбора "month=199".
         self.assertNotIn("price_overrides", template)
         self.assertNotIn("month=199", template)
@@ -7235,7 +7689,7 @@ class AdminStage4Tests(SimpleTestCase):
 
         self.assertTrue(hasattr(Broadcast, "disable_link_preview"))
 
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         self.assertIn('id="broadcast-disable-preview"', template)
         self.assertIn("checked", template)
         self.assertIn("body.append('disable_preview', '1')", template)
@@ -7290,7 +7744,7 @@ class AdminStage4Tests(SimpleTestCase):
             self.assertNotIn("query(User).", src)
 
     def test_template_has_broadcasts_and_bulk_panels(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('data-tab="broadcasts"', template)
         self.assertIn('data-tab="bulk-actions"', template)
@@ -7544,7 +7998,7 @@ class AdminSubscriptionManageRwmsStrictTests(SimpleTestCase):
             branch.index("create_user_until("),
         )
 
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         # UI показывает серверное сообщение 503, а не общее «Не удалось».
         self.assertIn("const errorPayload = await response.json();", template)
 
@@ -7586,7 +8040,7 @@ class AdminStage5PromoTests(SimpleTestCase):
         self.assertIn('"promo": promo', src)
 
     def test_template_has_promocodes_tab(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('data-tab="promocodes"', template)
         self.assertIn('id="promo-create"', template)
@@ -7598,7 +8052,7 @@ class AdminStage5PromoTests(SimpleTestCase):
         self.assertIn("start=promo_", Path("engine/views.py").read_text())
 
     def test_promocode_editor_explains_effects_and_audiences(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn("Один код — одна активация на человека", template)
         self.assertIn("Скидка на следующую оплату", template)
@@ -7616,7 +8070,7 @@ class AdminStage5PromoTests(SimpleTestCase):
         self.assertNotIn('<select id="promo-type"', template)
 
     def test_promocode_icons_and_supporting_copy_are_readable(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         def css_rule(selector):
             start = template.index(f"{selector} {{")
@@ -7722,7 +8176,7 @@ class AdminStage6RolesTests(SimpleTestCase):
         self.assertIn("SUPPORT_ADMIN_ACCOUNT_SESSION_KEY", src)
 
     def test_template_gates_marketer_sections(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn(
             "{% if support_admin_is_full_admin or support_admin_is_marketer %}",
@@ -7981,7 +8435,7 @@ class PromoCohortTests(SimpleTestCase):
     def test_template_has_cohort_ui_in_analytics(self):
         """Когорты живут вкладкой в «Аналитике»: обзор, динамика и люди;
         из раздела «Промокоды» кнопки убраны."""
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         self.assertIn('data-subtab="promo-cohorts"', template)
         self.assertIn('id="subpanel-promo-cohorts"', template)
@@ -8029,7 +8483,7 @@ class AdminScriptScopeTests(SimpleTestCase):
     def _main_script_block(self):
         import re
 
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         blocks = re.findall(r"<script>(.*?)</script>", template, re.S)
         return max(blocks, key=len)
 
@@ -8301,7 +8755,9 @@ class DashboardRwmsDegradationTests(SimpleTestCase):
     - достоверный NOT_FOUND (strict → None) → прежнее поведение: «истекла».
     """
 
-    def _dashboard_context(self, rwms_patch_kwargs, time_left=None):
+    def _dashboard_context(
+        self, rwms_patch_kwargs, time_left=None, telegram_id=100500, events=None
+    ):
         from django.http import HttpResponse
 
         from engine import views as _views
@@ -8326,13 +8782,22 @@ class DashboardRwmsDegradationTests(SimpleTestCase):
             def query(self, *args, **kwargs):
                 return FakeQuery()
 
+            def get(self, *args, **kwargs):
+                return None
+
             def commit(self):
+                if events is not None:
+                    events.append("commit")
                 return None
 
             def rollback(self):
+                if events is not None:
+                    events.append("rollback")
                 return None
 
             def close(self):
+                if events is not None:
+                    events.append("close")
                 return None
 
         class SessionDict(dict):
@@ -8343,7 +8808,7 @@ class DashboardRwmsDegradationTests(SimpleTestCase):
             is_authenticated=True,
             id=42,
             username="user-42",
-            telegram_id=100500,
+            telegram_id=telegram_id,
             email="user@example.com",
             time_until_expiration=time_left,
         )
@@ -8406,6 +8871,53 @@ class DashboardRwmsDegradationTests(SimpleTestCase):
         self.assertEqual(context["days_left"], 0)
         self.assertEqual(context["time_left_value"], 0)
 
+    def test_bind_link_is_committed_only_after_main_session_is_closed(self):
+        # commit в основной сессии истекал бы traffic_progress/support_ticket,
+        # и обращение к ним после close падало бы DetachedInstanceError.
+        from datetime import timedelta
+
+        events = []
+        with mock.patch(
+            "engine.views.get_or_create_telegram_bind_link",
+            return_value="https://t.me/test_bot?start=bind_42_token",
+        ) as issue:
+            context = self._dashboard_context(
+                {"return_value": None},
+                time_left=timedelta(days=5),
+                telegram_id=None,
+                events=events,
+            )
+
+        issue.assert_called_once()
+        self.assertEqual(
+            context["tg_bind_link"], "https://t.me/test_bot?start=bind_42_token"
+        )
+        self.assertTrue(context["show_telegram_bind_banner"])
+        self.assertEqual(events.count("commit"), 1)
+        self.assertLess(events.index("close"), events.index("commit"))
+
+    def test_bind_link_write_failure_renders_dashboard_without_banner(self):
+        from datetime import timedelta
+
+        from sqlalchemy.exc import OperationalError
+
+        events = []
+        with mock.patch(
+            "engine.views.get_or_create_telegram_bind_link",
+            side_effect=OperationalError("INSERT", {}, Exception("read-only")),
+        ), self.assertLogs(level="ERROR"):
+            context = self._dashboard_context(
+                {"return_value": None},
+                time_left=timedelta(days=5),
+                telegram_id=None,
+                events=events,
+            )
+
+        self.assertIsNone(context["tg_bind_link"])
+        self.assertFalse(context["show_telegram_bind_banner"])
+        self.assertNotIn("commit", events)
+        self.assertIn("rollback", events)
+
     def test_rwms_unavailable_does_not_grant_access_to_expired_db_user(self):
         from datetime import timedelta
 
@@ -8422,7 +8934,10 @@ class DashboardRwmsDegradationTests(SimpleTestCase):
     def test_normal_flow_uses_panel_subscription_url(self):
         from datetime import timedelta
 
-        sub = SimpleNamespace(subscription_url="https://sub.example/u")
+        sub = SimpleNamespace(
+            subscription_url="https://sub.example/u",
+            HasField=lambda _field_name: False,
+        )
         context = self._dashboard_context(
             {"return_value": sub}, time_left=timedelta(days=3)
         )
@@ -8584,6 +9099,46 @@ class PurchasePaymentOutcomeTests(PurchasePaymentStatusFixtureMixin, SimpleTestC
         )
 
         self.assertEqual(status, "failed")
+
+    def test_yookassa_token_does_not_use_another_payment_of_same_user(self):
+        self.session.add(
+            YkPayment(
+                id=1,
+                user_id=42,
+                amount=299,
+                currency="RUB",
+                status="succeeded",
+                created_at=datetime(2026, 8, 26, 10, 1, 0),
+                payment_id="other-payment",
+                subscription_period="month",
+            )
+        )
+        self.session.flush()
+        token = SimpleNamespace(
+            user_id=42,
+            created_at=datetime(2026, 8, 26, 10, 0, 0),
+            payment_gateway="yookassa",
+            payment_reference="expected-payment",
+        )
+
+        status, _message = get_purchase_payment_status(self.session, token)
+
+        self.assertEqual(status, "pending")
+
+    def test_wata_token_does_not_use_recent_invoice_of_same_user(self):
+        self._add_invoice(order_id="other-order")
+        self._add_transaction(
+            1,
+            "Paid",
+            datetime(2026, 8, 26, 10, 3, 0),
+            order_id="other-order",
+        )
+
+        status, _message = get_purchase_payment_status(
+            self.session, self._login_token(payment_reference="expected-order")
+        )
+
+        self.assertEqual(status, "pending")
 
 
 class PurchasePaymentNonTerminalStatusTests(
@@ -8861,12 +9416,9 @@ class SiteRegistrationLocalRowOwnershipTests(SimpleTestCase):
                     return_value=dict(self.CONTEXT),
                 ), mock.patch(
                     "engine.views.resolve_existing_site_subscription",
-                    return_value=None,
+                    side_effect=[None, self._panel_record()],
                 ), mock.patch(
                     "engine.views.create_user", return_value=None
-                ), mock.patch(
-                    "engine.views.find_rwms_user_by_identity",
-                    return_value=self._panel_record(),
                 ):
                     create_site_user(
                         session,
@@ -9022,25 +9574,22 @@ class SiteRegistrationOwnershipMessageTests(SimpleTestCase):
 
         return FakeSession()
 
-    def test_magic_link_sends_ownership_conflict_to_support(self):
-        request = RequestFactory().post("/magic/", {"email": "reused@example.com"})
+    def test_confirmed_registration_sends_ownership_conflict_to_support(self):
+        request = RequestFactory().get("/login/register/token/")
         request.session = {}
+        request.user = SimpleNamespace(is_authenticated=False)
+        token = views.build_site_registration_token("reused@example.com", {})
 
         with mock.patch(
             "engine.views.session_factory", return_value=self._magic_link_session()
         ), mock.patch(
             "engine.views.create_site_user",
             side_effect=SiteRegistrationOwnershipConflict("row belongs to other"),
-        ), mock.patch(
-            "engine.views.send_magic_link_email"
-        ) as send_email:
-            response = send_magic_link(request)
+        ):
+            response = views.auth_by_registration_link(request, token)
 
         self.assertEqual(response.status_code, 409)
-        payload = json.loads(response.content)
-        self.assertEqual(payload["status"], "error")
-        self.assertEqual(payload["message"], SITE_REGISTRATION_SUPPORT_MESSAGE)
-        send_email.assert_not_called()
+        self.assertIn(SITE_REGISTRATION_SUPPORT_MESSAGE, response.content.decode())
 
     @override_settings(PAYMENT_GATEWAY="wata")
     def test_pay_sends_ownership_conflict_to_support(self):
@@ -9051,6 +9600,10 @@ class SiteRegistrationOwnershipMessageTests(SimpleTestCase):
 
         class FakeQuery:
             def filter(self, *args, **kwargs):
+                return self
+
+            def with_for_update(self, **kwargs):
+                # FINAL-PAY-03: анонимная ветка читает users FOR UPDATE.
                 return self
 
             def first(self):
@@ -9100,17 +9653,14 @@ from common.models.db import PurchaseLoginToken  # noqa: E402
 
 
 class PurchaseLinkAuthRequiresPaymentTests(SimpleTestCase):
-    """CRITICAL: purchase-токен выпускается ДО оплаты, и его сырое значение
-    возвращается инициатору платежа в payment_status_url (pay() отдаёт JSON с
-    этим URL). Раньше auth_by_purchase_link логинил по нему БЕЗ проверки
-    оплаты — значит, любой, кто ввёл ЧУЖОЙ email в форму оплаты, получал
-    рабочий вход в чужой аккаунт, ничего не заплатив. Вход разрешён только по
-    подтверждённой оплате этого токена."""
+    """CRITICAL: only the separate email-delivered token can authenticate."""
+
+    LOGIN_TOKEN = "plogin_test-token"
 
     def _run_auth(self, payment_status):
         token_row = SimpleNamespace(
             user_id=42,
-            token_hash=views.hash_purchase_login_token("raw-token"),
+            token_hash=views.hash_purchase_login_token(self.LOGIN_TOKEN),
             revoked_at=None,
             last_used_at=None,
             payment_gateway="wata",
@@ -9161,7 +9711,7 @@ class PurchaseLinkAuthRequiresPaymentTests(SimpleTestCase):
                     views, "render_login", side_effect=lambda r, ctx: ("login", ctx)
                 ), \
                 mock.patch.object(views, "redirect", side_effect=lambda name: ("redirect", name)):
-            result = views.auth_by_purchase_link(mock.Mock(), "raw-token")
+            result = views.auth_by_purchase_link(mock.Mock(), self.LOGIN_TOKEN)
 
         return result, authorized, session
 
@@ -9179,12 +9729,41 @@ class PurchaseLinkAuthRequiresPaymentTests(SimpleTestCase):
         self.assertEqual(result, ("redirect", "dashboard"))
         self.assertEqual([u.id for u in authorized], [42])
 
+    def test_browser_visible_status_token_never_authorizes(self):
+        request = mock.Mock()
+        with mock.patch.object(views, "session_factory") as session_factory, \
+                mock.patch.object(
+                    views, "render_login", side_effect=lambda r, ctx: ("login", ctx)
+                ):
+            session_factory.return_value.close.return_value = None
+            result = views.auth_by_purchase_link(request, "pstatus_test-token")
+
+        self.assertEqual(result[0], "login")
+        session_factory.return_value.query.assert_not_called()
+
+    def test_legacy_unprefixed_token_fails_closed(self):
+        request = mock.Mock()
+        with mock.patch.object(views, "session_factory") as session_factory, \
+                mock.patch.object(
+                    views, "render_login", side_effect=lambda r, ctx: ("login", ctx)
+                ):
+            session_factory.return_value.close.return_value = None
+            result = views.auth_by_purchase_link(request, "legacy-token")
+
+        self.assertEqual(result[0], "login")
+        # Старая ссылка никогда не авторизует и не трогает БД, но объясняет,
+        # как войти (PAY-05/AUTH-04/TR-02).
+        self.assertEqual(result[1]["error"], views.LEGACY_PURCHASE_LOGIN_MESSAGE)
+        self.assertIn("Подписка продолжает работать", result[1]["error"])
+        session_factory.assert_not_called()
+        session_factory.return_value.query.assert_not_called()
+
 
 class InfraServersDashboardTemplateTests(SimpleTestCase):
     """Регрессии нового UX «Инфраструктура → Серверы»."""
 
     def setUp(self):
-        self.template = Path("engine/templates/admin_dashboard.html").read_text()
+        self.template = template_source("engine/templates/admin_dashboard.html")
 
     def test_servers_overview_has_filters_table_and_preview(self):
         for marker in (
@@ -11890,7 +12469,7 @@ class AntiabuseTrafficPayloadTests(SimpleTestCase):
 
 class AntiabuseTemplateAndDocsTests(SimpleTestCase):
     def test_template_has_antiabuse_tab_forms_bulk_and_alerts(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         css = Path("engine/static/css/admin_dashboard.css").read_text()
 
         for needle in (
@@ -11972,7 +12551,7 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
         self.assertNotIn("— без изменений —", template)
 
     def test_client_card_exposes_limit_and_actions(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
 
         for needle in (
             'data-client-sub-action="apply_trial_limit"',
@@ -12702,7 +13281,7 @@ class AdminInlineJsSmokeTests(SimpleTestCase):
     @classmethod
     def setUpClass(cls):
         super().setUpClass()
-        cls.template = Path("engine/templates/admin_dashboard.html").read_text()
+        cls.template = template_source("engine/templates/admin_dashboard.html")
 
     def _region(self, start_marker, end_marker):
         start = self.template.index(start_marker)
@@ -13072,7 +13651,7 @@ class PromoCohortTimeNormalisationTests(SimpleTestCase):
         self.assertIn("btn->>'promo_id' ~ '^[0-9]+$'", body)
 
     def test_client_reports_the_real_reason(self):
-        template = Path("engine/templates/admin_dashboard.html").read_text()
+        template = template_source("engine/templates/admin_dashboard.html")
         # Раньше 500 и обрыв сети давали одну и ту же плашку «проверьте
         # соединение», и диагностика уходила не туда
         self.assertIn("`Сервер ответил ${response.status}`", template)
@@ -13259,6 +13838,9 @@ class MalformedEmailGuardTests(SimpleTestCase):
             def filter(self, *args, **kwargs):
                 return self
 
+            def with_for_update(self):
+                return self
+
             def first(self):
                 return user
 
@@ -13367,7 +13949,9 @@ class MalformedEmailGuardTests(SimpleTestCase):
         tariff = SimpleNamespace(price=100, db_tariff_id="month", description="1 месяц")
         known = SimpleNamespace(id=42, email=self.BROKEN, username="m123")
 
-        with mock.patch(
+        request = self._pay_request(self.BROKEN)
+        request.user = SimpleNamespace(is_authenticated=True, id=42, email=self.BROKEN)
+        with mock.patch("engine.views.is_user_blocked", return_value=True), mock.patch(
             "engine.views.session_factory",
             return_value=self._fake_session_returning(known),
         ), mock.patch(
@@ -13378,7 +13962,7 @@ class MalformedEmailGuardTests(SimpleTestCase):
         ), mock.patch("engine.views.sync_existing_user_tracking"), mock.patch(
             "engine.views.create_wata_payment_sync"
         ), self.assertLogs(level="WARNING") as logs:
-            response = pay(self._pay_request(self.BROKEN))
+            response = pay(request)
 
         # Оговорка сработала и сказала об этом громко.
         self.assertTrue(
@@ -13409,3 +13993,739 @@ class MalformedEmailGuardTests(SimpleTestCase):
         self.assertIn("опечатка", request.session["email_bind_modal"]["error"])
         # До БД дело не дошло: невалидный адрес отвергнут раньше.
         session_factory.assert_not_called()
+
+
+class SecurityHardeningRegressionTests(SimpleTestCase):
+    class SessionDict(dict):
+        modified = False
+
+        def cycle_key(self):
+            self["cycle_key_called"] = True
+
+    def test_user_login_rotates_session_key(self):
+        request = SimpleNamespace(session=self.SessionDict(), META={})
+
+        views.authorize_user_session(request, SimpleNamespace(id=42))
+
+        self.assertTrue(request.session["cycle_key_called"])
+        self.assertEqual(request.session[views.SESSION_KEY], "42")
+
+    def test_magic_link_endpoint_rejects_get_without_touching_database(self):
+        request = RequestFactory().get("/login/send-link/")
+        request.session = self.SessionDict()
+
+        with mock.patch("engine.views.session_factory") as session_factory:
+            response = send_magic_link(request)
+
+        self.assertEqual(response.status_code, 405)
+        session_factory.assert_not_called()
+
+    def test_magic_email_delivery_failure_is_not_reported_as_success(self):
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def first(self):
+                return None
+
+        class FakeBegin:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        class FakeSession:
+            def begin(self):
+                return FakeBegin()
+
+            def query(self, *args, **kwargs):
+                return FakeQuery()
+
+            def close(self):
+                return None
+
+        request = RequestFactory().post(
+            "/login/send-link/",
+            {"email": "new@example.com"},
+            HTTP_HOST="example.com",
+        )
+        request.session = self.SessionDict()
+
+        with mock.patch(
+            "engine.views.session_factory", return_value=FakeSession()
+        ), mock.patch(
+            "engine.views.send_magic_link_email",
+            side_effect=RuntimeError("mail transport unavailable"),
+        ):
+            response = send_magic_link(request)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(json.loads(response.content)["status"], "error")
+
+    def test_email_confirmation_is_bound_to_previous_address(self):
+        db_user = SimpleNamespace(
+            id=42,
+            email="already-changed@example.com",
+            username="user-42",
+        )
+
+        class FakeQuery:
+            def filter(self, *args, **kwargs):
+                return self
+
+            def with_for_update(self):
+                return self
+
+            def first(self):
+                return db_user
+
+        class FakeSession:
+            def query(self, *args, **kwargs):
+                return FakeQuery()
+
+            def rollback(self):
+                return None
+
+            def close(self):
+                return None
+
+        request = RequestFactory().get("/confirm-email/token/")
+        request.session = self.SessionDict()
+        request.user = SimpleNamespace(is_authenticated=False, id=None)
+        token = views.build_email_confirmation_token(
+            db_user.id,
+            "next@example.com",
+            "old@example.com",
+        )
+
+        with mock.patch(
+            "engine.views.session_factory", return_value=FakeSession()
+        ), mock.patch("engine.views.rwms_client.update_user") as update_user:
+            response = views.confirm_email(request, token)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(db_user.email, "already-changed@example.com")
+        self.assertIn("устарела", request.session["email_bind_modal"]["error"])
+        update_user.assert_not_called()
+
+    @override_settings(TRUSTED_PROXY_NETWORKS=["127.0.0.1/32", "10.0.0.0/8"])
+    def test_admin_audit_ip_ignores_client_prepended_forwarded_value(self):
+        request = SimpleNamespace(
+            META={
+                "REMOTE_ADDR": "127.0.0.1",
+                "HTTP_X_FORWARDED_FOR": "198.51.100.99, 203.0.113.7, 10.0.0.4",
+            }
+        )
+
+        self.assertEqual(views.admin_client_ip(request), "203.0.113.7")
+
+    @override_settings(
+        SECRET_KEY="test-secret",
+        SUPPORT_ADMIN_PASSWORD="shared-admin",
+        SUPPORT_STAFF_PASSWORD="shared-support",
+    )
+    def test_personal_admin_role_is_refreshed_on_every_request(self):
+        account = SimpleNamespace(
+            login="operator",
+            password_hash="encoded-password",
+            role="support",
+            is_active=True,
+        )
+        request = SimpleNamespace(
+            session=self.SessionDict(
+                {
+                    views.SUPPORT_ADMIN_SESSION_KEY: True,
+                    views.SUPPORT_ADMIN_ROLE_SESSION_KEY: views.SUPPORT_ADMIN_ROLE_ADMIN,
+                    views.SUPPORT_ADMIN_ACCOUNT_SESSION_KEY: account.login,
+                    views.SUPPORT_ADMIN_AUTH_HASH_SESSION_KEY: views.support_admin_auth_fingerprint(
+                        f"account:{account.login}", account.password_hash
+                    ),
+                }
+            )
+        )
+        db_session = mock.Mock()
+        db_session.query.return_value.filter.return_value.first.return_value = account
+
+        with mock.patch.object(views, "session_factory", return_value=db_session):
+            self.assertTrue(views.validate_support_admin_session(request))
+
+        self.assertEqual(
+            request.session[views.SUPPORT_ADMIN_ROLE_SESSION_KEY],
+            views.SUPPORT_ADMIN_ROLE_SUPPORT,
+        )
+
+    @override_settings(SECRET_KEY="test-secret")
+    def test_disabled_or_password_changed_admin_session_is_rejected(self):
+        for active, password_hash in ((False, "old-hash"), (True, "new-hash")):
+            with self.subTest(active=active, password_hash=password_hash):
+                account = SimpleNamespace(
+                    login="operator",
+                    password_hash=password_hash,
+                    role="full",
+                    is_active=active,
+                )
+                request = SimpleNamespace(
+                    session=self.SessionDict(
+                        {
+                            views.SUPPORT_ADMIN_SESSION_KEY: True,
+                            views.SUPPORT_ADMIN_ROLE_SESSION_KEY: views.SUPPORT_ADMIN_ROLE_ADMIN,
+                            views.SUPPORT_ADMIN_ACCOUNT_SESSION_KEY: account.login,
+                            views.SUPPORT_ADMIN_AUTH_HASH_SESSION_KEY: views.support_admin_auth_fingerprint(
+                                f"account:{account.login}", "old-hash"
+                            ),
+                        }
+                    )
+                )
+                db_session = mock.Mock()
+                db_session.query.return_value.filter.return_value.first.return_value = account
+                with mock.patch.object(
+                    views, "session_factory", return_value=db_session
+                ):
+                    self.assertFalse(views.validate_support_admin_session(request))
+
+    def _personal_admin_request(self, path, **headers):
+        request = RequestFactory().get(path, **headers)
+        request.session = self.SessionDict(
+            {
+                views.SUPPORT_ADMIN_SESSION_KEY: True,
+                views.SUPPORT_ADMIN_ROLE_SESSION_KEY: views.SUPPORT_ADMIN_ROLE_ADMIN,
+                views.SUPPORT_ADMIN_ACCOUNT_SESSION_KEY: "operator",
+                views.SUPPORT_ADMIN_AUTH_HASH_SESSION_KEY: "stored-fingerprint",
+            }
+        )
+        return request
+
+    def test_admin_session_survives_database_outage_with_503(self):
+        from sqlalchemy.exc import OperationalError
+
+        cases = (
+            ("/support-admin/api/stats/", {}, "application/json"),
+            (
+                "/support-admin/tickets/7/messages-json/",
+                {"HTTP_X_REQUESTED_WITH": "XMLHttpRequest"},
+                "application/json",
+            ),
+            ("/support-admin/", {}, "text/plain; charset=utf-8"),
+        )
+        for path, headers, expected_type in cases:
+            with self.subTest(path=path):
+                request = self._personal_admin_request(path, **headers)
+                snapshot = dict(request.session)
+                db_session = mock.Mock()
+                db_session.query.side_effect = OperationalError(
+                    "SELECT", {}, Exception("server closed the connection")
+                )
+                with mock.patch.object(
+                    views, "session_factory", return_value=db_session
+                ), self.assertLogs(level="ERROR"):
+                    response = views.require_support_admin(request)
+
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response["Content-Type"], expected_type)
+                self.assertEqual(response["Retry-After"], "30")
+                self.assertEqual(dict(request.session), snapshot)
+                db_session.close.assert_called_once_with()
+
+    @override_settings(SECRET_KEY="test-secret")
+    def test_confirmed_account_deactivation_still_clears_admin_session(self):
+        account = SimpleNamespace(
+            login="operator", password_hash="hash", role="full", is_active=False
+        )
+        request = self._personal_admin_request("/support-admin/api/stats/")
+        db_session = mock.Mock()
+        db_session.query.return_value.filter.return_value.first.return_value = account
+
+        with mock.patch.object(views, "session_factory", return_value=db_session):
+            response = views.require_support_admin(request)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertNotIn(views.SUPPORT_ADMIN_SESSION_KEY, request.session)
+        self.assertNotIn(views.SUPPORT_ADMIN_ACCOUNT_SESSION_KEY, request.session)
+
+
+class SupportAttachmentSecurityTests(SimpleTestCase):
+    def test_attachment_limits_are_checked_before_storage(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        png = lambda name, size: SimpleUploadedFile(
+            name,
+            b"\x89PNG\r\n\x1a\n" + b"x" * max(0, size - 8),
+            content_type="image/png",
+        )
+        with override_settings(
+            SUPPORT_ATTACHMENT_MAX_FILES=2,
+            SUPPORT_ATTACHMENT_MAX_BYTES=20,
+            SUPPORT_ATTACHMENT_TOTAL_MAX_BYTES=30,
+        ):
+            self.assertIn("не больше 2", views.validate_support_attachments([
+                png("1.png", 8), png("2.png", 8), png("3.png", 8)
+            ]))
+            self.assertIn("превышает 0 МБ", views.validate_support_attachments([
+                png("large.png", 21)
+            ]))
+            self.assertIn("Общий размер", views.validate_support_attachments([
+                png("1.png", 16), png("2.png", 16)
+            ]))
+
+    @override_settings(SUPPORT_ATTACHMENT_X_ACCEL_REDIRECT=True)
+    def test_safe_attachment_uses_internal_nginx_redirect(self):
+        attachment = SimpleNamespace(
+            content_type="video/mp4",
+            file_name="clip.mp4",
+            storage_path="support_attachments/7/clip.mp4",
+        )
+        response = views.support_attachment_file_response(
+            attachment, Path("/path/need/not/exist")
+        )
+        self.assertEqual(
+            response["X-Accel-Redirect"],
+            "/_protected_support_media/support_attachments/7/clip.mp4",
+        )
+        self.assertEqual(response["Content-Type"], "video/mp4")
+
+    @override_settings(SUPPORT_ATTACHMENT_X_ACCEL_REDIRECT=True)
+    def test_internal_redirect_percent_encodes_non_ascii_file_names(self):
+        from urllib.parse import unquote
+
+        cases = (
+            (
+                "support_attachments/7/ab_Снимок_экрана_2026-09-11_в_10.00.00.png",
+                "/_protected_support_media/support_attachments/7/ab_%D0%A1%D0%BD",
+            ),
+            (
+                "/support_attachments/7/ab_café.png",
+                "/_protected_support_media/support_attachments/7/ab_caf%C3%A9.png",
+            ),
+        )
+        for storage_path, expected_prefix in cases:
+            with self.subTest(storage_path=storage_path):
+                attachment = SimpleNamespace(
+                    content_type="image/png",
+                    file_name=storage_path.rsplit("/", 1)[-1],
+                    storage_path=storage_path,
+                )
+                response = views.support_attachment_file_response(
+                    attachment, Path("/path/need/not/exist")
+                )
+                header = response["X-Accel-Redirect"]
+                self.assertTrue(header.startswith(expected_prefix), header)
+                self.assertTrue(header.isascii())
+                self.assertNotIn("=?utf-8?", header)
+                self.assertEqual(
+                    unquote(header),
+                    "/_protected_support_media/" + storage_path.lstrip("/"),
+                )
+
+    def test_svg_and_spoofed_png_are_rejected(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        message = SimpleNamespace(id=7)
+        db_session = mock.Mock()
+        with tempfile.TemporaryDirectory() as media_root, override_settings(
+            MEDIA_ROOT=media_root,
+            SUPPORT_ATTACHMENT_MAX_BYTES=1024 * 1024,
+        ):
+            result = views.attach_support_attachments(
+                db_session,
+                message,
+                [
+                    SimpleUploadedFile(
+                        "payload.svg",
+                        b'<svg onload="alert(1)"></svg>',
+                        content_type="image/svg+xml",
+                    ),
+                    SimpleUploadedFile(
+                        "payload.png",
+                        b"<html><script>alert(1)</script>",
+                        content_type="image/png",
+                    ),
+                ],
+            )
+
+        self.assertEqual(result, [])
+        db_session.add.assert_not_called()
+
+    def test_valid_png_signature_is_saved(self):
+        from django.core.files.uploadedfile import SimpleUploadedFile
+
+        import io
+        from PIL import Image
+        image = io.BytesIO()
+        Image.new("RGB", (2, 2)).save(image, format="PNG")
+        message = SimpleNamespace(id=8)
+        db_session = mock.Mock()
+        with tempfile.TemporaryDirectory() as media_root, override_settings(
+            MEDIA_ROOT=media_root,
+            SUPPORT_ATTACHMENT_MAX_BYTES=1024 * 1024,
+        ):
+            result = views.attach_support_attachments(
+                db_session,
+                message,
+                [
+                    SimpleUploadedFile(
+                        "screen.png",
+                        image.getvalue(),
+                        content_type="image/png",
+                    )
+                ],
+            )
+            stored_files = list(Path(media_root).rglob("*.png"))
+
+        self.assertEqual(len(result), 1)
+        self.assertEqual(len(stored_files), 1)
+
+    def test_legacy_svg_is_forced_to_download_with_nosniff(self):
+        with tempfile.TemporaryDirectory() as media_root:
+            path = Path(media_root) / "legacy.svg"
+            path.write_text('<svg onload="alert(1)"></svg>')
+            attachment = SimpleNamespace(
+                content_type="image/svg+xml", file_name="legacy.svg"
+            )
+
+            response = views.support_attachment_file_response(attachment, path)
+
+            self.assertEqual(response["Content-Type"], "application/octet-stream")
+            self.assertIn("attachment", response["Content-Disposition"])
+            self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+            response.close()
+
+
+class FrontendSecurityAndOfflineTests(SimpleTestCase):
+    def test_acquisition_table_escapes_data_cells_but_allows_explicit_markup(self):
+        template = template_source("engine/templates/admin_dashboard.html")
+        block = template[
+            template.index("const acqHtml =") : template.index("async function acqFetch")
+        ]
+        script = """
+const escapeHtml = (value) => String(value)
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  .replace(/\"/g, '&quot;').replace(/'/g, '&#039;');
+""" + block + """
+const rendered = acqTable(['<header>'], [['<img src=x onerror=alert(1)>', acqHtml('<b>ok</b>')]]);
+if (rendered.includes('<img')) process.exit(1);
+if (!rendered.includes('&lt;img')) process.exit(2);
+if (!rendered.includes('<b>ok</b>')) process.exit(3);
+"""
+        with tempfile.NamedTemporaryFile("w", suffix=".js", delete=False) as handle:
+            handle.write(script)
+            script_path = handle.name
+        try:
+            completed = subprocess.run(
+                ["node", script_path], capture_output=True, text=True, timeout=10
+            )
+        finally:
+            Path(script_path).unlink(missing_ok=True)
+
+        self.assertEqual(completed.returncode, 0, completed.stderr)
+
+    def test_service_worker_never_caches_authenticated_login_response(self):
+        worker = template_source("engine/templates/pwa/sw.js")
+
+        self.assertNotIn("'/login/'", worker)
+        self.assertIn("/static/pwa/offline.html", worker)
+        self.assertIn("cacheName.startsWith(CACHE_PREFIX)", worker)
+        self.assertTrue(Path("engine/static/pwa/offline.html").is_file())
+
+    def test_short_viewport_onboarding_allows_art_to_shrink(self):
+        template = template_source("engine/templates/login.html")
+
+        self.assertIn("@media (max-height: 700px)", template)
+        self.assertIn("max-height: min(42vh, 100%);", template)
+        self.assertIn("pointer-events: none;", template)
+
+    def test_heavy_editor_is_loaded_only_when_requested(self):
+        template = template_source("engine/templates/admin_dashboard.html")
+
+        self.assertNotIn(
+            '<script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror',
+            template,
+        )
+        self.assertIn("function ensureCodeMirrorAssets()", template)
+        self.assertIn("if (tabId === 'stats'", template)
+        self.assertNotIn("if (statsForm) loadStats();", template)
+
+    def test_payment_sheets_use_accessible_dialog_lifecycle(self):
+        template = template_source("engine/templates/dashboard.html")
+
+        for title_id in (
+            "payments-history-title",
+            "autopay-title",
+            "no-autopay-title",
+        ):
+            self.assertIn(f'aria-labelledby="{title_id}"', template)
+        self.assertIn("function openLegacyDialog(sheet, content)", template)
+        open_dialog_source = template[
+            template.index("function openLegacyDialog(sheet, content)"):
+            template.index("function closeLegacyDialog(sheet)")
+        ]
+        self.assertIn('const background = document.getElementById("app-container");', open_dialog_source)
+        self.assertIn("if (background) background.setAttribute('inert', '');", open_dialog_source)
+        self.assertIn("if (event.key === 'Escape')", template)
+
+
+class SQLAlchemyBackendLifecycleTests(SimpleTestCase):
+    def test_get_user_closes_session_when_query_fails(self):
+        from engine.auth_backend import SQLAlchemyBackend
+
+        db_session = mock.Mock()
+        db_session.query.side_effect = RuntimeError("database unavailable")
+        with mock.patch(
+            "engine.auth_backend.session_factory", return_value=db_session
+        ):
+            with self.assertRaisesRegex(RuntimeError, "database unavailable"):
+                SQLAlchemyBackend().get_user(12)
+
+        db_session.close.assert_called_once_with()
+
+    def test_authenticate_closes_session_when_query_fails(self):
+        from engine.auth_backend import SQLAlchemyBackend
+
+        db_session = mock.Mock()
+        db_session.query.side_effect = RuntimeError("database unavailable")
+        with mock.patch(
+            "engine.auth_backend.session_factory", return_value=db_session
+        ):
+            with self.assertRaisesRegex(RuntimeError, "database unavailable"):
+                SQLAlchemyBackend().authenticate(object(), user_id=12)
+
+        db_session.close.assert_called_once_with()
+
+
+class TelegramBindLinkTests(SimpleTestCase):
+    class SessionDict(dict):
+        modified = False
+
+    class Query:
+        def __init__(self, result=None):
+            self.result = result
+
+        def filter(self, *args, **kwargs):
+            return self
+
+        def first(self):
+            return self.result
+
+    class DbSession:
+        def __init__(self, result=None):
+            self.result = result
+            self.added = []
+
+        def query(self, *args, **kwargs):
+            return TelegramBindLinkTests.Query(self.result)
+
+        def add(self, value):
+            self.added.append(value)
+
+    def test_new_link_uses_random_152_bit_token_and_stores_only_hash(self):
+        from common.models.db import TelegramLoginToken
+        from engine.views import get_or_create_telegram_bind_link
+        from engine.views import hash_telegram_bind_token
+        from engine.views import hash_telegram_login_token
+
+        request = SimpleNamespace(session=self.SessionDict())
+        db_session = self.DbSession()
+        link = get_or_create_telegram_bind_link(
+            request,
+            db_session,
+            SimpleNamespace(id=71),
+            "test_bot",
+        )
+        raw_token = link.rsplit("_", 1)[-1]
+
+        self.assertRegex(raw_token, r"^[0-9a-f]{38}$")
+        self.assertEqual(len(db_session.added), 1)
+        self.assertIsInstance(db_session.added[0], TelegramLoginToken)
+        self.assertEqual(
+            db_session.added[0].token_hash,
+            hash_telegram_bind_token(raw_token),
+        )
+        # Пространство хэшей входа (/login/telegram/<token>/) не пересекается
+        # с bind-токенами: непогашенный bind-токен не станет ссылкой входа.
+        self.assertNotEqual(
+            db_session.added[0].token_hash,
+            hash_telegram_login_token(raw_token),
+        )
+        self.assertNotEqual(db_session.added[0].token_hash, raw_token)
+        self.assertNotIn(raw_token, repr(db_session.added[0].__dict__))
+
+    def test_fresh_unused_session_link_is_reused_without_new_row(self):
+        from engine.views import TELEGRAM_BIND_SESSION_CREATED_KEY
+        from engine.views import TELEGRAM_BIND_SESSION_TOKEN_KEY
+        from engine.views import get_or_create_telegram_bind_link
+
+        raw_token = "a" * 38
+        request = SimpleNamespace(
+            session=self.SessionDict(
+                {
+                    TELEGRAM_BIND_SESSION_TOKEN_KEY: raw_token,
+                    TELEGRAM_BIND_SESSION_CREATED_KEY: time.time(),
+                }
+            )
+        )
+        db_session = self.DbSession(result=SimpleNamespace(id=1))
+
+        link = get_or_create_telegram_bind_link(
+            request,
+            db_session,
+            SimpleNamespace(id=72),
+            "test_bot",
+        )
+
+        self.assertEqual(link, f"https://t.me/test_bot?start=bind_72_{raw_token}")
+        self.assertEqual(db_session.added, [])
+
+    def test_bind_link_write_failure_is_not_a_dashboard_error(self):
+        from sqlalchemy.exc import OperationalError
+
+        db_session = mock.Mock()
+        db_session.commit.side_effect = OperationalError(
+            "INSERT", {}, Exception("cannot execute INSERT in a read-only transaction")
+        )
+        request = SimpleNamespace(session=self.SessionDict())
+
+        with mock.patch.object(
+            views, "session_factory", return_value=db_session
+        ), self.assertLogs(level="ERROR") as logs:
+            link = views.issue_dashboard_telegram_bind_link(
+                request, SimpleNamespace(id=71), "test_bot"
+            )
+
+        self.assertIsNone(link)
+        db_session.rollback.assert_called_once_with()
+        db_session.close.assert_called_once_with()
+        self.assertNotIn(views.TELEGRAM_BIND_SESSION_TOKEN_KEY, request.session)
+        self.assertNotIn(views.TELEGRAM_BIND_SESSION_CREATED_KEY, request.session)
+        self.assertIn("telegram bind link was not issued", "\n".join(logs.output))
+
+
+class RequestTimingMiddlewareTests(SimpleTestCase):
+    @override_settings(REQUEST_TIMING_LOG_ALL=True)
+    def test_logs_route_pattern_without_secret_path_and_sets_request_id(self):
+        from django.http import HttpResponse
+        from engine.request_timing_middleware import RequestTimingMiddleware
+
+        request = RequestFactory().get("/login/magic/super-secret-token/")
+        request.resolver_match = SimpleNamespace(route="login/magic/<uuid:token>/")
+        middleware = RequestTimingMiddleware(lambda _request: HttpResponse("ok"))
+
+        with self.assertLogs("engine.request_timing", level="INFO") as logs:
+            response = middleware(request)
+
+        self.assertRegex(response["X-Request-ID"], r"^[0-9a-f]{32}$")
+        self.assertIn("login/magic/<uuid:token>/", logs.output[0])
+        self.assertNotIn("super-secret-token", logs.output[0])
+
+    def test_server_timing_is_not_exposed_by_default(self):
+        """OPS-4: время SQL в ответе magic-link выдавало, есть ли email в базе."""
+        from django.http import HttpResponse
+        from engine.request_timing_middleware import RequestTimingMiddleware
+
+        self.assertFalse(settings.REQUEST_TIMING_EXPOSE_SERVER_TIMING)
+        middleware = RequestTimingMiddleware(lambda _request: HttpResponse("ok"))
+
+        response = middleware(RequestFactory().post("/login/send-link/"))
+
+        self.assertNotIn("Server-Timing", response)
+        self.assertRegex(response["X-Request-ID"], r"^[0-9a-f]{32}$")
+
+    @override_settings(REQUEST_TIMING_EXPOSE_SERVER_TIMING=True)
+    def test_server_timing_can_be_enabled_explicitly(self):
+        from django.http import HttpResponse
+        from engine.request_timing_middleware import RequestTimingMiddleware
+
+        middleware = RequestTimingMiddleware(lambda _request: HttpResponse("ok"))
+
+        response = middleware(RequestFactory().get("/"))
+
+        self.assertRegex(response["Server-Timing"], r"^sql;dur=\d+\.\d$")
+        self.assertRegex(response["X-Request-ID"], r"^[0-9a-f]{32}$")
+
+
+class SupportTicketPaginationTests(SimpleTestCase):
+    def payload(self):
+        return {
+            "status_filter": "open",
+            "open_count": 3,
+            "closed_count": 2,
+            "tickets": [],
+            "ticket_payloads": [
+                {
+                    "id": 15,
+                    "updated_at_iso": "2026-09-10T12:00:00",
+                    "subject": "Test",
+                }
+            ],
+            "has_more": True,
+            "next_updated_at": "2026-09-10T11:00:00",
+            "next_id": 10,
+        }
+
+    def test_json_endpoint_forwards_bounded_keyset_cursor(self):
+        from engine import views
+
+        request = RequestFactory().get(
+            "/support-admin/tickets.json",
+            {
+                "status": "closed",
+                "limit": "75",
+                "before_updated_at": "2026-09-10T11:00:00",
+                "before_id": "10",
+            },
+        )
+        with mock.patch.object(views, "require_support_admin", return_value=None), mock.patch.object(
+            views, "load_support_admin_tickets", return_value=self.payload()
+        ) as loader:
+            response = views.support_admin_tickets_json(request)
+
+        self.assertEqual(response.status_code, 200)
+        loader.assert_called_once_with(
+            "closed",
+            limit=75,
+            before_updated_at="2026-09-10T11:00:00",
+            before_id="10",
+        )
+        body = json.loads(response.content)
+        self.assertTrue(body["has_more"])
+        self.assertEqual(body["next_cursor"]["id"], 10)
+
+    def test_matching_etag_returns_empty_304(self):
+        from engine import views
+
+        with mock.patch.object(views, "require_support_admin", return_value=None), mock.patch.object(
+            views, "load_support_admin_tickets", return_value=self.payload()
+        ):
+            first = views.support_admin_tickets_json(
+                RequestFactory().get("/support-admin/tickets.json")
+            )
+            second = views.support_admin_tickets_json(
+                RequestFactory().get(
+                    "/support-admin/tickets.json",
+                    HTTP_IF_NONE_MATCH=first["ETag"],
+                )
+            )
+
+        self.assertEqual(second.status_code, 304)
+        self.assertEqual(second.content, b"")
+        self.assertEqual(second["ETag"], first["ETag"])
+
+    def test_invalid_cursor_is_rejected(self):
+        from engine import views
+
+        request = RequestFactory().get(
+            "/support-admin/tickets.json",
+            {"before_updated_at": "not-a-date", "before_id": "12"},
+        )
+        with mock.patch.object(views, "require_support_admin", return_value=None):
+            response = views.support_admin_tickets_json(request)
+
+        self.assertEqual(response.status_code, 400)
+
+    def test_admin_template_has_bounded_load_more_and_poll_timeout(self):
+        template = template_source("engine/templates/admin_dashboard.html")
+
+        self.assertIn('id="tickets-load-more"', template)
+        self.assertIn("before_updated_at", template)
+        self.assertTrue("ticketsCursorHistory" in template)
+        self.assertFalse("TICKETS_MAX_RENDERED" in template)
+        self.assertIn("window.setTimeout(() => controller.abort(), 10000)", template)

@@ -893,7 +893,7 @@
                 <div class="eyebrow mb-4">Тарифы</div>
                 <h2 class="section-title mb-4">Чем дольше — тем выгоднее</h2>
                 <p class="text-white/60 text-base md:text-lg max-w-2xl mx-auto">
-                    Выберите срок, укажите email и оплатите картой. После подтверждения мы откроем личный кабинет с ключом и инструкциями
+                    Выберите срок, укажите email и оплатите картой. После оплаты ссылка для входа в личный кабинет с ключом и инструкциями придёт на email
                 </p>
             </div>
 
@@ -957,7 +957,7 @@
                             <span class="text-[10px] font-semibold uppercase tracking-wider">Mir · СБП</span>
                         </div>
                         <p class="text-center text-white/45 text-[11px] leading-relaxed">
-                            Безопасная оплата картой, данные карты не храним. Нажимая «Купить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-medium hover:underline">условия оферты</a>. После оплаты откроется личный кабинет, ссылка доступа также придёт на email.
+                            Безопасная оплата картой, данные карты не храним. Нажимая «Купить», вы принимаете <a href="/offer/" target="_blank" class="text-[#ffc700] font-medium hover:underline">условия оферты</a>. После оплаты ссылка для входа в личный кабинет придёт на email.
                         </p>
                     </form>
                 </div>
@@ -1108,7 +1108,7 @@
                     <div class="px-5 md:px-6 pb-6">
                         <div class="border-t border-white/10 pt-5">
                             <p class="text-white/85 text-sm md:text-base leading-relaxed">
-                                Сразу после успешной оплаты мы откроем личный кабинет со страницей доступа и отправим постоянную ссылку на указанный email.
+                                Сразу после успешной оплаты: постоянная ссылка для входа в личный кабинет со страницей доступа придёт на email, указанный при оплате.
                             </p>
                         </div>
                     </div>
@@ -1135,7 +1135,7 @@
     <section class="container mx-auto px-5 md:px-6 py-4 md:py-6">
         <div class="cta-banner px-6 md:px-14 py-10 md:py-14 text-center">
             <h2 class="section-title mb-3">Готовы подключиться?</h2>
-            <p class="text-black/70 text-base md:text-lg mb-7">Выберите тариф, оплатите доступ и сразу откройте личный кабинет с ключом и инструкциями</p>
+            <p class="text-black/70 text-base md:text-lg mb-7">Выберите тариф, оплатите доступ и получите на email ссылку в личный кабинет с ключом и инструкциями</p>
             <a href="#prices" data-conversion-goal="tariff_cta_click" class="btn-white">Перейти к тарифам</a>
         </div>
     </section>
@@ -1248,9 +1248,21 @@
 
                     const submitButton = form.querySelector('button[type="submit"]');
                     if (submitButton) submitButton.disabled = true;
+                    const paymentLaunchFallbackMessage = 'Не удалось открыть оплату. Обновите страницу и попробуйте ещё раз';
+                    let paymentTimeout = null;
 
                     try {
-                        const response = await fetch(form.action, {
+                        // AbortController есть не во всех старых браузерах/WebView:
+                        // без него запускаем оплату без таймаута, не ломая обработчик.
+                        const paymentController = typeof AbortController === 'function'
+                            ? new AbortController()
+                            : null;
+                        if (paymentController) {
+                            // 55 с: выше серверного бюджета /pay/ (RWMS, провайдер с
+                            // ретраями, письмо), ниже 60 с таймаута nginx и gunicorn.
+                            paymentTimeout = window.setTimeout(() => paymentController.abort(), 55000);
+                        }
+                        const paymentRequest = {
                             method: 'POST',
                             body: new FormData(form),
                             credentials: 'same-origin',
@@ -1259,10 +1271,30 @@
                                 'X-Requested-With': 'XMLHttpRequest',
                                 'X-Payment-Launch': 'new-tab',
                             },
-                        });
-                        const payload = await response.json();
-                        if (!response.ok || payload.status !== 'ok') {
-                            throw new Error(payload.message || 'payment launch failed');
+                        };
+                        if (paymentController) paymentRequest.signal = paymentController.signal;
+                        const response = await fetch(form.action, paymentRequest);
+                        // /pay/, CSRF-мидлварь и nginx могут ответить текстом или HTML:
+                        // JSON читаем только по content-type и внутри try, чтобы вместо
+                        // сообщения сервера не показать текст SyntaxError.
+                        const contentType = (response.headers && response.headers.get('content-type')) || '';
+                        let payload = null;
+                        if (contentType.indexOf('application/json') !== -1) {
+                            try {
+                                payload = await response.json();
+                            } catch (parseError) {
+                                payload = null;
+                            }
+                        }
+                        if (!response.ok || !payload || payload.status !== 'ok') {
+                            const launchError = new Error((payload && payload.message) || paymentLaunchFallbackMessage);
+                            launchError.isPaymentLaunchError = true;
+                            throw launchError;
+                        }
+                        if (payload.confirmation_required) {
+                            if (paymentWindow && !paymentWindow.closed) paymentWindow.close();
+                            window.location.href = payload.payment_url;
+                            return;
                         }
                         if (paymentWindow && payload.payment_url) {
                             paymentWindow.location.href = payload.payment_url;
@@ -1270,7 +1302,14 @@
                         window.location.href = payload.payment_status_url;
                     } catch (err) {
                         if (paymentWindow && !paymentWindow.closed) paymentWindow.close();
-                        form.submit();
+                        window.alert(
+                            err && err.name === 'AbortError'
+                                ? 'Сервис оплаты отвечает слишком долго. Попробуйте ещё раз.'
+                                : (err && err.isPaymentLaunchError ? err.message : paymentLaunchFallbackMessage),
+                        );
+                        if (submitButton) submitButton.disabled = false;
+                    } finally {
+                        if (paymentTimeout !== null) window.clearTimeout(paymentTimeout);
                     }
                 });
             });

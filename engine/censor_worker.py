@@ -12,6 +12,7 @@ Postgres advisory-lock на выделенном соединении. Оста�
 """
 
 import logging
+import random
 import threading
 import time
 
@@ -59,17 +60,19 @@ def _leader_loop(interval: int, fallback_key: str) -> None:
         _simple_loop(interval, fallback_key)
         return
 
+    failures = 0
     while True:
         # AUTOCOMMIT: не держим открытую транзакцию; session-level advisory-lock
         # висит на соединении, пока оно живо.
-        conn = engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+        conn = None
         try:
+            conn = engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+            failures = 0
             got = conn.execute(
                 text("SELECT pg_try_advisory_lock(:k)"), {"k": _ADVISORY_LOCK_KEY}
             ).scalar()
             if not got:
                 # Лидер уже есть в другом воркере — ждём и пробуем снова.
-                conn.close()
                 time.sleep(interval)
                 continue
 
@@ -85,11 +88,15 @@ def _leader_loop(interval: int, fallback_key: str) -> None:
                 time.sleep(interval)
         except Exception:
             logging.exception("censor worker: leader loop error, will re-elect")
-            try:
-                conn.close()
-            except Exception:
-                pass
-            time.sleep(interval)
+            failures += 1
+            delay = min(max(1, interval), 2 ** min(failures - 1, 6))
+            time.sleep(delay + random.uniform(0, min(1, delay * 0.1)))
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 
 def start() -> None:

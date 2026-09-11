@@ -8,12 +8,14 @@
 
 import os
 import logging
+import time
 
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, wait, FIRST_COMPLETED
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+from django.conf import settings
 from google.protobuf.timestamp_pb2 import Timestamp
 
 import proto.rwmanager_pb2 as proto
@@ -34,6 +36,42 @@ DETAILS_FETCH_CONCURRENCY = 8
 # Потолок строк в ответе API: защита от запроса "top=0" на десятках тысяч
 # пользователей — обогащение карточками стало бы неприемлемо долгим.
 MAX_TOP = 500
+
+
+# Shared pools bound both concurrency and the number of threads across requests.
+_NODE_POOL = ThreadPoolExecutor(max_workers=NODES_FETCH_CONCURRENCY, thread_name_prefix="traffic-node")
+_DETAIL_POOL = ThreadPoolExecutor(max_workers=DETAILS_FETCH_CONCURRENCY, thread_name_prefix="traffic-detail")
+REPORT_BUDGET_SECONDS = 20.0
+
+
+def _bounded_fetch(pool, items, fetch, concurrency, deadline):
+    pending = {}
+    waiting = iter(items)
+    results = []
+    def fill():
+        while len(pending) < concurrency and time.monotonic() < deadline:
+            try:
+                item = next(waiting)
+            except StopIteration:
+                break
+            pending[pool.submit(fetch, item)] = item
+    fill()
+    try:
+        while pending and time.monotonic() < deadline:
+            done, _ = wait(pending, timeout=max(0, deadline-time.monotonic()), return_when=FIRST_COMPLETED)
+            if not done:
+                break
+            for future in done:
+                item = pending.pop(future)
+                try:
+                    results.append((item, future.result()))
+                except Exception:
+                    results.append((item, None))
+            fill()
+    finally:
+        for future in pending:
+            future.cancel()
+    return results
 
 
 def excluded_usernames() -> set[str]:
@@ -75,18 +113,33 @@ def list_nodes(rwms_client: RwmsClientSync) -> Optional[list[proto.Node]]:
     return list(response.nodes)
 
 
+def _usage_rpc_timeout(deadline: float) -> float:
+    """Дедлайн одного GetNodeUsersUsage.
+
+    Вызов тяжёлый (common/README.md), обычных RWMS_RPC_TIMEOUT_SECONDS клиента
+    ему мало. Берём массовый дедлайн RWMS, но не дольше остатка бюджета
+    отчёта, чтобы брошенный отчётом RPC не держал поток общего пула. Не меньше
+    1 с: запрос, стартовавший у края бюджета, не получит мгновенный
+    DEADLINE_EXCEEDED.
+    """
+    remaining = deadline - time.monotonic()
+    return min(settings.RWMS_BULK_RPC_TIMEOUT_SECONDS, max(1.0, remaining))
+
+
 def _fetch_node_usage(
     rwms_client: RwmsClientSync,
     node_uuid: str,
     start: datetime,
     end: datetime,
+    timeout: float | None = None,
 ) -> Optional[list[proto.NodeUserUsage]]:
     response = rwms_client.get_node_users_usage(
         proto.GetNodeUsersUsageRequest(
             node_uuid=node_uuid,
             start=_to_ts(start),
             end=_to_ts(end),
-        )
+        ),
+        timeout=timeout,
     )
     if response is None:
         return None
@@ -98,6 +151,7 @@ def collect_usage(
     nodes: list[proto.Node],
     start: datetime,
     end: datetime,
+    deadline: float | None = None,
 ) -> tuple[dict[str, UserTraffic], list[str]]:
     """Собирает трафик пользователей на нодах и агрегирует по пользователю.
 
@@ -108,11 +162,18 @@ def collect_usage(
     usage: dict[str, UserTraffic] = {}
     failed_nodes: list[str] = []
 
-    def fetch(node: proto.Node):
-        return node, _fetch_node_usage(rwms_client, node.uuid, start, end)
+    deadline = deadline if deadline is not None else time.monotonic() + REPORT_BUDGET_SECONDS
 
-    with ThreadPoolExecutor(max_workers=NODES_FETCH_CONCURRENCY) as executor:
-        results = list(executor.map(fetch, nodes))
+    def fetch(node: proto.Node):
+        # Таймаут считается в момент старта RPC: ноды из очереди получают
+        # только остаток бюджета отчёта.
+        return _fetch_node_usage(
+            rwms_client, node.uuid, start, end, timeout=_usage_rpc_timeout(deadline)
+        )
+
+    results = _bounded_fetch(_NODE_POOL, nodes, fetch, NODES_FETCH_CONCURRENCY, deadline)
+    completed = {node.uuid for node, _ in results}
+    failed_nodes.extend(node.name for node in nodes if node.uuid not in completed)
 
     for node, rows in results:
         if rows is None:
@@ -133,14 +194,14 @@ def collect_usage(
     return usage, failed_nodes
 
 
-def fetch_details(rwms_client: RwmsClientSync, entries: list[UserTraffic]) -> None:
-    """Подтягивает карточки пользователей (статус, expire, hwid, tg id)."""
-
-    def fetch(entry: UserTraffic) -> None:
-        entry.details = rwms_client.get_user_by_uuid(entry.user_uuid)
-
-    with ThreadPoolExecutor(max_workers=DETAILS_FETCH_CONCURRENCY) as executor:
-        list(executor.map(fetch, entries))
+def fetch_details(rwms_client: RwmsClientSync, entries: list[UserTraffic], deadline=None) -> None:
+    deadline = deadline if deadline is not None else time.monotonic() + REPORT_BUDGET_SECONDS
+    results = _bounded_fetch(_DETAIL_POOL, entries,
+        lambda entry: rwms_client.get_user_by_uuid(entry.user_uuid),
+        DETAILS_FETCH_CONCURRENCY, deadline)
+    # Late futures never mutate rows already being serialized by the request.
+    for entry, details in results:
+        entry.details = details
 
 
 def build_report(
@@ -159,7 +220,8 @@ def build_report(
     # полуночи — иначе отчёт молча теряет данные (инцидент 2026-07-10).
     start = start.replace(hour=0, minute=0, second=0, microsecond=0)
 
-    usage, failed_nodes = collect_usage(rwms_client, nodes, start, end)
+    deadline = time.monotonic() + REPORT_BUDGET_SECONDS
+    usage, failed_nodes = collect_usage(rwms_client, nodes, start, end, deadline=deadline)
 
     excluded = excluded_usernames()
     excluded_entries = [e for e in usage.values() if e.username in excluded]
@@ -175,7 +237,7 @@ def build_report(
     entries = entries[:top]
 
     if with_details and entries:
-        fetch_details(rwms_client, entries)
+        fetch_details(rwms_client, entries, deadline=deadline)
 
     period_hours = max((end - start).total_seconds() / 3600, 1 / 60)
     multi_node = len(nodes) > 1
@@ -222,6 +284,7 @@ def build_report(
         "period_hours": round(period_hours, 2),
         "nodes_total": len(nodes),
         "failed_nodes": failed_nodes,
+        "details_complete": not with_details or all(entry.details is not None for entry in entries),
         "total_bytes": total_bytes,
         "users_with_traffic": len(usage),
         "excluded_users": [

@@ -18,8 +18,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends gcc libpq-dev n
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
-COPY package.json package-lock.json* ./
-RUN npm install --omit=dev && npm cache clean --force
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev && npm cache clean --force
 
 FROM python:3.12-slim
 

@@ -15,7 +15,14 @@ _client = None
 def rwms_client():
     global _client
     if _client is None:
-        _client = RwmsClientSync(settings.RWMS_HOST, settings.RWMS_PORT)
+        # Общий дедлайн RPC сайта (RWMS_RPC_TIMEOUT_SECONDS, по умолчанию 8 с),
+        # как у engine.views.rwms_client: без него зависшая панель держала бы
+        # поток gunicorn бесконечно.
+        _client = RwmsClientSync(
+            settings.RWMS_HOST,
+            settings.RWMS_PORT,
+            timeout=settings.RWMS_RPC_TIMEOUT_SECONDS,
+        )
     return _client
 
 

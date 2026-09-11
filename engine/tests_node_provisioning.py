@@ -67,7 +67,11 @@ def make_rwms_mock(connected=False):
     rwms = mock.Mock()
     rwms.get_node_secret.return_value = SimpleNamespace(secret_key="panel-key")
     rwms.create_node.return_value = rw_proto.Node(
-        uuid=NODE_UUID, name="DE Node", address="1.2.3.4"
+        uuid=NODE_UUID,
+        name="DE Node",
+        address="1.2.3.4",
+        config_profile_uuid=PROFILE_UUID,
+        active_inbound_uuids=INBOUND_UUIDS,
     )
     rwms.get_nodes.return_value = rw_proto.GetNodesResponse(
         nodes=[
@@ -311,6 +315,27 @@ class CreateRequestTests(NodeProvisioningDbTestCase):
 
 
 class ClaimTests(NodeProvisioningDbTestCase):
+    def test_claim_rejects_existing_node_with_different_identity(self):
+        provision_request, _token = self.make_request()
+        rwms = make_rwms_mock()
+        rwms.create_node.return_value = rw_proto.Node(
+            uuid=NODE_UUID,
+            name="DE Node",
+            address="9.9.9.9",
+            config_profile_uuid=PROFILE_UUID,
+            active_inbound_uuids=INBOUND_UUIDS,
+        )
+
+        with self.assertRaises(node_provisioning.ProvisionError) as ctx:
+            node_provisioning.claim_request(
+                self.session, provision_request, "1.2.3.4", rwms
+            )
+
+        self.assertEqual(ctx.exception.http_status, 409)
+        self.assertEqual(provision_request.status, NodeProvisionStatus.CREATED)
+        self.assertIsNone(provision_request.claimed_ip)
+        self.assertIsNone(provision_request.remnawave_node_uuid)
+
     def test_claim_registers_node_and_binds_ip(self):
         provision_request, token = self.make_request()
         rwms = make_rwms_mock()
@@ -443,8 +468,11 @@ class ProgressAndCompleteTests(NodeProvisioningDbTestCase):
         node_provisioning.complete_request(self.session, provision_request, 0)
 
         other_request, _other_token = self.make_request(node_name="Other node")
+        other_rwms = make_rwms_mock()
+        other_rwms.create_node.return_value.name = "Other node"
+        other_rwms.create_node.return_value.address = "4.4.4.4"
         node_provisioning.claim_request(
-            self.session, other_request, "4.4.4.4", make_rwms_mock()
+            self.session, other_request, "4.4.4.4", other_rwms
         )
         node_provisioning.complete_request(self.session, other_request, 7)
         self.assertEqual(other_request.status, NodeProvisionStatus.FAILED)
@@ -463,6 +491,17 @@ class ProgressAndCompleteTests(NodeProvisioningDbTestCase):
             self.session, provision_request, make_rwms_mock(connected=True)
         )
         self.assertEqual(provision_request.status, NodeProvisionStatus.READY)
+
+    def test_refresh_refuses_ready_when_bound_node_identity_changed(self):
+        provision_request, _token = self.claimed_request()
+        node_provisioning.complete_request(self.session, provision_request, 0)
+        rwms = make_rwms_mock(connected=True)
+        rwms.get_nodes.return_value.nodes[0].address = "9.9.9.9"
+
+        node_provisioning.refresh_connect_status(self.session, provision_request, rwms)
+
+        self.assertEqual(provision_request.status, NodeProvisionStatus.FAILED)
+        self.assertIn("не соответствует", provision_request.error)
 
 
 @override_settings(NODE_BOOTSTRAP_DOMAINS=["panel.test"])

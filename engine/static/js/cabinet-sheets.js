@@ -33,12 +33,12 @@ class CabinetSheets {
             if (event.key === 'Escape') { event.preventDefault(); this.close(); return; }
             if (event.key !== 'Tab') return;
             const nodes = [...this.active.querySelectorAll('button, summary, a[href], input, select, textarea, [tabindex="0"]')]
-                .filter(node => !node.disabled && node.getClientRects().length);
+                .filter(node => !node.disabled && node.getClientRects().length && getComputedStyle(node).visibility === 'visible');
             const first = nodes[0] || this.active;
             const last = nodes[nodes.length - 1] || this.active;
-            if (event.shiftKey && (document.activeElement === first || document.activeElement === this.active)) {
+            if (event.shiftKey && (document.activeElement === first || !this.active.contains(document.activeElement) || document.activeElement === this.active)) {
                 event.preventDefault(); last.focus();
-            } else if (!event.shiftKey && (document.activeElement === last || document.activeElement === this.active)) {
+            } else if (!event.shiftKey && (document.activeElement === last || !this.active.contains(document.activeElement) || document.activeElement === this.active)) {
                 event.preventDefault(); first.focus();
             }
         });
@@ -63,9 +63,8 @@ class CabinetSheets {
         sheet.inert = false;
         sheet.setAttribute('aria-hidden', 'false');
         sheet.classList.add('is-open');
-        requestAnimationFrame(() => {
-            if (this.active === sheet) (sheet.querySelector('.mi3-sheet-close') || sheet).focus({ preventScroll: true });
-        });
+        const first = [...sheet.querySelectorAll('.mi3-sheet-close')].find(node => !node.disabled && node.getClientRects().length && getComputedStyle(node).visibility === 'visible');
+        (first || sheet).focus({ preventScroll: true });
         this.onChange();
     }
 

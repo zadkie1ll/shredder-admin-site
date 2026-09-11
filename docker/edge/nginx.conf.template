@@ -29,7 +29,9 @@ server {
     add_header X-Frame-Options ${EDGE_FRAME_OPTIONS};
     add_header Referrer-Policy ${EDGE_REFERRER_POLICY};
 
-    client_max_body_size 10m;
+    # Up to three support attachments, 10 MiB each and 25 MiB total in the app,
+    # plus multipart framing overhead.
+    client_max_body_size 32m;
 
     location / {
         proxy_pass ${EDGE_ORIGIN_UPSTREAM};
@@ -38,7 +40,9 @@ server {
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-Host $host;
         proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # The public edge is the trust boundary: discard any client-supplied
+        # chain and start it with the actual TCP peer address.
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto https;
         proxy_set_header Connection "";
 

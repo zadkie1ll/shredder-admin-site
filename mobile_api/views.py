@@ -16,19 +16,23 @@ import proto.rwmanager_pb2 as proto
 from common.models.db import EmailLoginCode, User
 from common.rwms_client import RwmsUnavailableError
 from database import session_factory
+from engine.rate_limit import ip_rate_limit_skipped
+from engine.request_ip import client_ip
 from engine.rwms_helpers import RwmsSubscriptionOwnershipError
+from engine.user_block import is_user_blocked
 
 from .auth import (
     EMAIL_CODE_TTL,
     _issue_access_token,
     authenticate,
+    discard_undelivered_email_code,
     exchange_code,
     lock_email,
     register_email_code,
     verify_email_code,
 )
 from .subscription import get_rwms_user, rwms_client
-from .tariffs import MOBILE_TARIFFS, serialize_tariff
+from .tariffs import get_mobile_tariffs, serialize_tariff
 
 # Pragmatic email shape check (we do not verify deliverability here; the email
 # service is the source of truth for that). Mirrors common "good enough" patterns.
@@ -48,11 +52,27 @@ EXCHANGE_RATE_LIMIT = 90
 
 
 def _normalize_email(value):
-    return (value or "").strip().lower()
+    return value.strip().lower() if isinstance(value, str) else ""
 
 
 def _is_valid_email(email):
     return bool(email) and len(email) <= 256 and _EMAIL_RE.match(email) is not None
+
+
+def _json_object(request):
+    try:
+        body = json.loads(request.body or b"{}")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+    return body if isinstance(body, dict) else None
+
+
+def _string_field(body, key, max_length):
+    value = body.get(key)
+    if not isinstance(value, str):
+        return ""
+    value = value.strip()
+    return value if len(value) <= max_length else ""
 
 
 def _serialize_user(user):
@@ -82,25 +102,38 @@ def _status_name(rw):
 
 
 def _client_ip(request):
-    forwarded = request.META.get("HTTP_X_FORWARDED_FOR")
-    if forwarded:
-        return forwarded.split(",")[0].strip()
-    return request.META.get("REMOTE_ADDR", "") or "unknown"
+    return client_ip(request) or "unknown"
 
 
 def _exchange_rate_limited(request):
     """Sliding-window-ish per-IP counter on Django's cache. Returns True when the
     IP exceeded EXCHANGE_RATE_LIMIT requests in the current window."""
-    key = f"mobile_api:exchange:{_client_ip(request)}"
-    if cache.add(key, 1, EXCHANGE_RATE_WINDOW_SECONDS):
-        return False
+    ip = _client_ip(request)
+    key = f"mobile_api:exchange:{ip}"
     try:
-        count = cache.incr(key)
-    except ValueError:
-        # The key expired between add() and incr() — start a new window.
-        cache.add(key, 1, EXCHANGE_RATE_WINDOW_SECONDS)
+        # Как IP-бакеты сайта (engine.rate_limit): если IP клиента за прокси не
+        # определён (unknown, частный или доверенный адрес), общий счётчик
+        # запер бы всех таких клиентов разом, поэтому лимит не считаем.
+        if ip_rate_limit_skipped("mobile-exchange", ip):
+            return False
+        if cache.add(key, 1, EXCHANGE_RATE_WINDOW_SECONDS):
+            return False
+        try:
+            count = cache.incr(key)
+        except ValueError:
+            # The key expired between add() and incr() — start a new window.
+            cache.add(key, 1, EXCHANGE_RATE_WINDOW_SECONDS)
+            return False
+        if count == 1:
+            # Redis: ключ истёк между EXISTS и INCR внутри cache.incr, и INCR
+            # создал его без TTL. Без touch счётчик больше не обнулится.
+            cache.touch(key, EXCHANGE_RATE_WINDOW_SECONDS)
+        return count > EXCHANGE_RATE_LIMIT
+    except Exception:  # noqa: BLE001 - недоступный кэш не должен ронять вход
+        # Fail-open, как лимиты сайта: недоступный Redis не запирает вход
+        # (128-битный код остаётся основной защитой от перебора).
+        logging.exception("mobile_api: exchange rate limit cache failed")
         return False
-    return count > EXCHANGE_RATE_LIMIT
 
 
 @csrf_exempt
@@ -108,12 +141,11 @@ def _exchange_rate_limited(request):
 def auth_exchange(request):
     if _exchange_rate_limited(request):
         return JsonResponse({"error": "rate_limited"}, status=429)
-    try:
-        body = json.loads(request.body or b"{}")
-    except json.JSONDecodeError:
+    body = _json_object(request)
+    if body is None:
         return JsonResponse({"error": "invalid_json"}, status=400)
 
-    code = (body.get("code") or "").strip()
+    code = _string_field(body, "code", 512)
     if not code:
         return JsonResponse({"error": "missing_code"}, status=400)
 
@@ -123,28 +155,33 @@ def auth_exchange(request):
         if user is None:
             session.rollback()
             return JsonResponse({"error": "invalid_or_expired_code"}, status=401)
-        try:
-            rw = get_rwms_user(user.username)
-        except RwmsUnavailableError as error:
-            # Блип RWMS/панели не должен валить успешный вход: токен выдаём,
-            # subscription_url приложение добирает позже через /me.
-            logging.warning(
-                "mobile_api: RWMS unavailable during auth_exchange for %s: %s",
-                user.username,
-                error,
-            )
-            rw = None
-        subscription_url = rw.subscription_url if rw is not None else None
+        user_payload = _serialize_user(user)
+        username = user.username
+        # Persist the one-time code consumption and token before any network
+        # call. A concurrent exchange can no longer observe the code as unused.
         session.commit()
-        return JsonResponse(
-            {
-                "access_token": raw_token,
-                "subscription_url": subscription_url,
-                "user": _serialize_user(user),
-            }
-        )
     finally:
         session.close()
+
+    try:
+        rw = get_rwms_user(username)
+    except RwmsUnavailableError as error:
+        # Блип RWMS/панели не должен валить успешный вход: токен выдаём,
+        # subscription_url приложение добирает позже через /me.
+        logging.warning(
+            "mobile_api: RWMS unavailable during auth_exchange for %s: %s",
+            username,
+            error,
+        )
+        rw = None
+    subscription_url = rw.subscription_url if rw is not None else None
+    return JsonResponse(
+        {
+            "access_token": raw_token,
+            "subscription_url": subscription_url,
+            "user": user_payload,
+        }
+    )
 
 
 def _email_rate_limited(session, email, now):
@@ -172,54 +209,95 @@ def _email_rate_limited(session, email, now):
     return recent_count >= EMAIL_HOURLY_LIMIT
 
 
+def _discard_undelivered_code(email, code_id, voided_at):
+    """Best-effort компенсация, если письмо с кодом не ушло.
+
+    Отдельная короткая транзакция под той же блокировкой email: удаляет только
+    что созданный недоставленный код и возвращает прежние коды, аннулированные
+    этим же запросом. Как при rollback в HEAD, уже доставленный код остаётся
+    рабочим, а неудачная отправка не расходует квоту 60 с / 5 в час. Ошибка
+    компенсации только логируется: клиент в любом случае получает 502."""
+    session = None
+    try:
+        session = session_factory()
+        lock_email(session, email)
+        deleted, restored = discard_undelivered_email_code(
+            session, email, code_id, voided_at
+        )
+        session.commit()
+        if not deleted:
+            logging.warning(
+                "mobile_api: undelivered login code id=%s was already attempted "
+                "or used; previous codes stay voided",
+                code_id,
+            )
+        else:
+            logging.info(
+                "mobile_api: undelivered login code id=%s discarded, "
+                "previous codes restored=%s",
+                code_id,
+                restored,
+            )
+    except Exception:  # noqa: BLE001 - компенсация best-effort
+        logging.exception(
+            "mobile_api: failed to discard undelivered login code id=%s", code_id
+        )
+        if session is not None:
+            try:
+                session.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+    finally:
+        if session is not None:
+            session.close()
+
+
 @csrf_exempt
 @require_http_methods(["POST"])
 def auth_email_request(request):
     """Step 1 of email login: email a 6-digit code. Always 200 for a validly
     formatted email (never leak whether the user exists)."""
-    try:
-        body = json.loads(request.body or b"{}")
-    except json.JSONDecodeError:
+    body = _json_object(request)
+    if body is None:
         return JsonResponse({"error": "invalid_json"}, status=400)
 
     email = _normalize_email(body.get("email"))
     if not _is_valid_email(email):
         return JsonResponse({"error": "invalid_email"}, status=400)
 
-    now = datetime.utcnow()
     session = session_factory()
     try:
+        # The same transaction-scoped advisory lock is used by request and
+        # verify, so concurrent first sends cannot both pass the quota check.
+        lock_email(session, email)
+        now = datetime.utcnow()
         if _email_rate_limited(session, email, now):
             return JsonResponse({"error": "rate_limited"}, status=429)
 
         # Zero-padded 6-digit numeric code (000000-999999).
         code = f"{secrets.randbelow(1_000_000):06d}"
-        register_email_code(session, email, code, now=now)
+        row = register_email_code(session, email, code, now=now)
+        # id нужен компенсации, если письмо не уйдёт (коммит уже случится).
+        session.flush()
+        code_id = row.id
         ttl_minutes = int(EMAIL_CODE_TTL.total_seconds() // 60)
-
-        # Send synchronously via the SAME transport the site uses for magic-link
-        # emails (Resend, with the Django send_mail fallback) — no queue/worker.
-        # Lazy import keeps the auth-layer unit tests independent of engine.views.
-        from engine.views import send_login_code_email
-
-        try:
-            send_login_code_email(email, code, ttl_minutes=ttl_minutes)
-        except Exception:  # noqa: BLE001 - don't 500 the client on a provider hiccup
-            import logging
-
-            logging.exception(
-                "mobile_api: failed to send login-code email for %s", email
-            )
-            # The send failed → don't keep the code we couldn't deliver.
-            session.rollback()
-            return JsonResponse({"error": "email_send_failed"}, status=502)
-
         session.commit()
-        return JsonResponse(
-            {"ok": True, "ttl_seconds": int(EMAIL_CODE_TTL.total_seconds())}
-        )
     finally:
         session.close()
+
+    # Do not hold a DB connection/advisory lock while waiting for email I/O.
+    from engine.views import send_login_code_email
+
+    try:
+        send_login_code_email(email, code, ttl_minutes=ttl_minutes)
+    except Exception:  # noqa: BLE001 - explicit retryable transport failure
+        logging.exception("mobile_api: failed to send login-code email for %s", email)
+        _discard_undelivered_code(email, code_id, now)
+        return JsonResponse({"error": "email_send_failed"}, status=502)
+
+    return JsonResponse(
+        {"ok": True, "ttl_seconds": int(EMAIL_CODE_TTL.total_seconds())}
+    )
 
 
 @csrf_exempt
@@ -227,14 +305,13 @@ def auth_email_request(request):
 def auth_email_verify(request):
     """Step 2 of email login: verify the code, then return a bearer token. For a
     brand-new email this provisions a real RWMS trial subscription (bot way)."""
-    try:
-        body = json.loads(request.body or b"{}")
-    except json.JSONDecodeError:
+    body = _json_object(request)
+    if body is None:
         return JsonResponse({"error": "invalid_json"}, status=400)
 
     email = _normalize_email(body.get("email"))
-    code = (body.get("code") or "").strip()
-    if not _is_valid_email(email) or not code:
+    code = _string_field(body, "code", 6)
+    if not _is_valid_email(email) or not re.fullmatch(r"\d{6}", code):
         return JsonResponse({"error": "invalid_or_expired_code"}, status=400)
 
     now = datetime.utcnow()
@@ -272,32 +349,47 @@ def auth_email_verify(request):
                 )
             if user is None:
                 session.rollback()
-                return JsonResponse({"error": "invalid_or_expired_code"}, status=401)
+                return JsonResponse(
+                    {
+                        "error": "temporarily_unavailable",
+                        "message": "Не удалось подготовить аккаунт. Попробуйте позже.",
+                    },
+                    status=503,
+                )
         # Existing user: DO NOT touch RWMS, DO NOT re-provision a trial.
 
+        if is_user_blocked(session, user.id):
+            # Consume the valid code, but never issue a bearer token or reveal a
+            # subscription URL for a blocked business account.
+            session.commit()
+            return JsonResponse({"error": "account_blocked"}, status=403)
+
         raw_token = _issue_access_token(session, user, now=now)
-        try:
-            rw = get_rwms_user(user.username)
-        except RwmsUnavailableError as error:
-            # Вход уже состоялся — не показываем «нет подписки» из-за блипа
-            # панели; subscription_url приложение добирает через /me.
-            logging.warning(
-                "mobile_api: RWMS unavailable during email verify for %s: %s",
-                user.username,
-                error,
-            )
-            rw = None
-        subscription_url = rw.subscription_url if rw is not None else None
+        user_payload = _serialize_user(user)
+        username = user.username
         session.commit()
-        return JsonResponse(
-            {
-                "access_token": raw_token,
-                "subscription_url": subscription_url,
-                "user": _serialize_user(user),
-            }
-        )
     finally:
         session.close()
+
+    try:
+        rw = get_rwms_user(username)
+    except RwmsUnavailableError as error:
+        # Вход уже состоялся — не показываем «нет подписки» из-за блипа
+        # панели; subscription_url приложение добирает позже через /me.
+        logging.warning(
+            "mobile_api: RWMS unavailable during email verify for %s: %s",
+            username,
+            error,
+        )
+        rw = None
+    subscription_url = rw.subscription_url if rw is not None else None
+    return JsonResponse(
+        {
+            "access_token": raw_token,
+            "subscription_url": subscription_url,
+            "user": user_payload,
+        }
+    )
 
 
 @csrf_exempt
@@ -308,41 +400,50 @@ def me(request):
         user, _token = authenticate(session, request)
         if user is None:
             return JsonResponse({"error": "unauthorized"}, status=401)
-        try:
-            rw = get_rwms_user(user.username)
-        except RwmsUnavailableError as error:
-            # Панель недоступна — статус подписки выяснить нельзя. Отвечаем
-            # «временно недоступно» (503), а НЕ null-полями, которые
-            # приложение показало бы как «нет подписки/истекла».
-            logging.warning(
-                "mobile_api: RWMS unavailable during /me for %s: %s",
-                user.username,
-                error,
-            )
-            return JsonResponse(
-                {
-                    "error": "temporarily_unavailable",
-                    "message": "Данные временно недоступны, попробуйте позже",
-                },
-                status=503,
-            )
-        expire_iso, days_left = _expire_fields(rw)
-        payload = {
-            "user": _serialize_user(user),
+        user_payload = _serialize_user(user)
+        username = user.username
+        session.commit()
+    finally:
+        session.close()
+
+    try:
+        rw = get_rwms_user(username)
+    except RwmsUnavailableError as error:
+        # Панель недоступна — статус подписки выяснить нельзя. Отвечаем
+        # «временно недоступно» (503), а НЕ null-полями, которые
+        # приложение показало бы как «нет подписки/истекла».
+        logging.warning(
+            "mobile_api: RWMS unavailable during /me for %s: %s",
+            username,
+            error,
+        )
+        return JsonResponse(
+            {
+                "error": "temporarily_unavailable",
+                "message": "Данные временно недоступны, попробуйте позже",
+            },
+            status=503,
+        )
+    expire_iso, days_left = _expire_fields(rw)
+    return JsonResponse(
+        {
+            "user": user_payload,
             "status": _status_name(rw),
             "expire_at": expire_iso,
             "days_left": days_left,
             "subscription_url": rw.subscription_url if rw is not None else None,
         }
-        session.commit()
-        return JsonResponse(payload)
-    finally:
-        session.close()
+    )
 
 
 @require_http_methods(["GET"])
 def tariffs(request):
-    return JsonResponse({"tariffs": [serialize_tariff(t) for t in MOBILE_TARIFFS]})
+    session = session_factory()
+    try:
+        resolved = get_mobile_tariffs(session)
+    finally:
+        session.close()
+    return JsonResponse({"tariffs": [serialize_tariff(t) for t in resolved]})
 
 
 @csrf_exempt

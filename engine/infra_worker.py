@@ -26,10 +26,19 @@ INFRA_WORKER_INTERVAL секунд выполняет обслуживание:
 запрос не должен останавливать весь тик (инцидент 2026-09-02: INSERT
 агрегации висел 28 минут, и воркер не доходил ни до OFFLINE-проверки, ни
 до детектора аномалий, ни до замен).
+
+Бюджет тика (INFRA_MAINTENANCE_BUDGET_SECONDS) запрещает начинать следующий
+шаг после его исчерпания. OFFLINE-проверка всегда первая и бюджетом не
+отсекается; остальные шаги идут по сроку (самый просроченный первым).
+Обрезанный бюджетом тик доделывается после короткой паузы (min(interval,
+1) с), а не через полный interval, иначе под нагрузкой все шаги, включая
+OFFLINE, шли бы реже, чем без бюджета.
 """
 
 import logging
+import random
 import threading
+from django.conf import settings
 import time
 from datetime import timedelta
 
@@ -54,6 +63,7 @@ _MASS_ALERT_MAX_NAMES = 15
 _started = False
 _start_lock = threading.Lock()
 _tick_counter = 0
+_maintenance_due = {}
 
 log = logging.getLogger("infra-worker")
 
@@ -1110,6 +1120,8 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
     if not blocked_ips:
         return
 
+    live_block = _live_summary(verdict)
+
     if not verdict["actionable"]:
         _send_alert(
             "🟠 <b>ТСПУ: похоже на бан адреса, но уверенности мало</b>\n\n"
@@ -1121,8 +1133,6 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
             + "\n\n<b>Проверки:</b>\n" + evidence_text
         )
         return
-
-    live_block = _live_summary(verdict)
 
     if not cfg["infra_auto_replace_enabled"]:
         _send_alert(
@@ -2424,6 +2434,8 @@ def _run_step(name, fn, *args) -> bool:
     веб-запросы. Шаги внутри не коммитят, поэтому лимит действует на весь
     шаг. Возвращает True при успехе.
     """
+    started = time.monotonic()
+    succeeded = False
     db_session = session_factory()
     try:
         timeout_ms = _step_statement_timeout_ms()
@@ -2433,6 +2445,7 @@ def _run_step(name, fn, *args) -> bool:
             )
         fn(db_session, *args)
         db_session.commit()
+        succeeded = True
         return True
     except Exception:
         db_session.rollback()
@@ -2440,14 +2453,29 @@ def _run_step(name, fn, *args) -> bool:
         return False
     finally:
         db_session.close()
+        log.info("maintenance_step name=%s success=%s duration_ms=%.1f", name, succeeded, (time.monotonic()-started)*1000)
 
 
-def run_maintenance() -> None:
+def run_maintenance() -> bool:
     """Один тик обслуживания; каждая подзадача — своя сессия и commit.
 
-    Порядок: сначала дешёвая OFFLINE-проверка (алерты о слепоте мониторинга
-    важнее агрегатов), потом агрегация, от которой зависят детектор и
-    baseline, дальше остальное.
+    Порядок: OFFLINE-проверка всегда первая в тике (алерты о слепоте
+    мониторинга важнее агрегатов), остальные шаги — по сроку: первым идёт
+    тот, что просрочен дольше, поэтому медленный шаг не морит голодом
+    следующие. Срок шага — конец его прошлого запуска + every * interval
+    (детектор аномалий, DNS-вотчер и prune — раз в несколько интервалов).
+    У OFFLINE срок тоже от конца запуска: проверка дольше бюджета иначе
+    съедала бы каждое продолжение тика, и остальные шаги не шли бы вовсе.
+    Строгой очерёдности «агрегация перед детектором» нет: детектор берёт
+    текущее окно из сырой телеметрии.
+
+    INFRA_MAINTENANCE_BUDGET_SECONDS запрещает начинать следующий шаг после
+    бюджета; уже работающий шаг не прерывается, OFFLINE бюджетом не
+    отсекается. Возвращает True, если тик обрезан бюджетом и остались
+    просроченные шаги: цикл лидера тогда делает короткую паузу
+    (_tick_sleep_seconds) и доделывает их, а не ждёт полный interval
+    (INFRA-01: иначе под нагрузкой все шаги, включая OFFLINE, шли реже, чем
+    без бюджета).
     """
     from engine import infra
     from engine import geoip_updater
@@ -2463,31 +2491,73 @@ def run_maintenance() -> None:
         # алерты, агрегацию телеметрии или автозамену IP.
         log.exception("infra worker: DB-IP City Lite update failed")
     if not _infra_tables_ready():
-        return
+        return False
 
-    _run_step("offline", check_offline)
-    _run_step("aggregate", lambda db: infra.aggregate_telemetry(db))
-    _run_step("xray", check_xray)
-    _run_step("capacity", check_capacity)
-    _run_step("load", check_load)
-    if _tick_counter % _ANOMALY_EVERY_TICKS == 0:
-        _run_step("anomaly-detect", detect_anomalies)
-    _run_step("anomaly-process", process_anomalies)
-    _run_step("replacements", process_replacements)
-    if _tick_counter % _DNS_WATCH_EVERY_TICKS == 0:
-        _run_step("dns-watch", watch_dns_changes)
-    if _tick_counter % _PRUNE_EVERY_TICKS == 0:
-        _run_step("prune", lambda db: infra.prune_telemetry(db))
+    interval = max(1, int(getattr(settings, "INFRA_WORKER_INTERVAL", _DEFAULT_INTERVAL)))
+    started = time.monotonic()
+    budget = max(1, float(getattr(settings, "INFRA_MAINTENANCE_BUDGET_SECONDS", 30)))
+    steps = [
+        ("offline", check_offline, 1),
+        ("aggregate", lambda db: infra.aggregate_telemetry(db), 1),
+        ("xray", check_xray, 1),
+        ("capacity", check_capacity, 1),
+        ("load", check_load, 1),
+        ("anomaly-detect", detect_anomalies, _ANOMALY_EVERY_TICKS),
+        ("anomaly-process", process_anomalies, 1),
+        ("replacements", process_replacements, 1),
+        ("dns-watch", watch_dns_changes, _DNS_WATCH_EVERY_TICKS),
+        ("prune", lambda db: infra.prune_telemetry(db), _PRUNE_EVERY_TICKS),
+    ]
+    for name, _, every in steps:
+        _maintenance_due.setdefault(name, started if every == 1 else started + every * interval)
+    deferred = False
+    # OFFLINE — всегда первым (INFRA-01: иначе он вставал в очередь за
+    # шагами, пропущенными в прошлом тике, и бюджет срезал его целиком);
+    # дальше самый давно просроченный шаг первым, чтобы дорогой шаг не морил
+    # голодом следующие.
+    for name, fn, every in sorted(
+        steps, key=lambda step: (step[0] != "offline", _maintenance_due[step[0]])
+    ):
+        now = time.monotonic()
+        if name != "offline" and now - started >= budget:
+            # Просроченное осталось — доделать после короткой паузы, а не
+            # через полный interval
+            deferred = any(
+                now >= _maintenance_due[step_name] for step_name, _, _ in steps
+            )
+            log.warning(
+                "maintenance_budget_exhausted duration_ms=%.1f deferred=%s",
+                (now - started) * 1000,
+                deferred,
+            )
+            break
+        if now < _maintenance_due[name]:
+            continue
+        _run_step(name, fn)
+        _maintenance_due[name] = time.monotonic() + every * interval
+    return deferred
+
+
+def _tick_sleep_seconds(interval: int, deferred) -> int:
+    """Пауза перед следующим тиком.
+
+    Тик обрезан бюджетом и остались просроченные шаги — короткая пауза,
+    чтобы доделать их сразу; иначе полный interval, как раньше. Сравнение
+    строго с True: None или упавший тик — полный interval. Короткая пауза
+    не зацикливает воркер: обрезка бывает только после ≥ бюджета работы.
+    """
+    return min(interval, 1) if deferred is True else interval
 
 
 def _simple_loop(interval: int) -> None:
     log.info("infra worker: non-postgres backend, running without leader lock")
     while True:
+        deferred = False
         try:
-            run_maintenance()
+            deferred = run_maintenance()
         except Exception:
             log.exception("infra worker: maintenance iteration failed")
-        time.sleep(interval)
+        time.sleep(_tick_sleep_seconds(interval, deferred))
 
 
 def _leader_loop(interval: int) -> None:
@@ -2495,32 +2565,41 @@ def _leader_loop(interval: int) -> None:
         _simple_loop(interval)
         return
 
+    failures = 0
     while True:
-        conn = engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+        conn = None
         try:
+            conn = engine.connect().execution_options(isolation_level="AUTOCOMMIT")
+            failures = 0
             got = conn.execute(
                 text("SELECT pg_try_advisory_lock(:k)"), {"k": _ADVISORY_LOCK_KEY}
             ).scalar()
             if not got:
-                conn.close()
                 time.sleep(interval)
                 continue
 
             log.info("infra worker: acquired leadership, running maintenance loop")
             while True:
+                # SELECT 1 на lock-соединении — каждую итерацию, в том числе
+                # после короткой паузы: мёртвое соединение = перевыборы
                 conn.execute(text("SELECT 1"))
+                deferred = False
                 try:
-                    run_maintenance()
+                    deferred = run_maintenance()
                 except Exception:
                     log.exception("infra worker: maintenance iteration failed")
-                time.sleep(interval)
+                time.sleep(_tick_sleep_seconds(interval, deferred))
         except Exception:
             log.exception("infra worker: leader loop error, will re-elect")
-            try:
-                conn.close()
-            except Exception:
-                pass
-            time.sleep(interval)
+            failures += 1
+            delay = min(max(1, interval), 2 ** min(failures - 1, 6))
+            time.sleep(delay + random.uniform(0, min(1, delay * 0.1)))
+        finally:
+            if conn is not None:
+                try:
+                    conn.close()
+                except Exception:
+                    pass
 
 
 def start() -> None:

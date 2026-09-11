@@ -7,65 +7,11 @@
     <title>Тикет #{{ ticket.id }}</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <style>
-        :root { --brand-gold: #ffc700; --bg-color: #090a0f; --card-bg: rgba(17, 18, 23, .88); --inner-card-bg: rgba(255, 255, 255, .055); --input-bg: rgba(0, 0, 0, .48); --card-border: rgba(255,255,255,.08); --panel-border: rgba(255,255,255,.08); --muted: rgba(255,255,255,.56); --text-main: #fff; --green: #38d996; --red: #ff5c67; --blue: #ffc700; --violet: #ffc700; --coral: #ff6b72; --mint: #ffc700; }
-        html, body { min-height: 100%; }
-        body { font-family: 'Montserrat', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: var(--bg-color); color: var(--text-main); margin: 0; }
-        body::before { content: ""; position: fixed; inset: 0; background-image: url("{% static 'img/bg6.png' %}"); background-size: cover; background-position: center; opacity: .18; filter: saturate(.9) contrast(1.05); pointer-events: none; }
-        body::after { content: ""; position: fixed; inset: 0; background: radial-gradient(circle at 64% 8%, rgba(255,199,0,.12), transparent 28rem), radial-gradient(circle at 14% 72%, rgba(255,199,0,.08), transparent 30rem), linear-gradient(180deg, rgba(9,10,15,.8), #090a0f 88%); pointer-events: none; }
-        .ticket-page { min-height: 100vh; min-height: 100dvh; padding: 20px 24px calc(24px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; }
-        .ticket-shell { position: relative; z-index: 1; width: 100%; max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; flex: 1 1 auto; min-height: 0; }
-        .card { background: var(--card-bg); border: 1px solid var(--panel-border); border-radius: 10px; backdrop-filter: blur(14px); box-shadow: 0 24px 80px rgba(0,0,0,.24), inset 0 1px 0 rgba(255,255,255,.025); }
-        .msg { max-width: min(78%, 720px); border-radius: 12px; padding: 12px 14px; border: 1px solid rgba(255,255,255,.1); }
-        .msg-user { margin-right: auto; background: var(--inner-card-bg); border-color: rgba(255,255,255,.1); }
-        .msg-support { margin-left: auto; background: linear-gradient(135deg, rgba(255,199,0,.14), rgba(255,199,0,.045)); border-color: rgba(255,199,0,.24); }
-        .attachment-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-top: 12px; }
-        .attachment { display: block; overflow: hidden; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: rgba(0,0,0,.28); }
-        .attachment img, .attachment video { width: 100%; max-height: 240px; object-fit: cover; display: block; }
-        .file-btn { width: 46px; height: 46px; border-radius: 12px; border: 1px solid rgba(255,255,255,.1); background: var(--inner-card-bg); color: #9ca3af; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; }
-        .file-btn:hover { color: var(--blue); border-color: rgba(92,200,255,.32); }
-        .ticket-header { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 16px; align-items: start; }
-        .ticket-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
-        .ticket-title { margin: 8px 0 0; color: var(--text-main); font-size: clamp(26px, 2.1vw, 36px); line-height: 1.08; font-weight: 900; }
-        .ticket-subtitle { color: var(--muted); font-size: 15px; line-height: 1.45; font-weight: 700; margin-top: 6px; }
-        .ticket-action-btn { min-height: 42px; border-radius: 12px; padding: 0 16px; font-size: 12px; font-weight: 800; text-transform: none; }
-        .ticket-user-card { padding: 16px; background: radial-gradient(circle at 86% 10%, rgba(255,199,0,.09), transparent 10rem), var(--card-bg); border-color: rgba(255,199,0,.16); }
-        .ticket-user-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; font-size: 12px; font-weight: 800; }
-        .ticket-user-item { min-width: 0; border-radius: 12px; background: var(--inner-card-bg); border: 1px solid rgba(255,255,255,.1); padding: 13px 14px; }
-        .ticket-user-label { color: var(--muted); font-size: 12px; font-weight: 800; margin-bottom: 5px; }
-        .ticket-user-value { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .chat-card { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; padding: 16px; background: radial-gradient(circle at 86% 10%, rgba(255,199,0,.08), transparent 11rem), var(--card-bg); border-color: rgba(255,199,0,.14); }
-        .chat-scroll { flex: 1 1 auto; min-height: 260px; overflow-y: auto; padding-right: 4px; margin-bottom: 12px; }
-        .quick-replies { position: relative; display: flex; align-items: center; justify-content: flex-start; padding: 14px 0 10px; border-top: 1px solid rgba(255,255,255,.08); }
-        .quick-replies-toggle { min-height: 38px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid rgba(255,199,0,.28); border-radius: 12px; background: rgba(255,199,0,.09); color: var(--brand-gold); padding: 0 14px; font-size: 12px; font-weight: 800; cursor: pointer; outline: none; box-shadow: none; }
-        .quick-replies-toggle:hover { background: rgba(255,199,0,.14); border-color: rgba(255,199,0,.42); }
-        .quick-replies-toggle:focus-visible { box-shadow: 0 0 0 3px rgba(255,199,0,.16); }
-        .quick-replies-panel { position: absolute; left: 0; right: 0; bottom: calc(100% + 8px); z-index: 30; display: none; max-height: 320px; overflow-y: auto; gap: 8px; padding: 10px; border: 1px solid var(--panel-border); border-radius: 14px; background: rgba(17, 18, 23, .98); box-shadow: 0 24px 70px rgba(0,0,0,.48); }
-        .quick-replies.open .quick-replies-panel { display: grid; }
-        .quick-reply-item { width: 100%; min-width: 0; display: grid; gap: 5px; border: 1px solid rgba(255,255,255,.1); border-radius: 12px; background: rgba(255,255,255,.05); color: var(--text-main); padding: 12px; text-align: left; cursor: pointer; }
-        .quick-reply-item:hover { border-color: rgba(255,199,0,.28); background: rgba(255,199,0,.08); }
-        .quick-reply-title { color: #fff; font-size: 13px; font-weight: 800; }
-        .quick-reply-preview { color: var(--muted); font-size: 12px; line-height: 1.35; font-weight: 700; }
-        .quick-reply-empty { padding: 12px; color: var(--muted); font-size: 12px; font-weight: 800; }
-        .composer { display: grid; grid-template-columns: minmax(0, 1fr) 46px 46px; gap: 8px; align-items: end; padding-top: 0; border-top: 0; }
-        .composer textarea { min-height: 46px; max-height: 120px; resize: vertical; }
-        .composer-textarea { border-radius: 12px; border: 1px solid var(--card-border); background: var(--input-bg); color: var(--text-main); }
-        @media (max-width: 760px) {
-            .ticket-page { padding: 14px 12px calc(16px + env(safe-area-inset-bottom)); }
-            .ticket-header { grid-template-columns: 1fr; }
-            .ticket-actions { justify-content: flex-start; }
-            .ticket-actions form { flex: 1 1 150px; }
-            .ticket-action-btn { width: 100%; }
-            .ticket-user-grid { grid-template-columns: 1fr; }
-            .msg { max-width: 92%; }
-            .composer { grid-template-columns: minmax(0, 1fr) 42px 42px; }
-            .file-btn { width: 42px; height: 42px; }
-            .quick-replies-panel { max-height: 260px; }
-        }
-    </style>
+    <link rel="stylesheet" href="{% static 'styles/support_admin_ticket_detail-1.css' %}">
     {% include "includes/yandex_metrika.html" %}
     <link rel="stylesheet" href="{% static 'css/tw.css' %}?v=1">
     <link rel="stylesheet" href="{% static 'css/admin-concept-sections.css' %}?v=3">
+    <script src="{% static 'mi-network.js' %}"></script>
 </head>
 <body>
     <main class="ticket-page">
@@ -119,7 +65,7 @@
             <section class="card chat-card">
                 <div class="chat-scroll space-y-3" id="admin-chat-scroll">
                     {% for message in support_messages %}
-                        <div class="msg {% if message.sender_type == support_sender_user %}msg-user{% else %}msg-support{% endif %}">
+                        <div class="msg {% if message.sender_type == support_sender_user %}msg-user{% else %}msg-support{% endif %}" data-message-id="{{ message.id }}">
                             <div class="flex items-center justify-between gap-3 mb-2">
                                 <span class="text-xs font-bold {% if message.sender_type == support_sender_user %}text-gray-400{% else %}text-[#ffc700]{% endif %}">
                                     {% if message.sender_type == support_sender_user %}Пользователь{% else %}Поддержка{% endif %}
@@ -146,7 +92,7 @@
                             {% endif %}
                         </div>
                     {% empty %}
-                        <div class="h-full flex items-center justify-center text-gray-600 font-bold">
+                        <div data-empty-messages class="h-full flex items-center justify-center text-gray-600 font-bold">
                             Сообщений пока нет.
                         </div>
                     {% endfor %}
@@ -170,11 +116,12 @@
                     </div>
                 </div>
 
+                <p id="admin-chat-error" role="alert" class="text-sm text-red-300" hidden></p>
                 <form method="post" action="{% url 'support_admin_create_message' ticket.id %}" enctype="multipart/form-data" class="composer" id="admin-support-message-form" data-messages-url="{% url 'support_admin_ticket_messages_json' ticket.id %}">
                     {% csrf_token %}
                     <textarea name="message" rows="2" required placeholder="Ответ поддержки..." class="composer-textarea px-4 py-3 text-sm font-bold outline-none focus:border-[#ffc700]/40"></textarea>
                     <label class="file-btn" title="Прикрепить скриншот или видео">
-                        <input type="file" name="attachments" accept="image/*,video/*" multiple class="hidden">
+                        <input type="file" name="attachments" accept="image/jpeg,image/png,image/gif,image/webp,video/mp4,video/webm,video/quicktime" multiple class="hidden">
                         <i class="fas fa-paperclip"></i>
                     </label>
                     <button type="submit" class="h-[46px] min-w-[46px] rounded-xl bg-[#ffc700] text-black font-black">
@@ -184,235 +131,6 @@
             </section>
         </div>
     </main>
-    <script>
-        const adminChat = document.getElementById('admin-chat-scroll');
-
-        function escapeHtml(value) {
-            return String(value || '')
-                .replaceAll('&', '&amp;')
-                .replaceAll('<', '&lt;')
-                .replaceAll('>', '&gt;')
-                .replaceAll('"', '&quot;')
-                .replaceAll("'", '&#039;');
-        }
-
-        function attachmentHtml(attachment) {
-            const url = escapeHtml(attachment.url);
-            const fileName = escapeHtml(attachment.file_name);
-
-            if (attachment.is_image) {
-                return `
-                    <a href="${url}" target="_blank" class="attachment" title="${fileName}">
-                        <img src="${url}" alt="${fileName}">
-                    </a>
-                `;
-            }
-
-            if (attachment.is_video) {
-                return `
-                    <a href="${url}" target="_blank" class="attachment" title="${fileName}">
-                        <video src="${url}" controls preload="metadata"></video>
-                    </a>
-                `;
-            }
-
-            return `
-                <a href="${url}" target="_blank" class="attachment" title="${fileName}">
-                    <div class="p-3 text-xs font-bold text-gray-300">
-                        <i class="fas fa-paperclip mr-2 text-[#ffc700]"></i>${fileName}
-                    </div>
-                </a>
-            `;
-        }
-
-        function messageHtml(message) {
-            const senderLabel = message.is_user ? 'Пользователь' : 'Поддержка';
-            const senderClass = message.is_user ? 'text-gray-400' : 'text-[#ffc700]';
-            const bubbleClass = message.is_user ? 'msg-user' : 'msg-support';
-            const attachments = message.attachments && message.attachments.length
-                ? `<div class="attachment-grid">${message.attachments.map(attachmentHtml).join('')}</div>`
-                : '';
-
-            return `
-                <div class="msg ${bubbleClass}" data-message-id="${message.id}">
-                    <div class="flex items-center justify-between gap-3 mb-2">
-                        <span class="text-xs font-bold ${senderClass}">${senderLabel}</span>
-                        <span class="text-[10px] text-gray-500 font-bold">${escapeHtml(message.created_at_full || message.created_at)}</span>
-                    </div>
-                    <p class="text-sm text-white/90 font-bold leading-relaxed whitespace-pre-wrap">${escapeHtml(message.message)}</p>
-                    ${attachments}
-                </div>
-            `;
-        }
-
-        let knownMessageIds = new Set();
-        let messagesRefreshInFlight = false;
-        let soundReady = false;
-        let audioContext = null;
-
-        async function unlockSound(playTest = false) {
-            soundReady = true;
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContextClass) return;
-
-            audioContext = audioContext || new AudioContextClass();
-            if (audioContext.state === 'suspended') {
-                await audioContext.resume().catch(() => {});
-            }
-            const button = null;
-            if (button) button.remove();
-            if (playTest) playMessageSound();
-        }
-
-        function installSoundButton() {
-            return;
-        }
-
-        function playMessageSound() {
-            if (!soundReady) return;
-
-            const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-            if (!AudioContextClass) return;
-
-            const context = audioContext || new AudioContextClass();
-            audioContext = context;
-            const now = context.currentTime;
-            const gain = context.createGain();
-            gain.connect(context.destination);
-            gain.gain.setValueAtTime(0.0001, now);
-            gain.gain.exponentialRampToValueAtTime(0.08, now + 0.02);
-            gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.28);
-
-            [784, 1046].forEach((frequency, index) => {
-                const oscillator = context.createOscillator();
-                oscillator.type = 'sine';
-                oscillator.frequency.setValueAtTime(frequency, now + index * 0.09);
-                oscillator.connect(gain);
-                oscillator.start(now + index * 0.09);
-                oscillator.stop(now + index * 0.09 + 0.16);
-            });
-        }
-
-        function renderMessages(messages) {
-            if (!adminChat) return;
-
-            const shouldStickToBottom = adminChat.scrollTop + adminChat.clientHeight >= adminChat.scrollHeight - 80;
-            if (!messages.length) {
-                adminChat.innerHTML = `
-                    <div class="h-full flex items-center justify-center text-gray-600 font-bold">
-                        Сообщений пока нет.
-                    </div>
-                `;
-                return;
-            }
-
-            adminChat.innerHTML = messages.map(messageHtml).join('');
-            if (shouldStickToBottom) {
-                adminChat.scrollTop = adminChat.scrollHeight;
-            }
-        }
-
-        async function refreshMessages() {
-            const form = document.getElementById('admin-support-message-form');
-            if (!form || !form.dataset.messagesUrl || document.hidden || messagesRefreshInFlight) return;
-
-            messagesRefreshInFlight = true;
-            try {
-                const response = await fetch(form.dataset.messagesUrl, {
-                    headers: {'X-Requested-With': 'XMLHttpRequest'},
-                    cache: 'no-store',
-                });
-                if (!response.ok) return;
-                const payload = await response.json();
-                if (payload.status === 'ok') {
-                    const messages = payload.messages || [];
-                    const hasNewUserMessage = messages.some((message) => (
-                        message.is_user && !knownMessageIds.has(String(message.id))
-                    ));
-                    renderMessages(messages);
-                    knownMessageIds = new Set(messages.map((message) => String(message.id)));
-                    if (hasNewUserMessage) {
-                        playMessageSound();
-                    }
-                }
-            } catch (error) {
-                console.warn('Не удалось обновить тикет', error);
-            } finally {
-                messagesRefreshInFlight = false;
-            }
-        }
-
-        function setupAdminMessageForm() {
-            const form = document.getElementById('admin-support-message-form');
-            if (!form) return;
-
-            form.addEventListener('submit', async (event) => {
-                event.preventDefault();
-                const submitButton = form.querySelector('button[type="submit"]');
-                const originalDisabled = submitButton ? submitButton.disabled : false;
-
-                if (submitButton) submitButton.disabled = true;
-                try {
-                    const response = await fetch(form.action, {
-                        method: 'POST',
-                        body: new FormData(form),
-                        headers: {'X-Requested-With': 'XMLHttpRequest'},
-                    });
-                    if (!response.ok) return;
-
-                    form.reset();
-                    await refreshMessages();
-                    const textarea = form.querySelector('textarea[name="message"]');
-                    if (textarea) textarea.focus();
-                } catch (error) {
-                    console.warn('Не удалось отправить ответ поддержки', error);
-                } finally {
-                    if (submitButton) submitButton.disabled = originalDisabled;
-                }
-            });
-        }
-
-        function setupQuickReplies() {
-            const quickReplies = document.getElementById('quick-replies');
-            const toggle = document.getElementById('quick-replies-toggle');
-            const form = document.getElementById('admin-support-message-form');
-            const textarea = form?.querySelector('textarea[name="message"]');
-            if (!quickReplies || !toggle || !textarea) return;
-
-            toggle.addEventListener('click', (event) => {
-                event.stopPropagation();
-                quickReplies.classList.toggle('open');
-            });
-
-            quickReplies.querySelectorAll('.quick-reply-item').forEach((button) => {
-                button.addEventListener('click', () => {
-                    const body = button.querySelector('.quick-reply-body')?.textContent || '';
-                    const current = textarea.value.trim();
-                    textarea.value = current ? `${current}\n\n${body}` : body;
-                    textarea.focus();
-                    quickReplies.classList.remove('open');
-                });
-            });
-
-            document.addEventListener('click', (event) => {
-                if (!event.target.closest('#quick-replies')) {
-                    quickReplies.classList.remove('open');
-                }
-            });
-        }
-
-        if (adminChat) {
-            adminChat.scrollTop = adminChat.scrollHeight;
-            adminChat.querySelectorAll('[data-message-id]').forEach((node) => {
-                knownMessageIds.add(String(node.dataset.messageId));
-            });
-        }
-        setupAdminMessageForm();
-        setupQuickReplies();
-        setInterval(refreshMessages, 7000);
-        document.addEventListener('visibilitychange', () => {
-            if (!document.hidden) refreshMessages();
-        });
-    </script>
+    <script src="{% static 'scripts/support_admin_ticket_detail-1.js' %}"></script>
 </body>
 </html>

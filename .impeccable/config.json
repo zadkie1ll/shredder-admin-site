@@ -38,6 +38,34 @@
         ],
         "createdAt": "2026-09-10T01:50:04.417Z",
         "reason": "brief pinned: grid overlay is verbatim incumbent landing grammar (index_vpn.html .grid-bg), user approved cabinet skin in the landing world"
+      },
+      {
+        "rule": "overused-font",
+        "value": "montserrat",
+        "createdAt": "2026-09-11T16:02:54.246Z"
+      },
+      {
+        "rule": "overused-font",
+        "value": "arial",
+        "createdAt": "2026-09-11T16:02:54.282Z"
+      },
+      {
+        "rule": "overused-font",
+        "value": "inter",
+        "createdAt": "2026-09-11T16:02:54.318Z"
+      },
+      {
+        "rule": "overused-font",
+        "value": "roboto",
+        "createdAt": "2026-09-11T16:02:54.352Z"
+      },
+      {
+        "rule": "codex-grid-background",
+        "value": "*",
+        "files": [
+          "engine/templates/index_vpn.html"
+        ],
+        "createdAt": "2026-09-11T18:17:54.370Z"
       }
     ]
   }

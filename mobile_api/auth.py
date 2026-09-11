@@ -15,6 +15,7 @@ import secrets
 from datetime import datetime, timedelta
 
 from django.conf import settings
+from sqlalchemy import update
 
 from common.models.db import (
     EmailLoginCode,
@@ -32,6 +33,7 @@ AUTH_CODE_TTL = timedelta(minutes=10)
 # a 6-digit numeric code is short, so we cap verify attempts and the TTL tightly.
 EMAIL_CODE_TTL = timedelta(minutes=10)
 EMAIL_CODE_MAX_ATTEMPTS = 5
+ACCESS_TOKEN_LAST_SEEN_WRITE_INTERVAL = timedelta(minutes=5)
 
 
 def hash_auth_code(code):
@@ -85,16 +87,24 @@ def exchange_code(db_session, code, now=None):
     used and issues a fresh access token. Returns ``(user, raw_access_token)`` or
     ``(None, None)``."""
     now = now or datetime.utcnow()
-    row = (
-        db_session.query(MobileAuthCode)
-        .filter(MobileAuthCode.code_hash == hash_auth_code(code))
-        .one_or_none()
-    )
-    if row is None or row.used_at is not None or row.expires_at <= now:
+    user_id = db_session.execute(
+        update(MobileAuthCode)
+        .where(
+            MobileAuthCode.code_hash == hash_auth_code(code),
+            MobileAuthCode.used_at.is_(None),
+            MobileAuthCode.expires_at > now,
+        )
+        .values(used_at=now)
+        .returning(MobileAuthCode.user_id)
+    ).scalar_one_or_none()
+    if user_id is None:
         return None, None
 
-    row.used_at = now
-    user = db_session.query(User).filter(User.id == row.user_id).one_or_none()
+    user = (
+        db_session.query(User)
+        .filter(User.id == user_id)
+        .one_or_none()
+    )
     if user is None:
         return None, None
     if is_user_blocked(db_session, user.id):
@@ -129,6 +139,46 @@ def register_email_code(db_session, email, code, source="mobile_email", now=None
     )
     db_session.add(row)
     return row
+
+
+def discard_undelivered_email_code(db_session, email, code_id, voided_at, now=None):
+    """Откатить последствия ``register_email_code``, если письмо не ушло.
+
+    Удаляет ТОЛЬКО строку ``code_id`` этого запроса и только пока ею не
+    пытались воспользоваться (``used_at IS NULL``, ``attempts == 0``): это
+    недоставленный одноразовый код, пользовательские данные не затрагиваются.
+    Затем возвращает в строй прежние неистёкшие коды, которые аннулировал
+    именно этот запрос: ``register_email_code`` ставит им ``used_at = now``
+    запроса, поэтому восстанавливаются строго строки с ``used_at == voided_at``.
+    Коды, использованные или аннулированные в другое время, не трогаются.
+
+    Если новым кодом уже пытались войти, ничего не восстанавливается: иначе
+    активных кодов стало бы больше одного. Возвращает ``(deleted, restored)``,
+    коммитит вызывающий."""
+    now = now or datetime.utcnow()
+    deleted = (
+        db_session.query(EmailLoginCode)
+        .filter(
+            EmailLoginCode.id == code_id,
+            EmailLoginCode.email == email,
+            EmailLoginCode.used_at.is_(None),
+            EmailLoginCode.attempts == 0,
+        )
+        .delete(synchronize_session=False)
+    )
+    if not deleted:
+        return 0, 0
+    restored = (
+        db_session.query(EmailLoginCode)
+        .filter(
+            EmailLoginCode.email == email,
+            EmailLoginCode.id < code_id,
+            EmailLoginCode.used_at == voided_at,
+            EmailLoginCode.expires_at > now,
+        )
+        .update({EmailLoginCode.used_at: None}, synchronize_session=False)
+    )
+    return deleted, restored
 
 
 def verify_email_code(db_session, email, code, now=None):
@@ -198,7 +248,12 @@ def authenticate(db_session, request, now=None):
     )
     if row is None or row.revoked_at is not None:
         return None, None
-    row.last_seen_at = now or datetime.utcnow()
+    now = now or datetime.utcnow()
+    if (
+        row.last_seen_at is None
+        or row.last_seen_at <= now - ACCESS_TOKEN_LAST_SEEN_WRITE_INTERVAL
+    ):
+        row.last_seen_at = now
     user = db_session.query(User).filter(User.id == row.user_id).one_or_none()
     # Полностью заблокированный аккаунт (user_blocks) не аутентифицируется
     if user is not None and is_user_blocked(db_session, user.id):

@@ -1,5 +1,7 @@
 import sys
 import json
+import logging
+import math
 import dj_database_url
 from pathlib import Path
 from urllib.parse import urlparse
@@ -24,6 +26,55 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 def csv_list(value):
     return [item.strip() for item in value.split(",") if item.strip()]
+
+
+def unique_list(*lists):
+    """Склеить списки без повторов, сохранив порядок первого появления."""
+    seen = set()
+    result = []
+    for values in lists:
+        for item in values:
+            if item not in seen:
+                seen.add(item)
+                result.append(item)
+    return result
+
+
+def positive_seconds(name, default):
+    """Конечное положительное число секунд из env; битое значение — default.
+
+    Опечатка в env не должна ни ронять старт сайта, ни превращаться в
+    мгновенный или бесконечный таймаут."""
+    raw = config(name, default=default)
+    try:
+        value = float(raw)
+    except (TypeError, ValueError, OverflowError):
+        value = None
+    if value is None or not math.isfinite(value) or value <= 0:
+        logging.getLogger(__name__).warning(
+            "invalid %s=%r, using default %s", name, str(raw)[:32], default
+        )
+        return float(default)
+    return value
+
+
+DEFAULT_TRUSTED_PROXY_NETWORKS = (
+    "127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
+)
+# IP клиента (лимиты входа, аудит админки, bootstrap нод, «Ваш IP» на
+# лендингах) берётся из X-Forwarded-For только через доверенные прокси.
+# Edge ходят на origin с публичных IP, а origin nginx пускает только
+# ORIGIN_ALLOWED_PROXY_CIDRS (allow ...; deny all). Поэтому эти CIDR доверены
+# всегда: иначе IP edge стал бы «клиентом» для всех посетителей. Явный
+# TRUSTED_PROXY_NETWORKS должен включать docker-подсеть origin nginx.
+TRUSTED_PROXY_NETWORKS = unique_list(
+    config(
+        "TRUSTED_PROXY_NETWORKS",
+        default=DEFAULT_TRUSTED_PROXY_NETWORKS,
+        cast=csv_list,
+    ),
+    csv_list(config("ORIGIN_ALLOWED_PROXY_CIDRS", default="")),
+)
 
 
 def normalize_domain_entry(value):
@@ -189,6 +240,14 @@ SITE_TRIAL_REGISTRATION_ENABLED = config(
     default=False,
     cast=bool,
 )
+# Emergency compatibility switch for accounts created before deterministic
+# site usernames. The scan downloads the panel user list, so keep it off for
+# normal registration and enable only during a bounded legacy reconciliation.
+SITE_LEGACY_RWMS_IDENTITY_SCAN_ENABLED = config(
+    "SITE_LEGACY_RWMS_IDENTITY_SCAN_ENABLED",
+    default=False,
+    cast=bool,
+)
 
 # Старый пошаговый «мастер»-виджет настройки (с орбитой) отключён по умолчанию:
 # показываем плоский флоу «платформа → приложение → подписка» (как у конкурентов).
@@ -205,6 +264,50 @@ YANDEX_OAUTH_CLIENT_SECRET = config("YANDEX_OAUTH_CLIENT_SECRET", default="")
 YANDEX_OAUTH_REDIRECT_URI = config("YANDEX_OAUTH_REDIRECT_URI", default="")
 SUPPORT_ADMIN_PASSWORD = config("SUPPORT_ADMIN_PASSWORD", default="")
 SUPPORT_STAFF_PASSWORD = config("SUPPORT_STAFF_PASSWORD", default="")
+MAGIC_LINK_IP_RATE_LIMIT = config("MAGIC_LINK_IP_RATE_LIMIT", default=60, cast=int)
+MAGIC_LINK_EMAIL_RATE_LIMIT = config("MAGIC_LINK_EMAIL_RATE_LIMIT", default=5, cast=int)
+MAGIC_LINK_RATE_WINDOW_SECONDS = config(
+    "MAGIC_LINK_RATE_WINDOW_SECONDS", default=900, cast=int
+)
+MAGIC_LINK_GLOBAL_RATE_LIMIT = config(
+    "MAGIC_LINK_GLOBAL_RATE_LIMIT", default=500, cast=int
+)
+# Окно общего (со всех IP) лимита magic-link, сек. Лимит <= 0 выключает бакет.
+MAGIC_LINK_GLOBAL_RATE_WINDOW_SECONDS = config(
+    "MAGIC_LINK_GLOBAL_RATE_WINDOW_SECONDS", default=60, cast=int
+)
+# Лимиты анонимной оплаты с лендинга (/pay/ без входа): аккаунт по email и счёт
+# создаются до оплаты, поэтому запросы ограничены по IP, email и общему объёму.
+# Пороги мягкие: мобильные операторы сажают много абонентов на один IP (CGNAT).
+# Лимит <= 0 выключает бакет. Оплата авторизованного пользователя не лимитируется.
+PAYMENT_ANON_IP_RATE_LIMIT = config(
+    "PAYMENT_ANON_IP_RATE_LIMIT", default=120, cast=int
+)
+PAYMENT_ANON_EMAIL_RATE_LIMIT = config(
+    "PAYMENT_ANON_EMAIL_RATE_LIMIT", default=10, cast=int
+)
+PAYMENT_ANON_RATE_WINDOW_SECONDS = config(
+    "PAYMENT_ANON_RATE_WINDOW_SECONDS", default=900, cast=int
+)
+PAYMENT_ANON_GLOBAL_RATE_LIMIT = config(
+    "PAYMENT_ANON_GLOBAL_RATE_LIMIT", default=600, cast=int
+)
+PAYMENT_ANON_GLOBAL_RATE_WINDOW_SECONDS = config(
+    "PAYMENT_ANON_GLOBAL_RATE_WINDOW_SECONDS", default=60, cast=int
+)
+# Лимиты входа в админку считают только НЕУДАЧНЫЕ попытки: с одного IP и для
+# пары «аккаунт+IP». Общий счётчик аккаунта со всех IP не блокирует вход, а
+# только пишет ALERT в лог при превышении ADMIN_LOGIN_ACCOUNT_ALERT_LIMIT.
+ADMIN_LOGIN_IP_RATE_LIMIT = config("ADMIN_LOGIN_IP_RATE_LIMIT", default=30, cast=int)
+ADMIN_LOGIN_ACCOUNT_RATE_LIMIT = config(
+    "ADMIN_LOGIN_ACCOUNT_RATE_LIMIT", default=10, cast=int
+)
+ADMIN_LOGIN_RATE_WINDOW_SECONDS = config(
+    "ADMIN_LOGIN_RATE_WINDOW_SECONDS", default=900, cast=int
+)
+ADMIN_LOGIN_ACCOUNT_ALERT_LIMIT = config(
+    "ADMIN_LOGIN_ACCOUNT_ALERT_LIMIT", default=200, cast=int
+)
 # Ключ RIPE Atlas для вкладки «Замеры ТСПУ» (права: schedule measurement,
 # get non-public results). Пустой ключ отключает вкладку.
 RIPE_ATLAS_API_KEY = config("RIPE_ATLAS_API_KEY", default="")
@@ -249,8 +352,23 @@ INFRA_GEOIP_CACHE_SECONDS = config("INFRA_GEOIP_CACHE_SECONDS", default=60, cast
 CLOUDFLARE_API_TOKEN = config("CLOUDFLARE_API_TOKEN", default="")
 SUPPORT_ATTACHMENT_MAX_BYTES = config(
     "SUPPORT_ATTACHMENT_MAX_BYTES",
-    default=50 * 1024 * 1024,
+    default=10 * 1024 * 1024,
     cast=int,
+)
+SUPPORT_ATTACHMENT_MAX_FILES = config(
+    "SUPPORT_ATTACHMENT_MAX_FILES",
+    default=3,
+    cast=int,
+)
+SUPPORT_ATTACHMENT_TOTAL_MAX_BYTES = config(
+    "SUPPORT_ATTACHMENT_TOTAL_MAX_BYTES",
+    default=25 * 1024 * 1024,
+    cast=int,
+)
+SUPPORT_ATTACHMENT_X_ACCEL_REDIRECT = config(
+    "SUPPORT_ATTACHMENT_X_ACCEL_REDIRECT",
+    default=not config("DEBUG", default=False, cast=bool),
+    cast=bool,
 )
 SUPPORT_TELEGRAM_URL = config(
     "SUPPORT_TELEGRAM_URL",
@@ -273,6 +391,10 @@ YOOKASSA_SHOP_ID = config("YOOKASSA_SHOP_ID")
 YOOKASSA_SECRET_KEY = config("YOOKASSA_SECRET_KEY")
 RWMS_HOST = config("RWMS_HOST")
 RWMS_PORT = config("RWMS_PORT", cast=int)
+# Дедлайн одного обычного gRPC-вызова RWMS, сек (кабинет, оплата, смена email).
+RWMS_RPC_TIMEOUT_SECONDS = positive_seconds("RWMS_RPC_TIMEOUT_SECONDS", 8)
+# Дедлайн массовых вызовов RWMS (GetAllUsers, CreateNode), сек.
+RWMS_BULK_RPC_TIMEOUT_SECONDS = positive_seconds("RWMS_BULK_RPC_TIMEOUT_SECONDS", 30)
 
 CSRF_COOKIE_SECURE = not DEBUG
 SESSION_COOKIE_SECURE = not DEBUG
@@ -288,6 +410,14 @@ EMAIL_PORT = config("EMAIL_PORT", cast=int)
 EMAIL_USE_SSL = config("EMAIL_USE_SSL", default=True, cast=bool)
 EMAIL_HOST_USER = config("EMAIL_HOST_USER")
 EMAIL_HOST_PASSWORD = config("EMAIL_HOST_PASSWORD")
+EMAIL_TIMEOUT = config("EMAIL_TIMEOUT", default=10, cast=float)
+REQUEST_TIMING_SLOW_MS = config("REQUEST_TIMING_SLOW_MS", default=1000, cast=float)
+REQUEST_TIMING_LOG_ALL = config("REQUEST_TIMING_LOG_ALL", default=False, cast=bool)
+# Заголовок Server-Timing (время SQL) наружу только по явному флагу: по нему
+# можно отличить ветки одинакового ответа, например есть ли email в базе.
+REQUEST_TIMING_EXPOSE_SERVER_TIMING = config(
+    "REQUEST_TIMING_EXPOSE_SERVER_TIMING", default=False, cast=bool
+)
 DEFAULT_FROM_EMAIL = EMAIL_HOST_USER
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
 HAS_WHITENOISE = find_spec("whitenoise") is not None
@@ -307,6 +437,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "engine.request_timing_middleware.RequestTimingMiddleware",
     # Сжатие ответов: HTML админки (>1 МБ) и JSON телеметрии ужимаются в
     # разы. BREACH смягчается штатной маскировкой CSRF-токенов Django.
     "django.middleware.gzip.GZipMiddleware",
@@ -368,6 +499,33 @@ DATABASES = {
         ssl_require=WEB_DATABASE_SSL_REQUIRE,
     )
 }
+
+CACHE_REDIS_URL = config("CACHE_REDIS_URL", default="")
+# Таймаут подключения и одной операции с Redis, сек. Без него redis-py ждёт
+# бесконечно: при молча недоступном Redis каждый вход висел бы на connect и
+# выедал потоки gunicorn. С таймаутом лимиты получают исключение и
+# пропускают запрос (fail-open).
+CACHE_REDIS_SOCKET_TIMEOUT_SECONDS = positive_seconds(
+    "CACHE_REDIS_SOCKET_TIMEOUT_SECONDS", 0.5
+)
+if CACHE_REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": CACHE_REDIS_URL,
+            "OPTIONS": {
+                "socket_connect_timeout": CACHE_REDIS_SOCKET_TIMEOUT_SECONDS,
+                "socket_timeout": CACHE_REDIS_SOCKET_TIMEOUT_SECONDS,
+            },
+        }
+    }
+else:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "monkey-island-website",
+        }
+    }
 
 
 # Password validation
@@ -457,36 +615,32 @@ LOGGING = {
             "stream": sys.stdout,
             "formatter": "simple",
         },
-        "file": {
-            "class": "logging.FileHandler",
-            "filename": "debug.log",
-            "formatter": "verbose",
-        },
+
     },
     "root": {
-        "handlers": ["console", "file"],
+        "handlers": ["console"],
         "level": "INFO",
     },
     "loggers": {
         "django": {
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
         },
         "engine": {  # или название вашего приложения
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "DEBUG",
             "propagate": False,
         },
         # httpx на INFO пишет полный URL запроса, а URL Telegram Bot API
         # содержит токен бота — токены в логах запрещены
         "httpx": {
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "WARNING",
             "propagate": False,
         },
         "httpcore": {
-            "handlers": ["console", "file"],
+            "handlers": ["console"],
             "level": "WARNING",
             "propagate": False,
         },
@@ -495,6 +649,13 @@ LOGGING = {
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_ROOT = BASE_DIR / "mediafiles"
-FILE_UPLOAD_MAX_MEMORY_SIZE = SUPPORT_ATTACHMENT_MAX_BYTES
-DATA_UPLOAD_MAX_MEMORY_SIZE = SUPPORT_ATTACHMENT_MAX_BYTES + 1024 * 1024
+# Keep normal Django's small-file memory threshold. Larger support videos are
+# spooled to temporary files instead of multiplying worker RSS.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2_621_440
+# nginx accepts 32 MiB including multipart overhead; the application enforces
+# the stricter 25 MiB aggregate support-attachment budget.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 32 * 1024 * 1024
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
+# Cooperative budget: do not start another maintenance step after this time.
+INFRA_MAINTENANCE_BUDGET_SECONDS = max(1.0, min(120.0, config("INFRA_MAINTENANCE_BUDGET_SECONDS", default=30.0, cast=float)))

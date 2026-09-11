@@ -38,13 +38,27 @@ server {
     add_header X-Frame-Options DENY;
     add_header Referrer-Policy same-origin;
 
-    client_max_body_size 50m;
+    # Must match the public edge. The application applies the stricter per-file,
+    # count and aggregate support-upload limits.
+    client_max_body_size 32m;
 
     location /static/ {
         alias /var/www/static/;
         access_log off;
         expires 7d;
         add_header Cache-Control "public, max-age=604800";
+        gzip_static on;
+        gzip_vary on;
+    }
+
+    # Authorization stays in Django; nginx only serves an internal path after
+    # Django returns X-Accel-Redirect. Range requests keep video seeking cheap.
+    location /_protected_support_media/ {
+        internal;
+        alias /var/www/media/;
+        access_log off;
+        add_header X-Content-Type-Options nosniff always;
+        add_header Cross-Origin-Resource-Policy same-origin always;
     }
 
     location / {

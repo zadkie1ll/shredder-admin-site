@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta
 from unittest import mock
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, override_settings
 from sqlalchemy import BigInteger, create_engine
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
@@ -420,6 +420,122 @@ class MobileEmailRequestViewTests(SimpleTestCase):
         self.assertEqual(resp.status_code, 429)
         self.send_email.assert_not_called()
 
+    def test_send_failure_keeps_previous_code_and_allows_immediate_retry(self):
+        session = self.Session()
+        auth.register_email_code(
+            session, "a@b.com", "111111", now=datetime.utcnow() - timedelta(minutes=2)
+        )
+        session.commit()
+        session.close()
+
+        self.send_email.side_effect = RuntimeError("provider down")
+        with self.assertLogs(level="ERROR"):
+            failed = self._post({"email": "a@b.com"})
+        self.assertEqual(failed.status_code, 502)
+        self.assertEqual(json.loads(failed.content)["error"], "email_send_failed")
+
+        session = self.Session()
+        rows = session.query(EmailLoginCode).all()
+        # Недоставленный код удалён, код из прошлого письма снова активен.
+        self.assertEqual(len(rows), 1)
+        self.assertIsNone(rows[0].used_at)
+        ok, _row = auth.verify_email_code(session, "a@b.com", "111111")
+        self.assertTrue(ok)
+        session.rollback()
+        session.close()
+
+        # Провайдер ожил: повтор сразу проходит, а не получает 429.
+        self.send_email.side_effect = None
+        self.assertEqual(self._post({"email": "a@b.com"}).status_code, 200)
+
+    def test_repeated_send_failures_do_not_exhaust_hourly_quota(self):
+        from mobile_api import views
+
+        self.send_email.side_effect = RuntimeError("provider down")
+        with self.assertLogs(level="ERROR"):
+            for _ in range(views.EMAIL_HOURLY_LIMIT + 1):
+                self.assertEqual(self._post({"email": "a@b.com"}).status_code, 502)
+
+        session = self.Session()
+        self.assertEqual(session.query(EmailLoginCode).count(), 0)
+        session.close()
+        self.send_email.side_effect = None
+        self.assertEqual(self._post({"email": "a@b.com"}).status_code, 200)
+
+    def test_compensation_failure_still_returns_502(self):
+        self.send_email.side_effect = RuntimeError("provider down")
+        with mock.patch(
+            "mobile_api.views.discard_undelivered_email_code",
+            side_effect=RuntimeError("db blip"),
+        ), self.assertLogs(level="ERROR") as logs:
+            resp = self._post({"email": "a@b.com"})
+
+        self.assertEqual(resp.status_code, 502)
+        self.assertTrue(
+            any("failed to discard undelivered login code" in line for line in logs.output)
+        )
+
+    def test_compensation_restores_only_codes_voided_by_this_request(self):
+        session = self.Session()
+        now = datetime.utcnow()
+        session.add(
+            EmailLoginCode(
+                email="a@b.com",
+                code_hash=auth.hash_email_code("000000"),
+                created_at=now - timedelta(minutes=5),
+                expires_at=now + timedelta(minutes=5),
+                used_at=now - timedelta(minutes=4),
+            )
+        )
+        auth.register_email_code(
+            session, "a@b.com", "111111", now=now - timedelta(minutes=2)
+        )
+        session.commit()
+        new_row = auth.register_email_code(session, "a@b.com", "222222", now=now)
+        session.flush()
+        new_id = new_row.id
+        session.commit()
+
+        self.assertEqual(
+            auth.discard_undelivered_email_code(session, "a@b.com", new_id, now),
+            (1, 1),
+        )
+        session.commit()
+
+        rows = {
+            row.code_hash: row
+            for row in session.query(EmailLoginCode).order_by(EmailLoginCode.id)
+        }
+        self.assertNotIn(auth.hash_email_code("222222"), rows)
+        self.assertIsNone(rows[auth.hash_email_code("111111")].used_at)
+        # Код, погашенный раньше и другим действием, не воскрешается.
+        self.assertIsNotNone(rows[auth.hash_email_code("000000")].used_at)
+        session.close()
+
+    def test_compensation_skips_restore_when_new_code_was_attempted(self):
+        session = self.Session()
+        now = datetime.utcnow()
+        auth.register_email_code(
+            session, "a@b.com", "111111", now=now - timedelta(minutes=2)
+        )
+        session.commit()
+        new_row = auth.register_email_code(session, "a@b.com", "222222", now=now)
+        session.flush()
+        new_row.attempts = 1
+        new_id = new_row.id
+        session.commit()
+
+        self.assertEqual(
+            auth.discard_undelivered_email_code(session, "a@b.com", new_id, now),
+            (0, 0),
+        )
+        session.commit()
+
+        rows = session.query(EmailLoginCode).order_by(EmailLoginCode.id).all()
+        self.assertEqual(len(rows), 2)
+        self.assertIsNotNone(rows[0].used_at)
+        session.close()
+
 
 class MobileEmailVerifyViewTests(SimpleTestCase):
     def setUp(self):
@@ -616,7 +732,9 @@ class MobileExchangeRateLimitTests(SimpleTestCase):
     def tearDown(self):
         self._sf_patch.stop()
 
-    def _post(self, ip="10.0.0.1", forwarded=None):
+    # Публичный адрес по умолчанию: частные и доверенные IP лимитом не
+    # считаются (AUTHZ-F1, см. test_unresolved_client_ip_*).
+    def _post(self, ip="45.10.0.1", forwarded=None):
         from mobile_api import views
 
         request = mock.Mock()
@@ -649,9 +767,9 @@ class MobileExchangeRateLimitTests(SimpleTestCase):
 
         with mock.patch.object(views, "EXCHANGE_RATE_LIMIT", 3):
             for _ in range(4):
-                self._post(ip="10.0.0.1")
+                self._post(ip="45.10.0.1")
             # A different client is not affected by the exhausted bucket.
-            resp = self._post(ip="10.0.0.2")
+            resp = self._post(ip="45.10.0.2")
         self.assertEqual(resp.status_code, 401)
 
     def test_forwarded_header_wins_over_remote_addr(self):
@@ -665,6 +783,150 @@ class MobileExchangeRateLimitTests(SimpleTestCase):
             # Same proxy, different original client → separate bucket.
             other = self._post(ip="127.0.0.1", forwarded="203.0.113.8")
         self.assertEqual(other.status_code, 401)
+
+    @override_settings(TRUSTED_PROXY_NETWORKS=["127.0.0.1/32"])
+    def test_forwarded_chain_uses_nearest_untrusted_client(self):
+        from mobile_api import views
+
+        request = mock.Mock()
+        request.META = {
+            "REMOTE_ADDR": "127.0.0.1",
+            "HTTP_X_FORWARDED_FOR": "198.51.100.99, 203.0.113.7",
+        }
+
+        self.assertEqual(views._client_ip(request), "203.0.113.7")
+
+    @override_settings(TRUSTED_PROXY_NETWORKS=["127.0.0.1/32"])
+    def test_untrusted_peer_cannot_supply_forwarded_identity(self):
+        from mobile_api import views
+
+        request = mock.Mock()
+        request.META = {
+            "REMOTE_ADDR": "203.0.113.10",
+            "HTTP_X_FORWARDED_FOR": "198.51.100.99",
+        }
+
+        self.assertEqual(views._client_ip(request), "203.0.113.10")
+
+    @override_settings(
+        TRUSTED_PROXY_NETWORKS=[
+            "127.0.0.1/32",
+            "::1/128",
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+            "203.0.113.50/32",
+        ]
+    )
+    def test_clients_behind_public_edge_get_separate_buckets(self):
+        """MOB-01: docker nginx → публичный edge → клиент."""
+        from mobile_api import views
+
+        edge_chain = "{client}, 203.0.113.50"
+        with mock.patch.object(views, "EXCHANGE_RATE_LIMIT", 3):
+            for _ in range(4):
+                self._post(
+                    ip="172.18.0.5", forwarded=edge_chain.format(client="198.51.100.1")
+                )
+            limited = self._post(
+                ip="172.18.0.5", forwarded=edge_chain.format(client="198.51.100.1")
+            )
+            other = self._post(
+                ip="172.18.0.5", forwarded=edge_chain.format(client="198.51.100.2")
+            )
+
+        self.assertEqual(limited.status_code, 429)
+        self.assertEqual(other.status_code, 401)
+
+    def test_cache_outage_fails_open(self):
+        """OPS-8: недоступный Redis не должен превращать вход в 500."""
+        from mobile_api import views
+
+        broken = mock.Mock()
+        broken.add.side_effect = ConnectionError("redis down")
+
+        with mock.patch.object(views, "cache", broken), self.assertLogs(level="ERROR"):
+            resp = self._post()
+
+        self.assertEqual(resp.status_code, 401)
+
+    def test_counter_recreated_without_ttl_gets_ttl_back(self):
+        """RL-2: INCR в гонке с истечением окна создаёт ключ без TTL."""
+        from mobile_api import views
+
+        racy = mock.Mock()
+        racy.add.return_value = False
+        racy.incr.return_value = 1
+
+        with mock.patch.object(views, "cache", racy):
+            self.assertEqual(self._post().status_code, 401)
+
+        racy.touch.assert_called_once_with(
+            "mobile_api:exchange:45.10.0.1", views.EXCHANGE_RATE_WINDOW_SECONDS
+        )
+
+    def _reset_unresolved_ip_warning(self):
+        from engine import rate_limit
+
+        patcher = mock.patch.object(rate_limit, "_unresolved_ip_warned_at", None)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    @override_settings(
+        TRUSTED_PROXY_NETWORKS=[
+            "127.0.0.1/32",
+            "::1/128",
+            "10.0.0.0/8",
+            "172.16.0.0/12",
+            "192.168.0.0/16",
+            "203.0.113.50/32",
+        ]
+    )
+    def test_unresolved_client_ip_neither_consumes_nor_blocks(self):
+        """AUTHZ-F1: IPv6-клиенты edge за docker userland-proxy приходят как
+        шлюз bridge 172.x.0.1; один счётчик на всех запер бы вход всем разом."""
+        from django.core.cache import cache
+        from mobile_api import views
+
+        self._reset_unresolved_ip_warning()
+        cases = (
+            ("172.19.0.1", {"ip": "172.18.0.5", "forwarded": "172.19.0.1, 203.0.113.50"}),
+            ("10.0.0.1", {"ip": "10.0.0.1"}),
+            ("127.0.0.1", {"ip": "127.0.0.1"}),
+            ("203.0.113.50", {"ip": "203.0.113.50"}),
+            ("unknown", {"ip": ""}),
+        )
+        with mock.patch.object(views, "EXCHANGE_RATE_LIMIT", 3), self.assertLogs(
+            level="WARNING"
+        ) as logs:
+            for identity, post_kwargs in cases:
+                with self.subTest(identity=identity):
+                    for _ in range(6):
+                        self.assertEqual(self._post(**post_kwargs).status_code, 401)
+                    self.assertIsNone(cache.get(f"mobile_api:exchange:{identity}"))
+
+        warnings = [line for line in logs.output if "client IP unresolved" in line]
+        self.assertEqual(len(warnings), 1)
+        self.assertIn("scope=mobile-exchange", warnings[0])
+
+    def test_unresolved_client_ip_warning_is_shared_with_site_limits(self):
+        """Предупреждение не чаще раза в 10 минут на процесс, общее с сайтом."""
+        from engine import rate_limit
+
+        self._reset_unresolved_ip_warning()
+        clock = [5_000.0]
+        with mock.patch.object(
+            rate_limit, "_monotonic", side_effect=lambda: clock[0]
+        ), self.assertLogs(level="WARNING") as logs:
+            self._post(ip="10.0.0.1")
+            clock[0] += 599
+            rate_limit.rate_limit_exceeded("magic-link", (("ip", "unknown", 1, 900),))
+            self._post(ip="10.0.0.1")
+            clock[0] += 1
+            self._post(ip="10.0.0.1")
+
+        warnings = [line for line in logs.output if "client IP unresolved" in line]
+        self.assertEqual(len(warnings), 2)
 
 
 class MobileMeRwmsPolicyTests(SimpleTestCase):
@@ -733,6 +995,43 @@ class MobileMeRwmsPolicyTests(SimpleTestCase):
         data = json.loads(resp.content)
         self.assertEqual(data["subscription_url"], "https://sub.example/abc")
         self.assertEqual(data["days_left"], 3)
+
+
+class SubscriptionRwmsClientDeadlineTests(SimpleTestCase):
+    """mobile_api.subscription создаёт RWMS-клиент с общим дедлайном сайта
+    (RWMS_RPC_TIMEOUT_SECONDS), как engine.views.rwms_client: без дедлайна
+    зависшая панель держала бы поток gunicorn бесконечно."""
+
+    def setUp(self):
+        from mobile_api import subscription
+
+        self.subscription = subscription
+        # Ленивый синглтон: каждый тест начинает без клиента, после теста
+        # модулю возвращается прежнее значение.
+        patcher = mock.patch.object(subscription, "_client", None)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+
+    @override_settings(
+        RWMS_HOST="rwms.test", RWMS_PORT=50051, RWMS_RPC_TIMEOUT_SECONDS=8.0
+    )
+    def test_lazy_client_is_created_once_with_configured_deadline(self):
+        with mock.patch.object(self.subscription, "RwmsClientSync") as client_cls:
+            first = self.subscription.rwms_client()
+            second = self.subscription.rwms_client()
+
+        client_cls.assert_called_once_with("rwms.test", 50051, timeout=8.0)
+        self.assertIs(first, second)
+
+    @override_settings(
+        RWMS_HOST="127.0.0.1", RWMS_PORT=1, RWMS_RPC_TIMEOUT_SECONDS=12.5
+    )
+    def test_real_client_keeps_deadline_without_connecting(self):
+        # Канал gRPC ленивый: без RPC соединение не открывается.
+        client = self.subscription.rwms_client()
+        self.addCleanup(client.close)
+
+        self.assertEqual(client._RwmsClientSync__timeout, 12.5)
 
 
 class MobileAuthRwmsDegradationTests(SimpleTestCase):
@@ -1187,8 +1486,9 @@ class MobileEmailVerifyConcurrencyTests(SimpleTestCase):
 
     def test_rwms_unavailable_still_aborts_provisioning(self):
         """Политика прошлых раундов не ослаблена: недоступность панели при
-        strict-проверке username прерывает провижининг (401), AddUser не
-        зовётся, строка users не создаётся."""
+        strict-проверке username прерывает провижининг (retryable 503), AddUser
+        не зовётся, строка users не создаётся, валидный код остаётся пригоден
+        для повтора после восстановления панели."""
         from common.rwms_client import RwmsUnavailableError
 
         email = "down@example.com"
@@ -1200,11 +1500,13 @@ class MobileEmailVerifyConcurrencyTests(SimpleTestCase):
         with mock.patch("mobile_api.provisioning.create_user") as create_user:
             resp = self._post({"email": email, "code": "123456"})
 
-        self.assertEqual(resp.status_code, 401)
+        self.assertEqual(resp.status_code, 503)
+        self.assertEqual(json.loads(resp.content)["error"], "temporarily_unavailable")
         create_user.assert_not_called()
         session = self.Session()
         self.assertEqual(session.query(User).count(), 0)
         self.assertEqual(session.query(MobileAccessToken).count(), 0)
+        self.assertIsNone(session.query(EmailLoginCode).one().used_at)
         session.close()
 
 
@@ -1639,4 +1941,3 @@ class ProvisioningManagedLimitMarkerTests(SimpleTestCase):
         self.assertEqual(check.query(User).filter(User.email == email).count(), 1)
         check.close()
         session.close()
-

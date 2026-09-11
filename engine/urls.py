@@ -390,6 +390,11 @@ urlpatterns = [
     ),
     path("login/magic/<uuid:token>/", views.auth_by_magic_link, name="magic_auth"),
     path(
+        "login/register/<str:token>/",
+        views.auth_by_registration_link,
+        name="registration_auth",
+    ),
+    path(
         "login/purchase/<str:token>/",
         views.auth_by_purchase_link,
         name="purchase_auth",
