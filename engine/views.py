@@ -176,6 +176,7 @@ from common.models.settings import DEFAULT_IPGUARD_BURST_ENABLED
 from common.models.settings import DEFAULT_IPGUARD_BURST_WINDOW_MINUTES
 from common.models.settings import DEFAULT_IPGUARD_BURST_IPS_PER_HWID
 from common.models.settings import DEFAULT_IPGUARD_BURST_CONFIRMATIONS
+from common.models.settings import DEFAULT_IPGUARD_BURST_MIN_SUBNETS
 from common.models.settings import DEFAULT_IPGUARD_GEO_ENABLED
 from common.models.settings import DEFAULT_IPGUARD_GEO_WINDOW_MINUTES
 from common.models.settings import DEFAULT_IPGUARD_GEO_MIN_REGIONS
@@ -184,11 +185,18 @@ from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_SEGMENT
 from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_ESCALATION_WINDOW_HOURS
 from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_MAX_PER_HOUR
 from common.models.settings import DEFAULT_IPGUARD_MAX_ALERTS_PER_HOUR
+# Отдельный тумблер суточного слоя и период прогона детектора: без них по
+# админке нельзя понять, какой слой молчит и как часто слои вообще смотрят
+# на данные.
+from common.models.settings import DEFAULT_IPGUARD_SUBNETS_ENABLED
+from common.models.settings import DEFAULT_IPGUARD_CHECK_INTERVAL_SECONDS
 from common.models.settings import IPGUARD_ALERTS_ENABLED_SETTING
 from common.models.settings import IPGUARD_ALERT_COOLDOWN_HOURS_SETTING
 from common.models.settings import IPGUARD_ALERT_SEGMENT_ALL
 from common.models.settings import IPGUARD_ALERT_SEGMENT_NEVER_PAID
 from common.models.settings import IPGUARD_ALERT_SEGMENT_SETTING
+from common.models.settings import IPGUARD_SUBNETS_ENABLED_SETTING
+from common.models.settings import IPGUARD_CHECK_INTERVAL_SECONDS_SETTING
 from common.models.settings import IPGUARD_SUBNETS_PER_HWID_SETTING
 from common.models.settings import IPGUARD_WINDOW_HOURS_SETTING
 from common.models.settings import IPGUARD_WARNINGS_ENABLED_SETTING
@@ -197,6 +205,7 @@ from common.models.settings import IPGUARD_BURST_ENABLED_SETTING
 from common.models.settings import IPGUARD_BURST_WINDOW_MINUTES_SETTING
 from common.models.settings import IPGUARD_BURST_IPS_PER_HWID_SETTING
 from common.models.settings import IPGUARD_BURST_CONFIRMATIONS_SETTING
+from common.models.settings import IPGUARD_BURST_MIN_SUBNETS_SETTING
 from common.models.settings import IPGUARD_GEO_ENABLED_SETTING
 from common.models.settings import IPGUARD_GEO_WINDOW_MINUTES_SETTING
 from common.models.settings import IPGUARD_GEO_MIN_REGIONS_SETTING
@@ -6751,7 +6760,13 @@ ANTIABUSE_TRIAL_KEYS = (
     TRIAL_TRAFFIC_LIMIT_STRATEGY_SETTING,
 )
 ANTIABUSE_IPGUARD_KEYS = (
+    # Главный рубильник над ВСЕМИ слоями и период прогона — карточка-рубильник
+    # идёт первой на вкладке, поэтому и ключи первые.
     IPGUARD_ALERTS_ENABLED_SETTING,
+    IPGUARD_CHECK_INTERVAL_SECONDS_SETTING,
+    # Суточный слой: свой тумблер публикации, чтобы выключение подсетей не
+    # гасило всплеск и гео (и наоборот).
+    IPGUARD_SUBNETS_ENABLED_SETTING,
     IPGUARD_ALERT_SEGMENT_SETTING,
     IPGUARD_SUBNETS_PER_HWID_SETTING,
     IPGUARD_WINDOW_HOURS_SETTING,
@@ -6764,6 +6779,9 @@ ANTIABUSE_IPGUARD_KEYS = (
     IPGUARD_BURST_WINDOW_MINUTES_SETTING,
     IPGUARD_BURST_IPS_PER_HWID_SETTING,
     IPGUARD_BURST_CONFIRMATIONS_SETTING,
+    # Нижняя граница по подсетям для всплеска: первый боевой алерт слоя был
+    # ложным (4 IP за минуту из одной /24 — ротация CGNAT-оператора).
+    IPGUARD_BURST_MIN_SUBNETS_SETTING,
     IPGUARD_GEO_ENABLED_SETTING,
     IPGUARD_GEO_WINDOW_MINUTES_SETTING,
     IPGUARD_GEO_MIN_REGIONS_SETTING,
@@ -7037,12 +7055,23 @@ def admin_validate_antiabuse_setting_pair(
                 "исправьте её перед включением",
             ),
         )
-    elif key == IPGUARD_ALERTS_ENABLED_SETTING and normalized_value == "1":
+    elif (
+        key in (IPGUARD_ALERTS_ENABLED_SETTING, IPGUARD_SUBNETS_ENABLED_SETTING)
+        and normalized_value == "1"
+    ):
+        # Оба тумблера включают публикацию суточного слоя (главный рубильник —
+        # ещё и остальных), поэтому зависимости у них одни и те же: битое
+        # значение в БД молча ушло бы в дефолт, и админ увидел бы не свои числа.
         checks = (
             (
                 IPGUARD_ALERT_SEGMENT_SETTING,
                 "Сегмент ip-guard (ipguard_alert_segment) в БД некорректен: "
                 "исправьте его перед включением",
+            ),
+            (
+                IPGUARD_CHECK_INTERVAL_SECONDS_SETTING,
+                "Период прогона (ipguard_check_interval_seconds) в БД "
+                "некорректен: исправьте значение перед включением",
             ),
             (
                 IPGUARD_SUBNETS_PER_HWID_SETTING,
@@ -7075,6 +7104,11 @@ def admin_validate_antiabuse_setting_pair(
             (
                 IPGUARD_BURST_CONFIRMATIONS_SETTING,
                 "Подтверждений всплеска (ipguard_burst_confirmations) в БД "
+                "некорректно: исправьте значение перед включением",
+            ),
+            (
+                IPGUARD_BURST_MIN_SUBNETS_SETTING,
+                "Минимум подсетей всплеска (ipguard_burst_min_subnets) в БД "
                 "некорректно: исправьте значение перед включением",
             ),
         )
@@ -9852,6 +9886,16 @@ def admin_antiabuse_effective(db_session):
         "ipguard_alerts_enabled": parse_bool_setting(
             raw(IPGUARD_ALERTS_ENABLED_SETTING), DEFAULT_IPGUARD_ALERTS_ENABLED
         ),
+        # Период прогона общий для всех слоёв: если он больше окна короткого
+        # слоя, детектор между прогонами слеп — карточка считает это прямо в UI.
+        "ipguard_check_interval_seconds": parse_positive_int_setting(
+            raw(IPGUARD_CHECK_INTERVAL_SECONDS_SETTING),
+            DEFAULT_IPGUARD_CHECK_INTERVAL_SECONDS,
+        ),
+        # Тумблер ПУБЛИКАЦИИ суточного слоя, отдельно от главного рубильника.
+        "ipguard_subnets_enabled": parse_bool_setting(
+            raw(IPGUARD_SUBNETS_ENABLED_SETTING), DEFAULT_IPGUARD_SUBNETS_ENABLED
+        ),
         "ipguard_alert_segment": segment,
         "ipguard_alert_segment_label": IPGUARD_SEGMENT_LABELS.get(segment, segment),
         "ipguard_subnets_per_hwid": parse_positive_int_setting(
@@ -9885,6 +9929,10 @@ def admin_antiabuse_effective(db_session):
         "ipguard_burst_confirmations": parse_positive_int_setting(
             raw(IPGUARD_BURST_CONFIRMATIONS_SETTING),
             DEFAULT_IPGUARD_BURST_CONFIRMATIONS,
+        ),
+        "ipguard_burst_min_subnets": parse_positive_int_setting(
+            raw(IPGUARD_BURST_MIN_SUBNETS_SETTING),
+            DEFAULT_IPGUARD_BURST_MIN_SUBNETS,
         ),
         "ipguard_geo_enabled": parse_bool_setting(
             raw(IPGUARD_GEO_ENABLED_SETTING), DEFAULT_IPGUARD_GEO_ENABLED
@@ -10002,11 +10050,14 @@ def support_admin_api_antiabuse(request):
     """GET — настройки антиабьюза (сырые + действующие); POST —
     action=trial_limit_enable|trial_limit_disable|trial_limit_set
     (limit_value + limit_unit=gib|mib, strategy)|ipguard_enable|ipguard_disable|
+    ipguard_master_set (check_interval_seconds)|
+    ipguard_subnets_enable|ipguard_subnets_disable|
     ipguard_warnings_enable|ipguard_warnings_disable|
     ipguard_set (segment, subnets_per_hwid, warning_subnets_per_hwid,
     window_hours, cooldown_hours)|
     ipguard_burst_enable|ipguard_burst_disable|ipguard_burst_set
-    (burst_window_minutes, burst_ips_per_hwid, burst_confirmations)|
+    (burst_window_minutes, burst_ips_per_hwid, burst_confirmations,
+    burst_min_subnets)|
     ipguard_geo_enable|ipguard_geo_disable|ipguard_geo_set
     (geo_window_minutes, geo_min_regions)|
     ipguard_autoban_enable|ipguard_autoban_disable|ipguard_autoban_set
@@ -10058,6 +10109,18 @@ def support_admin_api_antiabuse(request):
                 updates.append((IPGUARD_ALERTS_ENABLED_SETTING, "1"))
             elif action == "ipguard_disable":
                 updates.append((IPGUARD_ALERTS_ENABLED_SETTING, "0"))
+            elif action == "ipguard_master_set":
+                # Период прогона один на все слои, поэтому живёт в карточке
+                # главного рубильника, а не в карточке конкретного слоя.
+                value = (request.POST.get("check_interval_seconds") or "").strip()
+                if value:
+                    updates.append((IPGUARD_CHECK_INTERVAL_SECONDS_SETTING, value))
+            elif action == "ipguard_subnets_enable":
+                updates.append((IPGUARD_SUBNETS_ENABLED_SETTING, "1"))
+            elif action == "ipguard_subnets_disable":
+                # Выключает ТОЛЬКО суточный слой (и его предупреждения);
+                # всплеск, гео и автобан продолжают работать.
+                updates.append((IPGUARD_SUBNETS_ENABLED_SETTING, "0"))
             elif action == "ipguard_warnings_enable":
                 updates.append((IPGUARD_WARNINGS_ENABLED_SETTING, "1"))
             elif action == "ipguard_warnings_disable":
@@ -10085,6 +10148,7 @@ def support_admin_api_antiabuse(request):
                     (IPGUARD_BURST_WINDOW_MINUTES_SETTING, "burst_window_minutes"),
                     (IPGUARD_BURST_IPS_PER_HWID_SETTING, "burst_ips_per_hwid"),
                     (IPGUARD_BURST_CONFIRMATIONS_SETTING, "burst_confirmations"),
+                    (IPGUARD_BURST_MIN_SUBNETS_SETTING, "burst_min_subnets"),
                 ):
                     value = (request.POST.get(form_key) or "").strip()
                     if value:

@@ -12111,6 +12111,11 @@ class AntiabuseSettingsEndpointTests(_AntiabuseSqliteMixin, SimpleTestCase):
         self.assertEqual(effective["trial_traffic_limit_strategy"], "day")
         self.assertEqual(effective["trial_traffic_limit_label"], "5 ГиБ · ежедневно")
         self.assertIs(effective["ipguard_alerts_enabled"], False)
+        # v4: период прогона виден в админке (раньше жил только в env
+        # коллектора), суточный слой по умолчанию разрешён — иначе включение
+        # рубильника изменило бы поведение уже работающих установок.
+        self.assertEqual(effective["ipguard_check_interval_seconds"], 300)
+        self.assertIs(effective["ipguard_subnets_enabled"], True)
         self.assertEqual(effective["ipguard_alert_segment"], "never_paid")
         self.assertEqual(effective["ipguard_subnets_per_hwid"], 10)
         self.assertEqual(effective["ipguard_window_hours"], 24)
@@ -12122,6 +12127,9 @@ class AntiabuseSettingsEndpointTests(_AntiabuseSqliteMixin, SimpleTestCase):
         self.assertEqual(effective["ipguard_burst_window_minutes"], 2)
         self.assertEqual(effective["ipguard_burst_ips_per_hwid"], 2)
         self.assertEqual(effective["ipguard_burst_confirmations"], 2)
+        # Нижняя граница по подсетям для всплеска: дефолт common, а не 1 —
+        # иначе первый же ложняк с ротацией CGNAT повторился бы из коробки.
+        self.assertEqual(effective["ipguard_burst_min_subnets"], 2)
         self.assertIs(effective["ipguard_geo_enabled"], False)
         self.assertEqual(effective["ipguard_geo_window_minutes"], 5)
         self.assertEqual(effective["ipguard_geo_min_regions"], 2)
@@ -12141,10 +12149,30 @@ class AntiabuseSettingsEndpointTests(_AntiabuseSqliteMixin, SimpleTestCase):
         self.assertEqual(effective["ipguard_excluded_ips_count"], 0)
         self.assertEqual(effective["ipguard_excluded_ips_label"], "не заданы")
         self.assertIs(payload["managed_limits_available"], True)
-        self.assertEqual(len(payload["settings"]), 24)
+        self.assertEqual(len(payload["settings"]), 27)
         self.assertEqual(
             [item["key"] for item in payload["settings"]][-2:],
             ["ipguard_max_alerts_per_hour", "ipguard_excluded_ips"],
+        )
+        # Минимум подсетей — поле карточки всплеска, поэтому идёт сразу за
+        # подтверждениями, а не в хвосте списка.
+        self.assertEqual(
+            [item["key"] for item in payload["settings"]][15:18],
+            [
+                "ipguard_burst_confirmations",
+                "ipguard_burst_min_subnets",
+                "ipguard_geo_enabled",
+            ],
+        )
+        # Порядок ключей = порядок карточек: рубильник (тумблер + период)
+        # первым, суточный слой со своим тумблером — следом.
+        self.assertEqual(
+            [item["key"] for item in payload["settings"]][3:6],
+            [
+                "ipguard_alerts_enabled",
+                "ipguard_check_interval_seconds",
+                "ipguard_subnets_enabled",
+            ],
         )
         self.assertTrue(all(item["is_set"] is False for item in payload["settings"]))
         self.assertEqual(
@@ -12233,6 +12261,97 @@ class AntiabuseSettingsEndpointTests(_AntiabuseSqliteMixin, SimpleTestCase):
         status, payload = self._request("POST", action="ipguard_disable")
         self.assertIs(payload["effective"]["ipguard_alerts_enabled"], False)
 
+    def test_ipguard_master_set_period(self):
+        """Период прогона правится из админки: раньше он жил только в env
+        коллектора, и по вкладке нельзя было понять, как часто слои вообще
+        смотрят на данные."""
+        from common.models.db import SystemSetting
+
+        status, payload = self._request(
+            "POST", action="ipguard_master_set", check_interval_seconds="60"
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["effective"]["ipguard_check_interval_seconds"], 60)
+        self.assertEqual(
+            self.session.get(SystemSetting, "ipguard_check_interval_seconds").value,
+            "60",
+        )
+        # Пустое поле — «не трогать», как в остальных формах вкладки.
+        status, payload = self._request(
+            "POST", action="ipguard_master_set", check_interval_seconds=""
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("Нет значений", payload["message"])
+        status, payload = self._request()
+        self.assertEqual(payload["effective"]["ipguard_check_interval_seconds"], 60)
+
+        for bad in ("0", "-5", "пять"):
+            status, payload = self._request(
+                "POST", action="ipguard_master_set", check_interval_seconds=bad
+            )
+            self.assertEqual(status, 400, bad)
+            self.assertIn("ipguard_check_interval_seconds", payload["message"])
+        status, payload = self._request()
+        self.assertEqual(payload["effective"]["ipguard_check_interval_seconds"], 60)
+
+    def test_ipguard_subnets_toggle_is_independent_of_master(self):
+        """Требование владельца: отключение алертов по подсетям не должно
+        отключать остальные слои. Тумблеры отдельные и не конфликтуют."""
+        status, payload = self._request("POST", action="ipguard_subnets_disable")
+
+        self.assertEqual(status, 200)
+        effective = payload["effective"]
+        self.assertIs(effective["ipguard_subnets_enabled"], False)
+        # Главный рубильник и слои — не тронуты.
+        self.assertIs(effective["ipguard_alerts_enabled"], False)
+        self.assertIs(effective["ipguard_burst_enabled"], False)
+        self.assertIs(effective["ipguard_geo_enabled"], False)
+
+        status, payload = self._request("POST", action="ipguard_enable")
+        self.assertEqual(status, 200)
+        effective = payload["effective"]
+        self.assertIs(effective["ipguard_alerts_enabled"], True)
+        # Включение главного рубильника не воскрешает выключенный слой.
+        self.assertIs(effective["ipguard_subnets_enabled"], False)
+
+        status, payload = self._request("POST", action="ipguard_subnets_enable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["ipguard_subnets_enabled"], True)
+        self.assertIs(payload["effective"]["ipguard_alerts_enabled"], True)
+
+        # И наоборот: выключение рубильника не трогает тумблер слоя — иначе
+        # аварийный стоп молча терял бы настройку.
+        status, payload = self._request("POST", action="ipguard_disable")
+        self.assertIs(payload["effective"]["ipguard_alerts_enabled"], False)
+        self.assertIs(payload["effective"]["ipguard_subnets_enabled"], True)
+
+    def test_ipguard_toggles_require_valid_dependent_values(self):
+        """Включение (любого из двух тумблеров суточного слоя) с битым
+        значением в БД запрещено: иначе ip-guard молча уехал бы в дефолт, и
+        админ считал бы не свои числа. Выключение не проверяет ничего."""
+        self._set("ipguard_check_interval_seconds", "мгновенно")
+        self.session.commit()
+
+        status, payload = self._request("POST", action="ipguard_enable")
+        self.assertEqual(status, 400)
+        self.assertIn("ipguard_check_interval_seconds", payload["message"])
+        status, payload = self._request("POST", action="ipguard_subnets_enable")
+        self.assertEqual(status, 400)
+        self.assertIn("ipguard_check_interval_seconds", payload["message"])
+        # Аварийный стоп обязан работать всегда.
+        status, _ = self._request("POST", action="ipguard_disable")
+        self.assertEqual(status, 200)
+        status, _ = self._request("POST", action="ipguard_subnets_disable")
+        self.assertEqual(status, 200)
+
+        self._set("ipguard_check_interval_seconds", "120")
+        self.session.commit()
+        status, payload = self._request("POST", action="ipguard_enable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["ipguard_alerts_enabled"], True)
+        self.assertEqual(payload["effective"]["ipguard_check_interval_seconds"], 120)
+
     def test_ipguard_burst_set_and_toggle(self):
         status, payload = self._request(
             "POST", action="ipguard_burst_set", burst_window_minutes="3",
@@ -12266,6 +12385,53 @@ class AntiabuseSettingsEndpointTests(_AntiabuseSqliteMixin, SimpleTestCase):
         status, payload = self._request("POST", action="ipguard_burst_enable")
         self.assertEqual(status, 400)
         self.assertIn("ipguard_burst_ips_per_hwid", payload["message"])
+
+    def test_ipguard_burst_min_subnets_set_via_endpoint(self):
+        # Минимум разных подсетей — поле той же формы ipguard_burst_set;
+        # пустое поле не трогает значение, соседние поля не задеваются.
+        status, payload = self._request(
+            "POST", action="ipguard_burst_set", burst_min_subnets="3"
+        )
+        self.assertEqual(status, 200)
+        effective = payload["effective"]
+        self.assertEqual(effective["ipguard_burst_min_subnets"], 3)
+        self.assertEqual(effective["ipguard_burst_confirmations"], 2)
+        raw = {item["key"]: item for item in payload["settings"]}
+        self.assertIs(raw["ipguard_burst_min_subnets"]["is_set"], True)
+        self.assertEqual(raw["ipguard_burst_min_subnets"]["value"], "3")
+
+        status, payload = self._request(
+            "POST", action="ipguard_burst_set", burst_min_subnets="",
+            burst_confirmations="4",
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["effective"]["ipguard_burst_min_subnets"], 3)
+        self.assertEqual(payload["effective"]["ipguard_burst_confirmations"], 4)
+
+        # 1 — допустимое значение: «считать по голым IP, как было».
+        status, payload = self._request(
+            "POST", action="ipguard_burst_set", burst_min_subnets="1"
+        )
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["effective"]["ipguard_burst_min_subnets"], 1)
+
+        # Битые значения отклоняются общим валидатором common (POSITIVE_INT),
+        # сохранённое при этом не меняется.
+        for broken in ("0", "abc", "-2", "1.5"):
+            status, payload = self._request(
+                "POST", action="ipguard_burst_set", burst_min_subnets=broken
+            )
+            self.assertEqual(status, 400, broken)
+            self.assertIn("ipguard_burst_min_subnets", payload["message"], broken)
+        status, payload = self._request()
+        self.assertEqual(payload["effective"]["ipguard_burst_min_subnets"], 1)
+
+        # Битое значение в БД не даёт включить слой — как и у остальных
+        # полей всплеска, иначе админ увидел бы молча подставленный дефолт.
+        self._set("ipguard_burst_min_subnets", "0")
+        status, payload = self._request("POST", action="ipguard_burst_enable")
+        self.assertEqual(status, 400)
+        self.assertIn("ipguard_burst_min_subnets", payload["message"])
 
     def test_ipguard_geo_set_and_toggle(self):
         status, payload = self._request(
@@ -12673,6 +12839,7 @@ class AntiabuseValidationTests(_AntiabuseSqliteMixin, SimpleTestCase):
             "ipguard_burst_window_minutes",
             "ipguard_burst_ips_per_hwid",
             "ipguard_burst_confirmations",
+            "ipguard_burst_min_subnets",
             "ipguard_geo_window_minutes",
             "ipguard_geo_min_regions",
             "ipguard_autoban_escalation_window_hours",
@@ -12838,7 +13005,7 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             'name="window_hours"',
             'name="cooldown_hours"',
             "Выключено — новые пробные создаются без лимита",
-            "Выключено — алерты не отправляются",
+            "Выключено — молчат все слои сразу",
             'data-antiabuse-bulk-preview="apply_trial_limit"',
             'data-antiabuse-bulk-apply="remove_trial_limit"',
             'data-antiabuse-bulk-apply="remove_paid_limit"',
@@ -12855,7 +13022,7 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             "data-antiabuse-bulk-url=",
             "data-ipguard-alerts-url=",
             'data-settings-group="antiabuse"',
-            "{slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid', 'ipguard_burst_enabled', 'ipguard_burst_window_minutes', 'ipguard_burst_ips_per_hwid', 'ipguard_burst_confirmations', 'ipguard_geo_enabled', 'ipguard_geo_window_minutes', 'ipguard_geo_min_regions', 'ipguard_autoban_enabled', 'ipguard_autoban_segment', 'ipguard_autoban_steps_minutes', 'ipguard_autoban_escalation_window_hours', 'ipguard_autoban_max_per_hour', 'ipguard_max_alerts_per_hour', 'ipguard_excluded_ips']}",
+            "{slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_check_interval_seconds', 'ipguard_subnets_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid', 'ipguard_burst_enabled', 'ipguard_burst_window_minutes', 'ipguard_burst_ips_per_hwid', 'ipguard_burst_confirmations', 'ipguard_burst_min_subnets', 'ipguard_geo_enabled', 'ipguard_geo_window_minutes', 'ipguard_geo_min_regions', 'ipguard_autoban_enabled', 'ipguard_autoban_segment', 'ipguard_autoban_steps_minutes', 'ipguard_autoban_escalation_window_hours', 'ipguard_autoban_max_per_hour', 'ipguard_max_alerts_per_hour', 'ipguard_excluded_ips']}",
             "loadAntiabuse();",
             # v2: предупреждения ip-guard, backfill маркеров, предзаполнение.
             'id="antiabuse-ipguard-warnings-toggle"',
@@ -12898,6 +13065,15 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             'data-antiabuse-state="ipguard_burst"',
             'data-antiabuse-current="ipguard_burst_ips_per_hwid"',
             "Всплеск: одновременные подключения",
+            # Минимум разных подсетей: поле формы, «Сейчас», предзаполнение и
+            # фраза в подсказке «Как это работает».
+            'name="burst_min_subnets"',
+            'data-antiabuse-current="ipguard_burst_min_subnets"',
+            "Минимум разных подсетей",
+            "1 — считать по голым IP",
+            "antiabuseSetField(burstForm, 'burst_min_subnets', effective.ipguard_burst_min_subnets)",
+            "antiabuseSetCurrent(burstForm, 'ipguard_burst_min_subnets', effective.ipguard_burst_min_subnets ?? '—')",
+            "иначе это ротация оператора, не всплеск",
             'id="antiabuse-geo-form"',
             'id="antiabuse-geo-toggle"',
             'value="ipguard_geo_enable"',
@@ -12938,6 +13114,35 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             "'antiabuse-burst-status', 'antiabuse-geo-status', 'antiabuse-autoban-status', 'antiabuse-excluded-status'",
             "ipguard_autoban_enable: 'ВКЛЮЧИТЬ АВТОБАН?",
             "ipguard_excluded_clear: 'Очистить список исключений ip-guard?",
+            # v4: карточка-рубильник с периодом прогона, отдельный тумблер
+            # суточного слоя и подсказки «Как это работает» с живыми числами.
+            'id="antiabuse-ipguard-master-form"',
+            'id="antiabuse-ipguard-master-status"',
+            'value="ipguard_master_set"',
+            'name="check_interval_seconds"',
+            'data-antiabuse-current="ipguard_check_interval_seconds"',
+            'id="antiabuse-ipguard-subnets-toggle"',
+            'value="ipguard_subnets_enable"',
+            'data-antiabuse-state="ipguard_subnets"',
+            "ipguard_subnets_disable: 'Выключить алерты по подсетям?",
+            "'antiabuse-ipguard-master-status', 'antiabuse-ipguard-status'",
+            '<details class="antifraud-how">',
+            'data-antiabuse-how="master"',
+            'data-antiabuse-how="subnets"',
+            'data-antiabuse-how="burst"',
+            'data-antiabuse-how="geo"',
+            'data-antiabuse-how="autoban"',
+            'data-antiabuse-blind="burst"',
+            'data-antiabuse-blind="geo"',
+            "function antiabuseRenderIpguardHints(",
+            "function antiabuseSetBlindWarning(",
+            # «Включено» на карточке слоя при выключенном рубильнике — ровно та
+            # путаница, из-за которой слой считают сломанным.
+            "function antiabuseMasterOffNote(",
+            "Но главный рубильник ip-guard выключен, поэтому ${tail}",
+            "antiabuseMasterOffNote('алертов нет, а без алерта нет и наказания')",
+            "и ${missedPhrase}, останется незамеченным",
+            "if (event.target.closest('[data-antiabuse-form]')) antiabuseRenderIpguardHints();",
         ):
             self.assertIn(needle, template, needle)
         for needle in (
@@ -12947,6 +13152,12 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             '[data-antiabuse-substate="on"]',
             ".client-summary-note.is-managed",
             ".client-summary-note.is-manual",
+            ".antifraud-how",
+            ".antifraud-how-now",
+            ".antifraud-warning",
+            # display:flex перебивает служебный hidden — без правила скрытое
+            # предупреждение о слепоте осталось бы видимым всегда.
+            ".antifraud-warning[hidden]",
         ):
             self.assertIn(needle, css, needle)
         # Селекты без «— без изменений —»: форма предзаполнена актуальным значением.
@@ -12960,7 +13171,18 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
 
         for form_id, toggle_id, implicit_action in (
             ("antiabuse-trial-form", "antiabuse-trial-toggle", "trial_limit_set"),
-            ("antiabuse-ipguard-form", "antiabuse-ipguard-toggle", "ipguard_set"),
+            # Рубильник — отдельная форма: Enter в поле периода прогона не
+            # должен включать ip-guard целиком.
+            (
+                "antiabuse-ipguard-master-form",
+                "antiabuse-ipguard-toggle",
+                "ipguard_master_set",
+            ),
+            (
+                "antiabuse-ipguard-form",
+                "antiabuse-ipguard-subnets-toggle",
+                "ipguard_set",
+            ),
             ("antiabuse-burst-form", "antiabuse-burst-toggle", "ipguard_burst_set"),
             ("antiabuse-geo-form", "antiabuse-geo-toggle", "ipguard_geo_set"),
             ("antiabuse-autoban-form", "antiabuse-autoban-toggle", "ipguard_autoban_set"),
@@ -13129,6 +13351,7 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             # v3: формы всплеска/гео/автобана/исключений вместо raw-списка.
             "ipguard_burst_enabled",
             "ipguard_burst_confirmations",
+            "`ipguard_burst_min_subnets`",
             "ipguard_geo_min_regions",
             "ipguard_autoban_steps_minutes",
             "ipguard_autoban_max_per_hour",
@@ -13139,6 +13362,14 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             "parse_ipguard_excluded_ips",
             "Включить автобан при битой\nлестнице в БД нельзя",
             "geo_status",
+            # v4: рубильник над слоями, период прогона, отдельный тумблер
+            # суточного слоя и подсказки с предупреждением о слепоте.
+            "ipguard_check_interval_seconds",
+            "ipguard_subnets_enabled",
+            "`ipguard_master_set`",
+            "`ipguard_subnets_enable` /\n`ipguard_subnets_disable`",
+            "Как это работает",
+            "смотрит 1 минуту из каждых 5 — он слеп 4 минуты из 5",
         ):
             self.assertIn(needle, readme, needle)
 
