@@ -1550,6 +1550,296 @@
                         </form>
                     </section>
 
+                    <section class="card system-card antiabuse-card" data-antiabuse-card="ipguard-burst">
+                        <div class="referral-section-heading">
+                            <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-bolt"></i></span>
+                            <div>
+                                <h2 class="system-card-title">Всплеск: одновременные подключения</h2>
+                                <p>Уникальные IP за короткое окно против числа HWID-устройств подписки. Это мера одновременности, а не суточный счёт подсетей: за пару минут человек не бывает в нескольких сетях, поэтому порог не подбирается эмпирически — он равен числу устройств с запасом на CGNAT мобильных операторов.</p>
+                            </div>
+                        </div>
+                        <div id="antiabuse-burst-status" class="referral-antifraud-status" aria-live="polite"></div>
+                        <form id="antiabuse-burst-form" class="referral-antifraud-form" data-antiabuse-form="ipguard-burst">
+                            {% csrf_token %}
+                            <button type="submit" name="action" value="ipguard_burst_set" class="antifraud-implicit-submit" tabindex="-1" aria-hidden="true"></button>
+                            <div class="antifraud-panel">
+                                <div class="antifraud-row antifraud-row-state">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Детект всплеска</div>
+                                        <div class="antifraud-row-desc">Выключено — как раньше, работает только суточный счёт подсетей.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <button class="antifraud-switch" id="antiabuse-burst-toggle" type="submit" name="action" value="ipguard_burst_enable" role="switch" aria-checked="false">
+                                            <span class="antifraud-switch-track" aria-hidden="true"><span class="antifraud-switch-thumb"></span></span>
+                                            <span class="antifraud-switch-label" data-antiabuse-toggle-label>Включить</span>
+                                        </button>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Состояние</span>
+                                        <strong data-antifraud-state data-antiabuse-state="ipguard_burst">—</strong>
+                                    </div>
+                                </div>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Окно детекта</div>
+                                        <div class="antifraud-row-desc">За сколько минут считаются уникальные IP подписки.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="burst_window_minutes" type="number" min="1" inputmode="numeric" placeholder="Например, 2" aria-label="Окно всплеска, минут">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_burst_window_minutes">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">IP на HWID-устройство</div>
+                                        <div class="antifraud-row-desc">Допустимо уникальных IP на одно устройство внутри окна: лимит = max(1, HWID-устройств) × значение. Запас нужен на CGNAT мобильных операторов.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="burst_ips_per_hwid" type="number" min="1" inputmode="numeric" placeholder="Например, 2" aria-label="IP на HWID во всплеске">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_burst_ips_per_hwid">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Подтверждений подряд</div>
+                                        <div class="antifraud-row-desc">Гистерезис: сколько прогонов подряд превышение обязано держаться, чтобы считаться всплеском. Одиночный скачок при переключении WiFi↔LTE не считается.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="burst_confirmations" type="number" min="1" inputmode="numeric" placeholder="Например, 2" aria-label="Подтверждений всплеска">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_burst_confirmations">—</strong>
+                                    </div>
+                                </label>
+
+                                <div class="antifraud-footer">
+                                    <p class="antifraud-footer-note">Поля предзаполнены текущими значениями. Пустое поле оставляет текущее значение.</p>
+                                    <button class="btn btn-secondary" type="submit" name="action" value="ipguard_burst_set"><i class="fas fa-floppy-disk"></i>Сохранить</button>
+                                </div>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section class="card system-card antiabuse-card" data-antiabuse-card="ipguard-geo">
+                        <div class="referral-section-heading">
+                            <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-location-dot"></i></span>
+                            <div>
+                                <h2 class="system-card-title">Гео: подключения из разных мест</h2>
+                                <p>Одновременные подключения подписки из разных регионов. Требует локальной City-MMDB на стороне ip-guard: без базы слой выключается сам, как бы ни стоял тумблер (состояние базы видно в <code>/api/stats</code>, поле <code>geo_status</code>). Соседние регионы ближе 300 км считаются одним местом — иначе мобильный клиент ловил бы ложные срабатывания.</p>
+                            </div>
+                        </div>
+                        <div id="antiabuse-geo-status" class="referral-antifraud-status" aria-live="polite"></div>
+                        <form id="antiabuse-geo-form" class="referral-antifraud-form" data-antiabuse-form="ipguard-geo">
+                            {% csrf_token %}
+                            <button type="submit" name="action" value="ipguard_geo_set" class="antifraud-implicit-submit" tabindex="-1" aria-hidden="true"></button>
+                            <div class="antifraud-panel">
+                                <div class="antifraud-row antifraud-row-state">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Гео-детект</div>
+                                        <div class="antifraud-row-desc">Выключено — регионы не считаются вообще. Включено, но City-MMDB не подключена — слой остаётся выключенным до появления базы.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <button class="antifraud-switch" id="antiabuse-geo-toggle" type="submit" name="action" value="ipguard_geo_enable" role="switch" aria-checked="false">
+                                            <span class="antifraud-switch-track" aria-hidden="true"><span class="antifraud-switch-thumb"></span></span>
+                                            <span class="antifraud-switch-label" data-antiabuse-toggle-label>Включить</span>
+                                        </button>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Состояние</span>
+                                        <strong data-antifraud-state data-antiabuse-state="ipguard_geo">—</strong>
+                                    </div>
+                                </div>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Окно гео-детекта</div>
+                                        <div class="antifraud-row-desc">За сколько минут подключения считаются одновременными.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="geo_window_minutes" type="number" min="1" inputmode="numeric" placeholder="Например, 5" aria-label="Окно гео-детекта, минут">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_geo_window_minutes">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Разных мест одновременно</div>
+                                        <div class="antifraud-row-desc">Со скольких далёких друг от друга регионов внутри окна считать шерингом.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="geo_min_regions" type="number" min="1" inputmode="numeric" placeholder="Например, 2" aria-label="Разных регионов">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_geo_min_regions">—</strong>
+                                    </div>
+                                </label>
+
+                                <div class="antifraud-footer">
+                                    <p class="antifraud-footer-note">Поля предзаполнены текущими значениями. Пустое поле оставляет текущее значение.</p>
+                                    <button class="btn btn-secondary" type="submit" name="action" value="ipguard_geo_set"><i class="fas fa-floppy-disk"></i>Сохранить</button>
+                                </div>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section class="card system-card antiabuse-card" data-antiabuse-card="ipguard-autoban">
+                        <div class="referral-section-heading">
+                            <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-gavel"></i></span>
+                            <div>
+                                <h2 class="system-card-title">Автобан и предохранители</h2>
+                                <p><strong>Осторожно: включённый автобан банит подписки автоматически, без участия админа.</strong> По умолчанию выключен, и пока он выключен, детектор только публикует алерты — решение всегда за админом. Наказание применяется только после публикации алерта; при сегменте «только пробные без платежа» платящих автобан не трогает никогда.</p>
+                            </div>
+                        </div>
+                        <div id="antiabuse-autoban-status" class="referral-antifraud-status" aria-live="polite"></div>
+                        <form id="antiabuse-autoban-form" class="referral-antifraud-form" data-antiabuse-form="ipguard-autoban">
+                            {% csrf_token %}
+                            <button type="submit" name="action" value="ipguard_autoban_set" class="antifraud-implicit-submit" tabindex="-1" aria-hidden="true"></button>
+                            <div class="antifraud-panel">
+                                <div class="antifraud-row antifraud-row-state">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Автоматическое наказание</div>
+                                        <div class="antifraud-row-desc">Выключено (по умолчанию) — как раньше: только алерт админам. Включено — подписка банится сама, на длительность из лестницы ниже.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <button class="antifraud-switch" id="antiabuse-autoban-toggle" type="submit" name="action" value="ipguard_autoban_enable" role="switch" aria-checked="false">
+                                            <span class="antifraud-switch-track" aria-hidden="true"><span class="antifraud-switch-thumb"></span></span>
+                                            <span class="antifraud-switch-label" data-antiabuse-toggle-label>Включить</span>
+                                        </button>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Состояние</span>
+                                        <strong data-antifraud-state data-antiabuse-state="ipguard_autoban">—</strong>
+                                    </div>
+                                </div>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Кого наказывать</div>
+                                        <div class="antifraud-row-desc">Только пробные без единого платежа (never_paid) или все подписки. При never_paid платящих автобан не трогает никогда.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <select class="input" name="autoban_segment" aria-label="Сегмент автобана" data-antiabuse-autoban-segment-select></select>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_autoban_segment">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Лестница наказаний, минуты</div>
+                                        <div class="antifraud-row-desc">Длительности бана за 1-е, 2-е, 3-е... нарушение внутри окна эскалации, через запятую. Последний шаг держится для всех последующих. Например: 15,60,1440.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="autoban_steps_minutes" type="text" inputmode="numeric" placeholder="Например, 15,60,1440" aria-label="Лестница наказаний, минут через запятую" autocomplete="off" spellcheck="false">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_autoban_steps_minutes">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Окно эскалации</div>
+                                        <div class="antifraud-row-desc">Часов, внутри которых нарушения считаются повторными и двигают наказание на следующий шаг лестницы.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="autoban_escalation_window_hours" type="number" min="1" inputmode="numeric" placeholder="Например, 24" aria-label="Окно эскалации, часов">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_autoban_escalation_window_hours">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Предохранитель: автобанов в час</div>
+                                        <div class="antifraud-row-desc">Часовой потолок. При превышении автобаны отключаются до следующего часа и уходит один алерт — массовая ошибка детектора не выкосит базу.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="autoban_max_per_hour" type="number" min="1" inputmode="numeric" placeholder="Например, 10" aria-label="Автобанов в час">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_autoban_max_per_hour">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Предохранитель: алертов в час</div>
+                                        <div class="antifraud-row-desc">Часовой потолок алертов. Сверх лимита уходит одна сводка «ещё N подписок» вместо потока сообщений.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="max_alerts_per_hour" type="number" min="1" inputmode="numeric" placeholder="Например, 30" aria-label="Алертов в час">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_max_alerts_per_hour">—</strong>
+                                    </div>
+                                </label>
+
+                                <div class="antifraud-footer">
+                                    <p class="antifraud-footer-note">Сначала задайте сегмент, лестницу и предохранители, потом включайте тумблер: включить автобан с некорректной лестницей нельзя.</p>
+                                    <button class="btn btn-secondary" type="submit" name="action" value="ipguard_autoban_set"><i class="fas fa-floppy-disk"></i>Сохранить</button>
+                                </div>
+                            </div>
+                        </form>
+                    </section>
+
+                    <section class="card system-card antiabuse-card" data-antiabuse-card="ipguard-excluded">
+                        <div class="referral-section-heading">
+                            <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-list-check"></i></span>
+                            <div>
+                                <h2 class="system-card-title">Исключения адресов</h2>
+                                <p>Адреса своих каскадных мостов и промежуточных узлов: с них приходят сразу все клиенты, и детектор видит «ещё один IP пользователя». Адреса нод ip-guard исключает сам — сюда их вписывать не нужно. Список применяется на приёме наблюдений, поэтому исключённые адреса вообще не попадают в таблицу.</p>
+                            </div>
+                        </div>
+                        <div id="antiabuse-excluded-status" class="referral-antifraud-status" aria-live="polite"></div>
+                        <form id="antiabuse-excluded-form" class="referral-antifraud-form" data-antiabuse-form="ipguard-excluded">
+                            {% csrf_token %}
+                            <button type="submit" name="action" value="ipguard_excluded_set" class="antifraud-implicit-submit" tabindex="-1" aria-hidden="true"></button>
+                            <div class="antifraud-panel">
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Адреса и подсети</div>
+                                        <div class="antifraud-row-desc">Через запятую, адрес или CIDR. Например: 37.143.13.212, 10.0.0.0/8. Одиночный адрес сохраняется как /32 — так его видит ip-guard. Опечатка отклоняется целиком, а не выбрасывается молча.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="excluded_ips" type="text" placeholder="37.143.13.212, 10.0.0.0/8" aria-label="Исключённые адреса и подсети" autocomplete="off" spellcheck="false">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_excluded_ips">—</strong>
+                                    </div>
+                                </label>
+
+                                <div class="antifraud-footer">
+                                    <p class="antifraud-footer-note">Пустое поле оставляет список как есть — чтобы убрать все исключения, нажмите «Очистить список».</p>
+                                    <button class="btn btn-secondary" type="submit" name="action" value="ipguard_excluded_clear"><i class="fas fa-eraser"></i>Очистить список</button>
+                                    <button class="btn btn-secondary" type="submit" name="action" value="ipguard_excluded_set"><i class="fas fa-floppy-disk"></i>Сохранить</button>
+                                </div>
+                            </div>
+                        </form>
+                    </section>
+
                     <section class="card system-card antiabuse-card">
                         <div class="referral-section-heading">
                             <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-layer-group"></i></span>
@@ -7641,11 +7931,10 @@
             // остаются сгруппированными, чтобы не дублироваться в «Прочих».
             {slug: 'referral-antifraud', keys: ['referral_registration_autoblock_enabled', 'referral_registration_burst_limit', 'referral_registration_burst_window_minutes']},
             {slug: 'alerts', keys: ['traffic_usage_suspicious_gb', 'traffic_usage_alert_gb']},
-            // Антиабьюз: основной UI — формы вкладки «Антиабьюз»; ключи
-            // сгруппированы, чтобы не уехать в «Прочие» (raw-список свёрнут).
-            // Слои «всплеск»/«гео», автобан с предохранителями и список ручных
-            // исключений своих форм пока не имеют и правятся строками в этом же
-            // raw-списке.
+            // Антиабьюз: основной UI — формы вкладки «Антиабьюз» (лимит
+            // пробных, алерты по подсетям, всплеск, гео, автобан, исключения);
+            // ключи сгруппированы, чтобы не уехать в «Прочие». Raw-список
+            // свёрнут и остаётся резервным путём правки.
             {slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid', 'ipguard_burst_enabled', 'ipguard_burst_window_minutes', 'ipguard_burst_ips_per_hwid', 'ipguard_burst_confirmations', 'ipguard_geo_enabled', 'ipguard_geo_window_minutes', 'ipguard_geo_min_regions', 'ipguard_autoban_enabled', 'ipguard_autoban_segment', 'ipguard_autoban_steps_minutes', 'ipguard_autoban_escalation_window_hours', 'ipguard_autoban_max_per_hour', 'ipguard_max_alerts_per_hour', 'ipguard_excluded_ips']},
             // Grace-доступ и маршрутизация админ-алертов по темам форума своих
             // форм не имеют — правятся строками в подвкладке «Общие».
@@ -7888,6 +8177,13 @@
             ipguard_disable: 'Выключить алерты ip-guard? Детектор продолжит считать и писать в лог, но публиковать не будет.',
             ipguard_warnings_enable: 'Включить предупреждения ip-guard (уровень suspicious) админам? Порог предупреждения должен быть строго меньше порога алерта.',
             ipguard_warnings_disable: 'Выключить предупреждения ip-guard? Suspicious останется только в логе (как раньше), алерты не изменятся.',
+            ipguard_burst_enable: 'Включить детект всплеска (уникальные IP за короткое окно)? Появятся новые алерты админам, наказание не применяется.',
+            ipguard_burst_disable: 'Выключить детект всплеска? Останется только суточный счёт подсетей, как раньше.',
+            ipguard_geo_enable: 'Включить гео-детект (подключения из разных мест)? Без локальной City-MMDB слой останется выключенным.',
+            ipguard_geo_disable: 'Выключить гео-детект? Регионы перестанут считаться.',
+            ipguard_autoban_enable: 'ВКЛЮЧИТЬ АВТОБАН? Подписки будут блокироваться АВТОМАТИЧЕСКИ, без участия админа, на длительность из лестницы наказаний. При сегменте never_paid платящих автобан не трогает. Продолжить?',
+            ipguard_autoban_disable: 'Выключить автобан? Детектор продолжит публиковать алерты, наказание снова только за админом. Уже выданные баны не снимаются.',
+            ipguard_excluded_clear: 'Очистить список исключений ip-guard? Адреса каскадных мостов снова начнут считаться подключениями пользователей.',
         };
         const ANTIABUSE_BULK_LABELS = {
             apply_trial_limit: 'Применить лимит ко всем активным пробным без платежей',
@@ -7983,7 +8279,47 @@
                 antiabuseSetCurrent(ipguardForm, 'ipguard_window_hours', effective.ipguard_window_hours ? `${effective.ipguard_window_hours} ч` : '—');
                 antiabuseSetCurrent(ipguardForm, 'ipguard_alert_cooldown_hours', effective.ipguard_alert_cooldown_hours ? `${effective.ipguard_alert_cooldown_hours} ч` : '—');
             }
-            ['antiabuse-trial-status', 'antiabuse-ipguard-status'].forEach((id) => {
+            const burstForm = document.getElementById('antiabuse-burst-form');
+            if (burstForm) {
+                antiabuseSetField(burstForm, 'burst_window_minutes', effective.ipguard_burst_window_minutes);
+                antiabuseSetField(burstForm, 'burst_ips_per_hwid', effective.ipguard_burst_ips_per_hwid);
+                antiabuseSetField(burstForm, 'burst_confirmations', effective.ipguard_burst_confirmations);
+                antiabuseSetToggle(burstForm, 'antiabuse-burst-toggle', Boolean(effective.ipguard_burst_enabled), 'ipguard_burst_enable', 'ipguard_burst_disable', 'ipguard_burst');
+                antiabuseSetCurrent(burstForm, 'ipguard_burst_window_minutes', effective.ipguard_burst_window_minutes ? `${effective.ipguard_burst_window_minutes} мин` : '—');
+                antiabuseSetCurrent(burstForm, 'ipguard_burst_ips_per_hwid', effective.ipguard_burst_ips_per_hwid ?? '—');
+                antiabuseSetCurrent(burstForm, 'ipguard_burst_confirmations', effective.ipguard_burst_confirmations ?? '—');
+            }
+            const geoForm = document.getElementById('antiabuse-geo-form');
+            if (geoForm) {
+                antiabuseSetField(geoForm, 'geo_window_minutes', effective.ipguard_geo_window_minutes);
+                antiabuseSetField(geoForm, 'geo_min_regions', effective.ipguard_geo_min_regions);
+                antiabuseSetToggle(geoForm, 'antiabuse-geo-toggle', Boolean(effective.ipguard_geo_enabled), 'ipguard_geo_enable', 'ipguard_geo_disable', 'ipguard_geo');
+                antiabuseSetCurrent(geoForm, 'ipguard_geo_window_minutes', effective.ipguard_geo_window_minutes ? `${effective.ipguard_geo_window_minutes} мин` : '—');
+                antiabuseSetCurrent(geoForm, 'ipguard_geo_min_regions', effective.ipguard_geo_min_regions ?? '—');
+            }
+            const autobanForm = document.getElementById('antiabuse-autoban-form');
+            if (autobanForm) {
+                const autobanSelect = autobanForm.querySelector('[data-antiabuse-autoban-segment-select]');
+                if (autobanSelect) autobanSelect.innerHTML = antiabuseOptionsHtml(payload.segments, effective.ipguard_autoban_segment);
+                antiabuseSetField(autobanForm, 'autoban_steps_minutes', effective.ipguard_autoban_steps_minutes);
+                antiabuseSetField(autobanForm, 'autoban_escalation_window_hours', effective.ipguard_autoban_escalation_window_hours);
+                antiabuseSetField(autobanForm, 'autoban_max_per_hour', effective.ipguard_autoban_max_per_hour);
+                antiabuseSetField(autobanForm, 'max_alerts_per_hour', effective.ipguard_max_alerts_per_hour);
+                antiabuseSetToggle(autobanForm, 'antiabuse-autoban-toggle', Boolean(effective.ipguard_autoban_enabled), 'ipguard_autoban_enable', 'ipguard_autoban_disable', 'ipguard_autoban');
+                antiabuseSetCurrent(autobanForm, 'ipguard_autoban_segment', effective.ipguard_autoban_segment_label || '—');
+                antiabuseSetCurrent(autobanForm, 'ipguard_autoban_steps_minutes', effective.ipguard_autoban_steps_label || '—');
+                antiabuseSetCurrent(autobanForm, 'ipguard_autoban_escalation_window_hours', effective.ipguard_autoban_escalation_window_hours ? `${effective.ipguard_autoban_escalation_window_hours} ч` : '—');
+                antiabuseSetCurrent(autobanForm, 'ipguard_autoban_max_per_hour', effective.ipguard_autoban_max_per_hour ?? '—');
+                antiabuseSetCurrent(autobanForm, 'ipguard_max_alerts_per_hour', effective.ipguard_max_alerts_per_hour ?? '—');
+            }
+            const excludedForm = document.getElementById('antiabuse-excluded-form');
+            if (excludedForm) {
+                // Поле предзаполняется РАЗОБРАННЫМ списком (адрес → /32): админ
+                // видит ровно то, что применит ip-guard, а не свою строку.
+                antiabuseSetField(excludedForm, 'excluded_ips', effective.ipguard_excluded_ips);
+                antiabuseSetCurrent(excludedForm, 'ipguard_excluded_ips', effective.ipguard_excluded_ips_label || '—');
+            }
+            ['antiabuse-trial-status', 'antiabuse-ipguard-status', 'antiabuse-burst-status', 'antiabuse-geo-status', 'antiabuse-autoban-status', 'antiabuse-excluded-status'].forEach((id) => {
                 const target = document.getElementById(id);
                 if (target) target.innerHTML = '';
             });

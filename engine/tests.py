@@ -12117,11 +12117,34 @@ class AntiabuseSettingsEndpointTests(_AntiabuseSqliteMixin, SimpleTestCase):
         self.assertEqual(effective["ipguard_alert_cooldown_hours"], 6)
         self.assertIs(effective["ipguard_warnings_enabled"], False)
         self.assertEqual(effective["ipguard_warning_subnets_per_hwid"], 3)
+        # v3: всплеск, гео, автобан с предохранителями, исключения адресов.
+        self.assertIs(effective["ipguard_burst_enabled"], False)
+        self.assertEqual(effective["ipguard_burst_window_minutes"], 2)
+        self.assertEqual(effective["ipguard_burst_ips_per_hwid"], 2)
+        self.assertEqual(effective["ipguard_burst_confirmations"], 2)
+        self.assertIs(effective["ipguard_geo_enabled"], False)
+        self.assertEqual(effective["ipguard_geo_window_minutes"], 5)
+        self.assertEqual(effective["ipguard_geo_min_regions"], 2)
+        self.assertIs(effective["ipguard_autoban_enabled"], False)
+        self.assertEqual(effective["ipguard_autoban_segment"], "never_paid")
+        self.assertEqual(
+            effective["ipguard_autoban_segment_label"], "Только пробные без платежа"
+        )
+        self.assertEqual(effective["ipguard_autoban_steps_minutes"], "15,60,1440")
+        self.assertEqual(
+            effective["ipguard_autoban_steps_label"], "15 мин → 60 мин → 1440 мин"
+        )
+        self.assertEqual(effective["ipguard_autoban_escalation_window_hours"], 24)
+        self.assertEqual(effective["ipguard_autoban_max_per_hour"], 10)
+        self.assertEqual(effective["ipguard_max_alerts_per_hour"], 30)
+        self.assertEqual(effective["ipguard_excluded_ips"], "")
+        self.assertEqual(effective["ipguard_excluded_ips_count"], 0)
+        self.assertEqual(effective["ipguard_excluded_ips_label"], "не заданы")
         self.assertIs(payload["managed_limits_available"], True)
-        self.assertEqual(len(payload["settings"]), 10)
+        self.assertEqual(len(payload["settings"]), 24)
         self.assertEqual(
             [item["key"] for item in payload["settings"]][-2:],
-            ["ipguard_warnings_enabled", "ipguard_warning_subnets_per_hwid"],
+            ["ipguard_max_alerts_per_hour", "ipguard_excluded_ips"],
         )
         self.assertTrue(all(item["is_set"] is False for item in payload["settings"]))
         self.assertEqual(
@@ -12209,6 +12232,164 @@ class AntiabuseSettingsEndpointTests(_AntiabuseSqliteMixin, SimpleTestCase):
         self.assertIs(payload["effective"]["ipguard_alerts_enabled"], True)
         status, payload = self._request("POST", action="ipguard_disable")
         self.assertIs(payload["effective"]["ipguard_alerts_enabled"], False)
+
+    def test_ipguard_burst_set_and_toggle(self):
+        status, payload = self._request(
+            "POST", action="ipguard_burst_set", burst_window_minutes="3",
+            burst_ips_per_hwid="4", burst_confirmations="",
+        )
+
+        self.assertEqual(status, 200)
+        effective = payload["effective"]
+        self.assertEqual(effective["ipguard_burst_window_minutes"], 3)
+        self.assertEqual(effective["ipguard_burst_ips_per_hwid"], 4)
+        # Пустое поле оставляет текущее значение (здесь — дефолт common).
+        self.assertEqual(effective["ipguard_burst_confirmations"], 2)
+
+        status, _ = self._request(
+            "POST", action="ipguard_burst_set", burst_window_minutes="0"
+        )
+        self.assertEqual(status, 400)
+        status, _ = self._request(
+            "POST", action="ipguard_burst_set", burst_confirmations="две"
+        )
+        self.assertEqual(status, 400)
+
+        status, payload = self._request("POST", action="ipguard_burst_enable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["ipguard_burst_enabled"], True)
+        status, payload = self._request("POST", action="ipguard_burst_disable")
+        self.assertIs(payload["effective"]["ipguard_burst_enabled"], False)
+
+        # Битое значение в БД не даёт включить слой (контракт парной проверки).
+        self._set("ipguard_burst_ips_per_hwid", "0")
+        status, payload = self._request("POST", action="ipguard_burst_enable")
+        self.assertEqual(status, 400)
+        self.assertIn("ipguard_burst_ips_per_hwid", payload["message"])
+
+    def test_ipguard_geo_set_and_toggle(self):
+        status, payload = self._request(
+            "POST", action="ipguard_geo_set", geo_window_minutes="7", geo_min_regions="3"
+        )
+
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["effective"]["ipguard_geo_window_minutes"], 7)
+        self.assertEqual(payload["effective"]["ipguard_geo_min_regions"], 3)
+
+        status, _ = self._request(
+            "POST", action="ipguard_geo_set", geo_min_regions="-1"
+        )
+        self.assertEqual(status, 400)
+
+        status, payload = self._request("POST", action="ipguard_geo_enable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["ipguard_geo_enabled"], True)
+        status, payload = self._request("POST", action="ipguard_geo_disable")
+        self.assertIs(payload["effective"]["ipguard_geo_enabled"], False)
+
+        self._set("ipguard_geo_window_minutes", "abc")
+        status, payload = self._request("POST", action="ipguard_geo_enable")
+        self.assertEqual(status, 400)
+        self.assertIn("ipguard_geo_window_minutes", payload["message"])
+
+    def test_ipguard_autoban_set_and_toggle(self):
+        status, payload = self._request(
+            "POST", action="ipguard_autoban_set", autoban_segment="all",
+            autoban_steps_minutes="30, 120, 2880",
+            autoban_escalation_window_hours="48", autoban_max_per_hour="5",
+            max_alerts_per_hour="20",
+        )
+
+        self.assertEqual(status, 200)
+        effective = payload["effective"]
+        self.assertEqual(effective["ipguard_autoban_segment"], "all")
+        self.assertEqual(effective["ipguard_autoban_segment_label"], "Все подписки")
+        self.assertEqual(effective["ipguard_autoban_steps_minutes"], "30,120,2880")
+        self.assertEqual(
+            effective["ipguard_autoban_steps_label"], "30 мин → 120 мин → 2880 мин"
+        )
+        self.assertEqual(effective["ipguard_autoban_escalation_window_hours"], 48)
+        self.assertEqual(effective["ipguard_autoban_max_per_hour"], 5)
+        self.assertEqual(effective["ipguard_max_alerts_per_hour"], 20)
+
+        # Мусор в лестнице отвергается, а не «сохраняется и молча заменяется
+        # дефолтом» парсером common.
+        for steps in ("0", "-15", "20160", "15,абв"):
+            status, _ = self._request(
+                "POST", action="ipguard_autoban_set", autoban_steps_minutes=steps
+            )
+            self.assertEqual(status, 400, steps)
+        status, _ = self._request(
+            "POST", action="ipguard_autoban_set", autoban_segment="everyone"
+        )
+        self.assertEqual(status, 400)
+        # Прежнее значение осталось нетронутым.
+        _, payload = self._request()
+        self.assertEqual(
+            payload["effective"]["ipguard_autoban_steps_minutes"], "30,120,2880"
+        )
+
+        status, payload = self._request("POST", action="ipguard_autoban_enable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["ipguard_autoban_enabled"], True)
+        status, payload = self._request("POST", action="ipguard_autoban_disable")
+        self.assertIs(payload["effective"]["ipguard_autoban_enabled"], False)
+
+    def test_autoban_cannot_be_enabled_with_broken_steps_in_db(self):
+        """Автобан трогает живые подписки: включение при лестнице, которую
+        ip-guard прочитает не так, как задумал админ, запрещено."""
+        self._set("ipguard_autoban_steps_minutes", "0")
+
+        status, payload = self._request("POST", action="ipguard_autoban_enable")
+
+        self.assertEqual(status, 400)
+        self.assertIn("ipguard_autoban_steps_minutes", payload["message"])
+        # Выключение не блокируется никогда.
+        status, _ = self._request("POST", action="ipguard_autoban_disable")
+        self.assertEqual(status, 200)
+        # Лестницу можно починить тем же сохранением, что включает автобан.
+        status, payload = self._request(
+            "POST", action="ipguard_autoban_set", autoban_steps_minutes="15,60"
+        )
+        self.assertEqual(status, 200)
+        status, payload = self._request("POST", action="ipguard_autoban_enable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["ipguard_autoban_enabled"], True)
+
+    def test_ipguard_excluded_ips_set_and_clear(self):
+        status, payload = self._request(
+            "POST", action="ipguard_excluded_set",
+            excluded_ips="37.143.13.212, 10.0.0.0/8",
+        )
+
+        self.assertEqual(status, 200)
+        effective = payload["effective"]
+        # Одиночный адрес канонизируется в /32 — так его видит ip-guard.
+        self.assertEqual(effective["ipguard_excluded_ips"], "37.143.13.212/32,10.0.0.0/8")
+        self.assertEqual(effective["ipguard_excluded_ips_count"], 2)
+        self.assertEqual(
+            effective["ipguard_excluded_ips_label"], "37.143.13.212/32, 10.0.0.0/8"
+        )
+
+        # Опечатка отвергается с указанием записи, а не выбрасывается молча.
+        status, payload = self._request(
+            "POST", action="ipguard_excluded_set", excluded_ips="10.0.0.0/8, 37.143.13.2.12"
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("37.143.13.2.12", payload["message"])
+
+        # Пустое поле — «не трогать» (как во всех *_set формах вкладки).
+        status, payload = self._request("POST", action="ipguard_excluded_set")
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["message"], "Нет значений для сохранения")
+        _, payload = self._request()
+        self.assertEqual(payload["effective"]["ipguard_excluded_ips_count"], 2)
+
+        # Очистка — отдельным действием.
+        status, payload = self._request("POST", action="ipguard_excluded_clear")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["effective"]["ipguard_excluded_ips"], "")
+        self.assertEqual(payload["effective"]["ipguard_excluded_ips_count"], 0)
 
     def test_ipguard_warning_threshold_pair(self):
         """Порог предупреждения строго меньше порога алерта: второе значение
@@ -12402,6 +12583,108 @@ class AntiabuseValidationTests(_AntiabuseSqliteMixin, SimpleTestCase):
         error = validate(self.session, "ipguard_warnings_enabled", "1")
         self.assertIn("ipguard_warning_subnets_per_hwid=abc", error)
         self.assertIsNone(validate(self.session, "ipguard_warnings_enabled", "0"))
+
+    def test_ipguard_autoban_steps_validation(self):
+        """Лестница наказаний: общий CSV-int валидатор пропускает «0» и
+        отрицательные, а parse_ipguard_autoban_steps молча меняет их на
+        дефолт (15,60,1440) — строгая проверка не даёт сохранить значение,
+        которое ip-guard прочитает иначе."""
+        from engine.views import admin_validate_antiabuse_setting_pair as validate
+        from engine.views import admin_validate_ipguard_autoban_steps_value as steps_ok
+
+        self.assertIsNone(steps_ok("15,60,1440"))
+        self.assertIsNone(steps_ok("15, 60"))
+        self.assertIsNone(steps_ok("10080"))
+        self.assertIsNotNone(steps_ok(""))
+        self.assertIn("0", steps_ok("0"))
+        self.assertIsNotNone(steps_ok("-15"))
+        self.assertIsNotNone(steps_ok("10081"))
+        self.assertIsNotNone(steps_ok("15,abc"))
+        self.assertIsNotNone(steps_ok("1,2,3,4,5,6,7,8,9,10,11"))
+
+        # Через парную валидацию (её зовут и форма, и raw-эндпоинт).
+        self.assertIsNone(validate(self.session, "ipguard_autoban_steps_minutes", "15,60"))
+        self.assertIsNotNone(validate(self.session, "ipguard_autoban_steps_minutes", "0"))
+        # Включение автобана при битой лестнице в БД запрещено, выключение — нет.
+        self._set("ipguard_autoban_steps_minutes", "0")
+        error = validate(self.session, "ipguard_autoban_enabled", "1")
+        self.assertIn("ipguard_autoban_steps_minutes", error)
+        self.assertIsNone(validate(self.session, "ipguard_autoban_enabled", "0"))
+        # Значение из этого же сохранения важнее того, что лежит в БД.
+        pending = {"ipguard_autoban_steps_minutes": "15,60"}
+        self.assertIsNone(validate(self.session, "ipguard_autoban_enabled", "1", pending))
+        # Битый сегмент/предохранитель тоже блокируют включение.
+        self._set("ipguard_autoban_steps_minutes", "15,60")
+        self._set("ipguard_autoban_max_per_hour", "0")
+        self.assertIn(
+            "ipguard_autoban_max_per_hour",
+            validate(self.session, "ipguard_autoban_enabled", "1"),
+        )
+
+    def test_ipguard_excluded_ips_validation(self):
+        """parse_ipguard_excluded_ips выбрасывает нераспознанные записи молча —
+        на входе называем конкретную запись, иначе опечатка «тихо исчезает»."""
+        from engine.views import admin_validate_antiabuse_setting_pair as validate
+        from engine.views import admin_validate_ipguard_excluded_ips_value as ips_ok
+
+        self.assertIsNone(ips_ok(""))
+        self.assertIsNone(ips_ok("37.143.13.212"))
+        self.assertIsNone(ips_ok("37.143.13.212, 10.0.0.0/8, 2a01:4f8::/32"))
+        self.assertIn("10.0.0.0/64", ips_ok("10.0.0.0/64"))
+        self.assertIn("37.143.13.2.12", ips_ok("10.0.0.0/8, 37.143.13.2.12"))
+        self.assertIsNotNone(ips_ok(",".join(["10.0.0.1"] * 101)))
+
+        # Слишком широкая маска = тихое выключение ip-guard: под 0.0.0.0/0
+        # попадает весь интернет, наблюдения перестают записываться, детектор
+        # слепнет. Одна опечатка («/0» вместо «/32») не должна так стоить.
+        for broad in ("37.143.13.212/0", "0.0.0.0/0", "10.0.0.0/4", "2a01:4f8::/16"):
+            self.assertIn("широкая маска", ips_ok(broad) or "", broad)
+        self.assertIsNone(ips_ok("10.0.0.0/8"))
+        self.assertIsNone(ips_ok("2a01:4f8::/32"))
+
+        # system_settings.value — VARCHAR(512): длинный список иначе падает на
+        # вставке и не сохраняется вовсе.
+        long_list = ", ".join(f"10.0.{i}.0/24" for i in range(100))
+        self.assertIn("длиннее", ips_ok(long_list) or "")
+
+        self.assertIsNone(validate(self.session, "ipguard_excluded_ips", ""))
+        self.assertIsNone(
+            validate(self.session, "ipguard_excluded_ips", "37.143.13.212,10.0.0.0/8")
+        )
+        self.assertIsNotNone(validate(self.session, "ipguard_excluded_ips", "мост"))
+
+    def test_generic_validator_handles_new_ipguard_keys(self):
+        self.assertEqual(admin_validate_runtime_setting("ipguard_burst_enabled", "да"), ("1", None))
+        self.assertEqual(admin_validate_runtime_setting("ipguard_geo_enabled", "выкл"), ("0", None))
+        self.assertEqual(
+            admin_validate_runtime_setting("ipguard_autoban_segment", "NEVER_PAID"),
+            ("never_paid", None),
+        )
+        self.assertIsNotNone(admin_validate_runtime_setting("ipguard_autoban_segment", "trial")[1])
+        self.assertEqual(
+            admin_validate_runtime_setting("ipguard_autoban_steps_minutes", "15, 60 ,1440"),
+            ("15,60,1440", None),
+        )
+        self.assertEqual(
+            admin_validate_runtime_setting("ipguard_excluded_ips", "10.0.0.0/8 , 1.2.3.4"),
+            ("10.0.0.0/8,1.2.3.4", None),
+        )
+        for key in (
+            "ipguard_burst_window_minutes",
+            "ipguard_burst_ips_per_hwid",
+            "ipguard_burst_confirmations",
+            "ipguard_geo_window_minutes",
+            "ipguard_geo_min_regions",
+            "ipguard_autoban_escalation_window_hours",
+            "ipguard_autoban_max_per_hour",
+            "ipguard_max_alerts_per_hour",
+        ):
+            self.assertEqual(admin_validate_runtime_setting(key, "3"), ("3", None), key)
+            self.assertIsNotNone(admin_validate_runtime_setting(key, "0")[1], key)
+            self.assertEqual(admin_runtime_setting_type(key), "int", key)
+        self.assertEqual(admin_runtime_setting_type("ipguard_autoban_steps_minutes"), "csv_int")
+        self.assertEqual(admin_runtime_setting_type("ipguard_excluded_ips"), "csv")
+        self.assertEqual(admin_runtime_setting_type("ipguard_autoban_segment"), "enum")
 
     def test_generic_validator_handles_antiabuse_keys(self):
         self.assertEqual(admin_validate_runtime_setting("trial_traffic_limit_gb", "0,5"), ("0.5", None))
@@ -12604,6 +12887,57 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             "managed_limits_available === false",
             "if (event.target.matches('[data-antiabuse-form]')) submitAntiabuseForm(event);",
             "formData.append('action', 'temp_ban');",
+            # v3: карточки «всплеск», «гео», «автобан», «исключения адресов».
+            'id="antiabuse-burst-form"',
+            'id="antiabuse-burst-toggle"',
+            'value="ipguard_burst_enable"',
+            'value="ipguard_burst_set"',
+            'name="burst_window_minutes"',
+            'name="burst_ips_per_hwid"',
+            'name="burst_confirmations"',
+            'data-antiabuse-state="ipguard_burst"',
+            'data-antiabuse-current="ipguard_burst_ips_per_hwid"',
+            "Всплеск: одновременные подключения",
+            'id="antiabuse-geo-form"',
+            'id="antiabuse-geo-toggle"',
+            'value="ipguard_geo_enable"',
+            'value="ipguard_geo_set"',
+            'name="geo_window_minutes"',
+            'name="geo_min_regions"',
+            'data-antiabuse-state="ipguard_geo"',
+            'data-antiabuse-current="ipguard_geo_min_regions"',
+            "Гео: подключения из разных мест",
+            "geo_status",
+            'id="antiabuse-autoban-form"',
+            'id="antiabuse-autoban-toggle"',
+            'value="ipguard_autoban_enable"',
+            'value="ipguard_autoban_set"',
+            "data-antiabuse-autoban-segment-select",
+            'name="autoban_segment"',
+            'name="autoban_steps_minutes"',
+            'name="autoban_escalation_window_hours"',
+            'name="autoban_max_per_hour"',
+            'name="max_alerts_per_hour"',
+            'data-antiabuse-state="ipguard_autoban"',
+            'data-antiabuse-current="ipguard_max_alerts_per_hour"',
+            "Автобан и предохранители",
+            "включённый автобан банит подписки автоматически",
+            'id="antiabuse-excluded-form"',
+            'value="ipguard_excluded_set"',
+            'value="ipguard_excluded_clear"',
+            'name="excluded_ips"',
+            'data-antiabuse-current="ipguard_excluded_ips"',
+            "Исключения адресов",
+            "37.143.13.212, 10.0.0.0/8",
+            # Слоты статуса новых карточек обязаны чиститься в renderAntiabuse,
+            # иначе ошибка загрузки повиснет навсегда.
+            'id="antiabuse-burst-status"',
+            'id="antiabuse-geo-status"',
+            'id="antiabuse-autoban-status"',
+            'id="antiabuse-excluded-status"',
+            "'antiabuse-burst-status', 'antiabuse-geo-status', 'antiabuse-autoban-status', 'antiabuse-excluded-status'",
+            "ipguard_autoban_enable: 'ВКЛЮЧИТЬ АВТОБАН?",
+            "ipguard_excluded_clear: 'Очистить список исключений ip-guard?",
         ):
             self.assertIn(needle, template, needle)
         for needle in (
@@ -12617,6 +12951,42 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             self.assertIn(needle, css, needle)
         # Селекты без «— без изменений —»: форма предзаполнена актуальным значением.
         self.assertNotIn("— без изменений —", template)
+
+    def test_antiabuse_forms_submit_on_enter_instead_of_toggling(self):
+        """В каждой форме вкладки скрытая кнопка *_set стоит ДО тумблера: иначе
+        Enter в числовом поле отправлял бы форму с action первой submit-кнопки,
+        то есть включал бы слой (для автобана — автоматические баны)."""
+        template = template_source("engine/templates/admin_dashboard.html")
+
+        for form_id, toggle_id, implicit_action in (
+            ("antiabuse-trial-form", "antiabuse-trial-toggle", "trial_limit_set"),
+            ("antiabuse-ipguard-form", "antiabuse-ipguard-toggle", "ipguard_set"),
+            ("antiabuse-burst-form", "antiabuse-burst-toggle", "ipguard_burst_set"),
+            ("antiabuse-geo-form", "antiabuse-geo-toggle", "ipguard_geo_set"),
+            ("antiabuse-autoban-form", "antiabuse-autoban-toggle", "ipguard_autoban_set"),
+        ):
+            start = template.index(f'id="{form_id}"')
+            form = template[start : template.index("</form>", start)]
+            self.assertIn(
+                f'value="{implicit_action}" class="antifraud-implicit-submit"', form
+            )
+            self.assertLess(
+                form.index("antifraud-implicit-submit"),
+                form.index(f'id="{toggle_id}"'),
+                form_id,
+            )
+        # У карточки исключений тумблера нет, но неявная отправка всё равно
+        # обязана быть «Сохранить», а не «Очистить список».
+        start = template.index('id="antiabuse-excluded-form"')
+        excluded_form = template[start : template.index("</form>", start)]
+        self.assertIn(
+            'value="ipguard_excluded_set" class="antifraud-implicit-submit"',
+            excluded_form,
+        )
+        self.assertLess(
+            excluded_form.index("antifraud-implicit-submit"),
+            excluded_form.index('value="ipguard_excluded_clear"'),
+        )
 
     def test_client_card_exposes_limit_and_actions(self):
         template = template_source("engine/templates/admin_dashboard.html")
@@ -12756,6 +13126,19 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             "лимитом пробного: N — будут помечены и сняты страховкой user-notify/оплатой",
             "ANTIABUSE_BACKFILL_ROWS_SQL",
             "коммитятся сразу после его\n  `UpdateUser`",
+            # v3: формы всплеска/гео/автобана/исключений вместо raw-списка.
+            "ipguard_burst_enabled",
+            "ipguard_burst_confirmations",
+            "ipguard_geo_min_regions",
+            "ipguard_autoban_steps_minutes",
+            "ipguard_autoban_max_per_hour",
+            "ipguard_max_alerts_per_hour",
+            "ipguard_excluded_ips",
+            "`ipguard_excluded_set` / `ipguard_excluded_clear`",
+            "parse_ipguard_autoban_steps",
+            "parse_ipguard_excluded_ips",
+            "Включить автобан при битой\nлестнице в БД нельзя",
+            "geo_status",
         ):
             self.assertIn(needle, readme, needle)
 

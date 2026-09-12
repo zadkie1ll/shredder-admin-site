@@ -1,5 +1,6 @@
 import os
 import uuid
+import ipaddress
 from types import SimpleNamespace
 import hmac
 import hashlib
@@ -171,6 +172,18 @@ from common.models.settings import DEFAULT_IPGUARD_SUBNETS_PER_HWID
 from common.models.settings import DEFAULT_IPGUARD_WINDOW_HOURS
 from common.models.settings import DEFAULT_IPGUARD_WARNINGS_ENABLED
 from common.models.settings import DEFAULT_IPGUARD_WARNING_SUBNETS_PER_HWID
+from common.models.settings import DEFAULT_IPGUARD_BURST_ENABLED
+from common.models.settings import DEFAULT_IPGUARD_BURST_WINDOW_MINUTES
+from common.models.settings import DEFAULT_IPGUARD_BURST_IPS_PER_HWID
+from common.models.settings import DEFAULT_IPGUARD_BURST_CONFIRMATIONS
+from common.models.settings import DEFAULT_IPGUARD_GEO_ENABLED
+from common.models.settings import DEFAULT_IPGUARD_GEO_WINDOW_MINUTES
+from common.models.settings import DEFAULT_IPGUARD_GEO_MIN_REGIONS
+from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_ENABLED
+from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_SEGMENT
+from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_ESCALATION_WINDOW_HOURS
+from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_MAX_PER_HOUR
+from common.models.settings import DEFAULT_IPGUARD_MAX_ALERTS_PER_HOUR
 from common.models.settings import IPGUARD_ALERTS_ENABLED_SETTING
 from common.models.settings import IPGUARD_ALERT_COOLDOWN_HOURS_SETTING
 from common.models.settings import IPGUARD_ALERT_SEGMENT_ALL
@@ -180,7 +193,26 @@ from common.models.settings import IPGUARD_SUBNETS_PER_HWID_SETTING
 from common.models.settings import IPGUARD_WINDOW_HOURS_SETTING
 from common.models.settings import IPGUARD_WARNINGS_ENABLED_SETTING
 from common.models.settings import IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING
+from common.models.settings import IPGUARD_BURST_ENABLED_SETTING
+from common.models.settings import IPGUARD_BURST_WINDOW_MINUTES_SETTING
+from common.models.settings import IPGUARD_BURST_IPS_PER_HWID_SETTING
+from common.models.settings import IPGUARD_BURST_CONFIRMATIONS_SETTING
+from common.models.settings import IPGUARD_GEO_ENABLED_SETTING
+from common.models.settings import IPGUARD_GEO_WINDOW_MINUTES_SETTING
+from common.models.settings import IPGUARD_GEO_MIN_REGIONS_SETTING
+from common.models.settings import IPGUARD_AUTOBAN_ENABLED_SETTING
+from common.models.settings import IPGUARD_AUTOBAN_SEGMENT_SETTING
+from common.models.settings import IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING
+from common.models.settings import IPGUARD_AUTOBAN_ESCALATION_WINDOW_HOURS_SETTING
+from common.models.settings import IPGUARD_AUTOBAN_MAX_PER_HOUR_SETTING
+from common.models.settings import IPGUARD_AUTOBAN_MAX_STEPS
+from common.models.settings import IPGUARD_AUTOBAN_STEP_MINUTES_MAX
+from common.models.settings import IPGUARD_MAX_ALERTS_PER_HOUR_SETTING
+from common.models.settings import IPGUARD_EXCLUDED_IPS_SETTING
+from common.models.settings import IPGUARD_MAX_EXCLUDED_ENTRIES
 from common.models.settings import ipguard_warning_threshold_is_valid
+from common.models.settings import parse_ipguard_autoban_steps
+from common.models.settings import parse_ipguard_excluded_ips
 from common.runtime_tariffs import resolve_runtime_tariffs
 from engine.request_ip import client_ip
 from engine.rate_limit import rate_limit_exceeded
@@ -6726,6 +6758,22 @@ ANTIABUSE_IPGUARD_KEYS = (
     IPGUARD_ALERT_COOLDOWN_HOURS_SETTING,
     IPGUARD_WARNINGS_ENABLED_SETTING,
     IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING,
+    # v3: слои «всплеск» и «гео», автобан с предохранителями и ручные
+    # исключения адресов. Порядок = порядок карточек на вкладке.
+    IPGUARD_BURST_ENABLED_SETTING,
+    IPGUARD_BURST_WINDOW_MINUTES_SETTING,
+    IPGUARD_BURST_IPS_PER_HWID_SETTING,
+    IPGUARD_BURST_CONFIRMATIONS_SETTING,
+    IPGUARD_GEO_ENABLED_SETTING,
+    IPGUARD_GEO_WINDOW_MINUTES_SETTING,
+    IPGUARD_GEO_MIN_REGIONS_SETTING,
+    IPGUARD_AUTOBAN_ENABLED_SETTING,
+    IPGUARD_AUTOBAN_SEGMENT_SETTING,
+    IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING,
+    IPGUARD_AUTOBAN_ESCALATION_WINDOW_HOURS_SETTING,
+    IPGUARD_AUTOBAN_MAX_PER_HOUR_SETTING,
+    IPGUARD_MAX_ALERTS_PER_HOUR_SETTING,
+    IPGUARD_EXCLUDED_IPS_SETTING,
 )
 # Пара порогов ip-guard: предупреждение (suspicious) обязано быть СТРОГО
 # меньше алерта, иначе предупреждение никогда не отделить от алерта.
@@ -6842,6 +6890,105 @@ def admin_validate_ipguard_threshold_pair(db_session, key, normalized_value, pen
     )
 
 
+def admin_ipguard_csv_items(value):
+    """Элементы CSV-настройки ip-guard так, как их видит парсер common
+    (разделители «,» и «;», пустые отброшены)."""
+    return [
+        item.strip()
+        for item in str(value if value is not None else "").replace(";", ",").split(",")
+        if item.strip()
+    ]
+
+
+def admin_validate_ipguard_autoban_steps_value(value):
+    """Лестница наказаний автобана: текст ошибки либо None.
+
+    ``parse_ipguard_autoban_steps`` намеренно МОЛЧА выбрасывает мусорные шаги,
+    а на пустом результате отдаёт дефолтную лестницу — для рантайма это
+    правильно (включённый автобан не остаётся без длительности), но в админке
+    это «сохранил 0, получил 15,60,1440 и не заметил». Поэтому на входе
+    требуем, чтобы разбор совпал с введённым списком.
+    """
+    items = admin_ipguard_csv_items(value)
+    if not items:
+        return (
+            "Лестница наказаний ip-guard пуста: укажите хотя бы одну "
+            "длительность бана в минутах (например, 15,60,1440)"
+        )
+    if len(items) > IPGUARD_AUTOBAN_MAX_STEPS:
+        return f"Шагов в лестнице не больше {IPGUARD_AUTOBAN_MAX_STEPS}"
+    numbers = []
+    for item in items:
+        try:
+            number = int(item)
+        except ValueError:
+            return f"Шаг «{item}» не число: нужны минуты через запятую"
+        if number <= 0:
+            return f"Шаг «{item}»: длительность бана должна быть больше нуля"
+        if number > IPGUARD_AUTOBAN_STEP_MINUTES_MAX:
+            return (
+                f"Шаг «{item}» больше предела "
+                f"{IPGUARD_AUTOBAN_STEP_MINUTES_MAX} минут (неделя)"
+            )
+        numbers.append(number)
+    if tuple(numbers) != parse_ipguard_autoban_steps(value):
+        # Страховка от расхождения с парсером common: сохранять значение,
+        # которое ip-guard прочитает иначе, нельзя.
+        return "Лестница наказаний ip-guard не читается: исправьте список"
+    return None
+
+
+# Границы списка исключений ip-guard. Минимальный префикс: маска шире /8 (и
+# /32 у IPv6) исключает такой кусок интернета, что детектор фактически
+# выключается — это почти наверняка опечатка, а не намерение. Максимальная
+# длина — под колонку system_settings.value (VARCHAR(512)).
+IPGUARD_EXCLUDED_MIN_PREFIX_V4 = 8
+IPGUARD_EXCLUDED_MIN_PREFIX_V6 = 32
+IPGUARD_EXCLUDED_MAX_LENGTH = 500
+
+
+def admin_validate_ipguard_excluded_ips_value(value):
+    """Список исключений ip-guard: текст ошибки либо None.
+
+    ``parse_ipguard_excluded_ips`` пропускает нераспознанные записи молча (одна
+    опечатка не должна выключать список целиком) — в админке это значит
+    «сохранил, а адрес не применился». Проверяем каждую запись тем же парсером
+    и называем конкретную. Пустое значение допустимо: это «исключений нет».
+    """
+    items = admin_ipguard_csv_items(value)
+    if len(items) > IPGUARD_MAX_EXCLUDED_ENTRIES:
+        return f"Записей в списке исключений не больше {IPGUARD_MAX_EXCLUDED_ENTRIES}"
+    for item in items:
+        parsed = parse_ipguard_excluded_ips(item)
+        if not parsed:
+            return f"«{item}» не похоже на IP-адрес или подсеть (CIDR)"
+        # Слишком широкая маска — это не исключение, а выключение ip-guard
+        # целиком: «37.143.13.212/0» разбирается в 0.0.0.0/0, под неё попадает
+        # весь интернет, наблюдения перестают записываться вовсе, и детектор
+        # молча слепнет. Опечатка в одном символе не должна так стоить.
+        network = ipaddress.ip_network(parsed[0], strict=False)
+        min_prefix = (
+            IPGUARD_EXCLUDED_MIN_PREFIX_V4
+            if network.version == 4
+            else IPGUARD_EXCLUDED_MIN_PREFIX_V6
+        )
+        if network.prefixlen < min_prefix:
+            return (
+                f"«{item}» — слишком широкая маска ({network}): так исключается "
+                f"{network.num_addresses:,} адресов и ip-guard перестанет "
+                f"видеть подключения. Минимум /{min_prefix}"
+            ).replace(",", " ")
+    # Значение целиком уходит в system_settings.value (VARCHAR(512)): длинный
+    # список иначе падает на вставке, ничего не сохранив.
+    normalized = ", ".join(items)
+    if len(normalized) > IPGUARD_EXCLUDED_MAX_LENGTH:
+        return (
+            f"Список длиннее {IPGUARD_EXCLUDED_MAX_LENGTH} символов "
+            f"({len(normalized)}) — сократите записи или объедините их в подсети"
+        )
+    return None
+
+
 def admin_validate_antiabuse_setting_pair(
     db_session, key, normalized_value, pending=None
 ):
@@ -6869,6 +7016,14 @@ def admin_validate_antiabuse_setting_pair(
             ),
             pending,
         )
+    # CSV-ключи ip-guard: общий валидатор проверяет только форму записи
+    # («числа через запятую» / «строки через запятую»), а парсеры common молча
+    # выбрасывают то, что не поняли, — без строгой проверки админ сохранит
+    # значение, которое ip-guard прочитает иначе.
+    if key == IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING:
+        return admin_validate_ipguard_autoban_steps_value(normalized_value)
+    if key == IPGUARD_EXCLUDED_IPS_SETTING:
+        return admin_validate_ipguard_excluded_ips_value(normalized_value)
     if key == TRIAL_TRAFFIC_LIMIT_ENABLED_SETTING and normalized_value == "1":
         checks = (
             (
@@ -6903,6 +7058,73 @@ def admin_validate_antiabuse_setting_pair(
                 IPGUARD_ALERT_COOLDOWN_HOURS_SETTING,
                 "Кулдаун ip-guard (ipguard_alert_cooldown_hours) в БД некорректен: "
                 "исправьте значение перед включением",
+            ),
+        )
+    elif key == IPGUARD_BURST_ENABLED_SETTING and normalized_value == "1":
+        checks = (
+            (
+                IPGUARD_BURST_WINDOW_MINUTES_SETTING,
+                "Окно всплеска (ipguard_burst_window_minutes) в БД некорректно: "
+                "исправьте значение перед включением",
+            ),
+            (
+                IPGUARD_BURST_IPS_PER_HWID_SETTING,
+                "IP на HWID во всплеске (ipguard_burst_ips_per_hwid) в БД "
+                "некорректно: исправьте значение перед включением",
+            ),
+            (
+                IPGUARD_BURST_CONFIRMATIONS_SETTING,
+                "Подтверждений всплеска (ipguard_burst_confirmations) в БД "
+                "некорректно: исправьте значение перед включением",
+            ),
+        )
+    elif key == IPGUARD_GEO_ENABLED_SETTING and normalized_value == "1":
+        checks = (
+            (
+                IPGUARD_GEO_WINDOW_MINUTES_SETTING,
+                "Окно гео-детекта (ipguard_geo_window_minutes) в БД некорректно: "
+                "исправьте значение перед включением",
+            ),
+            (
+                IPGUARD_GEO_MIN_REGIONS_SETTING,
+                "Регионов для гео-детекта (ipguard_geo_min_regions) в БД "
+                "некорректно: исправьте значение перед включением",
+            ),
+        )
+    elif key == IPGUARD_AUTOBAN_ENABLED_SETTING and normalized_value == "1":
+        # Лестницу проверяем строгим валидатором отдельно: общий CSV-int
+        # пропускает «0» и отрицательные, а автобан по fallback-длительности —
+        # это бан, которого админ не задавал. Автобан трогает живые подписки,
+        # поэтому включение с сомнительными зависимостями запрещено.
+        if pending and IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING in pending:
+            steps_raw = pending[IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING]
+        else:
+            steps_setting = db_session.get(
+                SystemSetting, IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING
+            )
+            steps_raw = steps_setting.value if steps_setting is not None else None
+        if steps_raw is not None and admin_validate_ipguard_autoban_steps_value(
+            steps_raw
+        ):
+            return (
+                "Лестница наказаний (ipguard_autoban_steps_minutes) в БД "
+                "некорректна: исправьте её перед включением автобана"
+            )
+        checks = (
+            (
+                IPGUARD_AUTOBAN_SEGMENT_SETTING,
+                "Сегмент автобана (ipguard_autoban_segment) в БД некорректен: "
+                "исправьте его перед включением",
+            ),
+            (
+                IPGUARD_AUTOBAN_ESCALATION_WINDOW_HOURS_SETTING,
+                "Окно эскалации (ipguard_autoban_escalation_window_hours) в БД "
+                "некорректно: исправьте значение перед включением",
+            ),
+            (
+                IPGUARD_AUTOBAN_MAX_PER_HOUR_SETTING,
+                "Предохранитель автобанов (ipguard_autoban_max_per_hour) в БД "
+                "некорректен: исправьте значение перед включением",
             ),
         )
     else:
@@ -9605,6 +9827,19 @@ def admin_antiabuse_effective(db_session):
         if segment_raw is not None
         else DEFAULT_IPGUARD_ALERT_SEGMENT
     )
+    autoban_segment_raw = raw(IPGUARD_AUTOBAN_SEGMENT_SETTING)
+    autoban_segment = (
+        normalize_ipguard_alert_segment(autoban_segment_raw)
+        if autoban_segment_raw is not None
+        else DEFAULT_IPGUARD_AUTOBAN_SEGMENT
+    )
+    # Для CSV-ключей действующее значение — результат парсера common, а не
+    # строка из БД: именно его видит ip-guard (адрес канонизируется в /32,
+    # мусор отбрасывается), и именно его должен видеть админ.
+    autoban_steps = parse_ipguard_autoban_steps(
+        raw(IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING)
+    )
+    excluded_ips = parse_ipguard_excluded_ips(raw(IPGUARD_EXCLUDED_IPS_SETTING))
     return {
         "trial_traffic_limit_enabled": trial_traffic_limit_enabled(db_session),
         "trial_traffic_limit_gb": limit.limit_gb,
@@ -9635,6 +9870,61 @@ def admin_antiabuse_effective(db_session):
         "ipguard_warning_subnets_per_hwid": parse_positive_int_setting(
             raw(IPGUARD_WARNING_SUBNETS_PER_HWID_SETTING),
             DEFAULT_IPGUARD_WARNING_SUBNETS_PER_HWID,
+        ),
+        "ipguard_burst_enabled": parse_bool_setting(
+            raw(IPGUARD_BURST_ENABLED_SETTING), DEFAULT_IPGUARD_BURST_ENABLED
+        ),
+        "ipguard_burst_window_minutes": parse_positive_int_setting(
+            raw(IPGUARD_BURST_WINDOW_MINUTES_SETTING),
+            DEFAULT_IPGUARD_BURST_WINDOW_MINUTES,
+        ),
+        "ipguard_burst_ips_per_hwid": parse_positive_int_setting(
+            raw(IPGUARD_BURST_IPS_PER_HWID_SETTING),
+            DEFAULT_IPGUARD_BURST_IPS_PER_HWID,
+        ),
+        "ipguard_burst_confirmations": parse_positive_int_setting(
+            raw(IPGUARD_BURST_CONFIRMATIONS_SETTING),
+            DEFAULT_IPGUARD_BURST_CONFIRMATIONS,
+        ),
+        "ipguard_geo_enabled": parse_bool_setting(
+            raw(IPGUARD_GEO_ENABLED_SETTING), DEFAULT_IPGUARD_GEO_ENABLED
+        ),
+        "ipguard_geo_window_minutes": parse_positive_int_setting(
+            raw(IPGUARD_GEO_WINDOW_MINUTES_SETTING),
+            DEFAULT_IPGUARD_GEO_WINDOW_MINUTES,
+        ),
+        "ipguard_geo_min_regions": parse_positive_int_setting(
+            raw(IPGUARD_GEO_MIN_REGIONS_SETTING), DEFAULT_IPGUARD_GEO_MIN_REGIONS
+        ),
+        "ipguard_autoban_enabled": parse_bool_setting(
+            raw(IPGUARD_AUTOBAN_ENABLED_SETTING), DEFAULT_IPGUARD_AUTOBAN_ENABLED
+        ),
+        "ipguard_autoban_segment": autoban_segment,
+        "ipguard_autoban_segment_label": IPGUARD_SEGMENT_LABELS.get(
+            autoban_segment, autoban_segment
+        ),
+        "ipguard_autoban_steps_minutes": ",".join(str(step) for step in autoban_steps),
+        "ipguard_autoban_steps_label": " → ".join(
+            f"{step} мин" for step in autoban_steps
+        ),
+        "ipguard_autoban_escalation_window_hours": parse_positive_int_setting(
+            raw(IPGUARD_AUTOBAN_ESCALATION_WINDOW_HOURS_SETTING),
+            DEFAULT_IPGUARD_AUTOBAN_ESCALATION_WINDOW_HOURS,
+        ),
+        "ipguard_autoban_max_per_hour": parse_positive_int_setting(
+            raw(IPGUARD_AUTOBAN_MAX_PER_HOUR_SETTING),
+            DEFAULT_IPGUARD_AUTOBAN_MAX_PER_HOUR,
+        ),
+        "ipguard_max_alerts_per_hour": parse_positive_int_setting(
+            raw(IPGUARD_MAX_ALERTS_PER_HOUR_SETTING),
+            DEFAULT_IPGUARD_MAX_ALERTS_PER_HOUR,
+        ),
+        # Поле формы — ровно в том виде, в каком значение ляжет в БД (без
+        # пробелов), чтобы повторное сохранение не переписывало строку.
+        "ipguard_excluded_ips": ",".join(excluded_ips),
+        "ipguard_excluded_ips_count": len(excluded_ips),
+        "ipguard_excluded_ips_label": (
+            ", ".join(excluded_ips) if excluded_ips else "не заданы"
         ),
     }
 
@@ -9714,10 +10004,20 @@ def support_admin_api_antiabuse(request):
     (limit_value + limit_unit=gib|mib, strategy)|ipguard_enable|ipguard_disable|
     ipguard_warnings_enable|ipguard_warnings_disable|
     ipguard_set (segment, subnets_per_hwid, warning_subnets_per_hwid,
-    window_hours, cooldown_hours).
+    window_hours, cooldown_hours)|
+    ipguard_burst_enable|ipguard_burst_disable|ipguard_burst_set
+    (burst_window_minutes, burst_ips_per_hwid, burst_confirmations)|
+    ipguard_geo_enable|ipguard_geo_disable|ipguard_geo_set
+    (geo_window_minutes, geo_min_regions)|
+    ipguard_autoban_enable|ipguard_autoban_disable|ipguard_autoban_set
+    (autoban_segment, autoban_steps_minutes, autoban_escalation_window_hours,
+    autoban_max_per_hour, max_alerts_per_hour)|
+    ipguard_excluded_set (excluded_ips)|ipguard_excluded_clear.
     Пустое поле в *_set оставляет текущее значение; значение, равное
-    сохранённому, не перезаписывается. Ответ POST — тот же payload, что GET
-    (UI после сохранения дополнительно перечитывает GET)."""
+    сохранённому, не перезаписывается. Очистка списка исключений — отдельным
+    действием ipguard_excluded_clear (пустое поле трактуется как «не трогать»).
+    Ответ POST — тот же payload, что GET (UI после сохранения дополнительно
+    перечитывает GET)."""
     auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
     if auth_response:
         return auth_response
@@ -9776,6 +10076,58 @@ def support_admin_api_antiabuse(request):
                     value = (request.POST.get(form_key) or "").strip()
                     if value:
                         updates.append((key, value))
+            elif action == "ipguard_burst_enable":
+                updates.append((IPGUARD_BURST_ENABLED_SETTING, "1"))
+            elif action == "ipguard_burst_disable":
+                updates.append((IPGUARD_BURST_ENABLED_SETTING, "0"))
+            elif action == "ipguard_burst_set":
+                for key, form_key in (
+                    (IPGUARD_BURST_WINDOW_MINUTES_SETTING, "burst_window_minutes"),
+                    (IPGUARD_BURST_IPS_PER_HWID_SETTING, "burst_ips_per_hwid"),
+                    (IPGUARD_BURST_CONFIRMATIONS_SETTING, "burst_confirmations"),
+                ):
+                    value = (request.POST.get(form_key) or "").strip()
+                    if value:
+                        updates.append((key, value))
+            elif action == "ipguard_geo_enable":
+                updates.append((IPGUARD_GEO_ENABLED_SETTING, "1"))
+            elif action == "ipguard_geo_disable":
+                updates.append((IPGUARD_GEO_ENABLED_SETTING, "0"))
+            elif action == "ipguard_geo_set":
+                for key, form_key in (
+                    (IPGUARD_GEO_WINDOW_MINUTES_SETTING, "geo_window_minutes"),
+                    (IPGUARD_GEO_MIN_REGIONS_SETTING, "geo_min_regions"),
+                ):
+                    value = (request.POST.get(form_key) or "").strip()
+                    if value:
+                        updates.append((key, value))
+            elif action == "ipguard_autoban_enable":
+                updates.append((IPGUARD_AUTOBAN_ENABLED_SETTING, "1"))
+            elif action == "ipguard_autoban_disable":
+                updates.append((IPGUARD_AUTOBAN_ENABLED_SETTING, "0"))
+            elif action == "ipguard_autoban_set":
+                for key, form_key in (
+                    (IPGUARD_AUTOBAN_SEGMENT_SETTING, "autoban_segment"),
+                    (IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING, "autoban_steps_minutes"),
+                    (
+                        IPGUARD_AUTOBAN_ESCALATION_WINDOW_HOURS_SETTING,
+                        "autoban_escalation_window_hours",
+                    ),
+                    (IPGUARD_AUTOBAN_MAX_PER_HOUR_SETTING, "autoban_max_per_hour"),
+                    (IPGUARD_MAX_ALERTS_PER_HOUR_SETTING, "max_alerts_per_hour"),
+                ):
+                    value = (request.POST.get(form_key) or "").strip()
+                    if value:
+                        updates.append((key, value))
+            elif action == "ipguard_excluded_set":
+                value = (request.POST.get("excluded_ips") or "").strip()
+                if value:
+                    updates.append((IPGUARD_EXCLUDED_IPS_SETTING, value))
+            elif action == "ipguard_excluded_clear":
+                # Отдельное действие: пустое поле в *_set означает «не трогать»
+                # (общий контракт форм вкладки), поэтому очистить список
+                # исключений иначе было бы нельзя.
+                updates.append((IPGUARD_EXCLUDED_IPS_SETTING, ""))
             else:
                 return JsonResponse(
                     {"status": "error", "message": "Неизвестное действие"}, status=400
