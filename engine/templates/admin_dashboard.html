@@ -7643,8 +7643,13 @@
             {slug: 'alerts', keys: ['traffic_usage_suspicious_gb', 'traffic_usage_alert_gb']},
             // Антиабьюз: основной UI — формы вкладки «Антиабьюз»; ключи
             // сгруппированы, чтобы не уехать в «Прочие» (raw-список свёрнут).
-            {slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid']},
-            {slug: 'general', keys: ['trial_period_days', 'site_trial_registration_enabled', 'banned_telegram_ids', 'web_login_url', 'redirect_url', 'internal_squads_uuids', 'technical_work_enabled', 'apple_recommended_app', 'webapp_enabled', 'webapp_url', 'webapp_button_text', 'admin_report_enabled', 'admin_report_hour_msk']},
+            // Слои «всплеск»/«гео», автобан с предохранителями и список ручных
+            // исключений своих форм пока не имеют и правятся строками в этом же
+            // raw-списке.
+            {slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid', 'ipguard_burst_enabled', 'ipguard_burst_window_minutes', 'ipguard_burst_ips_per_hwid', 'ipguard_burst_confirmations', 'ipguard_geo_enabled', 'ipguard_geo_window_minutes', 'ipguard_geo_min_regions', 'ipguard_autoban_enabled', 'ipguard_autoban_segment', 'ipguard_autoban_steps_minutes', 'ipguard_autoban_escalation_window_hours', 'ipguard_autoban_max_per_hour', 'ipguard_max_alerts_per_hour', 'ipguard_excluded_ips']},
+            // Grace-доступ и маршрутизация админ-алертов по темам форума своих
+            // форм не имеют — правятся строками в подвкладке «Общие».
+            {slug: 'general', keys: ['trial_period_days', 'site_trial_registration_enabled', 'banned_telegram_ids', 'web_login_url', 'redirect_url', 'internal_squads_uuids', 'technical_work_enabled', 'apple_recommended_app', 'webapp_enabled', 'webapp_url', 'webapp_button_text', 'admin_report_enabled', 'admin_report_hour_msk', 'grace_access_enabled', 'grace_access_squad_uuid', 'grace_access_hours', 'grace_access_segment', 'grace_access_dry_run', 'grace_access_max_per_run', 'admin_alert_chat_id', 'admin_alert_topics']},
         ];
 
         function settingRowHtml(setting) {
@@ -7872,7 +7877,9 @@
         }
 
         // --- Антиабьюз: лимит трафика пробных и алерты ip-guard ----------------
-        const ANTIABUSE_KEYS = new Set(['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid']);
+        // Совпадает с группой 'antiabuse' в SETTING_GROUPS: сохранение любой из
+        // этих строк перечитывает формы вкладки «Антиабьюз» (loadAntiabuse).
+        const ANTIABUSE_KEYS = new Set(['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid', 'ipguard_burst_enabled', 'ipguard_burst_window_minutes', 'ipguard_burst_ips_per_hwid', 'ipguard_burst_confirmations', 'ipguard_geo_enabled', 'ipguard_geo_window_minutes', 'ipguard_geo_min_regions', 'ipguard_autoban_enabled', 'ipguard_autoban_segment', 'ipguard_autoban_steps_minutes', 'ipguard_autoban_escalation_window_hours', 'ipguard_autoban_max_per_hour', 'ipguard_max_alerts_per_hour', 'ipguard_excluded_ips']);
         const ANTIABUSE_BULK_BATCH = 50;
         const ANTIABUSE_CONFIRMS = {
             trial_limit_enable: 'Включить лимит трафика для НОВЫХ пробных подписок без платежа? Уже существующие подписки не изменятся — для них есть «Применить лимит ко всем активным пробным» ниже.',
@@ -8186,8 +8193,12 @@
             }
         }
 
+        // Красным — то, где уже есть факт наказания или превышен порог алерта
+        // (alert, autoban); жёлтым — наблюдения слоёв (suspicious, burst, geo).
+        const IPGUARD_RED_LEVELS = new Set(['alert', 'autoban']);
+
         function ipguardAlertRowHtml(row) {
-            const levelClass = row.level === 'alert' ? 'red' : 'gold';
+            const levelClass = IPGUARD_RED_LEVELS.has(row.level) ? 'red' : 'gold';
             const client = row.username
                 ? `<button type="button" class="client-text-button" data-ipguard-open-card="${escapeHtml(row.username)}">${escapeHtml(row.username)}</button>${row.local_user ? '' : ' <span class="muted">(нет в БД)</span>'}${row.user_uuid ? ` <span class="muted" title="${escapeHtml(row.user_uuid)}">uuid</span>` : ''}`
                 : '<span class="muted">не разрешён (RWMS)</span>';
@@ -8201,7 +8212,9 @@
                 client,
                 `${escapeHtml(row.unique_subnet_count)} / ${escapeHtml(row.unique_ip_count)}`,
                 escapeHtml(row.threshold ?? '—'),
-                `${escapeHtml(row.window_hours ?? '—')} ч`,
+                // У коротких слоёв (всплеск, гео, автобан) окно измеряется
+                // минутами и приходит нулём — часы тут не показываем.
+                row.window_hours ? `${escapeHtml(row.window_hours)} ч` : '—',
                 escapeHtml((row.nodes || []).join(', ') || '—'),
                 ban,
             ];

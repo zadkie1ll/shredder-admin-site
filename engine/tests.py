@@ -9,6 +9,7 @@ import os
 import re
 import time
 from contextlib import ExitStack
+from urllib.parse import urlsplit
 from datetime import date
 from datetime import datetime
 from datetime import timedelta
@@ -1809,15 +1810,23 @@ class WataPaymentFlowTests(SimpleTestCase):
                 return user
 
         class FakeSession:
+            def __init__(self):
+                self.added = []
+
             def query(self, model):
                 return FakeQuery()
 
             def add(self, obj):
-                if isinstance(obj, MagicToken):
-                    obj.token = "magic-token"
+                # Токен проставляется во flush(), как в настоящей сессии:
+                # питоновский column default применяется на INSERT. Дубль,
+                # ставивший его в add(), скрывал регресс 2026-09-12
+                # (/login/magic/None/ в письме).
+                self.added.append(obj)
 
             def flush(self):
-                return None
+                for pending in self.added:
+                    if isinstance(pending, MagicToken) and pending.token is None:
+                        pending.token = "magic-token"
 
             def commit(self):
                 return None
@@ -1921,15 +1930,23 @@ class WataPaymentFlowTests(SimpleTestCase):
                 return user
 
         class FakeSession:
+            def __init__(self):
+                self.added = []
+
             def query(self, model):
                 return FakeQuery()
 
             def add(self, obj):
-                if isinstance(obj, MagicToken):
-                    obj.token = "magic-token"
+                # Токен проставляется во flush(), как в настоящей сессии:
+                # питоновский column default применяется на INSERT. Дубль,
+                # ставивший его в add(), скрывал регресс 2026-09-12
+                # (/login/magic/None/ в письме).
+                self.added.append(obj)
 
             def flush(self):
-                return None
+                for pending in self.added:
+                    if isinstance(pending, MagicToken) and pending.token is None:
+                        pending.token = "magic-token"
 
             def commit(self):
                 return None
@@ -2015,15 +2032,23 @@ class WataPaymentFlowTests(SimpleTestCase):
                 return user
 
         class FakeSession:
+            def __init__(self):
+                self.added = []
+
             def query(self, model):
                 return FakeQuery()
 
             def add(self, obj):
-                if isinstance(obj, MagicToken):
-                    obj.token = "magic-token"
+                # Токен проставляется во flush(), как в настоящей сессии:
+                # питоновский column default применяется на INSERT. Дубль,
+                # ставивший его в add(), скрывал регресс 2026-09-12
+                # (/login/magic/None/ в письме).
+                self.added.append(obj)
 
             def flush(self):
-                return None
+                for pending in self.added:
+                    if isinstance(pending, MagicToken) and pending.token is None:
+                        pending.token = "magic-token"
 
             def commit(self):
                 events.append("commit")
@@ -4267,6 +4292,7 @@ class SiteRegistrationViewFallbackTests(SimpleTestCase):
         class FakeSession:
             def __init__(self):
                 self.closed = False
+                self.added = []
 
             def begin(self):
                 return outer._FakeBegin()
@@ -4275,8 +4301,17 @@ class SiteRegistrationViewFallbackTests(SimpleTestCase):
                 return FakeQuery()
 
             def add(self, obj):
-                if isinstance(obj, MagicToken):
-                    obj.token = "magic-token"
+                # Токен здесь НЕ проставляем: питоновский column default
+                # (`MagicToken.token = Column(default=uuid.uuid4)`) настоящая
+                # сессия применяет на INSERT, то есть во flush(). Пока дубль
+                # делал это в add(), код без flush() проходил тесты и слал
+                # письма со ссылкой /login/magic/None/ (инцидент 2026-09-12).
+                self.added.append(obj)
+
+            def flush(self):
+                for obj in self.added:
+                    if isinstance(obj, MagicToken) and obj.token is None:
+                        obj.token = "magic-token"
 
             def close(self):
                 self.closed = True
@@ -4357,6 +4392,39 @@ class SiteRegistrationViewFallbackTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(json.loads(response.content), {"status": "ok"})
         send_email.assert_called_once()
+
+    def test_magic_link_in_letter_actually_opens_login(self):
+        """Регресс 2026-09-12: в письме уходила ссылка /login/magic/None/.
+
+        Утверждать «письмо отправлено» мало — именно так баг и доехал до прода:
+        отправка была, а ссылка в ней вела в 404, и войти не мог никто.
+        Поэтому проверяем не факт отправки, а то, что путь из письма
+        РАЗРЕЗОЛВИТСЯ Django в обработчик входа — то есть по нему реально
+        откроется кабинет.
+        """
+        user = SimpleNamespace(id=7, email="legacy@example.com", username="u7")
+        session = self._fake_session(user)
+
+        with mock.patch(
+            "engine.views.session_factory", return_value=session
+        ), mock.patch("engine.views.create_site_user"), mock.patch(
+            "engine.views.get_registration_context",
+            return_value={"referrer": None, "traffic_source": None, "ymid": None},
+        ), mock.patch(
+            "engine.views.sync_existing_user_tracking"
+        ), mock.patch(
+            "engine.views.send_magic_link_email"
+        ) as send_email:
+            response = send_magic_link(self._post("legacy@example.com"))
+
+        self.assertEqual(response.status_code, 200)
+        link = send_email.call_args.args[1]
+
+        # Токен обязан быть настоящим: «None» в пути — ровно тот инцидент.
+        self.assertNotIn("/magic/None/", link)
+        path = urlsplit(link).path
+        self.assertRegex(path, r"^/login/magic/[^/]+/$")
+        self.assertNotIn("None", path)
 
     @override_settings(PAYMENT_GATEWAY="wata")
     def test_pay_asks_to_retry_instead_of_creating_orphan(self):
@@ -12504,7 +12572,7 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             "data-antiabuse-bulk-url=",
             "data-ipguard-alerts-url=",
             'data-settings-group="antiabuse"',
-            "{slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid']}",
+            "{slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid', 'ipguard_burst_enabled', 'ipguard_burst_window_minutes', 'ipguard_burst_ips_per_hwid', 'ipguard_burst_confirmations', 'ipguard_geo_enabled', 'ipguard_geo_window_minutes', 'ipguard_geo_min_regions', 'ipguard_autoban_enabled', 'ipguard_autoban_segment', 'ipguard_autoban_steps_minutes', 'ipguard_autoban_escalation_window_hours', 'ipguard_autoban_max_per_hour', 'ipguard_max_alerts_per_hour', 'ipguard_excluded_ips']}",
             "loadAntiabuse();",
             # v2: предупреждения ip-guard, backfill маркеров, предзаполнение.
             'id="antiabuse-ipguard-warnings-toggle"',
@@ -13852,6 +13920,9 @@ class MalformedEmailGuardTests(SimpleTestCase):
                 return False
 
         class FakeSession:
+            def __init__(self):
+                self.added = []
+
             def begin(self):
                 return FakeBegin()
 
@@ -13859,8 +13930,11 @@ class MalformedEmailGuardTests(SimpleTestCase):
                 return FakeQuery()
 
             def add(self, obj):
-                if isinstance(obj, MagicToken):
-                    obj.token = "magic-token"
+                # Токен проставляется во flush(), как в настоящей сессии:
+                # питоновский column default применяется на INSERT. Дубль,
+                # ставивший его в add(), скрывал регресс 2026-09-12
+                # (/login/magic/None/ в письме).
+                self.added.append(obj)
 
             def commit(self):
                 return None
@@ -13869,7 +13943,9 @@ class MalformedEmailGuardTests(SimpleTestCase):
                 return None
 
             def flush(self):
-                return None
+                for pending in self.added:
+                    if isinstance(pending, MagicToken) and pending.token is None:
+                        pending.token = "magic-token"
 
             def close(self):
                 return None

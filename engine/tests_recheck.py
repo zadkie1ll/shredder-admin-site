@@ -832,7 +832,12 @@ class _AnonymousCheckoutSession(Session):
         self.existing_user = existing_user
         self.commit = mock.Mock()
         self.rollback = mock.Mock()
-        self.flush = mock.Mock()
+        # flush остаётся Mock (тесты считают вызовы), но с побочным эффектом
+        # настоящей сессии: именно здесь применяются питоновские column
+        # defaults. Пока дубль ставил MagicToken.token в add(), код без
+        # flush() проходил тесты и слал /login/magic/None/ (инцидент
+        # 2026-09-12).
+        self.flush = mock.Mock(side_effect=self._apply_insert_defaults)
 
     def rows(self, model):
         return [item for item in self.added if isinstance(item, model)]
@@ -844,11 +849,16 @@ class _AnonymousCheckoutSession(Session):
             return _CheckoutRows(self.rows(model))
         return Query(None)
 
+    def _apply_insert_defaults(self):
+        """Как SQLAlchemy на INSERT: проставляем то, что даёт БД/дефолт."""
+        for item in self.added:
+            if isinstance(item, MagicToken) and item.token is None:
+                item.token = 'magic-short-token'
+            if isinstance(item, User) and item.id is None:
+                item.id = self.next_user_id
+
     def add(self, item):
-        if isinstance(item, MagicToken):
-            item.token = 'magic-short-token'
-        if isinstance(item, User) and item.id is None:
-            item.id = self.next_user_id
+        # Никаких дефолтов здесь: их применяет flush(), как настоящая сессия.
         self.added.append(item)
 
 

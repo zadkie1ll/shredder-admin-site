@@ -2385,6 +2385,29 @@ def get_telegram_webapp_user_id(init_data_fields):
         return None
 
 
+def build_magic_link(base_url, token):
+    """Собирает ссылку входа и ОТКАЗЫВАЕТСЯ собрать её с пустым токеном.
+
+    Зачем проверка: `MagicToken.token` — питоновский column default
+    (`default=uuid.uuid4`), а он применяется на INSERT, а не при создании
+    объекта. Забыл `flush()` перед чтением — и в письмо уезжает
+    `/login/magic/None/`, которое URL-конвертер `<uuid:token>` не матчит:
+    пользователь получает 404 и не может войти вообще никак. Инцидент
+    2026-09-12: так сломался основной вход на сайт, письма уходили молча,
+    люди приходили в поддержку.
+
+    Исключение тут лучше, чем битая ссылка: обработчик входа ловит его,
+    отвечает «попробуйте ещё раз» и пишет traceback в лог — сбой становится
+    видимым сразу, а не через обращения в поддержку.
+    """
+    if token is None or str(token).strip() in ("", "None"):
+        raise ValueError(
+            "magic link token is empty — most likely the object was not "
+            "flushed before reading MagicToken.token"
+        )
+    return f"{base_url}/login/magic/{token}/"
+
+
 def send_magic_link_email(email, link, *, subject=None, template_context=None):
     context = {"link": link}
     if template_context:
@@ -2621,7 +2644,11 @@ def send_magic_link(request):
                 )
                 magic = MagicToken(user_id=user.id)
                 db_session.add(magic)
-                link = f"{auth_base_url}/login/magic/{magic.token}/"
+                # flush ОБЯЗАТЕЛЕН: до него magic.token ещё None (питоновский
+                # column default применяется на INSERT), и в письмо уходит
+                # ссылка /login/magic/None/ — 404 вместо входа.
+                db_session.flush()
+                link = build_magic_link(auth_base_url, magic.token)
             else:
                 # Existing malformed addresses remain reachable for their owner,
                 # but a new account may only be requested for a valid address.
@@ -11198,8 +11225,8 @@ def pay(request):
                 magic = MagicToken(user_id=user.id)
                 db_session.add(magic)
                 db_session.flush()
-                login_link = (
-                    f"{get_current_base_url(request)}/login/magic/{magic.token}/"
+                login_link = build_magic_link(
+                    get_current_base_url(request), magic.token
                 )
                 logging.info(
                     "created short payment magic link: email=%s user_id=%s tariff_id=%s",

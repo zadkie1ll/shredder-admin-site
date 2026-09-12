@@ -632,9 +632,19 @@ class _MagicLinkSession:
         return self.user
 
     def add(self, obj):
-        if isinstance(obj, MagicToken):
-            obj.token = "magic-token"
+        # НЕ проставляем здесь token: настоящая сессия применяет питоновский
+        # column default (`MagicToken.token = Column(default=uuid.uuid4)`) во
+        # время INSERT, то есть на flush(), а не на add(). Раньше дубль ставил
+        # токен именно тут — и код, забывший flush(), выглядел в тестах
+        # исправным, пока в проде уходили письма со ссылкой
+        # /login/magic/None/ (инцидент 2026-09-12).
         self.added.append(obj)
+
+    def flush(self):
+        """Как у SQLAlchemy: именно здесь применяются питоновские дефолты."""
+        for obj in self.added:
+            if isinstance(obj, MagicToken) and obj.token is None:
+                obj.token = "magic-token"
 
     def close(self):
         self.closed = True
