@@ -1813,7 +1813,7 @@
                             <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-gavel"></i></span>
                             <div>
                                 <h2 class="system-card-title">Автобан и предохранители</h2>
-                                <p><strong>Осторожно: включённый автобан банит подписки автоматически, без участия админа.</strong> По умолчанию выключен, и пока он выключен, детектор только публикует алерты — решение всегда за админом. Наказание применяется только после публикации алерта; при сегменте «только пробные без платежа» платящих автобан не трогает никогда.</p>
+                                <p><strong>Осторожно: включённый автобан банит подписки автоматически, без участия админа.</strong> По умолчанию выключен, и пока он выключен, детектор только публикует алерты — решение всегда за админом. Банит ТОЛЬКО суточный слой по одному абсолютному порогу: подписка вышла из N и более разных подсетей за окно подсчёта — независимо от числа устройств и порогов алертов. Всплеск и гео никогда не банят, только алертят. При сегменте «только пробные без платежа» платящих автобан не трогает никогда. Пробный режим (включён по умолчанию) — бан не выполняется, в алерт лишь добавляется строка «в боевом режиме был бы бан».</p>
                             </div>
                         </div>
                         <div id="antiabuse-autoban-status" class="referral-antifraud-status" aria-live="polite"></div>
@@ -1824,7 +1824,7 @@
                                 <div class="antifraud-row antifraud-row-state">
                                     <div class="antifraud-row-info">
                                         <div class="antifraud-row-name">Автоматическое наказание</div>
-                                        <div class="antifraud-row-desc">Выключено (по умолчанию) — как раньше: только алерт админам. Включено — подписка банится сама, на длительность из лестницы ниже.</div>
+                                        <div class="antifraud-row-desc">Выключено (по умолчанию) — как раньше: только алерт админам. Включено — подписка, перешагнувшая порог подсетей ниже, банится сама на длительность из лестницы (в пробном режиме — только помечается в алерте).</div>
                                     </div>
                                     <div class="antifraud-row-control">
                                         <button class="antifraud-switch" id="antiabuse-autoban-toggle" type="submit" name="action" value="ipguard_autoban_enable" role="switch" aria-checked="false">
@@ -1837,6 +1837,56 @@
                                         <strong data-antifraud-state data-antiabuse-state="ipguard_autoban">—</strong>
                                     </div>
                                 </div>
+
+                                <div class="antifraud-row antifraud-row-state">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Пробный режим (не банить, только помечать в алерте)</div>
+                                        <div class="antifraud-row-desc">Включено (по умолчанию) — даже при включённом автобане бан не выполняется, в алерт добавляется строка «в боевом режиме был бы бан». Выключено — баны боевые. Рекомендация: неделя наблюдений в пробном режиме; если строка появлялась только у настоящих раздатчиков — выключить пробный режим, порог не трогать.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <button class="antifraud-switch" id="antiabuse-autoban-dry-run-toggle" type="submit" name="action" value="ipguard_autoban_dry_run_enable" role="switch" aria-checked="false">
+                                            <span class="antifraud-switch-track" aria-hidden="true"><span class="antifraud-switch-thumb"></span></span>
+                                            <span class="antifraud-switch-label" data-antiabuse-toggle-label>Включить</span>
+                                        </button>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Состояние</span>
+                                        <strong data-antiabuse-state="ipguard_autoban_dry_run">—</strong>
+                                    </div>
+                                </div>
+
+                                <div class="antifraud-warning" data-antiabuse-dry-run role="status" hidden>
+                                    <i class="fas fa-flask" aria-hidden="true"></i>
+                                    <span data-antiabuse-dry-run-text>Пробный режим: баны не выполняются — подписки, перешагнувшие порог, только помечаются в алерте строкой «в боевом режиме был бы бан».</span>
+                                </div>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Бан с N подсетей за окно</div>
+                                        <div class="antifraud-row-desc">Абсолютный порог: бан, если подписка за окно подсчёта суточного слоя («Окно подсчёта» в карточке подсетей) вышла из N и более уникальных подсетей /24 — независимо от числа HWID-устройств и порогов алертов. Ложные алерты — единицы подсетей (ротация CGNAT одного оператора), настоящая раздача — десятки, сотни и тысячи; 30 — пустой коридор между ними. Работает даже при выключенных алертах суточного слоя.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="autoban_min_subnets" type="number" min="1" inputmode="numeric" placeholder="Например, 30" aria-label="Порог автобана, подсетей за окно">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_autoban_min_subnets">—</strong>
+                                    </div>
+                                </label>
+
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Подтверждений подряд</div>
+                                        <div class="antifraud-row-desc">Гистерезис: сколько прогонов детектора подряд порог обязан держаться, прежде чем банить. Защита от одиночного выброса в данных; при периоде прогона из карточки-рубильника это и есть задержка до бана.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <input class="input" name="autoban_confirmations" type="number" min="1" inputmode="numeric" placeholder="Например, 2" aria-label="Подтверждений автобана подряд">
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_autoban_confirmations">—</strong>
+                                    </div>
+                                </label>
 
                                 <label class="antifraud-row">
                                     <div class="antifraud-row-info">
@@ -1911,14 +1961,14 @@
                                 <details class="antifraud-how">
                                     <summary>Как это работает</summary>
                                     <div class="antifraud-how-body">
-                                        <p>Автобан — не отдельный детектор: он срабатывает только ПОСЛЕ опубликованного алерта любого слоя (подсети, всплеск, гео) и только по тем, кто попадает в выбранный сегмент. Нет алерта — нет наказания; выключен главный рубильник — нет ни алертов, ни наказаний.</p>
-                                        <p>Наказание — временная блокировка подписки на срок из лестницы: бот переводит её в ban-сквад и сам возвращает обратно по истечении срока, подписка не пересоздаётся. Повторное нарушение внутри окна эскалации двигает срок на следующую ступень, последняя ступень держится для всех дальнейших; вне окна счётчик начинается заново. Дольше 7 суток бот не забанит, даже если в лестнице стоит больше.</p>
+                                        <p>Бан принимает ТОЛЬКО суточный слой и только по одному абсолютному порогу: подписка за окно подсчёта вышла из N и более уникальных подсетей /24 — независимо от числа устройств и порогов алертов. Ложные алерты — это единицы подсетей (телефон на CGNAT-операторе получает адреса из разных /24), настоящая раздача — десятки, сотни и тысячи; между ними пустой коридор, в котором нет ни одного честного пользователя. Всплеск и гео (минутные окна) шумят по природе и банить не могут — только алертят. Порог обязан продержаться несколько прогонов подряд; сорвался на одном — счётчик начинается заново. Бан работает даже при выключенных алертах суточного слоя, но выключен главный рубильник — нет ни алертов, ни наказаний.</p>
+                                        <p>Пробный режим — обкатка: бан не выполняется, в алерт добавляется строка «в боевом режиме был бы бан». Неделя наблюдений; если строка появлялась только у настоящих раздатчиков — выключить пробный режим, порог не трогать. Наказание в боевом режиме — временная блокировка подписки на срок из лестницы: бот переводит её в ban-сквад и сам возвращает обратно по истечении срока, подписка не пересоздаётся. Повторное нарушение внутри окна эскалации двигает срок на следующую ступень, последняя держится для всех дальнейших; вне окна счётчик начинается заново. Дольше 7 суток бот не забанит, даже если в лестнице стоит больше. Подписки из «Исключённых подписок» не проверяются и не банятся.</p>
                                         <p class="antifraud-how-now"><span class="antifraud-how-now-label">Сейчас</span><span data-antiabuse-how="autoban">—</span></p>
                                     </div>
                                 </details>
 
                                 <div class="antifraud-footer">
-                                    <p class="antifraud-footer-note">Сначала задайте сегмент, лестницу и предохранители, потом включайте тумблер: включить автобан с некорректной лестницей нельзя.</p>
+                                    <p class="antifraud-footer-note">Сначала задайте порог, подтверждения, сегмент, лестницу и предохранители, потом включайте тумблер: включить автобан (и выключить пробный режим) с некорректными значениями в БД нельзя.</p>
                                     <button class="btn btn-secondary" type="submit" name="action" value="ipguard_autoban_set"><i class="fas fa-floppy-disk"></i>Сохранить</button>
                                 </div>
                             </div>
@@ -1929,8 +1979,8 @@
                         <div class="referral-section-heading">
                             <span class="referral-section-icon" aria-hidden="true"><i class="fas fa-list-check"></i></span>
                             <div>
-                                <h2 class="system-card-title">Исключения адресов</h2>
-                                <p>Адреса своих каскадных мостов и промежуточных узлов: с них приходят сразу все клиенты, и детектор видит «ещё один IP пользователя». Адреса нод ip-guard исключает сам — сюда их вписывать не нужно. Список применяется на приёме наблюдений, поэтому исключённые адреса вообще не попадают в таблицу.</p>
+                                <h2 class="system-card-title">Исключения адресов и подписок</h2>
+                                <p>Адреса своих каскадных мостов и промежуточных узлов: с них приходят сразу все клиенты, и детектор видит «ещё один IP пользователя». Адреса нод ip-guard исключает сам — сюда их вписывать не нужно. Список применяется на приёме наблюдений, поэтому исключённые адреса вообще не попадают в таблицу. Ниже — исключённые подписки: свои сознательно розданные, их не проверяет ни один слой и не банит автобан.</p>
                             </div>
                         </div>
                         <div id="antiabuse-excluded-status" class="referral-antifraud-status" aria-live="polite"></div>
@@ -1956,6 +2006,32 @@
                                     <p class="antifraud-footer-note">Пустое поле оставляет список как есть — чтобы убрать все исключения, нажмите «Очистить список».</p>
                                     <button class="btn btn-secondary" type="submit" name="action" value="ipguard_excluded_clear"><i class="fas fa-eraser"></i>Очистить список</button>
                                     <button class="btn btn-secondary" type="submit" name="action" value="ipguard_excluded_set"><i class="fas fa-floppy-disk"></i>Сохранить</button>
+                                </div>
+                            </div>
+                        </form>
+                        <div id="antiabuse-excluded-usernames-status" class="referral-antifraud-status" aria-live="polite"></div>
+                        <form id="antiabuse-excluded-usernames-form" class="referral-antifraud-form" data-antiabuse-form="ipguard-excluded-usernames">
+                            {% csrf_token %}
+                            <button type="submit" name="action" value="ipguard_excluded_usernames_set" class="antifraud-implicit-submit" tabindex="-1" aria-hidden="true"></button>
+                            <div class="antifraud-panel">
+                                <label class="antifraud-row">
+                                    <div class="antifraud-row-info">
+                                        <div class="antifraud-row-name">Исключённые подписки</div>
+                                        <div class="antifraud-row-desc">Свои сознательно розданные подписки: их не проверяет ни один слой (подсети, всплеск, гео) и не банит автобан. Юзернеймы через запятую — ровно как в строке «Юзернейм» алерта (числовой ID панели). Например: 594514115, 7715572734. Опечатка отклоняется целиком, а не выбрасывается молча.</div>
+                                    </div>
+                                    <div class="antifraud-row-control">
+                                        <textarea class="input" name="excluded_usernames" rows="3" placeholder="594514115, 7715572734" aria-label="Исключённые подписки (юзернеймы через запятую)" autocomplete="off" spellcheck="false"></textarea>
+                                    </div>
+                                    <div class="antifraud-row-current">
+                                        <span>Сейчас</span>
+                                        <strong data-antiabuse-current="ipguard_excluded_usernames">—</strong>
+                                    </div>
+                                </label>
+
+                                <div class="antifraud-footer">
+                                    <p class="antifraud-footer-note">Пустое поле оставляет список как есть — чтобы убрать все исключения подписок, нажмите «Очистить список».</p>
+                                    <button class="btn btn-secondary" type="submit" name="action" value="ipguard_excluded_usernames_clear"><i class="fas fa-eraser"></i>Очистить список</button>
+                                    <button class="btn btn-secondary" type="submit" name="action" value="ipguard_excluded_usernames_set"><i class="fas fa-floppy-disk"></i>Сохранить</button>
                                 </div>
                             </div>
                         </form>
@@ -8056,7 +8132,7 @@
             // пробных, алерты по подсетям, всплеск, гео, автобан, исключения);
             // ключи сгруппированы, чтобы не уехать в «Прочие». Raw-список
             // свёрнут и остаётся резервным путём правки.
-            {slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_check_interval_seconds', 'ipguard_subnets_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid', 'ipguard_burst_enabled', 'ipguard_burst_window_minutes', 'ipguard_burst_ips_per_hwid', 'ipguard_burst_confirmations', 'ipguard_burst_min_subnets', 'ipguard_geo_enabled', 'ipguard_geo_window_minutes', 'ipguard_geo_min_regions', 'ipguard_autoban_enabled', 'ipguard_autoban_segment', 'ipguard_autoban_steps_minutes', 'ipguard_autoban_escalation_window_hours', 'ipguard_autoban_max_per_hour', 'ipguard_max_alerts_per_hour', 'ipguard_excluded_ips']},
+            {slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_check_interval_seconds', 'ipguard_subnets_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid', 'ipguard_burst_enabled', 'ipguard_burst_window_minutes', 'ipguard_burst_ips_per_hwid', 'ipguard_burst_confirmations', 'ipguard_burst_min_subnets', 'ipguard_geo_enabled', 'ipguard_geo_window_minutes', 'ipguard_geo_min_regions', 'ipguard_autoban_enabled', 'ipguard_autoban_segment', 'ipguard_autoban_steps_minutes', 'ipguard_autoban_escalation_window_hours', 'ipguard_autoban_max_per_hour', 'ipguard_autoban_min_subnets', 'ipguard_autoban_confirmations', 'ipguard_autoban_dry_run', 'ipguard_max_alerts_per_hour', 'ipguard_excluded_ips', 'ipguard_excluded_usernames']},
             // Grace-доступ и маршрутизация админ-алертов по темам форума своих
             // форм не имеют — правятся строками в подвкладке «Общие».
             {slug: 'general', keys: ['trial_period_days', 'site_trial_registration_enabled', 'banned_telegram_ids', 'web_login_url', 'redirect_url', 'internal_squads_uuids', 'technical_work_enabled', 'apple_recommended_app', 'webapp_enabled', 'webapp_url', 'webapp_button_text', 'admin_report_enabled', 'admin_report_hour_msk', 'grace_access_enabled', 'grace_access_squad_uuid', 'grace_access_hours', 'grace_access_segment', 'grace_access_dry_run', 'grace_access_max_per_run', 'admin_alert_chat_id', 'admin_alert_topics']},
@@ -8289,7 +8365,7 @@
         // --- Антиабьюз: лимит трафика пробных и алерты ip-guard ----------------
         // Совпадает с группой 'antiabuse' в SETTING_GROUPS: сохранение любой из
         // этих строк перечитывает формы вкладки «Антиабьюз» (loadAntiabuse).
-        const ANTIABUSE_KEYS = new Set(['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_check_interval_seconds', 'ipguard_subnets_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid', 'ipguard_burst_enabled', 'ipguard_burst_window_minutes', 'ipguard_burst_ips_per_hwid', 'ipguard_burst_confirmations', 'ipguard_burst_min_subnets', 'ipguard_geo_enabled', 'ipguard_geo_window_minutes', 'ipguard_geo_min_regions', 'ipguard_autoban_enabled', 'ipguard_autoban_segment', 'ipguard_autoban_steps_minutes', 'ipguard_autoban_escalation_window_hours', 'ipguard_autoban_max_per_hour', 'ipguard_max_alerts_per_hour', 'ipguard_excluded_ips']);
+        const ANTIABUSE_KEYS = new Set(['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_check_interval_seconds', 'ipguard_subnets_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid', 'ipguard_burst_enabled', 'ipguard_burst_window_minutes', 'ipguard_burst_ips_per_hwid', 'ipguard_burst_confirmations', 'ipguard_burst_min_subnets', 'ipguard_geo_enabled', 'ipguard_geo_window_minutes', 'ipguard_geo_min_regions', 'ipguard_autoban_enabled', 'ipguard_autoban_segment', 'ipguard_autoban_steps_minutes', 'ipguard_autoban_escalation_window_hours', 'ipguard_autoban_max_per_hour', 'ipguard_autoban_min_subnets', 'ipguard_autoban_confirmations', 'ipguard_autoban_dry_run', 'ipguard_max_alerts_per_hour', 'ipguard_excluded_ips', 'ipguard_excluded_usernames']);
         const ANTIABUSE_BULK_BATCH = 50;
         const ANTIABUSE_CONFIRMS = {
             trial_limit_enable: 'Включить лимит трафика для НОВЫХ пробных подписок без платежа? Уже существующие подписки не изменятся — для них есть «Применить лимит ко всем активным пробным» ниже.',
@@ -8304,9 +8380,11 @@
             ipguard_burst_disable: 'Выключить детект всплеска? Останется только суточный счёт подсетей, как раньше.',
             ipguard_geo_enable: 'Включить гео-детект (подключения из разных мест)? Без локальной City-MMDB слой останется выключенным.',
             ipguard_geo_disable: 'Выключить гео-детект? Регионы перестанут считаться.',
-            ipguard_autoban_enable: 'ВКЛЮЧИТЬ АВТОБАН? Подписки будут блокироваться АВТОМАТИЧЕСКИ, без участия админа, на длительность из лестницы наказаний. При сегменте never_paid платящих автобан не трогает. Продолжить?',
+            ipguard_autoban_enable: 'ВКЛЮЧИТЬ АВТОБАН? Подписки, перешагнувшие порог подсетей за окно, будут блокироваться АВТОМАТИЧЕСКИ, без участия админа, на длительность из лестницы наказаний (в пробном режиме — только помечаться в алерте). При сегменте never_paid платящих автобан не трогает. Продолжить?',
             ipguard_autoban_disable: 'Выключить автобан? Детектор продолжит публиковать алерты, наказание снова только за админом. Уже выданные баны не снимаются.',
+            ipguard_autoban_dry_run_disable: 'ВЫКЛЮЧИТЬ ПРОБНЫЙ РЕЖИМ? При включённом автобане подписки, перешагнувшие порог, начнут блокироваться ПО-НАСТОЯЩЕМУ. Рекомендуется неделя наблюдений в пробном режиме, когда строка «в боевом режиме был бы бан» появлялась только у настоящих раздатчиков. Продолжить?',
             ipguard_excluded_clear: 'Очистить список исключений ip-guard? Адреса каскадных мостов снова начнут считаться подключениями пользователей.',
+            ipguard_excluded_usernames_clear: 'Очистить список исключённых подписок? Их снова начнут проверять все слои, и автобан сможет их банить.',
         };
         const ANTIABUSE_BULK_LABELS = {
             apply_trial_limit: 'Применить лимит ко всем активным пробным без платежей',
@@ -8483,7 +8561,9 @@
             const on = layers.filter(([, enabled]) => enabled).map(([name]) => name);
             const off = layers.filter(([, enabled]) => !enabled).map(([name]) => name);
             const autobanText = antiabuseEffective.ipguard_autoban_enabled
-                ? 'Автобан включён: после алерта подписка может быть заблокирована автоматически.'
+                ? (antiabuseEffective.ipguard_autoban_dry_run
+                    ? 'Автобан включён в пробном режиме: подписка с порога подсетей только помечается в алерте, бан не выполняется.'
+                    : 'Автобан включён (боевой режим): подписка с порога подсетей за окно блокируется автоматически.')
                 : 'Автобан выключен: наказание остаётся за админом.';
             antiabuseSetHint('master', antiabuseEffective.ipguard_alerts_enabled
                 ? `: детектор просыпается раз в ${antiabuseSecondsText(interval)}. `
@@ -8544,19 +8624,38 @@
                 : ': пороги в БД некорректны — исправьте значения.');
             antiabuseSetBlindWarning('geo', geoWindow, interval, 'одновременный вход из разных мест, уложившийся в этот промежуток');
 
-            // Автобан: лестница читается словами, иначе «15,60,1440» приходится
+            // Автобан: порог — абсолютное число подсетей за окно суточного слоя,
+            // задержка до бана складывается из подтверждений и периода прогона;
+            // лестница читается словами, иначе «15,60,1440» приходится
             // расшифровывать каждый раз заново.
+            const banSubnets = antiabuseHintNumber('antiabuse-autoban-form', 'autoban_min_subnets', 'ipguard_autoban_min_subnets');
+            const banConfirmations = antiabuseHintNumber('antiabuse-autoban-form', 'autoban_confirmations', 'ipguard_autoban_confirmations');
             const escalation = antiabuseHintNumber('antiabuse-autoban-form', 'autoban_escalation_window_hours', 'ipguard_autoban_escalation_window_hours');
             const maxBans = antiabuseHintNumber('antiabuse-autoban-form', 'autoban_max_per_hour', 'ipguard_autoban_max_per_hour');
             const maxAlerts = antiabuseHintNumber('antiabuse-autoban-form', 'max_alerts_per_hour', 'ipguard_max_alerts_per_hour');
             const segmentSelect = document.getElementById('antiabuse-autoban-form')?.elements?.autoban_segment;
             const segmentLabel = segmentSelect?.selectedOptions?.[0]?.textContent
                 || antiabuseEffective.ipguard_autoban_segment_label || '—';
-            antiabuseSetHint('autoban', `: наказываем «${segmentLabel}». Лестница: ${antiabuseAutobanStepsText()}; `
-                + `счётчик нарушений обнуляется через ${escalation || '—'} ч без новых алертов. `
-                + `Предохранители: не больше ${maxBans || '—'} автобанов и ${maxAlerts || '—'} алертов в час — `
-                + 'сверх лимита автобаны отключаются до конца часа, а алерты сворачиваются в одну сводку.'
-                + antiabuseMasterOffNote('алертов нет, а без алерта нет и наказания'));
+            const dryRun = Boolean(antiabuseEffective.ipguard_autoban_dry_run);
+            const banDelayText = banConfirmations > 1
+                ? `${antiabuseCount(banConfirmations, ['прогон', 'прогона', 'прогонов'])} подряд`
+                    + `${interval ? ` (~${antiabuseSecondsText((banConfirmations - 1) * interval)} при периоде ${interval} с)` : ''}`
+                : 'на первом же прогоне, где порог достигнут';
+            antiabuseSetHint('autoban', banSubnets
+                ? `: бан с ${antiabuseCount(banSubnets, ['подсети', 'подсетей', 'подсетей'])} за ${windowHours || '—'} ч `
+                    + '(суточный слой, независимо от числа устройств и порогов алертов), порог должен держаться '
+                    + `${banDelayText}; всплеск и гео не банят. `
+                    + `Пробный режим ${dryRun ? 'включён: бан не выполняется, в алерт добавляется «в боевом режиме был бы бан»' : 'выключен: баны боевые'}. `
+                    + `Наказываем «${segmentLabel}». Лестница: ${antiabuseAutobanStepsText()}; `
+                    + `счётчик нарушений обнуляется через ${escalation || '—'} ч без новых нарушений. `
+                    + `Предохранители: не больше ${maxBans || '—'} автобанов и ${maxAlerts || '—'} алертов в час — `
+                    + 'сверх лимита автобаны отключаются до конца часа, а алерты сворачиваются в одну сводку.'
+                    + antiabuseMasterOffNote('ни алертов, ни наказаний нет')
+                : ': порог автобана в БД некорректен — исправьте значение.');
+            // Бейдж пробного режима висит на виду, не внутри свёрнутой подсказки:
+            // «автобан включён, а банов нет» — ровно та путаница, которую он снимает.
+            const dryRunBox = document.querySelector('[data-antiabuse-dry-run]');
+            if (dryRunBox) dryRunBox.hidden = !dryRun;
         }
 
         function renderAntiabuse(payload) {
@@ -8633,12 +8732,19 @@
                 antiabuseSetField(autobanForm, 'autoban_steps_minutes', effective.ipguard_autoban_steps_minutes);
                 antiabuseSetField(autobanForm, 'autoban_escalation_window_hours', effective.ipguard_autoban_escalation_window_hours);
                 antiabuseSetField(autobanForm, 'autoban_max_per_hour', effective.ipguard_autoban_max_per_hour);
+                antiabuseSetField(autobanForm, 'autoban_min_subnets', effective.ipguard_autoban_min_subnets);
+                antiabuseSetField(autobanForm, 'autoban_confirmations', effective.ipguard_autoban_confirmations);
                 antiabuseSetField(autobanForm, 'max_alerts_per_hour', effective.ipguard_max_alerts_per_hour);
                 antiabuseSetToggle(autobanForm, 'antiabuse-autoban-toggle', Boolean(effective.ipguard_autoban_enabled), 'ipguard_autoban_enable', 'ipguard_autoban_disable', 'ipguard_autoban');
+                // Пробный режим — вложенный тумблер (панель не красит): он не
+                // включает автобан, а лишь удерживает его от боевых банов.
+                antiabuseSetToggle(autobanForm, 'antiabuse-autoban-dry-run-toggle', Boolean(effective.ipguard_autoban_dry_run), 'ipguard_autoban_dry_run_enable', 'ipguard_autoban_dry_run_disable', 'ipguard_autoban_dry_run', false);
                 antiabuseSetCurrent(autobanForm, 'ipguard_autoban_segment', effective.ipguard_autoban_segment_label || '—');
                 antiabuseSetCurrent(autobanForm, 'ipguard_autoban_steps_minutes', effective.ipguard_autoban_steps_label || '—');
                 antiabuseSetCurrent(autobanForm, 'ipguard_autoban_escalation_window_hours', effective.ipguard_autoban_escalation_window_hours ? `${effective.ipguard_autoban_escalation_window_hours} ч` : '—');
                 antiabuseSetCurrent(autobanForm, 'ipguard_autoban_max_per_hour', effective.ipguard_autoban_max_per_hour ?? '—');
+                antiabuseSetCurrent(autobanForm, 'ipguard_autoban_min_subnets', effective.ipguard_autoban_min_subnets ? `${effective.ipguard_autoban_min_subnets} подсетей` : '—');
+                antiabuseSetCurrent(autobanForm, 'ipguard_autoban_confirmations', effective.ipguard_autoban_confirmations ?? '—');
                 antiabuseSetCurrent(autobanForm, 'ipguard_max_alerts_per_hour', effective.ipguard_max_alerts_per_hour ?? '—');
             }
             const excludedForm = document.getElementById('antiabuse-excluded-form');
@@ -8648,7 +8754,12 @@
                 antiabuseSetField(excludedForm, 'excluded_ips', effective.ipguard_excluded_ips);
                 antiabuseSetCurrent(excludedForm, 'ipguard_excluded_ips', effective.ipguard_excluded_ips_label || '—');
             }
-            ['antiabuse-trial-status', 'antiabuse-ipguard-master-status', 'antiabuse-ipguard-status', 'antiabuse-burst-status', 'antiabuse-geo-status', 'antiabuse-autoban-status', 'antiabuse-excluded-status'].forEach((id) => {
+            const excludedUsernamesForm = document.getElementById('antiabuse-excluded-usernames-form');
+            if (excludedUsernamesForm) {
+                antiabuseSetField(excludedUsernamesForm, 'excluded_usernames', effective.ipguard_excluded_usernames);
+                antiabuseSetCurrent(excludedUsernamesForm, 'ipguard_excluded_usernames', effective.ipguard_excluded_usernames_label || '—');
+            }
+            ['antiabuse-trial-status', 'antiabuse-ipguard-master-status', 'antiabuse-ipguard-status', 'antiabuse-burst-status', 'antiabuse-geo-status', 'antiabuse-autoban-status', 'antiabuse-excluded-status', 'antiabuse-excluded-usernames-status'].forEach((id) => {
                 const target = document.getElementById(id);
                 if (target) target.innerHTML = '';
             });

@@ -12144,15 +12144,36 @@ class AntiabuseSettingsEndpointTests(_AntiabuseSqliteMixin, SimpleTestCase):
         )
         self.assertEqual(effective["ipguard_autoban_escalation_window_hours"], 24)
         self.assertEqual(effective["ipguard_autoban_max_per_hour"], 10)
+        # Порог автобана — абсолютный по суточному слою, гистерезис по прогонам,
+        # пробный режим по умолчанию ВКЛЮЧЁН: бан не выполняется из коробки.
+        self.assertEqual(effective["ipguard_autoban_min_subnets"], 30)
+        self.assertEqual(effective["ipguard_autoban_confirmations"], 2)
+        self.assertIs(effective["ipguard_autoban_dry_run"], True)
         self.assertEqual(effective["ipguard_max_alerts_per_hour"], 30)
         self.assertEqual(effective["ipguard_excluded_ips"], "")
         self.assertEqual(effective["ipguard_excluded_ips_count"], 0)
         self.assertEqual(effective["ipguard_excluded_ips_label"], "не заданы")
+        self.assertEqual(effective["ipguard_excluded_usernames"], "")
+        self.assertEqual(effective["ipguard_excluded_usernames_list"], [])
+        self.assertEqual(effective["ipguard_excluded_usernames_count"], 0)
+        self.assertEqual(effective["ipguard_excluded_usernames_label"], "не заданы")
         self.assertIs(payload["managed_limits_available"], True)
-        self.assertEqual(len(payload["settings"]), 27)
+        self.assertEqual(len(payload["settings"]), 31)
         self.assertEqual(
             [item["key"] for item in payload["settings"]][-2:],
-            ["ipguard_max_alerts_per_hour", "ipguard_excluded_ips"],
+            ["ipguard_excluded_ips", "ipguard_excluded_usernames"],
+        )
+        # Ключи автобана — подряд, в порядке полей карточки: предохранитель,
+        # порог, подтверждения, пробный режим, потолок алертов.
+        self.assertEqual(
+            [item["key"] for item in payload["settings"]][24:29],
+            [
+                "ipguard_autoban_max_per_hour",
+                "ipguard_autoban_min_subnets",
+                "ipguard_autoban_confirmations",
+                "ipguard_autoban_dry_run",
+                "ipguard_max_alerts_per_hour",
+            ],
         )
         # Минимум подсетей — поле карточки всплеска, поэтому идёт сразу за
         # подтверждениями, а не в хвосте списка.
@@ -12501,6 +12522,170 @@ class AntiabuseSettingsEndpointTests(_AntiabuseSqliteMixin, SimpleTestCase):
         status, payload = self._request("POST", action="ipguard_autoban_disable")
         self.assertIs(payload["effective"]["ipguard_autoban_enabled"], False)
 
+    def test_ipguard_autoban_threshold_and_confirmations_set(self):
+        """Порог автобана — одно абсолютное число подсетей за окно и
+        гистерезис по прогонам: сохраняются той же формой, что и лестница;
+        мусор отвергается, значение не меняется."""
+        from common.models.db import SystemSetting
+
+        status, payload = self._request(
+            "POST", action="ipguard_autoban_set", autoban_min_subnets="40",
+            autoban_confirmations="3",
+        )
+
+        self.assertEqual(status, 200)
+        effective = payload["effective"]
+        self.assertEqual(effective["ipguard_autoban_min_subnets"], 40)
+        self.assertEqual(effective["ipguard_autoban_confirmations"], 3)
+        self.assertEqual(
+            self.session.get(SystemSetting, "ipguard_autoban_min_subnets").value, "40"
+        )
+        self.assertEqual(
+            self.session.get(SystemSetting, "ipguard_autoban_confirmations").value, "3"
+        )
+        # Остальные поля карточки формой не тронуты (пустое = «не трогать»).
+        self.assertEqual(effective["ipguard_autoban_steps_minutes"], "15,60,1440")
+
+        for field in ("autoban_min_subnets", "autoban_confirmations"):
+            for bad in ("0", "abc", "-1", "1.5"):
+                status, payload = self._request(
+                    "POST", action="ipguard_autoban_set", **{field: bad}
+                )
+                self.assertEqual(status, 400, (field, bad))
+                self.assertIn(f"ipguard_{field}", payload["message"], (field, bad))
+        _, payload = self._request()
+        self.assertEqual(payload["effective"]["ipguard_autoban_min_subnets"], 40)
+        self.assertEqual(payload["effective"]["ipguard_autoban_confirmations"], 3)
+        self.assertEqual(
+            self.session.get(SystemSetting, "ipguard_autoban_min_subnets").value, "40"
+        )
+
+    def test_ipguard_autoban_dry_run_toggle(self):
+        """Пробный режим: по умолчанию включён, выключается и включается
+        отдельными действиями; в аудит уходит setting_save по ключу."""
+        from common.models.db import SystemSetting
+
+        status, payload = self._request("POST", action="ipguard_autoban_dry_run_disable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["ipguard_autoban_dry_run"], False)
+        self.assertEqual(
+            self.session.get(SystemSetting, "ipguard_autoban_dry_run").value, "0"
+        )
+        status, payload = self._request("POST", action="ipguard_autoban_dry_run_enable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["ipguard_autoban_dry_run"], True)
+        self.assertEqual(
+            self.session.get(SystemSetting, "ipguard_autoban_dry_run").value, "1"
+        )
+        self.assertEqual(
+            [call.kwargs["target"] for call in self.audit.call_args_list],
+            ["ipguard_autoban_dry_run", "ipguard_autoban_dry_run"],
+        )
+
+    def test_autoban_cannot_be_enabled_with_broken_threshold_in_db(self):
+        """Битый порог/подтверждения в БД молча ушли бы в дефолт common —
+        включение автобана и выключение пробного режима запрещены до
+        исправления; выключение автобана и включение пробного режима — нет."""
+        from common.models.db import SystemSetting
+
+        # Эндпоинт откатывает сессию на ошибке, а _set только flush-ит —
+        # битое значение выставляется заново перед каждой проверкой.
+        self._set("ipguard_autoban_min_subnets", "abc")
+        status, payload = self._request("POST", action="ipguard_autoban_enable")
+        self.assertEqual(status, 400)
+        self.assertIn("ipguard_autoban_min_subnets", payload["message"])
+        self._set("ipguard_autoban_min_subnets", "abc")
+        status, payload = self._request("POST", action="ipguard_autoban_dry_run_disable")
+        self.assertEqual(status, 400)
+        self.assertIn("ipguard_autoban_min_subnets", payload["message"])
+        _, payload = self._request()
+        self.assertIs(payload["effective"]["ipguard_autoban_enabled"], False)
+        self.assertIs(payload["effective"]["ipguard_autoban_dry_run"], True)
+        self._set("ipguard_autoban_min_subnets", "abc")
+        status, _ = self._request("POST", action="ipguard_autoban_disable")
+        self.assertEqual(status, 200)
+        self._set("ipguard_autoban_min_subnets", "abc")
+        status, _ = self._request("POST", action="ipguard_autoban_dry_run_enable")
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            self.session.get(SystemSetting, "ipguard_autoban_min_subnets").value, "abc"
+        )
+
+        # Починка тем же сохранением — и включение проходит.
+        status, _ = self._request(
+            "POST", action="ipguard_autoban_set", autoban_min_subnets="30"
+        )
+        self.assertEqual(status, 200)
+        self._set("ipguard_autoban_confirmations", "0")
+        status, payload = self._request("POST", action="ipguard_autoban_enable")
+        self.assertEqual(status, 400)
+        self.assertIn("ipguard_autoban_confirmations", payload["message"])
+        self._set("ipguard_autoban_confirmations", "2")
+        status, payload = self._request("POST", action="ipguard_autoban_enable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["ipguard_autoban_enabled"], True)
+        status, payload = self._request("POST", action="ipguard_autoban_dry_run_disable")
+        self.assertEqual(status, 200)
+        self.assertIs(payload["effective"]["ipguard_autoban_dry_run"], False)
+
+    def test_ipguard_excluded_usernames_set_and_clear(self):
+        from common.models.db import SystemSetting
+
+        status, payload = self._request(
+            "POST", action="ipguard_excluded_usernames_set",
+            excluded_usernames="594514115, 7715572734",
+        )
+
+        self.assertEqual(status, 200)
+        effective = payload["effective"]
+        self.assertEqual(effective["ipguard_excluded_usernames"], "594514115,7715572734")
+        self.assertEqual(
+            effective["ipguard_excluded_usernames_list"], ["594514115", "7715572734"]
+        )
+        self.assertEqual(effective["ipguard_excluded_usernames_count"], 2)
+        self.assertEqual(
+            effective["ipguard_excluded_usernames_label"], "594514115, 7715572734"
+        )
+        self.assertEqual(
+            self.session.get(SystemSetting, "ipguard_excluded_usernames").value,
+            "594514115,7715572734",
+        )
+        # Список подписок не трогает список адресов и наоборот.
+        self.assertEqual(effective["ipguard_excluded_ips_count"], 0)
+
+        # Мусор отвергается с указанием записи и именем ключа, значение не
+        # меняется.
+        for bad in ("594514115, bad name", "<script>alert(1)</script>", "a" * 65):
+            status, payload = self._request(
+                "POST", action="ipguard_excluded_usernames_set", excluded_usernames=bad
+            )
+            self.assertEqual(status, 400, bad)
+            self.assertIn("ipguard_excluded_usernames", payload["message"], bad)
+        status, payload = self._request(
+            "POST", action="ipguard_excluded_usernames_set",
+            excluded_usernames="594514115, bad name",
+        )
+        self.assertIn("bad name", payload["message"])
+        too_long = ", ".join(str(1_000_000_000 + i) for i in range(60))
+        status, payload = self._request(
+            "POST", action="ipguard_excluded_usernames_set", excluded_usernames=too_long
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("длиннее", payload["message"])
+        _, payload = self._request()
+        self.assertEqual(payload["effective"]["ipguard_excluded_usernames_count"], 2)
+
+        # Пустое поле — «не трогать».
+        status, payload = self._request("POST", action="ipguard_excluded_usernames_set")
+        self.assertEqual(status, 400)
+        self.assertEqual(payload["message"], "Нет значений для сохранения")
+
+        # Очистка — отдельным действием.
+        status, payload = self._request("POST", action="ipguard_excluded_usernames_clear")
+        self.assertEqual(status, 200)
+        self.assertEqual(payload["effective"]["ipguard_excluded_usernames"], "")
+        self.assertEqual(payload["effective"]["ipguard_excluded_usernames_count"], 0)
+
     def test_autoban_cannot_be_enabled_with_broken_steps_in_db(self):
         """Автобан трогает живые подписки: включение при лестнице, которую
         ip-guard прочитает не так, как задумал админ, запрещено."""
@@ -12819,6 +13004,57 @@ class AntiabuseValidationTests(_AntiabuseSqliteMixin, SimpleTestCase):
         )
         self.assertIsNotNone(validate(self.session, "ipguard_excluded_ips", "мост"))
 
+    def test_ipguard_excluded_usernames_validation(self):
+        """parse_ipguard_excluded_usernames выбрасывает мусор молча — на входе
+        называем конкретную запись; пустое = очистка; длина под VARCHAR(512)."""
+        from engine.views import admin_validate_antiabuse_setting_pair as validate
+        from engine.views import admin_validate_ipguard_excluded_usernames_value as ok
+
+        self.assertIsNone(ok(""))
+        self.assertIsNone(ok("594514115"))
+        self.assertIsNone(ok("594514115, 7715572734"))
+        self.assertIsNone(ok("user_name.1@x-y"))
+        self.assertIsNone(ok("a" * 64))
+        self.assertIn("bad name", ok("594514115, bad name"))
+        self.assertIn("<script>", ok("<script>alert(1)</script>"))
+        self.assertIsNotNone(ok("a" * 65))
+        self.assertIsNotNone(ok("юзер"))
+        self.assertIn("не больше 200", ok(",".join(str(i) for i in range(201))))
+        self.assertIn("длиннее", ok(", ".join(str(1_000_000_000 + i) for i in range(60))))
+
+        self.assertIsNone(validate(self.session, "ipguard_excluded_usernames", ""))
+        self.assertIsNone(
+            validate(self.session, "ipguard_excluded_usernames", "594514115,7715572734")
+        )
+        self.assertIsNotNone(
+            validate(self.session, "ipguard_excluded_usernames", "bad name")
+        )
+
+    def test_ipguard_autoban_threshold_pair_validation(self):
+        """Битый порог/подтверждения в БД блокируют включение автобана и
+        выключение пробного режима; значение из этого же сохранения важнее."""
+        from engine.views import admin_validate_antiabuse_setting_pair as validate
+
+        self.assertIsNone(validate(self.session, "ipguard_autoban_enabled", "1"))
+        self.assertIsNone(validate(self.session, "ipguard_autoban_dry_run", "0"))
+        self._set("ipguard_autoban_min_subnets", "0")
+        self.assertIn(
+            "ipguard_autoban_min_subnets",
+            validate(self.session, "ipguard_autoban_enabled", "1"),
+        )
+        self.assertIn(
+            "ipguard_autoban_min_subnets",
+            validate(self.session, "ipguard_autoban_dry_run", "0"),
+        )
+        self.assertIsNone(validate(self.session, "ipguard_autoban_enabled", "0"))
+        self.assertIsNone(validate(self.session, "ipguard_autoban_dry_run", "1"))
+        self._set("ipguard_autoban_min_subnets", "30")
+        self._set("ipguard_autoban_confirmations", "abc")
+        self.assertIn(
+            "ipguard_autoban_confirmations",
+            validate(self.session, "ipguard_autoban_enabled", "1"),
+        )
+
     def test_generic_validator_handles_new_ipguard_keys(self):
         self.assertEqual(admin_validate_runtime_setting("ipguard_burst_enabled", "да"), ("1", None))
         self.assertEqual(admin_validate_runtime_setting("ipguard_geo_enabled", "выкл"), ("0", None))
@@ -12844,6 +13080,8 @@ class AntiabuseValidationTests(_AntiabuseSqliteMixin, SimpleTestCase):
             "ipguard_geo_min_regions",
             "ipguard_autoban_escalation_window_hours",
             "ipguard_autoban_max_per_hour",
+            "ipguard_autoban_min_subnets",
+            "ipguard_autoban_confirmations",
             "ipguard_max_alerts_per_hour",
         ):
             self.assertEqual(admin_validate_runtime_setting(key, "3"), ("3", None), key)
@@ -12851,6 +13089,13 @@ class AntiabuseValidationTests(_AntiabuseSqliteMixin, SimpleTestCase):
             self.assertEqual(admin_runtime_setting_type(key), "int", key)
         self.assertEqual(admin_runtime_setting_type("ipguard_autoban_steps_minutes"), "csv_int")
         self.assertEqual(admin_runtime_setting_type("ipguard_excluded_ips"), "csv")
+        self.assertEqual(admin_runtime_setting_type("ipguard_excluded_usernames"), "csv")
+        self.assertEqual(admin_runtime_setting_type("ipguard_autoban_dry_run"), "bool")
+        self.assertEqual(admin_validate_runtime_setting("ipguard_autoban_dry_run", "вкл"), ("1", None))
+        self.assertEqual(
+            admin_validate_runtime_setting("ipguard_excluded_usernames", "594514115 , 7715572734"),
+            ("594514115,7715572734", None),
+        )
         self.assertEqual(admin_runtime_setting_type("ipguard_autoban_segment"), "enum")
 
     def test_generic_validator_handles_antiabuse_keys(self):
@@ -13022,7 +13267,7 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             "data-antiabuse-bulk-url=",
             "data-ipguard-alerts-url=",
             'data-settings-group="antiabuse"',
-            "{slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_check_interval_seconds', 'ipguard_subnets_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid', 'ipguard_burst_enabled', 'ipguard_burst_window_minutes', 'ipguard_burst_ips_per_hwid', 'ipguard_burst_confirmations', 'ipguard_burst_min_subnets', 'ipguard_geo_enabled', 'ipguard_geo_window_minutes', 'ipguard_geo_min_regions', 'ipguard_autoban_enabled', 'ipguard_autoban_segment', 'ipguard_autoban_steps_minutes', 'ipguard_autoban_escalation_window_hours', 'ipguard_autoban_max_per_hour', 'ipguard_max_alerts_per_hour', 'ipguard_excluded_ips']}",
+            "{slug: 'antiabuse', keys: ['trial_traffic_limit_enabled', 'trial_traffic_limit_gb', 'trial_traffic_limit_strategy', 'ipguard_alerts_enabled', 'ipguard_check_interval_seconds', 'ipguard_subnets_enabled', 'ipguard_alert_segment', 'ipguard_subnets_per_hwid', 'ipguard_window_hours', 'ipguard_alert_cooldown_hours', 'ipguard_warnings_enabled', 'ipguard_warning_subnets_per_hwid', 'ipguard_burst_enabled', 'ipguard_burst_window_minutes', 'ipguard_burst_ips_per_hwid', 'ipguard_burst_confirmations', 'ipguard_burst_min_subnets', 'ipguard_geo_enabled', 'ipguard_geo_window_minutes', 'ipguard_geo_min_regions', 'ipguard_autoban_enabled', 'ipguard_autoban_segment', 'ipguard_autoban_steps_minutes', 'ipguard_autoban_escalation_window_hours', 'ipguard_autoban_max_per_hour', 'ipguard_autoban_min_subnets', 'ipguard_autoban_confirmations', 'ipguard_autoban_dry_run', 'ipguard_max_alerts_per_hour', 'ipguard_excluded_ips', 'ipguard_excluded_usernames']}",
             "loadAntiabuse();",
             # v2: предупреждения ip-guard, backfill маркеров, предзаполнение.
             'id="antiabuse-ipguard-warnings-toggle"',
@@ -13140,9 +13385,42 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             # путаница, из-за которой слой считают сломанным.
             "function antiabuseMasterOffNote(",
             "Но главный рубильник ip-guard выключен, поэтому ${tail}",
-            "antiabuseMasterOffNote('алертов нет, а без алерта нет и наказания')",
+            "antiabuseMasterOffNote('ни алертов, ни наказаний нет')",
             "и ${missedPhrase}, останется незамеченным",
             "if (event.target.closest('[data-antiabuse-form]')) antiabuseRenderIpguardHints();",
+            # v5: автобан по абсолютному порогу суточного слоя, гистерезис по
+            # прогонам, пробный режим с бейджем на виду, исключённые подписки.
+            'name="autoban_min_subnets"',
+            'name="autoban_confirmations"',
+            'data-antiabuse-current="ipguard_autoban_min_subnets"',
+            'data-antiabuse-current="ipguard_autoban_confirmations"',
+            "Бан с N подсетей за окно",
+            "Подтверждений подряд",
+            'id="antiabuse-autoban-dry-run-toggle"',
+            'value="ipguard_autoban_dry_run_enable"',
+            'data-antiabuse-state="ipguard_autoban_dry_run"',
+            "Пробный режим (не банить, только помечать в алерте)",
+            '<div class="antifraud-warning" data-antiabuse-dry-run role="status" hidden>',
+            "Пробный режим: баны не выполняются",
+            "в боевом режиме был бы бан",
+            "Всплеск и гео никогда не банят",
+            "antiabuseSetField(autobanForm, 'autoban_min_subnets', effective.ipguard_autoban_min_subnets)",
+            "antiabuseSetField(autobanForm, 'autoban_confirmations', effective.ipguard_autoban_confirmations)",
+            "antiabuseSetToggle(autobanForm, 'antiabuse-autoban-dry-run-toggle', Boolean(effective.ipguard_autoban_dry_run), 'ipguard_autoban_dry_run_enable', 'ipguard_autoban_dry_run_disable', 'ipguard_autoban_dry_run', false)",
+            "if (dryRunBox) dryRunBox.hidden = !dryRun;",
+            "всплеск и гео не банят",
+            "ipguard_autoban_dry_run_disable: 'ВЫКЛЮЧИТЬ ПРОБНЫЙ РЕЖИМ?",
+            'id="antiabuse-excluded-usernames-form"',
+            'id="antiabuse-excluded-usernames-status"',
+            'value="ipguard_excluded_usernames_set"',
+            'value="ipguard_excluded_usernames_clear"',
+            'name="excluded_usernames"',
+            'data-antiabuse-current="ipguard_excluded_usernames"',
+            "Исключённые подписки",
+            "594514115, 7715572734",
+            "antiabuseSetField(excludedUsernamesForm, 'excluded_usernames', effective.ipguard_excluded_usernames)",
+            "'antiabuse-excluded-status', 'antiabuse-excluded-usernames-status'",
+            "ipguard_excluded_usernames_clear: 'Очистить список исключённых подписок?",
         ):
             self.assertIn(needle, template, needle)
         for needle in (
@@ -13208,6 +13486,27 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
         self.assertLess(
             excluded_form.index("antifraud-implicit-submit"),
             excluded_form.index('value="ipguard_excluded_clear"'),
+        )
+        # Исключённые подписки — отдельная форма в той же карточке: Enter в
+        # ней не должен ни очищать список, ни трогать список адресов.
+        start = template.index('id="antiabuse-excluded-usernames-form"')
+        usernames_form = template[start : template.index("</form>", start)]
+        self.assertIn(
+            'value="ipguard_excluded_usernames_set" class="antifraud-implicit-submit"',
+            usernames_form,
+        )
+        self.assertLess(
+            usernames_form.index("antifraud-implicit-submit"),
+            usernames_form.index('value="ipguard_excluded_usernames_clear"'),
+        )
+        self.assertNotIn('name="excluded_ips"', usernames_form)
+        # Тумблер пробного режима стоит ПОСЛЕ скрытой кнопки *_set и не
+        # является первой submit-кнопкой формы автобана.
+        start = template.index('id="antiabuse-autoban-form"')
+        autoban_form = template[start : template.index("</form>", start)]
+        self.assertLess(
+            autoban_form.index("antifraud-implicit-submit"),
+            autoban_form.index('id="antiabuse-autoban-dry-run-toggle"'),
         )
 
     def test_client_card_exposes_limit_and_actions(self):
@@ -13370,6 +13669,17 @@ class AntiabuseTemplateAndDocsTests(SimpleTestCase):
             "`ipguard_subnets_enable` /\n`ipguard_subnets_disable`",
             "Как это работает",
             "смотрит 1 минуту из каждых 5 — он слеп 4 минуты из 5",
+            # v5: автобан по абсолютному порогу суточного слоя, гистерезис,
+            # пробный режим, исключённые подписки.
+            "`ipguard_autoban_min_subnets`",
+            "`ipguard_autoban_confirmations`",
+            "`ipguard_autoban_dry_run`",
+            "`ipguard_excluded_usernames`",
+            "`ipguard_autoban_dry_run_enable` /\n`ipguard_autoban_dry_run_disable`",
+            "`ipguard_excluded_usernames_set` /\n`ipguard_excluded_usernames_clear`",
+            "parse_ipguard_excluded_usernames",
+            "в боевом режиме был бы бан",
+            "Всплеск и гео",
         ):
             self.assertIn(needle, readme, needle)
 

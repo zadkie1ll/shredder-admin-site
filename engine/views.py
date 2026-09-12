@@ -184,6 +184,11 @@ from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_ENABLED
 from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_SEGMENT
 from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_ESCALATION_WINDOW_HOURS
 from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_MAX_PER_HOUR
+# Порог автобана — одно абсолютное число по суточному слою, гистерезис по
+# прогонам и пробный режим (бан не выполняется, только помечается в алерте).
+from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_MIN_SUBNETS
+from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_CONFIRMATIONS
+from common.models.settings import DEFAULT_IPGUARD_AUTOBAN_DRY_RUN
 from common.models.settings import DEFAULT_IPGUARD_MAX_ALERTS_PER_HOUR
 # Отдельный тумблер суточного слоя и период прогона детектора: без них по
 # админке нельзя понять, какой слой молчит и как часто слои вообще смотрят
@@ -214,14 +219,20 @@ from common.models.settings import IPGUARD_AUTOBAN_SEGMENT_SETTING
 from common.models.settings import IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING
 from common.models.settings import IPGUARD_AUTOBAN_ESCALATION_WINDOW_HOURS_SETTING
 from common.models.settings import IPGUARD_AUTOBAN_MAX_PER_HOUR_SETTING
+from common.models.settings import IPGUARD_AUTOBAN_MIN_SUBNETS_SETTING
+from common.models.settings import IPGUARD_AUTOBAN_CONFIRMATIONS_SETTING
+from common.models.settings import IPGUARD_AUTOBAN_DRY_RUN_SETTING
 from common.models.settings import IPGUARD_AUTOBAN_MAX_STEPS
 from common.models.settings import IPGUARD_AUTOBAN_STEP_MINUTES_MAX
 from common.models.settings import IPGUARD_MAX_ALERTS_PER_HOUR_SETTING
 from common.models.settings import IPGUARD_EXCLUDED_IPS_SETTING
+from common.models.settings import IPGUARD_EXCLUDED_USERNAMES_SETTING
 from common.models.settings import IPGUARD_MAX_EXCLUDED_ENTRIES
+from common.models.settings import IPGUARD_MAX_EXCLUDED_USERNAMES
 from common.models.settings import ipguard_warning_threshold_is_valid
 from common.models.settings import parse_ipguard_autoban_steps
 from common.models.settings import parse_ipguard_excluded_ips
+from common.models.settings import parse_ipguard_excluded_usernames
 from common.runtime_tariffs import resolve_runtime_tariffs
 from engine.request_ip import client_ip
 from engine.rate_limit import rate_limit_exceeded
@@ -6790,8 +6801,16 @@ ANTIABUSE_IPGUARD_KEYS = (
     IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING,
     IPGUARD_AUTOBAN_ESCALATION_WINDOW_HOURS_SETTING,
     IPGUARD_AUTOBAN_MAX_PER_HOUR_SETTING,
+    # Порог автобана — одно абсолютное число по суточному слою (подсети за
+    # окно), гистерезис по прогонам и пробный режим. Ключи идут в карточке
+    # автобана, поэтому и в реестре — сразу за её предохранителем.
+    IPGUARD_AUTOBAN_MIN_SUBNETS_SETTING,
+    IPGUARD_AUTOBAN_CONFIRMATIONS_SETTING,
+    IPGUARD_AUTOBAN_DRY_RUN_SETTING,
     IPGUARD_MAX_ALERTS_PER_HOUR_SETTING,
     IPGUARD_EXCLUDED_IPS_SETTING,
+    # Исключённые подписки — второе поле карточки исключений.
+    IPGUARD_EXCLUDED_USERNAMES_SETTING,
 )
 # Пара порогов ip-guard: предупреждение (suspicious) обязано быть СТРОГО
 # меньше алерта, иначе предупреждение никогда не отделить от алерта.
@@ -7007,6 +7026,41 @@ def admin_validate_ipguard_excluded_ips_value(value):
     return None
 
 
+def admin_validate_ipguard_excluded_usernames_value(value):
+    """Список исключённых подписок ip-guard: текст ошибки либо None.
+
+    ``parse_ipguard_excluded_usernames`` пропускает мусор молча (одна опечатка
+    не должна снимать исключение с остальных подписок) — в админке это значит
+    «сохранил, а подписка не исключилась». Каждая запись проверяется тем же
+    парсером и называется конкретно. Пустое значение допустимо: это «исключений
+    нет» (очистка списка).
+    """
+    # Имя ключа — в каждом сообщении: парная ошибка уходит админу как есть,
+    # без префикса «ключ: …» типовой валидации.
+    key = IPGUARD_EXCLUDED_USERNAMES_SETTING
+    items = admin_ipguard_csv_items(value)
+    if len(items) > IPGUARD_MAX_EXCLUDED_USERNAMES:
+        return (
+            f"Подписок в списке исключений ({key}) не больше "
+            f"{IPGUARD_MAX_EXCLUDED_USERNAMES}"
+        )
+    for item in items:
+        if not parse_ipguard_excluded_usernames(item):
+            return (
+                f"«{item}» не похоже на юзернейм подписки ({key}): нужен "
+                "числовой ID панели (как в строке «Юзернейм» алерта, напр. "
+                "594514115) или имя без пробелов до 64 символов"
+            )
+    # Значение целиком уходит в system_settings.value (VARCHAR(512)).
+    normalized = ", ".join(items)
+    if len(normalized) > IPGUARD_EXCLUDED_MAX_LENGTH:
+        return (
+            f"Список подписок ({key}) длиннее {IPGUARD_EXCLUDED_MAX_LENGTH} "
+            f"символов ({len(normalized)}) — сократите его"
+        )
+    return None
+
+
 def admin_validate_antiabuse_setting_pair(
     db_session, key, normalized_value, pending=None
 ):
@@ -7042,6 +7096,8 @@ def admin_validate_antiabuse_setting_pair(
         return admin_validate_ipguard_autoban_steps_value(normalized_value)
     if key == IPGUARD_EXCLUDED_IPS_SETTING:
         return admin_validate_ipguard_excluded_ips_value(normalized_value)
+    if key == IPGUARD_EXCLUDED_USERNAMES_SETTING:
+        return admin_validate_ipguard_excluded_usernames_value(normalized_value)
     if key == TRIAL_TRAFFIC_LIMIT_ENABLED_SETTING and normalized_value == "1":
         checks = (
             (
@@ -7125,11 +7181,15 @@ def admin_validate_antiabuse_setting_pair(
                 "некорректно: исправьте значение перед включением",
             ),
         )
-    elif key == IPGUARD_AUTOBAN_ENABLED_SETTING and normalized_value == "1":
+    elif (key == IPGUARD_AUTOBAN_ENABLED_SETTING and normalized_value == "1") or (
+        key == IPGUARD_AUTOBAN_DRY_RUN_SETTING and normalized_value == "0"
+    ):
         # Лестницу проверяем строгим валидатором отдельно: общий CSV-int
         # пропускает «0» и отрицательные, а автобан по fallback-длительности —
         # это бан, которого админ не задавал. Автобан трогает живые подписки,
-        # поэтому включение с сомнительными зависимостями запрещено.
+        # поэтому включение с сомнительными зависимостями запрещено. Выключение
+        # пробного режима — тот же порог риска (с него баны становятся
+        # боевыми), поэтому проверяется теми же зависимостями.
         if pending and IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING in pending:
             steps_raw = pending[IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING]
         else:
@@ -7159,6 +7219,16 @@ def admin_validate_antiabuse_setting_pair(
                 IPGUARD_AUTOBAN_MAX_PER_HOUR_SETTING,
                 "Предохранитель автобанов (ipguard_autoban_max_per_hour) в БД "
                 "некорректен: исправьте значение перед включением",
+            ),
+            (
+                IPGUARD_AUTOBAN_MIN_SUBNETS_SETTING,
+                "Порог автобана (ipguard_autoban_min_subnets) в БД некорректен: "
+                "исправьте значение перед включением",
+            ),
+            (
+                IPGUARD_AUTOBAN_CONFIRMATIONS_SETTING,
+                "Подтверждений автобана (ipguard_autoban_confirmations) в БД "
+                "некорректно: исправьте значение перед включением",
             ),
         )
     else:
@@ -9874,6 +9944,9 @@ def admin_antiabuse_effective(db_session):
         raw(IPGUARD_AUTOBAN_STEPS_MINUTES_SETTING)
     )
     excluded_ips = parse_ipguard_excluded_ips(raw(IPGUARD_EXCLUDED_IPS_SETTING))
+    excluded_usernames = parse_ipguard_excluded_usernames(
+        raw(IPGUARD_EXCLUDED_USERNAMES_SETTING)
+    )
     return {
         "trial_traffic_limit_enabled": trial_traffic_limit_enabled(db_session),
         "trial_traffic_limit_gb": limit.limit_gb,
@@ -9963,6 +10036,19 @@ def admin_antiabuse_effective(db_session):
             raw(IPGUARD_AUTOBAN_MAX_PER_HOUR_SETTING),
             DEFAULT_IPGUARD_AUTOBAN_MAX_PER_HOUR,
         ),
+        # Порог автобана — абсолютный, по суточному слою; гистерезис по
+        # прогонам; пробный режим по умолчанию ВКЛЮЧЁН (бан не выполняется).
+        "ipguard_autoban_min_subnets": parse_positive_int_setting(
+            raw(IPGUARD_AUTOBAN_MIN_SUBNETS_SETTING),
+            DEFAULT_IPGUARD_AUTOBAN_MIN_SUBNETS,
+        ),
+        "ipguard_autoban_confirmations": parse_positive_int_setting(
+            raw(IPGUARD_AUTOBAN_CONFIRMATIONS_SETTING),
+            DEFAULT_IPGUARD_AUTOBAN_CONFIRMATIONS,
+        ),
+        "ipguard_autoban_dry_run": parse_bool_setting(
+            raw(IPGUARD_AUTOBAN_DRY_RUN_SETTING), DEFAULT_IPGUARD_AUTOBAN_DRY_RUN
+        ),
         "ipguard_max_alerts_per_hour": parse_positive_int_setting(
             raw(IPGUARD_MAX_ALERTS_PER_HOUR_SETTING),
             DEFAULT_IPGUARD_MAX_ALERTS_PER_HOUR,
@@ -9973,6 +10059,14 @@ def admin_antiabuse_effective(db_session):
         "ipguard_excluded_ips_count": len(excluded_ips),
         "ipguard_excluded_ips_label": (
             ", ".join(excluded_ips) if excluded_ips else "не заданы"
+        ),
+        # Исключённые подписки: строка в форму (как ляжет в БД), разобранный
+        # список и подпись — по аналогии с адресами.
+        "ipguard_excluded_usernames": ",".join(excluded_usernames),
+        "ipguard_excluded_usernames_list": list(excluded_usernames),
+        "ipguard_excluded_usernames_count": len(excluded_usernames),
+        "ipguard_excluded_usernames_label": (
+            ", ".join(excluded_usernames) if excluded_usernames else "не заданы"
         ),
     }
 
@@ -10062,11 +10156,17 @@ def support_admin_api_antiabuse(request):
     (geo_window_minutes, geo_min_regions)|
     ipguard_autoban_enable|ipguard_autoban_disable|ipguard_autoban_set
     (autoban_segment, autoban_steps_minutes, autoban_escalation_window_hours,
-    autoban_max_per_hour, max_alerts_per_hour)|
-    ipguard_excluded_set (excluded_ips)|ipguard_excluded_clear.
+    autoban_max_per_hour, autoban_min_subnets, autoban_confirmations,
+    max_alerts_per_hour)|
+    ipguard_autoban_dry_run_enable|ipguard_autoban_dry_run_disable
+    (пробный режим автобана: бан не выполняется, только помечается в алерте;
+    выключение проверяет те же зависимости в БД, что и включение автобана)|
+    ipguard_excluded_set (excluded_ips)|ipguard_excluded_clear|
+    ipguard_excluded_usernames_set (excluded_usernames)|
+    ipguard_excluded_usernames_clear.
     Пустое поле в *_set оставляет текущее значение; значение, равное
-    сохранённому, не перезаписывается. Очистка списка исключений — отдельным
-    действием ipguard_excluded_clear (пустое поле трактуется как «не трогать»).
+    сохранённому, не перезаписывается. Очистка списков исключений — отдельными
+    действиями *_clear (пустое поле трактуется как «не трогать»).
     Ответ POST — тот же payload, что GET (UI после сохранения дополнительно
     перечитывает GET)."""
     auth_response = require_support_admin_role(request, SUPPORT_ADMIN_ROLE_ADMIN)
@@ -10178,11 +10278,19 @@ def support_admin_api_antiabuse(request):
                         "autoban_escalation_window_hours",
                     ),
                     (IPGUARD_AUTOBAN_MAX_PER_HOUR_SETTING, "autoban_max_per_hour"),
+                    (IPGUARD_AUTOBAN_MIN_SUBNETS_SETTING, "autoban_min_subnets"),
+                    (IPGUARD_AUTOBAN_CONFIRMATIONS_SETTING, "autoban_confirmations"),
                     (IPGUARD_MAX_ALERTS_PER_HOUR_SETTING, "max_alerts_per_hour"),
                 ):
                     value = (request.POST.get(form_key) or "").strip()
                     if value:
                         updates.append((key, value))
+            elif action == "ipguard_autoban_dry_run_enable":
+                updates.append((IPGUARD_AUTOBAN_DRY_RUN_SETTING, "1"))
+            elif action == "ipguard_autoban_dry_run_disable":
+                # С этого момента автобан (если включён) банит по-настоящему:
+                # парная проверка отказывает при битых зависимостях в БД.
+                updates.append((IPGUARD_AUTOBAN_DRY_RUN_SETTING, "0"))
             elif action == "ipguard_excluded_set":
                 value = (request.POST.get("excluded_ips") or "").strip()
                 if value:
@@ -10192,6 +10300,12 @@ def support_admin_api_antiabuse(request):
                 # (общий контракт форм вкладки), поэтому очистить список
                 # исключений иначе было бы нельзя.
                 updates.append((IPGUARD_EXCLUDED_IPS_SETTING, ""))
+            elif action == "ipguard_excluded_usernames_set":
+                value = (request.POST.get("excluded_usernames") or "").strip()
+                if value:
+                    updates.append((IPGUARD_EXCLUDED_USERNAMES_SETTING, value))
+            elif action == "ipguard_excluded_usernames_clear":
+                updates.append((IPGUARD_EXCLUDED_USERNAMES_SETTING, ""))
             else:
                 return JsonResponse(
                     {"status": "error", "message": "Неизвестное действие"}, status=400
