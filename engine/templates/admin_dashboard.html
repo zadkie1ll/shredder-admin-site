@@ -10841,6 +10841,38 @@
             });
         }
 
+        // У журнала сервера и лога установки ноды своя прокрутка внутри
+        // карточки (max-height + overflow-y). Перерисовка раз в 5 секунд
+        // создаёт эти панели заново, и без снимка позиции журнал каждый тик
+        // уезжал в начало прямо под руками у админа. Позиция восстанавливается
+        // по индексу внутри своего селектора (состав панелей между тиками
+        // стабилен), а кламп страхует от укоротившегося содержимого.
+        const INFRA_SCROLL_PANE_SELECTORS = ['.infra-log-list', '.node-provision-log'];
+
+        function infraSnapshotScrollPanes(container) {
+            const snapshot = {};
+            INFRA_SCROLL_PANE_SELECTORS.forEach((selector) => {
+                snapshot[selector] = Array.from(
+                    container.querySelectorAll(selector),
+                    (pane) => pane.scrollTop,
+                );
+            });
+            return snapshot;
+        }
+
+        function infraRestoreScrollPanes(container, snapshot) {
+            if (!snapshot) return;
+            INFRA_SCROLL_PANE_SELECTORS.forEach((selector) => {
+                const positions = snapshot[selector] || [];
+                container.querySelectorAll(selector).forEach((pane, index) => {
+                    const top = positions[index];
+                    if (!top) return;
+                    const maxTop = Math.max(0, pane.scrollHeight - pane.clientHeight);
+                    pane.scrollTop = Math.min(top, maxTop);
+                });
+            });
+        }
+
         // Телеметрия длинных периодов (24h/7d/30d) построена на минутных и
         // 15-минутных агрегатах — перезапрашивать её каждый 5-секундный тик
         // бессмысленно. Кэш последней серии позволяет обновлять её раз в
@@ -10904,12 +10936,14 @@
                 const dirty = infraSnapshotDirtyFields(container);
                 const interaction = infraSnapshotInteraction(container);
                 const openDetails = infraSnapshotOpenDetails(container);
+                const scrollPanes = infraSnapshotScrollPanes(container);
                 const previousScrollTop = window.scrollY;
                 infraDetailRenderedSeq = requestSeq;
                 infraPreviewCache.set(requestedId, detailPayload.result);
                 renderInfraDetail(container, detailPayload.result, telemetryPayload.result, full);
                 infraRestoreDirtyFields(container, dirty);
                 infraRestoreOpenDetails(container, openDetails);
+                infraRestoreScrollPanes(container, scrollPanes);
                 window.scrollTo({top: previousScrollTop, behavior: 'auto'});
                 infraRestoreInteraction(container, interaction);
                 const selected = infraServersResult?.servers?.find((server) => server.id === infraSelectedServerId);
