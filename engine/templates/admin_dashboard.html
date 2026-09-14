@@ -1003,13 +1003,33 @@
                             <div class="broadcast-promo-audience-hint" id="broadcast-promo-audience-hint">Выбор доступен после добавления кнопки «Промокод».</div>
                         </div>
                         <div class="broadcast-buttons" id="broadcast-buttons"></div>
+                        <div class="broadcast-schedule" id="broadcast-schedule" data-mode="now">
+                            <div class="broadcast-schedule-title"><i class="fas fa-clock"></i>Когда отправить</div>
+                            <div class="broadcast-schedule-options" role="radiogroup" aria-label="Время отправки">
+                                <label class="broadcast-schedule-option">
+                                    <input type="radio" name="broadcast-schedule-mode" value="now" checked>
+                                    <span><b>Сразу</b><small>Боты начнут отправку в течение 5 секунд</small></span>
+                                </label>
+                                <label class="broadcast-schedule-option">
+                                    <input type="radio" name="broadcast-schedule-mode" value="later">
+                                    <span><b>По расписанию</b><small>Рассылка стартует сама в указанное время (МСК)</small></span>
+                                </label>
+                            </div>
+                            <div class="broadcast-schedule-when" id="broadcast-schedule-when" hidden>
+                                <label class="broadcast-field">
+                                    <span class="broadcast-field-label">Дата и время старта <span>московское время</span></span>
+                                    <input class="input" type="datetime-local" id="broadcast-schedule-at" step="60">
+                                </label>
+                                <span class="broadcast-schedule-hint" id="broadcast-schedule-hint">Не раньше чем через минуту и не дальше 90 дней. До старта рассылку можно перенести, отправить сразу или отменить.</span>
+                            </div>
+                        </div>
                         <div class="broadcast-actions">
-                            <button class="btn broadcast-launch" type="button" id="broadcast-create"><i class="fas fa-paper-plane"></i>Запустить рассылку</button>
+                            <button class="btn broadcast-launch" type="button" id="broadcast-create"><i class="fas fa-paper-plane"></i><span id="broadcast-create-label">Запустить рассылку</span></button>
                             <div class="broadcast-test">
                                 <input class="input" id="broadcast-test-id" placeholder="Telegram ID">
                                 <button class="btn btn-secondary" type="button" id="broadcast-test-send"><i class="fas fa-vial"></i>Тест себе</button>
                             </div>
-                            <span class="broadcast-send-note"><i class="fas fa-circle-info"></i>Отправка начнётся сразу. Оба бота отправляют сообщения батчами с паузами, примерно по 5 сообщений в секунду. Тест уйдёт только на указанный Telegram ID.</span>
+                            <span class="broadcast-send-note"><i class="fas fa-circle-info"></i>Отправка начнётся сразу или в запланированное время. Оба бота отправляют сообщения батчами с паузами, примерно по 5 сообщений в секунду. Тест уйдёт только на указанный Telegram ID и всегда сразу.</span>
                         </div>
                     </div>
                     <div class="broadcast-preview-pane">
@@ -6886,6 +6906,39 @@
             renderBroadcastPreview();
         }
 
+        // Режим запуска: сразу / по расписанию. datetime-local отдаёт
+        // «YYYY-MM-DDTHH:MM» без зоны — админка договорилась, что это МСК.
+        function broadcastScheduleMode() {
+            return document.querySelector('input[name="broadcast-schedule-mode"]:checked')?.value === 'later' ? 'later' : 'now';
+        }
+        function broadcastScheduleLabel(value) {
+            const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(String(value || ''));
+            return match ? `${match[3]}.${match[2]}.${match[1]} ${match[4]}:${match[5]}` : String(value || '');
+        }
+        function broadcastScheduleDefault() {
+            // Ближайший «круглый» час завтра — удобная стартовая точка.
+            const now = new Date(Date.now() + 3 * 60 * 60 * 1000);
+            now.setUTCDate(now.getUTCDate() + 1);
+            now.setUTCHours(12, 0, 0, 0);
+            return now.toISOString().slice(0, 16);
+        }
+        function setBroadcastScheduleMode(mode) {
+            const box = document.getElementById('broadcast-schedule');
+            const when = document.getElementById('broadcast-schedule-when');
+            const input = document.getElementById('broadcast-schedule-at');
+            const label = document.getElementById('broadcast-create-label');
+            const icon = document.querySelector('#broadcast-create i');
+            if (!box || !when || !input) return;
+            const radio = document.querySelector(`input[name="broadcast-schedule-mode"][value="${mode}"]`);
+            if (radio) radio.checked = true;
+            box.dataset.mode = mode;
+            when.hidden = mode !== 'later';
+            if (mode === 'later' && !input.value) input.value = broadcastScheduleDefault();
+            if (label) label.textContent = mode === 'later' ? 'Запланировать рассылку' : 'Запустить рассылку';
+            if (icon) icon.className = mode === 'later' ? 'fas fa-clock' : 'fas fa-paper-plane';
+        }
+        document.querySelectorAll('input[name="broadcast-schedule-mode"]').forEach((radio) => radio.addEventListener('change', () => setBroadcastScheduleMode(broadcastScheduleMode())));
+
         async function submitBroadcast(action) {
             const title = document.getElementById('broadcast-title').value.trim();
             const segment = document.getElementById('broadcast-segment').value;
@@ -6907,13 +6960,22 @@
             }
             const hasPromoButton = buttons.some((button) => button.type === 'claim_promo');
             const promoRecipients = hasPromoButton ? broadcastPromoRecipients() : 'all';
+            // Отложенный запуск: время в МСК уходит как есть, сервер сам
+            // переводит в UTC; тест всегда сразу.
+            const scheduleLater = !isTest && broadcastScheduleMode() === 'later';
+            const scheduledAt = scheduleLater ? (document.getElementById('broadcast-schedule-at').value || '') : '';
+            if (scheduleLater && !scheduledAt) return showAdminToast('Укажите дату и время отправки', 'error');
+            if (scheduleLater && new Date(scheduledAt).getTime() <= Date.now() + 60 * 1000) return showAdminToast('Время отправки уже прошло — выберите момент в будущем', 'error');
             if (!isTest) {
                 const hint = document.getElementById('broadcast-segment-hint').textContent;
                 const promoLine = !hasPromoButton ? ''
                     : promoRecipients === 'exclude_activated'
                         ? '\nПромокод: без тех, кто уже активировал его.'
                         : '\nПромокод: всем в сегменте, включая уже активировавших (повторно).';
-                if (!confirm(`Запустить рассылку «${title}»?\n${hint}${promoLine}\nОтправка начнётся немедленно.`)) return;
+                const whenLine = scheduleLater
+                    ? `\nСтарт по расписанию: ${broadcastScheduleLabel(scheduledAt)} МСК. Получатели будут пересчитаны на момент старта.`
+                    : '\nОтправка начнётся немедленно.';
+                if (!confirm(`${scheduleLater ? 'Запланировать' : 'Запустить'} рассылку «${title}»?\n${hint}${promoLine}${whenLine}`)) return;
             }
             const body = new FormData();
             body.append('csrfmiddlewaretoken', csrfToken);
@@ -6926,13 +6988,15 @@
             if (hasPromoButton) body.append('promo_recipients', promoRecipients);
             if (mediaFile) body.append('media', mediaFile);
             if (isTest) body.append('telegram_id', document.getElementById('broadcast-test-id').value.trim());
+            if (scheduleLater) body.append('scheduled_at', scheduledAt);
             const response = await fetch(main.dataset.broadcastsUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
             const payload = await response.json();
             if (payload.status === 'ok') {
-                showAdminToast(isTest ? 'Тест отправлен — проверьте Telegram' : 'Рассылка запущена', 'success');
+                showAdminToast(isTest ? 'Тест отправлен — проверьте Telegram' : (scheduleLater ? `Рассылка запланирована на ${broadcastScheduleLabel(scheduledAt)} МСК` : 'Рассылка запущена'), 'success');
                 if (!isTest) {
                     document.getElementById('broadcast-title').value = '';
                     document.getElementById('broadcast-text').value = '';
+                    setBroadcastScheduleMode('now');
                     renderBroadcastPreview();
                 }
                 loadBroadcastsList();
@@ -6964,6 +7028,7 @@
                 if (payload.status !== 'ok') throw new Error();
                 const rows = payload.result || [];
                 const statusMeta = {
+                    scheduled: {label: 'Запланирована', icon: 'fa-clock'},
                     running: {label: 'Идёт отправка', icon: 'fa-paper-plane'},
                     stopped: {label: 'Рассылка остановлена', icon: 'fa-stop'},
                     done: {label: 'Рассылка завершена', icon: 'fa-check'},
@@ -6989,6 +7054,7 @@
                     const badges = [
                         `<span class="broadcast-badge accent"><i class="fas fa-users"></i>${escapeHtml(row.segment_label || 'Сегмент')}</span>`,
                         row.is_test ? '<span class="broadcast-badge"><i class="fas fa-vial"></i>тест</span>' : '',
+                        scheduled ? `<span class="broadcast-badge accent" title="Стартует автоматически"><i class="fas fa-clock"></i>старт ${escapeHtml(row.scheduled_at || '')} МСК</span>` : '',
                         row.has_media ? '<span class="broadcast-badge"><i class="fas fa-image"></i>фото</span>' : '',
                         row.exclude_promo_id ? `<span class="broadcast-badge" title="Активировавшие промокод исключены из рассылки"><i class="fas fa-user-slash"></i>без активировавших ${escapeHtml(row.exclude_promo_code || 'промокод')}</span>` : '',
                         ...(row.buttons || []).map((button) => button.type === 'claim_promo'
@@ -6999,7 +7065,10 @@
                     // статус и доставка — одной строкой, дальше воронка из
                     // четырёх ступеней с конверсией на стыке, выручка —
                     // единственная зелёная ступень
-                    const stateLabel = {running: 'Идёт отправка', stopped: 'Остановлена', done: 'Завершена'}[row.status] || status.label;
+                    const scheduled = row.status === 'scheduled';
+                    const stateLabel = scheduled
+                        ? `Запланирована на ${escapeHtml(row.scheduled_at || '—')} МСК`
+                        : ({running: 'Идёт отправка', stopped: 'Остановлена', done: 'Завершена'}[row.status] || status.label);
                     const audienceRate = total ? Math.round(100 * sent / total) : 0;
                     const perBuyer = buyers ? Math.round(revenue / buyers) : null;
                     const duration = row.status === 'done' ? broadcastDurationLabel(row.created_at, row.finished_at) : '';
@@ -7026,7 +7095,7 @@
                         <div class="broadcast-record-result">
                             <div class="broadcast-record-state">
                                 <span class="broadcast-status-label"><span class="broadcast-record-dot" aria-hidden="true"></span>${stateLabel}</span>
-                                <span class="broadcast-record-delivery">${sent.toLocaleString('ru-RU')} из ${total.toLocaleString('ru-RU')} доставлено · ${audienceRate}%</span>
+                                <span class="broadcast-record-delivery">${scheduled ? `${total.toLocaleString('ru-RU')} получателей сейчас · пересчитаем на старте` : `${sent.toLocaleString('ru-RU')} из ${total.toLocaleString('ru-RU')} доставлено · ${audienceRate}%`}</span>
                             </div>
                             <div class="broadcast-funnel" role="list" aria-label="Воронка рассылки">
                                 <div class="broadcast-funnel-step" role="listitem"><span>Доставлено</span><b>${sent.toLocaleString('ru-RU')}</b><small>${audienceRate}% аудитории</small>${conv(claims, sent)}</div>
@@ -7037,8 +7106,11 @@
                             <div class="broadcast-record-foot">
                                 <div class="broadcast-record-progress" aria-hidden="true"><span style="width:${progress}%"></span></div>
                                 <span class="broadcast-record-actions">
+                                    ${scheduled ? `<span class="broadcast-reschedule" data-broadcast-reschedule-box="${Number(row.id)}"><input class="input" type="datetime-local" step="60" value="${escapeHtml(row.scheduled_at_input || '')}" aria-label="Новое время старта (МСК)"><button class="btn btn-secondary" data-broadcast-reschedule="${Number(row.id)}"><i class="fas fa-calendar-check"></i>Перенести</button></span>` : ''}
+                                    ${scheduled ? `<button class="btn" data-broadcast-send-now="${Number(row.id)}"><i class="fas fa-paper-plane"></i>Отправить сейчас</button>` : ''}
+                                    ${scheduled ? `<button class="btn btn-danger broadcast-stop" data-broadcast-stop="${Number(row.id)}" data-broadcast-cancel="1"><i class="fas fa-ban"></i>Отменить</button>` : ''}
                                     ${row.status === 'running' ? `<button class="btn btn-danger broadcast-stop" data-broadcast-stop="${Number(row.id)}"><i class="fas fa-stop"></i>Остановить</button>` : ''}
-                                    ${row.status !== 'running' && !row.archived ? `<button class="btn btn-secondary" data-broadcast-archive="${Number(row.id)}" title="Убрать из основного списка"><i class="fas fa-box-archive"></i>В архив</button>` : ''}
+                                    ${row.status !== 'running' && !scheduled && !row.archived ? `<button class="btn btn-secondary" data-broadcast-archive="${Number(row.id)}" title="Убрать из основного списка"><i class="fas fa-box-archive"></i>В архив</button>` : ''}
                                     ${row.archived ? `<button class="btn btn-secondary" data-broadcast-unarchive="${Number(row.id)}"><i class="fas fa-box-open"></i>Вернуть из архива</button>` : ''}
                                 </span>
                             </div>
@@ -7046,7 +7118,8 @@
                     </article>`;
                 }).join('') : (broadcastsArchiveView ? '<div class="info-card muted">Архив пуст.</div>' : '<div class="info-card muted">Рассылок ещё не было.</div>');
                 target.querySelectorAll('[data-broadcast-stop]').forEach((button) => button.addEventListener('click', async () => {
-                    if (!confirm('Остановить рассылку? Неотправленные сообщения не уйдут.')) return;
+                    const cancelling = button.dataset.broadcastCancel === '1';
+                    if (!confirm(cancelling ? 'Отменить запланированную рассылку? Она не стартует.' : 'Остановить рассылку? Неотправленные сообщения не уйдут.')) return;
                     const body = new FormData();
                     body.append('csrfmiddlewaretoken', csrfToken);
                     body.append('action', 'stop');
@@ -7066,10 +7139,38 @@
                     loadBroadcastsList();
                 };
                 target.querySelectorAll('[data-broadcast-archive]').forEach((button) => button.addEventListener('click', () => broadcastArchivePost('archive', button.dataset.broadcastArchive)));
+                // Отложенные: перенос на другое время и старт прямо сейчас.
+                const broadcastSchedulePost = async (action, id, scheduledAt) => {
+                    const body = new FormData();
+                    body.append('csrfmiddlewaretoken', csrfToken);
+                    body.append('action', action);
+                    body.append('id', id);
+                    if (scheduledAt) body.append('scheduled_at', scheduledAt);
+                    const response = await fetch(main.dataset.broadcastsUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                    const result = await response.json();
+                    if (result.status !== 'ok') showAdminToast(result.message || 'Не удалось изменить расписание', 'error');
+                    else showAdminToast(action === 'send_now' ? 'Рассылка запущена' : `Старт перенесён на ${broadcastScheduleLabel(scheduledAt)} МСК`, 'success');
+                    loadBroadcastsList();
+                };
+                target.querySelectorAll('[data-broadcast-reschedule]').forEach((button) => button.addEventListener('click', () => {
+                    const box = target.querySelector(`[data-broadcast-reschedule-box="${button.dataset.broadcastReschedule}"]`);
+                    const value = box?.querySelector('input')?.value || '';
+                    if (!value) return showAdminToast('Укажите новое время старта', 'error');
+                    broadcastSchedulePost('reschedule', button.dataset.broadcastReschedule, value);
+                }));
+                target.querySelectorAll('[data-broadcast-send-now]').forEach((button) => button.addEventListener('click', () => {
+                    if (!confirm('Отправить запланированную рассылку прямо сейчас?')) return;
+                    broadcastSchedulePost('send_now', button.dataset.broadcastSendNow);
+                }));
                 target.querySelectorAll('[data-broadcast-unarchive]').forEach((button) => button.addEventListener('click', () => broadcastArchivePost('unarchive', button.dataset.broadcastUnarchive)));
                 if (rows.some((row) => row.status === 'running')) {
                     clearTimeout(loadBroadcastsList._timer);
                     loadBroadcastsList._timer = setTimeout(() => loadBroadcastsList(true), 5000);
+                } else if (rows.some((row) => row.status === 'scheduled')) {
+                    // Запланированная стартует без участия админки — раз в
+                    // минуту подглядываем, не началась ли отправка.
+                    clearTimeout(loadBroadcastsList._timer);
+                    loadBroadcastsList._timer = setTimeout(() => loadBroadcastsList(true), 60000);
                 }
             } catch (error) {
                 // Фоновая ошибка (сеть мигнула) не стирает список — просто

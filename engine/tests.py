@@ -7762,6 +7762,97 @@ class AdminStage4Tests(SimpleTestCase):
         self.assertIn("checked", template)
         self.assertIn("body.append('disable_preview', '1')", template)
 
+    def test_broadcast_schedule_time_is_msk_and_bounded(self):
+        """Время из datetime-local — МСК без зоны; хранится naive UTC (−3 ч).
+        Прошлое и «дальше 90 дней» отклоняются с текстом для админа, пустое —
+        «сразу»."""
+        from datetime import datetime, timedelta
+
+        from engine import views
+
+        now = datetime(2026, 9, 14, 9, 0)  # UTC
+        self.assertIsNone(views.admin_broadcast_parse_schedule("", now=now))
+        self.assertIsNone(views.admin_broadcast_parse_schedule(None, now=now))
+        self.assertEqual(
+            views.admin_broadcast_parse_schedule("2026-09-14T18:30", now=now),
+            datetime(2026, 9, 14, 15, 30),
+        )
+        with self.assertRaisesRegex(ValueError, "уже прошло"):
+            views.admin_broadcast_parse_schedule("2026-09-14T12:00", now=now)
+        with self.assertRaisesRegex(ValueError, "уже прошло"):
+            # ровно «сейчас» по МСК — меньше минуты вперёд
+            views.admin_broadcast_parse_schedule("2026-09-14T12:00", now=now)
+        with self.assertRaisesRegex(ValueError, "90 дней"):
+            views.admin_broadcast_parse_schedule(
+                (now + timedelta(days=91, hours=3)).strftime("%Y-%m-%dT%H:%M"),
+                now=now,
+            )
+        with self.assertRaisesRegex(ValueError, "дату и время"):
+            views.admin_broadcast_parse_schedule("завтра", now=now)
+        with self.assertRaisesRegex(ValueError, "дату и время"):
+            views.admin_broadcast_parse_schedule("2026-09-14 18:30", now=now)
+
+    def test_broadcasts_can_be_scheduled(self):
+        """Отложенные рассылки: status=scheduled + scheduled_at (naive UTC);
+        стартуют боты (первый атомарно переводит в running и пересчитывает
+        total) или админ кнопкой «Отправить сейчас». До старта — перенос и
+        отмена; архивировать нельзя, тест «себе» всегда сразу."""
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.support_admin_api_broadcasts)
+        self.assertIn('request.POST.get("scheduled_at")', src)
+        self.assertIn('status="scheduled" if scheduled_at else "running"', src)
+        self.assertIn("scheduled_at=scheduled_at,", src)
+        # тест — всегда сразу
+        self.assertIn("if not is_test:\n                try:\n                    scheduled_at = admin_broadcast_parse_schedule(", src)
+        # stop отменяет отложенную, архив запрещён до старта
+        self.assertIn('broadcast.status in ("running", "scheduled")', src)
+        self.assertIn('"broadcast_cancel" if was_scheduled else "broadcast_stop"', src)
+        # перенос и «отправить сейчас» — только для scheduled
+        self.assertIn('action in ("reschedule", "send_now")', src)
+        self.assertIn('broadcast.status != "scheduled"', src)
+        self.assertIn("Рассылка уже не запланирована", src)
+        self.assertIn('"broadcast_reschedule"', src)
+        self.assertIn('"broadcast_send_now"', src)
+        self.assertIn("broadcast.total = admin_broadcast_count_total(db_session, broadcast)", src)
+        self.assertIn('"broadcast_schedule" if scheduled_at else "broadcast_create"', src)
+
+        count_src = inspect.getsource(views.admin_broadcast_count_total)
+        self.assertIn("segment_count_sql(broadcast.segment, exclude_promo=True)", count_src)
+
+        payload_src = inspect.getsource(views.admin_broadcast_payload)
+        self.assertIn('"scheduled_at": admin_date_label(scheduled_at)', payload_src)
+        self.assertIn('"scheduled_at_input"', payload_src)
+        self.assertIn("BROADCAST_SCHEDULE_FORMAT", payload_src)
+
+        from common.models.db import Broadcast
+
+        self.assertTrue(hasattr(Broadcast, "scheduled_at"))
+
+        template = template_source("engine/templates/admin_dashboard.html")
+        for needle in (
+            'id="broadcast-schedule" data-mode="now"',
+            'name="broadcast-schedule-mode" value="now" checked',
+            'name="broadcast-schedule-mode" value="later"',
+            'id="broadcast-schedule-at"',
+            "function broadcastScheduleMode()",
+            "function setBroadcastScheduleMode(mode)",
+            "if (scheduleLater) body.append('scheduled_at', scheduledAt);",
+            "Запланировать рассылку",
+            "scheduled: {label: 'Запланирована', icon: 'fa-clock'}",
+            "data-broadcast-reschedule=",
+            "data-broadcast-send-now=",
+            'data-broadcast-cancel="1"',
+            "broadcastSchedulePost('reschedule'",
+            "broadcastSchedulePost('send_now'",
+            "row.status === 'scheduled'",
+        ):
+            self.assertIn(needle, template, needle)
+        css = template_source("engine/static/css/admin-concept-customers.css")
+        self.assertIn('.broadcast-record[data-status="scheduled"]', css)
+
     def test_fast_segment_counts_cover_every_segment(self):
         """У каждого сегмента из ADMIN_SEGMENTS должно быть условие быстрого
         подсчёта — иначе новый сегмент молча уйдёт на медленный fallback."""

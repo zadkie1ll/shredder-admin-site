@@ -15160,6 +15160,33 @@ BROADCAST_TARIFF_IDS = {"oneday", "threedays", "month", "threemonths", "sixmonth
 # Получатели промокода из кнопки claim_promo: all — всем в сегменте (повторно и
 # уже активировавшим), exclude_activated — без активировавших (promo_code_uses).
 BROADCAST_PROMO_RECIPIENTS = {"all", "exclude_activated"}
+# Отложенные рассылки: время из админки приходит в МСК (datetime-local без
+# зоны), хранится naive UTC (как всё в БД). Ближе минуты планировать нельзя —
+# это уже «сразу»; дальше 90 дней — почти наверняка опечатка в дате.
+BROADCAST_SCHEDULE_FORMAT = "%Y-%m-%dT%H:%M"
+BROADCAST_SCHEDULE_MIN_AHEAD = timedelta(minutes=1)
+BROADCAST_SCHEDULE_MAX_AHEAD = timedelta(days=90)
+
+
+def admin_broadcast_parse_schedule(raw, now=None):
+    """'2026-09-20T18:00' (МСК) -> naive UTC datetime; пусто -> None.
+
+    ValueError с текстом для админа: неверный формат, прошлое, слишком далеко.
+    """
+    value = str(raw or "").strip()
+    if not value:
+        return None
+    try:
+        local = datetime.strptime(value, BROADCAST_SCHEDULE_FORMAT)
+    except ValueError:
+        raise ValueError("Укажите дату и время отправки (МСК)")
+    scheduled_at = local - ADMIN_TZ_OFFSET
+    now = now or datetime.utcnow()
+    if scheduled_at < now + BROADCAST_SCHEDULE_MIN_AHEAD:
+        raise ValueError("Время отправки уже прошло — выберите момент в будущем")
+    if scheduled_at > now + BROADCAST_SCHEDULE_MAX_AHEAD:
+        raise ValueError("Рассылку можно запланировать не дальше чем на 90 дней")
+    return scheduled_at
 
 
 def admin_broadcast_parse_buttons(db_session, raw_buttons):
@@ -15327,6 +15354,23 @@ def admin_broadcast_progress(db_session, broadcast):
     return int(covered), int(sent)
 
 
+def admin_broadcast_count_total(db_session, broadcast):
+    """Число получателей сегмента сейчас — с тем же фильтром промокода, что
+    у ботов (иначе покрытие и total разойдутся и рассылка не станет done)."""
+    exclude_promo_id = getattr(broadcast, "exclude_promo_id", None)
+    if exclude_promo_id:
+        return int(
+            db_session.execute(
+                sa_text(segment_count_sql(broadcast.segment, exclude_promo=True)),
+                {"exclude_promo_id": exclude_promo_id},
+            ).scalar()
+            or 0
+        )
+    return int(
+        db_session.execute(sa_text(segment_count_sql(broadcast.segment))).scalar() or 0
+    )
+
+
 def admin_broadcast_exclude_promo_code(broadcast):
     """Код промокода, активировавшие который исключены из рассылки
     (exclude_promo_id всегда ссылается на промокод кнопки claim_promo,
@@ -15349,12 +15393,21 @@ def admin_broadcast_payload(db_session, broadcast):
         broadcast.status = "done"
         broadcast.finished_at = datetime.utcnow()
         db_session.commit()
+    scheduled_at = getattr(broadcast, "scheduled_at", None)
     return {
         "id": broadcast.id,
         "title": broadcast.title,
         "segment": broadcast.segment,
         "segment_label": ADMIN_SEGMENTS.get(broadcast.segment, (broadcast.segment,))[0],
         "status": broadcast.status,
+        # Отложенная: когда стартует (МСК, как остальные даты админки) и
+        # значение для datetime-local при переносе.
+        "scheduled_at": admin_date_label(scheduled_at) if scheduled_at else None,
+        "scheduled_at_input": (
+            (scheduled_at + ADMIN_TZ_OFFSET).strftime(BROADCAST_SCHEDULE_FORMAT)
+            if scheduled_at
+            else None
+        ),
         "text": broadcast.text,
         "buttons": broadcast.buttons or [],
         "has_media": bool(broadcast.media_type),
@@ -15414,13 +15467,69 @@ def support_admin_api_broadcasts(request):
             broadcast = db_session.get(Broadcast, int(request.POST.get("id") or 0))
             if not broadcast:
                 return JsonResponse({"status": "not_found"}, status=404)
-            if broadcast.status == "running":
+            # stop работает и для отложенной: она отменяется, не стартовав.
+            if broadcast.status in ("running", "scheduled"):
+                was_scheduled = broadcast.status == "scheduled"
                 broadcast.status = "stopped"
                 broadcast.finished_at = datetime.utcnow()
                 admin_audit_write(
-                    db_session, request, "broadcast_stop", target=str(broadcast.id)
+                    db_session,
+                    request,
+                    "broadcast_cancel" if was_scheduled else "broadcast_stop",
+                    target=str(broadcast.id),
                 )
                 db_session.commit()
+            return JsonResponse(
+                {"status": "ok", "result": admin_broadcast_payload(db_session, broadcast)}
+            )
+
+        if action in ("reschedule", "send_now"):
+            # Только для ещё не стартовавшей: running/stopped/done перенести
+            # нельзя — боты уже прошли (или проходят) по получателям.
+            broadcast = db_session.get(Broadcast, int(request.POST.get("id") or 0))
+            if not broadcast:
+                return JsonResponse({"status": "not_found"}, status=404)
+            if broadcast.status != "scheduled":
+                return JsonResponse(
+                    {"status": "error", "message": "Рассылка уже не запланирована"},
+                    status=400,
+                )
+            if action == "reschedule":
+                try:
+                    scheduled_at = admin_broadcast_parse_schedule(
+                        request.POST.get("scheduled_at")
+                    )
+                except ValueError as error:
+                    return JsonResponse(
+                        {"status": "error", "message": str(error)}, status=400
+                    )
+                if scheduled_at is None:
+                    return JsonResponse(
+                        {"status": "error", "message": "Укажите новое время отправки"},
+                        status=400,
+                    )
+                broadcast.scheduled_at = scheduled_at
+                admin_audit_write(
+                    db_session,
+                    request,
+                    "broadcast_reschedule",
+                    target=str(broadcast.id),
+                    scheduled_at=scheduled_at.isoformat(timespec="minutes"),
+                )
+            else:
+                # «Отправить сейчас»: стартуем отсюда же, не дожидаясь бота.
+                # total пересчитывается на момент старта — как делает бот.
+                broadcast.status = "running"
+                if not broadcast.test_telegram_id:
+                    broadcast.total = admin_broadcast_count_total(db_session, broadcast)
+                admin_audit_write(
+                    db_session,
+                    request,
+                    "broadcast_send_now",
+                    target=str(broadcast.id),
+                    total=int(broadcast.total or 0),
+                )
+            db_session.commit()
             return JsonResponse(
                 {"status": "ok", "result": admin_broadcast_payload(db_session, broadcast)}
             )
@@ -15430,7 +15539,7 @@ def support_admin_api_broadcasts(request):
             if not broadcast:
                 return JsonResponse({"status": "not_found"}, status=404)
             if action == "archive":
-                if broadcast.status == "running":
+                if broadcast.status in ("running", "scheduled"):
                     return JsonResponse(
                         {
                             "status": "error",
@@ -15517,6 +15626,19 @@ def support_admin_api_broadcasts(request):
                     )
                 exclude_promo_id = int(promo_button["promo_id"])
 
+            # Отложенный запуск: время (МСК) из формы; тест всегда сразу —
+            # проверять письмо «через неделю» незачем.
+            scheduled_at = None
+            if not is_test:
+                try:
+                    scheduled_at = admin_broadcast_parse_schedule(
+                        request.POST.get("scheduled_at")
+                    )
+                except ValueError as error:
+                    return JsonResponse(
+                        {"status": "error", "message": str(error)}, status=400
+                    )
+
             test_telegram_id = None
             if is_test:
                 try:
@@ -15572,7 +15694,8 @@ def support_admin_api_broadcasts(request):
                 title=title if not is_test else f"[тест] {title}"[:256],
                 text=text_value,
                 segment=segment,
-                status="running",
+                status="scheduled" if scheduled_at else "running",
+                scheduled_at=scheduled_at,
                 buttons=clean_buttons,
                 media=media_bytes,
                 media_type=media_type,
@@ -15587,11 +15710,16 @@ def support_admin_api_broadcasts(request):
             admin_audit_write(
                 db_session,
                 request,
-                "broadcast_test" if is_test else "broadcast_create",
+                "broadcast_test"
+                if is_test
+                else ("broadcast_schedule" if scheduled_at else "broadcast_create"),
                 target=title,
                 segment=segment,
                 total=int(total),
                 exclude_promo_id=exclude_promo_id,
+                scheduled_at=(
+                    scheduled_at.isoformat(timespec="minutes") if scheduled_at else None
+                ),
             )
             db_session.commit()
             return JsonResponse(

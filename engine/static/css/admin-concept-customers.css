@@ -309,6 +309,21 @@ html[data-admin-theme="light"] #panel-user-payments {
 #panel-broadcasts .broadcast-promo-audience-option { padding: 12px; }
 #panel-broadcasts .broadcast-promo-audience-option b { font-size: 13px; }
 #panel-broadcasts .broadcast-promo-audience-option small { font-size: 12px; line-height: 1.5; font-weight: 400; }
+#panel-broadcasts .broadcast-schedule { display: grid; gap: 12px; padding: 14px; border: 1px solid var(--workspace-line, rgba(0,0,0,.08)); border-radius: 10px; }
+#panel-broadcasts .broadcast-schedule-title { display: inline-flex; align-items: center; gap: 8px; font-size: 14px; font-weight: 600; color: var(--admin-accent); }
+#panel-broadcasts .broadcast-schedule-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+#panel-broadcasts .broadcast-schedule-option { display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid var(--workspace-line, rgba(0,0,0,.08)); border-radius: 10px; cursor: pointer; }
+#panel-broadcasts .broadcast-schedule-option input { margin-top: 3px; }
+#panel-broadcasts .broadcast-schedule-option b { display: block; font-size: 13px; }
+#panel-broadcasts .broadcast-schedule-option small { display: block; font-size: 12px; line-height: 1.5; font-weight: 400; color: var(--muted, #6b7280); }
+#panel-broadcasts .broadcast-schedule[data-mode="later"] .broadcast-schedule-option:has(input[value="later"]) { border-color: var(--brand-gold); background: var(--workspace-gold-bg); }
+#panel-broadcasts .broadcast-schedule-when { display: grid; gap: 8px; }
+#panel-broadcasts .broadcast-schedule-when .input { max-width: 260px; }
+#panel-broadcasts .broadcast-schedule-hint { font-size: 12px; line-height: 1.5; color: var(--muted, #6b7280); }
+#panel-broadcasts .broadcast-reschedule { display: inline-flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+#panel-broadcasts .broadcast-reschedule .input { width: 200px; }
+#panel-broadcasts .broadcast-record[data-status="scheduled"] .broadcast-record-dot { background: var(--admin-accent); box-shadow: 0 0 0 4px rgba(59,130,246,.15); }
+#panel-broadcasts .broadcast-record[data-status="scheduled"] .broadcast-status-label { color: var(--admin-accent); }
 #panel-broadcasts .broadcast-actions { padding-top: 20px; gap: 12px; }
 #panel-broadcasts .broadcast-test { min-width: 0; flex-wrap: wrap; }
 #panel-broadcasts .broadcast-test .input { width: 170px; flex: 1 1 150px; }
