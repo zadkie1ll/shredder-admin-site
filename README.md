@@ -130,6 +130,11 @@ UI-слой поверх существующего UX (бизнес-логик�
 - Юридические страницы (offer/terms/privacy) переведены на Inter и фон лендинга.
 - Ассеты в `engine/static/brand/`: `hero-loop.svg`, `poster.svg`,
   `flagship.svg`, `radar-grid.svg`, `sea-mist.svg`, `tile.svg`.
+- В `engine/static/brand/avatars/` лежат квадратные PNG-аватарки 1254×1254:
+  `monkey-village-friendly.png` и `monkey-village-island.png` — альтернативы
+  основной аватарки проекта, `monkey-village-alerts.png` — аватарка группы
+  алертов по абьюзу, трафику и состоянию сервисов. Композиции имеют безопасные
+  поля под круглую обрезку Telegram и не содержат текста.
 - Правки в login/dashboard/support_admin_login помечены комментарием
   `=== Новый UI v3 ===` в конце инлайновых `<style>`; слой админки — в конце
   `static/css/admin_dashboard.css`. Каждую можно откатить независимо.
