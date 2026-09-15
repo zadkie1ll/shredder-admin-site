@@ -846,3 +846,18 @@ html[data-admin-theme="light"] #subpanel-promo-cohorts .promo-cohort-metric:nth-
     #subpanel-promo-cohorts .promo-cohort-tariff-track { grid-column: 2; }
     #subpanel-promo-cohorts .promo-cohort-tariff-revenue { grid-column: auto; }
 }
+
+/* Подписи меток трафика («Источники трафика»): что это за канал + бюджет, правка на месте. */
+#panel-stats .source-title-wrap { display: grid; gap: 4px; min-width: 0; flex: 1 1 auto; }
+#panel-stats .source-note { display: inline-flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; line-height: 1.4; color: var(--admin-text-muted); }
+#panel-stats .source-note.is-compact { display: flex; }
+#panel-stats .source-note-text { min-width: 0; overflow-wrap: anywhere; }
+#panel-stats .source-note-text.is-empty { font-style: italic; color: var(--admin-text-muted); opacity: .8; }
+#panel-stats .source-note-budget { padding: 1px 6px; border: 1px solid var(--admin-border); border-radius: 999px; font-size: 11px; font-variant-numeric: tabular-nums; color: var(--admin-text-soft); white-space: nowrap; }
+#panel-stats .source-note-edit { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: transparent; color: var(--admin-text-muted); font-size: 11px; cursor: pointer; transition: background .14s, color .14s; }
+#panel-stats .source-note-edit:hover, #panel-stats .source-note-edit:focus-visible { background: var(--admin-surface-soft); color: var(--admin-accent); outline: none; }
+#panel-stats .source-note-form { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; width: 100%; }
+#panel-stats .source-note-form .input { flex: 1 1 180px; min-width: 0; min-height: 32px; padding: 5px 8px; font-size: 12px; }
+#panel-stats .source-note-form .source-note-budget-input { flex: 0 1 110px; }
+#panel-stats .source-note-form .btn { min-height: 32px; height: 32px; width: 32px; padding: 0; display: inline-flex; align-items: center; justify-content: center; }
+#panel-stats .sources-cell-name-copy .source-note { margin-top: 2px; }

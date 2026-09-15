@@ -1105,6 +1105,114 @@ class AcquisitionCohortPathTests(SimpleTestCase):
             self.assertNotIn(gone, template, gone)
 
 
+class AdminTrafficSourceNotesTests(SimpleTestCase):
+    """Подписи меток трафика: traffic_sources.name/budget подмешиваются к
+    источникам в stats и правятся эндпоинтом support-admin/api/traffic-sources/."""
+
+    class FakeSession:
+        def __init__(self, rows=()):
+            self.rows = {row.id: row for row in rows}
+            self.added = []
+            self.deleted = []
+            self.committed = 0
+
+        def query(self, model):
+            rows = list(self.rows.values())
+
+            class Q:
+                def all(_self):
+                    return rows
+
+            return Q()
+
+        def get(self, model, key):
+            return self.rows.get(key)
+
+        def add(self, row):
+            if not hasattr(row, "id") or row.id is None:
+                row.id = len(self.rows) + 1
+            self.rows[row.id] = row
+            self.added.append(row)
+
+        def delete(self, row):
+            self.rows.pop(row.id, None)
+            self.deleted.append(row)
+
+        def commit(self):
+            self.committed += 1
+
+        def close(self):
+            pass
+
+    def _request(self, method="POST", data=None):
+        factory = RequestFactory()
+        request = factory.post("/support-admin/api/traffic-sources/", data or {}) if method == "POST" else factory.get("/support-admin/api/traffic-sources/", data or {})
+        request.session = {}
+        return request
+
+    def test_notes_attached_to_sources(self):
+        from engine.views import admin_attach_source_notes
+
+        session = self.FakeSession([SimpleNamespace(id=217, name=" Сайт, лендинг ", budget=15000)])
+        sources = [{"traffic_source": "217"}, {"traffic_source": "4"}, {"traffic_source": None}]
+        admin_attach_source_notes(session, sources)
+        self.assertEqual((sources[0]["name"], sources[0]["budget"]), ("Сайт, лендинг", 15000))
+        self.assertEqual((sources[1]["name"], sources[1]["budget"]), ("", None))
+        self.assertEqual((sources[2]["name"], sources[2]["budget"]), ("", None))
+
+    def test_endpoint_upserts_clears_and_validates(self):
+        from engine import views
+
+        session = self.FakeSession()
+        with mock.patch("engine.views.require_support_admin_any", return_value=None), mock.patch(
+            "engine.views.session_factory", return_value=session
+        ), mock.patch("engine.views.admin_audit_write") as audit:
+            response = views.support_admin_api_traffic_sources(
+                self._request(data={"id": "217", "name": "Трафик с сайта", "budget": "12 000"})
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(json.loads(response.content)["result"], {"id": 217, "name": "Трафик с сайта", "budget": 12000})
+            self.assertEqual((session.rows[217].name, session.rows[217].budget), ("Трафик с сайта", 12000))
+            self.assertEqual(audit.call_args[0][2], "traffic_source_note")
+            # Правка существующей: имя меняется, бюджет пустой -> None.
+            views.support_admin_api_traffic_sources(self._request(data={"id": "217", "name": "Директ №3"}))
+            self.assertEqual((session.rows[217].name, session.rows[217].budget), ("Директ №3", None))
+            # Список.
+            listing = json.loads(views.support_admin_api_traffic_sources(self._request("GET")).content)
+            self.assertEqual(listing["result"], [{"id": 217, "name": "Директ №3", "budget": None}])
+            # Пустая подпись без бюджета удаляет строку.
+            response = views.support_admin_api_traffic_sources(self._request(data={"id": "217", "name": "  "}))
+            self.assertEqual(json.loads(response.content)["result"]["name"], "")
+            self.assertNotIn(217, session.rows)
+            self.assertEqual(audit.call_args[0][2], "traffic_source_note_clear")
+            # Валидация.
+            for data in ({"id": "abc", "name": "x"}, {"id": "0", "name": "x"}, {"id": "5", "name": "x", "budget": "-1"}, {"id": "5", "name": "x", "budget": "много"}):
+                self.assertEqual(views.support_admin_api_traffic_sources(self._request(data=data)).status_code, 400, data)
+            self.assertNotIn(5, session.rows)
+
+    def test_template_has_inline_note_editor(self):
+        template = template_source("engine/templates/admin_dashboard.html")
+        for needle in (
+            'data-traffic-sources-url="{% url \'support_admin_api_traffic_sources\' %}"',
+            "function sourceNoteHtml(source, compact = false)",
+            "function openSourceNoteEditor(value)",
+            "async function saveSourceNote(form)",
+            "data-source-note-edit=",
+            "data-source-note-form=",
+            "Что это за метка? Добавьте описание",
+            "${sourceNoteHtml(source)}",
+            "sourceNoteHtml(source, true)",
+        ):
+            self.assertIn(needle, template, needle)
+        css = template_source("engine/static/css/admin-concept-customers.css")
+        self.assertIn(".source-note-form", css)
+
+    def test_route_registered(self):
+        from django.urls import reverse
+
+        self.assertTrue(reverse("support_admin_api_traffic_sources"))
+
+
 class AcquisitionRevenueTests(SimpleTestCase):
     """«Привлечение → Выручка»: дневные разрезы оплат, недельная сводка с
     единым определением продления и активной базой; старый «Отвал базы»

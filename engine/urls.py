@@ -74,6 +74,11 @@ urlpatterns = [
         name="support_admin_api_ad_spends",
     ),
     path(
+        "support-admin/api/traffic-sources/",
+        views.support_admin_api_traffic_sources,
+        name="support_admin_api_traffic_sources",
+    ),
+    path(
         "support-admin/api/stats/source-users/",
         views.support_admin_api_stats_source_users,
         name="support_admin_api_stats_source_users",

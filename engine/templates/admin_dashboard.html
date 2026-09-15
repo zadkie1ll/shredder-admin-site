@@ -81,6 +81,7 @@
         data-stats-url="{% url 'support_admin_api_stats' %}"
         data-acquisition-url="{% url 'support_admin_api_acquisition' %}"
         data-ad-spends-url="{% url 'support_admin_api_ad_spends' %}"
+        data-traffic-sources-url="{% url 'support_admin_api_traffic_sources' %}"
         data-stats-source-users-url="{% url 'support_admin_api_stats_source_users' %}"
         data-cohort-stats-url="{% url 'support_admin_api_cohort_stats' %}"
         data-user-payments-url="{% url 'support_admin_api_user_payments' %}"
@@ -3556,6 +3557,10 @@
             const sourceDetailsButton = event.target.closest('[data-source-details]');
             if (sourceDetailsButton) openSourceUsersModal(sourceDetailsButton);
 
+            const noteEditButton = event.target.closest('[data-source-note-edit]');
+            if (noteEditButton) { event.preventDefault(); openSourceNoteEditor(noteEditButton.dataset.sourceNoteEdit); return; }
+            if (event.target.closest('[data-source-note-cancel]')) { event.preventDefault(); rerenderSourcesSection(); return; }
+
             const sourcesViewButton = event.target.closest('[data-sources-view]');
             if (sourcesViewButton) {
                 const mode = sourcesViewButton.dataset.sourcesView === 'cards' ? 'cards' : 'table';
@@ -4963,6 +4968,63 @@
             {key: 'payment_conversion', label: 'В продажу', fmt: pct, conversion: true, hint: 'Покупатели / подписки'},
         ];
 
+        // Подпись метки трафика (traffic_sources.name): что это за канал.
+        // Редактируется на месте — инпут вместо подписи, Enter/✓ сохраняет.
+        function sourceNoteHtml(source, compact = false) {
+            const value = sourceValueOf(source);
+            if (value === '__direct__') return '';
+            const name = String(source.name || '').trim();
+            const budget = source.budget != null ? `<span class="source-note-budget" title="Бюджет метки">${money(source.budget)}</span>` : '';
+            const text = name
+                ? `<span class="source-note-text">${escapeHtml(name)}</span>`
+                : `<span class="source-note-text is-empty">${compact ? 'Без описания' : 'Что это за метка? Добавьте описание'}</span>`;
+            return `<span class="source-note${compact ? ' is-compact' : ''}" data-source-note="${escapeHtml(value)}">${text}${budget}<button type="button" class="source-note-edit" data-source-note-edit="${escapeHtml(value)}" title="Описать метку" aria-label="Описать метку ${escapeHtml(source.label)}"><i class="fas fa-pen"></i></button></span>`;
+        }
+
+        function openSourceNoteEditor(value) {
+            const source = (lastStatsResult?.sources || []).find((item) => sourceValueOf(item) === value);
+            if (!source) return;
+            document.querySelectorAll(`[data-source-note="${CSS.escape(value)}"]`).forEach((box) => {
+                box.innerHTML = `<form class="source-note-form" data-source-note-form="${escapeHtml(value)}">
+                    <input class="input" name="name" value="${escapeHtml(source.name || '')}" maxlength="256" placeholder="Что за канал: сайт, Директ №3, канал в Telegram…" aria-label="Описание метки">
+                    <input class="input source-note-budget-input" name="budget" inputmode="numeric" value="${source.budget != null ? escapeHtml(String(source.budget)) : ''}" placeholder="Бюджет, ₽" aria-label="Бюджет метки, ₽">
+                    <button type="submit" class="btn" title="Сохранить" aria-label="Сохранить"><i class="fas fa-check"></i></button>
+                    <button type="button" class="btn btn-secondary" data-source-note-cancel title="Отмена" aria-label="Отмена"><i class="fas fa-xmark"></i></button>
+                </form>`;
+                box.querySelector('input[name="name"]')?.focus();
+            });
+        }
+
+        async function saveSourceNote(form) {
+            const value = form.dataset.sourceNoteForm;
+            const body = new FormData();
+            body.append('csrfmiddlewaretoken', csrfToken);
+            body.append('id', value);
+            body.append('name', form.querySelector('input[name="name"]').value.trim());
+            body.append('budget', form.querySelector('input[name="budget"]').value.trim());
+            form.querySelectorAll('button').forEach((button) => { button.disabled = true; });
+            try {
+                const response = await fetch(main.dataset.trafficSourcesUrl, {method: 'POST', body, headers: {'X-CSRFToken': csrfToken, 'X-Requested-With': 'XMLHttpRequest'}});
+                const payload = await response.json();
+                if (payload.status !== 'ok') throw new Error(payload.message || 'Не удалось сохранить описание');
+                (lastStatsResult?.sources || []).forEach((item) => {
+                    if (sourceValueOf(item) === value) { item.name = payload.result.name; item.budget = payload.result.budget; }
+                });
+                showAdminToast(payload.result.name ? 'Описание метки сохранено' : 'Описание метки удалено', 'success');
+                rerenderSourcesSection();
+            } catch (error) {
+                showAdminToast(error.message || String(error), 'error');
+                form.querySelectorAll('button').forEach((button) => { button.disabled = false; });
+            }
+        }
+
+        document.addEventListener('submit', (event) => {
+            const form = event.target.closest('[data-source-note-form]');
+            if (!form) return;
+            event.preventDefault();
+            saveSourceNote(form);
+        });
+
         function sourceValueOf(source) {
             return source.traffic_source === null || source.traffic_source === undefined
                 ? '__direct__'
@@ -5042,7 +5104,7 @@
                         const direct = sourceValue === '__direct__';
                         return `<span class="sources-cell sources-cell-name" title="${escapeHtml(source.label)}">
                             <span class="sources-cell-name-icon"><i class="fas ${direct ? 'fa-arrow-pointer' : 'fa-tag'}"></i></span>
-                            <span class="sources-cell-name-copy"><b>${escapeHtml(source.label)}</b><small>${direct ? 'Прямой трафик' : 'Метка источника'}</small></span>
+                            <span class="sources-cell-name-copy"><b>${escapeHtml(source.label)}</b>${direct ? '<small>Прямой трафик</small>' : sourceNoteHtml(source, true)}</span>
                         </span>`;
                     }
                     if (col.conversion) {
@@ -5065,7 +5127,10 @@
                 return `
                 <article class="card source-card" data-source-card="${index}">
                     <div class="source-header">
-                        <h3 class="source-title" title="${escapeHtml(source.label)}">${escapeHtml(source.label)}</h3>
+                        <div class="source-title-wrap">
+                            <h3 class="source-title" title="${escapeHtml(source.label)}">${escapeHtml(source.label)}</h3>
+                            ${sourceNoteHtml(source)}
+                        </div>
                         <div class="source-actions">
                             <button type="button" class="source-details-btn" data-source-details data-source="${escapeHtml(sourceValue)}" data-source-label="${escapeHtml(source.label)}">
                                 <i class="fas fa-list"></i>Подробности

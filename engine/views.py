@@ -86,6 +86,7 @@ from common.managed_traffic_limits import upsert_managed_limit
 from common.models.db import User
 from engine.email_change import issue_email_change, consume_email_change, sync_email_change, email_change_already_applied, has_fresh_unused_email_change
 from common.models.db import TemporarySquadBan
+from common.models.db import TrafficSource
 from common.models.db import EventLog
 from common.models.db import ReferralBonus
 from common.models.db import ReferralBonusType
@@ -6241,6 +6242,36 @@ def admin_stats_source_key(value):
     return None if value is None else str(value)
 
 
+# Подписи меток трафика: в событиях лежит только номер (TS_217), а что это за
+# канал — знал только владелец. Хранятся в traffic_sources (id = номер метки,
+# name — описание, budget — бюджет, ₽), редактируются прямо в «Источниках
+# трафика»; в API stats к каждому источнику подмешиваются name и budget.
+TRAFFIC_SOURCE_NAME_MAX = 256
+
+
+def admin_traffic_source_notes(db_session):
+    """{"217": {"name": ..., "budget": ...}} по всем строкам traffic_sources."""
+    try:
+        rows = db_session.query(TrafficSource).all()
+    except Exception:
+        logging.exception("failed to load traffic source notes")
+        return {}
+    return {
+        str(row.id): {"name": (row.name or "").strip(), "budget": row.budget}
+        for row in rows
+    }
+
+
+def admin_attach_source_notes(db_session, sources):
+    notes = admin_traffic_source_notes(db_session)
+    for source in sources:
+        key = source.get("traffic_source")
+        note = notes.get(str(key)) if key is not None else None
+        source["name"] = note["name"] if note else ""
+        source["budget"] = note["budget"] if note else None
+    return sources
+
+
 def admin_stats_sales_series_totals(buckets, unique_paying_users=0):
     """Собирает кассовые итоги из тех же бакетов, которые показаны на графике."""
     totals = {
@@ -8159,6 +8190,7 @@ def build_admin_interval_stats(
 
     # Не держим временную таблицу на пуловом соединении после ответа.
     drop_admin_cohort_table(db_session)
+    admin_attach_source_notes(db_session, sources)
 
     return {
         "period": {"start": start_date.isoformat(), "end": end_date.isoformat()},
@@ -8426,6 +8458,7 @@ def build_admin_cohort_retention_stats(
         ),
     }
 
+    admin_attach_source_notes(db_session, sources)
     return {
         "period": {"start": period_start.isoformat(), "end": period_end.isoformat()},
         "cohort": {"start": cohort_start.isoformat(), "end": cohort_end.isoformat()},
@@ -15130,6 +15163,83 @@ def support_admin_api_acquisition(request):
         return JsonResponse({"status": "ok", "result": handler(db_session, request)})
     except ValueError:
         return JsonResponse({"status": "error", "message": "bad params"}, status=400)
+    finally:
+        db_session.close()
+
+
+def support_admin_api_traffic_sources(request):
+    """Подписи меток трафика (traffic_sources): GET — список, POST — upsert
+    по номеру метки (пустое имя без бюджета = удалить подпись)."""
+    auth_response = require_support_admin_any(request, ANALYTICS_ROLES)
+    if auth_response:
+        return auth_response
+    db_session = session_factory()
+    try:
+        if request.method == "GET":
+            notes = admin_traffic_source_notes(db_session)
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "result": [
+                        {"id": int(key), "name": note["name"], "budget": note["budget"]}
+                        for key, note in sorted(notes.items(), key=lambda item: int(item[0]))
+                    ],
+                }
+            )
+        if request.method != "POST":
+            return JsonResponse({"status": "error"}, status=405)
+        try:
+            source_id = int(request.POST.get("id") or "")
+        except ValueError:
+            source_id = 0
+        if source_id <= 0:
+            return JsonResponse(
+                {"status": "error", "message": "Укажите номер метки (число из TS_N)"},
+                status=400,
+            )
+        name = (request.POST.get("name") or "").strip()[:TRAFFIC_SOURCE_NAME_MAX]
+        budget_raw = (request.POST.get("budget") or "").strip().replace(" ", "")
+        budget = None
+        if budget_raw:
+            try:
+                budget = int(budget_raw)
+            except ValueError:
+                budget = -1
+            if budget < 0:
+                return JsonResponse(
+                    {"status": "error", "message": "Бюджет — целое число рублей"},
+                    status=400,
+                )
+        row = db_session.get(TrafficSource, source_id)
+        if not name and budget is None:
+            # Пустая подпись — убираем строку целиком, а не храним пустоту.
+            if row is not None:
+                db_session.delete(row)
+                admin_audit_write(
+                    db_session, request, "traffic_source_note_clear", target=str(source_id)
+                )
+                db_session.commit()
+            return JsonResponse(
+                {"status": "ok", "result": {"id": source_id, "name": "", "budget": None}}
+            )
+        if row is None:
+            row = TrafficSource(id=source_id, name=name, budget=budget)
+            db_session.add(row)
+        else:
+            row.name = name
+            row.budget = budget
+        admin_audit_write(
+            db_session,
+            request,
+            "traffic_source_note",
+            target=str(source_id),
+            name=name,
+            budget=budget,
+        )
+        db_session.commit()
+        return JsonResponse(
+            {"status": "ok", "result": {"id": source_id, "name": name, "budget": budget}}
+        )
     finally:
         db_session.close()
 
