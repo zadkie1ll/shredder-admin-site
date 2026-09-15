@@ -13001,6 +13001,10 @@ def _expiry_aggregate(periods, start, end, group, window_days, now, today):
     empty = lambda: {"ending": {}, "renewed": {}, "pending": {}, "autopay": {}}  # noqa: E731
     buckets = [empty() for _ in keys]
     seen = set()
+    # Уникальные подписки: у коротких тарифов (день/3 дня) один человек даёт
+    # по периоду на каждую оплату, и «окончаний» в разы больше, чем подписок.
+    users_by_tariff = {}
+    users_all = set()
 
     def bump(counter, tariff):
         counter[tariff] = counter.get(tariff, 0) + 1
@@ -13011,6 +13015,8 @@ def _expiry_aggregate(periods, start, end, group, window_days, now, today):
         if position is None:
             continue
         seen.add(tariff)
+        users_by_tariff.setdefault(tariff, set()).add(user_id)
+        users_all.add(user_id)
         bucket = buckets[position]
         bump(bucket["ending"], tariff)
         if period_end > now:
@@ -13034,6 +13040,7 @@ def _expiry_aggregate(periods, start, end, group, window_days, now, today):
         # Финальная доля продлений: только бакеты с закрытым окном.
         "ending_closed": 0,
         "renewed_closed": 0,
+        "subscriptions": len(users_all),
         "by_tariff": {},
     }
     for key, bucket in zip(keys, buckets):
@@ -13065,7 +13072,14 @@ def _expiry_aggregate(periods, start, end, group, window_days, now, today):
         )
         for tariff in tariffs:
             slot = totals["by_tariff"].setdefault(
-                tariff, {"ending": 0, "renewed": 0, "pending": 0, "autopay": 0}
+                tariff,
+                {
+                    "ending": 0,
+                    "renewed": 0,
+                    "pending": 0,
+                    "autopay": 0,
+                    "subscriptions": len(users_by_tariff.get(tariff, ())),
+                },
             )
             for name in ("ending", "renewed", "pending", "autopay"):
                 slot[name] += bucket[name].get(tariff, 0)

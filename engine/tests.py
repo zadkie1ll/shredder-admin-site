@@ -1156,7 +1156,12 @@ class AcquisitionExpiryTests(SimpleTestCase):
         self.assertEqual(totals["renewed"], 2)
         self.assertEqual(totals["pending"], 1)
         self.assertEqual(totals["autopay_future"], 1)
-        self.assertEqual(totals["by_tariff"]["month"], {"ending": 5, "renewed": 2, "pending": 1, "autopay": 0})
+        self.assertEqual(
+            totals["by_tariff"]["month"],
+            {"ending": 5, "renewed": 2, "pending": 1, "autopay": 0, "subscriptions": 5},
+        )
+        # 7 периодов в диапазоне у 7 разных пользователей.
+        self.assertEqual(totals["subscriptions"], 7)
 
     def test_window_changes_verdict(self):
         from engine.views import _expiry_aggregate

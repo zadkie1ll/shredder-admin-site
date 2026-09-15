@@ -355,22 +355,42 @@
                 const key = btn.dataset.expiryTariff;
                 if (expiryState.hidden.has(key)) expiryState.hidden.delete(key); else expiryState.hidden.add(key);
                 btn.setAttribute('aria-pressed', String(!expiryState.hidden.has(key)));
+                renderExpiryCards(expiryState.res);
                 renderExpiryChart(expiryState.res);
                 renderExpiryTable(expiryState.res);
             }));
         }
 
+        // Плитки считаются на клиенте по видимым тарифам — они обязаны
+        // совпадать с графиком и таблицей, иначе скрытые пробные (их в разы
+        // больше платных) делают итоги нечитаемыми.
+        function expiryVisibleTotals(res) {
+            const visible = res.tariffs.filter((t) => !expiryState.hidden.has(t.key)).map((t) => t.key);
+            const t = {ending: 0, endingPast: 0, endingFuture: 0, renewed: 0, pending: 0, autopayFuture: 0, endingClosed: 0, renewedClosed: 0, subscriptions: 0};
+            visible.forEach((key) => { t.subscriptions += (res.totals.by_tariff[key] || {}).subscriptions || 0; });
+            res.buckets.forEach((row) => {
+                const sum = (bag) => visible.reduce((acc, key) => acc + (bag[key] || 0), 0);
+                const ending = sum(row.ending), renewed = sum(row.renewed);
+                t.ending += ending;
+                t.renewed += renewed;
+                t.pending += sum(row.pending);
+                if (row.is_past || row.is_current) t.endingPast += ending; else { t.endingFuture += ending; t.autopayFuture += sum(row.autopay); }
+                if (row.window_closed) { t.endingClosed += ending; t.renewedClosed += renewed; }
+            });
+            return t;
+        }
+
         function renderExpiryCards(res) {
             const box = document.getElementById('acq-expiry-cards');
-            if (!box) return;
-            const t = res.totals;
+            if (!box || !res) return;
+            const t = expiryVisibleTotals(res);
             const card = (label, value, meta) => `<div><div>${label}</div><div>${value}</div>${meta ? `<small>${meta}</small>` : ''}</div>`;
-            const openRenewed = t.renewed - t.renewed_closed;
+            const openRenewed = t.renewed - t.renewedClosed;
             box.innerHTML = [
-                card('Заканчивается за период', fmtRub(t.ending), `${fmtRub(t.ending_future)} ещё впереди · ${fmtRub(t.ending_past)} уже закончились`),
-                card('Продлились', t.ending_closed ? `${fmtRub(t.renewed_closed)}<span class="acq-expiry-card-pct">${expiryPct(t.renewed_closed, t.ending_closed)}</span>` : '—', t.ending_closed ? `из ${fmtRub(t.ending_closed)} с закрытым окном ${res.window_days} дн.${openRenewed ? ` · ещё ${fmtRub(openRenewed)} в открытом окне` : ''}` : `нет дней с закрытым окном ${res.window_days} дн. — расширьте период влево`),
+                card('Окончаний за период', fmtRub(t.ending), `у ${fmtRub(t.subscriptions)} подписок · ${fmtRub(t.endingFuture)} впереди · ${fmtRub(t.endingPast)} уже прошли`),
+                card('Продлились', t.endingClosed ? `${fmtRub(t.renewedClosed)}<span class="acq-expiry-card-pct">${expiryPct(t.renewedClosed, t.endingClosed)}</span>` : '—', t.endingClosed ? `из ${fmtRub(t.endingClosed)} с закрытым окном ${res.window_days} дн.${openRenewed ? ` · ещё ${fmtRub(openRenewed)} в открытом окне` : ''}` : `нет дней с закрытым окном ${res.window_days} дн. — расширьте период влево`),
                 card('Ещё могут продлиться', fmtRub(t.pending), 'закончились недавно, окно ещё открыто'),
-                card('С автоплатежом впереди', fmtRub(t.autopay_future), `${expiryPct(t.autopay_future, t.ending_future)} будущих окончаний`),
+                card('С автоплатежом впереди', fmtRub(t.autopayFuture), `${expiryPct(t.autopayFuture, t.endingFuture)} будущих окончаний`),
             ].join('');
         }
 
@@ -396,10 +416,10 @@
             });
             const summary = document.getElementById('acq-expiry-summary');
             if (summary) {
-                const t = res.totals;
+                const t = expiryVisibleTotals(res);
                 const groupWord = res.group === 'week' ? 'неделям' : 'дням';
                 summary.innerHTML = rows.length
-                    ? `По ${groupWord}, ${res.start.slice(8, 10)}.${res.start.slice(5, 7)}.${res.start.slice(0, 4)} — ${res.end.slice(8, 10)}.${res.end.slice(5, 7)}.${res.end.slice(0, 4)}. Левее «сегодня» — оценка по цепочке оплат, правее — реальные сроки подписок. Всего заканчивается <b>${fmtRub(t.ending)}</b>, из уже закончившихся продлилось <b>${fmtRub(t.renewed)}</b>. Данные пересобираются раз в ${Math.round((res.cache_ttl || 300) / 60)} мин.`
+                    ? `По ${groupWord}, ${res.start.slice(8, 10)}.${res.start.slice(5, 7)}.${res.start.slice(0, 4)} — ${res.end.slice(8, 10)}.${res.end.slice(5, 7)}.${res.end.slice(0, 4)}, по выбранным тарифам. Левее «сегодня» — оценка по цепочке оплат, правее — реальные сроки подписок. Считаются <b>окончания периодов</b>: подписка на 1 день за месяц даёт до 30 окончаний, поэтому окончаний больше, чем подписок (<b>${fmtRub(t.subscriptions)}</b>). Всего окончаний <b>${fmtRub(t.ending)}</b>, из уже прошедших продлилось <b>${fmtRub(t.renewed)}</b>. Данные пересобираются раз в ${Math.round((res.cache_ttl || 300) / 60)} мин.`
                     : 'Нет данных за выбранный период.';
             }
         }
