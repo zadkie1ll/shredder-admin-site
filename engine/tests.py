@@ -7420,7 +7420,7 @@ class AdminClientWorkspaceTests(SimpleTestCase):
         self.assertIn("#panel-user-payments .client-action-registry .client-action-controls { display: grid; grid-template-columns: var(--client-action-btn) var(--client-action-btn);", css)
         self.assertIn(".client-action-button.is-primary { grid-column: 2; }", css)
         self.assertIn(".client-action-pair { grid-column: 1 / -1;", css)
-        self.assertIn("@import url('./admin-concept-customers.css?v=10');", Path("engine/static/css/admin-concept.css").read_text())
+        self.assertIn("@import url('./admin-concept-customers.css?v=11');", Path("engine/static/css/admin-concept.css").read_text())
 
 
 class AdminMoscowTimeTests(SimpleTestCase):
