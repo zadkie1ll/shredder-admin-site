@@ -428,7 +428,7 @@
                 <button type="button" class="subtab active" data-subtab="acq-revenue" role="tab"><i class="fas fa-coins"></i>Выручка</button>
                 <button type="button" class="subtab" data-subtab="acq-newrep" role="tab"><i class="fas fa-people-arrows"></i>Новые vs повторные</button>
                 <button type="button" class="subtab" data-subtab="acq-expiry" role="tab"><i class="fas fa-hourglass-half"></i>Окончания и продления</button>
-                <button type="button" class="subtab" data-subtab="acq-funnel" role="tab"><i class="fas fa-filter"></i>Воронка</button>
+                <button type="button" class="subtab" data-subtab="acq-cohortpath" role="tab"><i class="fas fa-route"></i>Путь когорты</button>
                 <button type="button" class="subtab" data-subtab="acq-ads" role="tab"><i class="fas fa-bullhorn"></i>Реклама</button>
                 <button type="button" class="subtab" data-subtab="acq-cohorts" role="tab"><i class="fas fa-layer-group"></i>Когорты</button>
                 <button type="button" class="subtab" data-subtab="acq-pushes" role="tab"><i class="fas fa-bell"></i>Пуши</button>
@@ -653,37 +653,47 @@
                 </section>
             </div>
 
-            <div id="subpanel-acq-funnel" class="subtab-panel">
-                <div class="card" style="padding:18px;margin-bottom:14px;">
-                    <span class="chart-title-wrap"><strong>Воронка по неделям: подписки → инвойсы → новые покупатели</strong><button type="button" class="chart-info" data-help="funnel" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
-                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
-                        <b>Подписки</b> — созданные подписки в панели (событие subscription_created, то же, что «Подписки» в таблице у партнёра).
-                        <b>Инвойсы</b> — сколько раз нажали кнопку оплаты (создан счёт).
-                        <b>Новые покупатели</b> — люди, оплатившие впервые за всю историю.
-                        <b>Подписка→покупатель</b> — какой % созданных на неделе подписок стал новым покупателем.
-                        <b>Инвойс→Оплата</b> — какой % созданных счетов закончился успешной оплатой.
+            <div id="subpanel-acq-cohortpath" class="subtab-panel">
+                <section class="card acq-cohortpath" aria-labelledby="acq-cohortpath-title">
+                    <header class="acq-expiry-head">
+                        <div class="acq-expiry-heading">
+                            <strong id="acq-cohortpath-title">Путь когорты: от подписки до третьего продления</strong>
+                            <p>Строка — все, кто создал подписку за неделю или месяц. Дальше их же путь: подключились → купили впервые → продлили 1-й, 2-й, 3-й период → сколько денег принесли. Один и тот же человек в одной строке на каждом шаге.</p>
+                        </div>
+                        <div class="acq-expiry-controls" role="group" aria-label="Шаг и глубина когорт">
+                            <div class="acq-expiry-presets" role="group" aria-label="Шаг когорты">
+                                <button type="button" class="subtab active" data-cohortpath-group="week">По неделям</button>
+                                <button type="button" class="subtab" data-cohortpath-group="month">По месяцам</button>
+                            </div>
+                            <label class="acq-expiry-window">
+                                <span>Глубина</span>
+                                <select id="acq-cohortpath-count" class="input" aria-label="Сколько когорт показать">
+                                    <option value="8">8 когорт</option>
+                                    <option value="16" selected>16 когорт</option>
+                                    <option value="26">26 когорт</option>
+                                </select>
+                            </label>
+                        </div>
+                    </header>
+                    <div id="acq-cohortpath-body" class="acq-expiry-body">
+                        <div id="acq-cohortpath-loading" class="acq-expiry-loading" role="status" aria-live="polite" hidden>
+                            <span class="acq-expiry-spinner" aria-hidden="true"></span>
+                            <span id="acq-cohortpath-loading-text">Собираем когорты…</span>
+                        </div>
+                        <div class="acq-expiry-chart-block">
+                            <div class="acq-expiry-chart-head">
+                                <span class="chart-title-wrap"><strong>Растёт или падает конверсия по шагам</strong><button type="button" class="chart-info" data-help="cohortpath" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
+                                <span class="acq-expiry-legend-note">только дозревшие когорты; правый край пустой — окно ещё не закрыто</span>
+                            </div>
+                            <canvas id="acq-cohortpath-chart" style="width:100%;height:260px;display:block;"></canvas>
+                            <p id="acq-cohortpath-summary" class="acq-expiry-summary"></p>
+                        </div>
+                        <div class="acq-expiry-table-block">
+                            <div class="acq-expiry-table-head"><strong>Когорты по шагам</strong><span>процент — от предыдущего шага; серым — шаг ещё не дозрел; клик по когорте раскрывает тарифы первой покупки и переходы</span></div>
+                            <div id="acq-cohortpath-table" class="acq-expiry-table-wrap"></div>
+                        </div>
                     </div>
-                    <canvas id="acq-funnel-chart" style="width:100%;height:260px;display:block;margin-top:10px;"></canvas>
-                    <div id="acq-funnel-table" style="margin-top:12px;overflow-x:auto;"></div>
-                </div>
-                <div class="card" style="padding:18px;">
-                    <span class="chart-title-wrap"><strong>Подписки по дням и конверсия в первую оплату</strong><button type="button" class="chart-info" data-help="trials" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
-                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
-                        Синие столбики — сколько подписок создано за день (левая ось).
-                        Зелёная линия — какой % из созданных в этот день подписок оплатил впервые в течение выбранного окна (правая ось, в процентах).
-                        Падение столбиков = реклама приводит меньше людей; падение линии = люди приходят, но не покупают.
-                        Последние дни в размере окна — «недозрелые»: их процент ещё дорастёт.
-                    </div>
-                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;font-size:12px;">
-                        <span style="color:var(--muted);">Окно конверсии:</span>
-                        <select id="acq-trials-window" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
-                            <option value="10" selected>10 дней</option>
-                            <option value="30">30 дней</option>
-                            <option value="60">60 дней</option>
-                        </select>
-                    </div>
-                    <canvas id="acq-trials-chart" style="width:100%;height:240px;display:block;margin-top:10px;"></canvas>
-                </div>
+                </section>
             </div>
 
             <div id="subpanel-acq-ads" class="subtab-panel">

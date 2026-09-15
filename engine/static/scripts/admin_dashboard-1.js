@@ -777,46 +777,117 @@
                 : 'Нет данных за выбранный период.';
         }
 
-        async function loadFunnel() {
-            const res = await acqFetch('funnel', {weeks: 12});
-            const wk = res.weeks;
-            acqDraw(document.getElementById('acq-funnel-chart'),
-                wk.map((r) => dayLabel(r.week)),
-                [],
-                [
-                    {label: 'Подписки', tone: 'indigo', data: wk.map((r) => r.trials), fmt: 'raw'},
-                    {label: 'Подключения', tone: 'indigoSoft', data: wk.map((r) => r.connected), fmt: 'raw'},
-                    {label: '100 МБ', tone: 'amberSoft', data: wk.map((r) => r.mb100), fmt: 'raw'},
-                    {label: 'Инвойсы', tone: 'amber', data: wk.map((r) => r.invoice_clicks), fmt: 'raw'},
-                    {label: 'Новые покупатели', tone: 'green', data: wk.map((r) => r.new_payers), fmt: 'raw'},
-                ],
-                {fullLabels: wk.map((r) => 'неделя с ' + r.week)});
-            const funnelPct = (num, den) => den ? (100 * num / den).toFixed(1) + '%' : '—';
-            document.getElementById('acq-funnel-table').innerHTML = acqTable(
-                ['Неделя', 'Подписки', 'Подключения', '5 МБ', '100 МБ', 'Инвойсы', 'Оплат всего', 'Новых покупателей',
-                 'Подписка→подкл.', 'Подкл.→100 МБ', 'Подписка→покупатель', 'Инвойс→Оплата', 'Выручка новых'],
-                wk.map((r) => [r.week, r.trials, r.connected, r.mb5, r.mb100, r.invoice_clicks, r.payments, r.new_payers,
-                    funnelPct(r.connected, r.trials),
-                    funnelPct(r.mb100, r.connected),
-                    funnelPct(r.new_payers, r.trials),
-                    funnelPct(r.payments, r.invoice_clicks),
-                    fmtRub(r.new_rub) + ' ₽']));
-            await loadTrials();
+        // ===== Путь когорты =====
+        const cohortState = {res: null, group: 'week', open: new Set()};
+        const STEP_TONES = ['sky', 'amber', 'green', 'violet', 'indigo'];
+
+        function cohortPathRows(res) {
+            return res.cohorts;
         }
 
-        async function loadTrials() {
-            const windowDays = document.getElementById('acq-trials-window')?.value || '10';
-            const tr = await acqFetch('trials', {days: 60, window: windowDays});
-            const win = tr.window_days || windowDays;
-            acqDraw(document.getElementById('acq-trials-chart'),
-                tr.days.map((r) => dayLabel(r.day)),
-                [{label: 'Подписок создано', tone: 'indigoSoft', data: tr.days.map((r) => r.trials), fmt: 'raw'}],
-                [{label: `Оплатили в течение ${win} дней, %`, tone: 'green', data: tr.days.map((r) => r.conv_pct), fmt: 'pct'}],
-                {fullLabels: tr.days.map((r) => r.day)});
+        function renderCohortPathChart(res) {
+            const canvas = document.getElementById('acq-cohortpath-chart');
+            if (!canvas || !res) return;
+            const rows = res.cohorts;
+            const pct = (n, d) => d ? Math.round(1000 * n / d) / 10 : null;
+            const conv = rows.map((r) => r.buy_mature ? r.buyers_pct : null);
+            const r1 = rows.map((r) => r.renewals[0].mature ? r.renewals[0].pct : null);
+            const r2 = rows.map((r) => r.renewals[1].mature ? r.renewals[1].pct : null);
+            acqDraw(canvas, rows.map((r) => r.label), [], [
+                {label: 'Подписка → покупатель, %', tone: 'amber', data: conv, fmt: 'pct'},
+                {label: 'Покупатель → 1-е продление, %', tone: 'green', data: r1, fmt: 'pct'},
+                {label: '1-е → 2-е продление, %', tone: 'violet', data: r2, fmt: 'pct'},
+            ], {lineOnly: true, fullLabels: rows.map((r) => `когорта ${res.group === 'week' ? 'недели с ' : 'месяца '}${r.label}`)});
+            // Пустые когорты (нет подписок) в сводку не берём: у них нет процента.
+            const mature = rows.filter((r) => r.buy_mature && r.subs);
+            const last = mature[mature.length - 1], first = mature[0];
+            const lastRenew = rows.filter((r) => r.renewals[0].mature && r.renewals[0].matured).slice(-1)[0];
+            const summary = document.getElementById('acq-cohortpath-summary');
+            if (summary) summary.innerHTML = last
+                ? `Дозревших когорт: <b>${mature.length}</b>. Конверсия в покупку: <b class="chart-tone-amber">${last.buyers_pct}%</b> у последней (${last.label}) против <b>${first.buyers_pct}%</b> у первой (${first.label}).${lastRenew ? ` Продление после первой покупки у последней когорты с закрытым окном (${lastRenew.label}) — <b class="chart-tone-green">${lastRenew.renewals[0].pct}%</b>.` : ''} Данные пересобираются раз в ${Math.round((res.cache_ttl || 300) / 60)} мин.`
+                : 'Пока нет дозревших когорт — расширьте глубину.';
         }
 
-        const fmtCost = (v) => v == null ? '—' : v.toFixed(2) + ' ₽';
-        const fmtInt = (v) => v == null ? '—' : v.toLocaleString('ru-RU');
+        function cohortDetailsHtml(row, res) {
+            const labelOf = Object.fromEntries(res.tariffs.map((t) => [t.key, t.label]));
+            const tariffs = Object.entries(row.first_tariffs).sort((a, b) => b[1] - a[1]);
+            const total = tariffs.reduce((a, [, n]) => a + n, 0);
+            const chips = tariffs.map(([k, n]) => `<span class="acq-expiry-chip" aria-pressed="true"><span class="acq-expiry-chip-dot" style="background:${chartTone(expiryTone(k))}"></span>${escapeHtml(labelOf[k] || k)}<b>${fmtRub(n)} · ${total ? Math.round(100 * n / total) : 0}%</b></span>`).join('');
+            const from = Object.keys(row.transitions);
+            let matrix = '<p class="acq-ads-summary-note">Продлений с закрытым окном в этой когорте пока нет.</p>';
+            if (from.length) {
+                const toSet = new Set(); from.forEach((f) => Object.keys(row.transitions[f]).forEach((t) => toSet.add(t)));
+                const order = res.tariffs.map((t) => t.key);
+                const toKeys = order.filter((k) => toSet.has(k));
+                const head = `<tr><th scope="col">Закончился</th>${toKeys.map((k) => `<th scope="col">→ ${escapeHtml(labelOf[k] || k)}</th>`).join('')}<th scope="col">Всего</th></tr>`;
+                const body = order.filter((k) => from.includes(k)).map((f) => {
+                    const rowT = row.transitions[f]; const sum = Object.values(rowT).reduce((a, b) => a + b, 0);
+                    return `<tr><th scope="row">${escapeHtml(labelOf[f] || f)}</th>${toKeys.map((t) => rowT[t] ? `<td class="${t === f ? 'is-same' : 'is-move'}"><span class="acq-expiry-cell-end">${fmtRub(rowT[t])}</span><small>${Math.round(100 * rowT[t] / sum)}%</small></td>` : '<td class="is-empty">—</td>').join('')}<td><span class="acq-expiry-cell-end">${fmtRub(sum)}</span></td></tr>`;
+                }).join('');
+                matrix = `<table class="acq-expiry-table acq-expiry-matrix"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+            }
+            return `<div class="acq-cohort-details"><div><strong>Тариф первой покупки</strong><div class="acq-expiry-tariffs">${chips || '<span class="acq-ads-summary-note">покупок нет</span>'}</div></div><div><strong>Переходы при продлении</strong>${matrix}</div></div>`;
+        }
+
+        function renderCohortPathTable(res) {
+            const box = document.getElementById('acq-cohortpath-table');
+            if (!box || !res) return;
+            const rows = res.cohorts;
+            const cell = (main, sub = '', cls = '') => `<td class="${cls}"><span class="acq-expiry-cell-end">${main}</span>${sub ? `<small>${sub}</small>` : ''}</td>`;
+            const stepCell = (slot, prevCount) => {
+                if (!slot.eligible) return '<td class="is-empty">—</td>';
+                const pct = slot.pct == null ? '—' : `${slot.pct}%`;
+                const sub = slot.mature ? `${fmtRub(slot.renewed)} из ${fmtRub(slot.matured)}` : `${fmtRub(slot.renewed)} из ${fmtRub(slot.matured)} · ещё ${fmtRub(slot.eligible - slot.matured)} в окне`;
+                return cell(pct, sub, slot.mature ? 'is-move' : 'is-immature');
+            };
+            const head = `<tr><th scope="col">${res.group === 'week' ? 'Неделя' : 'Месяц'}</th><th scope="col">Подписок</th><th scope="col">Подключились</th><th scope="col">Купили</th><th scope="col">Продлили 1-й</th><th scope="col">Продлили 2-й</th><th scope="col">Продлили 3-й</th><th scope="col">Выручка</th><th scope="col">₽ на подписку</th><th scope="col">₽ на покупателя</th></tr>`;
+            const body = rows.slice().reverse().map((r) => {
+                const open = cohortState.open.has(r.cohort);
+                const main = `<tr class="acq-cohort-row${open ? ' is-open' : ''}" data-cohort="${escapeHtml(r.cohort)}" tabindex="0" role="button" aria-expanded="${open}"><th scope="row"><i class="fas fa-chevron-right acq-cohort-caret" aria-hidden="true"></i>${r.label}</th>`
+                    + cell(fmtRub(r.subs))
+                    + cell(r.connected_pct == null ? '—' : `${r.connected_pct}%`, `${fmtRub(r.connected)} чел.`)
+                    + cell(r.buyers_pct == null ? '—' : `${r.buyers_pct}%`, `${fmtRub(r.buyers)} чел.${r.buy_mature ? '' : ' · ещё дозревает'}`, r.buy_mature ? 'is-move' : 'is-immature')
+                    + stepCell(r.renewals[0]) + stepCell(r.renewals[1]) + stepCell(r.renewals[2])
+                    + cell(`${fmtRub(r.revenue)} ₽`)
+                    + cell(r.revenue_per_sub == null ? '—' : `${fmtRub(r.revenue_per_sub)} ₽`)
+                    + cell(r.revenue_per_buyer == null ? '—' : `${fmtRub(r.revenue_per_buyer)} ₽`)
+                    + '</tr>';
+                const details = open ? `<tr class="acq-cohort-details-row"><td colspan="10">${cohortDetailsHtml(r, res)}</td></tr>` : '';
+                return main + details;
+            }).join('');
+            box.innerHTML = rows.length ? `<table class="acq-expiry-table acq-cohort-table"><thead>${head}</thead><tbody>${body}</tbody></table>` : '<p class="acq-ads-summary-note">Когорт нет.</p>';
+            box.querySelectorAll('[data-cohort]').forEach((tr) => {
+                const toggle = () => {
+                    const key = tr.dataset.cohort;
+                    if (cohortState.open.has(key)) cohortState.open.delete(key); else cohortState.open.add(key);
+                    renderCohortPathTable(res);
+                };
+                tr.addEventListener('click', toggle);
+                tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+            });
+        }
+
+        async function loadCohortPath() {
+            const body = document.getElementById('acq-cohortpath-body');
+            const loading = document.getElementById('acq-cohortpath-loading');
+            if (!body) return;
+            body.classList.add('is-loading');
+            if (loading) loading.hidden = false;
+            try {
+                const res = await acqFetch('cohort_path', {group: cohortState.group, count: document.getElementById('acq-cohortpath-count')?.value || '16'}, {timeoutMs: 120000});
+                cohortState.res = res;
+                renderCohortPathChart(res);
+                renderCohortPathTable(res);
+            } catch (error) {
+                if (error?.name === 'AbortError') return;
+                const table = document.getElementById('acq-cohortpath-table');
+                if (table) table.innerHTML = `<p class="acq-ads-summary-note is-error">Не удалось загрузить когорты: ${escapeHtml(error.message || String(error))}</p>`;
+                throw error;
+            } finally {
+                body.classList.remove('is-loading');
+                if (loading) loading.hidden = true;
+            }
+        }
 
         function updateAdsDailyTableFrame(group, rowCount) {
             const scroller = document.getElementById('acq-ads-daily-table');
@@ -1130,7 +1201,7 @@
         }
 
         const loaders = {
-            'acq-revenue': loadRevenue, 'acq-newrep': loadNewRepeat, 'acq-expiry': loadExpiry, 'acq-funnel': loadFunnel, 'acq-ads': loadAds,
+            'acq-revenue': loadRevenue, 'acq-newrep': loadNewRepeat, 'acq-expiry': loadExpiry, 'acq-cohortpath': loadCohortPath, 'acq-ads': loadAds,
             'acq-cohorts': loadCohorts, 'acq-pushes': loadPushes, 'acq-patterns': loadPatterns,
             'acq-journey': loadJourney, 'acq-mrr': loadMrr, 'acq-payhealth': loadPayHealth,
         };
@@ -1278,6 +1349,18 @@
             loadNewRepeat().catch(console.error);
         });
         document.getElementById('acq-newrep-apply')?.addEventListener('click', () => loadNewRepeat().catch(console.error));
+        // Путь когорты: шаг и глубина.
+        document.querySelectorAll('[data-cohortpath-group]').forEach((button) => button.addEventListener('click', () => {
+            cohortState.group = button.dataset.cohortpathGroup === 'month' ? 'month' : 'week';
+            document.querySelectorAll('[data-cohortpath-group]').forEach((b) => b.classList.toggle('active', b === button));
+            const count = document.getElementById('acq-cohortpath-count');
+            if (count) {
+                const opts = cohortState.group === 'month' ? [['6', '6 когорт'], ['12', '12 когорт'], ['24', '24 когорты']] : [['8', '8 когорт'], ['16', '16 когорт'], ['26', '26 когорт']];
+                count.innerHTML = opts.map(([v, l], i) => `<option value="${v}"${i === 1 ? ' selected' : ''}>${l}</option>`).join('');
+            }
+            loadCohortPath().catch(console.error);
+        }));
+        document.getElementById('acq-cohortpath-count')?.addEventListener('change', () => loadCohortPath().catch(console.error));
         // Выручка: пресеты, разрез столбиков, ручной период.
         document.querySelectorAll('[data-revenue-preset]').forEach((button) => button.addEventListener('click', () => {
             setRevenuePreset(button.dataset.revenuePreset);
@@ -1452,7 +1535,6 @@
         document.getElementById('acq-ads-group')?.addEventListener('change', () => loadAdsDaily().catch(console.error));
         document.getElementById('acq-ads-days')?.addEventListener('change', () => loadAdsDaily().catch(console.error));
         window.addEventListener('resize', () => document.getElementById('acq-ads-daily-table')?.__refreshScrollCues?.());
-        document.getElementById('acq-trials-window')?.addEventListener('change', () => loadTrials().catch(console.error));
         document.getElementById('acq-csv-form')?.addEventListener('submit', async (ev) => {
             ev.preventDefault();
             const statusEl = document.getElementById('acq-csv-status');

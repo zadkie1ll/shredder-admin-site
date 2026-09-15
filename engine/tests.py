@@ -1005,11 +1005,104 @@ class AcquisitionTrialsTests(SimpleTestCase):
 
         self.assertEqual(result["days"][0]["conv_pct"], 0)
 
-    def test_trials_window_selector_in_template(self):
-        template = template_source("engine/templates/admin_dashboard.html")
 
-        self.assertIn('id="acq-trials-window"', template)
-        self.assertIn('<option value="10" selected>', template)
+class AcquisitionCohortPathTests(SimpleTestCase):
+    """«Привлечение → Путь когорты»: один человек в одной строке на всех
+    шагах — подписка, подключение, покупка, 1/2/3-е продление, деньги."""
+
+    NOW = datetime(2026, 9, 15, 12, 0)
+    TODAY = date(2026, 9, 15)
+
+    def test_cohort_rows_follow_users_through_steps(self):
+        from engine.views import _acq_cohort_path_rows
+
+        signups = {
+            1: datetime(2026, 7, 6, 10),  # неделя 06.07: купил, продлил 1-й, 2-й не продлил
+            2: datetime(2026, 7, 7, 10),  # неделя 06.07: купил, не продлил
+            3: datetime(2026, 7, 8, 10),  # неделя 06.07: подключился, не купил
+            4: datetime(2026, 7, 9, 10),  # неделя 06.07: ничего
+            5: datetime(2026, 9, 14, 10),  # текущая неделя: не дозрела
+        }
+        connected = {1, 2, 3}
+        payments = [
+            (1, datetime(2026, 7, 7), "month", 249.0, "yk", False),
+            (1, datetime(2026, 8, 5), "threemonths", 599.0, "yk", False),
+            (2, datetime(2026, 7, 8), "month", 249.0, "wata", False),
+        ]
+        periods = [
+            (1, datetime(2026, 8, 6), "month", datetime(2026, 8, 5), False, "threemonths"),  # 1-й период: продлён досрочно, окно закрыто
+            (1, datetime(2026, 11, 4), "threemonths", None, False, None),  # 2-й период: ещё идёт
+            (2, datetime(2026, 8, 7), "month", None, False, None),  # 1-й период: окно закрыто, отвал
+            (1, datetime(2026, 7, 6, 10) + timedelta(days=7), "trial", datetime(2026, 7, 7), False, "month"),  # пробный не считается
+        ]
+        rows = _acq_cohort_path_rows(signups, connected, payments, periods, "week", 12, 30, self.NOW, self.TODAY)
+        self.assertEqual(len(rows), 12)
+        by = {r["cohort"]: r for r in rows}
+        july = by["2026-07-06"]
+        self.assertEqual((july["subs"], july["connected"], july["buyers"]), (4, 3, 2))
+        self.assertEqual((july["connected_pct"], july["buyers_pct"]), (75.0, 50.0))
+        self.assertTrue(july["buy_mature"])
+        r1, r2, r3 = july["renewals"]
+        self.assertEqual((r1["eligible"], r1["matured"], r1["renewed"], r1["pct"], r1["mature"]), (2, 2, 1, 50.0, True))
+        self.assertEqual((r2["eligible"], r2["matured"], r2["renewed"], r2["pct"], r2["mature"]), (1, 0, 0, None, False))
+        self.assertEqual(r3["eligible"], 0)
+        self.assertEqual(july["revenue"], 1097)
+        self.assertEqual(july["revenue_per_sub"], 274)
+        self.assertEqual(july["revenue_per_buyer"], 548)
+        self.assertEqual(july["first_tariffs"], {"month": 2})
+        self.assertEqual(july["transitions"], {"month": {"threemonths": 1}})
+        current = by["2026-09-14"]
+        self.assertEqual(current["subs"], 1)
+        self.assertFalse(current["buy_mature"])
+
+    def test_month_cohorts_and_labels(self):
+        from engine.views import _acq_cohort_path_rows
+
+        signups = {1: datetime(2026, 8, 31, 22, 30)}  # 01.09 01:30 МСК -> когорта сентября
+        rows = _acq_cohort_path_rows(signups, set(), [], [], "month", 3, 30, self.NOW, self.TODAY)
+        self.assertEqual([r["cohort"] for r in rows], ["2026-07-01", "2026-08-01", "2026-09-01"])
+        self.assertEqual(rows[-1]["label"], "09.2026")
+        self.assertEqual(rows[-1]["subs"], 1)
+        self.assertEqual(rows[-2]["subs"], 0)
+
+    @mock.patch("engine.views._lifecycle_load_connected", return_value=set())
+    @mock.patch("engine.views._lifecycle_load_signups", return_value={})
+    @mock.patch("engine.views._expiry_load_trial_days", return_value=7)
+    @mock.patch("engine.views._expiry_load_autopay", return_value=set())
+    @mock.patch("engine.views._expiry_load_trial_starts", return_value={})
+    @mock.patch("engine.views._expiry_load_expires", return_value={})
+    @mock.patch("engine.views._expiry_load_payments", return_value=[])
+    def test_section_defaults_and_cache(self, _p, _e, _t, _a, _d, signups_mock, _c):
+        from engine.views import _acq_cohort_path, _expiry_cache_clear
+
+        _expiry_cache_clear()
+        self.addCleanup(_expiry_cache_clear)
+        res = _acq_cohort_path(object())
+        self.assertEqual((res["group"], res["count"], res["renewal_steps"]), ("week", 16, 3))
+        self.assertEqual(len(res["cohorts"]), 16)
+        res = _acq_cohort_path(object(), "month", "999")
+        self.assertEqual((res["group"], res["count"]), ("month", 24))
+        _acq_cohort_path(object(), "week", "8")
+        self.assertEqual(signups_mock.call_count, 1)
+
+    def test_template_replaces_funnel_with_cohort_path(self):
+        template = template_source("engine/templates/admin_dashboard.html")
+        for needle in (
+            'data-subtab="acq-cohortpath"',
+            'id="subpanel-acq-cohortpath"',
+            'id="acq-cohortpath-chart"',
+            'id="acq-cohortpath-table"',
+            'data-cohortpath-group="month"',
+            'id="acq-cohortpath-count"',
+            'data-help="cohortpath"',
+            "'acq-cohortpath': loadCohortPath",
+            "acqFetch('cohort_path'",
+            "function cohortDetailsHtml(row, res)",
+            "cohortpath: {",
+        ):
+            self.assertIn(needle, template, needle)
+        for gone in ('data-subtab="acq-funnel"', "acq-funnel-chart", "acq-trials-window", "loadFunnel", "loadTrials", "            funnel: {", "            trials: {"):
+            self.assertNotIn(gone, template, gone)
 
 
 class AcquisitionRevenueTests(SimpleTestCase):
@@ -6146,22 +6239,6 @@ class AcquisitionJourneyTests(SimpleTestCase):
         self.assertIn("acqFetch('tariff_paths'", template)
 
 
-class AcquisitionFunnelTemplateTests(SimpleTestCase):
-    def test_funnel_table_has_invoice_to_payment_percent(self):
-        # В таблице воронки рядом с «Подписка→покупатель» есть колонка
-        # «Инвойс→Оплата»: все оплаты недели ÷ инвойсы той же недели.
-        template = template_source("engine/templates/admin_dashboard.html")
-
-        self.assertIn("'Инвойс→Оплата'", template)
-        self.assertIn("funnelPct(r.payments, r.invoice_clicks)", template)
-        # Метрика описана в легенде метрик и в help-модалке воронки.
-        self.assertIn("Инвойс→Оплата в воронке", template)
-        self.assertIn(
-            "<b>Инвойс→Оплата</b> = все оплаты недели ÷ инвойсы той же недели.",
-            template,
-        )
-
-
 class AdminCensorBulkUpdateTests(SimpleTestCase):
     def test_bulk_update_changes_only_selected_fields_for_all_checks(self):
         request = RequestFactory().post(
@@ -6661,8 +6738,9 @@ class AdminAnalyticsStage1Tests(SimpleTestCase):
         src = inspect.getsource(_acq_funnel)
         self.assertIn("traffic_threshold_reached", src)
         self.assertIn("mb100", src)
-        template = template_source("engine/templates/admin_dashboard.html")
-        self.assertIn("Подкл.→100 МБ", template)
+        # Собственной вкладки у воронки больше нет («Путь когорты»), но
+        # секция funnel живёт в API — её колонки использует «Реклама».
+        self.assertNotIn('data-subtab="acq-funnel"', template_source("engine/templates/admin_dashboard.html"))
 
 
 class SetupWizardTests(SimpleTestCase):

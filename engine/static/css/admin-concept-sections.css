@@ -453,3 +453,21 @@ html[data-admin-theme="light"] #panel-system [data-winback-status].is-error { co
 #panel-acquisition .acq-revenue-table tr.is-weekend th[scope="row"] { color: var(--admin-text-muted); }
 #panel-acquisition .acq-revenue-table th[scope="row"] small { color: var(--admin-text-muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
 #panel-acquisition .acq-revenue-table tr.is-today th[scope="row"] small { color: var(--admin-accent); }
+
+/* Путь когорты */
+#panel-acquisition .acq-cohortpath { display: grid; gap: 22px; min-width: 0; }
+#panel-acquisition .acq-cohortpath > *, #panel-acquisition .acq-cohortpath .acq-expiry-head > * { min-width: 0; }
+#panel-acquisition .acq-cohort-row { cursor: pointer; }
+#panel-acquisition .acq-cohort-row:hover th, #panel-acquisition .acq-cohort-row:hover td { background: var(--admin-surface-soft); }
+#panel-acquisition .acq-cohort-row:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: -2px; }
+#panel-acquisition .acq-cohort-caret { display: inline-block; width: 12px; margin-right: 6px; font-size: 10px; color: var(--admin-text-muted); transition: transform .15s; }
+#panel-acquisition .acq-cohort-row.is-open .acq-cohort-caret { transform: rotate(90deg); }
+#panel-acquisition .acq-cohort-table td.is-immature { color: var(--admin-text-muted); }
+#panel-acquisition .acq-cohort-table td.is-immature .acq-expiry-cell-end { color: var(--admin-text-muted); font-weight: 500; }
+#panel-acquisition .acq-cohort-details-row td { padding: 14px 16px 18px; background: var(--admin-surface-soft); white-space: normal; }
+#panel-acquisition .acq-cohort-details { display: grid; grid-template-columns: minmax(220px, 1fr) minmax(0, 2fr); gap: 18px 28px; }
+#panel-acquisition .acq-cohort-details > div { display: grid; gap: 10px; min-width: 0; }
+#panel-acquisition .acq-cohort-details strong { font-size: 13px; font-weight: 600; }
+#panel-acquisition .acq-cohort-details .acq-expiry-chip { cursor: default; }
+#panel-acquisition .acq-cohort-details .acq-expiry-matrix { max-height: none; }
+@media (max-width: 900px) { #panel-acquisition .acq-cohort-details { grid-template-columns: 1fr; } }
