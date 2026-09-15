@@ -1569,12 +1569,15 @@ class AcquisitionRevenueTests(SimpleTestCase):
             "|| 'acq-revenue'",
             "revenue: {",
             "weekly: {",
-            # Переключатель месяцев «Новые vs повторные» остался.
-            'id="acq-newrep-month"',
-            "За период <b>${fullDay(rows[0].day)}",
         ):
             self.assertIn(needle, template, needle)
-        for gone in ("acq-renew45-chart", "loadRenew45", "Отвал базы: % продливших", 'data-help="renew45"'):
+        # «Отвал базы» и отдельная под-вкладка «Новые vs повторные» убраны:
+        # разрез новые/повторные живёт режимом графика на «Выручке».
+        for gone in (
+            "acq-renew45-chart", "loadRenew45", "Отвал базы: % продливших", 'data-help="renew45"',
+            'data-subtab="acq-newrep"', 'id="subpanel-acq-newrep"', 'id="acq-newrep-month"',
+            "loadNewRepeat", "acqFetch('new_repeat'", "            newrep: {",
+        ):
             self.assertNotIn(gone, template, gone)
 
 
@@ -7251,18 +7254,20 @@ class AdminAcqDatePickerTests(SimpleTestCase):
     """Календарь периода в «Привлечении»: кастомный пикер как в «Аналитике»
     вместо нативных input[type=date], плюс запрет «конец раньше начала»."""
 
-    def test_newrep_period_uses_custom_date_picker(self):
+    def test_acquisition_periods_use_custom_date_picker(self):
         template = template_source("engine/templates/admin_dashboard.html")
 
-        # Нативных date-инпутов у графика «новые vs повторные» больше нет —
-        # только hidden внутри date-field.
-        self.assertNotIn('type="date" id="acq-newrep-start"', template)
-        self.assertNotIn('type="date" id="acq-newrep-end"', template)
-        self.assertIn('<input type="hidden" id="acq-newrep-start">', template)
-        self.assertIn('<input type="hidden" id="acq-newrep-end">', template)
+        # Нативных date-инпутов в «Привлечении» нет — только hidden внутри
+        # date-field («Выручка», «Окончания»).
+        self.assertNotIn('type="date" id="acq-', template)
+        self.assertIn('<input type="hidden" id="acq-revenue-start">', template)
+        self.assertIn('<input type="hidden" id="acq-revenue-end">', template)
+        self.assertIn('<input type="hidden" id="acq-expiry-start">', template)
+        self.assertIn('<input type="hidden" id="acq-expiry-end">', template)
         # Программная установка дат идёт через setDateFieldValue (лейблы)
         self.assertIn("function setAcqDateField", template)
-        self.assertIn("setAcqDateField('acq-newrep-start'", template)
+        self.assertIn("setAcqDateField('acq-revenue-start'", template)
+        self.assertIn("setAcqDateField('acq-expiry-start'", template)
 
     def test_date_range_cannot_invert(self):
         template = template_source("engine/templates/admin_dashboard.html")
@@ -7271,19 +7276,12 @@ class AdminAcqDatePickerTests(SimpleTestCase):
         # max — это конец. Подключено и в «Привлечении», и в «Аналитике».
         self.assertIn("function resolveRangeBound", template)
         self.assertIn("range-disabled", template)
-        self.assertIn('data-range-min-from="#acq-newrep-start"', template)
-        self.assertIn('data-range-max-from="#acq-newrep-end"', template)
+        self.assertIn('data-range-min-from="#acq-revenue-start"', template)
+        self.assertIn('data-range-max-from="#acq-revenue-end"', template)
+        self.assertIn('data-range-min-from="#acq-expiry-start"', template)
+        self.assertIn('data-range-max-from="#acq-expiry-end"', template)
         self.assertIn('data-range-min-from=\'[name="start"]\'', template)
         self.assertIn('data-range-min-from=\'[name="cohort_start"]\'', template)
-
-    def test_month_selection_survives_programmatic_date_set(self):
-        template = template_source("engine/templates/admin_dashboard.html")
-
-        # setDateFieldValue шлёт input-событие; подстановка границ месяца
-        # не должна сбрасывать сам селектор месяца.
-        self.assertIn("settingMonthBounds = true", template)
-        self.assertIn("if (!settingMonthBounds) monthSel.value = ''", template)
-        self.assertIn("input.dispatchEvent(new Event('input'", template)
 
 
 class CabinetPaymentsHistoryTests(SimpleTestCase):

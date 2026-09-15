@@ -798,30 +798,6 @@
             }
         }
 
-        async function loadNewRepeat() {
-            const start = document.getElementById('acq-newrep-start').value;
-            const end = document.getElementById('acq-newrep-end').value;
-            const params = (start && end)
-                ? {start, end}
-                : {days: document.getElementById('acq-newrep-days').value};
-            const res = await acqFetch('new_repeat', params);
-            const rows = res.days;
-            acqDraw(document.getElementById('acq-newrep-chart'),
-                rows.map((r) => dayLabel(r.day)),
-                [
-                    {label: 'Повторные, ₽', tone: 'indigo', data: rows.map((r) => r.repeat_rub), fmt: 'rub'},
-                    {label: 'Новые, ₽', tone: 'amber', data: rows.map((r) => r.new_rub), fmt: 'rub'},
-                ],
-                [{label: 'Новых покупателей (правая ось)', tone: 'green', data: rows.map((r) => r.new_payers), fmt: 'raw'}],
-                {fullLabels: rows.map((r) => r.day)});
-            const nSum = rows.reduce((a, r) => a + r.new_rub, 0), rSum = rows.reduce((a, r) => a + r.repeat_rub, 0);
-            const nPayers = rows.reduce((a, r) => a + r.new_payers, 0);
-            const fullDay = (iso) => dayLabel(iso) + '.' + iso.slice(0, 4);
-            document.getElementById('acq-newrep-summary').innerHTML = rows.length
-                ? `За период <b>${fullDay(rows[0].day)} — ${fullDay(rows[rows.length - 1].day)}</b>: новые <b class="chart-tone-amber">${fmtRub(nSum)} ₽</b> (${Math.round(100 * nSum / Math.max(1, nSum + rSum))}%), повторные <b class="chart-tone-indigo">${fmtRub(rSum)} ₽</b>, итого <b>${fmtRub(nSum + rSum)} ₽</b>; новых покупателей: <b>${fmtRub(nPayers)}</b>. Повторные — эхо продаж прошлых месяцев; рекламу оценивайте по жёлтой части.`
-                : 'Нет данных за выбранный период.';
-        }
-
         // ===== Путь когорты =====
         const cohortState = {res: null, group: 'week', open: new Set()};
         const STEP_TONES = ['sky', 'amber', 'green', 'violet', 'indigo'];
@@ -1290,7 +1266,7 @@
         }
 
         const loaders = {
-            'acq-revenue': loadRevenue, 'acq-newrep': loadNewRepeat, 'acq-expiry': loadExpiry, 'acq-cohortpath': loadCohortPathTab, 'acq-ads': loadAds,
+            'acq-revenue': loadRevenue, 'acq-expiry': loadExpiry, 'acq-cohortpath': loadCohortPathTab, 'acq-ads': loadAds,
             'acq-cohorts': loadCohorts, 'acq-pushes': loadPushes, 'acq-patterns': loadPatterns,
             'acq-journey': loadJourney, 'acq-mrr': loadMrr, 'acq-payhealth': loadPayHealth,
         };
@@ -1430,14 +1406,6 @@
             if (field) setDateFieldValue(field, iso);
             else input.value = iso;
         }
-        document.getElementById('acq-newrep-days')?.addEventListener('change', () => {
-            setAcqDateField('acq-newrep-start', '');
-            setAcqDateField('acq-newrep-end', '');
-            const monthSel = document.getElementById('acq-newrep-month');
-            if (monthSel) monthSel.value = '';
-            loadNewRepeat().catch(console.error);
-        });
-        document.getElementById('acq-newrep-apply')?.addEventListener('click', () => loadNewRepeat().catch(console.error));
         // Путь когорты: шаг и глубина.
         document.querySelectorAll('[data-cohortpath-group]').forEach((button) => button.addEventListener('click', () => {
             cohortState.group = button.dataset.cohortpathGroup === 'month' ? 'month' : 'week';
@@ -1492,40 +1460,6 @@
             document.querySelectorAll('[data-expiry-preset]').forEach((b) => b.classList.remove('active'));
         }));
         window.addEventListener('resize', () => { if (expiryState.res && document.getElementById('subpanel-acq-expiry')?.classList.contains('active')) renderExpiryChart(expiryState.res); });
-        // Переключатель по месяцам: заполняем список последних месяцев и по выбору
-        // подставляем границы месяца в календарные поля периода.
-        (function () {
-            const monthSel = document.getElementById('acq-newrep-month');
-            if (!monthSel) return;
-            const MONTH_NAMES = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
-            const now = new Date();
-            for (let i = 0; i < 18; i++) {
-                const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-                const opt = document.createElement('option');
-                opt.value = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-                opt.textContent = `${MONTH_NAMES[d.getMonth()]} ${d.getFullYear()}`;
-                monthSel.appendChild(opt);
-            }
-            // setDateFieldValue шлёт input-событие; во время программной
-            // подстановки границ месяца сброс селектора надо подавлять.
-            let settingMonthBounds = false;
-            monthSel.addEventListener('change', () => {
-                if (!monthSel.value) return;
-                const [y, m] = monthSel.value.split('-').map(Number);
-                const lastDay = new Date(y, m, 0).getDate();
-                settingMonthBounds = true;
-                setAcqDateField('acq-newrep-start', `${monthSel.value}-01`);
-                setAcqDateField('acq-newrep-end', `${monthSel.value}-${String(lastDay).padStart(2, '0')}`);
-                settingMonthBounds = false;
-                loadNewRepeat().catch(console.error);
-            });
-            // Ручная правка календарных дат снимает выбор месяца
-            ['acq-newrep-start', 'acq-newrep-end'].forEach((id) => {
-                document.getElementById(id)?.addEventListener('input', () => {
-                    if (!settingMonthBounds) monthSel.value = '';
-                });
-            });
-        })();
         document.getElementById('acq-patterns-days')?.addEventListener('change', () => loadPatterns().catch(console.error));
         document.getElementById('acq-timing-days')?.addEventListener('change', () => loadJourney().catch(console.error));
         document.getElementById('acq-paths-months')?.addEventListener('change', () => loadTariffPaths().catch(console.error));
