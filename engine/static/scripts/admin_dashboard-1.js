@@ -499,12 +499,19 @@
             const churned = res.totals.churned || {};
             const labelOf = Object.fromEntries(res.tariffs.map((t) => [t.key, t.label]));
             const order = res.tariffs.map((t) => t.key);
-            const fromKeys = order.filter((k) => !expiryState.hidden.has(k) && ((transitions[k] && Object.keys(transitions[k]).length) || churned[k]));
+            // Чипы легенды прячут линии на графике для читаемости и на матрицу
+            // не влияют: строка есть у каждого тарифа, у которого в выбранном
+            // периоде были окончания за дни с закрытым окном.
+            const fromKeys = order.filter((k) => (transitions[k] && Object.keys(transitions[k]).length) || churned[k]);
             const toSet = new Set();
             fromKeys.forEach((k) => Object.keys(transitions[k] || {}).forEach((to) => toSet.add(to)));
             const toKeys = [...order.filter((k) => toSet.has(k)), ...[...toSet].filter((k) => !order.includes(k))];
+            const closedTo = expiryClosedTo(res);
+            const closedNote = closedTo
+                ? `Окончания с <b>${fullDay(res.start)}</b> по <b>${fullDay(closedTo)}</b> (окно ${res.window_days} дн. уже закрыто); тарифы, чьи периоды за эти дни не заканчивались, строкой не показаны.`
+                : 'В выбранном периоде нет дней с закрытым окном продления — расширьте период влево.';
             if (!fromKeys.length) {
-                box.innerHTML = '<p class="acq-ads-summary-note">Пока нет дней с закрытым окном продления по выбранным тарифам — расширьте период влево.</p>';
+                box.innerHTML = `<p class="acq-ads-summary-note">${closedNote}</p>`;
                 return;
             }
             const dot = (key) => `<span class="acq-expiry-chip-dot" style="background:${chartTone(expiryTone(key))}"></span>`;
@@ -521,7 +528,19 @@
                 }).join('');
                 return `<tr><th scope="row">${dot(from)}${escapeHtml(labelOf[from] || from)}</th>${cells}<td class="is-lost"><span class="acq-expiry-cell-end">${fmtRub(lost)}</span><small>${expiryPct(lost, total)}</small></td><td><span class="acq-expiry-cell-end">${fmtRub(total)}</span><small>${expiryPct(renewed, total)} продлились</small></td></tr>`;
             }).join('');
-            box.innerHTML = `<table class="acq-expiry-table acq-expiry-matrix"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+            box.innerHTML = `<p class="acq-ads-summary-note acq-expiry-matrix-note">${closedNote}</p><table class="acq-expiry-table acq-expiry-matrix"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+        }
+
+        // Последний день диапазона, у которого окно продления уже закрыто
+        // (день + окно < сегодня), или null, если таких дней нет.
+        function expiryClosedTo(res) {
+            // Считаем в UTC: локальная полночь при переводе в ISO съезжает на день.
+            const today = new Date(res.today + 'T00:00:00Z');
+            const last = new Date(today.getTime() - (res.window_days + 1) * 86400000);
+            const end = new Date(res.end + 'T00:00:00Z');
+            const to = last < end ? last : end;
+            const iso = to.toISOString().slice(0, 10);
+            return iso >= res.start ? iso : null;
         }
 
         async function loadExpiry() {

@@ -410,6 +410,11 @@ html[data-admin-theme="light"] #panel-system [data-winback-status].is-error { co
 #panel-acquisition .acq-expiry-table { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
 #panel-acquisition .acq-expiry-table th, #panel-acquisition .acq-expiry-table td { padding: 8px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--admin-border); vertical-align: top; }
 #panel-acquisition .acq-expiry-table thead th { position: sticky; top: 0; z-index: 2; background: var(--admin-surface); font-size: 11px; font-weight: 600; color: var(--admin-text-muted); }
+/* Общее правило `:is(#panel-acquisition, …) table:not(#acq-heatmap table) th`
+   выше по специфичности (два id) и ставит заголовкам text-align: left, из-за
+   чего подписи числовых колонок уезжали от своих цифр. Числовые колонки —
+   все, кроме первой (подпись строки). */
+#panel-acquisition .acq-expiry-table thead th:not(:first-child) { text-align: right !important; }
 #panel-acquisition .acq-expiry-table thead th .acq-expiry-chip-dot { margin-right: 6px; vertical-align: 0; }
 #panel-acquisition .acq-expiry-table th[scope="row"], #panel-acquisition .acq-expiry-table thead th:first-child { position: sticky; left: 0; z-index: 1; text-align: left; font-weight: 600; background: var(--admin-surface); }
 #panel-acquisition .acq-expiry-table thead th:first-child { z-index: 3; }
@@ -427,6 +432,7 @@ html[data-admin-theme="light"] #panel-system [data-winback-status].is-error { co
 #panel-acquisition .acq-expiry-matrix td.is-move .acq-expiry-cell-end { color: var(--workspace-success, #75d9ab); }
 #panel-acquisition .acq-expiry-matrix td.is-lost .acq-expiry-cell-end { color: var(--workspace-danger, #f298a2); }
 #panel-acquisition .acq-expiry-matrix { max-height: none; }
+#panel-acquisition .acq-expiry-table-wrap .acq-expiry-matrix-note { margin: 0; padding: 8px 12px; font-size: 11px; color: var(--admin-text-muted); border-bottom: 1px solid var(--admin-border); }
 #panel-acquisition .acq-expiry-table tr.is-today th, #panel-acquisition .acq-expiry-table tr.is-today td { background: rgba(255, 204, 36, .07); }
 #panel-acquisition .acq-expiry-table tfoot th, #panel-acquisition .acq-expiry-table tfoot td { position: sticky; bottom: 0; z-index: 2; background: var(--admin-surface); border-top: 1px solid var(--admin-border); border-bottom: 0; font-weight: 600; }
 #panel-acquisition .acq-expiry-table tfoot th { z-index: 3; }
