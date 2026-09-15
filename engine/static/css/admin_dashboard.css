@@ -1094,6 +1094,7 @@ html[data-admin-theme="light"] .chart-tone-pink { color: #b82a70; }
     font-weight: 700;
 }
 
+.acq-tooltip-row.is-total { font-weight: 600; padding-bottom: 4px; margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,.12); }
 .acq-tooltip-row {
     display: flex;
     align-items: baseline;

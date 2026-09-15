@@ -1095,14 +1095,43 @@ class AcquisitionCohortPathTests(SimpleTestCase):
             'data-cohortpath-group="month"',
             'id="acq-cohortpath-count"',
             'data-help="cohortpath"',
-            "'acq-cohortpath': loadCohortPath",
+            "'acq-cohortpath': loadCohortPathTab",
             "acqFetch('cohort_path'",
             "function cohortDetailsHtml(row, res)",
             "cohortpath: {",
+            # Недельная воронка и конверсия по дням живут на той же вкладке,
+            # ниже когорт (владелец пользуется таблицей воронки и графиком).
+            'id="acq-funnel-chart"',
+            'id="acq-funnel-table"',
+            'id="acq-trials-chart"',
+            'id="acq-trials-window"',
+            '<option value="10" selected>',
+            'data-help="funnel"',
+            'data-help="trials"',
+            "Promise.allSettled([loadCohortPath(), loadFunnel(), loadTrials()])",
+            "acqFetch('funnel', {weeks: 12})",
+            "acqFetch('trials', {days: 60, window: windowDays})",
+            "'Инвойс→Оплата'",
+            "funnelPct(r.payments, r.invoice_clicks)",
+            "Подкл.→100 МБ",
+            "Инвойс→Оплата в воронке",
+            "<b>Инвойс→Оплата</b> = все оплаты недели ÷ инвойсы той же недели.",
+            "            funnel: {",
+            "            trials: {",
         ):
             self.assertIn(needle, template, needle)
-        for gone in ('data-subtab="acq-funnel"', "acq-funnel-chart", "acq-trials-window", "loadFunnel", "loadTrials", "            funnel: {", "            trials: {"):
-            self.assertNotIn(gone, template, gone)
+        # Отдельной под-вкладки «Воронка» нет.
+        self.assertNotIn('data-subtab="acq-funnel"', template)
+        self.assertNotIn('id="subpanel-acq-funnel"', template)
+
+    def test_ads_cost_formatters_are_module_scoped(self):
+        # fmtCost/fmtInt использует «Реклама» (сводка за период, таблица
+        # аккаунтов) — раньше они жили внутри loadFunnel и после его удаления
+        # сводка падала с «fmtCost is not defined».
+        script = Path("engine/static/scripts/admin_dashboard-1.js").read_text()
+        self.assertIn("        const fmtCost = (v) => v == null ? '—' : v.toFixed(2) + ' ₽';", script)
+        self.assertIn("        const fmtInt = (v) => v == null ? '—' : v.toLocaleString('ru-RU');", script)
+        self.assertIn("tile('CPC', fmtCost(res.cpc)", script)
 
 
 class AdminTrafficSourceNotesTests(SimpleTestCase):
@@ -1311,6 +1340,8 @@ class AcquisitionRevenueTests(SimpleTestCase):
             "acqFetch('revenue_kpis'",
             "acqFetch('summary'",
             "sharedAxis: true",
+            "barLabels: true, totalLabel: 'Всего за день, ₽'",
+            "acq-tooltip-row is-total",
             "|| 'acq-revenue'",
             "revenue: {",
             "weekly: {",
@@ -6606,8 +6637,10 @@ class AdminChartReadabilityTests(SimpleTestCase):
         self.assertIn("млн", self.template)
         self.assertIn("тыс", self.template)
         self.assertIn("if (fmt === 'pct') return `${Math.round(value)}%`;", self.template)
-        # Обе оси обоих графиков используют общий форматтер.
-        self.assertEqual(self.template.count("adminChartAxisLabel("), 5)
+        # Обе оси обоих графиков используют общий форматтер; шестой вызов —
+        # подписи сумм над столбиками (barLabels), считается один раз на бар.
+        self.assertEqual(self.template.count("adminChartAxisLabel("), 6)
+        self.assertIn("const barLabelTexts = barTotals.map((v) => adminChartAxisLabel(v, barFmt));", self.template)
 
     def test_tooltip_values_have_separators_and_units(self):
         self.assertIn("function acqFmtValue(series, value)", self.template)

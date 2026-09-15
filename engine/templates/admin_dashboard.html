@@ -695,6 +695,37 @@
                         </div>
                     </div>
                 </section>
+                <div class="card" style="padding:18px;margin-top:14px;">
+                    <span class="chart-title-wrap"><strong>Воронка по неделям: подписки → инвойсы → новые покупатели</strong><button type="button" class="chart-info" data-help="funnel" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        <b>Подписки</b> — созданные подписки в панели (событие subscription_created, то же, что «Подписки» в таблице у партнёра).
+                        <b>Инвойсы</b> — сколько раз нажали кнопку оплаты (создан счёт).
+                        <b>Новые покупатели</b> — люди, оплатившие впервые за всю историю.
+                        <b>Подписка→покупатель</b> — какой % созданных на неделе подписок стал новым покупателем.
+                        <b>Инвойс→Оплата</b> — какой % созданных счетов закончился успешной оплатой.
+                        Это недельные итоги, а не когорта — строгий путь одних и тех же людей выше, в «Пути когорты».
+                    </div>
+                    <canvas id="acq-funnel-chart" style="width:100%;height:260px;display:block;margin-top:10px;"></canvas>
+                    <div id="acq-funnel-table" style="margin-top:12px;overflow-x:auto;"></div>
+                </div>
+                <div class="card" style="padding:18px;margin-top:14px;">
+                    <span class="chart-title-wrap"><strong>Подписки по дням и конверсия в первую оплату</strong><button type="button" class="chart-info" data-help="trials" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
+                    <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.5;">
+                        Синие столбики — сколько подписок создано за день (левая ось).
+                        Зелёная линия — какой % из созданных в этот день подписок оплатил впервые в течение выбранного окна (правая ось, в процентах).
+                        Падение столбиков = реклама приводит меньше людей; падение линии = люди приходят, но не покупают.
+                        Последние дни в размере окна — «недозрелые»: их процент ещё дорастёт.
+                    </div>
+                    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;align-items:center;font-size:12px;">
+                        <span style="color:var(--muted);">Окно конверсии:</span>
+                        <select id="acq-trials-window" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
+                            <option value="10" selected>10 дней</option>
+                            <option value="30">30 дней</option>
+                            <option value="60">60 дней</option>
+                        </select>
+                    </div>
+                    <canvas id="acq-trials-chart" style="width:100%;height:240px;display:block;margin-top:10px;"></canvas>
+                </div>
             </div>
 
             <div id="subpanel-acq-ads" class="subtab-panel">
