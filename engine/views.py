@@ -5,6 +5,8 @@ from types import SimpleNamespace
 import hmac
 import hashlib
 import logging
+import threading
+from time import monotonic as _monotonic
 import math
 import base64
 import json
@@ -143,6 +145,7 @@ from engine.user_block import ACCOUNT_BLOCKED_MESSAGE
 from engine.user_block import is_user_blocked
 from common.models.settings import BOOL_RUNTIME_SETTINGS
 from common.models.settings import BOT_APPLE_RECOMMENDED_APP_SETTING
+from common.models.settings import BOT_TRIAL_PERIOD_DAYS_SETTING
 from common.models.settings import BOT_JOIN_REFERRER_BONUS_DAYS_SETTING
 from common.models.settings import BOT_PURCHASE_REFERRER_BONUS_DAYS_SETTING
 from common.models.settings import BOT_REFERRAL_REGISTRATION_AUTOBLOCK_ENABLED_SETTING
@@ -12801,6 +12804,365 @@ def _acq_rows(db_session, sql, **params):
     return db_session.execute(sa_text(sql), params).mappings().all()
 
 
+# --- Окончания и продления подписок по тарифам («Привлечение → Окончания») ---
+#
+# Точной истории сроков нет: users.expire_at хранит только текущий срок, а
+# событие subscription_expired из common.models.analytics_event ни один сервис
+# не пишет. Концы прошлых периодов восстанавливаются из цепочки оплат: период
+# = max(конец предыдущего, момент оплаты) + длительность тарифа (так продлевает
+# payment-сервис: extend_user_subscription стакует срок, если он ещё не истёк).
+# У последнего периода конец — реальный expire_at (в нём и бонусы, и ручные
+# продления), у прошлых бонусы не видны — цифры за прошлое помечаются как
+# оценка. Пробные подписки: без единой оплаты — конец по expire_at (точно);
+# у плативших — старт из события subscription_created + пробные дни.
+EXPIRY_TARIFF_DAYS = {
+    "oneday": 1,
+    "threedays": 3,
+    "oneweek": 7,
+    "month": 30,
+    "threemonths": 90,
+    "sixmonths": 180,
+    "year": 360,
+}
+EXPIRY_TRIAL_KEY = "trial"
+EXPIRY_OTHER_KEY = "other"
+EXPIRY_OTHER_DAYS = 30
+EXPIRY_TARIFF_ORDER = (
+    EXPIRY_TRIAL_KEY,
+    "oneday",
+    "threedays",
+    "oneweek",
+    "month",
+    "threemonths",
+    "sixmonths",
+    "year",
+    EXPIRY_OTHER_KEY,
+)
+EXPIRY_TARIFF_LABELS = {EXPIRY_TRIAL_KEY: "Пробный", EXPIRY_OTHER_KEY: "Без тарифа"}
+# Окно продления в днях после конца периода; другие значения приводятся к 30.
+EXPIRY_WINDOWS = (7, 14, 30)
+EXPIRY_DEFAULT_WINDOW = 30
+EXPIRY_MAX_RANGE_DAYS = 366
+EXPIRY_DEFAULT_TRIAL_DAYS = 7
+
+
+def _expiry_tariff_label(key):
+    return EXPIRY_TARIFF_LABELS.get(key) or get_tariff_display_name(key)
+
+
+def _expiry_load_payments(db_session):
+    """(user_id, paid_at UTC, tariff) по всем успешным оплатам, по порядку."""
+    return [
+        (int(r["user_id"]), r["paid_at"], str(r["tariff"] or ""))
+        for r in _acq_rows(
+            db_session,
+            """
+            SELECT user_id, paid_at, tariff FROM (
+                SELECT wi.user_id AS user_id,
+                       (t.payment_time AT TIME ZONE 'UTC') AS paid_at,
+                       COALESCE(wi.tariff_id, '') AS tariff
+                FROM wata_transactions t
+                JOIN wata_invoices wi ON wi.order_id = t.order_id
+                WHERE t.transaction_status = 'Paid'
+                UNION ALL
+                SELECT p.user_id, p.created_at, p.subscription_period
+                FROM yk_payments p
+                WHERE p.status = 'succeeded'
+            ) pays
+            ORDER BY user_id, paid_at
+            """,
+        )
+    ]
+
+
+# Сроки нужны плативших (правда для последнего периода) и пробных без оплат,
+# чей срок попадает в мыслимый диапазон: старые истёкшие триалы (старше
+# EXPIRY_MAX_RANGE_DAYS + запас) ни в один отчёт не попадут — не тянем.
+EXPIRY_EXPIRES_LOOKBACK_DAYS = EXPIRY_MAX_RANGE_DAYS + 30
+
+
+def _expiry_load_expires(db_session):
+    return {
+        int(r["id"]): r["expire_at"]
+        for r in _acq_rows(
+            db_session,
+            f"""
+            SELECT u.id, u.expire_at FROM users u
+            WHERE u.expire_at IS NOT NULL
+              AND (
+                u.expire_at >= now() AT TIME ZONE 'UTC'
+                    - make_interval(days => {int(EXPIRY_EXPIRES_LOOKBACK_DAYS)})
+                OR ({PAYS_EXISTS_SQL})
+              )
+            """,
+        )
+    }
+
+
+def _expiry_load_autopay(db_session):
+    """Кто продлится сам: есть привязка рекуррента и автоплатёж не отключён."""
+    return {
+        int(r["user_id"])
+        for r in _acq_rows(
+            db_session,
+            """
+            SELECT r.user_id FROM yk_recurrent_payments r
+            JOIN users u ON u.id = r.user_id
+            WHERE u.autopay_allow
+            """,
+        )
+    }
+
+
+def _expiry_load_trial_starts(db_session):
+    """Старт пробного нужен только плативших: у остальных конец пробного —
+    это их expire_at, событие не требуется."""
+    return {
+        int(r["user_id"]): r["started_at"]
+        for r in _acq_rows(
+            db_session,
+            f"""
+            SELECT e.user_id, min(e.timestamp) AS started_at FROM event_logs e
+            WHERE e.event_type = 'subscription_created'
+              AND EXISTS (SELECT 1 FROM users u WHERE u.id = e.user_id AND ({PAYS_EXISTS_SQL}))
+            GROUP BY e.user_id
+            """,
+        )
+    }
+
+
+def _expiry_load_trial_days(db_session):
+    setting = db_session.get(SystemSetting, BOT_TRIAL_PERIOD_DAYS_SETTING)
+    return parse_positive_int_setting(
+        setting.value if setting else None, EXPIRY_DEFAULT_TRIAL_DAYS
+    )
+
+
+def _expiry_periods(payments, expires, trial_starts, trial_days, autopay_users):
+    """Периоды подписок: (user_id, end_utc, tariff, next_paid_at, autopay).
+
+    next_paid_at — момент следующей оплаты после начала периода (None — её
+    нет); по нему считается продление относительно конца периода.
+    """
+    periods = []
+    by_user = {}
+    for user_id, paid_at, tariff in payments:
+        by_user.setdefault(user_id, []).append((paid_at, tariff))
+    trial_delta = timedelta(days=trial_days)
+    for user_id, pays in by_user.items():
+        autopay = user_id in autopay_users
+        end_prev = None
+        started = trial_starts.get(user_id)
+        if started is not None:
+            end_prev = started + trial_delta
+            periods.append((user_id, end_prev, EXPIRY_TRIAL_KEY, pays[0][0], autopay))
+        for index, (paid_at, tariff) in enumerate(pays):
+            key = tariff if tariff in EXPIRY_TARIFF_DAYS else EXPIRY_OTHER_KEY
+            days = EXPIRY_TARIFF_DAYS.get(key, EXPIRY_OTHER_DAYS)
+            base = paid_at if end_prev is None or end_prev < paid_at else end_prev
+            end = base + timedelta(days=days)
+            is_last = index == len(pays) - 1
+            if is_last:
+                actual = expires.get(user_id)
+                if actual is not None and actual >= paid_at:
+                    end = actual
+            next_paid = pays[index + 1][0] if not is_last else None
+            periods.append((user_id, end, key, next_paid, autopay))
+            end_prev = end
+    for user_id, expire_at in expires.items():
+        if user_id in by_user:
+            continue
+        periods.append((user_id, expire_at, EXPIRY_TRIAL_KEY, None, False))
+    return periods
+
+
+def _expiry_bucket_key(end_utc, group):
+    day = (end_utc + ADMIN_TZ_OFFSET).date()
+    if group == "week":
+        return day - timedelta(days=day.weekday())
+    return day
+
+
+def _expiry_bucket_keys(start, end, group):
+    keys = []
+    cursor = start - timedelta(days=start.weekday()) if group == "week" else start
+    step = timedelta(days=7 if group == "week" else 1)
+    while cursor <= end:
+        keys.append(cursor)
+        cursor += step
+    return keys
+
+
+def _expiry_aggregate(periods, start, end, group, window_days, now, today):
+    """Считает бакеты диапазона [start, end] (даты МСК) из списка периодов."""
+    window = timedelta(days=window_days)
+    keys = _expiry_bucket_keys(start, end, group)
+    index = {key: i for i, key in enumerate(keys)}
+    empty = lambda: {"ending": {}, "renewed": {}, "pending": {}, "autopay": {}}  # noqa: E731
+    buckets = [empty() for _ in keys]
+    seen = set()
+
+    def bump(counter, tariff):
+        counter[tariff] = counter.get(tariff, 0) + 1
+
+    for user_id, period_end, tariff, next_paid, autopay in periods:
+        key = _expiry_bucket_key(period_end, group)
+        position = index.get(key)
+        if position is None:
+            continue
+        seen.add(tariff)
+        bucket = buckets[position]
+        bump(bucket["ending"], tariff)
+        if period_end > now:
+            if autopay and tariff != EXPIRY_TRIAL_KEY:
+                bump(bucket["autopay"], tariff)
+            continue
+        if next_paid is not None and next_paid <= period_end + window:
+            bump(bucket["renewed"], tariff)
+        elif next_paid is None and now < period_end + window:
+            bump(bucket["pending"], tariff)
+
+    tariffs = [key for key in EXPIRY_TARIFF_ORDER if key in seen]
+    rows = []
+    totals = {
+        "ending": 0,
+        "ending_past": 0,
+        "ending_future": 0,
+        "renewed": 0,
+        "pending": 0,
+        "autopay_future": 0,
+        # Финальная доля продлений: только бакеты с закрытым окном.
+        "ending_closed": 0,
+        "renewed_closed": 0,
+        "by_tariff": {},
+    }
+    for key, bucket in zip(keys, buckets):
+        last_day = key if group == "day" else key + timedelta(days=6)
+        is_past = last_day < today
+        is_current = key <= today <= last_day
+        # Окно закрыто у всех периодов бакета: последний день бакета + окно
+        # уже прошли. Только по таким бакетам доля продлений финальна —
+        # в остальных она занижена (кто-то ещё продлится).
+        window_closed = last_day + timedelta(days=window_days) < today
+        ending_total = sum(bucket["ending"].values())
+        renewed_total = sum(bucket["renewed"].values())
+        rows.append(
+            {
+                "key": key.isoformat(),
+                "label": key.strftime("%d.%m"),
+                "is_past": is_past,
+                "is_current": is_current,
+                "window_closed": window_closed,
+                "ending": bucket["ending"],
+                "renewed": bucket["renewed"],
+                "pending": bucket["pending"],
+                "autopay": bucket["autopay"],
+                "total_ending": ending_total,
+                "total_renewed": renewed_total,
+                "total_pending": sum(bucket["pending"].values()),
+                "total_autopay": sum(bucket["autopay"].values()),
+            }
+        )
+        for tariff in tariffs:
+            slot = totals["by_tariff"].setdefault(
+                tariff, {"ending": 0, "renewed": 0, "pending": 0, "autopay": 0}
+            )
+            for name in ("ending", "renewed", "pending", "autopay"):
+                slot[name] += bucket[name].get(tariff, 0)
+        totals["ending"] += ending_total
+        totals["renewed"] += renewed_total
+        totals["pending"] += sum(bucket["pending"].values())
+        totals["autopay_future"] += sum(bucket["autopay"].values())
+    # Прошлое/будущее по бакетам: текущий бакет относится к прошлому — в нём
+    # уже есть истёкшие, а продления по ним ещё копятся (pending).
+    for row in rows:
+        if row["is_past"] or row["is_current"]:
+            totals["ending_past"] += row["total_ending"]
+        else:
+            totals["ending_future"] += row["total_ending"]
+        if row["window_closed"]:
+            totals["ending_closed"] += row["total_ending"]
+            totals["renewed_closed"] += row["total_renewed"]
+    return tariffs, rows, totals
+
+
+# Сборка периодов — самая дорогая часть (все оплаты, сроки, старты пробных,
+# ~сотни тысяч строк): кэшируется в памяти процесса на EXPIRY_CACHE_TTL секунд.
+# Смена диапазона/шага/окна в админке пересчитывает только бакеты по готовому
+# списку — мгновенно. Данные внизу меняются медленно (оплаты, сроки), пять
+# минут отставания для этого отчёта не важны; ?refresh=1 сбрасывает кэш.
+EXPIRY_CACHE_TTL = 300
+_EXPIRY_CACHE = {"at": 0.0, "periods": None, "trial_days": None}
+_EXPIRY_CACHE_LOCK = threading.Lock()
+
+
+def _expiry_cache_clear():
+    with _EXPIRY_CACHE_LOCK:
+        _EXPIRY_CACHE.update(at=0.0, periods=None, trial_days=None)
+
+
+def _expiry_periods_cached(db_session, refresh=False):
+    now = _monotonic()
+    with _EXPIRY_CACHE_LOCK:
+        if (
+            not refresh
+            and _EXPIRY_CACHE["periods"] is not None
+            and now - _EXPIRY_CACHE["at"] < EXPIRY_CACHE_TTL
+        ):
+            return _EXPIRY_CACHE["periods"], _EXPIRY_CACHE["trial_days"]
+    started = _monotonic()
+    trial_days = _expiry_load_trial_days(db_session)
+    periods = _expiry_periods(
+        _expiry_load_payments(db_session),
+        _expiry_load_expires(db_session),
+        _expiry_load_trial_starts(db_session),
+        trial_days,
+        _expiry_load_autopay(db_session),
+    )
+    logging.info(
+        "acquisition expirations: %s periods rebuilt in %.2fs",
+        len(periods),
+        _monotonic() - started,
+    )
+    with _EXPIRY_CACHE_LOCK:
+        _EXPIRY_CACHE.update(at=_monotonic(), periods=periods, trial_days=trial_days)
+    return periods, trial_days
+
+
+def _acq_expirations(
+    db_session, start=None, end=None, group="day", window=None, refresh=False
+):
+    today = admin_msk_today()
+    start = date.fromisoformat(start) if start else today - timedelta(days=30)
+    end = date.fromisoformat(end) if end else today + timedelta(days=30)
+    if end < start or (end - start).days > EXPIRY_MAX_RANGE_DAYS:
+        raise ValueError("bad range")
+    group = "week" if group == "week" else "day"
+    try:
+        window_days = int(window)
+    except (TypeError, ValueError):
+        window_days = EXPIRY_DEFAULT_WINDOW
+    if window_days not in EXPIRY_WINDOWS:
+        window_days = EXPIRY_DEFAULT_WINDOW
+
+    periods, trial_days = _expiry_periods_cached(db_session, refresh=refresh)
+    tariffs, rows, totals = _expiry_aggregate(
+        periods, start, end, group, window_days, datetime.utcnow(), today
+    )
+    return {
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "today": today.isoformat(),
+        "group": group,
+        "window_days": window_days,
+        "trial_days": trial_days,
+        "cache_ttl": EXPIRY_CACHE_TTL,
+        "tariffs": [{"key": key, "label": _expiry_tariff_label(key)} for key in tariffs],
+        "buckets": rows,
+        "totals": totals,
+    }
+
+
 def _acq_new_repeat(db_session, days, start=None, end=None):
     if start and end:
         where = f"{ACQ_MSK_DAY} BETWEEN :start AND :end"
@@ -14280,6 +14642,14 @@ ACQ_SECTIONS = {
     "new_repeat": lambda s, req: _acq_new_repeat(
         s, int(req.GET.get("days", 60)),
         req.GET.get("start") or None, req.GET.get("end") or None,
+    ),
+    "expirations": lambda s, req: _acq_expirations(
+        s,
+        req.GET.get("start") or None,
+        req.GET.get("end") or None,
+        req.GET.get("group") or "day",
+        req.GET.get("window"),
+        req.GET.get("refresh") == "1",
     ),
     "renew45": lambda s, req: _acq_renew45(s, int(req.GET.get("months", 12))),
     "funnel": lambda s, req: _acq_funnel(s, int(req.GET.get("weeks", 12))),

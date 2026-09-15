@@ -1057,6 +1057,203 @@ class AcquisitionRenew45Tests(SimpleTestCase):
         self.assertIn("За период <b>${fullDay(rows[0].day)}", template)
 
 
+class AcquisitionExpiryTests(SimpleTestCase):
+    """«Привлечение → Окончания и продления»: концы периодов восстанавливаются
+    из цепочки оплат со стакованием, последний — по реальному expire_at;
+    продление — следующая оплата не позже окна после конца (в том числе
+    досрочная); пробные — по expire_at без оплат и по subscription_created."""
+
+    NOW = datetime(2026, 9, 15, 12, 0)  # UTC; МСК-сегодня 15.09
+    TODAY = date(2026, 9, 15)
+
+    def _periods(self, payments, expires=None, trial_starts=None, autopay=()):
+        from engine.views import _expiry_periods
+
+        return _expiry_periods(payments, expires or {}, trial_starts or {}, 7, set(autopay))
+
+    def test_periods_stack_from_previous_end_and_use_real_expire_for_last(self):
+        payments = [
+            (1, datetime(2026, 6, 1), "month"),  # до 01.07
+            (1, datetime(2026, 6, 28), "month"),  # досрочно: 01.07 + 30 = 31.07
+            (1, datetime(2026, 8, 5), "threemonths"),  # после паузы: 05.08 + 90
+        ]
+        expires = {1: datetime(2026, 11, 10)}  # реальный срок с бонусом
+        periods = self._periods(payments, expires)
+        ends = [(p[1], p[2], p[3]) for p in periods]
+        self.assertEqual(
+            ends,
+            [
+                (datetime(2026, 7, 1), "month", datetime(2026, 6, 28)),
+                (datetime(2026, 7, 31), "month", datetime(2026, 8, 5)),
+                (datetime(2026, 11, 10), "threemonths", None),
+            ],
+        )
+
+    def test_real_expire_before_last_payment_is_ignored(self):
+        # expire_at раньше последней оплаты — рассинхрон, берём симуляцию.
+        periods = self._periods([(1, datetime(2026, 9, 1), "month")], {1: datetime(2026, 8, 1)})
+        self.assertEqual(periods[0][1], datetime(2026, 10, 1))
+
+    def test_trial_periods_for_payers_and_non_payers(self):
+        payments = [(1, datetime(2026, 9, 5), "month")]
+        expires = {1: datetime(2026, 10, 5), 2: datetime(2026, 9, 20)}
+        trial_starts = {1: datetime(2026, 9, 1)}
+        periods = self._periods(payments, expires, trial_starts)
+        trial = [p for p in periods if p[2] == "trial"]
+        self.assertEqual(
+            sorted((p[0], p[1], p[3]) for p in trial),
+            [(1, datetime(2026, 9, 8), datetime(2026, 9, 5)), (2, datetime(2026, 9, 20), None)],
+        )
+        # Оплата в пробный период стакуется от конца пробного: 08.09 + 30.
+        self.assertIn((1, datetime(2026, 10, 5), "month", None, False), periods)
+
+    def test_unknown_tariff_falls_back_to_other(self):
+        periods = self._periods([(1, datetime(2026, 9, 1), "")])
+        self.assertEqual(periods[0][2], "other")
+        self.assertEqual(periods[0][1], datetime(2026, 10, 1))
+
+    def test_aggregate_renewed_pending_future_and_autopay(self):
+        from engine.views import _expiry_aggregate
+
+        periods = [
+            (1, datetime(2026, 9, 1, 10), "month", datetime(2026, 8, 30), False),  # досрочное продление
+            (2, datetime(2026, 9, 1, 11), "month", datetime(2026, 9, 20), False),  # позже, но в окне 30
+            (3, datetime(2026, 9, 1, 12), "month", None, False),  # окно 30 ещё открыто (сегодня 15.09)
+            (4, datetime(2026, 8, 1, 12), "month", None, False),  # окно закрыто — отвал
+            (5, datetime(2026, 8, 1, 12), "month", datetime(2026, 9, 10), False),  # позже окна — возврат, не продление
+            (6, datetime(2026, 9, 20, 12), "year", None, True),  # будущее с автоплатежом
+            (7, datetime(2026, 9, 20, 12), "trial", None, True),  # пробный: автоплатёж не считается
+            (8, datetime(2026, 12, 1), "month", None, False),  # вне диапазона
+        ]
+        tariffs, rows, totals = _expiry_aggregate(
+            periods, date(2026, 8, 1), date(2026, 9, 30), "day", 30, self.NOW, self.TODAY
+        )
+        self.assertEqual(tariffs, ["trial", "month", "year"])
+        by_key = {r["key"]: r for r in rows}
+        self.assertEqual(len(rows), 61)
+        sep1 = by_key["2026-09-01"]
+        self.assertEqual(sep1["ending"], {"month": 3})
+        self.assertEqual(sep1["renewed"], {"month": 2})
+        self.assertEqual(sep1["pending"], {"month": 1})
+        self.assertTrue(sep1["is_past"])
+        aug1 = by_key["2026-08-01"]
+        self.assertEqual(aug1["ending"], {"month": 2})
+        self.assertEqual(aug1["renewed"], {})
+        self.assertEqual(aug1["pending"], {})
+        sep20 = by_key["2026-09-20"]
+        self.assertFalse(sep20["is_past"])
+        self.assertEqual(sep20["ending"], {"year": 1, "trial": 1})
+        self.assertEqual(sep20["autopay"], {"year": 1})
+        self.assertTrue(by_key["2026-09-15"]["is_current"])
+        # Окно 30 дн.: у 01.08 закрыто (01.08+30 < 15.09), у 01.09 — нет.
+        self.assertTrue(aug1["window_closed"])
+        self.assertFalse(sep1["window_closed"])
+        self.assertEqual(totals["ending_closed"], 2)
+        self.assertEqual(totals["renewed_closed"], 0)
+        self.assertEqual(totals["ending"], 7)
+        self.assertEqual(totals["ending_past"], 5)
+        self.assertEqual(totals["ending_future"], 2)
+        self.assertEqual(totals["renewed"], 2)
+        self.assertEqual(totals["pending"], 1)
+        self.assertEqual(totals["autopay_future"], 1)
+        self.assertEqual(totals["by_tariff"]["month"], {"ending": 5, "renewed": 2, "pending": 1, "autopay": 0})
+
+    def test_window_changes_verdict(self):
+        from engine.views import _expiry_aggregate
+
+        periods = [(2, datetime(2026, 9, 1, 11), "month", datetime(2026, 9, 20), False)]
+        _, rows, _ = _expiry_aggregate(periods, date(2026, 9, 1), date(2026, 9, 1), "day", 7, self.NOW, self.TODAY)
+        self.assertEqual(rows[0]["renewed"], {})
+        self.assertEqual(rows[0]["pending"], {})
+
+    def test_msk_day_and_week_buckets(self):
+        from engine.views import _expiry_aggregate
+
+        # 31.08 22:30 UTC = 01.09 01:30 МСК; неделя 31.08–06.09 (понедельник 31.08).
+        periods = [(1, datetime(2026, 8, 31, 22, 30), "month", None, False)]
+        _, rows, _ = _expiry_aggregate(periods, date(2026, 9, 1), date(2026, 9, 1), "day", 30, self.NOW, self.TODAY)
+        self.assertEqual(rows[0]["ending"], {"month": 1})
+        _, rows, _ = _expiry_aggregate(periods, date(2026, 9, 2), date(2026, 9, 16), "week", 30, self.NOW, self.TODAY)
+        self.assertEqual([r["key"] for r in rows], ["2026-08-31", "2026-09-07", "2026-09-14"])
+        self.assertEqual(rows[0]["ending"], {"month": 1})
+        self.assertTrue(rows[0]["is_past"])
+        self.assertTrue(rows[2]["is_current"])
+        self.assertFalse(rows[2]["is_past"])
+
+    @mock.patch("engine.views._expiry_load_trial_days", return_value=7)
+    @mock.patch("engine.views._expiry_load_autopay", return_value=set())
+    @mock.patch("engine.views._expiry_load_trial_starts", return_value={})
+    @mock.patch("engine.views._expiry_load_expires", return_value={})
+    @mock.patch("engine.views._expiry_load_payments", return_value=[])
+    def test_section_defaults_and_param_validation(self, *_mocks):
+        from engine.views import ACQ_SECTIONS, _acq_expirations, _expiry_cache_clear
+
+        _expiry_cache_clear()
+        self.addCleanup(_expiry_cache_clear)
+        self.assertIn("expirations", ACQ_SECTIONS)
+        res = _acq_expirations(object())
+        self.assertEqual(res["cache_ttl"], 300)
+        self.assertEqual(res["group"], "day")
+        self.assertEqual(res["window_days"], 30)
+        self.assertEqual(len(res["buckets"]), 61)
+        self.assertEqual(res["tariffs"], [])
+        res = _acq_expirations(object(), "2026-09-01", "2026-09-30", "week", "x")
+        self.assertEqual(res["group"], "week")
+        self.assertEqual(res["window_days"], 30)
+        self.assertEqual(_acq_expirations(object(), None, None, "day", "7")["window_days"], 7)
+        with self.assertRaises(ValueError):
+            _acq_expirations(object(), "2026-09-30", "2026-09-01")
+        with self.assertRaises(ValueError):
+            _acq_expirations(object(), "2025-01-01", "2026-09-01")
+        with self.assertRaises(ValueError):
+            _acq_expirations(object(), "вчера", "2026-09-01")
+
+    @mock.patch("engine.views._expiry_load_trial_days", return_value=7)
+    @mock.patch("engine.views._expiry_load_autopay", return_value=set())
+    @mock.patch("engine.views._expiry_load_trial_starts", return_value={})
+    @mock.patch("engine.views._expiry_load_expires", return_value={})
+    @mock.patch("engine.views._expiry_load_payments", return_value=[])
+    def test_periods_are_cached_between_requests(self, payments_mock, *_mocks):
+        """Дорогая сборка периодов делается раз в EXPIRY_CACHE_TTL: смена
+        диапазона/шага не ходит в БД, refresh=1 пересобирает."""
+        from engine.views import _acq_expirations, _expiry_cache_clear
+
+        _expiry_cache_clear()
+        self.addCleanup(_expiry_cache_clear)
+        _acq_expirations(object(), "2026-09-01", "2026-09-30")
+        _acq_expirations(object(), "2026-08-01", "2026-09-30", "week", "7")
+        self.assertEqual(payments_mock.call_count, 1)
+        _acq_expirations(object(), "2026-09-01", "2026-09-30", refresh=True)
+        self.assertEqual(payments_mock.call_count, 2)
+
+    def test_template_has_expiry_subtab_chart_and_table(self):
+        template = template_source("engine/templates/admin_dashboard.html")
+        for needle in (
+            'data-subtab="acq-expiry"',
+            'id="subpanel-acq-expiry"',
+            'id="acq-expiry-chart"',
+            'id="acq-expiry-table"',
+            'id="acq-expiry-tariffs"',
+            'id="acq-expiry-window"',
+            'data-expiry-group="week"',
+            'data-expiry-preset="around30"',
+            'data-help="expiry"',
+            "'acq-expiry': loadExpiry",
+            "acqFetch('expirations'",
+            "marker: todayIndex >= 0",
+            "shade: {from: 0, to: pastEnd}",
+            "hideLegend: true",
+            "hidden: new Set(['trial'])",
+            "row.window_closed ? expiryPct(renewed, ending)",
+            "expiry: {",
+            "Окончания и продления по тарифам",
+        ):
+            self.assertIn(needle, template, needle)
+        css = template_source("engine/static/css/admin-concept-sections.css")
+        self.assertIn(".acq-expiry-table tr.is-today", css)
+        self.assertIn('.acq-expiry-chip[aria-pressed="false"]', css)
+
+
 class AcquisitionAdsDailyTests(SimpleTestCase):
     @mock.patch("engine.views._acq_rows")
     def test_daily_rows_merge_spend_funnel_and_costs(self, rows_mock):

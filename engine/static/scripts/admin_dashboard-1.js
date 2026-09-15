@@ -102,7 +102,9 @@
             meta.render = function (hi) {
                 const {ctx, w, h} = acqSetupCanvas(canvas);
                 const n = labels.length;
-                const legend = [...barSeries, ...lineSeries].filter((sr) => sr.label);
+                // hideLegend: легенду рисует сама вкладка (чипы/подпись), в
+                // тултипе подписи серий остаются.
+                const legend = opts.hideLegend ? [] : [...barSeries, ...lineSeries].filter((sr) => sr.label);
                 // Легенда переносится по строкам: в одну строку она не влезает на
                 // узких экранах и раньше просто уезжала за правый край канвы.
                 const legendRowH = 18;
@@ -120,6 +122,12 @@
                 const barFmt = barSeries[0]?.fmt || 'raw';
                 const lineFmt = lineSeries[0]?.fmt || 'raw';
                 const step = meta.step, barW = Math.max(2, step * 0.62);
+                // Подложка диапазона бакетов (например, «прошлое — оценка»):
+                // рисуется под сеткой, чтобы линии и подписи оставались сверху.
+                if (opts.shade && opts.shade.to > opts.shade.from) {
+                    ctx.fillStyle = adminChartUiColor('highlight');
+                    ctx.fillRect(padL + opts.shade.from * step, padT, (opts.shade.to - opts.shade.from) * step, plotH);
+                }
                 if (hi != null && hi >= 0 && hi < n) {
                     ctx.fillStyle = adminChartUiColor('highlight');
                     ctx.fillRect(padL + hi * step, padT, step, plotH);
@@ -192,6 +200,22 @@
                     });
                     ctx.stroke(); ctx.setLineDash([]);
                 });
+                // Маркер бакета (сплошная вертикаль с подписью сверху) — «сегодня».
+                if (opts.marker && opts.marker.index >= 0 && opts.marker.index < n) {
+                    const mx = padL + opts.marker.index * step + step / 2;
+                    ctx.strokeStyle = adminChartSeriesColor({tone: 'amber'}); ctx.lineWidth = 1.5;
+                    ctx.setLineDash([]);
+                    ctx.beginPath(); ctx.moveTo(mx, padT); ctx.lineTo(mx, padT + plotH); ctx.stroke();
+                    if (opts.marker.label) {
+                        ctx.font = '600 11px Manrope, system-ui, sans-serif';
+                        const tw = ctx.measureText(opts.marker.label).width;
+                        const alignRight = mx + tw + 10 > w - padR;
+                        ctx.textAlign = alignRight ? 'right' : 'left';
+                        ctx.fillStyle = adminChartSeriesColor({tone: 'amber'});
+                        ctx.fillText(opts.marker.label, alignRight ? mx - 6 : mx + 6, padT + 12);
+                        ctx.textAlign = 'right';
+                    }
+                }
                 if (hi != null && hi >= 0 && hi < n) {
                     const x = padL + hi * step + step / 2;
                     ctx.strokeStyle = adminChartUiColor('guide'); ctx.lineWidth = 1;
@@ -246,13 +270,15 @@
 
         const acqFetchState = new Map();
 
-        async function acqFetch(section, params = {}) {
+        async function acqFetch(section, params = {}, options = {}) {
             const previous = acqFetchState.get(section);
             if (previous) previous.controller.abort();
             const controller = new AbortController();
             const generation = (previous?.generation || 0) + 1;
             acqFetchState.set(section, {controller, generation});
-            const timeoutId = setTimeout(() => controller.abort(), 20000);
+            // Таймаут — понятной ошибкой, а не «signal is aborted without reason».
+            const timeoutMs = options.timeoutMs || 20000;
+            const timeoutId = setTimeout(() => controller.abort(new DOMException(`Сервер не ответил за ${Math.round(timeoutMs / 1000)} с`, 'TimeoutError')), timeoutMs);
             const q = new URLSearchParams({section, ...params});
             try {
                 const resp = await fetch(`${API}?${q}`, {
@@ -275,6 +301,181 @@
         }
 
         const dayLabel = (iso) => iso.slice(8, 10) + '.' + iso.slice(5, 7);
+
+        // ===== Окончания и продления по тарифам =====
+        // Состояние вкладки: последний ответ и скрытые тарифы — перерисовка
+        // графика и таблицы без повторного запроса.
+        // Пробные скрыты по умолчанию: их в разы больше платных, и на общей
+        // шкале линии тарифов прижимаются к нулю. Чип включает их обратно.
+        const expiryState = {res: null, hidden: new Set(['trial']), group: 'day'};
+        const EXPIRY_TONES = {trial: 'slate', oneday: 'sky', threedays: 'pink', oneweek: 'orange', month: 'amber', threemonths: 'indigo', sixmonths: 'violet', year: 'green', other: 'slate'};
+        const expiryTone = (key) => EXPIRY_TONES[key] || 'slate';
+        const expiryPct = (part, whole) => whole ? `${Math.round(100 * part / whole)}%` : '—';
+
+        function expiryIsoShift(days) {
+            const d = new Date(Date.now() + 3 * 60 * 60 * 1000);
+            d.setUTCDate(d.getUTCDate() + days);
+            return d.toISOString().slice(0, 10);
+        }
+
+        function setExpiryPreset(name) {
+            const mskNow = new Date(Date.now() + 3 * 60 * 60 * 1000);
+            let start, end;
+            if (name === 'next14') { start = expiryIsoShift(0); end = expiryIsoShift(14); }
+            else if (name === 'month') {
+                const y = mskNow.getUTCFullYear(), m = mskNow.getUTCMonth();
+                start = `${y}-${String(m + 1).padStart(2, '0')}-01`;
+                end = new Date(Date.UTC(y, m + 1, 0)).toISOString().slice(0, 10);
+            }
+            else if (name === 'quarter') { start = expiryIsoShift(0); end = expiryIsoShift(91); }
+            // По умолчанию 60 дней назад: при окне продления 30 дней у первого
+            // месяца окно уже закрыто и доля продлений — финальная.
+            else { start = expiryIsoShift(-60); end = expiryIsoShift(30); }
+            setAcqDateField('acq-expiry-start', start);
+            setAcqDateField('acq-expiry-end', end);
+            document.querySelectorAll('[data-expiry-preset]').forEach((b) => b.classList.toggle('active', b.dataset.expiryPreset === name));
+        }
+
+        function expiryBucketLabel(row, group) {
+            if (group !== 'week') return row.label;
+            const [y, m, d] = row.key.split('-').map(Number);
+            const endDay = new Date(Date.UTC(y, m - 1, d + 6));
+            return `${row.label}–${String(endDay.getUTCDate()).padStart(2, '0')}.${String(endDay.getUTCMonth() + 1).padStart(2, '0')}`;
+        }
+
+        function renderExpiryChips(res) {
+            const box = document.getElementById('acq-expiry-tariffs');
+            if (!box) return;
+            box.innerHTML = res.tariffs.map((t) => {
+                const total = res.totals.by_tariff[t.key] || {ending: 0};
+                const on = !expiryState.hidden.has(t.key);
+                return `<button type="button" class="acq-expiry-chip" data-expiry-tariff="${escapeHtml(t.key)}" aria-pressed="${on}"><span class="acq-expiry-chip-dot" style="background:${chartTone(expiryTone(t.key))}"></span>${escapeHtml(t.label)}<b>${fmtRub(total.ending)}</b></button>`;
+            }).join('');
+            box.querySelectorAll('[data-expiry-tariff]').forEach((btn) => btn.addEventListener('click', () => {
+                const key = btn.dataset.expiryTariff;
+                if (expiryState.hidden.has(key)) expiryState.hidden.delete(key); else expiryState.hidden.add(key);
+                btn.setAttribute('aria-pressed', String(!expiryState.hidden.has(key)));
+                renderExpiryChart(expiryState.res);
+                renderExpiryTable(expiryState.res);
+            }));
+        }
+
+        function renderExpiryCards(res) {
+            const box = document.getElementById('acq-expiry-cards');
+            if (!box) return;
+            const t = res.totals;
+            const card = (label, value, meta) => `<div><div>${label}</div><div>${value}</div>${meta ? `<small>${meta}</small>` : ''}</div>`;
+            const openRenewed = t.renewed - t.renewed_closed;
+            box.innerHTML = [
+                card('Заканчивается за период', fmtRub(t.ending), `${fmtRub(t.ending_future)} ещё впереди · ${fmtRub(t.ending_past)} уже закончились`),
+                card('Продлились', t.ending_closed ? `${fmtRub(t.renewed_closed)}<span class="acq-expiry-card-pct">${expiryPct(t.renewed_closed, t.ending_closed)}</span>` : '—', t.ending_closed ? `из ${fmtRub(t.ending_closed)} с закрытым окном ${res.window_days} дн.${openRenewed ? ` · ещё ${fmtRub(openRenewed)} в открытом окне` : ''}` : `нет дней с закрытым окном ${res.window_days} дн. — расширьте период влево`),
+                card('Ещё могут продлиться', fmtRub(t.pending), 'закончились недавно, окно ещё открыто'),
+                card('С автоплатежом впереди', fmtRub(t.autopay_future), `${expiryPct(t.autopay_future, t.ending_future)} будущих окончаний`),
+            ].join('');
+        }
+
+        function renderExpiryChart(res) {
+            const canvas = document.getElementById('acq-expiry-chart');
+            if (!canvas || !res) return;
+            const rows = res.buckets;
+            const visible = res.tariffs.filter((t) => !expiryState.hidden.has(t.key));
+            const todayIndex = rows.findIndex((r) => r.is_current);
+            const pastEnd = rows.filter((r) => r.is_past).length;
+            const lines = [];
+            visible.forEach((t) => {
+                lines.push({label: `${t.label}: заканчиваются`, tone: expiryTone(t.key), data: rows.map((r) => r.ending[t.key] || 0), fmt: 'raw', width: 2});
+                lines.push({label: `${t.label}: продлились`, tone: expiryTone(t.key), dash: [5, 4], width: 1.5, fmt: 'raw',
+                    data: rows.map((r) => (r.is_past || r.is_current) ? (r.renewed[t.key] || 0) : null)});
+            });
+            acqDraw(canvas, rows.map((r) => r.label), [], lines, {
+                lineOnly: true,
+                hideLegend: true,
+                fullLabels: rows.map((r) => `${expiryBucketLabel(r, res.group)}${r.is_current ? ' · сегодня' : r.is_past ? ' · оценка' : ''}`),
+                marker: todayIndex >= 0 ? {index: todayIndex, label: 'сегодня'} : null,
+                shade: {from: 0, to: pastEnd},
+            });
+            const summary = document.getElementById('acq-expiry-summary');
+            if (summary) {
+                const t = res.totals;
+                const groupWord = res.group === 'week' ? 'неделям' : 'дням';
+                summary.innerHTML = rows.length
+                    ? `По ${groupWord}, ${res.start.slice(8, 10)}.${res.start.slice(5, 7)}.${res.start.slice(0, 4)} — ${res.end.slice(8, 10)}.${res.end.slice(5, 7)}.${res.end.slice(0, 4)}. Левее «сегодня» — оценка по цепочке оплат, правее — реальные сроки подписок. Всего заканчивается <b>${fmtRub(t.ending)}</b>, из уже закончившихся продлилось <b>${fmtRub(t.renewed)}</b>. Данные пересобираются раз в ${Math.round((res.cache_ttl || 300) / 60)} мин.`
+                    : 'Нет данных за выбранный период.';
+            }
+        }
+
+        function renderExpiryTable(res) {
+            const box = document.getElementById('acq-expiry-table');
+            if (!box || !res) return;
+            const visible = res.tariffs.filter((t) => !expiryState.hidden.has(t.key));
+            const rows = res.buckets;
+            const cell = (row, key) => {
+                const ending = row.ending[key] || 0;
+                if (!ending) return '<td class="is-empty">—</td>';
+                if (row.is_past || row.is_current) {
+                    const renewed = row.renewed[key] || 0, pending = row.pending[key] || 0;
+                    // Доля — только когда окно закрыто; иначе она занижена.
+                    const meta = row.window_closed ? expiryPct(renewed, ending) : (pending ? `ещё ${fmtRub(pending)} в окне` : 'окно открыто');
+                    return `<td><span class="acq-expiry-cell-end">${fmtRub(ending)}</span><span class="acq-expiry-cell-arrow" aria-hidden="true">→</span><span class="acq-expiry-cell-ren">${fmtRub(renewed)}</span><small>${meta}</small></td>`;
+                }
+                const autopay = row.autopay[key] || 0;
+                return `<td><span class="acq-expiry-cell-end">${fmtRub(ending)}</span><small>${autopay ? `автоплатёж ${fmtRub(autopay)}` : 'без автоплатежа'}</small></td>`;
+            };
+            const totalCell = (row) => {
+                if (!row.total_ending) return '<td class="is-empty">—</td>';
+                if (row.is_past || row.is_current) {
+                    const meta = row.window_closed ? expiryPct(row.total_renewed, row.total_ending) : (row.total_pending ? `ещё ${fmtRub(row.total_pending)} в окне` : 'окно открыто');
+                    return `<td><span class="acq-expiry-cell-end">${fmtRub(row.total_ending)}</span><span class="acq-expiry-cell-arrow" aria-hidden="true">→</span><span class="acq-expiry-cell-ren">${fmtRub(row.total_renewed)}</span><small>${meta}</small></td>`;
+                }
+                return `<td><span class="acq-expiry-cell-end">${fmtRub(row.total_ending)}</span><small>${row.total_autopay ? `автоплатёж ${fmtRub(row.total_autopay)}` : ''}</small></td>`;
+            };
+            const head = `<tr><th scope="col">${res.group === 'week' ? 'Неделя' : 'День'}</th>${visible.map((t) => `<th scope="col"><span class="acq-expiry-chip-dot" style="background:${chartTone(expiryTone(t.key))}"></span>${escapeHtml(t.label)}</th>`).join('')}<th scope="col">Всего</th></tr>`;
+            const body = rows.map((r) => `<tr class="${r.is_current ? 'is-today' : r.is_past ? 'is-past' : 'is-future'}"><th scope="row">${expiryBucketLabel(r, res.group)}${r.is_current ? '<small>сегодня</small>' : r.is_past && !r.window_closed ? '<small class="is-open">окно открыто</small>' : ''}</th>${visible.map((t) => cell(r, t.key)).join('')}${totalCell(r)}</tr>`).join('');
+            const by = res.totals.by_tariff;
+            const foot = `<tr><th scope="row">Итого</th>${visible.map((t) => { const x = by[t.key] || {ending: 0, renewed: 0, pending: 0, autopay: 0}; return `<td><span class="acq-expiry-cell-end">${fmtRub(x.ending)}</span><span class="acq-expiry-cell-arrow" aria-hidden="true">→</span><span class="acq-expiry-cell-ren">${fmtRub(x.renewed)}</span><small>${x.autopay ? `автоплатёж ${fmtRub(x.autopay)}` : ''}</small></td>`; }).join('')}<td><span class="acq-expiry-cell-end">${fmtRub(res.totals.ending)}</span><span class="acq-expiry-cell-arrow" aria-hidden="true">→</span><span class="acq-expiry-cell-ren">${fmtRub(res.totals.renewed)}</span></td></tr>`;
+            box.innerHTML = rows.length
+                ? `<table class="acq-expiry-table"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table>`
+                : '<p class="acq-ads-summary-note">Нет данных за выбранный период.</p>';
+        }
+
+        async function loadExpiry() {
+            const startEl = document.getElementById('acq-expiry-start');
+            const endEl = document.getElementById('acq-expiry-end');
+            if (!startEl || !endEl) return;
+            if (!startEl.value || !endEl.value) setExpiryPreset('around30');
+            const body = document.getElementById('acq-expiry-body');
+            body?.classList.add('is-loading');
+            if (!expiryState.res) {
+                const table = document.getElementById('acq-expiry-table');
+                if (table) table.innerHTML = '<p class="acq-ads-summary-note">Собираем периоды по всем оплатам — первый раз это может занять до минуты, дальше быстро.</p>';
+            }
+            try {
+                // Первая сборка на большой базе может занять десятки секунд
+                // (дальше отдаётся из кэша сервера) — ждём дольше обычного.
+                const res = await acqFetch('expirations', {
+                    start: startEl.value,
+                    end: endEl.value,
+                    group: expiryState.group,
+                    window: document.getElementById('acq-expiry-window')?.value || '30',
+                }, {timeoutMs: 120000});
+                expiryState.res = res;
+                // Скрытые тарифы, которых больше нет в ответе, забываем.
+                expiryState.hidden = new Set([...expiryState.hidden].filter((k) => res.tariffs.some((t) => t.key === k)));
+                renderExpiryCards(res);
+                renderExpiryChips(res);
+                renderExpiryChart(res);
+                renderExpiryTable(res);
+            } catch (error) {
+                // Запрос вытеснен более новым (сменили шаг/период) — не ошибка,
+                // новый сам отрисует всё.
+                if (error?.name === 'AbortError') return;
+                const table = document.getElementById('acq-expiry-table');
+                if (table) table.innerHTML = `<p class="acq-ads-summary-note is-error">Не удалось загрузить данные: ${escapeHtml(error.message || String(error))}</p>`;
+                throw error;
+            } finally {
+                body?.classList.remove('is-loading');
+            }
+        }
 
         async function loadNewRepeat() {
             const start = document.getElementById('acq-newrep-start').value;
@@ -674,7 +875,7 @@
         }
 
         const loaders = {
-            'acq-newrep': loadNewRepeat, 'acq-funnel': loadFunnel, 'acq-ads': loadAds,
+            'acq-newrep': loadNewRepeat, 'acq-expiry': loadExpiry, 'acq-funnel': loadFunnel, 'acq-ads': loadAds,
             'acq-cohorts': loadCohorts, 'acq-pushes': loadPushes, 'acq-patterns': loadPatterns,
             'acq-journey': loadJourney, 'acq-mrr': loadMrr, 'acq-payhealth': loadPayHealth,
         };
@@ -822,6 +1023,25 @@
             loadNewRepeat().catch(console.error);
         });
         document.getElementById('acq-newrep-apply')?.addEventListener('click', () => loadNewRepeat().catch(console.error));
+        // Окончания и продления: пресеты периода, шаг, окно, ручной период.
+        document.querySelectorAll('[data-expiry-preset]').forEach((button) => button.addEventListener('click', () => {
+            setExpiryPreset(button.dataset.expiryPreset);
+            loadExpiry().catch(console.error);
+        }));
+        document.querySelectorAll('[data-expiry-group]').forEach((button) => button.addEventListener('click', () => {
+            expiryState.group = button.dataset.expiryGroup === 'week' ? 'week' : 'day';
+            document.querySelectorAll('[data-expiry-group]').forEach((b) => b.classList.toggle('active', b === button));
+            loadExpiry().catch(console.error);
+        }));
+        document.getElementById('acq-expiry-window')?.addEventListener('change', () => loadExpiry().catch(console.error));
+        document.getElementById('acq-expiry-apply')?.addEventListener('click', () => {
+            document.querySelectorAll('[data-expiry-preset]').forEach((b) => b.classList.remove('active'));
+            loadExpiry().catch(console.error);
+        });
+        ['acq-expiry-start', 'acq-expiry-end'].forEach((id) => document.getElementById(id)?.addEventListener('input', () => {
+            document.querySelectorAll('[data-expiry-preset]').forEach((b) => b.classList.remove('active'));
+        }));
+        window.addEventListener('resize', () => { if (expiryState.res && document.getElementById('subpanel-acq-expiry')?.classList.contains('active')) renderExpiryChart(expiryState.res); });
         // Переключатель по месяцам: заполняем список последних месяцев и по выбору
         // подставляем границы месяца в календарные поля периода.
         (function () {

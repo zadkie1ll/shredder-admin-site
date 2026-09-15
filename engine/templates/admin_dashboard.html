@@ -426,6 +426,7 @@
             </header>
             <div class="subtabs" role="tablist" aria-label="Разделы привлечения">
                 <button type="button" class="subtab active" data-subtab="acq-newrep" role="tab"><i class="fas fa-people-arrows"></i>Новые vs повторные</button>
+                <button type="button" class="subtab" data-subtab="acq-expiry" role="tab"><i class="fas fa-hourglass-half"></i>Окончания и продления</button>
                 <button type="button" class="subtab" data-subtab="acq-funnel" role="tab"><i class="fas fa-filter"></i>Воронка</button>
                 <button type="button" class="subtab" data-subtab="acq-ads" role="tab"><i class="fas fa-bullhorn"></i>Реклама</button>
                 <button type="button" class="subtab" data-subtab="acq-cohorts" role="tab"><i class="fas fa-layer-group"></i>Когорты</button>
@@ -512,6 +513,70 @@
                     <canvas id="acq-renew45-chart" style="width:100%;height:260px;display:block;margin-top:10px;"></canvas>
                     <div id="acq-renew45-summary" style="margin-top:12px;font-size:12px;color:var(--muted);"></div>
                 </div>
+            </div>
+
+            <div id="subpanel-acq-expiry" class="subtab-panel">
+                <section class="card acq-expiry" aria-labelledby="acq-expiry-title">
+                    <header class="acq-expiry-head">
+                        <div class="acq-expiry-heading">
+                            <strong id="acq-expiry-title">Сколько подписок заканчивается и сколько из них продлевается</strong>
+                            <p>По дням или неделям (МСК), по последнему купленному тарифу. Будущее — по реальным срокам подписок; прошлое восстановлено по цепочке оплат и помечено как оценка.</p>
+                        </div>
+                        <div class="acq-expiry-controls" role="group" aria-label="Период, шаг и окно продления">
+                            <div class="acq-expiry-presets" role="group" aria-label="Быстрый выбор периода">
+                                <button type="button" class="subtab" data-expiry-preset="next14">14 дней вперёд</button>
+                                <button type="button" class="subtab active" data-expiry-preset="around30">60 назад · 30 вперёд</button>
+                                <button type="button" class="subtab" data-expiry-preset="month">Этот месяц</button>
+                                <button type="button" class="subtab" data-expiry-preset="quarter">Квартал вперёд</button>
+                            </div>
+                            <div class="date-field" data-date-picker data-range-max-from="#acq-expiry-end">
+                                <input type="hidden" id="acq-expiry-start">
+                                <button type="button" class="date-trigger" data-date-trigger>
+                                    <span data-date-label>Дата начала</span>
+                                    <i class="fas fa-calendar-days"></i>
+                                </button>
+                                <div class="date-popover" data-date-popover></div>
+                            </div>
+                            <div class="date-field" data-date-picker data-range-min-from="#acq-expiry-start">
+                                <input type="hidden" id="acq-expiry-end">
+                                <button type="button" class="date-trigger" data-date-trigger>
+                                    <span data-date-label>Дата конца</span>
+                                    <i class="fas fa-calendar-days"></i>
+                                </button>
+                                <div class="date-popover" data-date-popover></div>
+                            </div>
+                            <div class="acq-expiry-presets" role="group" aria-label="Шаг графика">
+                                <button type="button" class="subtab active" data-expiry-group="day">По дням</button>
+                                <button type="button" class="subtab" data-expiry-group="week">По неделям</button>
+                            </div>
+                            <label class="acq-expiry-window" title="Период считается продлённым, если следующая оплата пришла не позже этого срока после его конца (досрочная оплата тоже считается)">
+                                <span>Окно продления</span>
+                                <select id="acq-expiry-window" class="input" aria-label="Окно продления после конца подписки">
+                                    <option value="7">7 дней после конца</option>
+                                    <option value="14">14 дней после конца</option>
+                                    <option value="30" selected>30 дней после конца</option>
+                                </select>
+                            </label>
+                            <button type="button" id="acq-expiry-apply" class="subtab active">Показать</button>
+                        </div>
+                    </header>
+                    <div id="acq-expiry-body" class="acq-expiry-body">
+                        <div id="acq-expiry-cards" class="acq-expiry-cards" aria-live="polite"></div>
+                        <div class="acq-expiry-chart-block">
+                            <div class="acq-expiry-chart-head">
+                                <span class="chart-title-wrap"><strong id="acq-expiry-chart-title">Заканчиваются и продлеваются</strong><button type="button" class="chart-info" data-help="expiry" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
+                                <div class="acq-expiry-legend-note"><span class="acq-expiry-swatch is-solid" aria-hidden="true"></span>заканчиваются <span class="acq-expiry-swatch is-dashed" aria-hidden="true"></span>из них продлились <span class="acq-expiry-swatch is-today" aria-hidden="true"></span>сегодня</div>
+                            </div>
+                            <div id="acq-expiry-tariffs" class="acq-expiry-tariffs" role="group" aria-label="Тарифы на графике"></div>
+                            <canvas id="acq-expiry-chart" style="width:100%;height:300px;display:block;"></canvas>
+                            <p id="acq-expiry-summary" class="acq-expiry-summary"></p>
+                        </div>
+                        <div class="acq-expiry-table-block">
+                            <div class="acq-expiry-table-head"><strong>Те же данные таблицей</strong><span>заканчиваются → продлились; доля — только для дней с закрытым окном продления; в будущем — сколько с автоплатежом</span></div>
+                            <div id="acq-expiry-table" class="acq-expiry-table-wrap"></div>
+                        </div>
+                    </div>
+                </section>
             </div>
 
             <div id="subpanel-acq-funnel" class="subtab-panel">

@@ -4,8 +4,24 @@
     {
       "name": "cabinet-concept",
       "runtimeExecutable": "python3",
-      "runtimeArgs": ["-m", "http.server", "8765", "--directory", "docs/cabinet-desktop"],
+      "runtimeArgs": [
+        "-m",
+        "http.server",
+        "8765",
+        "--directory",
+        "docs/cabinet-desktop"
+      ],
       "port": 8765
+    },
+    {
+      "name": "website",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": [
+        "manage.py",
+        "runserver",
+        "127.0.0.1:8017"
+      ],
+      "port": 8017
     }
   ]
 }

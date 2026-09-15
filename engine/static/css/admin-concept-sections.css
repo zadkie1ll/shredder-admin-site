@@ -354,3 +354,75 @@ html[data-admin-theme="light"] #panel-system [data-winback-status].is-error { co
     .ticket-page .ticket-title { font-size: 26px; }
     .ticket-page .ticket-user-grid { gap: 12px; }
 }
+
+/* Окончания и продления по тарифам («Привлечение → Окончания») */
+/* min-width: 0 у грид-детей: иначе ряд пресетов и таблица растягивают карточку шире экрана телефона. */
+#panel-acquisition .acq-expiry { display: grid; gap: 22px; min-width: 0; }
+#panel-acquisition .acq-expiry > *, #panel-acquisition .acq-expiry-head > *, #panel-acquisition .acq-expiry-body > *, #panel-acquisition .acq-expiry-chart-block > * { min-width: 0; }
+#panel-acquisition .acq-expiry-head { display: grid; gap: 16px; }
+#panel-acquisition .acq-expiry-heading { display: grid; gap: 4px; max-width: 64ch; }
+#panel-acquisition .acq-expiry-heading strong { font-size: 18px; line-height: 1.4; font-weight: 600; }
+#panel-acquisition .acq-expiry-heading p { margin: 0; font-size: 12px; line-height: 1.5; color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-controls { display: flex; align-items: center; gap: 8px 10px; flex-wrap: wrap; }
+#panel-acquisition .acq-expiry-controls .date-field { width: 150px; }
+#panel-acquisition .acq-expiry-controls .date-trigger { min-height: 40px; height: 40px; padding: 8px 10px; border-radius: 7px; font-size: 13px !important; }
+#panel-acquisition .acq-expiry-presets { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 3px; border: 1px solid var(--admin-border); border-radius: 8px; background: var(--admin-surface-soft); }
+#panel-acquisition .acq-expiry-presets .subtab { min-height: 32px; padding: 6px 10px; margin: 0; border: 0; border-radius: 6px; font-size: 12px; font-weight: 600; color: var(--admin-text-muted); background: transparent; }
+#panel-acquisition .acq-expiry-presets .subtab.active { color: #141414; background: var(--admin-accent); }
+#panel-acquisition .acq-expiry-window { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-window select { min-height: 40px; width: auto; padding: 6px 30px 6px 10px; border-radius: 7px; font-size: 13px; }
+#panel-acquisition #acq-expiry-apply { min-height: 40px; padding: 9px 14px; margin: 0; border-radius: 7px; font-size: 13px; font-weight: 650; color: #141414; background: var(--admin-accent); border: 1px solid var(--admin-accent); }
+#panel-acquisition .acq-expiry-body { display: grid; gap: 26px; transition: opacity .15s; }
+#panel-acquisition .acq-expiry-body.is-loading { opacity: .5; }
+#panel-acquisition .acq-expiry-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 20px; padding: 0 0 22px; border-bottom: 1px solid var(--admin-border); }
+#panel-acquisition .acq-expiry-cards > div { display: grid; gap: 4px; min-width: 0; }
+#panel-acquisition .acq-expiry-cards > div > div:first-child { font-size: 12px; font-weight: 550; color: var(--admin-text-soft); }
+#panel-acquisition .acq-expiry-cards > div > div:nth-child(2) { font-size: 27px; font-weight: 600; letter-spacing: -.5px; line-height: 1.3; font-variant-numeric: tabular-nums; }
+#panel-acquisition .acq-expiry-cards > div > small { font-size: 12px; line-height: 1.45; color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-card-pct { margin-left: 8px; font-size: 14px; font-weight: 600; color: var(--workspace-success, #75d9ab); vertical-align: 4px; }
+#panel-acquisition .acq-expiry-chart-block { display: grid; gap: 12px; }
+#panel-acquisition .acq-expiry-chart-head { display: flex; align-items: center; justify-content: space-between; gap: 10px 20px; flex-wrap: wrap; }
+#panel-acquisition .acq-expiry-chart-head .chart-title-wrap > strong { font-size: 14px; font-weight: 600; }
+#panel-acquisition .acq-expiry-legend-note { display: inline-flex; align-items: center; gap: 6px 8px; flex-wrap: wrap; font-size: 12px; color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-swatch { display: inline-block; width: 22px; height: 0; border-top: 2px solid var(--admin-text-soft); vertical-align: middle; }
+#panel-acquisition .acq-expiry-swatch.is-dashed { border-top-style: dashed; }
+#panel-acquisition .acq-expiry-swatch.is-today { width: 2px; height: 12px; border-top: 0; background: var(--admin-accent); }
+#panel-acquisition .acq-expiry-tariffs { display: flex; gap: 6px; flex-wrap: wrap; }
+#panel-acquisition .acq-expiry-chip { display: inline-flex; align-items: center; gap: 7px; min-height: 30px; padding: 5px 10px 5px 8px; border: 1px solid var(--admin-border); border-radius: 999px; background: var(--admin-surface-soft); color: var(--admin-text); font: inherit; font-size: 12px; font-weight: 550; cursor: pointer; transition: border-color .15s, color .15s, background .15s, opacity .15s; }
+#panel-acquisition .acq-expiry-chip b { font-weight: 600; font-variant-numeric: tabular-nums; color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-chip:hover { border-color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-chip:focus-visible { outline: 2px solid var(--admin-accent); outline-offset: 3px; }
+#panel-acquisition .acq-expiry-chip[aria-pressed="false"] { opacity: .55; text-decoration: line-through; text-decoration-color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-chip[aria-pressed="false"] .acq-expiry-chip-dot { background: var(--admin-border) !important; }
+#panel-acquisition .acq-expiry-chip-dot { display: inline-block; flex: 0 0 auto; width: 9px; height: 9px; border-radius: 50%; }
+#panel-acquisition .acq-expiry-summary { margin: 0; font-size: 12px; line-height: 1.55; color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-summary b { color: var(--admin-text); }
+#panel-acquisition .acq-expiry-table-block { display: grid; gap: 10px; }
+#panel-acquisition .acq-expiry-table-head { display: flex; align-items: baseline; gap: 6px 14px; flex-wrap: wrap; }
+#panel-acquisition .acq-expiry-table-head strong { font-size: 14px; font-weight: 600; }
+#panel-acquisition .acq-expiry-table-head span { font-size: 12px; color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-table-wrap { overflow: auto; max-height: 560px; border: 1px solid var(--admin-border); border-radius: 10px; }
+#panel-acquisition .acq-expiry-table { border-collapse: separate; border-spacing: 0; min-width: 100%; font-size: 12px; font-variant-numeric: tabular-nums; }
+#panel-acquisition .acq-expiry-table th, #panel-acquisition .acq-expiry-table td { padding: 8px 12px; text-align: right; white-space: nowrap; border-bottom: 1px solid var(--admin-border); vertical-align: top; }
+#panel-acquisition .acq-expiry-table thead th { position: sticky; top: 0; z-index: 2; background: var(--admin-surface); font-size: 11px; font-weight: 600; color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-table thead th .acq-expiry-chip-dot { margin-right: 6px; vertical-align: 0; }
+#panel-acquisition .acq-expiry-table th[scope="row"], #panel-acquisition .acq-expiry-table thead th:first-child { position: sticky; left: 0; z-index: 1; text-align: left; font-weight: 600; background: var(--admin-surface); }
+#panel-acquisition .acq-expiry-table thead th:first-child { z-index: 3; }
+#panel-acquisition .acq-expiry-table th[scope="row"] small { display: block; font-size: 10px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--admin-accent); }
+#panel-acquisition .acq-expiry-table th[scope="row"] small.is-open { color: var(--admin-text-muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
+#panel-acquisition .acq-expiry-table td small { display: block; font-size: 11px; color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-table td.is-empty { color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-cell-end { font-weight: 600; }
+#panel-acquisition .acq-expiry-cell-arrow { margin: 0 5px; color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-cell-ren { color: var(--workspace-success, #75d9ab); font-weight: 600; }
+#panel-acquisition .acq-expiry-table tr.is-past th[scope="row"] { color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-table tr.is-today th, #panel-acquisition .acq-expiry-table tr.is-today td { background: rgba(255, 204, 36, .07); }
+#panel-acquisition .acq-expiry-table tfoot th, #panel-acquisition .acq-expiry-table tfoot td { position: sticky; bottom: 0; z-index: 2; background: var(--admin-surface); border-top: 1px solid var(--admin-border); border-bottom: 0; font-weight: 600; }
+#panel-acquisition .acq-expiry-table tfoot th { z-index: 3; }
+@media (max-width: 700px) {
+    #panel-acquisition .acq-expiry-controls .date-field { flex: 1 1 130px; width: auto; }
+    #panel-acquisition .acq-expiry-presets { width: 100%; justify-content: space-between; }
+    #panel-acquisition .acq-expiry-presets .subtab { flex: 1 1 45%; padding: 6px 4px; }
+    #panel-acquisition .acq-expiry-window { width: 100%; flex-wrap: wrap; }
+    #panel-acquisition #acq-expiry-apply { width: 100%; }
+}
