@@ -12855,21 +12855,33 @@ def _expiry_tariff_label(key):
 
 
 def _expiry_load_payments(db_session):
-    """(user_id, paid_at UTC, tariff) по всем успешным оплатам, по порядку."""
+    """(user_id, paid_at UTC, tariff, amount ₽, provider, autopay) по всем
+    успешным оплатам. provider: yk | wata; autopay — автосписание ЮKassa."""
     return [
-        (int(r["user_id"]), r["paid_at"], str(r["tariff"] or ""))
+        (
+            int(r["user_id"]),
+            r["paid_at"],
+            str(r["tariff"] or ""),
+            float(r["amount"] or 0),
+            str(r["provider"]),
+            bool(r["autopay"]),
+        )
         for r in _acq_rows(
             db_session,
             """
-            SELECT user_id, paid_at, tariff FROM (
+            SELECT user_id, paid_at, tariff, amount, provider, autopay FROM (
                 SELECT wi.user_id AS user_id,
                        (t.payment_time AT TIME ZONE 'UTC') AS paid_at,
-                       COALESCE(wi.tariff_id, '') AS tariff
+                       COALESCE(wi.tariff_id, '') AS tariff,
+                       t.amount::numeric AS amount,
+                       'wata' AS provider,
+                       false AS autopay
                 FROM wata_transactions t
                 JOIN wata_invoices wi ON wi.order_id = t.order_id
                 WHERE t.transaction_status = 'Paid'
                 UNION ALL
-                SELECT p.user_id, p.created_at, p.subscription_period
+                SELECT p.user_id, p.created_at, p.subscription_period, p.amount::numeric,
+                       'yk' AS provider, COALESCE(p.is_autopay, false) AS autopay
                 FROM yk_payments p
                 WHERE p.status = 'succeeded'
             ) pays
@@ -12953,7 +12965,8 @@ def _expiry_periods(payments, expires, trial_starts, trial_days, autopay_users):
     """
     periods = []
     by_user = {}
-    for user_id, paid_at, tariff in payments:
+    for row in payments:
+        user_id, paid_at, tariff = row[:3]
         by_user.setdefault(user_id, []).append((paid_at, tariff))
     trial_delta = timedelta(days=trial_days)
     for user_id, pays in by_user.items():
@@ -13142,13 +13155,14 @@ def _expiry_aggregate(periods, start, end, group, window_days, now, today):
 # списку — мгновенно. Данные внизу меняются медленно (оплаты, сроки), пять
 # минут отставания для этого отчёта не важны; ?refresh=1 сбрасывает кэш.
 EXPIRY_CACHE_TTL = 300
-_EXPIRY_CACHE = {"at": 0.0, "periods": None, "trial_days": None}
+_EXPIRY_CACHE = {"at": 0.0, "periods": None, "trial_days": None, "payments": None}
 _EXPIRY_CACHE_LOCK = threading.Lock()
 
 
 def _expiry_cache_clear():
     with _EXPIRY_CACHE_LOCK:
-        _EXPIRY_CACHE.update(at=0.0, periods=None, trial_days=None)
+        _EXPIRY_CACHE.update(at=0.0, periods=None, trial_days=None, payments=None)
+    _lifecycle_cache_clear()
 
 
 def _expiry_periods_cached(db_session, refresh=False):
@@ -13162,8 +13176,9 @@ def _expiry_periods_cached(db_session, refresh=False):
             return _EXPIRY_CACHE["periods"], _EXPIRY_CACHE["trial_days"]
     started = _monotonic()
     trial_days = _expiry_load_trial_days(db_session)
+    payments = _expiry_load_payments(db_session)
     periods = _expiry_periods(
-        _expiry_load_payments(db_session),
+        payments,
         _expiry_load_expires(db_session),
         _expiry_load_trial_starts(db_session),
         trial_days,
@@ -13175,8 +13190,430 @@ def _expiry_periods_cached(db_session, refresh=False):
         _monotonic() - started,
     )
     with _EXPIRY_CACHE_LOCK:
-        _EXPIRY_CACHE.update(at=_monotonic(), periods=periods, trial_days=trial_days)
+        _EXPIRY_CACHE.update(
+            at=_monotonic(), periods=periods, trial_days=trial_days, payments=payments
+        )
     return periods, trial_days
+
+
+def _expiry_payments_cached(db_session, refresh=False):
+    """Оплаты той же сборки, что и периоды (с суммами)."""
+    _expiry_periods_cached(db_session, refresh=refresh)
+    with _EXPIRY_CACHE_LOCK:
+        return _EXPIRY_CACHE["payments"] or []
+
+
+# --- Жизненный цикл клиента: сводка «почему выручка такая» и «Путь когорты» ---
+#
+# Единое определение продления на всю админку: период подписки продлён, если
+# следующая оплата пришла не позже EXPIRY_DEFAULT_WINDOW дней после его конца
+# (досрочная — тоже). Пробные периоды в удержание не входят, они — конверсия.
+_LIFECYCLE_CACHE = {"at": 0.0, "signups": None, "connected": None}
+
+
+def _lifecycle_cache_clear():
+    with _EXPIRY_CACHE_LOCK:
+        _LIFECYCLE_CACHE.update(at=0.0, signups=None, connected=None)
+
+
+def _lifecycle_load_signups(db_session):
+    """user_id -> момент создания подписки (первое subscription_created)."""
+    return {
+        int(r["user_id"]): r["started_at"]
+        for r in _acq_rows(
+            db_session,
+            """
+            SELECT user_id, min(timestamp) AS started_at FROM event_logs
+            WHERE event_type = 'subscription_created' GROUP BY user_id
+            """,
+        )
+    }
+
+
+def _lifecycle_load_connected(db_session):
+    """Кто хоть раз подключился (первый трафик — порог 0, как в воронке)."""
+    return {
+        int(r["user_id"])
+        for r in _acq_rows(
+            db_session,
+            """
+            SELECT DISTINCT user_id FROM event_logs
+            WHERE event_type = 'traffic_threshold_reached'
+              AND event_payload->>'threshold' = '0'
+            """,
+        )
+    }
+
+
+def _lifecycle_cached(db_session, refresh=False):
+    now = _monotonic()
+    with _EXPIRY_CACHE_LOCK:
+        if (
+            not refresh
+            and _LIFECYCLE_CACHE["signups"] is not None
+            and now - _LIFECYCLE_CACHE["at"] < EXPIRY_CACHE_TTL
+        ):
+            return _LIFECYCLE_CACHE["signups"], _LIFECYCLE_CACHE["connected"]
+    signups = _lifecycle_load_signups(db_session)
+    connected = _lifecycle_load_connected(db_session)
+    with _EXPIRY_CACHE_LOCK:
+        _LIFECYCLE_CACHE.update(at=_monotonic(), signups=signups, connected=connected)
+    return signups, connected
+
+
+def _msk_week(value_utc):
+    day = (value_utc + ADMIN_TZ_OFFSET).date()
+    return day - timedelta(days=day.weekday())
+
+
+def _msk_month(value_utc):
+    return (value_utc + ADMIN_TZ_OFFSET).date().replace(day=1)
+
+
+def _paid_periods_by_user(periods, window_days, now):
+    """user_id -> [(end, tariff, renewed, window_closed, next_tariff)] по
+    возрастанию конца, только платные периоды."""
+    window = timedelta(days=window_days)
+    result = {}
+    for user_id, end, tariff, next_paid, _autopay, next_tariff in periods:
+        if tariff == EXPIRY_TRIAL_KEY:
+            continue
+        renewed = next_paid is not None and next_paid <= end + window
+        closed = end + window <= now
+        result.setdefault(user_id, []).append((end, tariff, renewed, closed, next_tariff))
+    for items in result.values():
+        items.sort(key=lambda item: item[0])
+    return result
+
+
+def _acq_summary_weeks(payments, periods, weeks, window_days, now, today):
+    """Недельная сводка: выручка новые/повторные, покупатели, чек, доля
+    продлений (закрытое окно), активная платная база на конец недели."""
+    this_week = today - timedelta(days=today.weekday())
+    keys = [this_week - timedelta(days=7 * i) for i in range(weeks - 1, -1, -1)]
+    index = {key: i for i, key in enumerate(keys)}
+    rows = [
+        {
+            "week": key.isoformat(),
+            "label": key.strftime("%d.%m"),
+            "is_current": key == this_week,
+            "revenue_new": 0.0,
+            "revenue_repeat": 0.0,
+            "new_payers": 0,
+            "payments": 0,
+            "ending_closed": 0,
+            "renewed_closed": 0,
+            "base": 0,
+        }
+        for key in keys
+    ]
+    first_pay = {}
+    for row in payments:
+        user_id, paid_at = row[0], row[1]
+        if user_id not in first_pay or paid_at < first_pay[user_id]:
+            first_pay[user_id] = paid_at
+    for row in payments:
+        user_id, paid_at, _tariff, amount = row[0], row[1], row[2], (row[3] if len(row) > 3 else 0)
+        position = index.get(_msk_week(paid_at))
+        if position is None:
+            continue
+        bucket = rows[position]
+        bucket["payments"] += 1
+        if paid_at == first_pay[user_id]:
+            bucket["revenue_new"] += amount
+            bucket["new_payers"] += 1
+        else:
+            bucket["revenue_repeat"] += amount
+    window = timedelta(days=window_days)
+    week_ends_utc = [
+        datetime.combine(key + timedelta(days=7), time.min) - ADMIN_TZ_OFFSET for key in keys
+    ]
+    for _user_id, end, tariff, next_paid, _autopay, _next_tariff in periods:
+        if tariff == EXPIRY_TRIAL_KEY:
+            continue
+        position = index.get(_msk_week(end))
+        if position is not None and end + window <= now:
+            rows[position]["ending_closed"] += 1
+            if next_paid is not None and next_paid <= end + window:
+                rows[position]["renewed_closed"] += 1
+        # Активная платная база: период покрывает конец недели. Начало
+        # периода = конец − длительность тарифа (стакование делает это
+        # точным; бонусы последнего периода дают небольшую погрешность).
+        start = end - timedelta(days=EXPIRY_TARIFF_DAYS.get(tariff, EXPIRY_OTHER_DAYS))
+        for position, week_end in enumerate(week_ends_utc):
+            if start <= week_end < end:
+                rows[position]["base"] += 1
+    for bucket in rows:
+        bucket["revenue"] = round(bucket["revenue_new"] + bucket["revenue_repeat"])
+        bucket["revenue_new"] = round(bucket["revenue_new"])
+        bucket["revenue_repeat"] = round(bucket["revenue_repeat"])
+        bucket["avg_check"] = (
+            round(bucket["revenue"] / bucket["payments"]) if bucket["payments"] else None
+        )
+        bucket["renewal_pct"] = (
+            round(100.0 * bucket["renewed_closed"] / bucket["ending_closed"], 1)
+            if bucket["ending_closed"]
+            else None
+        )
+    return rows
+
+
+def _acq_summary(db_session, weeks=None, refresh=False):
+    try:
+        weeks = int(weeks)
+    except (TypeError, ValueError):
+        weeks = 12
+    weeks = max(4, min(weeks, 52))
+    periods, _trial_days = _expiry_periods_cached(db_session, refresh=refresh)
+    payments = _expiry_payments_cached(db_session)
+    rows = _acq_summary_weeks(
+        payments, periods, weeks, EXPIRY_DEFAULT_WINDOW, datetime.utcnow(), admin_msk_today()
+    )
+    return {"weeks": rows, "window_days": EXPIRY_DEFAULT_WINDOW, "cache_ttl": EXPIRY_CACHE_TTL}
+
+
+REVENUE_MAX_RANGE_DAYS = 366
+
+
+def _revenue_empty_day(key):
+    return {
+        "day": key.isoformat(),
+        "label": key.strftime("%d.%m"),
+        "weekday": key.weekday(),
+        "revenue": 0.0,
+        "payments": 0,
+        "new_rub": 0.0,
+        "new_payers": 0,
+        "repeat_rub": 0.0,
+        "repeat_payers": 0,
+        "autopay_rub": 0.0,
+        "autopay_count": 0,
+        "manual_rub": 0.0,
+        "manual_count": 0,
+        "yk_rub": 0.0,
+        "wata_rub": 0.0,
+        "by_tariff": {},
+    }
+
+
+def _acq_revenue_days_rows(payments, start, end):
+    """Выручка по дням МСК с разбивкой: новые/повторные, автоплатёж/вручную,
+    провайдер, тарифы. Оплата «новая» = первая успешная оплата пользователя."""
+    keys = []
+    cursor = start
+    while cursor <= end:
+        keys.append(cursor)
+        cursor += timedelta(days=1)
+    index = {key: i for i, key in enumerate(keys)}
+    rows = [_revenue_empty_day(key) for key in keys]
+    first_pay = {}
+    for row in payments:
+        user_id, paid_at = row[0], row[1]
+        if user_id not in first_pay or paid_at < first_pay[user_id]:
+            first_pay[user_id] = paid_at
+    for row in payments:
+        user_id, paid_at, tariff = row[0], row[1], row[2]
+        amount = row[3] if len(row) > 3 else 0.0
+        provider = row[4] if len(row) > 4 else "yk"
+        autopay = bool(row[5]) if len(row) > 5 else False
+        position = index.get((paid_at + ADMIN_TZ_OFFSET).date())
+        if position is None:
+            continue
+        day = rows[position]
+        day["revenue"] += amount
+        day["payments"] += 1
+        if paid_at == first_pay[user_id]:
+            day["new_rub"] += amount
+            day["new_payers"] += 1
+        else:
+            day["repeat_rub"] += amount
+            day["repeat_payers"] += 1
+        if autopay:
+            day["autopay_rub"] += amount
+            day["autopay_count"] += 1
+        else:
+            day["manual_rub"] += amount
+            day["manual_count"] += 1
+        if provider == "wata":
+            day["wata_rub"] += amount
+        else:
+            day["yk_rub"] += amount
+        key = _expiry_tariff_key(tariff)
+        slot = day["by_tariff"].setdefault(key, {"count": 0, "rub": 0.0})
+        slot["count"] += 1
+        slot["rub"] += amount
+    for day in rows:
+        for name in ("revenue", "new_rub", "repeat_rub", "autopay_rub", "manual_rub", "yk_rub", "wata_rub"):
+            day[name] = round(day[name])
+        day["avg_check"] = round(day["revenue"] / day["payments"]) if day["payments"] else None
+        for slot in day["by_tariff"].values():
+            slot["rub"] = round(slot["rub"])
+    return rows
+
+
+def _acq_revenue_days(db_session, start=None, end=None, refresh=False):
+    today = admin_msk_today()
+    end = date.fromisoformat(end) if end else today
+    start = date.fromisoformat(start) if start else end - timedelta(days=44)
+    if end < start or (end - start).days > REVENUE_MAX_RANGE_DAYS:
+        raise ValueError("bad range")
+    payments = _expiry_payments_cached(db_session, refresh=refresh)
+    rows = _acq_revenue_days_rows(payments, start, end)
+    seen = set()
+    for row in rows:
+        seen.update(row["by_tariff"])
+    return {
+        "start": start.isoformat(),
+        "end": end.isoformat(),
+        "today": today.isoformat(),
+        "tariffs": [
+            {"key": key, "label": _expiry_tariff_label(key)}
+            for key in EXPIRY_TARIFF_ORDER
+            if key in seen
+        ],
+        "days": rows,
+        "cache_ttl": EXPIRY_CACHE_TTL,
+    }
+
+
+COHORT_PATH_GROUPS = ("week", "month")
+COHORT_PATH_RENEWALS = 3
+# Через сколько дней после конца когорты конверсия в покупку считается
+# дозревшей: почти все первые оплаты происходят в первые две недели.
+COHORT_PATH_BUY_MATURITY_DAYS = 14
+
+
+def _acq_cohort_path_rows(
+    signups, connected, payments, periods, group, count, window_days, now, today
+):
+    bucket_of = _msk_month if group == "month" else _msk_week
+    if group == "month":
+        first = today.replace(day=1)
+        keys = []
+        cursor = first
+        for _ in range(count):
+            keys.append(cursor)
+            cursor = (cursor - timedelta(days=1)).replace(day=1)
+        keys.reverse()
+    else:
+        this_week = today - timedelta(days=today.weekday())
+        keys = [this_week - timedelta(days=7 * i) for i in range(count - 1, -1, -1)]
+    index = {key: i for i, key in enumerate(keys)}
+
+    def cohort_end(key):
+        if group == "month":
+            nxt = (key.replace(day=28) + timedelta(days=4)).replace(day=1)
+            return nxt - timedelta(days=1)
+        return key + timedelta(days=6)
+
+    pays_by_user = {}
+    for row in payments:
+        pays_by_user.setdefault(row[0], []).append(row)
+    paid_periods = _paid_periods_by_user(periods, window_days, now)
+
+    rows = []
+    for key in keys:
+        rows.append(
+            {
+                "cohort": key.isoformat(),
+                "label": key.strftime("%d.%m") if group == "week" else key.strftime("%m.%Y"),
+                "subs": 0,
+                "connected": 0,
+                "buyers": 0,
+                "buy_mature": cohort_end(key) + timedelta(days=COHORT_PATH_BUY_MATURITY_DAYS) < today,
+                "renewals": [
+                    {"eligible": 0, "matured": 0, "renewed": 0}
+                    for _ in range(COHORT_PATH_RENEWALS)
+                ],
+                "revenue": 0.0,
+                "first_tariffs": {},
+                "transitions": {},
+            }
+        )
+    for user_id, started in signups.items():
+        position = index.get(bucket_of(started))
+        if position is None:
+            continue
+        row = rows[position]
+        row["subs"] += 1
+        if user_id in connected:
+            row["connected"] += 1
+        pays = pays_by_user.get(user_id)
+        if not pays:
+            continue
+        row["buyers"] += 1
+        row["revenue"] += sum((p[3] if len(p) > 3 else 0) for p in pays)
+        first_key = _expiry_tariff_key(pays[0][2])
+        row["first_tariffs"][first_key] = row["first_tariffs"].get(first_key, 0) + 1
+        for k, (end, tariff, renewed, closed, next_tariff) in enumerate(
+            paid_periods.get(user_id, [])[:COHORT_PATH_RENEWALS]
+        ):
+            slot = row["renewals"][k]
+            slot["eligible"] += 1
+            if closed:
+                slot["matured"] += 1
+                if renewed:
+                    slot["renewed"] += 1
+                    dest = row["transitions"].setdefault(tariff, {})
+                    dest[next_tariff or EXPIRY_OTHER_KEY] = dest.get(next_tariff or EXPIRY_OTHER_KEY, 0) + 1
+    for row in rows:
+        subs = row["subs"]
+        row["connected_pct"] = round(100.0 * row["connected"] / subs, 1) if subs else None
+        row["buyers_pct"] = round(100.0 * row["buyers"] / subs, 1) if subs else None
+        for slot in row["renewals"]:
+            slot["pct"] = (
+                round(100.0 * slot["renewed"] / slot["matured"], 1) if slot["matured"] else None
+            )
+            slot["mature"] = slot["eligible"] > 0 and slot["matured"] == slot["eligible"]
+        row["revenue"] = round(row["revenue"])
+        row["revenue_per_sub"] = round(row["revenue"] / subs) if subs else None
+        row["revenue_per_buyer"] = (
+            round(row["revenue"] / row["buyers"]) if row["buyers"] else None
+        )
+    return rows
+
+
+def _acq_cohort_path(db_session, group="week", count=None, refresh=False):
+    group = "month" if group == "month" else "week"
+    try:
+        count = int(count)
+    except (TypeError, ValueError):
+        count = 16 if group == "week" else 12
+    count = max(4, min(count, 52 if group == "week" else 24))
+    periods, _trial_days = _expiry_periods_cached(db_session, refresh=refresh)
+    payments = _expiry_payments_cached(db_session)
+    signups, connected = _lifecycle_cached(db_session, refresh=refresh)
+    rows = _acq_cohort_path_rows(
+        signups,
+        connected,
+        payments,
+        periods,
+        group,
+        count,
+        EXPIRY_DEFAULT_WINDOW,
+        datetime.utcnow(),
+        admin_msk_today(),
+    )
+    seen = set()
+    for row in rows:
+        seen.update(row["first_tariffs"])
+        for src, dest in row["transitions"].items():
+            seen.add(src)
+            seen.update(dest)
+    return {
+        "group": group,
+        "count": count,
+        "window_days": EXPIRY_DEFAULT_WINDOW,
+        "buy_maturity_days": COHORT_PATH_BUY_MATURITY_DAYS,
+        "renewal_steps": COHORT_PATH_RENEWALS,
+        "tariffs": [
+            {"key": key, "label": _expiry_tariff_label(key)}
+            for key in EXPIRY_TARIFF_ORDER
+            if key in seen
+        ],
+        "cohorts": rows,
+        "cache_ttl": EXPIRY_CACHE_TTL,
+    }
 
 
 def _acq_expirations(
@@ -13247,74 +13684,6 @@ def _acq_new_repeat(db_session, days, start=None, end=None):
             for r in rows
         ]
     }
-
-
-def _acq_renew45(db_session, months):
-    """Отвал/удержание базы коротких тарифов по месяцам.
-
-    Когорта месяца — пользователи, оплатившие в нём короткий тариф
-    (день/3 дня/неделя/месяц). Продлившим считается тот, у кого в течение
-    45 дней после его последней оплаты в месяце есть любая следующая оплата
-    (включая апгрейд на длинный тариф). Длинные тарифы (3/6/12 мес) в когорту
-    не входят: их окно продления заведомо длиннее 45 дней. Когорты, у которых
-    45-дневное окно ещё не закрыто, помечаются mature=False — их процент
-    занижен и на графике не показывается.
-    """
-    rows = _acq_rows(
-        db_session,
-        """
-        WITH pays AS (
-            SELECT wi.user_id AS user_id,
-                   (t.payment_time AT TIME ZONE 'UTC') AS paid_at,
-                   COALESCE(wi.tariff_id, '') AS tariff
-            FROM wata_transactions t
-            JOIN wata_invoices wi ON wi.order_id = t.order_id
-            WHERE t.transaction_status = 'Paid'
-            UNION ALL
-            SELECT p.user_id, p.created_at, p.subscription_period
-            FROM yk_payments p
-            WHERE p.status = 'succeeded'
-        ),
-        cohort AS (
-            SELECT date_trunc('month', (paid_at AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date AS m,
-                   user_id,
-                   max(paid_at) AS last_in_month
-            FROM pays
-            WHERE tariff IN ('oneday', 'threedays', 'oneweek', 'month')
-            GROUP BY 1, 2
-        ),
-        renew AS (
-            SELECT c.m, c.user_id,
-                   bool_or(p.paid_at <= c.last_in_month + interval '45 days') AS renewed
-            FROM cohort c
-            LEFT JOIN pays p ON p.user_id = c.user_id AND p.paid_at > c.last_in_month
-            GROUP BY 1, 2
-        )
-        SELECT m AS month, count(*) AS payers,
-               count(*) FILTER (WHERE renewed) AS renewed
-        FROM renew
-        WHERE m >= date_trunc('month', (now() AT TIME ZONE 'UTC') AT TIME ZONE 'Europe/Moscow')::date
-                   - make_interval(months => :months)
-        GROUP BY 1 ORDER BY 1
-        """,
-        months=months,
-    )
-    result = []
-    for r in rows:
-        m = r["month"]
-        next_month = date(m.year + (m.month == 12), m.month % 12 + 1, 1)
-        payers = r["payers"]
-        renewed = r["renewed"]
-        result.append(
-            {
-                "month": m.isoformat(),
-                "payers": payers,
-                "renewed": renewed,
-                "renew_pct": round(100.0 * renewed / payers, 1) if payers else 0.0,
-                "mature": admin_msk_today() >= next_month + timedelta(days=45),
-            }
-        )
-    return {"months": result}
 
 
 def _acq_funnel(db_session, weeks):
@@ -14701,7 +15070,23 @@ ACQ_SECTIONS = {
         req.GET.get("window"),
         req.GET.get("refresh") == "1",
     ),
-    "renew45": lambda s, req: _acq_renew45(s, int(req.GET.get("months", 12))),
+    "summary": lambda s, req: _acq_summary(
+        s, req.GET.get("weeks"), req.GET.get("refresh") == "1"
+    ),
+    "revenue_days": lambda s, req: _acq_revenue_days(
+        s, req.GET.get("start") or None, req.GET.get("end") or None,
+        req.GET.get("refresh") == "1",
+    ),
+    # Плитки «сегодня/вчера/7/30 дней» — те же дневные строки за 61 день,
+    # независимо от диапазона графика.
+    "revenue_kpis": lambda s, req: _acq_revenue_days(
+        s, req.GET.get("start") or None, req.GET.get("end") or None,
+        req.GET.get("refresh") == "1",
+    ),
+    "cohort_path": lambda s, req: _acq_cohort_path(
+        s, req.GET.get("group") or "week", req.GET.get("count"),
+        req.GET.get("refresh") == "1",
+    ),
     "funnel": lambda s, req: _acq_funnel(s, int(req.GET.get("weeks", 12))),
     "ads": lambda s, req: _acq_ads(s, int(req.GET.get("weeks", 12))),
     "ads_daily": lambda s, req: _acq_ads_daily(

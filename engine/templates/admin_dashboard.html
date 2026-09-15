@@ -425,7 +425,8 @@
                 <p class="admin-subtitle">Новые vs повторные, воронка, реклама, когорты, пуши и паттерны оплат</p>
             </header>
             <div class="subtabs" role="tablist" aria-label="Разделы привлечения">
-                <button type="button" class="subtab active" data-subtab="acq-newrep" role="tab"><i class="fas fa-people-arrows"></i>Новые vs повторные</button>
+                <button type="button" class="subtab active" data-subtab="acq-revenue" role="tab"><i class="fas fa-coins"></i>Выручка</button>
+                <button type="button" class="subtab" data-subtab="acq-newrep" role="tab"><i class="fas fa-people-arrows"></i>Новые vs повторные</button>
                 <button type="button" class="subtab" data-subtab="acq-expiry" role="tab"><i class="fas fa-hourglass-half"></i>Окончания и продления</button>
                 <button type="button" class="subtab" data-subtab="acq-funnel" role="tab"><i class="fas fa-filter"></i>Воронка</button>
                 <button type="button" class="subtab" data-subtab="acq-ads" role="tab"><i class="fas fa-bullhorn"></i>Реклама</button>
@@ -471,7 +472,77 @@
                 </dl>
             </details>
 
-            <div id="subpanel-acq-newrep" class="subtab-panel active">
+            <div id="subpanel-acq-revenue" class="subtab-panel active">
+                <section class="card acq-revenue" aria-labelledby="acq-revenue-title">
+                    <header class="acq-expiry-head">
+                        <div class="acq-expiry-heading">
+                            <strong id="acq-revenue-title">Выручка по дням</strong>
+                            <p>Все успешные оплаты ЮKassa и Wata по московским суткам: сколько, за что и от кого. Новые — первая оплата человека, повторные — все следующие.</p>
+                        </div>
+                        <div id="acq-revenue-kpis" class="acq-revenue-kpis" aria-live="polite"></div>
+                        <div class="acq-expiry-controls" role="group" aria-label="Период и разрез">
+                            <div class="acq-expiry-presets" role="group" aria-label="Быстрый выбор периода">
+                                <button type="button" class="subtab" data-revenue-preset="30">30 дней</button>
+                                <button type="button" class="subtab active" data-revenue-preset="45">45 дней</button>
+                                <button type="button" class="subtab" data-revenue-preset="90">90 дней</button>
+                                <button type="button" class="subtab" data-revenue-preset="month">Этот месяц</button>
+                                <button type="button" class="subtab" data-revenue-preset="prev_month">Прошлый месяц</button>
+                            </div>
+                            <div class="date-field" data-date-picker data-range-max-from="#acq-revenue-end">
+                                <input type="hidden" id="acq-revenue-start">
+                                <button type="button" class="date-trigger" data-date-trigger>
+                                    <span data-date-label>Дата начала</span>
+                                    <i class="fas fa-calendar-days"></i>
+                                </button>
+                                <div class="date-popover" data-date-popover></div>
+                            </div>
+                            <div class="date-field" data-date-picker data-range-min-from="#acq-revenue-start">
+                                <input type="hidden" id="acq-revenue-end">
+                                <button type="button" class="date-trigger" data-date-trigger>
+                                    <span data-date-label>Дата конца</span>
+                                    <i class="fas fa-calendar-days"></i>
+                                </button>
+                                <div class="date-popover" data-date-popover></div>
+                            </div>
+                            <button type="button" id="acq-revenue-apply" class="subtab active">Показать</button>
+                        </div>
+                    </header>
+                    <div id="acq-revenue-body" class="acq-expiry-body">
+                        <div id="acq-revenue-loading" class="acq-expiry-loading" role="status" aria-live="polite" hidden>
+                            <span class="acq-expiry-spinner" aria-hidden="true"></span>
+                            <span id="acq-revenue-loading-text">Собираем оплаты…</span>
+                        </div>
+                        <div class="acq-expiry-chart-block">
+                            <div class="acq-expiry-chart-head">
+                                <span class="chart-title-wrap"><strong id="acq-revenue-chart-title">Выручка по дням</strong><button type="button" class="chart-info" data-help="revenue" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
+                                <div class="acq-expiry-presets" role="group" aria-label="Разрез столбиков">
+                                    <button type="button" class="subtab active" data-revenue-mode="tariff">По тарифам</button>
+                                    <button type="button" class="subtab" data-revenue-mode="newrep">Новые / повторные</button>
+                                    <button type="button" class="subtab" data-revenue-mode="autopay">Автоплатёж / вручную</button>
+                                    <button type="button" class="subtab" data-revenue-mode="provider">ЮKassa / Wata</button>
+                                </div>
+                            </div>
+                            <canvas id="acq-revenue-chart" style="width:100%;height:300px;display:block;"></canvas>
+                            <p id="acq-revenue-summary" class="acq-expiry-summary"></p>
+                        </div>
+                        <div class="acq-expiry-chart-block">
+                            <div class="acq-expiry-chart-head">
+                                <span class="chart-title-wrap"><strong>Почему выручка такая: по неделям</strong><button type="button" class="chart-info" data-help="weekly" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
+                                <span class="acq-expiry-legend-note">новые и повторные — столбики, доля продлений — линия (правая ось)</span>
+                            </div>
+                            <canvas id="acq-weekly-chart" style="width:100%;height:260px;display:block;"></canvas>
+                            <p id="acq-weekly-summary" class="acq-expiry-summary"></p>
+                            <div id="acq-weekly-table" class="acq-expiry-table-wrap"></div>
+                        </div>
+                        <div class="acq-expiry-table-block">
+                            <div class="acq-expiry-table-head"><strong>Каждый день в цифрах</strong><span>Δ — к тому же дню неделей раньше; новые и повторные — ₽ и людей; тарифы — оплат · ₽</span></div>
+                            <div id="acq-revenue-table" class="acq-expiry-table-wrap"></div>
+                        </div>
+                    </div>
+                </section>
+            </div>
+
+            <div id="subpanel-acq-newrep" class="subtab-panel">
                 <div class="admin-section-query">
                             <select id="acq-newrep-month" style="background:#111;border:1px solid rgba(255,255,255,.14);color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;">
                                 <option value="" selected>Месяц…</option>
@@ -507,11 +578,6 @@
                     </div>
                     <canvas id="acq-newrep-chart" style="width:100%;height:280px;display:block;"></canvas>
                     <div id="acq-newrep-summary" style="margin-top:12px;font-size:12px;color:var(--muted);"></div>
-                </div>
-                <div class="card" style="padding:18px;margin-top:14px;">
-                    <span class="chart-title-wrap"><strong>Отвал базы: % продливших в течение 45 дней (короткие тарифы, по месяцам)</strong><button type="button" class="chart-info" data-help="renew45" aria-label="Как считается и как читать" title="Как считается и как читать"><i class="fas fa-circle-info"></i></button></span>
-                    <canvas id="acq-renew45-chart" style="width:100%;height:260px;display:block;margin-top:10px;"></canvas>
-                    <div id="acq-renew45-summary" style="margin-top:12px;font-size:12px;color:var(--muted);"></div>
                 </div>
             </div>
 

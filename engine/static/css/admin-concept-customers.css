@@ -574,7 +574,10 @@ html[data-admin-theme="light"] :is(#panel-broadcasts, #panel-promocodes, #subpan
 #panel-broadcasts .broadcast-button-row .input { margin: 0; padding: 11px; }
 #panel-broadcasts .broadcast-actions { margin: 20px 0 0; padding-top: 20px; border-color: var(--broadcast-line); gap: 12px; align-items: center; }
 #panel-broadcasts .broadcast-test { gap: 12px; margin-left: auto; }
+#panel-broadcasts .broadcast-test { align-items: stretch; }
 #panel-broadcasts .broadcast-test .input { flex: 0 1 190px; width: 190px; }
+/* Кнопка «Тест себе» — той же высоты, что поле Telegram ID рядом. */
+#panel-broadcasts .broadcast-test .btn { align-self: stretch; height: auto; min-height: 0; }
 #panel-broadcasts .broadcast-send-note { margin-top: 8px; color: var(--campaign-caption); }
 #panel-broadcasts .broadcast-send-note > i { display: none; }
 #panel-broadcasts .broadcast-preview-pane { padding: 24px 12px 24px 22px; border-left: 1px solid var(--broadcast-line); border-right: 1px solid var(--admin-border); background: var(--campaign-aside); }

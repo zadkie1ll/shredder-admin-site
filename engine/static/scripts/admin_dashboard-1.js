@@ -110,7 +110,7 @@
                 const legendRowH = 18;
                 const legendRows = acqLegendRows(ctx, legend, Math.max(80, w - 12));
                 const lineOnly = opts.lineOnly && !barSeries.length && lineSeries.length;
-                const padL = 54, padR = lineSeries.length && !lineOnly ? 54 : 14;
+                const padL = 54, padR = lineSeries.length && !lineOnly && !opts.sharedAxis ? 54 : 14;
                 const padT = 6 + legendRows.length * legendRowH + 6, padB = 26;
                 const plotW = w - padL - padR, plotH = Math.max(1, h - padT - padB);
                 meta.padL = padL;
@@ -118,7 +118,11 @@
                 if (!n) { ctx.fillStyle = adminChartUiColor('empty'); ctx.font = '12px Manrope, system-ui, sans-serif'; ctx.fillText('Нет данных', padL, h / 2); return; }
                 const barTotals = labels.map((_, i2) => barSeries.reduce((acc, sr) => acc + (sr.data[i2] || 0), 0));
                 const maxBar = Math.max(1, ...barTotals);
-                const maxLine = Math.max(1, ...lineSeries.flatMap((sr) => sr.data.filter((v) => v != null)));
+                // sharedAxis: линии в тех же единицах, что столбики (скользящее
+                // среднее выручки) — одна шкала, правая ось не рисуется.
+                const maxLine = opts.sharedAxis
+                    ? Math.max(maxBar, ...lineSeries.flatMap((sr) => sr.data.filter((v) => v != null)))
+                    : Math.max(1, ...lineSeries.flatMap((sr) => sr.data.filter((v) => v != null)));
                 const barFmt = barSeries[0]?.fmt || 'raw';
                 const lineFmt = lineSeries[0]?.fmt || 'raw';
                 const step = meta.step, barW = Math.max(2, step * 0.62);
@@ -140,15 +144,15 @@
                     ctx.strokeStyle = adminChartUiColor(g === 0 ? 'gridStrong' : 'grid');
                     ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke();
                     ctx.fillStyle = adminChartUiColor('label');
-                    ctx.fillText(adminChartAxisLabel(((lineOnly ? maxLine : maxBar) * g) / 4, lineOnly ? lineFmt : barFmt), padL - 6, y + 3);
-                    if (lineSeries.length && !lineOnly) { ctx.textAlign = 'left'; ctx.fillText(adminChartAxisLabel((maxLine * g) / 4, lineFmt), w - padR + 6, y + 3); ctx.textAlign = 'right'; }
+                    ctx.fillText(adminChartAxisLabel(((lineOnly || opts.sharedAxis ? maxLine : maxBar) * g) / 4, lineOnly ? lineFmt : barFmt), padL - 6, y + 3);
+                    if (lineSeries.length && !lineOnly && !opts.sharedAxis) { ctx.textAlign = 'left'; ctx.fillText(adminChartAxisLabel((maxLine * g) / 4, lineFmt), w - padR + 6, y + 3); ctx.textAlign = 'right'; }
                 }
                 barSeries.length && labels.forEach((_, i2) => {
                     let y = padT + plotH;
                     const bx = padL + i2 * step + (step - barW) / 2;
                     barSeries.forEach((sr) => {
                         const v = sr.data[i2] || 0;
-                        const bh = (v / maxBar) * plotH;
+                        const bh = (v / (opts.sharedAxis ? maxLine : maxBar)) * plotH;
                         ctx.fillStyle = adminChartSeriesColor(sr);
                         ctx.fillRect(bx, y - bh, barW, bh);
                         // Тонкий разрез между сегментами стека: без него соседние
@@ -546,6 +550,209 @@
             }
         }
 
+        // ===== Выручка по дням =====
+        const revenueState = {res: null, weekly: null, mode: 'tariff'};
+        const REVENUE_MODE_LABELS = {tariff: 'по тарифам', newrep: 'новые и повторные', autopay: 'автоплатёж и вручную', provider: 'ЮKassa и Wata'};
+        const WEEKDAYS_SHORT = ['пн', 'вт', 'ср', 'чт', 'пт', 'сб', 'вс'];
+        const fullDay = (iso) => dayLabel(iso) + '.' + iso.slice(0, 4);
+        const deltaHtml = (current, previous) => {
+            if (previous == null || current == null) return '<span class="acq-delta is-flat">—</span>';
+            if (!previous) return current ? '<span class="acq-delta is-up">новое</span>' : '<span class="acq-delta is-flat">—</span>';
+            const pct = Math.round(100 * (current - previous) / previous);
+            const cls = pct > 0 ? 'is-up' : pct < 0 ? 'is-down' : 'is-flat';
+            return `<span class="acq-delta ${cls}">${pct > 0 ? '+' : ''}${pct}%</span>`;
+        };
+
+        function setRevenuePreset(name) {
+            const mskNow = new Date(Date.now() + 3 * 60 * 60 * 1000);
+            const y = mskNow.getUTCFullYear(), m = mskNow.getUTCMonth();
+            let start, end;
+            if (name === 'month') { start = `${y}-${String(m + 1).padStart(2, '0')}-01`; end = expiryIsoShift(0); }
+            else if (name === 'prev_month') {
+                start = new Date(Date.UTC(y, m - 1, 1)).toISOString().slice(0, 10);
+                end = new Date(Date.UTC(y, m, 0)).toISOString().slice(0, 10);
+            }
+            else { const days = Number(name) || 45; start = expiryIsoShift(-(days - 1)); end = expiryIsoShift(0); }
+            setAcqDateField('acq-revenue-start', start);
+            setAcqDateField('acq-revenue-end', end);
+            document.querySelectorAll('[data-revenue-preset]').forEach((b) => b.classList.toggle('active', b.dataset.revenuePreset === name));
+        }
+
+        // Плитки: сегодня/вчера/7/30 дней с дельтой к сопоставимому периоду —
+        // считаются по своему запросу за 61 день, чтобы не зависеть от
+        // выбранного на графике диапазона.
+        function renderRevenueKpis(res) {
+            const box = document.getElementById('acq-revenue-kpis');
+            if (!box || !res) return;
+            const days = res.days;
+            const byDay = Object.fromEntries(days.map((d) => [d.day, d]));
+            const todayIso = res.today;
+            const shift = (iso, n) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+            const sum = (from, to, field = 'revenue') => days.filter((d) => d.day >= from && d.day <= to).reduce((a, d) => a + (d[field] || 0), 0);
+            const today = byDay[todayIso] || {revenue: 0, payments: 0};
+            const yesterday = byDay[shift(todayIso, -1)] || {revenue: 0, payments: 0};
+            const weekAgo = byDay[shift(todayIso, -7)] || {revenue: 0};
+            const last7 = sum(shift(todayIso, -6), todayIso), prev7 = sum(shift(todayIso, -13), shift(todayIso, -7));
+            const last30 = sum(shift(todayIso, -29), todayIso), prev30 = sum(shift(todayIso, -59), shift(todayIso, -30));
+            const pays30 = sum(shift(todayIso, -29), todayIso, 'payments'), paysPrev30 = sum(shift(todayIso, -59), shift(todayIso, -30), 'payments');
+            const check30 = pays30 ? Math.round(last30 / pays30) : null, checkPrev30 = paysPrev30 ? Math.round(prev30 / paysPrev30) : null;
+            const auto30 = sum(shift(todayIso, -29), todayIso, 'autopay_rub');
+            const card = (label, value, delta, meta) => `<div><div>${label}</div><div>${value}${delta}</div><small>${meta}</small></div>`;
+            box.innerHTML = [
+                card('Сегодня', `${fmtRub(today.revenue)} ₽`, deltaHtml(today.revenue, yesterday.revenue), `${fmtRub(today.payments)} оплат · день ещё идёт`),
+                card('Вчера', `${fmtRub(yesterday.revenue)} ₽`, deltaHtml(yesterday.revenue, weekAgo.revenue), `${fmtRub(yesterday.payments)} оплат · к тому же дню неделей раньше`),
+                card('7 дней', `${fmtRub(last7)} ₽`, deltaHtml(last7, prev7), `к предыдущим 7 дням (${fmtRub(prev7)} ₽)`),
+                card('30 дней', `${fmtRub(last30)} ₽`, deltaHtml(last30, prev30), `к предыдущим 30 дням (${fmtRub(prev30)} ₽)`),
+                card('Средний чек, 30 дн.', check30 == null ? '—' : `${fmtRub(check30)} ₽`, deltaHtml(check30, checkPrev30), `${fmtRub(pays30)} оплат за 30 дней`),
+                card('Автоплатёж, 30 дн.', `${fmtRub(auto30)} ₽`, `<span class="acq-delta is-flat">${last30 ? Math.round(100 * auto30 / last30) : 0}%</span>`, 'доля выручки со списаний ЮKassa'),
+            ].join('');
+        }
+
+        function revenueSeries(res) {
+            const days = res.days;
+            const mode = revenueState.mode;
+            if (mode === 'newrep') return [
+                {label: 'Повторные, ₽', tone: 'indigo', data: days.map((d) => d.repeat_rub), fmt: 'rub'},
+                {label: 'Новые, ₽', tone: 'amber', data: days.map((d) => d.new_rub), fmt: 'rub'},
+            ];
+            if (mode === 'autopay') return [
+                {label: 'Автоплатёж, ₽', tone: 'violet', data: days.map((d) => d.autopay_rub), fmt: 'rub'},
+                {label: 'Вручную, ₽', tone: 'amber', data: days.map((d) => d.manual_rub), fmt: 'rub'},
+            ];
+            if (mode === 'provider') return [
+                {label: 'ЮKassa, ₽', tone: 'sky', data: days.map((d) => d.yk_rub), fmt: 'rub'},
+                {label: 'Wata, ₽', tone: 'orange', data: days.map((d) => d.wata_rub), fmt: 'rub'},
+            ];
+            return res.tariffs.filter((t) => t.key !== 'trial').map((t) => ({
+                label: `${t.label}, ₽`, tone: expiryTone(t.key), fmt: 'rub',
+                data: days.map((d) => (d.by_tariff[t.key] || {}).rub || 0),
+            }));
+        }
+
+        function renderRevenueChart(res) {
+            const canvas = document.getElementById('acq-revenue-chart');
+            if (!canvas || !res) return;
+            const days = res.days;
+            const ma = days.map((_, i) => {
+                if (i < 6) return null;
+                let acc = 0; for (let k = i - 6; k <= i; k++) acc += days[k].revenue;
+                return Math.round(acc / 7);
+            });
+            acqDraw(canvas, days.map((d) => d.label), revenueSeries(res),
+                [{label: 'Среднее за 7 дней, ₽', tone: 'neutral', width: 1.5, dash: [4, 4], data: ma, fmt: 'rub'}],
+                {sharedAxis: true, fullLabels: days.map((d) => `${fullDay(d.day)}, ${WEEKDAYS_SHORT[d.weekday]}${d.day === res.today ? ' · сегодня' : ''}`)});
+            const total = days.reduce((a, d) => a + d.revenue, 0);
+            const newRub = days.reduce((a, d) => a + d.new_rub, 0);
+            const pays = days.reduce((a, d) => a + d.payments, 0);
+            const best = days.reduce((a, d) => (d.revenue > (a?.revenue || 0) ? d : a), null);
+            const summary = document.getElementById('acq-revenue-summary');
+            if (summary) summary.innerHTML = days.length
+                ? `${fullDay(res.start)} — ${fullDay(res.end)}, ${REVENUE_MODE_LABELS[revenueState.mode]}: всего <b class="chart-tone-strong">${fmtRub(total)} ₽</b> за <b>${fmtRub(pays)}</b> оплат (чек <b>${pays ? fmtRub(total / pays) : '—'} ₽</b>), новые <b class="chart-tone-amber">${fmtRub(newRub)} ₽</b> (${total ? Math.round(100 * newRub / total) : 0}%), повторные <b class="chart-tone-indigo">${fmtRub(total - newRub)} ₽</b>.${best ? ` Лучший день — <b class="chart-tone-green">${fullDay(best.day)}</b>: ${fmtRub(best.revenue)} ₽.` : ''} Пунктир — среднее за 7 дней. Данные пересобираются раз в ${Math.round((res.cache_ttl || 300) / 60)} мин.`
+                : 'Нет оплат за выбранный период.';
+        }
+
+        function renderRevenueTable(res) {
+            const box = document.getElementById('acq-revenue-table');
+            if (!box || !res) return;
+            const days = res.days;
+            const byDay = Object.fromEntries(days.map((d) => [d.day, d]));
+            const tariffs = res.tariffs.filter((t) => t.key !== 'trial');
+            const shift = (iso, n) => { const d = new Date(`${iso}T00:00:00Z`); d.setUTCDate(d.getUTCDate() + n); return d.toISOString().slice(0, 10); };
+            const head = `<tr><th scope="col">День</th><th scope="col">Выручка</th><th scope="col">Δ неделя</th><th scope="col">Оплат</th><th scope="col">Чек</th><th scope="col">Новые</th><th scope="col">Повторные</th><th scope="col">Автоплатёж</th><th scope="col">ЮKassa / Wata</th>${tariffs.map((t) => `<th scope="col"><span class="acq-expiry-chip-dot" style="background:${chartTone(expiryTone(t.key))}"></span>${escapeHtml(t.label)}</th>`).join('')}</tr>`;
+            const cell = (main, sub = '') => `<td><span class="acq-expiry-cell-end">${main}</span>${sub ? `<small>${sub}</small>` : ''}</td>`;
+            const body = days.slice().reverse().map((d) => {
+                const weekAgo = byDay[shift(d.day, -7)];
+                const isToday = d.day === res.today;
+                const isWeekend = d.weekday >= 5;
+                return `<tr class="${isToday ? 'is-today' : ''}${isWeekend ? ' is-weekend' : ''}"><th scope="row">${d.label}<small>${WEEKDAYS_SHORT[d.weekday]}${isToday ? ' · сегодня' : ''}</small></th>`
+                    + cell(`${fmtRub(d.revenue)} ₽`)
+                    + `<td>${deltaHtml(d.revenue, weekAgo ? weekAgo.revenue : null)}</td>`
+                    + cell(fmtRub(d.payments))
+                    + cell(d.avg_check == null ? '—' : `${fmtRub(d.avg_check)} ₽`)
+                    + cell(`${fmtRub(d.new_rub)} ₽`, `${fmtRub(d.new_payers)} чел.`)
+                    + cell(`${fmtRub(d.repeat_rub)} ₽`, `${fmtRub(d.repeat_payers)} чел.`)
+                    + cell(`${fmtRub(d.autopay_rub)} ₽`, `${fmtRub(d.autopay_count)} шт. · ${d.revenue ? Math.round(100 * d.autopay_rub / d.revenue) : 0}%`)
+                    + cell(`${fmtRub(d.yk_rub)} / ${fmtRub(d.wata_rub)}`)
+                    + tariffs.map((t) => { const x = d.by_tariff[t.key]; return x ? cell(`${fmtRub(x.count)} · ${fmtRub(x.rub)} ₽`) : '<td class="is-empty">—</td>'; }).join('')
+                    + '</tr>';
+            }).join('');
+            const total = (f) => days.reduce((a, d) => a + (d[f] || 0), 0);
+            const tTotal = (key, f) => days.reduce((a, d) => a + ((d.by_tariff[key] || {})[f] || 0), 0);
+            const foot = `<tr><th scope="row">Итого</th>${cell(`${fmtRub(total('revenue'))} ₽`)}<td></td>${cell(fmtRub(total('payments')))}${cell(total('payments') ? `${fmtRub(total('revenue') / total('payments'))} ₽` : '—')}${cell(`${fmtRub(total('new_rub'))} ₽`, `${fmtRub(total('new_payers'))} чел.`)}${cell(`${fmtRub(total('repeat_rub'))} ₽`, `${fmtRub(total('repeat_payers'))} чел.`)}${cell(`${fmtRub(total('autopay_rub'))} ₽`, `${fmtRub(total('autopay_count'))} шт.`)}${cell(`${fmtRub(total('yk_rub'))} / ${fmtRub(total('wata_rub'))}`)}${tariffs.map((t) => cell(`${fmtRub(tTotal(t.key, 'count'))} · ${fmtRub(tTotal(t.key, 'rub'))} ₽`)).join('')}</tr>`;
+            box.innerHTML = days.length ? `<table class="acq-expiry-table acq-revenue-table"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table>` : '<p class="acq-ads-summary-note">Нет оплат за выбранный период.</p>';
+        }
+
+        // Недельный блок «почему выручка такая»: новые/повторные столбиками,
+        // доля продлений (единое определение: оплата ≤ 30 дней после конца
+        // периода) линией, таблица с чеком и активной базой.
+        function renderWeekly(res) {
+            const canvas = document.getElementById('acq-weekly-chart');
+            const box = document.getElementById('acq-weekly-table');
+            if (!canvas || !box || !res) return;
+            const wk = res.weeks;
+            acqDraw(canvas, wk.map((w) => w.label),
+                [
+                    {label: 'Повторные, ₽', tone: 'indigo', data: wk.map((w) => w.revenue_repeat), fmt: 'rub'},
+                    {label: 'Новые, ₽', tone: 'amber', data: wk.map((w) => w.revenue_new), fmt: 'rub'},
+                ],
+                [{label: `Продлились, % (окно ${res.window_days} дн., правая ось)`, tone: 'green', data: wk.map((w) => w.renewal_pct), fmt: 'pct'}],
+                {fullLabels: wk.map((w) => `неделя с ${fullDay(w.week)}${w.is_current ? ' · текущая' : ''}${w.renewal_pct == null ? ' · окно продления ещё не закрыто' : ''}`)});
+            const head = '<tr><th scope="col">Неделя</th><th scope="col">Выручка</th><th scope="col">Δ</th><th scope="col">Новые</th><th scope="col">Повторные</th><th scope="col">Новых покупателей</th><th scope="col">Оплат</th><th scope="col">Чек</th><th scope="col">Продлились</th><th scope="col">Платная база</th></tr>';
+            const cell = (main, sub = '') => `<td><span class="acq-expiry-cell-end">${main}</span>${sub ? `<small>${sub}</small>` : ''}</td>`;
+            const body = wk.slice().reverse().map((w, i, arr) => {
+                const prev = arr[i + 1];
+                return `<tr class="${w.is_current ? 'is-today' : ''}"><th scope="row">${w.label}${w.is_current ? '<small>текущая</small>' : ''}</th>`
+                    + cell(`${fmtRub(w.revenue)} ₽`) + `<td>${deltaHtml(w.revenue, prev ? prev.revenue : null)}</td>`
+                    + cell(`${fmtRub(w.revenue_new)} ₽`, `${w.revenue ? Math.round(100 * w.revenue_new / w.revenue) : 0}%`)
+                    + cell(`${fmtRub(w.revenue_repeat)} ₽`, `${w.revenue ? Math.round(100 * w.revenue_repeat / w.revenue) : 0}%`)
+                    + cell(fmtRub(w.new_payers)) + cell(fmtRub(w.payments))
+                    + cell(w.avg_check == null ? '—' : `${fmtRub(w.avg_check)} ₽`)
+                    + (w.renewal_pct == null ? '<td class="is-empty">окно открыто</td>' : cell(`${w.renewal_pct}%`, `${fmtRub(w.renewed_closed)} из ${fmtRub(w.ending_closed)}`))
+                    + cell(fmtRub(w.base), 'на конец недели')
+                    + '</tr>';
+            }).join('');
+            box.innerHTML = `<table class="acq-expiry-table"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+            const closed = wk.filter((w) => w.renewal_pct != null);
+            const last = closed[closed.length - 1];
+            const summary = document.getElementById('acq-weekly-summary');
+            if (summary) summary.innerHTML = last
+                ? `Последняя неделя с закрытым окном — <b>${fullDay(last.week)}</b>: закончилось <b>${fmtRub(last.ending_closed)}</b> платных периодов, продлилось <b class="chart-tone-green">${last.renewal_pct}%</b>, отвал <b class="chart-tone-pink">${(100 - last.renewal_pct).toFixed(1)}%</b>; платная база на конец недели — <b>${fmtRub(last.base)}</b>.`
+                : 'Ещё нет недель с закрытым окном продления.';
+        }
+
+        async function loadRevenue() {
+            const startEl = document.getElementById('acq-revenue-start');
+            const endEl = document.getElementById('acq-revenue-end');
+            if (!startEl || !endEl) return;
+            if (!startEl.value || !endEl.value) setRevenuePreset('45');
+            const body = document.getElementById('acq-revenue-body');
+            const loading = document.getElementById('acq-revenue-loading');
+            const loadingText = document.getElementById('acq-revenue-loading-text');
+            body?.classList.add('is-loading');
+            if (loading) { loading.hidden = false; if (loadingText) loadingText.textContent = revenueState.res ? 'Пересчитываем…' : 'Собираем оплаты и периоды — первый раз до минуты, дальше быстро.'; }
+            try {
+                const [res, kpiRes, weekly] = await Promise.all([
+                    acqFetch('revenue_days', {start: startEl.value, end: endEl.value}, {timeoutMs: 120000}),
+                    acqFetch('revenue_kpis', {start: expiryIsoShift(-60), end: expiryIsoShift(0)}, {timeoutMs: 120000}),
+                    acqFetch('summary', {weeks: 12}, {timeoutMs: 120000}),
+                ]);
+                revenueState.res = res;
+                revenueState.weekly = weekly;
+                renderRevenueKpis(kpiRes);
+                renderRevenueChart(res);
+                renderRevenueTable(res);
+                renderWeekly(weekly);
+            } catch (error) {
+                if (error?.name === 'AbortError') return;
+                const table = document.getElementById('acq-revenue-table');
+                if (table) table.innerHTML = `<p class="acq-ads-summary-note is-error">Не удалось загрузить данные: ${escapeHtml(error.message || String(error))}</p>`;
+                throw error;
+            } finally {
+                body?.classList.remove('is-loading');
+                if (loading) loading.hidden = true;
+            }
+        }
+
         async function loadNewRepeat() {
             const start = document.getElementById('acq-newrep-start').value;
             const end = document.getElementById('acq-newrep-end').value;
@@ -568,27 +775,6 @@
             document.getElementById('acq-newrep-summary').innerHTML = rows.length
                 ? `За период <b>${fullDay(rows[0].day)} — ${fullDay(rows[rows.length - 1].day)}</b>: новые <b class="chart-tone-amber">${fmtRub(nSum)} ₽</b> (${Math.round(100 * nSum / Math.max(1, nSum + rSum))}%), повторные <b class="chart-tone-indigo">${fmtRub(rSum)} ₽</b>, итого <b>${fmtRub(nSum + rSum)} ₽</b>; новых покупателей: <b>${fmtRub(nPayers)}</b>. Повторные — эхо продаж прошлых месяцев; рекламу оценивайте по жёлтой части.`
                 : 'Нет данных за выбранный период.';
-            await loadRenew45();
-        }
-
-        // Отвал базы: % продливших за 45 дней. Не зависит от выбранного
-        // периода верхнего графика, поэтому грузится один раз.
-        async function loadRenew45() {
-            if (loaded.renew45) return;
-            const ret = await acqFetch('renew45', {months: 12});
-            loaded.renew45 = true;
-            const mrows = ret.months;
-            const monthLabel = (iso) => iso.slice(5, 7) + '.' + iso.slice(0, 4);
-            acqDraw(document.getElementById('acq-renew45-chart'),
-                mrows.map((r) => monthLabel(r.month)),
-                [{label: 'Платили в месяце (короткие тарифы)', tone: 'indigoSoft', data: mrows.map((r) => r.payers), fmt: 'raw'}],
-                [{label: 'Продлили в течение 45 дней, % (правая ось)', tone: 'green', data: mrows.map((r) => r.mature ? r.renew_pct : null), fmt: 'pct'}],
-                {fullLabels: mrows.map((r) => monthLabel(r.month) + (r.mature ? '' : ' — окно 45 дней ещё не закрыто'))});
-            const matureRows = mrows.filter((r) => r.mature);
-            const lastM = matureRows[matureRows.length - 1];
-            document.getElementById('acq-renew45-summary').innerHTML = lastM
-                ? `Последний месяц с закрытым окном — <b>${monthLabel(lastM.month)}</b>: платили <b>${fmtRub(lastM.payers)}</b> чел., продлили <b class="chart-tone-green">${lastM.renew_pct}%</b>, отвал <b class="chart-tone-pink">${(100 - lastM.renew_pct).toFixed(1)}%</b>. Месяцы без закрытого 45-дневного окна на линии не показываются — их процент был бы занижен.`
-                : 'Ещё нет месяцев с закрытым 45-дневным окном.';
         }
 
         async function loadFunnel() {
@@ -944,7 +1130,7 @@
         }
 
         const loaders = {
-            'acq-newrep': loadNewRepeat, 'acq-expiry': loadExpiry, 'acq-funnel': loadFunnel, 'acq-ads': loadAds,
+            'acq-revenue': loadRevenue, 'acq-newrep': loadNewRepeat, 'acq-expiry': loadExpiry, 'acq-funnel': loadFunnel, 'acq-ads': loadAds,
             'acq-cohorts': loadCohorts, 'acq-pushes': loadPushes, 'acq-patterns': loadPatterns,
             'acq-journey': loadJourney, 'acq-mrr': loadMrr, 'acq-payhealth': loadPayHealth,
         };
@@ -1066,9 +1252,9 @@
         setupSubtabs('panel-acquisition');
 
         document.querySelector('.tab-btn[data-tab="acquisition"]')?.addEventListener('click', () => {
-            loadAcqSection(document.querySelector('#panel-acquisition .subtab.active')?.dataset.subtab || 'acq-newrep');
+            loadAcqSection(document.querySelector('#panel-acquisition .subtab.active')?.dataset.subtab || 'acq-revenue');
         });
-        if (location.hash === '#acquisition') loadAcqSection('acq-newrep');
+        if (location.hash === '#acquisition') loadAcqSection('acq-revenue');
 
         document.getElementById('acq-mrr-months')?.addEventListener('change', () => loadAcqSection('acq-mrr', true));
         document.getElementById('acq-payhealth-days')?.addEventListener('change', () => loadAcqSection('acq-payhealth', true));
@@ -1092,6 +1278,28 @@
             loadNewRepeat().catch(console.error);
         });
         document.getElementById('acq-newrep-apply')?.addEventListener('click', () => loadNewRepeat().catch(console.error));
+        // Выручка: пресеты, разрез столбиков, ручной период.
+        document.querySelectorAll('[data-revenue-preset]').forEach((button) => button.addEventListener('click', () => {
+            setRevenuePreset(button.dataset.revenuePreset);
+            loadRevenue().catch(console.error);
+        }));
+        document.querySelectorAll('[data-revenue-mode]').forEach((button) => button.addEventListener('click', () => {
+            revenueState.mode = button.dataset.revenueMode;
+            document.querySelectorAll('[data-revenue-mode]').forEach((b) => b.classList.toggle('active', b === button));
+            if (revenueState.res) renderRevenueChart(revenueState.res);
+        }));
+        document.getElementById('acq-revenue-apply')?.addEventListener('click', () => {
+            document.querySelectorAll('[data-revenue-preset]').forEach((b) => b.classList.remove('active'));
+            loadRevenue().catch(console.error);
+        });
+        ['acq-revenue-start', 'acq-revenue-end'].forEach((id) => document.getElementById(id)?.addEventListener('input', () => {
+            document.querySelectorAll('[data-revenue-preset]').forEach((b) => b.classList.remove('active'));
+        }));
+        window.addEventListener('resize', () => {
+            if (!document.getElementById('subpanel-acq-revenue')?.classList.contains('active')) return;
+            if (revenueState.res) renderRevenueChart(revenueState.res);
+            if (revenueState.weekly) renderWeekly(revenueState.weekly);
+        });
         // Окончания и продления: пресеты периода, шаг, окно, ручной период.
         document.querySelectorAll('[data-expiry-preset]').forEach((button) => button.addEventListener('click', () => {
             setExpiryPreset(button.dataset.expiryPreset);

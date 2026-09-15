@@ -437,3 +437,19 @@ html[data-admin-theme="light"] #panel-system [data-winback-status].is-error { co
     #panel-acquisition .acq-expiry-window { width: 100%; flex-wrap: wrap; }
     #panel-acquisition #acq-expiry-apply { width: 100%; }
 }
+
+/* Выручка по дням */
+#panel-acquisition .acq-revenue { display: grid; gap: 22px; min-width: 0; }
+#panel-acquisition .acq-revenue > *, #panel-acquisition .acq-revenue .acq-expiry-head > * { min-width: 0; }
+#panel-acquisition .acq-revenue-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 18px 20px; padding: 4px 0 20px; border-bottom: 1px solid var(--admin-border); }
+#panel-acquisition .acq-revenue-kpis > div { display: grid; gap: 4px; min-width: 0; }
+#panel-acquisition .acq-revenue-kpis > div > div:first-child { font-size: 12px; font-weight: 550; color: var(--admin-text-soft); }
+#panel-acquisition .acq-revenue-kpis > div > div:nth-child(2) { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font-size: 24px; font-weight: 600; letter-spacing: -.4px; line-height: 1.3; font-variant-numeric: tabular-nums; }
+#panel-acquisition .acq-revenue-kpis > div > small { font-size: 12px; line-height: 1.45; color: var(--admin-text-muted); }
+#panel-acquisition .acq-delta { display: inline-block; font-size: 12px; font-weight: 600; font-variant-numeric: tabular-nums; }
+#panel-acquisition .acq-delta.is-up { color: var(--workspace-success, #75d9ab); }
+#panel-acquisition .acq-delta.is-down { color: var(--workspace-danger, #f298a2); }
+#panel-acquisition .acq-delta.is-flat { color: var(--admin-text-muted); }
+#panel-acquisition .acq-revenue-table tr.is-weekend th[scope="row"] { color: var(--admin-text-muted); }
+#panel-acquisition .acq-revenue-table th[scope="row"] small { color: var(--admin-text-muted); font-weight: 500; text-transform: none; letter-spacing: 0; }
+#panel-acquisition .acq-revenue-table tr.is-today th[scope="row"] small { color: var(--admin-accent); }
