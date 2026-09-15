@@ -1,7 +1,7 @@
 @import url('./admin-concept-infrastructure.css?v=13');
-@import url('./admin-concept-customers.css?v=10');
+@import url('./admin-concept-customers.css?v=11');
 @import url('./admin-concept-client-details.css?v=6');
-@import url('./admin-concept-sections.css?v=7');
+@import url('./admin-concept-sections.css?v=8');
 
 /* Geometry and visual hierarchy from the approved admin-concept-pattern-hover.
  * Existing forms, data, actions, permissions and state stay in the real template.
