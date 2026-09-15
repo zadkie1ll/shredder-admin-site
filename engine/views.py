@@ -13161,10 +13161,17 @@ def _expiry_aggregate(periods, start, end, group, window_days, now, today):
                     "pending": 0,
                     "autopay": 0,
                     "subscriptions": len(users_by_tariff.get(tariff, ())),
+                    # Финальная доля продлений тарифа — только по бакетам с
+                    # закрытым окном (иначе она занижена).
+                    "ending_closed": 0,
+                    "renewed_closed": 0,
                 },
             )
             for name in ("ending", "renewed", "pending", "autopay"):
                 slot[name] += bucket[name].get(tariff, 0)
+            if window_closed:
+                slot["ending_closed"] += bucket["ending"].get(tariff, 0)
+                slot["renewed_closed"] += bucket["renewed"].get(tariff, 0)
         totals["ending"] += ending_total
         totals["renewed"] += renewed_total
         totals["pending"] += sum(bucket["pending"].values())

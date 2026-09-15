@@ -1111,7 +1111,19 @@ class AcquisitionExpiryTests(SimpleTestCase):
         self.assertEqual(totals["autopay_future"], 1)
         self.assertEqual(
             totals["by_tariff"]["month"],
-            {"ending": 5, "renewed": 2, "pending": 1, "autopay": 0, "subscriptions": 5},
+            {"ending": 5, "renewed": 2, "pending": 1, "autopay": 0, "subscriptions": 5,
+             # Закрытое окно у month: два окончания 01.08, оба без продления;
+             # единственное закрытое продление — пробный → month.
+             "ending_closed": 2, "renewed_closed": 0},
+        )
+        # Чипы и строка «Все платные тарифы» строятся из этих же полей.
+        self.assertEqual(
+            sum(slot["ending_closed"] for slot in totals["by_tariff"].values()),
+            totals["ending_closed"],
+        )
+        self.assertEqual(
+            sum(slot["renewed_closed"] for slot in totals["by_tariff"].values()),
+            totals["renewed_closed"],
         )
         # 8 периодов в диапазоне у 8 разных пользователей.
         self.assertEqual(totals["subscriptions"], 8)
@@ -1218,6 +1230,13 @@ class AcquisitionExpiryTests(SimpleTestCase):
             "acq-expiry-matrix-note",
             "уже закрыто); тарифы, чьи периоды за эти дни не заканчивались, строкой не показаны.",
             "Чипы легенды графика на матрицу не влияют",
+            # Процент продлений тарифа в чипе и общий по всем тарифам.
+            "acq-expiry-chip-pct",
+            "expiryPct(total.renewed_closed, total.ending_closed)",
+            "function expiryOverallHtml(res)",
+            "Все платные тарифы: <b>",
+            "с пробным: <b>",
+            "card('Продлились по выбранным тарифам'",
         ):
             self.assertIn(needle, template, needle)
         self.assertNotIn("order.filter((k) => !expiryState.hidden.has(k) && ((transitions[k]", template)

@@ -379,8 +379,11 @@
             box.innerHTML = res.tariffs.map((t) => {
                 const total = res.totals.by_tariff[t.key] || {ending: 0};
                 const on = !expiryState.hidden.has(t.key);
-                return `<button type="button" class="acq-expiry-chip" data-expiry-tariff="${escapeHtml(t.key)}" aria-pressed="${on}"><span class="acq-expiry-chip-dot" style="background:${chartTone(expiryTone(t.key))}"></span>${escapeHtml(t.label)}<b>${fmtRub(total.ending)}</b></button>`;
-            }).join('');
+                // Доля продлений тарифа по дням с закрытым окном — прямо в чипе,
+                // чтобы видеть её и без выбора тарифа.
+                const pct = total.ending_closed ? `<span class="acq-expiry-chip-pct" title="продлились из ${fmtRub(total.ending_closed)} с закрытым окном ${res.window_days} дн.">${expiryPct(total.renewed_closed, total.ending_closed)}</span>` : '';
+                return `<button type="button" class="acq-expiry-chip" data-expiry-tariff="${escapeHtml(t.key)}" aria-pressed="${on}"><span class="acq-expiry-chip-dot" style="background:${chartTone(expiryTone(t.key))}"></span>${escapeHtml(t.label)}<b>${fmtRub(total.ending)}</b>${pct}</button>`;
+            }).join('') + expiryOverallHtml(res);
             box.querySelectorAll('[data-expiry-tariff]').forEach((btn) => btn.addEventListener('click', () => {
                 const key = btn.dataset.expiryTariff;
                 if (expiryState.hidden.has(key)) expiryState.hidden.delete(key); else expiryState.hidden.add(key);
@@ -395,6 +398,18 @@
         // Плитки считаются на клиенте по видимым тарифам — они обязаны
         // совпадать с графиком и таблицей, иначе скрытые пробные (их в разы
         // больше платных) делают итоги нечитаемыми.
+        // Итог по всем тарифам сразу, независимо от чипов: платные и с пробным.
+        function expiryOverallHtml(res) {
+            const sum = (keys, name) => keys.reduce((acc, key) => acc + ((res.totals.by_tariff[key] || {})[name] || 0), 0);
+            const all = res.tariffs.map((t) => t.key);
+            const paid = all.filter((key) => key !== 'trial');
+            const paidClosed = sum(paid, 'ending_closed'), paidRenewed = sum(paid, 'renewed_closed');
+            const allClosed = sum(all, 'ending_closed'), allRenewed = sum(all, 'renewed_closed');
+            if (!allClosed) return '';
+            const withTrial = allClosed !== paidClosed ? ` · с пробным: <b>${expiryPct(allRenewed, allClosed)}</b> (${fmtRub(allRenewed)} из ${fmtRub(allClosed)})` : '';
+            return `<span class="acq-expiry-overall">Все платные тарифы: <b>${expiryPct(paidRenewed, paidClosed)}</b> продлились (${fmtRub(paidRenewed)} из ${fmtRub(paidClosed)} с закрытым окном ${res.window_days} дн.)${withTrial}</span>`;
+        }
+
         function expiryVisibleTotals(res) {
             const visible = res.tariffs.filter((t) => !expiryState.hidden.has(t.key)).map((t) => t.key);
             const t = {ending: 0, endingPast: 0, endingFuture: 0, renewed: 0, pending: 0, autopayFuture: 0, endingClosed: 0, renewedClosed: 0, subscriptions: 0};
@@ -419,7 +434,7 @@
             const openRenewed = t.renewed - t.renewedClosed;
             box.innerHTML = [
                 card('Окончаний за период', fmtRub(t.ending), `у ${fmtRub(t.subscriptions)} подписок · ${fmtRub(t.endingFuture)} впереди · ${fmtRub(t.endingPast)} уже прошли`),
-                card('Продлились', t.endingClosed ? `${fmtRub(t.renewedClosed)}<span class="acq-expiry-card-pct">${expiryPct(t.renewedClosed, t.endingClosed)}</span>` : '—', t.endingClosed ? `из ${fmtRub(t.endingClosed)} с закрытым окном ${res.window_days} дн.${openRenewed ? ` · ещё ${fmtRub(openRenewed)} в открытом окне` : ''}` : `нет дней с закрытым окном ${res.window_days} дн. — расширьте период влево`),
+                card('Продлились по выбранным тарифам', t.endingClosed ? `${fmtRub(t.renewedClosed)}<span class="acq-expiry-card-pct">${expiryPct(t.renewedClosed, t.endingClosed)}</span>` : '—', t.endingClosed ? `из ${fmtRub(t.endingClosed)} с закрытым окном ${res.window_days} дн.${openRenewed ? ` · ещё ${fmtRub(openRenewed)} в открытом окне` : ''}` : `нет дней с закрытым окном ${res.window_days} дн. — расширьте период влево`),
                 card('Ещё могут продлиться', fmtRub(t.pending), 'закончились недавно, окно ещё открыто'),
                 card('С автоплатежом впереди', fmtRub(t.autopayFuture), `${expiryPct(t.autopayFuture, t.endingFuture)} будущих окончаний`),
             ].join('');
