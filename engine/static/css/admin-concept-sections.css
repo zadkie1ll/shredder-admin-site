@@ -373,7 +373,12 @@ html[data-admin-theme="light"] #panel-system [data-winback-status].is-error { co
 #panel-acquisition .acq-expiry-window select { min-height: 40px; width: auto; padding: 6px 30px 6px 10px; border-radius: 7px; font-size: 13px; }
 #panel-acquisition #acq-expiry-apply { min-height: 40px; padding: 9px 14px; margin: 0; border-radius: 7px; font-size: 13px; font-weight: 650; color: #141414; background: var(--admin-accent); border: 1px solid var(--admin-accent); }
 #panel-acquisition .acq-expiry-body { display: grid; gap: 26px; transition: opacity .15s; }
-#panel-acquisition .acq-expiry-body.is-loading { opacity: .5; }
+#panel-acquisition .acq-expiry-body.is-loading > :not(.acq-expiry-loading) { opacity: .45; }
+#panel-acquisition .acq-expiry-loading { display: flex; align-items: center; gap: 12px; padding: 14px 16px; border: 1px solid var(--admin-border); border-radius: 10px; background: var(--admin-surface-soft); font-size: 13px; color: var(--admin-text); }
+#panel-acquisition .acq-expiry-loading[hidden] { display: none; }
+#panel-acquisition .acq-expiry-spinner { flex: 0 0 auto; width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--admin-border); border-top-color: var(--admin-accent); animation: acq-expiry-spin .8s linear infinite; }
+@keyframes acq-expiry-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { #panel-acquisition .acq-expiry-spinner { animation: none; border-top-color: var(--admin-accent); border-right-color: var(--admin-accent); } }
 #panel-acquisition .acq-expiry-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 20px; padding: 0 0 22px; border-bottom: 1px solid var(--admin-border); }
 #panel-acquisition .acq-expiry-cards > div { display: grid; gap: 4px; min-width: 0; }
 #panel-acquisition .acq-expiry-cards > div > div:first-child { font-size: 12px; font-weight: 550; color: var(--admin-text-soft); }

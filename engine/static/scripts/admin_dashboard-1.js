@@ -465,9 +465,19 @@
             if (!startEl.value || !endEl.value) setExpiryPreset('around30');
             const body = document.getElementById('acq-expiry-body');
             body?.classList.add('is-loading');
+            // Явный индикатор: первая сборка на большой базе идёт десятки
+            // секунд, и без крутилки пустой блок читается как «сломалось».
+            const loading = document.getElementById('acq-expiry-loading');
+            const loadingText = document.getElementById('acq-expiry-loading-text');
+            if (loading) {
+                loading.hidden = false;
+                if (loadingText) loadingText.textContent = expiryState.res
+                    ? 'Пересчитываем по новому периоду…'
+                    : 'Собираем периоды по всем оплатам — первый раз это может занять до минуты, дальше быстро.';
+            }
             if (!expiryState.res) {
                 const table = document.getElementById('acq-expiry-table');
-                if (table) table.innerHTML = '<p class="acq-ads-summary-note">Собираем периоды по всем оплатам — первый раз это может занять до минуты, дальше быстро.</p>';
+                if (table) table.innerHTML = '';
             }
             try {
                 // Первая сборка на большой базе может занять десятки секунд
@@ -494,6 +504,8 @@
                 throw error;
             } finally {
                 body?.classList.remove('is-loading');
+                const loadingEl = document.getElementById('acq-expiry-loading');
+                if (loadingEl) loadingEl.hidden = true;
             }
         }
 

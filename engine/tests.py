@@ -1249,6 +1249,8 @@ class AcquisitionExpiryTests(SimpleTestCase):
             "shade: {from: 0, to: pastEnd}",
             "hideLegend: true",
             "hidden: new Set(['trial'])",
+            'id="acq-expiry-loading"',
+            "loading.hidden = false;",
             "row.window_closed ? expiryPct(renewed, ending)",
             "expiry: {",
             "Окончания и продления по тарифам",
