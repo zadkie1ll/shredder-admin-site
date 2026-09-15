@@ -1079,13 +1079,13 @@ class AcquisitionExpiryTests(SimpleTestCase):
         ]
         expires = {1: datetime(2026, 11, 10)}  # реальный срок с бонусом
         periods = self._periods(payments, expires)
-        ends = [(p[1], p[2], p[3]) for p in periods]
+        ends = [(p[1], p[2], p[3], p[5]) for p in periods]
         self.assertEqual(
             ends,
             [
-                (datetime(2026, 7, 1), "month", datetime(2026, 6, 28)),
-                (datetime(2026, 7, 31), "month", datetime(2026, 8, 5)),
-                (datetime(2026, 11, 10), "threemonths", None),
+                (datetime(2026, 7, 1), "month", datetime(2026, 6, 28), "month"),
+                (datetime(2026, 7, 31), "month", datetime(2026, 8, 5), "threemonths"),
+                (datetime(2026, 11, 10), "threemonths", None, None),
             ],
         )
 
@@ -1101,11 +1101,11 @@ class AcquisitionExpiryTests(SimpleTestCase):
         periods = self._periods(payments, expires, trial_starts)
         trial = [p for p in periods if p[2] == "trial"]
         self.assertEqual(
-            sorted((p[0], p[1], p[3]) for p in trial),
-            [(1, datetime(2026, 9, 8), datetime(2026, 9, 5)), (2, datetime(2026, 9, 20), None)],
+            sorted((p[0], p[1], p[3], p[5]) for p in trial),
+            [(1, datetime(2026, 9, 8), datetime(2026, 9, 5), "month"), (2, datetime(2026, 9, 20), None, None)],
         )
         # Оплата в пробный период стакуется от конца пробного: 08.09 + 30.
-        self.assertIn((1, datetime(2026, 10, 5), "month", None, False), periods)
+        self.assertIn((1, datetime(2026, 10, 5), "month", None, False, None), periods)
 
     def test_unknown_tariff_falls_back_to_other(self):
         periods = self._periods([(1, datetime(2026, 9, 1), "")])
@@ -1116,19 +1116,23 @@ class AcquisitionExpiryTests(SimpleTestCase):
         from engine.views import _expiry_aggregate
 
         periods = [
-            (1, datetime(2026, 9, 1, 10), "month", datetime(2026, 8, 30), False),  # досрочное продление
-            (2, datetime(2026, 9, 1, 11), "month", datetime(2026, 9, 20), False),  # позже, но в окне 30
-            (3, datetime(2026, 9, 1, 12), "month", None, False),  # окно 30 ещё открыто (сегодня 15.09)
-            (4, datetime(2026, 8, 1, 12), "month", None, False),  # окно закрыто — отвал
-            (5, datetime(2026, 8, 1, 12), "month", datetime(2026, 9, 10), False),  # позже окна — возврат, не продление
-            (6, datetime(2026, 9, 20, 12), "year", None, True),  # будущее с автоплатежом
-            (7, datetime(2026, 9, 20, 12), "trial", None, True),  # пробный: автоплатёж не считается
-            (8, datetime(2026, 12, 1), "month", None, False),  # вне диапазона
+            (1, datetime(2026, 9, 1, 10), "month", datetime(2026, 8, 30), False, "month"),  # досрочное продление
+            (2, datetime(2026, 9, 1, 11), "month", datetime(2026, 9, 20), False, "year"),  # позже, но в окне 30
+            (3, datetime(2026, 9, 1, 12), "month", None, False, None),  # окно 30 ещё открыто (сегодня 15.09)
+            (4, datetime(2026, 8, 1, 12), "month", None, False, None),  # окно закрыто — отвал
+            (5, datetime(2026, 8, 1, 12), "month", datetime(2026, 9, 10), False, "month"),  # позже окна — возврат, не продление
+            (6, datetime(2026, 9, 20, 12), "year", None, True, None),  # будущее с автоплатежом
+            (7, datetime(2026, 9, 20, 12), "trial", None, True, None),  # пробный: автоплатёж не считается
+            (8, datetime(2026, 12, 1), "month", None, False, None),  # вне диапазона
+            (9, datetime(2026, 8, 2, 12), "trial", datetime(2026, 8, 3), False, "month"),  # пробный -> месяц, окно закрыто
         ]
         tariffs, rows, totals = _expiry_aggregate(
             periods, date(2026, 8, 1), date(2026, 9, 30), "day", 30, self.NOW, self.TODAY
         )
         self.assertEqual(tariffs, ["trial", "month", "year"])
+        # Переходы — только по закрытому окну: 01.09 ещё открыт, туда не попадает.
+        self.assertEqual(totals["transitions"], {"trial": {"month": 1}})
+        self.assertEqual(totals["churned"], {"month": 2})
         by_key = {r["key"]: r for r in rows}
         self.assertEqual(len(rows), 61)
         sep1 = by_key["2026-09-01"]
@@ -1148,25 +1152,25 @@ class AcquisitionExpiryTests(SimpleTestCase):
         # Окно 30 дн.: у 01.08 закрыто (01.08+30 < 15.09), у 01.09 — нет.
         self.assertTrue(aug1["window_closed"])
         self.assertFalse(sep1["window_closed"])
-        self.assertEqual(totals["ending_closed"], 2)
-        self.assertEqual(totals["renewed_closed"], 0)
-        self.assertEqual(totals["ending"], 7)
-        self.assertEqual(totals["ending_past"], 5)
+        self.assertEqual(totals["ending_closed"], 3)
+        self.assertEqual(totals["renewed_closed"], 1)
+        self.assertEqual(totals["ending"], 8)
+        self.assertEqual(totals["ending_past"], 6)
         self.assertEqual(totals["ending_future"], 2)
-        self.assertEqual(totals["renewed"], 2)
+        self.assertEqual(totals["renewed"], 3)
         self.assertEqual(totals["pending"], 1)
         self.assertEqual(totals["autopay_future"], 1)
         self.assertEqual(
             totals["by_tariff"]["month"],
             {"ending": 5, "renewed": 2, "pending": 1, "autopay": 0, "subscriptions": 5},
         )
-        # 7 периодов в диапазоне у 7 разных пользователей.
-        self.assertEqual(totals["subscriptions"], 7)
+        # 8 периодов в диапазоне у 8 разных пользователей.
+        self.assertEqual(totals["subscriptions"], 8)
 
     def test_window_changes_verdict(self):
         from engine.views import _expiry_aggregate
 
-        periods = [(2, datetime(2026, 9, 1, 11), "month", datetime(2026, 9, 20), False)]
+        periods = [(2, datetime(2026, 9, 1, 11), "month", datetime(2026, 9, 20), False, "month")]
         _, rows, _ = _expiry_aggregate(periods, date(2026, 9, 1), date(2026, 9, 1), "day", 7, self.NOW, self.TODAY)
         self.assertEqual(rows[0]["renewed"], {})
         self.assertEqual(rows[0]["pending"], {})
@@ -1175,7 +1179,7 @@ class AcquisitionExpiryTests(SimpleTestCase):
         from engine.views import _expiry_aggregate
 
         # 31.08 22:30 UTC = 01.09 01:30 МСК; неделя 31.08–06.09 (понедельник 31.08).
-        periods = [(1, datetime(2026, 8, 31, 22, 30), "month", None, False)]
+        periods = [(1, datetime(2026, 8, 31, 22, 30), "month", None, False, None)]
         _, rows, _ = _expiry_aggregate(periods, date(2026, 9, 1), date(2026, 9, 1), "day", 30, self.NOW, self.TODAY)
         self.assertEqual(rows[0]["ending"], {"month": 1})
         _, rows, _ = _expiry_aggregate(periods, date(2026, 9, 2), date(2026, 9, 16), "week", 30, self.NOW, self.TODAY)
@@ -1250,6 +1254,9 @@ class AcquisitionExpiryTests(SimpleTestCase):
             "hideLegend: true",
             "hidden: new Set(['trial'])",
             'id="acq-expiry-loading"',
+            'id="acq-expiry-transitions"',
+            "function renderExpiryTransitions(res)",
+            "res.totals.transitions",
             "loading.hidden = false;",
             "row.window_closed ? expiryPct(renewed, ending)",
             "expiry: {",

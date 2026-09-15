@@ -357,6 +357,7 @@
                 btn.setAttribute('aria-pressed', String(!expiryState.hidden.has(key)));
                 renderExpiryCards(expiryState.res);
                 renderExpiryChart(expiryState.res);
+                renderExpiryTransitions(expiryState.res);
                 renderExpiryTable(expiryState.res);
             }));
         }
@@ -458,6 +459,41 @@
                 : '<p class="acq-ads-summary-note">Нет данных за выбранный период.</p>';
         }
 
+        // Матрица переходов: строки — тариф закончившегося периода (только
+        // видимые чипами), колонки — тариф следующей оплаты (все, куда
+        // кто-то ушёл) + «не продлились». Диагональ выделена: остались на своём.
+        function renderExpiryTransitions(res) {
+            const box = document.getElementById('acq-expiry-transitions');
+            if (!box || !res) return;
+            const transitions = res.totals.transitions || {};
+            const churned = res.totals.churned || {};
+            const labelOf = Object.fromEntries(res.tariffs.map((t) => [t.key, t.label]));
+            const order = res.tariffs.map((t) => t.key);
+            const fromKeys = order.filter((k) => !expiryState.hidden.has(k) && ((transitions[k] && Object.keys(transitions[k]).length) || churned[k]));
+            const toSet = new Set();
+            fromKeys.forEach((k) => Object.keys(transitions[k] || {}).forEach((to) => toSet.add(to)));
+            const toKeys = [...order.filter((k) => toSet.has(k)), ...[...toSet].filter((k) => !order.includes(k))];
+            if (!fromKeys.length) {
+                box.innerHTML = '<p class="acq-ads-summary-note">Пока нет дней с закрытым окном продления по выбранным тарифам — расширьте период влево.</p>';
+                return;
+            }
+            const dot = (key) => `<span class="acq-expiry-chip-dot" style="background:${chartTone(expiryTone(key))}"></span>`;
+            const head = `<tr><th scope="col">Закончился</th>${toKeys.map((k) => `<th scope="col">${dot(k)}→ ${escapeHtml(labelOf[k] || k)}</th>`).join('')}<th scope="col">Не продлились</th><th scope="col">Всего</th></tr>`;
+            const body = fromKeys.map((from) => {
+                const row = transitions[from] || {};
+                const renewed = Object.values(row).reduce((a, b) => a + b, 0);
+                const lost = churned[from] || 0;
+                const total = renewed + lost;
+                const cells = toKeys.map((to) => {
+                    const n = row[to] || 0;
+                    if (!n) return '<td class="is-empty">—</td>';
+                    return `<td class="${to === from ? 'is-same' : 'is-move'}"><span class="acq-expiry-cell-end">${fmtRub(n)}</span><small>${expiryPct(n, total)}</small></td>`;
+                }).join('');
+                return `<tr><th scope="row">${dot(from)}${escapeHtml(labelOf[from] || from)}</th>${cells}<td class="is-lost"><span class="acq-expiry-cell-end">${fmtRub(lost)}</span><small>${expiryPct(lost, total)}</small></td><td><span class="acq-expiry-cell-end">${fmtRub(total)}</span><small>${expiryPct(renewed, total)} продлились</small></td></tr>`;
+            }).join('');
+            box.innerHTML = `<table class="acq-expiry-table acq-expiry-matrix"><thead>${head}</thead><tbody>${body}</tbody></table>`;
+        }
+
         async function loadExpiry() {
             const startEl = document.getElementById('acq-expiry-start');
             const endEl = document.getElementById('acq-expiry-end');
@@ -494,6 +530,7 @@
                 renderExpiryCards(res);
                 renderExpiryChips(res);
                 renderExpiryChart(res);
+                renderExpiryTransitions(res);
                 renderExpiryTable(res);
             } catch (error) {
                 // Запрос вытеснен более новым (сменили шаг/период) — не ошибка,

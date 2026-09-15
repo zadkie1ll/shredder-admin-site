@@ -421,6 +421,12 @@ html[data-admin-theme="light"] #panel-system [data-winback-status].is-error { co
 #panel-acquisition .acq-expiry-cell-arrow { margin: 0 5px; color: var(--admin-text-muted); }
 #panel-acquisition .acq-expiry-cell-ren { color: var(--workspace-success, #75d9ab); font-weight: 600; }
 #panel-acquisition .acq-expiry-table tr.is-past th[scope="row"] { color: var(--admin-text-muted); }
+#panel-acquisition .acq-expiry-matrix th[scope="row"] .acq-expiry-chip-dot { margin-right: 7px; vertical-align: 0; }
+#panel-acquisition .acq-expiry-matrix td.is-same { background: rgba(255, 204, 36, .08); }
+#panel-acquisition .acq-expiry-matrix td.is-same .acq-expiry-cell-end { color: var(--admin-accent); }
+#panel-acquisition .acq-expiry-matrix td.is-move .acq-expiry-cell-end { color: var(--workspace-success, #75d9ab); }
+#panel-acquisition .acq-expiry-matrix td.is-lost .acq-expiry-cell-end { color: var(--workspace-danger, #f298a2); }
+#panel-acquisition .acq-expiry-matrix { max-height: none; }
 #panel-acquisition .acq-expiry-table tr.is-today th, #panel-acquisition .acq-expiry-table tr.is-today td { background: rgba(255, 204, 36, .07); }
 #panel-acquisition .acq-expiry-table tfoot th, #panel-acquisition .acq-expiry-table tfoot td { position: sticky; bottom: 0; z-index: 2; background: var(--admin-surface); border-top: 1px solid var(--admin-border); border-bottom: 0; font-weight: 600; }
 #panel-acquisition .acq-expiry-table tfoot th { z-index: 3; }

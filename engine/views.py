@@ -12846,6 +12846,10 @@ EXPIRY_MAX_RANGE_DAYS = 366
 EXPIRY_DEFAULT_TRIAL_DAYS = 7
 
 
+def _expiry_tariff_key(tariff):
+    return tariff if tariff in EXPIRY_TARIFF_DAYS else EXPIRY_OTHER_KEY
+
+
 def _expiry_tariff_label(key):
     return EXPIRY_TARIFF_LABELS.get(key) or get_tariff_display_name(key)
 
@@ -12939,10 +12943,13 @@ def _expiry_load_trial_days(db_session):
 
 
 def _expiry_periods(payments, expires, trial_starts, trial_days, autopay_users):
-    """Периоды подписок: (user_id, end_utc, tariff, next_paid_at, autopay).
+    """Периоды подписок:
+    (user_id, end_utc, tariff, next_paid_at, autopay, next_tariff).
 
     next_paid_at — момент следующей оплаты после начала периода (None — её
     нет); по нему считается продление относительно конца периода.
+    next_tariff — тариф этой следующей оплаты: по нему строится матрица
+    переходов «с какого тарифа на какой пересаживаются».
     """
     periods = []
     by_user = {}
@@ -12955,9 +12962,18 @@ def _expiry_periods(payments, expires, trial_starts, trial_days, autopay_users):
         started = trial_starts.get(user_id)
         if started is not None:
             end_prev = started + trial_delta
-            periods.append((user_id, end_prev, EXPIRY_TRIAL_KEY, pays[0][0], autopay))
+            periods.append(
+                (
+                    user_id,
+                    end_prev,
+                    EXPIRY_TRIAL_KEY,
+                    pays[0][0],
+                    autopay,
+                    _expiry_tariff_key(pays[0][1]),
+                )
+            )
         for index, (paid_at, tariff) in enumerate(pays):
-            key = tariff if tariff in EXPIRY_TARIFF_DAYS else EXPIRY_OTHER_KEY
+            key = _expiry_tariff_key(tariff)
             days = EXPIRY_TARIFF_DAYS.get(key, EXPIRY_OTHER_DAYS)
             base = paid_at if end_prev is None or end_prev < paid_at else end_prev
             end = base + timedelta(days=days)
@@ -12967,12 +12983,13 @@ def _expiry_periods(payments, expires, trial_starts, trial_days, autopay_users):
                 if actual is not None and actual >= paid_at:
                     end = actual
             next_paid = pays[index + 1][0] if not is_last else None
-            periods.append((user_id, end, key, next_paid, autopay))
+            next_key = _expiry_tariff_key(pays[index + 1][1]) if not is_last else None
+            periods.append((user_id, end, key, next_paid, autopay, next_key))
             end_prev = end
     for user_id, expire_at in expires.items():
         if user_id in by_user:
             continue
-        periods.append((user_id, expire_at, EXPIRY_TRIAL_KEY, None, False))
+        periods.append((user_id, expire_at, EXPIRY_TRIAL_KEY, None, False, None))
     return periods
 
 
@@ -13005,11 +13022,22 @@ def _expiry_aggregate(periods, start, end, group, window_days, now, today):
     # по периоду на каждую оплату, и «окончаний» в разы больше, чем подписок.
     users_by_tariff = {}
     users_all = set()
+    # Матрица переходов по продлениям диапазона: с какого тарифа на какой
+    # (диагональ — остались на своём). Только по бакетам с закрытым окном —
+    # иначе «не продлились» ещё не окончательные.
+    transitions = {}
+    churned = {}
 
-    def bump(counter, tariff):
-        counter[tariff] = counter.get(tariff, 0) + 1
+    def bump(counter, tariff, step=1):
+        counter[tariff] = counter.get(tariff, 0) + step
 
-    for user_id, period_end, tariff, next_paid, autopay in periods:
+    closed_positions = set()
+    for position, key in enumerate(keys):
+        last_day = key if group == "day" else key + timedelta(days=6)
+        if last_day + timedelta(days=window_days) < today:
+            closed_positions.add(position)
+
+    for user_id, period_end, tariff, next_paid, autopay, next_tariff in periods:
         key = _expiry_bucket_key(period_end, group)
         position = index.get(key)
         if position is None:
@@ -13023,10 +13051,15 @@ def _expiry_aggregate(periods, start, end, group, window_days, now, today):
             if autopay and tariff != EXPIRY_TRIAL_KEY:
                 bump(bucket["autopay"], tariff)
             continue
-        if next_paid is not None and next_paid <= period_end + window:
+        renewed = next_paid is not None and next_paid <= period_end + window
+        if renewed:
             bump(bucket["renewed"], tariff)
+            if position in closed_positions:
+                bump(transitions.setdefault(tariff, {}), next_tariff or EXPIRY_OTHER_KEY)
         elif next_paid is None and now < period_end + window:
             bump(bucket["pending"], tariff)
+        elif position in closed_positions:
+            bump(churned, tariff)
 
     tariffs = [key for key in EXPIRY_TARIFF_ORDER if key in seen]
     rows = []
@@ -13042,6 +13075,9 @@ def _expiry_aggregate(periods, start, end, group, window_days, now, today):
         "renewed_closed": 0,
         "subscriptions": len(users_all),
         "by_tariff": {},
+        # {from: {to: n}} и {from: не продлившиеся} — по закрытому окну.
+        "transitions": transitions,
+        "churned": churned,
     }
     for key, bucket in zip(keys, buckets):
         last_day = key if group == "day" else key + timedelta(days=6)
