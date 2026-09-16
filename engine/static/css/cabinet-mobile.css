@@ -88,6 +88,12 @@
 .cm-setup h2 { margin: 0 0 8px; font-size: 20px; font-weight: 700; letter-spacing: -.02em; }
 .cm-setup p { margin: 0 0 16px; font-size: 15px; line-height: 1.5; color: var(--cm-muted); }
 
+/* Рекомендация привязать почту */
+.cm-warn { border: 1px solid rgba(255, 199, 0, .35); background: rgba(255, 199, 0, .08); }
+.cm-warn strong { display: block; margin-bottom: 6px; font-size: 17px; font-weight: 700; }
+.cm-warn p { margin: 0 0 14px; font-size: 14px; line-height: 1.5; color: var(--cm-muted); }
+.cm-row-warn { margin-bottom: 14px; border-radius: var(--cm-radius); background: rgba(255, 199, 0, .08); border-bottom: 0; }
+.cm-row-warn > i { color: var(--cm-accent); }
 /* Оплата: тумблер */
 .cm-toggle-row { cursor: pointer; }
 /* Тумблер — span внутри .cm-row, перебиваем `.cm-row > span` (flex: 1, колонка). */
@@ -168,8 +174,9 @@
 .cm-step > div { flex: 1; min-width: 0; }
 .cm-step p { margin: 3px 0 0; font-size: 16px; line-height: 1.5; }
 .cm-step .cm-note a { color: var(--cm-accent); }
-.cm-qr { display: flex; justify-content: center; margin: 16px 0 20px; }
-.cm-qr img, .cm-qr canvas { border-radius: 12px; background: #fff; padding: 10px; }
+.cm-qr { display: flex; justify-content: center; margin: 12px 0 20px; }
+.cm-qr img { width: min(100%, 300px); height: auto; border-radius: 22px; }
+.cm-ref-actions { display: flex; justify-content: center; gap: 22px; margin: 0 0 18px; }
 
 /* Устройства */
 .cm-device { display: block; border-bottom: 1px solid var(--cm-line); }

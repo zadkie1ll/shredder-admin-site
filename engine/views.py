@@ -6,6 +6,7 @@ import hmac
 import hashlib
 import logging
 import threading
+from io import BytesIO
 from time import monotonic as _monotonic
 import math
 import base64
@@ -129,6 +130,7 @@ from common.models.db import AdminDirectMessageDelivery
 from common.models.db import RwmsSyncMismatch
 from common.models.db import UserBlock
 from common.models.db import PromoCodeUse
+from common.models.db import OAuthIdentity
 from common.models.db import UserDiscount
 from common.models.db import PromoBatch
 from common.models.db import PromoCode
@@ -240,6 +242,7 @@ from common.models.settings import parse_ipguard_excluded_ips
 from common.models.settings import parse_ipguard_excluded_usernames
 from common.runtime_tariffs import resolve_runtime_tariffs
 from engine.request_ip import client_ip
+from engine.branded_qr import make_branded_qr
 from engine.rate_limit import rate_limit_exceeded
 from engine.rate_limit import rate_limit_hit
 from engine.rate_limit import rate_limit_log_digest
@@ -2777,6 +2780,192 @@ def get_google_oauth_redirect_uri(request):
     return f"{get_current_base_url(request)}/login/google/callback/"
 
 
+# --- Привязка внешних аккаунтов (Google / Яндекс) к кабинету ---
+#
+# Вход через OAuth по-прежнему сопоставляет пользователя по email. Таблица
+# oauth_identities хранит (провайдер, subject) → user_id: по ней «Способы
+# входа» показывают «Привязано» по каждому провайдеру, а сценарий
+# «Привязать» из кабинета (login/google/?link=1) прикрепляет аккаунт к
+# текущему пользователю. Все обращения к таблице мягкие: до применения
+# миграции кабинет и вход работают как раньше.
+OAUTH_LINK_SESSION_KEY = "oauth_link_intent"
+OAUTH_LINK_PROVIDERS = ("google", "yandex")
+OAUTH_PROVIDER_TITLES = {"google": "Google", "yandex": "Яндекс"}
+
+
+def remember_oauth_link_intent(request, provider):
+    if request.GET.get("link") == "1" and request.user.is_authenticated:
+        request.session[OAUTH_LINK_SESSION_KEY] = {
+            "provider": provider,
+            "user_id": request.user.id,
+        }
+    else:
+        request.session.pop(OAUTH_LINK_SESSION_KEY, None)
+
+
+def pop_oauth_link_intent(request, provider):
+    """user_id, для которого начата привязка этого провайдера, иначе None.
+    Требует ту же авторизованную сессию, что начала привязку."""
+    intent = request.session.pop(OAUTH_LINK_SESSION_KEY, None)
+    request.session.modified = True
+    if not isinstance(intent, dict) or intent.get("provider") != provider:
+        return None
+    user_id = intent.get("user_id")
+    if not request.user.is_authenticated or request.user.id != user_id:
+        logging.warning(
+            "oauth link intent ignored: session user mismatch provider=%s", provider
+        )
+        return None
+    return user_id
+
+
+def record_oauth_identity(db_session, user, provider, subject, email):
+    """Запоминает привязку после успешного входа через провайдера.
+
+    Внутри savepoint: отсутствие таблицы (миграция ещё не применена) или
+    гонка по уникальному ключу не должны ломать вход.
+    """
+    if not subject:
+        return
+    try:
+        with db_session.begin_nested():
+            identity = (
+                db_session.query(OAuthIdentity)
+                .filter(
+                    OAuthIdentity.provider == provider,
+                    OAuthIdentity.subject == subject,
+                )
+                .first()
+            )
+            if identity is None:
+                db_session.add(
+                    OAuthIdentity(
+                        user_id=user.id, provider=provider, subject=subject, email=email
+                    )
+                )
+            elif identity.user_id == user.id:
+                identity.email = email
+            else:
+                logging.warning(
+                    "oauth identity %s/%s already belongs to user %s, login as %s by email",
+                    provider,
+                    subject[:8],
+                    identity.user_id,
+                    user.id,
+                )
+    except Exception:
+        logging.exception("failed to record oauth identity provider=%s", provider)
+
+
+def load_oauth_identities(db_session, user_id):
+    """{provider: email} привязанных внешних аккаунтов; {} при любой ошибке."""
+    try:
+        with db_session.begin_nested():
+            rows = (
+                db_session.query(OAuthIdentity)
+                .filter(OAuthIdentity.user_id == user_id)
+                .all()
+            )
+            return {row.provider: row.email or "" for row in rows}
+    except Exception:
+        logging.exception("failed to load oauth identities user_id=%s", user_id)
+        return {}
+
+
+def cabinet_flash(request, kind, text):
+    request.session["cabinet_flash"] = {"kind": kind, "text": text}
+    request.session.modified = True
+
+
+def finish_oauth_link(request, provider, user_id, subject, email):
+    """Привязка провайдера к текущему пользователю кабинета.
+
+    Правила: subject уже привязан к другому кабинету — отказ; у кабинета
+    нет почты — берём подтверждённую провайдером (если она не занята
+    другим кабинетом); почта есть и другая — привязываем провайдер, почту
+    не меняем (смена почты — только через подтверждение письмом).
+    """
+    title = OAUTH_PROVIDER_TITLES.get(provider, provider)
+    redirect_to = f"{reverse('dashboard')}#cm-login"
+    if not subject:
+        cabinet_flash(request, "error", f"{title} не вернул идентификатор аккаунта.")
+        return redirect(redirect_to)
+    db_session = session_factory()
+    try:
+        with db_session.begin():
+            db_user = (
+                db_session.query(User).filter(User.id == user_id).with_for_update().first()
+            )
+            if db_user is None:
+                cabinet_flash(request, "error", "Аккаунт не найден. Войдите заново.")
+                return redirect(redirect_to)
+            identity = (
+                db_session.query(OAuthIdentity)
+                .filter(
+                    OAuthIdentity.provider == provider,
+                    OAuthIdentity.subject == subject,
+                )
+                .first()
+            )
+            if identity is not None and identity.user_id != db_user.id:
+                logging.warning(
+                    "oauth link refused: %s/%s belongs to user %s, requested by %s",
+                    provider,
+                    subject[:8],
+                    identity.user_id,
+                    db_user.id,
+                )
+                cabinet_flash(
+                    request,
+                    "error",
+                    f"Этот аккаунт {title} уже привязан к другому кабинету.",
+                )
+                return redirect(redirect_to)
+            email_note = ""
+            if not db_user.email and email:
+                taken = (
+                    db_session.query(User.id)
+                    .filter(User.email == email, User.id != db_user.id)
+                    .first()
+                )
+                if taken is not None:
+                    cabinet_flash(
+                        request,
+                        "error",
+                        f"Почта {email} уже используется другим кабинетом — "
+                        f"привязать {title} нельзя.",
+                    )
+                    return redirect(redirect_to)
+                # Почта подтверждена провайдером — письмо не требуется.
+                db_user.email = email
+                email_note = f" Почта {email} привязана к кабинету."
+            if identity is None:
+                db_session.add(
+                    OAuthIdentity(
+                        user_id=db_user.id, provider=provider, subject=subject, email=email
+                    )
+                )
+            else:
+                identity.email = email
+        if email_note:
+            request.user.email = email
+        logging.info(
+            "oauth link done: provider=%s user_id=%s email_set=%s",
+            provider,
+            user_id,
+            bool(email_note),
+        )
+        cabinet_flash(request, "ok", f"{title} привязан.{email_note}")
+    except Exception:
+        logging.exception("oauth link failed provider=%s user_id=%s", provider, user_id)
+        cabinet_flash(
+            request, "error", f"Не удалось привязать {title}. Попробуйте позже."
+        )
+    finally:
+        db_session.close()
+    return redirect(redirect_to)
+
+
 def login_with_google(request):
     if not settings.GOOGLE_OAUTH_CLIENT_ID or not settings.GOOGLE_OAUTH_CLIENT_SECRET:
         logging.warning("google oauth login requested but credentials are missing")
@@ -2789,6 +2978,9 @@ def login_with_google(request):
     captured_tracking_params = capture_tracking_params(request)
     state = secrets.token_urlsafe(32)
     request.session["google_oauth_state"] = state
+    # ?link=1 из «Способов входа» кабинета: callback привяжет аккаунт к
+    # текущему пользователю, а не будет искать/создавать по email.
+    remember_oauth_link_intent(request, "google")
     request.session.modified = True
 
     auth_url = (
@@ -2869,6 +3061,11 @@ def auth_by_google_callback(request):
     if not email:
         logging.warning("google oauth userinfo has no email")
         return render_login(request, {"error": "Google не вернул email аккаунта."})
+    subject = str(userinfo.get("sub") or "").strip()
+
+    link_user_id = pop_oauth_link_intent(request, "google")
+    if link_user_id:
+        return finish_oauth_link(request, "google", link_user_id, subject, email)
 
     db_session = session_factory()
     try:
@@ -2896,6 +3093,7 @@ def auth_by_google_callback(request):
                 user,
                 analytics_event.FirstSuccessfulLogin(login_method="google_oauth"),
             )
+            record_oauth_identity(db_session, user, "google", subject, email)
 
         authorize_user_session(request, user)
         return redirect("dashboard")
@@ -2944,6 +3142,9 @@ def login_with_yandex(request):
     captured_tracking_params = capture_tracking_params(request)
     state = secrets.token_urlsafe(32)
     request.session["yandex_oauth_state"] = state
+    # ?link=1 из «Способов входа» кабинета: callback привяжет аккаунт к
+    # текущему пользователю, а не будет искать/создавать по email.
+    remember_oauth_link_intent(request, "yandex")
     request.session.modified = True
 
     auth_url = (
@@ -3026,6 +3227,11 @@ def auth_by_yandex_callback(request):
             request,
             {"error": "Яндекс не вернул email аккаунта. Проверьте права приложения."},
         )
+    subject = str(userinfo.get("id") or "").strip()
+
+    link_user_id = pop_oauth_link_intent(request, "yandex")
+    if link_user_id:
+        return finish_oauth_link(request, "yandex", link_user_id, subject, email)
 
     db_session = session_factory()
     try:
@@ -3053,6 +3259,7 @@ def auth_by_yandex_callback(request):
                 user,
                 analytics_event.FirstSuccessfulLogin(login_method="yandex_oauth"),
             )
+            record_oauth_identity(db_session, user, "yandex", subject, email)
 
         authorize_user_session(request, user)
         return redirect("dashboard")
@@ -4133,6 +4340,8 @@ def dashboard(request):
             .filter(YkRecurrentPayment.user_id == user.id)
             .scalar()
         )
+        # «Способы входа» мобильного кабинета: привязанные Google / Яндекс.
+        oauth_identities = load_oauth_identities(session, user.id)
         # Экран «Оплата» мобильного кабинета: что именно привязано к автоплатежу.
         recurrent = (
             session.query(YkRecurrentPayment)
@@ -4454,6 +4663,10 @@ def dashboard(request):
             # Мобильный кабинет (includes/cabinet_mobile.html)
             "recurrent_info": recurrent_info,
             "cabinet_discount": cabinet_discount,
+            "oauth_identities": oauth_identities,
+            "cabinet_flash": request.session.pop("cabinet_flash", None),
+            "google_oauth_enabled": bool(settings.GOOGLE_OAUTH_CLIENT_ID and settings.GOOGLE_OAUTH_CLIENT_SECRET),
+            "yandex_oauth_enabled": bool(settings.YANDEX_OAUTH_CLIENT_ID and settings.YANDEX_OAUTH_CLIENT_SECRET),
             "cabinet_tariffs": cabinet_tariff_cards(runtime_tariffs),
             "referral_bonus_days": referral_bonus_days,
             "telegram_channel_url": settings.TELEGRAM_CHANNEL_URL,
@@ -5379,6 +5592,36 @@ def cabinet_subscription_reissue(request):
     return JsonResponse(
         {"status": "ok", "subscription_url": updated.subscription_url or ""}
     )
+
+
+CABINET_QR_KINDS = ("subscription", "referral")
+
+
+@login_required(login_url="/login/")
+def cabinet_qr(request):
+    """PNG брендового QR (стиль бота, engine/branded_qr.py): kind=subscription —
+    ссылка подписки из панели, kind=referral — реферальная ссылка бота."""
+    kind = request.GET.get("kind") or "subscription"
+    if kind not in CABINET_QR_KINDS:
+        return JsonResponse({"status": "error", "message": "unknown kind"}, status=400)
+    if kind == "referral":
+        data = f"https://t.me/{settings.TG_BOT_USERNAME}?start=a{request.user.username}"
+    else:
+        try:
+            subscription = _cabinet_rw_subscription(request)
+        except RwmsUnavailableError:
+            return _cabinet_rwms_unavailable_response()
+        if subscription is None or not subscription.subscription_url:
+            return JsonResponse(
+                {"status": "error", "message": "subscription not found"}, status=404
+            )
+        data = subscription.subscription_url
+    image = make_branded_qr(data)
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    response = HttpResponse(buffer.getvalue(), content_type="image/png")
+    response["Cache-Control"] = "private, no-store"
+    return response
 
 
 @login_required(login_url="/login/")

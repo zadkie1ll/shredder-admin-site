@@ -22,4 +22,5 @@ python-decouple==3.8
 dj_database_url==3.1.2
 alembic==1.18.4
 Pillow==12.2.0
+qrcode[pil]==8.2
 maxminddb==3.1.1

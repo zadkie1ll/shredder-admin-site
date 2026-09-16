@@ -26,6 +26,7 @@
         devices: null,
         discount: parseInt(root.getAttribute('data-cm-discount') || '0', 10) || 0,
         plainUrl: root.getAttribute('data-cm-plain-url') || '',
+        qrKind: 'subscription',
         happUrl: root.getAttribute('data-cm-happ-url') || '',
     };
     var pages = {};
@@ -129,6 +130,14 @@
         showPage(target);
     });
     if (!(history.state && history.state.cmPage)) history.replaceState({ cmPage: 'home' }, '');
+    // Возврат с привязки Google/Яндекс: /dashboard/#cm-login открывает «Способы входа».
+    if (isMobileMode() && /^#cm-([a-z]+)$/.test(location.hash)) {
+        var deepPage = location.hash.slice(4);
+        if (pages[deepPage]) {
+            history.replaceState({ cmPage: deepPage }, '', location.pathname + location.search);
+            showPage(deepPage);
+        }
+    }
     // Точки интеграции с TG BackButton основного скрипта.
     window.cmBackNeeded = function () { return isMobileMode() && (state.page !== 'home' || !!state.sheet); };
     window.cmHandleBack = function () { return isMobileMode() ? back() : false; };
@@ -182,7 +191,11 @@
         if (goEl) { event.preventDefault(); go(goEl.getAttribute('data-cm-go')); return; }
         if (event.target.closest('[data-cm-back]')) { event.preventDefault(); back(); return; }
         var sheetEl = event.target.closest('[data-cm-sheet]');
-        if (sheetEl) { event.preventDefault(); openSheet(sheetEl.getAttribute('data-cm-sheet')); }
+        if (sheetEl) {
+            event.preventDefault();
+            state.qrKind = sheetEl.getAttribute('data-cm-qr') || 'subscription';
+            openSheet(sheetEl.getAttribute('data-cm-sheet'));
+        }
     });
     sheetLayer.addEventListener('click', function (event) {
         if (event.target.closest('[data-cm-sheet-close]')) { event.preventDefault(); closeSheet(); }
@@ -278,14 +291,23 @@
         var value = installCopy.getAttribute('data-cm-copy-value') || state.plainUrl;
         copyText(value).then(function (ok) { flashCopied(installCopy, ok); });
     });
+    // Брендовый QR рисует сервер (api/cabinet/qr/, стиль бота): подписка или рефералка.
     function renderQr() {
         var box = document.getElementById('cm-qr-box');
         if (!box) return;
-        box.innerHTML = '';
-        if (!state.plainUrl) { box.innerHTML = '<p class="cm-note">Ссылка подписки сейчас недоступна — обновите страницу чуть позже.</p>'; return; }
-        if (typeof QRCode !== 'function') { box.textContent = state.plainUrl; return; }
-        var size = Math.min(240, Math.max(160, window.innerWidth - 120));
-        new QRCode(box, { text: state.plainUrl, width: size, height: size, colorDark: '#101113', colorLight: '#ffffff', correctLevel: QRCode.CorrectLevel.M });
+        var kind = state.qrKind || 'subscription';
+        var title = document.getElementById('cm-qr-title');
+        var text = document.getElementById('cm-qr-text');
+        if (title) title.textContent = kind === 'referral' ? 'QR-код реферальной ссылки' : 'QR-код подписки';
+        if (text) text.textContent = kind === 'referral' ? 'Покажите другу — он отсканирует и попадёт в бота по вашей ссылке.' : 'Отсканируйте камерой или приложением на другом устройстве.';
+        if (kind === 'subscription' && !state.plainUrl) { box.innerHTML = '<p class="cm-note">Ссылка подписки сейчас недоступна — обновите страницу чуть позже.</p>'; return; }
+        var url = (box.getAttribute('data-cm-qr-url') || '/api/cabinet/qr/') + '?kind=' + encodeURIComponent(kind) + '&t=' + Date.now();
+        box.innerHTML = '<div class="cm-empty">Готовим QR…</div>';
+        var img = new Image();
+        img.alt = 'QR-код';
+        img.onload = function () { box.innerHTML = ''; box.appendChild(img); };
+        img.onerror = function () { box.innerHTML = '<p class="cm-note">Не удалось построить QR-код. Попробуйте позже.</p>'; };
+        img.src = url;
     }
     var autoBtn = document.getElementById('cm-install-auto');
     if (autoBtn) {

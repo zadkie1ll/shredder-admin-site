@@ -16827,3 +16827,230 @@ class MobileCabinetTemplateTests(SimpleTestCase):
         self.assertGreater(by_id["year"]["savings"], by_id["threemonths"]["savings"])
         self.assertEqual(by_id["year"]["title"], "12 месяцев")
 
+
+
+class CabinetOAuthLinkTests(SimpleTestCase):
+    """Привязка Google/Яндекс из «Способов входа»: intent в сессии, привязка к
+    текущему пользователю, почта берётся у провайдера только если её нет."""
+
+    class FakeSessionDict(dict):
+        modified = False
+
+    def _request(self, user_id=42, email=None, get=None):
+        request = RequestFactory().get("/login/google/", get or {})
+        request.session = self.FakeSessionDict()
+        request.user = SimpleNamespace(is_authenticated=True, id=user_id, email=email, username="u42")
+        return request
+
+    def test_link_intent_remembered_only_for_authenticated_link_requests(self):
+        from engine import views
+
+        request = self._request(get={"link": "1"})
+        views.remember_oauth_link_intent(request, "google")
+        self.assertEqual(request.session[views.OAUTH_LINK_SESSION_KEY], {"provider": "google", "user_id": 42})
+        self.assertEqual(views.pop_oauth_link_intent(request, "google"), 42)
+        self.assertNotIn(views.OAUTH_LINK_SESSION_KEY, request.session)
+        # Обычный вход сбрасывает intent, чужой провайдер/пользователь — None.
+        request = self._request()
+        request.session[views.OAUTH_LINK_SESSION_KEY] = {"provider": "google", "user_id": 42}
+        views.remember_oauth_link_intent(request, "google")
+        self.assertNotIn(views.OAUTH_LINK_SESSION_KEY, request.session)
+        request.session[views.OAUTH_LINK_SESSION_KEY] = {"provider": "yandex", "user_id": 42}
+        self.assertIsNone(views.pop_oauth_link_intent(request, "google"))
+        request.session[views.OAUTH_LINK_SESSION_KEY] = {"provider": "google", "user_id": 7}
+        self.assertIsNone(views.pop_oauth_link_intent(request, "google"))
+
+    def _session(self, db_user, identity=None, taken=None):
+        recorded = {"added": [], "closed": False}
+
+        class FakeQuery:
+            def __init__(self, model):
+                self.model = model
+
+            def filter(self, *args, **kwargs):
+                return self
+
+            def with_for_update(self):
+                return self
+
+            def first(self):
+                if self.model is _User:
+                    return db_user
+                if self.model is views_module.OAuthIdentity:
+                    return identity
+                return taken  # User.id — занятость почты
+
+            def all(self):
+                return [identity] if identity else []
+
+        class Tx:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *args):
+                return False
+
+        class FakeSession:
+            def query(self, model):
+                return FakeQuery(model)
+
+            def begin(self):
+                return Tx()
+
+            def begin_nested(self):
+                return Tx()
+
+            def add(self, obj):
+                recorded["added"].append(obj)
+
+            def close(self):
+                recorded["closed"] = True
+
+        from engine import views as views_module
+
+        return FakeSession(), recorded
+
+    def test_link_sets_email_when_missing_and_records_identity(self):
+        from engine import views
+
+        db_user = SimpleNamespace(id=42, email=None)
+        session, recorded = self._session(db_user)
+        request = self._request(email=None)
+        with mock.patch("engine.views.session_factory", return_value=session):
+            response = views.finish_oauth_link(request, "google", 42, "sub-1", "me@gmail.com")
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(response["Location"].endswith("/dashboard/#cm-login"))
+        self.assertEqual(db_user.email, "me@gmail.com")
+        self.assertEqual(request.user.email, "me@gmail.com")
+        identities = [obj for obj in recorded["added"] if isinstance(obj, views.OAuthIdentity)]
+        self.assertEqual((identities[0].provider, identities[0].subject, identities[0].user_id), ("google", "sub-1", 42))
+        self.assertEqual(request.session["cabinet_flash"]["kind"], "ok")
+        self.assertIn("me@gmail.com", request.session["cabinet_flash"]["text"])
+
+    def test_link_keeps_existing_email_and_refuses_foreign_identity(self):
+        from engine import views
+
+        db_user = SimpleNamespace(id=42, email="old@mail.ru")
+        session, recorded = self._session(db_user)
+        request = self._request(email="old@mail.ru")
+        with mock.patch("engine.views.session_factory", return_value=session):
+            views.finish_oauth_link(request, "yandex", 42, "ya-1", "other@yandex.ru")
+        self.assertEqual(db_user.email, "old@mail.ru")
+        self.assertEqual(len([o for o in recorded["added"] if isinstance(o, views.OAuthIdentity)]), 1)
+
+        foreign = SimpleNamespace(user_id=7, provider="google", subject="sub-1", email="x@gmail.com")
+        session, recorded = self._session(SimpleNamespace(id=42, email=None), identity=foreign)
+        request = self._request()
+        with mock.patch("engine.views.session_factory", return_value=session):
+            views.finish_oauth_link(request, "google", 42, "sub-1", "x@gmail.com")
+        self.assertEqual(request.session["cabinet_flash"]["kind"], "error")
+        self.assertIn("другому кабинету", request.session["cabinet_flash"]["text"])
+        self.assertEqual(recorded["added"], [])
+
+    def test_link_refuses_email_taken_by_another_user(self):
+        from engine import views
+
+        session, recorded = self._session(SimpleNamespace(id=42, email=None), taken=SimpleNamespace(id=9))
+        request = self._request()
+        with mock.patch("engine.views.session_factory", return_value=session):
+            views.finish_oauth_link(request, "google", 42, "sub-2", "busy@gmail.com")
+        self.assertEqual(request.session["cabinet_flash"]["kind"], "error")
+        self.assertEqual(recorded["added"], [])
+
+    def test_identity_helpers_survive_missing_table(self):
+        from engine import views
+
+        class BrokenSession:
+            def begin_nested(self):
+                raise RuntimeError("relation oauth_identities does not exist")
+
+        self.assertEqual(views.load_oauth_identities(BrokenSession(), 42), {})
+        # Обычный вход тоже не ломается.
+        views.record_oauth_identity(BrokenSession(), SimpleNamespace(id=42), "google", "sub", "a@b.c")
+
+    def test_google_callback_wiring_and_model(self):
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.auth_by_google_callback)
+        self.assertIn('pop_oauth_link_intent(request, "google")', src)
+        self.assertIn('record_oauth_identity(db_session, user, "google", subject, email)', src)
+        src = inspect.getsource(views.auth_by_yandex_callback)
+        self.assertIn('pop_oauth_link_intent(request, "yandex")', src)
+        self.assertIn('record_oauth_identity(db_session, user, "yandex", subject, email)', src)
+        self.assertEqual(views.OAuthIdentity.__tablename__, "oauth_identities")
+        names = {c.name for c in views.OAuthIdentity.__table__.constraints}
+        self.assertIn("uq_oauth_identity_subject", names)
+
+    def test_template_login_methods_screen(self):
+        template = template_source("engine/templates/dashboard.html")
+        for needle in (
+            "{% url 'google_login' %}?link=1",
+            "{% url 'yandex_login' %}?link=1",
+            "{% if oauth_identities.google %}",
+            '<section class="cm-card cm-warn" aria-label="Рекомендация">',
+            "Привяжите почту",
+            'class="cm-row cm-row-warn" data-cm-go="login"',
+            "{% if cabinet_flash %}",
+            "/^#cm-([a-z]+)$/.test(location.hash)",
+        ):
+            self.assertIn(needle, template, needle)
+
+
+class CabinetQrTests(SimpleTestCase):
+    """Брендовый QR (стиль бота) для подписки и реферальной ссылки."""
+
+    def _request(self, kind):
+        request = RequestFactory().get("/api/cabinet/qr/", {"kind": kind})
+        request.user = SimpleNamespace(is_authenticated=True, id=42, username="u42")
+        return request
+
+    def test_referral_qr_is_png(self):
+        from engine import views
+
+        response = views.cabinet_qr(self._request("referral"))
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "image/png")
+        self.assertEqual(response["Cache-Control"], "private, no-store")
+        self.assertTrue(response.content.startswith(b"\x89PNG"))
+
+    def test_subscription_qr_uses_panel_url_and_degrades(self):
+        from engine import views
+        import proto.rwmanager_pb2 as proto
+
+        sub = proto.UserResponse(uuid="rw-1", subscription_url="https://sub.example/abc")
+        with mock.patch.object(views.rwms_client, "get_user_by_username_strict", return_value=sub), \
+                mock.patch("engine.views.make_branded_qr", wraps=views.make_branded_qr) as qr:
+            response = views.cabinet_qr(self._request("subscription"))
+        self.assertEqual(response.status_code, 200)
+        qr.assert_called_once_with("https://sub.example/abc")
+        with mock.patch.object(views.rwms_client, "get_user_by_username_strict", return_value=None):
+            self.assertEqual(views.cabinet_qr(self._request("subscription")).status_code, 404)
+        self.assertEqual(views.cabinet_qr(self._request("bogus")).status_code, 400)
+
+    def test_branded_qr_decodes_and_falls_back(self):
+        from engine.branded_qr import QR_EMBLEM_PATH, make_branded_qr
+
+        self.assertTrue(QR_EMBLEM_PATH.is_file())
+        image = make_branded_qr("https://t.me/monkeyislandvpnbot?start=a1")
+        self.assertGreater(image.size[0], 300)
+        try:
+            import zxingcpp  # noqa: F401
+        except ImportError:
+            return
+        from PIL import Image  # noqa: F401
+
+        results = zxingcpp.read_barcodes(image)
+        self.assertEqual(results[0].text, "https://t.me/monkeyislandvpnbot?start=a1")
+
+    def test_template_uses_server_qr(self):
+        template = template_source("engine/templates/dashboard.html")
+        self.assertIn('data-cm-qr="subscription"', template)
+        self.assertIn('data-cm-qr="referral"', template)
+        self.assertIn("data-cm-qr-url=\"{% url 'cabinet_qr' %}\"", template)
+        script = Path("engine/static/js/cabinet-mobile.js").read_text()
+        self.assertIn("'?kind=' + encodeURIComponent(kind)", script)
+        # Клиентский qrcodejs в мобильном кабинете больше не используется.
+        self.assertNotIn("new QRCode(", script)

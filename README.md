@@ -2031,7 +2031,32 @@ optional chaining — старые WebView), стили `engine/static/css/cabin
   страницу, чтобы обновить ссылки. Это единственное исключение из правила «не
   перевыпускать ключи» — только по явному подтверждению владельца.
 
-Контекст `dashboard` для мобильного кабинета: `recurrent_info`,
+Привязка Google / Яндекс («Способы входа», 2026-09-17): таблица
+`oauth_identities` (`common.models.db.OAuthIdentity`: `provider`, `subject` —
+стабильный id у провайдера, `email`, unique `(provider, subject)`; миграцию
+генерирует владелец). Кнопка «Привязать» ведёт на `login/google/?link=1` /
+`login/yandex/?link=1`: `remember_oauth_link_intent` кладёт в сессию
+`{provider, user_id}`, callback через `pop_oauth_link_intent` (та же
+авторизованная сессия) вызывает `finish_oauth_link`: чужой `subject` — отказ;
+у кабинета нет почты — берётся подтверждённая провайдером (если не занята
+другим кабинетом), иначе почта не меняется (смена — только через письмо);
+результат — `cabinet_flash` в сессии и редирект на `/dashboard/#cm-login`
+(фронт открывает экран по хэшу). Обычный вход через провайдера тоже пишет
+`record_oauth_identity` (savepoint: без таблицы вход не ломается);
+`load_oauth_identities` для контекста `oauth_identities` мягкий по той же
+причине. Если почта не привязана, кабинет явно рекомендует привязать её:
+карточка на экране «Способы входа» и строка-предупреждение на главной.
+
+Брендовый QR (стиль бота): `engine/branded_qr.py` — порт `utils/branded_qr.py`
+бота (жёлтые скруглённые модули на чёрном, сплошные финдеры, рамка, эмблема
+`static/icons/qr-logo.png`; зависимость `qrcode[pil]`). Эндпоинт
+`api/cabinet/qr/?kind=subscription|referral` (auth, PNG, `no-store`) — ссылка
+подписки из панели (503/404 как у устройств) или реферальная ссылка бота;
+шторка QR в кабинете грузит картинку с него (qrcodejs в мобильном кабинете не
+используется). QR реферальной ссылки — кнопка «QR-код» на экране рефералки.
+
+Контекст `dashboard` для мобильного кабинета: `oauth_identities`, `cabinet_flash`,
+`google_oauth_enabled`, `yandex_oauth_enabled`, `recurrent_info`,
 `cabinet_discount`, `cabinet_tariffs`, `referral_bonus_days`
 (`referral_bonus_days` — пробный срок друга), `telegram_channel_url`,
 `tg_bot_url`, `payment_gateway`, `payment_method_label`. Новая переменная

@@ -58,6 +58,7 @@ urlpatterns = [
         views.cabinet_subscription_reissue,
         name="cabinet_subscription_reissue",
     ),
+    path("api/cabinet/qr/", views.cabinet_qr, name="cabinet_qr"),
     path("support-admin/login/", views.support_admin_login, name="support_admin_login"),
     path(
         "support-admin/logout/", views.support_admin_logout, name="support_admin_logout"
