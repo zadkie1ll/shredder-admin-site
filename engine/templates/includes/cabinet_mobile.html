@@ -2,7 +2,7 @@
 {# Мобильный кабинет (≤1024px и Telegram Mini App): экраны как в приложении — #}
 {# главная → аккаунт → способы входа / оплата / перевыпуск ключа / рефералы / #}
 {# промокоды; покупка, установка, устройства. Логика — static/js/cabinet-mobile.js #}
-<div class="cm" id="cm-root" data-cm-has-access="{% if has_subscription_access %}1{% else %}0{% endif %}" data-cm-discount="{% if cabinet_discount %}{{ cabinet_discount.percent }}{% else %}0{% endif %}" data-cm-gateway="{{ payment_gateway }}" data-cm-plain-url="{{ plain_subscription_url }}">
+<div class="cm" id="cm-root" data-cm-has-access="{% if has_subscription_access %}1{% else %}0{% endif %}" data-cm-discount="{% if cabinet_discount %}{{ cabinet_discount.percent }}{% else %}0{% endif %}" data-cm-gateway="{{ payment_gateway }}" data-cm-plain-url="{{ plain_subscription_url }}" data-cm-happ-url="{{ happ_subscription_url }}">
 
     {# ===== Главная ===== #}
     <section class="cm-page is-active" data-cm-page="home" aria-labelledby="cm-home-title">
@@ -150,7 +150,7 @@
         <p class="cm-note">Вы ещё не пригласили ни одного друга. Делитесь своей реферальной ссылкой и получайте до {{ max_referral_bonus_days }} бонусных дней за каждого приглашённого.</p>
         {% endif %}
         <button type="button" class="cm-btn cm-btn-primary" id="cm-ref-share" data-cm-share="{{ referral_link }}">Поделиться ссылкой</button>
-        <button type="button" class="cm-ref-link" data-mi3-copy="{{ referral_link }}" title="Скопировать"><code>{{ referral_link }}</code></button>
+        <button type="button" class="cm-ref-link" data-mi3-copy="{{ referral_link }}" title="Скопировать"><code data-cm-copy-label>{{ referral_link }}</code></button>
         <button type="button" class="cm-link cm-link-center" data-mi3-copy="{{ site_referral_link }}">Скопировать ссылку на сайт</button>
         <h3 class="cm-label">Как это работает</h3>
         <section class="cm-card cm-ref-rules">
@@ -245,7 +245,7 @@
         <section class="cm-card cm-steps" id="cm-install-steps" aria-live="polite"></section>
         <h3 class="cm-label">Ссылка подписки</h3>
         <div class="cm-list">
-            <button type="button" class="cm-row" id="cm-install-copy"><i class="fas fa-link" aria-hidden="true"></i><span>Скопировать ссылку<small>Вставьте её в приложение вручную</small></span><i class="far fa-copy cm-row-end" aria-hidden="true"></i></button>
+            <button type="button" class="cm-row" id="cm-install-copy"><i class="fas fa-link" aria-hidden="true"></i><span><span data-cm-copy-label>Скопировать ссылку</span><small>Вставьте её в приложение вручную</small></span><i class="far fa-copy cm-row-end" aria-hidden="true"></i></button>
             <button type="button" class="cm-row" data-cm-sheet="cm-qr-sheet"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-phone"></use></svg><span>Показать QR-код<small>Отсканируйте с другого устройства</small></span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
         </div>
         <a class="cm-btn cm-btn-soft cm-support" href="{{ support_telegram_url }}" target="_blank" rel="noopener"><i class="fas fa-headset" aria-hidden="true"></i> Написать в поддержку</a>

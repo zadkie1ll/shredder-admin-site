@@ -16780,6 +16780,15 @@ class MobileCabinetTemplateTests(SimpleTestCase):
         self.assertIn("state.discount = payload.value;", self.script)
         self.assertIn("'X-CSRFToken': csrfToken()", self.script)
         self.assertIn("window.showTariffs = function ()", self.script)
+        # Копирование: «Скопировано!» зелёным в самом элементе, без тостов.
+        self.assertIn("function flashCopied(el, ok)", self.script)
+        self.assertIn("label.innerHTML = ok ? 'Скопировано!' : 'Не удалось скопировать';", self.script)
+        self.assertNotIn("toast(ok ? 'Ссылка скопирована'", self.script)
+        self.assertIn('<span data-cm-copy-label>Скопировать ссылку</span>', self.include)
+        self.assertIn(".cm .is-copied", self.css)
+        # Для Apple при рекомендованном INCY альтернатива — Happ, а не второй INCY.
+        self.assertIn("alternative: { name: 'Happ'", self.script)
+        self.assertIn('data-cm-happ-url="{{ happ_subscription_url }}"', self.include)
         # Отключение автопродления только через подтверждение, как в боте.
         self.assertIn("autopayToggle.checked = true;", self.script)
         self.assertIn("window.openAutopaySheet()", self.script)

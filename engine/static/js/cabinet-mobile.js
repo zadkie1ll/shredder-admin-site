@@ -26,6 +26,7 @@
         devices: null,
         discount: parseInt(root.getAttribute('data-cm-discount') || '0', 10) || 0,
         plainUrl: root.getAttribute('data-cm-plain-url') || '',
+        happUrl: root.getAttribute('data-cm-happ-url') || '',
     };
     var pages = {};
     Array.prototype.forEach.call(root.querySelectorAll('[data-cm-page]'), function (el) {
@@ -45,6 +46,20 @@
     }
     function toast(message) {
         if (typeof window.showToast === 'function') window.showToast(message);
+    }
+    // «Скопировано!» зелёным прямо в элементе, без всплывающих окон.
+    function flashCopied(el, ok) {
+        if (!el) return;
+        var label = el.querySelector('[data-cm-copy-label]') || el;
+        if (!el.hasAttribute('data-cm-copy-original')) el.setAttribute('data-cm-copy-original', label.innerHTML);
+        label.innerHTML = ok ? 'Скопировано!' : 'Не удалось скопировать';
+        el.classList.toggle('is-copied', ok);
+        el.classList.toggle('is-copy-failed', !ok);
+        clearTimeout(el._cmCopyTimer);
+        el._cmCopyTimer = setTimeout(function () {
+            label.innerHTML = el.getAttribute('data-cm-copy-original');
+            el.classList.remove('is-copied', 'is-copy-failed');
+        }, 2000);
     }
     function copyText(value) {
         return new Promise(function (resolve) {
@@ -203,7 +218,7 @@
                 fallbackUrl: key === 'macos' ? INCY_MACOS_INTEL_URL : null,
                 subscriptionUrl: appleSubscriptionUrl,
                 copyValue: appleSubscriptionUrl,
-                alternative: cfg.appName ? { name: cfg.appName, installUrl: cfg.installUrl, subscriptionUrl: cfg.subscriptionUrl } : null,
+                alternative: { name: 'Happ', installUrl: 'https://apps.apple.com/ru/app/happ-proxy-utility-plus/id6788279553', subscriptionUrl: state.happUrl || cfg.subscriptionUrl },
             };
         }
         return {
@@ -251,7 +266,7 @@
     var installCopy = document.getElementById('cm-install-copy');
     if (installCopy) installCopy.addEventListener('click', function () {
         var value = installCopy.getAttribute('data-cm-copy-value') || state.plainUrl;
-        copyText(value).then(function (ok) { toast(ok ? 'Ссылка скопирована' : 'Не удалось скопировать — выделите ссылку вручную'); });
+        copyText(value).then(function (ok) { flashCopied(installCopy, ok); });
     });
     function renderQr() {
         var box = document.getElementById('cm-qr-box');
@@ -489,14 +504,8 @@
 
     // ----- Кнопки «Скопировать» (мобильный кабинет и десктопная карточка рефералов) -----
     Array.prototype.forEach.call(document.querySelectorAll('[data-mi3-copy]'), function (btn) {
-        var original = btn.innerHTML;
-        var restoreTimer = null;
         btn.addEventListener('click', function () {
-            copyText(btn.getAttribute('data-mi3-copy') || '').then(function (ok) {
-                btn.innerHTML = ok ? '<i class="fas fa-check"></i> Скопировано' : '<i class="far fa-copy"></i> Не удалось';
-                clearTimeout(restoreTimer);
-                restoreTimer = setTimeout(function () { btn.innerHTML = original; }, 2000);
-            });
+            copyText(btn.getAttribute('data-mi3-copy') || '').then(function (ok) { flashCopied(btn, ok); });
         });
     });
 
@@ -508,6 +517,6 @@
             navigator.share({ title: 'Monkey Island VPN', text: 'Подключайся к Monkey Island VPN по моей ссылке', url: url }).catch(function () {});
             return;
         }
-        copyText(url).then(function (ok) { toast(ok ? 'Ссылка скопирована' : 'Не удалось скопировать'); });
+        copyText(url).then(function (ok) { flashCopied(share, ok); });
     });
 })();

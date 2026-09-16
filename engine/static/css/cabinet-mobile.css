@@ -47,6 +47,9 @@
 .cm-empty { padding: 22px 16px; color: var(--cm-muted); font-size: 14px; line-height: 1.5; text-align: center; }
 .cm-empty .cm-link { display: block; margin: 8px auto 0; }
 
+/* «Скопировано!» — зелёным в самом элементе, без всплывающих окон */
+.cm .is-copied, .cm .is-copied > span > [data-cm-copy-label], .cm .is-copied code, body .dt-copy-btn.is-copied { color: var(--cm-green, #38d996) !important; }
+.cm .is-copy-failed, .cm .is-copy-failed > span > [data-cm-copy-label], body .dt-copy-btn.is-copy-failed { color: var(--cm-red, #ff5c67) !important; }
 /* Кнопки */
 .cm-btn { width: 100%; display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 56px; padding: 14px 18px; border: 0; border-radius: 999px; font: inherit; font-size: 17px; font-weight: 600; text-decoration: none; cursor: pointer; transition: filter .15s, background .15s; }
 .cm-btn + .cm-btn { margin-top: 10px; }
