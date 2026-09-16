@@ -4325,34 +4325,7 @@
             });
         }
 
-        // Кнопки «Скопировать» реферальных ссылок (мобильный кабинет и десктоп)
-        document.querySelectorAll('[data-mi3-copy]').forEach((btn) => {
-            const original = btn.innerHTML;
-            let restoreTimer = null;
-            btn.addEventListener('click', async function () {
-                const value = this.dataset.mi3Copy || '';
-                let ok = false;
-                try { await navigator.clipboard.writeText(value); ok = true; } catch (e) {
-                    // Fallback для webview без clipboard API
-                    try {
-                        const ta = document.createElement('textarea');
-                        ta.value = value;
-                        ta.style.position = 'fixed';
-                        ta.style.opacity = '0';
-                        document.body.appendChild(ta);
-                        ta.focus();
-                        ta.select();
-                        ok = document.execCommand('copy');
-                        ta.remove();
-                    } catch (err) { ok = false; }
-                }
-                this.innerHTML = ok
-                    ? '<i class="fas fa-check"></i> Скопировано'
-                    : '<i class="far fa-copy"></i> Не удалось';
-                clearTimeout(restoreTimer);
-                restoreTimer = setTimeout(() => { this.innerHTML = original; }, 2000);
-            });
-        });
+        // Кнопки «Скопировать» реферальных ссылок ([data-mi3-copy]) — в js/cabinet-mobile.js.
 
         // Десктопный этапный мастер установки (UX мобильного визарда, UI лендинга):
         // платформа → приложение → установка → подписка (1 клик + ключ + QR) → готово.

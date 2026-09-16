@@ -487,6 +487,19 @@
         }
     });
 
+    // ----- Кнопки «Скопировать» (мобильный кабинет и десктопная карточка рефералов) -----
+    Array.prototype.forEach.call(document.querySelectorAll('[data-mi3-copy]'), function (btn) {
+        var original = btn.innerHTML;
+        var restoreTimer = null;
+        btn.addEventListener('click', function () {
+            copyText(btn.getAttribute('data-mi3-copy') || '').then(function (ok) {
+                btn.innerHTML = ok ? '<i class="fas fa-check"></i> Скопировано' : '<i class="far fa-copy"></i> Не удалось';
+                clearTimeout(restoreTimer);
+                restoreTimer = setTimeout(function () { btn.innerHTML = original; }, 2000);
+            });
+        });
+    });
+
     // ----- Поделиться ссылкой -----
     var share = document.getElementById('cm-ref-share');
     if (share) share.addEventListener('click', function () {
