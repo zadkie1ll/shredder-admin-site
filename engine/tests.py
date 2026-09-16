@@ -16761,7 +16761,7 @@ class MobileCabinetTemplateTests(SimpleTestCase):
         ):
             self.assertIn(needle, self.template, needle)
         self.assertIn("{% static 'js/cabinet-mobile.js' %}", self.template)
-        self.assertIn("{% static 'css/cabinet-mobile.css' %}?v=3", self.template)
+        self.assertIn("{% static 'css/cabinet-mobile.css' %}?v=4", self.template)
         # Старая мобильная навигация и шторки убраны вместе со скриптом.
         for gone in ('<nav class="nav-mobile"', 'id="mi3-connect-sheet"', 'id="mi3-devices-sheet"', "cabinet-sheets.js", "mi3OpenDevices", "mi3OpenConnect"):
             self.assertNotIn(gone, self.template, gone)
@@ -16799,6 +16799,9 @@ class MobileCabinetTemplateTests(SimpleTestCase):
         self.assertIn("body.dashboard-v2 #interface-wrapper.hidden { display: block !important; }", self.css)
         self.assertIn("body.tg-webapp #interface-wrapper.hidden { display: block !important; }", self.css)
         self.assertIn("--cm-accent: #ffc700", self.css)
+        # Отступы списка устройств: подпись не липнет к списку, раскрытая часть — к названию.
+        self.assertIn("#cm-devices-note { margin: 0 2px 16px; }", self.css)
+        self.assertIn(".cm-device-body { padding: 16px 16px 18px 54px;", self.css)
 
     def test_dashboard_context_for_mobile_cabinet(self):
         import inspect

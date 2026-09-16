@@ -42,6 +42,7 @@
 .cm-label { margin: 22px 0 10px; padding: 0 2px; font-size: 12px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--cm-dim); }
 .cm-note { margin: 10px 2px 0; font-size: 13px; line-height: 1.5; color: var(--cm-muted); }
 .cm-note-center { text-align: center; }
+#cm-devices-note { margin: 0 2px 16px; }
 .cm-text { margin: 0 2px 18px; font-size: 16px; line-height: 1.5; color: var(--cm-muted); }
 .cm-h2 { margin: 26px 0 12px; font-size: 24px; font-weight: 700; letter-spacing: -.02em; }
 .cm-empty { padding: 22px 16px; color: var(--cm-muted); font-size: 14px; line-height: 1.5; text-align: center; }
@@ -170,8 +171,8 @@
 .cm-device > summary::-webkit-details-marker { display: none; }
 .cm-device[open] > summary .cm-chevron { transform: rotate(90deg); }
 .cm-device-seen.is-online { color: var(--cm-green) !important; }
-.cm-device-body { padding: 0 16px 16px 54px; }
-.cm-device-field { display: grid; gap: 4px; margin-bottom: 10px; }
+.cm-device-body { padding: 16px 16px 18px 54px; margin-top: 4px; border-top: 1px dashed var(--cm-line); }
+.cm-device-field { display: grid; gap: 6px; margin-bottom: 14px; }
 .cm-device-field > span { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--cm-dim); }
 .cm-ua { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; line-height: 1.45; color: var(--cm-muted); overflow-wrap: anywhere; white-space: pre-wrap; }
 .cm-device-body .cm-btn-danger { margin-top: 12px; }
