@@ -135,7 +135,15 @@
     window.cmGo = go;
 
     // ----- Шторки -----
+    // Шторки и затемнение выносим на уровень body: внутри контейнера кабинета
+    // fixed-элементы считаются от трансформированного предка и обрезаются его
+    // углами, не доходя до низа экрана.
     var overlay = document.getElementById('cm-overlay');
+    var sheetLayer = document.createElement('div');
+    sheetLayer.className = 'cm cm-sheet-layer';
+    sheetLayer.appendChild(overlay);
+    Array.prototype.forEach.call(root.querySelectorAll('.cm-sheet'), function (sheet) { sheetLayer.appendChild(sheet); });
+    document.body.appendChild(sheetLayer);
     function openSheet(id) {
         var sheet = document.getElementById(id);
         if (!sheet) return;
@@ -174,7 +182,9 @@
         if (goEl) { event.preventDefault(); go(goEl.getAttribute('data-cm-go')); return; }
         if (event.target.closest('[data-cm-back]')) { event.preventDefault(); back(); return; }
         var sheetEl = event.target.closest('[data-cm-sheet]');
-        if (sheetEl) { event.preventDefault(); openSheet(sheetEl.getAttribute('data-cm-sheet')); return; }
+        if (sheetEl) { event.preventDefault(); openSheet(sheetEl.getAttribute('data-cm-sheet')); }
+    });
+    sheetLayer.addEventListener('click', function (event) {
         if (event.target.closest('[data-cm-sheet-close]')) { event.preventDefault(); closeSheet(); }
     });
     var tgBack = tgBackButton();
