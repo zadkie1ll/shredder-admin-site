@@ -111,10 +111,14 @@
 .cm-stat span { font-size: 13px; color: var(--cm-muted); }
 .cm-ref-link { width: 100%; margin: 12px 0 6px; padding: 8px; border: 0; background: none; color: var(--cm-muted); cursor: pointer; }
 .cm-ref-link code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; }
-.cm-ref-rules p { margin: 0 0 12px; font-size: 15px; line-height: 1.5; color: var(--cm-muted); }
-.cm-rule { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 0; border-top: 1px solid var(--cm-line); font-size: 15px; line-height: 1.4; }
-.cm-rule b { flex: 0 0 auto; color: var(--cm-accent); font-weight: 700; white-space: nowrap; }
-.cm-rule span { color: var(--cm-text); }
+.cm-ref-rules p { margin: 0 0 12px; font-size: 14px; line-height: 1.5; color: var(--cm-muted); }
+.cm-ref-rules .cm-note { margin-top: 12px; font-size: 13px; }
+/* Шаг: название белым и жирным, пояснение серым второй строкой, бонус жёлтым */
+.cm-rule { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 0; border-top: 1px solid var(--cm-line); line-height: 1.4; }
+.cm-rule > span { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.cm-rule strong { font-size: 16px; font-weight: 600; color: var(--cm-text); }
+.cm-rule small { font-size: 13px; color: var(--cm-muted); }
+.cm-rule b { flex: 0 0 auto; color: var(--cm-accent); font-size: 16px; font-weight: 700; white-space: nowrap; }
 
 /* Промокод и формы */
 .cm-input { width: 100%; min-height: 56px; padding: 14px 18px; border: 1px solid var(--cm-line); border-radius: 16px; background: var(--cm-card); color: var(--cm-text); font: inherit; font-size: 17px; outline: none; }

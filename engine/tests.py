@@ -16761,7 +16761,7 @@ class MobileCabinetTemplateTests(SimpleTestCase):
         ):
             self.assertIn(needle, self.template, needle)
         self.assertIn("{% static 'js/cabinet-mobile.js' %}", self.template)
-        self.assertIn("{% static 'css/cabinet-mobile.css' %}?v=6", self.template)
+        self.assertIn("{% static 'css/cabinet-mobile.css' %}?v=7", self.template)
         # Старая мобильная навигация и шторки убраны вместе со скриптом.
         for gone in ('<nav class="nav-mobile"', 'id="mi3-connect-sheet"', 'id="mi3-devices-sheet"', "cabinet-sheets.js", "mi3OpenDevices", "mi3OpenConnect"):
             self.assertNotIn(gone, self.template, gone)
