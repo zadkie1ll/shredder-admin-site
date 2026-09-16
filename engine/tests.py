@@ -16761,7 +16761,7 @@ class MobileCabinetTemplateTests(SimpleTestCase):
         ):
             self.assertIn(needle, self.template, needle)
         self.assertIn("{% static 'js/cabinet-mobile.js' %}", self.template)
-        self.assertIn("{% static 'css/cabinet-mobile.css' %}?v=7", self.template)
+        self.assertIn("{% static 'css/cabinet-mobile.css' %}?v=8", self.template)
         # Старая мобильная навигация и шторки убраны вместе со скриптом.
         for gone in ('<nav class="nav-mobile"', 'id="mi3-connect-sheet"', 'id="mi3-devices-sheet"', "cabinet-sheets.js", "mi3OpenDevices", "mi3OpenConnect"):
             self.assertNotIn(gone, self.template, gone)
@@ -16806,6 +16806,8 @@ class MobileCabinetTemplateTests(SimpleTestCase):
         self.assertIn("sheetLayer.className = 'cm cm-sheet-layer';", self.script)
         self.assertIn("document.body.appendChild(sheetLayer);", self.script)
         self.assertIn(".cm-sheet-layer { position: static;", self.css)
+        # Тумблер автопродления тоже span в строке — ширина зафиксирована.
+        self.assertIn(".cm-row > .cm-toggle, .cm-toggle { position: relative; display: block; width: 52px;", self.css)
         # Кружок способа оплаты не растягивается правилом `.cm-row > span`.
         self.assertIn(".cm-row > .cm-method-mark, .cm-method-mark { width: 40px; height: 40px; flex: 0 0 40px;", self.css)
 
