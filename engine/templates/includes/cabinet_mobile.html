@@ -1,0 +1,283 @@
+{% load static %}
+{# Мобильный кабинет (≤1024px и Telegram Mini App): экраны как в приложении — #}
+{# главная → аккаунт → способы входа / оплата / перевыпуск ключа / рефералы / #}
+{# промокоды; покупка, установка, устройства. Логика — static/js/cabinet-mobile.js #}
+<div class="cm" id="cm-root" data-cm-has-access="{% if has_subscription_access %}1{% else %}0{% endif %}" data-cm-discount="{% if cabinet_discount %}{{ cabinet_discount.percent }}{% else %}0{% endif %}" data-cm-gateway="{{ payment_gateway }}" data-cm-plain-url="{{ plain_subscription_url }}">
+
+    {# ===== Главная ===== #}
+    <section class="cm-page is-active" data-cm-page="home" aria-labelledby="cm-home-title">
+        <header class="cm-brand">
+            <span class="cm-brand-mark" aria-hidden="true"><img src="{% static 'icons/logo-face-white.png' %}?v=2" alt=""></span>
+            <span class="cm-brand-name" id="cm-home-title">Monkey Island <span>VPN</span></span>
+            <button type="button" class="cm-avatar" data-cm-go="account" aria-label="Аккаунт"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-user"></use></svg></button>
+        </header>
+
+        <section class="cm-card cm-sub" aria-label="Состояние подписки">
+            <div class="cm-sub-head">
+                <h2 class="cm-sub-title">Подписка</h2>
+                <span class="cm-chip{% if not has_subscription_access %} is-off{% elif show_expiring_banner %} is-warn{% else %} is-on{% endif %}">{% if not has_subscription_access %}Не активна{% elif show_expiring_banner %}Истекает{% else %}Активна{% endif %}</span>
+            </div>
+            <dl class="cm-sub-stats">
+                <div>
+                    <dt>Осталось</dt>
+                    <dd>{% if has_subscription_access %}{{ time_left_value }} {{ time_left_unit }}<small>до {{ user.expire_at|date:"d.m.Y" }}</small>{% else %}0 дней<small>доступ не оплачен</small>{% endif %}</dd>
+                </div>
+                <div>
+                    <dt>Трафик</dt>
+                    <dd>{% if rw_traffic_limit_gb %}{{ rw_traffic_limit_gb|floatformat:0 }} ГБ<small>{{ rw_traffic_strategy_label|default:"лимит" }}</small>{% else %}Безлимит{% endif %}</dd>
+                </div>
+            </dl>
+            <button type="button" class="cm-row cm-row-plain" data-cm-go="devices">
+                <svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-phone"></use></svg>
+                <span>Устройства</span>
+                <b id="cm-devices-count" aria-live="polite">…</b>
+                <svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg>
+            </button>
+            <button type="button" class="cm-btn cm-btn-primary" data-cm-go="buy">{% if not has_subscription_access %}Купить подписку{% elif has_recurrent %}Продлить заранее{% else %}Продлить подписку{% endif %}</button>
+            {% if has_recurrent %}<p class="cm-note cm-note-center">Автопродление включено{% if recurrent_info %} · {{ recurrent_info.tariff }}, {{ recurrent_info.amount }} ₽{% endif %}</p>{% endif %}
+        </section>
+
+        <section class="cm-card cm-setup" aria-labelledby="cm-setup-title">
+            <h2 id="cm-setup-title">Настройте Monkey Island</h2>
+            <p>Мы поддерживаем все популярные платформы — выберите свою, чтобы посмотреть инструкцию по настройке.</p>
+            <button type="button" class="cm-btn cm-btn-primary" id="cm-install-auto" data-cm-install-auto><span id="cm-install-auto-label">Скачать приложение</span></button>
+            <button type="button" class="cm-btn cm-btn-ghost" data-cm-go="install">Другие платформы</button>
+        </section>
+
+        <a class="cm-btn cm-btn-soft cm-support" href="{{ support_telegram_url }}" target="_blank" rel="noopener"><i class="fas fa-headset" aria-hidden="true"></i> Написать в поддержку</a>
+    </section>
+
+    {# ===== Аккаунт ===== #}
+    <section class="cm-page" data-cm-page="account" aria-labelledby="cm-account-title">
+        <header class="cm-page-head">
+            <button type="button" class="cm-back" data-cm-back aria-label="Назад"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-arrow"></use></svg></button>
+            <h1 id="cm-account-title">Аккаунт</h1>
+        </header>
+        <div class="cm-list">
+            <button type="button" class="cm-row" data-cm-go="login"><i class="fas fa-key" aria-hidden="true"></i><span>Способы входа</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
+            <button type="button" class="cm-row" data-cm-go="payment"><i class="far fa-credit-card" aria-hidden="true"></i><span>Оплата</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
+            <button type="button" class="cm-row" data-cm-sheet="cm-reissue-sheet"><i class="fas fa-rotate-right" aria-hidden="true"></i><span>Перевыпустить ключ</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
+        </div>
+        <h3 class="cm-label">Бонусы</h3>
+        <div class="cm-list">
+            <button type="button" class="cm-row" data-cm-go="referral"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-gift"></use></svg><span>Реферальная программа</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
+            <button type="button" class="cm-row" data-cm-go="promo"><i class="fas fa-tag" aria-hidden="true"></i><span>Промокоды</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
+        </div>
+        <h3 class="cm-label">Ссылки</h3>
+        <div class="cm-list">
+            <a class="cm-row" href="{{ telegram_channel_url }}" target="_blank" rel="noopener"><i class="fab fa-telegram" aria-hidden="true"></i><span>Telegram-канал</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></a>
+            <a class="cm-row" href="{{ tg_bot_url }}" target="_blank" rel="noopener"><i class="fab fa-telegram" aria-hidden="true"></i><span>Telegram-бот</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></a>
+            <a class="cm-row" href="{% url 'offer' %}" target="_blank" rel="noopener"><i class="fas fa-circle-info" aria-hidden="true"></i><span>Публичная оферта</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></a>
+            <a class="cm-row" href="{% url 'privacy' %}" target="_blank" rel="noopener"><i class="fas fa-circle-info" aria-hidden="true"></i><span>Политика конфиденциальности</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></a>
+        </div>
+        <div class="cm-list tg-webapp-hide">
+            <a class="cm-row is-danger" href="{% url 'logout' %}"><i class="fas fa-arrow-right-from-bracket" aria-hidden="true"></i><span>Выйти</span></a>
+        </div>
+    </section>
+
+    {# ===== Способы входа ===== #}
+    <section class="cm-page" data-cm-page="login" aria-labelledby="cm-login-title">
+        <header class="cm-page-head">
+            <button type="button" class="cm-back" data-cm-back aria-label="Назад"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-arrow"></use></svg></button>
+            <h1 id="cm-login-title">Способы входа</h1>
+        </header>
+        <h3 class="cm-label">Привязанные способы</h3>
+        <div class="cm-list">
+            <div class="cm-row cm-row-static">
+                <i class="far fa-envelope" aria-hidden="true"></i>
+                <span>Почта{% if user.email %}<small>{{ user.email }}</small>{% endif %}</span>
+                {% if user.email %}<em class="cm-tag is-on">Привязано</em>{% else %}<button type="button" class="cm-link" onclick="openEmailBindSheet()">Привязать</button>{% endif %}
+            </div>
+            <div class="cm-row cm-row-static">
+                <i class="fab fa-telegram" aria-hidden="true"></i>
+                <span>Telegram{% if user.telegram_id %}<small>ID {{ user.telegram_id }}</small>{% endif %}</span>
+                {% if user.telegram_id %}<em class="cm-tag is-on">Привязано</em>{% elif tg_bind_link %}<a class="cm-link" href="{{ tg_bind_link }}" target="_blank" rel="noopener">Привязать</a>{% else %}<em class="cm-tag">Не привязано</em>{% endif %}
+            </div>
+        </div>
+        <p class="cm-note">Вход по почте — по ссылке из письма. Через Telegram — кнопкой «Личный кабинет» в боте.</p>
+    </section>
+
+    {# ===== Оплата ===== #}
+    <section class="cm-page" data-cm-page="payment" aria-labelledby="cm-payment-title">
+        <header class="cm-page-head">
+            <button type="button" class="cm-back" data-cm-back aria-label="Назад"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-arrow"></use></svg></button>
+            <h1 id="cm-payment-title">Оплата</h1>
+        </header>
+        <h3 class="cm-label">Автопродление</h3>
+        <div class="cm-list">
+            <label class="cm-row cm-row-static cm-toggle-row">
+                <span>Автопродление{% if not has_recurrent %}<small>Подключается при оплате картой с сохранением</small>{% endif %}</span>
+                <span class="cm-toggle{% if not has_recurrent %} is-disabled{% endif %}">
+                    <input type="checkbox" id="cm-autopay-toggle" {% if has_recurrent %}checked{% else %}disabled{% endif %} aria-label="Автопродление">
+                    <i aria-hidden="true"></i>
+                </span>
+            </label>
+        </div>
+        <h3 class="cm-label">Привязанные методы</h3>
+        <div class="cm-list">
+            {% if recurrent_info %}
+            <div class="cm-row cm-row-static">
+                <span class="cm-method-mark" aria-hidden="true"><i class="far fa-credit-card"></i></span>
+                <span>Карта · ЮKassa<small>{{ recurrent_info.tariff }} · {{ recurrent_info.amount }} {{ recurrent_info.currency }}</small></span>
+                <button type="button" class="cm-icon-btn is-danger" onclick="openAutopaySheet()" aria-label="Отвязать способ оплаты"><i class="far fa-trash-can" aria-hidden="true"></i></button>
+            </div>
+            {% else %}
+            <div class="cm-row cm-row-static"><span>Нет привязанных методов<small>Способ оплаты сохраняется при оплате картой через ЮKassa</small></span></div>
+            {% endif %}
+            <button type="button" class="cm-row" onclick="openPaymentsHistorySheet()"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-wallet"></use></svg><span>История платежей</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
+        </div>
+    </section>
+
+    {# ===== Реферальная программа ===== #}
+    <section class="cm-page" data-cm-page="referral" aria-labelledby="cm-referral-title">
+        <header class="cm-page-head">
+            <button type="button" class="cm-back" data-cm-back aria-label="Назад"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-arrow"></use></svg></button>
+            <h1 id="cm-referral-title">Реферальная программа</h1>
+        </header>
+        <section class="cm-card cm-ref-hero">
+            <span class="cm-ref-icon" aria-hidden="true"><svg class="cabinet-icon"><use href="#cabinet-gift"></use></svg></span>
+            <div>
+                <h2>Зовите друзей — получайте дни</h2>
+                <p>До {{ max_referral_bonus_days }} дней за каждого друга</p>
+            </div>
+        </section>
+        <div class="cm-stats">
+            <div class="cm-stat"><b>{{ ref_invited_count }}</b><span>Приглашено</span></div>
+            <div class="cm-stat"><b>{{ ref_purchased_count }}</b><span>Оплатили</span></div>
+            <div class="cm-stat"><b>+{{ bonus_days }}</b><span>Дней получено</span></div>
+        </div>
+        {% if not ref_invited_count %}
+        <p class="cm-note">Вы ещё не пригласили ни одного друга. Делитесь своей реферальной ссылкой и получайте до {{ max_referral_bonus_days }} бонусных дней за каждого приглашённого.</p>
+        {% endif %}
+        <button type="button" class="cm-btn cm-btn-primary" id="cm-ref-share" data-cm-share="{{ referral_link }}">Поделиться ссылкой</button>
+        <button type="button" class="cm-ref-link" data-mi3-copy="{{ referral_link }}" title="Скопировать"><code>{{ referral_link }}</code></button>
+        <button type="button" class="cm-link cm-link-center" data-mi3-copy="{{ site_referral_link }}">Скопировать ссылку на сайт</button>
+        <h3 class="cm-label">Как это работает</h3>
+        <section class="cm-card cm-ref-rules">
+            <p>Друг переходит по вашей ссылке и получает {{ referral_bonus_days }} дней пробного периода. Вы получаете дни за каждый его шаг:</p>
+            <div class="cm-rule"><span>Подключение — друг зарегистрировался и начал пользоваться</span><b>+{{ join_referrer_bonus_days }} дн.</b></div>
+            <div class="cm-rule"><span>Активность — друг стал активным пользователем</span><b>+{{ traffic_referrer_bonus_days }} дн.</b></div>
+            <div class="cm-rule"><span>Покупка — друг оплатил подписку от 1 месяца</span><b>+{{ purchase_referrer_bonus_days }} дн.</b></div>
+            <p class="cm-note">Дни продлевают вашу подписку. Если подписка закончилась — она продлится с текущего момента.</p>
+        </section>
+    </section>
+
+    {# ===== Промокоды ===== #}
+    <section class="cm-page" data-cm-page="promo" aria-labelledby="cm-promo-title">
+        <header class="cm-page-head">
+            <button type="button" class="cm-back" data-cm-back aria-label="Назад"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-arrow"></use></svg></button>
+            <h1 id="cm-promo-title">Промокоды</h1>
+        </header>
+        <p class="cm-text">Есть промокод или код друга? Введите его — бонус начислится автоматически.</p>
+        <form id="cm-promo-form" class="cm-promo-form" action="{% url 'cabinet_promo_activate' %}" method="post" novalidate>
+            {% csrf_token %}
+            <input type="text" name="code" id="cm-promo-code" class="cm-input" placeholder="Введите код" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="64" aria-label="Промокод">
+            <button type="submit" class="cm-btn cm-btn-primary" id="cm-promo-submit" disabled>Активировать</button>
+        </form>
+        <p id="cm-promo-result" class="cm-result" role="status" aria-live="polite" hidden></p>
+    </section>
+
+    {# ===== Купить ===== #}
+    <section class="cm-page" data-cm-page="buy" aria-labelledby="cm-buy-title">
+        <header class="cm-page-head">
+            <button type="button" class="cm-back" data-cm-back aria-label="Назад"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-arrow"></use></svg></button>
+            <h1 id="cm-buy-title">{% if has_subscription_access %}Продлить{% else %}Купить{% endif %}</h1>
+        </header>
+        <form method="POST" action="/pay/" class="cm-buy-form" id="cm-buy-form" data-payment-form data-context="dashboard_renew">
+            {% csrf_token %}
+            <div class="cm-tariffs" role="radiogroup" aria-label="Срок подписки">
+                {% for card in cabinet_tariffs %}
+                <label class="cm-tariff" for="cm-tariff-{{ card.id }}">
+                    <input id="cm-tariff-{{ card.id }}" class="cm-tariff-radio" type="radio" name="tariff_id" value="{{ card.id }}" data-price="{{ card.price }}" {% if forloop.first %}checked{% endif %}>
+                    <span class="cm-tariff-main">
+                        <span class="cm-tariff-title">{{ card.title }}</span>
+                        {% if card.savings %}<span class="cm-badge">Выгода {{ card.savings }}%</span>{% endif %}
+                    </span>
+                    <span class="cm-tariff-price">
+                        <b>{{ card.per_month }} ₽ / месяц</b>
+                        {% if card.months > 1 %}<small>{{ card.price }} ₽ сейчас</small>{% endif %}
+                    </span>
+                    <span class="cm-tariff-check" aria-hidden="true"><i class="fas fa-check"></i></span>
+                </label>
+                {% endfor %}
+            </div>
+
+            <h3 class="cm-label">Чем платим</h3>
+            <div class="cm-list">
+                <div class="cm-row cm-row-static">
+                    <span class="cm-method-mark" aria-hidden="true"><i class="far fa-credit-card"></i></span>
+                    <span>{{ payment_method_label }}<small>Спишем сразу</small></span>
+                </div>
+            </div>
+
+            <div class="cm-total">
+                {% if cabinet_discount %}<div class="cm-total-row is-discount"><span>Вы сэкономили {{ cabinet_discount.percent }}%</span><b id="cm-total-saved">−0 ₽</b></div>{% endif %}
+                <div class="cm-total-row"><span>Итого к оплате</span><b id="cm-total-price">0 ₽</b></div>
+            </div>
+
+            {% if user.email %}
+                <input type="hidden" name="email" value="{{ user.email }}">
+            {% else %}
+                <input type="email" name="email" required autocomplete="email" placeholder="Email для чека" aria-describedby="cm-email-hint" class="cm-input">
+                <p id="cm-email-hint" class="cm-note">Адрес для чека. Чтобы входить на сайт по email, подтвердите его по ссылке из письма.</p>
+            {% endif %}
+
+            <button type="submit" class="cm-btn cm-btn-primary payment-cta" id="cm-buy-submit">Продолжить · <span id="cm-buy-submit-price">0 ₽</span></button>
+            <button type="button" class="cm-btn cm-btn-ghost" data-cm-go="promo">У меня есть промокод</button>
+            <p class="cm-legal">Оформляя покупку, вы соглашаетесь с <a href="{% url 'offer' %}" target="_blank" rel="noopener">офертой</a> и <a href="{% url 'privacy' %}" target="_blank" rel="noopener">политикой конфиденциальности</a></p>
+        </form>
+        <h2 class="cm-h2">Подписка Monkey Island</h2>
+        <ul class="cm-features">
+            <li><i class="fas fa-check" aria-hidden="true"></i>Безлимитный трафик</li>
+            <li><i class="fas fa-check" aria-hidden="true"></i>YouTube без рекламы</li>
+            <li><i class="fas fa-check" aria-hidden="true"></i>Обход белых списков</li>
+            <li><i class="fas fa-check" aria-hidden="true"></i>Все платформы: телефон, компьютер, ТВ</li>
+        </ul>
+    </section>
+
+    {# ===== Установка ===== #}
+    <section class="cm-page" data-cm-page="install" aria-labelledby="cm-install-title">
+        <header class="cm-page-head">
+            <button type="button" class="cm-back" data-cm-back aria-label="Назад"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-arrow"></use></svg></button>
+            <h1 id="cm-install-title">Установка</h1>
+        </header>
+        <div class="cm-tabs" id="cm-install-tabs" role="tablist" aria-label="Платформа"></div>
+        <section class="cm-card cm-steps" id="cm-install-steps" aria-live="polite"></section>
+        <h3 class="cm-label">Ссылка подписки</h3>
+        <div class="cm-list">
+            <button type="button" class="cm-row" id="cm-install-copy"><i class="fas fa-link" aria-hidden="true"></i><span>Скопировать ссылку<small>Вставьте её в приложение вручную</small></span><i class="far fa-copy cm-row-end" aria-hidden="true"></i></button>
+            <button type="button" class="cm-row" data-cm-sheet="cm-qr-sheet"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-phone"></use></svg><span>Показать QR-код<small>Отсканируйте с другого устройства</small></span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
+        </div>
+        <a class="cm-btn cm-btn-soft cm-support" href="{{ support_telegram_url }}" target="_blank" rel="noopener"><i class="fas fa-headset" aria-hidden="true"></i> Написать в поддержку</a>
+    </section>
+
+    {# ===== Устройства ===== #}
+    <section class="cm-page" data-cm-page="devices" aria-labelledby="cm-devices-title">
+        <header class="cm-page-head">
+            <button type="button" class="cm-back" data-cm-back aria-label="Назад"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-arrow"></use></svg></button>
+            <h1 id="cm-devices-title">Устройства</h1>
+        </header>
+        <p class="cm-note" id="cm-devices-note">Устройства, на которых добавлена ваша подписка.</p>
+        <div class="cm-list" id="cm-devices-list" aria-label="Список устройств"><div class="cm-empty">Загружаем…</div></div>
+        <div class="cm-list">
+            <button type="button" class="cm-row" data-cm-go="install"><i class="fas fa-circle-info" aria-hidden="true"></i><span>Как подключить устройство<small>Пошаговая инструкция для вашей платформы</small></span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
+        </div>
+    </section>
+
+    {# ===== Шторки ===== #}
+    <div class="cm-overlay" id="cm-overlay" hidden></div>
+    <div class="cm-sheet" id="cm-reissue-sheet" role="dialog" aria-modal="true" aria-labelledby="cm-reissue-title" hidden>
+        <div class="cm-sheet-grab" aria-hidden="true"></div>
+        <h2 id="cm-reissue-title">Перевыпустить ключ?</h2>
+        <p>Старый ключ перестанет работать на всех устройствах. После перевыпуска обновите подписку в приложениях — новый ключ на экране «Установка».</p>
+        <button type="button" class="cm-btn cm-btn-primary" id="cm-reissue-confirm">Перевыпустить</button>
+        <button type="button" class="cm-btn cm-btn-ghost" data-cm-sheet-close>Отмена</button>
+    </div>
+    <div class="cm-sheet" id="cm-qr-sheet" role="dialog" aria-modal="true" aria-labelledby="cm-qr-title" hidden>
+        <div class="cm-sheet-grab" aria-hidden="true"></div>
+        <h2 id="cm-qr-title">QR-код подписки</h2>
+        <p>Отсканируйте камерой или приложением на другом устройстве.</p>
+        <div class="cm-qr" id="cm-qr-box" aria-label="QR-код ссылки подписки"></div>
+        <button type="button" class="cm-btn cm-btn-ghost" data-cm-sheet-close>Закрыть</button>
+    </div>
+</div>

@@ -1977,6 +1977,68 @@ UX-детали раздела (закреплены тестами `ConfigTempl
 - в списке правил User-Agent ячейка приоритета держит высоту кнопок (26px), чтобы
   строка не прыгала, когда при наведении приоритет сменяется иконками.
 
+### Мобильный кабинет (2026-09-17)
+
+На ширине ≤1024px и в Telegram Mini App кабинет — отдельное приложение-экраны
+по образцу мобильного клиента: разметка `engine/templates/includes/
+cabinet_mobile.html` (подключается в `dashboard.html` внутри
+`.tg-mini-home`), логика `engine/static/js/cabinet-mobile.js` (ES2018, без
+optional chaining — старые WebView), стили `engine/static/css/cabinet-mobile.css`.
+Десктопный кабинет (`cabinet-desktop.css`, `.standard-dashboard-home`) не менялся.
+
+Экраны: **Главная** (карточка подписки: статус, остаток, трафик, число
+устройств, «Продлить/Купить»; «Настройте Monkey Island» — кнопка под
+определённую по User-Agent платформу и «Другие платформы»; «Написать в
+поддержку») → аватар → **Аккаунт**: «Способы входа» (почта / Telegram со
+статусом привязки и кнопками привязки), «Оплата» (тумблер автопродления — только
+выключение через прежний confirm-лист, привязанный метод ЮKassa с тарифом и
+суммой из `yk_recurrent_payments`, «История платежей»), «Перевыпустить ключ»
+(шторка с подтверждением), «Реферальная программа», «Промокоды», ссылки
+(Telegram-канал `TELEGRAM_CHANNEL_URL`, бот, оферта, политика), «Выйти».
+**Купить**: карточки тарифов с ценой в месяц и «Выгода N%» относительно
+месячного (`cabinet_tariff_cards`), способ оплаты по `PAYMENT_GATEWAY`, итог с
+действующей промо-скидкой (`active_first_purchase_discount`), «У меня есть
+промокод»; отправка — прежний обработчик `[data-payment-form]` → `/pay/`.
+**Установка**: вкладки платформ, три шага (магазин → «Добавить в …» →
+подключение), «Скопировать ссылку», «Показать QR-код» (qrcodejs по
+`plain_subscription_url`). **Устройства**: список HWID из панели; в раскрытой
+строке — **User-Agent** и HWID (ответ на вопрос «что за устройство
+добавилось»), удаление с подтверждением. Докупки трафика нет — у сервиса её
+нет. Нижней навигации больше нет: на мобильном экраны открываются из главной,
+`showTariffs()` переопределён на экран «Купить», paywall `.plans-only-view`
+на мобильном скрыт (главная показывает «Не активна» и «Купить подписку»).
+Навигация — `history.pushState`, нативная кнопка «Назад» Mini App закрывает
+экраны и шторки первыми (`window.cmBackNeeded` / `window.cmHandleBack`).
+
+Новые эндпоинты (auth, POST):
+
+- `api/cabinet/promo/activate/` (`code`) — активация промокода по правилам
+  бота (`utils/promo.py`): строка кода под `FOR UPDATE`, окно `valid_from/
+  valid_until`, `max_uses`, `first_purchase_only` (есть ли успешная оплата),
+  один раз на пользователя (`promo_code_uses`). `days` — срок продлевается в
+  БД (`max(now, expire_at) + N`) и в панели (`UpdateUser.expire_at`) **до
+  commit**: при недоступности RWMS активация откатывается (503), без подписки в
+  панели — 404 `subscription_missing`. `discount` — upsert `user_discounts`
+  (без `valid_until` у кода — 72 ч), применяется в `/pay/`. Лимит
+  `CABINET_PROMO_RATE_LIMIT` (10 попыток / 10 мин на пользователя) — 429.
+  Ответ `{status, promo_type, value, expire_at|valid_until}` либо
+  `{status: error, reason, message}` (`PROMO_ERROR_MESSAGES`).
+- `api/cabinet/subscription/reissue/` — перевыпуск подписки владельцем:
+  `RwmsClientSync.revoke_user_subscription(uuid)` (RPC `RevokeUserSubscription`,
+  RWMS ≥ 2026-09-17): панель выдаёт новый `short_uuid` и credentials, старая
+  ссылка перестаёт работать на всех устройствах. Лимит 3 раза в час (429), при
+  недоступности RWMS или старом RWMS без RPC — 503, фронт перезагружает
+  страницу, чтобы обновить ссылки. Это единственное исключение из правила «не
+  перевыпускать ключи» — только по явному подтверждению владельца.
+
+Контекст `dashboard` для мобильного кабинета: `recurrent_info`,
+`cabinet_discount`, `cabinet_tariffs`, `referral_bonus_days`
+(`referral_bonus_days` — пробный срок друга), `telegram_channel_url`,
+`tg_bot_url`, `payment_gateway`, `payment_method_label`. Новая переменная
+окружения `TELEGRAM_CHANNEL_URL` (по умолчанию `https://t.me/monkeyisland_news`).
+`template_source` в тестах теперь подключает `{% include %}`-шаблоны и
+`js/`-ассеты страницы. Порядок выкатки: сначала RWMS (новый RPC), затем сайт.
+
 ### Персональные конфиги для пользователя (пиннинг, без миграции)
 
 На вкладке «Конфиги» есть панель «Персональные конфиги для пользователя»

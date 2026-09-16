@@ -178,7 +178,7 @@ class LegacyBrowserSyntaxGuardTests(SimpleTestCase):
         "dashboard.html",
         "support_admin_ticket_detail.html",
     )
-    static_scripts = ("mi-network.js", "scripts/support_admin_ticket_detail-1.js")
+    static_scripts = ("mi-network.js", "scripts/support_admin_ticket_detail-1.js", "js/cabinet-mobile.js")
 
     def sources(self):
         for name in self.templates:

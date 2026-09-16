@@ -192,6 +192,7 @@ cp docker/website/.env.example /root/website/website/.env
 | Переменная | По умолчанию | Назначение |
 | --- | --- | --- |
 | `TRUSTED_PROXY_NETWORKS` | `127.0.0.1/32,::1/128,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16` | Доверенные прокси для `X-Forwarded-For`. К списку всегда добавляется `ORIGIN_ALLOWED_PROXY_CIDRS`. Явное значение заменяет приватные сети: docker-подсеть origin должна в нём остаться |
+| `TELEGRAM_CHANNEL_URL` | `https://t.me/monkeyisland_news` | Ссылка на канал в мобильном кабинете («Аккаунт → Ссылки») |
 | `CACHE_REDIS_URL` | пусто — локальный кэш процесса | Redis для лимитов входа и кэша отчётов, общих для всех воркеров. Без него каждый gunicorn-воркер считает лимиты сам. Redis в этом compose нет: нужен внешний, доступный из `monkey-island-network` |
 | `CACHE_REDIS_SOCKET_TIMEOUT_SECONDS` | `0.5` | Таймаут подключения и операции с Redis. При сбое Redis лимиты входа пропускают запрос и пишут ошибку в лог |
 | `RWMS_RPC_TIMEOUT_SECONDS` | `8` | Deadline обычного gRPC-вызова RWMS с сайта: кабинет, оплата, смена email, воркер `reconciliation` и мобильный API (`mobile_api/subscription.py`). Битое значение (не число, `0` или меньше) заменяется значением по умолчанию с предупреждением в логе |

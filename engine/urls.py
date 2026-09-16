@@ -48,6 +48,16 @@ urlpatterns = [
         views.cabinet_device_delete,
         name="cabinet_device_delete",
     ),
+    path(
+        "api/cabinet/promo/activate/",
+        views.cabinet_promo_activate,
+        name="cabinet_promo_activate",
+    ),
+    path(
+        "api/cabinet/subscription/reissue/",
+        views.cabinet_subscription_reissue,
+        name="cabinet_subscription_reissue",
+    ),
     path("support-admin/login/", views.support_admin_login, name="support_admin_login"),
     path(
         "support-admin/logout/", views.support_admin_logout, name="support_admin_logout"

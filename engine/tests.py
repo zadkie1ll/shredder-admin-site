@@ -5427,7 +5427,10 @@ class SettingsTabTemplateTests(SimpleTestCase):
         self.assertIn('id="tab-settings"', template)
         # Пользовательское название и иконка соответствуют содержимому раздела;
         # внутренний settings-id сохраняется для обратной совместимости ссылок.
-        self.assertIn('<use href="#cabinet-user"></use></svg><span>Профиль</span>', template)
+        # Мобильный кабинет: профиль открывается аватаром на главной («Аккаунт»),
+        # нижней навигации больше нет.
+        self.assertIn('class="cm-avatar" data-cm-go="account" aria-label="Аккаунт"', template)
+        self.assertNotIn('<nav class="nav-mobile"', template)
         self.assertIn('tracking-tighter mb-3">Профиль</h1>', template)
         self.assertNotIn('<i class="fas fa-cog"></i><span>Настройки</span>', template)
         self.assertIn("Отключить автопродление", template)
@@ -5570,27 +5573,26 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         # Компактная главная всегда есть в DOM: на сайте её включает mobile
         # breakpoint, а Mini App использует её независимо от ширины.
         self.assertIn('<div class="tg-mini-home cabinet-home">', template)
+        self.assertIn('{% include "includes/cabinet_mobile.html" %}', template)
         self.assertIn("body.tg-webapp .tg-mini-home", template)
         self.assertIn("{% if not tg_webapp_mode %}", template)
         self.assertIn('<div class="standard-dashboard-home">', template)
-        # Карточка статуса подписки (редизайн b95ea64: cabinet-access).
-        self.assertIn('<section class="cabinet-access" aria-labelledby="cabinet-access-title">', template)
-        self.assertIn("<dt>Подписка до</dt>", template)
-        self.assertIn('{{ user.expire_at|date:"j E Y" }}', template)
-        # Главная CTA зависит от состояния подписки/рекуррента.
-        self.assertIn('onclick="showTariffs()" class="cabinet-renew"', template)
+        # Карточка подписки: статус, остаток, трафик, устройства, главная CTA.
+        self.assertIn('<section class="cm-card cm-sub" aria-label="Состояние подписки">', template)
+        self.assertIn("{% if not has_subscription_access %}Не активна{% elif show_expiring_banner %}Истекает{% else %}Активна{% endif %}", template)
+        self.assertIn('{{ user.expire_at|date:"d.m.Y" }}', template)
         self.assertIn(
+            '<button type="button" class="cm-btn cm-btn-primary" data-cm-go="buy">'
             "{% if not has_subscription_access %}Купить подписку"
             "{% elif has_recurrent %}Продлить заранее"
-            "{% else %}Продлить подписку{% endif %}",
+            "{% else %}Продлить подписку{% endif %}</button>",
             template,
         )
-        self.assertIn('onclick="mi3OpenConnect()" class="cabinet-connect"', template)
-        self.assertIn("<span>Подключить устройство</span>", template)
-        self.assertIn('<section class="cabinet-actions" aria-label="Управление подпиской">', template)
-        # На главном экране вместо «Автопродление» — «Платежи и подписка»
-        self.assertIn('class="cabinet-action" onclick="openPaymentsHistorySheet()"', template)
-        self.assertIn("<span>Платежи и подписка</span>", template)
+        self.assertIn('data-cm-go="devices"', template)
+        self.assertIn('id="cm-devices-count"', template)
+        # Без докупки трафика — у Monkey Island его нет.
+        self.assertNotIn("Докупить трафик", template)
+        self.assertNotIn("cm-page=\"traffic\"", template)
 
     def test_mobile_home_has_restrained_visual_hierarchy(self):
         template = template_source("engine/templates/dashboard.html")
@@ -5674,25 +5676,6 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("navigator.clipboard.writeText(value)", template)
         # Fallback для webview без clipboard API
         self.assertIn("document.execCommand('copy')", template)
-
-    def test_connect_sheet_has_back_button(self):
-        """Шторка подключения: назад | прогресс шагов | закрыть, заголовок
-        отдельной строкой (кнопки не смещают его). На шаге 1 «Назад»
-        невидима, но держит место."""
-        template = template_source("engine/templates/dashboard.html")
-
-        self.assertIn('id="mi3-connect-back"', template)
-        self.assertIn('onclick="mi3ConnectBack()"', template)
-        self.assertIn("window.mi3ConnectBack = function ()", template)
-        self.assertIn('class="mi3-sheet-nav"', template)
-        self.assertIn('id="mi3-connect-bars"', template)
-        self.assertIn("back.classList.toggle('is-ghosted', step === 1)", template)
-        self.assertIn("bar.classList.toggle('is-on', i < step)", template)
-        # Заголовок вне flex-строки с кнопками
-        self.assertIn(
-            '<div class="mi3-sheet-title" id="mi3-connect-title">Что подключаем?</div>\n        <div id="mi3-connect-body"></div>',
-            template,
-        )
 
     def test_quick_access_waits_for_deferred_install_prompt(self):
         """Первый клик по «Быстрому доступу» не должен сваливаться в
@@ -5819,10 +5802,12 @@ class MobileDashboardHomeTemplateTests(SimpleTestCase):
         self.assertIn("if (appContainer) appContainer.setAttribute('inert', '');", template)
         self.assertIn("if (appContainer) appContainer.removeAttribute('inert');", template)
         self.assertIn(
-            "if (document.querySelector('.mi3-sheet.is-open') || referralTermsOpen || setupActive) "
+            "if (cabinetBack || referralTermsOpen || setupActive) "
             "back.show(); else back.hide();",
             template,
         )
+        # Экраны и шторки мобильного кабинета закрываются нативной кнопкой первыми.
+        self.assertIn("if (window.cmHandleBack && window.cmHandleBack()) return;", template)
         self.assertIn("closeReferralTerms();\n            } else if (newSetupStep", template)
         self.assertIn("function initReferralTermsSwipe()", template)
         self.assertIn("window.matchMedia('(max-width: 1024px)').matches", template)
@@ -7492,8 +7477,9 @@ class CabinetPaymentsHistoryTests(SimpleTestCase):
         # (редизайн b95ea64: строки-действия стали cabinet-action).
         self.assertNotIn('tg-mini-action-label">Автопродление', template)
         self.assertNotIn(">Автопродление</span>", template)
-        self.assertIn('class="cabinet-action" onclick="openPaymentsHistorySheet()"', template)
-        self.assertIn("<span>Платежи и подписка</span>", template)
+        # Мобильный кабинет: история платежей — строка на экране «Оплата».
+        self.assertIn('class="cm-row" onclick="openPaymentsHistorySheet()"', template)
+        self.assertIn("<span>История платежей</span>", template)
         # Профиль: заметной карточки отмены больше нет
         self.assertNotIn(
             '<div class="text-white font-black">Отключить автопродление</div>',
@@ -8800,9 +8786,13 @@ class AdminStage5PromoTests(SimpleTestCase):
 
         from engine import views
 
-        src = inspect.getsource(views.site_apply_first_purchase_discount)
+        # Правила действия скидки вынесены в active_first_purchase_discount
+        # (её же использует экран покупки мобильного кабинета).
+        src = inspect.getsource(views.active_first_purchase_discount)
         self.assertIn("has_paid", src)
         self.assertIn("valid_until", src)
+        src = inspect.getsource(views.site_apply_first_purchase_discount)
+        self.assertIn("active_first_purchase_discount(db_session, user)", src)
         # Цена не может уйти ниже 1 ₽ и скидка fail-open при ошибках.
         self.assertIn("max(1,", src)
         self.assertIn("except Exception", src)
@@ -16437,3 +16427,383 @@ class SupportTicketPaginationTests(SimpleTestCase):
         self.assertTrue("ticketsCursorHistory" in template)
         self.assertFalse("TICKETS_MAX_RENDERED" in template)
         self.assertIn("window.setTimeout(() => controller.abort(), 10000)", template)
+
+
+from common.models.db import PromoCode as _PromoCode  # noqa: E402
+from common.models.db import PromoCodeUse as _PromoCodeUse  # noqa: E402
+from common.models.db import User as _User  # noqa: E402
+from common.models.db import UserDiscount as _UserDiscount  # noqa: E402
+from common.rwms_client import RwmsUnavailableError as _RwmsUnavailableError  # noqa: E402
+
+
+class CabinetPromoActivateTests(SimpleTestCase):
+    """Активация промокода из кабинета: правила бота (окно дат, лимит,
+    однократность, «только первая покупка»), дни — в БД и RWMS одной
+    транзакцией, скидка — в user_discounts."""
+
+    def setUp(self):
+        from django.core.cache import cache
+
+        cache.clear()
+
+    def _promo(self, **overrides):
+        base = dict(
+            id=7, code="SUMMER", is_active=True, valid_from=None, valid_until=None,
+            max_uses=0, used_count=0, first_purchase_only=False,
+            promo_type="days", value=5,
+        )
+        base.update(overrides)
+        return SimpleNamespace(**base)
+
+    def _session(self, promo, db_user, used=None, discount=None):
+        recorded = {"added": [], "committed": False, "rolled_back": False}
+
+        class FakeQuery:
+            def __init__(self, model):
+                self.model = model
+
+            def filter(self, *args, **kwargs):
+                return self
+
+            def with_for_update(self):
+                return self
+
+            def first(self):
+                if self.model is _PromoCode:
+                    return promo
+                if self.model is _User:
+                    return db_user
+                if self.model is _PromoCodeUse:
+                    return used
+                if self.model is _UserDiscount:
+                    return discount
+                return None
+
+        class FakeSession:
+            def query(self, model):
+                return FakeQuery(model)
+
+            def add(self, obj):
+                recorded["added"].append(obj)
+
+            def commit(self):
+                recorded["committed"] = True
+
+            def rollback(self):
+                recorded["rolled_back"] = True
+
+            def close(self):
+                recorded["closed"] = True
+
+        return FakeSession(), recorded
+
+    def _post(self, code, user_id=42):
+        request = RequestFactory().post("/api/cabinet/promo/activate/", {"code": code})
+        request.user = SimpleNamespace(is_authenticated=True, id=user_id, username="u42")
+        return request
+
+    def _activate(self, request, session, subscription="sub", update_result="ok", has_payment=False):
+        from engine import views
+        import proto.rwmanager_pb2 as proto
+
+        sub = None
+        if subscription == "sub":
+            sub = proto.UserResponse(uuid="rw-1", username="u42")
+        if subscription == "unavailable":
+            strict = mock.Mock(side_effect=_RwmsUnavailableError("u42", "UNAVAILABLE"))
+        else:
+            strict = mock.Mock(return_value=sub)
+        update = mock.Mock(return_value=None if update_result is None else proto.UserResponse(uuid="rw-1"))
+        with mock.patch("engine.views.session_factory", return_value=session), \
+                mock.patch.object(views.rwms_client, "get_user_by_username_strict", strict), \
+                mock.patch.object(views.rwms_client, "update_user", update), \
+                mock.patch("engine.views._cabinet_has_any_payment", return_value=has_payment):
+            response = views.cabinet_promo_activate(request)
+        return response, update
+
+    def test_days_promo_extends_db_and_panel_in_one_transaction(self):
+        promo = self._promo()
+        expire = datetime.utcnow() + timedelta(days=3)
+        db_user = SimpleNamespace(id=42, expire_at=expire)
+        session, recorded = self._session(promo, db_user)
+
+        response, update = self._activate(self._post(" summer "), session)
+
+        self.assertEqual(response.status_code, 200, response.content)
+        payload = json.loads(response.content)
+        self.assertEqual((payload["status"], payload["promo_type"], payload["value"]), ("ok", "days", 5))
+        # Дни стакуются к действующему сроку, а не к «сейчас».
+        self.assertEqual(db_user.expire_at, expire + timedelta(days=5))
+        self.assertEqual(promo.used_count, 1)
+        self.assertTrue(recorded["committed"])
+        self.assertTrue(any(isinstance(obj, _PromoCodeUse) for obj in recorded["added"]))
+        (update_request,), _ = update.call_args
+        self.assertEqual(update_request.uuid, "rw-1")
+        self.assertEqual(update_request.expire_at.ToDatetime(), db_user.expire_at)
+
+    def test_days_promo_on_expired_user_counts_from_now(self):
+        promo = self._promo(value=2)
+        db_user = SimpleNamespace(id=42, expire_at=datetime.utcnow() - timedelta(days=30))
+        session, _ = self._session(promo, db_user)
+
+        response, _ = self._activate(self._post("SUMMER"), session)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(db_user.expire_at, datetime.utcnow() + timedelta(days=1, hours=23))
+
+    def test_days_promo_rolls_back_when_panel_update_fails(self):
+        promo = self._promo()
+        db_user = SimpleNamespace(id=42, expire_at=None)
+        session, recorded = self._session(promo, db_user)
+
+        response, _ = self._activate(self._post("SUMMER"), session, update_result=None)
+
+        self.assertEqual(response.status_code, 503)
+        self.assertEqual(json.loads(response.content)["reason"], "rwms_unavailable")
+        self.assertTrue(recorded["rolled_back"])
+        self.assertFalse(recorded["committed"])
+
+    def test_days_promo_without_panel_subscription_is_rejected(self):
+        promo = self._promo()
+        session, recorded = self._session(promo, SimpleNamespace(id=42, expire_at=None))
+
+        response, _ = self._activate(self._post("SUMMER"), session, subscription=None)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertEqual(json.loads(response.content)["reason"], "subscription_missing")
+        self.assertTrue(recorded["rolled_back"])
+
+    def test_days_promo_when_rwms_unavailable_does_not_burn_activation(self):
+        promo = self._promo()
+        session, recorded = self._session(promo, SimpleNamespace(id=42, expire_at=None))
+
+        response, _ = self._activate(self._post("SUMMER"), session, subscription="unavailable")
+
+        self.assertEqual(response.status_code, 503)
+        self.assertTrue(recorded["rolled_back"])
+
+    def test_discount_promo_creates_user_discount_with_default_ttl(self):
+        promo = self._promo(promo_type="discount", value=15)
+        session, recorded = self._session(promo, SimpleNamespace(id=42, expire_at=None))
+
+        response, update = self._activate(self._post("SUMMER"), session)
+
+        self.assertEqual(response.status_code, 200)
+        payload = json.loads(response.content)
+        self.assertEqual((payload["promo_type"], payload["value"]), ("discount", 15))
+        discounts = [obj for obj in recorded["added"] if isinstance(obj, _UserDiscount)]
+        self.assertEqual(len(discounts), 1)
+        self.assertEqual(discounts[0].percent, 15)
+        self.assertEqual(discounts[0].source_promo_id, 7)
+        self.assertGreater(discounts[0].valid_until, datetime.utcnow() + timedelta(hours=71))
+        update.assert_not_called()
+        self.assertTrue(recorded["committed"])
+
+    def test_discount_promo_reactivation_reopens_window(self):
+        promo = self._promo(promo_type="discount", value=20, valid_until=datetime.utcnow() + timedelta(days=2))
+        existing = SimpleNamespace(percent=5, valid_until=None, source_promo_id=1, created_at=datetime(2020, 1, 1))
+        session, recorded = self._session(promo, SimpleNamespace(id=42, expire_at=None), discount=existing)
+
+        response, _ = self._activate(self._post("SUMMER"), session)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual((existing.percent, existing.source_promo_id, existing.valid_until), (20, 7, promo.valid_until))
+        self.assertGreater(existing.created_at, datetime(2020, 1, 2))
+        self.assertFalse(any(isinstance(obj, _UserDiscount) for obj in recorded["added"]))
+
+    def test_validation_reasons(self):
+        cases = (
+            (dict(is_active=False), "not_found"),
+            (dict(valid_from=datetime.utcnow() + timedelta(days=1)), "expired"),
+            (dict(valid_until=datetime.utcnow() - timedelta(days=1)), "expired"),
+            (dict(max_uses=3, used_count=3), "exhausted"),
+        )
+        for overrides, reason in cases:
+            with self.subTest(reason=reason):
+                session, recorded = self._session(self._promo(**overrides), SimpleNamespace(id=42, expire_at=None))
+                response, _ = self._activate(self._post("SUMMER"), session)
+                self.assertEqual(response.status_code, 400)
+                self.assertEqual(json.loads(response.content)["reason"], reason)
+                self.assertFalse(recorded["committed"])
+
+    def test_unknown_code_and_empty_code(self):
+        session, _ = self._session(None, SimpleNamespace(id=42, expire_at=None))
+        response, _ = self._activate(self._post("NOPE"), session)
+        self.assertEqual(json.loads(response.content)["reason"], "not_found")
+        response, _ = self._activate(self._post("   "), session)
+        self.assertEqual(json.loads(response.content)["reason"], "not_found")
+
+    def test_already_used_and_first_purchase_only(self):
+        session, _ = self._session(self._promo(), SimpleNamespace(id=42, expire_at=None), used=SimpleNamespace(id=1))
+        response, _ = self._activate(self._post("SUMMER"), session)
+        self.assertEqual(json.loads(response.content)["reason"], "already_used")
+
+        session, _ = self._session(self._promo(first_purchase_only=True), SimpleNamespace(id=42, expire_at=None))
+        response, _ = self._activate(self._post("SUMMER"), session, has_payment=True)
+        self.assertEqual(json.loads(response.content)["reason"], "not_first")
+
+    def test_rate_limit_and_method_guard(self):
+        from engine import views
+
+        session, _ = self._session(None, SimpleNamespace(id=42, expire_at=None))
+        for _ in range(views.CABINET_PROMO_RATE_LIMIT):
+            self._activate(self._post("NOPE", user_id=77), session)
+        response, _ = self._activate(self._post("NOPE", user_id=77), session)
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(json.loads(response.content)["reason"], "rate_limited")
+
+        request = RequestFactory().get("/api/cabinet/promo/activate/")
+        request.user = SimpleNamespace(is_authenticated=True, id=42)
+        self.assertEqual(views.cabinet_promo_activate(request).status_code, 403)
+
+
+class CabinetSubscriptionReissueTests(SimpleTestCase):
+    """Перевыпуск подписки владельцем: RWMS Revoke_UserSubscription по uuid
+    собственной подписки, лимит попыток, 503 при недоступности."""
+
+    def setUp(self):
+        from django.core.cache import cache
+
+        cache.clear()
+
+    def _post(self, user_id=42):
+        request = RequestFactory().post("/api/cabinet/subscription/reissue/")
+        request.user = SimpleNamespace(is_authenticated=True, id=user_id, username="u42")
+        return request
+
+    def test_reissue_returns_new_subscription_url(self):
+        from engine import views
+        import proto.rwmanager_pb2 as proto
+
+        current = proto.UserResponse(uuid="rw-1", short_uuid="old", username="u42")
+        updated = proto.UserResponse(uuid="rw-1", short_uuid="new", subscription_url="https://s/new")
+        with mock.patch.object(views.rwms_client, "get_user_by_username_strict", return_value=current), \
+                mock.patch.object(views.rwms_client, "revoke_user_subscription", return_value=updated) as revoke:
+            response = views.cabinet_subscription_reissue(self._post())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(json.loads(response.content)["subscription_url"], "https://s/new")
+        revoke.assert_called_once_with("rw-1")
+
+    def test_reissue_unavailable_and_not_found(self):
+        from engine import views
+        import proto.rwmanager_pb2 as proto
+
+        with mock.patch.object(views.rwms_client, "get_user_by_username_strict",
+                               side_effect=_RwmsUnavailableError("u42", "UNAVAILABLE")):
+            self.assertEqual(views.cabinet_subscription_reissue(self._post()).status_code, 503)
+        with mock.patch.object(views.rwms_client, "get_user_by_username_strict", return_value=None):
+            self.assertEqual(views.cabinet_subscription_reissue(self._post()).status_code, 404)
+        current = proto.UserResponse(uuid="rw-1", username="u42")
+        with mock.patch.object(views.rwms_client, "get_user_by_username_strict", return_value=current), \
+                mock.patch.object(views.rwms_client, "revoke_user_subscription",
+                                  side_effect=_RwmsUnavailableError("rw-1", "UNIMPLEMENTED")):
+            # Старый RWMS без RPC — «временно недоступно», а не 500.
+            self.assertEqual(views.cabinet_subscription_reissue(self._post()).status_code, 503)
+
+    def test_reissue_rate_limit_and_method_guard(self):
+        from engine import views
+        import proto.rwmanager_pb2 as proto
+
+        current = proto.UserResponse(uuid="rw-1", username="u42")
+        with mock.patch.object(views.rwms_client, "get_user_by_username_strict", return_value=current), \
+                mock.patch.object(views.rwms_client, "revoke_user_subscription", return_value=current):
+            for _ in range(views.CABINET_REISSUE_RATE_LIMIT):
+                self.assertEqual(views.cabinet_subscription_reissue(self._post(user_id=9)).status_code, 200)
+            response = views.cabinet_subscription_reissue(self._post(user_id=9))
+        self.assertEqual(response.status_code, 429)
+
+        request = RequestFactory().get("/api/cabinet/subscription/reissue/")
+        request.user = SimpleNamespace(is_authenticated=True, id=42)
+        self.assertEqual(views.cabinet_subscription_reissue(request).status_code, 403)
+
+
+class MobileCabinetTemplateTests(SimpleTestCase):
+    """Мобильный кабинет по образцу приложения: экраны, эндпоинты, устройства
+    с User-Agent, промокоды, перевыпуск ключа; без докупки трафика."""
+
+    def setUp(self):
+        self.template = template_source("engine/templates/dashboard.html")
+        self.include = Path("engine/templates/includes/cabinet_mobile.html").read_text()
+        self.script = Path("engine/static/js/cabinet-mobile.js").read_text()
+        self.css = Path("engine/static/css/cabinet-mobile.css").read_text()
+
+    def test_screens_and_wiring(self):
+        for page in ("home", "account", "login", "payment", "referral", "promo", "buy", "install", "devices"):
+            self.assertIn(f'data-cm-page="{page}"', self.include, page)
+        for needle in (
+            'id="cm-root"',
+            "{% url 'cabinet_promo_activate' %}",
+            "'/api/cabinet/subscription/reissue/'",
+            "'/api/cabinet/devices/'",
+            "'/api/cabinet/devices/delete/'",
+            'id="cm-reissue-sheet"',
+            "Старый ключ перестанет работать на всех устройствах.",
+            'data-cm-sheet="cm-qr-sheet"',
+            "data-payment-form data-context=\"dashboard_renew\"",
+            'name="tariff_id" value="{{ card.id }}" data-price="{{ card.price }}"',
+            "Выгода {{ card.savings }}%",
+            "{{ payment_method_label }}",
+            "Вы сэкономили {{ cabinet_discount.percent }}%",
+            'data-cm-go="promo">У меня есть промокод',
+            "{{ telegram_channel_url }}",
+            "{{ tg_bot_url }}",
+            'href="{% url \'logout\' %}"',
+            'data-mi3-copy="{{ referral_link }}"',
+            'data-mi3-copy="{{ site_referral_link }}"',
+            "+{{ join_referrer_bonus_days }} дн.",
+            "{{ referral_bonus_days }} дней пробного периода",
+            'id="cm-autopay-toggle"',
+            "onclick=\"openAutopaySheet()\"",
+            "{{ recurrent_info.tariff }} · {{ recurrent_info.amount }} {{ recurrent_info.currency }}",
+            "onclick=\"openEmailBindSheet()\"",
+            "{{ tg_bind_link }}",
+        ):
+            self.assertIn(needle, self.template, needle)
+        self.assertIn("{% static 'js/cabinet-mobile.js' %}", self.template)
+        self.assertIn("{% static 'css/cabinet-mobile.css' %}?v=3", self.template)
+        # Старая мобильная навигация и шторки убраны вместе со скриптом.
+        for gone in ('<nav class="nav-mobile"', 'id="mi3-connect-sheet"', 'id="mi3-devices-sheet"', "cabinet-sheets.js", "mi3OpenDevices", "mi3OpenConnect"):
+            self.assertNotIn(gone, self.template, gone)
+        self.assertFalse(Path("engine/static/js/cabinet-sheets.js").exists())
+
+    def test_devices_show_user_agent_preview(self):
+        # Вопрос «что за устройство добавилось» закрывает строка User-Agent из панели.
+        self.assertIn("'<div class=\"cm-device-field\"><span>User-Agent</span><code class=\"cm-ua\">' + esc(d.user_agent || 'не передан приложением')", self.script)
+        self.assertIn("function deviceOs(d)", self.script)
+        self.assertIn("data-cm-hwid=", self.script)
+        self.assertIn("Точно удалить?", self.script)
+
+    def test_promo_and_reissue_flows(self):
+        self.assertIn("payload.promo_type === 'days'", self.script)
+        self.assertIn("window.location.reload()", self.script)
+        self.assertIn("state.discount = payload.value;", self.script)
+        self.assertIn("'X-CSRFToken': csrfToken()", self.script)
+        self.assertIn("window.showTariffs = function ()", self.script)
+        # Отключение автопродления только через подтверждение, как в боте.
+        self.assertIn("autopayToggle.checked = true;", self.script)
+        self.assertIn("window.openAutopaySheet()", self.script)
+
+    def test_mobile_breakpoint_hides_paywall_and_legacy_nav(self):
+        self.assertIn("body.dashboard-v2 .nav-mobile { display: none !important; }", self.css)
+        self.assertIn("body.dashboard-v2 .plans-only-view { display: none !important; }", self.css)
+        self.assertIn("body.dashboard-v2 #interface-wrapper.hidden { display: block !important; }", self.css)
+        self.assertIn("body.tg-webapp #interface-wrapper.hidden { display: block !important; }", self.css)
+        self.assertIn("--cm-accent: #ffc700", self.css)
+
+    def test_dashboard_context_for_mobile_cabinet(self):
+        import inspect
+
+        from engine import views
+
+        src = inspect.getsource(views.dashboard)
+        for key in ('"recurrent_info"', '"cabinet_discount"', '"cabinet_tariffs"', '"referral_bonus_days"', '"telegram_channel_url"', '"tg_bot_url"', '"payment_method_label"'):
+            self.assertIn(key, src, key)
+        cards = views.cabinet_tariff_cards(views.ACTUAL_TARIFFS)
+        by_id = {card["id"]: card for card in cards}
+        self.assertEqual(by_id["month"]["per_month"], views.ACTUAL_TARIFFS[0].price)
+        self.assertEqual(by_id["month"]["savings"], 0)
+        self.assertEqual(by_id["threemonths"]["months"], 3)
+        self.assertGreater(by_id["year"]["savings"], by_id["threemonths"]["savings"])
+        self.assertEqual(by_id["year"]["title"], "12 месяцев")
+

@@ -148,6 +148,7 @@ from common.models.settings import BOOL_RUNTIME_SETTINGS
 from common.models.settings import BOT_APPLE_RECOMMENDED_APP_SETTING
 from common.models.settings import BOT_TRIAL_PERIOD_DAYS_SETTING
 from common.models.settings import BOT_JOIN_REFERRER_BONUS_DAYS_SETTING
+from common.models.settings import BOT_REFERRAL_BONUS_DAYS_SETTING
 from common.models.settings import BOT_PURCHASE_REFERRER_BONUS_DAYS_SETTING
 from common.models.settings import BOT_REFERRAL_REGISTRATION_AUTOBLOCK_ENABLED_SETTING
 from common.models.settings import BOT_REFERRAL_REGISTRATION_BURST_LIMIT_SETTING
@@ -2259,61 +2260,71 @@ def build_payment_retry_url(request, token):
     return f"{get_current_base_url(request)}{reverse('payment_retry', args=[token])}"
 
 
-def site_apply_first_purchase_discount(db_session, user, tariff):
-    """Персональная промо-скидка (активируется в боте).
+def active_first_purchase_discount(db_session, user):
+    """Действующая персональная промо-скидка пользователя (UserDiscount) или None.
 
-    Возвращает (tariff, applied). Скидка одноразовая: сгорает после первой
-    успешной оплаты с момента активации, платежи до активации не мешают —
-    код можно выдать и действующему клиенту. Рекуррент заводится по
-    регулярной цене (metadata.promo).
+    Скидка одноразовая: сгорает после первой успешной оплаты с момента
+    активации, платежи до активации не мешают — код можно выдать и
+    действующему клиенту. Выключение промокода в админке гасит и выданные
+    им скидки. Используется при оплате (/pay/) и в кабинете (экран покупки).
+    """
+    discount = (
+        db_session.query(UserDiscount)
+        .filter(UserDiscount.user_id == user.id)
+        .first()
+    )
+    if discount is None:
+        return None
+    if discount.valid_until is None or discount.valid_until <= datetime.utcnow():
+        return None
+    if not 1 <= (discount.percent or 0) <= 99:
+        return None
+    if discount.source_promo_id is not None:
+        promo_is_active = (
+            db_session.query(PromoCode.is_active)
+            .filter(PromoCode.id == discount.source_promo_id)
+            .scalar()
+        )
+        if promo_is_active is False:
+            return None
+
+    activated_at = discount.created_at
+    yk_paid_query = db_session.query(YkPayment.id).filter(
+        YkPayment.user_id == user.id, YkPayment.status == "succeeded"
+    )
+    wata_paid_query = (
+        db_session.query(WataTransaction.id)
+        .join(WataInvoice, WataInvoice.order_id == WataTransaction.order_id)
+        .filter(
+            WataInvoice.user_id == user.id,
+            WataTransaction.transaction_status == "Paid",
+        )
+    )
+    if activated_at is not None:
+        yk_paid_query = yk_paid_query.filter(YkPayment.created_at > activated_at)
+        # payment_time хранится с таймзоной — сравниваем с aware-версией.
+        wata_paid_query = wata_paid_query.filter(
+            WataTransaction.payment_time
+            > activated_at.replace(tzinfo=timezone.utc)
+        )
+    has_paid = (
+        yk_paid_query.first() is not None or wata_paid_query.first() is not None
+    )
+    if has_paid:
+        return None
+    return discount
+
+
+def site_apply_first_purchase_discount(db_session, user, tariff):
+    """Персональная промо-скидка (активируется в боте или в кабинете).
+
+    Возвращает (tariff, applied). Рекуррент заводится по регулярной цене
+    (metadata.promo). Правила действия скидки — active_first_purchase_discount.
     """
     try:
-        discount = (
-            db_session.query(UserDiscount)
-            .filter(UserDiscount.user_id == user.id)
-            .first()
-        )
+        discount = active_first_purchase_discount(db_session, user)
         if discount is None:
             return tariff, False
-        if discount.valid_until is None or discount.valid_until <= datetime.utcnow():
-            return tariff, False
-        if not 1 <= (discount.percent or 0) <= 99:
-            return tariff, False
-        if discount.source_promo_id is not None:
-            # Выключение промокода в админке гасит и выданные им скидки.
-            promo_is_active = (
-                db_session.query(PromoCode.is_active)
-                .filter(PromoCode.id == discount.source_promo_id)
-                .scalar()
-            )
-            if promo_is_active is False:
-                return tariff, False
-
-        activated_at = discount.created_at
-        yk_paid_query = db_session.query(YkPayment.id).filter(
-            YkPayment.user_id == user.id, YkPayment.status == "succeeded"
-        )
-        wata_paid_query = (
-            db_session.query(WataTransaction.id)
-            .join(WataInvoice, WataInvoice.order_id == WataTransaction.order_id)
-            .filter(
-                WataInvoice.user_id == user.id,
-                WataTransaction.transaction_status == "Paid",
-            )
-        )
-        if activated_at is not None:
-            yk_paid_query = yk_paid_query.filter(YkPayment.created_at > activated_at)
-            # payment_time хранится с таймзоной — сравниваем с aware-версией.
-            wata_paid_query = wata_paid_query.filter(
-                WataTransaction.payment_time
-                > activated_at.replace(tzinfo=timezone.utc)
-            )
-        has_paid = (
-            yk_paid_query.first() is not None or wata_paid_query.first() is not None
-        )
-        if has_paid:
-            return tariff, False
-
         new_price = max(1, round(tariff.price * (100 - discount.percent) / 100))
         if new_price >= tariff.price:
             return tariff, False
@@ -4122,6 +4133,32 @@ def dashboard(request):
             .filter(YkRecurrentPayment.user_id == user.id)
             .scalar()
         )
+        # Экран «Оплата» мобильного кабинета: что именно привязано к автоплатежу.
+        recurrent = (
+            session.query(YkRecurrentPayment)
+            .filter(YkRecurrentPayment.user_id == user.id)
+            .first()
+        )
+        recurrent_info = (
+            {
+                "tariff": get_tariff_display_name(recurrent.subscription_period),
+                "amount": recurrent.amount,
+                "currency": recurrent.currency or "RUB",
+            }
+            if recurrent
+            else None
+        )
+        # Экран «Купить»: действующая промо-скидка и пробный срок друга по рефералке.
+        cabinet_discount = None
+        try:
+            discount = active_first_purchase_discount(session, user)
+            if discount is not None:
+                cabinet_discount = {
+                    "percent": discount.percent,
+                    "valid_until": discount.valid_until,
+                }
+        except Exception:
+            logging.exception("dashboard: failed to resolve promo discount")
 
         ref_invited_count = (
             session.query(func.count(User.id))
@@ -4155,6 +4192,9 @@ def dashboard(request):
         )
         purchase_referrer_bonus_days = runtime_int_from_db(
             session, BOT_PURCHASE_REFERRER_BONUS_DAYS_SETTING, 30
+        )
+        referral_bonus_days = runtime_int_from_db(
+            session, BOT_REFERRAL_BONUS_DAYS_SETTING, 15
         )
 
         support_open_ticket = (
@@ -4411,6 +4451,19 @@ def dashboard(request):
             "referral_link": f"https://t.me/{tg_bot}?start=a{user.username}",
             "site_referral_link": f"{get_current_base_url(request)}/?a={user.username}",
             "tg_webapp_mode": bool(request.session.get("tg_webapp_mode")),
+            # Мобильный кабинет (includes/cabinet_mobile.html)
+            "recurrent_info": recurrent_info,
+            "cabinet_discount": cabinet_discount,
+            "cabinet_tariffs": cabinet_tariff_cards(runtime_tariffs),
+            "referral_bonus_days": referral_bonus_days,
+            "telegram_channel_url": settings.TELEGRAM_CHANNEL_URL,
+            "tg_bot_url": f"https://t.me/{tg_bot}",
+            "payment_gateway": settings.PAYMENT_GATEWAY,
+            "payment_method_label": (
+                "Карта · ЮKassa"
+                if settings.PAYMENT_GATEWAY == "yookassa"
+                else "Карта или СБП · WATA"
+            ),
         },
     )
 
@@ -5029,6 +5082,302 @@ def cabinet_device_delete(request):
             "limit": limit,
             "devices": [_hwid_device_to_dict(d) for d in resp.devices],
         }
+    )
+
+
+# --- Личный кабинет: промокоды и перевыпуск подписки ---
+#
+# Активация промокода повторяет правила бота (utils/promo.py): строка кода
+# блокируется на время активации, проверяются окно дат, лимит активаций,
+# «только первая покупка» и однократность на пользователя. Дни продлевают
+# срок и в БД, и в панели (RWMS) в одной транзакции; скидка пишется в
+# user_discounts и применяется при следующей оплате (site_apply_first_
+# purchase_discount). Перебор кодов и перевыпуск ограничены по попыткам.
+CABINET_PROMO_RATE_LIMIT = 10
+CABINET_PROMO_RATE_WINDOW_SECONDS = 600
+CABINET_REISSUE_RATE_LIMIT = 3
+CABINET_REISSUE_RATE_WINDOW_SECONDS = 3600
+PROMO_DEFAULT_DISCOUNT_TTL_HOURS = 72  # как в боте: скидка без valid_until
+PROMO_ERROR_MESSAGES = {
+    "not_found": "Такой промокод не найден или уже отключён",
+    "expired": "Срок действия промокода истёк",
+    "exhausted": "Лимит активаций этого промокода исчерпан",
+    "already_used": "Вы уже активировали этот промокод",
+    "not_first": "Этот промокод действует только до первой покупки",
+    "rate_limited": "Слишком много попыток — подождите несколько минут",
+    "subscription_missing": "Подписка не найдена — напишите в поддержку",
+    "rwms_unavailable": "Сервис временно недоступен, попробуйте позже",
+}
+
+
+def normalize_promo_code(raw):
+    return (raw or "").strip().upper()[:64]
+
+
+def _promo_error(reason, status=400):
+    return JsonResponse(
+        {
+            "status": "error",
+            "reason": reason,
+            "message": PROMO_ERROR_MESSAGES.get(reason, "Не удалось активировать промокод"),
+        },
+        status=status,
+    )
+
+
+def _cabinet_has_any_payment(db_session, user_id):
+    """Есть ли у пользователя хоть одна успешная оплата (для first_purchase_only)."""
+    yk_paid = (
+        db_session.query(YkPayment.id)
+        .filter(YkPayment.user_id == user_id, YkPayment.status == "succeeded")
+        .first()
+    )
+    if yk_paid is not None:
+        return True
+    wata_paid = (
+        db_session.query(WataTransaction.id)
+        .join(WataInvoice, WataInvoice.order_id == WataTransaction.order_id)
+        .filter(
+            WataInvoice.user_id == user_id,
+            WataTransaction.transaction_status == "Paid",
+        )
+        .first()
+    )
+    return wata_paid is not None
+
+
+def cabinet_promo_activate(request):
+    """POST code=... — активация промокода из личного кабинета."""
+    if request.method != "POST" or not request.user.is_authenticated:
+        return JsonResponse({"status": "error"}, status=403)
+
+    code = normalize_promo_code(request.POST.get("code"))
+    if not code:
+        return _promo_error("not_found")
+
+    limited, _retry = rate_limit_exceeded(
+        "cabinet-promo",
+        (
+            (
+                "user",
+                str(request.user.id),
+                CABINET_PROMO_RATE_LIMIT,
+                CABINET_PROMO_RATE_WINDOW_SECONDS,
+            ),
+        ),
+    )
+    if limited:
+        logging.warning(
+            "cabinet promo: rate limit reached user_id=%s", request.user.id
+        )
+        return _promo_error("rate_limited", status=429)
+
+    session = session_factory()
+    try:
+        now = datetime.utcnow()
+        promo = (
+            session.query(PromoCode)
+            .filter(PromoCode.code == code)
+            .with_for_update()
+            .first()
+        )
+        if promo is None or not promo.is_active:
+            return _promo_error("not_found")
+        if promo.valid_from and now < promo.valid_from:
+            return _promo_error("expired")
+        if promo.valid_until and now > promo.valid_until:
+            return _promo_error("expired")
+        if promo.max_uses and (promo.used_count or 0) >= promo.max_uses:
+            return _promo_error("exhausted")
+
+        db_user = (
+            session.query(User)
+            .filter(User.id == request.user.id)
+            .with_for_update()
+            .first()
+        )
+        if db_user is None:
+            return JsonResponse({"status": "error"}, status=404)
+        if promo.first_purchase_only and _cabinet_has_any_payment(session, db_user.id):
+            return _promo_error("not_first")
+
+        already = (
+            session.query(PromoCodeUse)
+            .filter(
+                PromoCodeUse.promo_id == promo.id,
+                PromoCodeUse.user_id == db_user.id,
+            )
+            .first()
+        )
+        if already is not None:
+            return _promo_error("already_used")
+
+        session.add(PromoCodeUse(promo_id=promo.id, user_id=db_user.id, created_at=now))
+        promo.used_count = (promo.used_count or 0) + 1
+
+        if promo.promo_type == "days":
+            days = int(promo.value or 0)
+            # Панель — истина по существованию ключа: без подписки в панели
+            # дни начислять некуда; при блипе RWMS активацию не тратим.
+            try:
+                subscription = _cabinet_rw_subscription(request)
+            except RwmsUnavailableError:
+                session.rollback()
+                return _promo_error("rwms_unavailable", status=503)
+            if subscription is None:
+                session.rollback()
+                return _promo_error("subscription_missing", status=404)
+            base = (
+                db_user.expire_at
+                if db_user.expire_at is not None and db_user.expire_at > now
+                else now
+            )
+            new_expire_at = base + timedelta(days=days)
+            db_user.expire_at = new_expire_at
+            update = proto.UpdateUserRequest(uuid=subscription.uuid)
+            update.expire_at.FromDatetime(new_expire_at)
+            # Срок в панели обновляем до commit: если RWMS не ответил —
+            # откатываем и активацию, и дни, пользователь попробует позже.
+            if rwms_client.update_user(update) is None:
+                session.rollback()
+                logging.error(
+                    "cabinet promo %s: RWMS expire update failed user_id=%s rw_uuid=%s",
+                    code,
+                    db_user.id,
+                    subscription.uuid,
+                )
+                return _promo_error("rwms_unavailable", status=503)
+            session.commit()
+            logging.info(
+                "cabinet promo %s activated by user %s: +%s days, expire_at=%s",
+                code,
+                db_user.id,
+                days,
+                new_expire_at.isoformat(),
+            )
+            return JsonResponse(
+                {
+                    "status": "ok",
+                    "promo_type": "days",
+                    "value": days,
+                    "expire_at": new_expire_at.isoformat() + "Z",
+                }
+            )
+
+        percent = int(promo.value or 0)
+        valid_until = promo.valid_until or (
+            now + timedelta(hours=PROMO_DEFAULT_DISCOUNT_TTL_HOURS)
+        )
+        discount = (
+            session.query(UserDiscount)
+            .filter(UserDiscount.user_id == db_user.id)
+            .first()
+        )
+        if discount is None:
+            session.add(
+                UserDiscount(
+                    user_id=db_user.id,
+                    percent=percent,
+                    valid_until=valid_until,
+                    source_promo_id=promo.id,
+                    created_at=now,
+                )
+            )
+        else:
+            # Повторная активация открывает новое окно «до первой оплаты».
+            discount.percent = percent
+            discount.valid_until = valid_until
+            discount.source_promo_id = promo.id
+            discount.created_at = now
+        session.commit()
+        logging.info(
+            "cabinet promo %s activated by user %s: %s%% discount until %s",
+            code,
+            db_user.id,
+            percent,
+            valid_until.isoformat(),
+        )
+        return JsonResponse(
+            {
+                "status": "ok",
+                "promo_type": "discount",
+                "value": percent,
+                "valid_until": valid_until.isoformat() + "Z",
+            }
+        )
+    except Exception:
+        session.rollback()
+        logging.exception(
+            "cabinet promo activation failed user_id=%s", request.user.id
+        )
+        return JsonResponse({"status": "error"}, status=500)
+    finally:
+        session.close()
+
+
+def cabinet_subscription_reissue(request):
+    """POST — перевыпуск подписки владельцем: новая ссылка, старая перестаёт
+    работать на всех устройствах. Единственное исключение из правила
+    «не перевыпускать ключи»: явное подтверждённое действие владельца."""
+    if request.method != "POST" or not request.user.is_authenticated:
+        return JsonResponse({"status": "error"}, status=403)
+
+    limited, _retry = rate_limit_exceeded(
+        "cabinet-reissue",
+        (
+            (
+                "user",
+                str(request.user.id),
+                CABINET_REISSUE_RATE_LIMIT,
+                CABINET_REISSUE_RATE_WINDOW_SECONDS,
+            ),
+        ),
+    )
+    if limited:
+        logging.warning(
+            "cabinet reissue: rate limit reached user_id=%s", request.user.id
+        )
+        return JsonResponse(
+            {
+                "status": "error",
+                "reason": "rate_limited",
+                "message": "Перевыпускать ключ можно не чаще нескольких раз в час",
+            },
+            status=429,
+        )
+
+    try:
+        subscription = _cabinet_rw_subscription(request)
+    except RwmsUnavailableError:
+        return _cabinet_rwms_unavailable_response()
+    if subscription is None:
+        return JsonResponse(
+            {"status": "error", "message": "subscription not found"}, status=404
+        )
+
+    logging.info(
+        "cabinet reissue requested: user_id=%s rw_uuid=%s short_uuid=%s",
+        request.user.id,
+        subscription.uuid,
+        subscription.short_uuid,
+    )
+    try:
+        updated = rwms_client.revoke_user_subscription(subscription.uuid)
+    except RwmsUnavailableError:
+        return _cabinet_rwms_unavailable_response()
+    if updated is None:
+        return JsonResponse(
+            {"status": "error", "message": "subscription not found"}, status=404
+        )
+    logging.info(
+        "cabinet reissue done: user_id=%s rw_uuid=%s short_uuid %s -> %s",
+        request.user.id,
+        subscription.uuid,
+        subscription.short_uuid,
+        updated.short_uuid,
+    )
+    return JsonResponse(
+        {"status": "ok", "subscription_url": updated.subscription_url or ""}
     )
 
 
@@ -6071,6 +6420,38 @@ def runtime_int_from_db(db_session, key, default_value, min_value=0):
         logging.error("invalid integer system setting %s=%r", key, value.value)
         return default_value
     return parsed_value
+
+
+CABINET_TARIFF_TITLES = {"month": "1 месяц", "threemonths": "3 месяца", "year": "12 месяцев"}
+
+
+def cabinet_tariff_cards(tariffs):
+    """Карточки тарифов экрана «Купить» мобильного кабинета: цена в месяц и
+    выгода относительно месячного тарифа (как в приложении-образце)."""
+    month_price = next(
+        (t.price for t in tariffs if t.db_tariff_id == "month"), None
+    )
+    cards = []
+    for tariff in tariffs:
+        days = tariff.subscription_period.days or 30
+        months = max(1, round(days / 30))
+        per_month = tariff.price // months
+        savings = 0
+        if month_price and months > 1 and per_month < month_price:
+            savings = round(100 - per_month * 100 / month_price)
+        cards.append(
+            {
+                "id": tariff.db_tariff_id,
+                "title": CABINET_TARIFF_TITLES.get(
+                    tariff.db_tariff_id, get_tariff_display_name(tariff.db_tariff_id)
+                ),
+                "months": months,
+                "price": tariff.price,
+                "per_month": per_month,
+                "savings": savings,
+            }
+        )
+    return cards
 
 
 def get_runtime_actual_tariffs(db_session=None):

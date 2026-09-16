@@ -245,6 +245,16 @@ message DeleteUserHwidDeviceResponse {
   repeated HwidDevice devices = 2;
 }
 
+// --- Перевыпуск подписки (личный кабинет) ---
+// Единственное исключение из правила «не перевыпускать ключи»: явное
+// действие владельца подписки в кабинете. Панель генерирует новый
+// short_uuid и новые credentials — старая ссылка подписки и старые
+// конфиги перестают работать на всех устройствах. Срок, статус, сквады
+// и лимиты подписки не меняются.
+message RevokeUserSubscriptionRequest {
+  string uuid = 1;
+}
+
 // Панельные настройки HWID (из /api/subscription-settings панели):
 // enabled — включён ли учёт устройств, fallback_device_limit — глобальный
 // лимит устройств для подписок без личного hwid_device_limit.
@@ -282,4 +292,9 @@ service RwManager {
   // Панельные настройки HWID: нужны кабинету, чтобы показать реальный
   // лимит устройств подписки, когда личный hwid_device_limit не задан.
   rpc GetHwidSettings(Empty) returns (GetHwidSettingsResponse) {}
+
+  // Перевыпуск подписки по явному действию владельца в кабинете:
+  // POST /api/users/{uuid}/actions/revoke панели. Ответ — обновлённый
+  // пользователь с новым short_uuid и subscription_url.
+  rpc RevokeUserSubscription(RevokeUserSubscriptionRequest) returns (UserResponse) {}
 }

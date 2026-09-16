@@ -109,6 +109,11 @@ class RwManagerStub:
                 request_serializer=proto_dot_rwmanager__pb2.Empty.SerializeToString,
                 response_deserializer=proto_dot_rwmanager__pb2.GetHwidSettingsResponse.FromString,
                 _registered_method=True)
+        self.RevokeUserSubscription = channel.unary_unary(
+                '/rwmanager.RwManager/RevokeUserSubscription',
+                request_serializer=proto_dot_rwmanager__pb2.RevokeUserSubscriptionRequest.SerializeToString,
+                response_deserializer=proto_dot_rwmanager__pb2.UserResponse.FromString,
+                _registered_method=True)
 
 
 class RwManagerServicer:
@@ -212,6 +217,15 @@ class RwManagerServicer:
         context.set_details('Method not implemented!')
         raise NotImplementedError('Method not implemented!')
 
+    def RevokeUserSubscription(self, request, context):
+        """Перевыпуск подписки по явному действию владельца в кабинете:
+        POST /api/users/{uuid}/actions/revoke панели. Ответ — обновлённый
+        пользователь с новым short_uuid и subscription_url.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
 
 def add_RwManagerServicer_to_server(servicer, server):
     rpc_method_handlers = {
@@ -289,6 +303,11 @@ def add_RwManagerServicer_to_server(servicer, server):
                     servicer.GetHwidSettings,
                     request_deserializer=proto_dot_rwmanager__pb2.Empty.FromString,
                     response_serializer=proto_dot_rwmanager__pb2.GetHwidSettingsResponse.SerializeToString,
+            ),
+            'RevokeUserSubscription': grpc.unary_unary_rpc_method_handler(
+                    servicer.RevokeUserSubscription,
+                    request_deserializer=proto_dot_rwmanager__pb2.RevokeUserSubscriptionRequest.FromString,
+                    response_serializer=proto_dot_rwmanager__pb2.UserResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -696,6 +715,33 @@ class RwManager:
             '/rwmanager.RwManager/GetHwidSettings',
             proto_dot_rwmanager__pb2.Empty.SerializeToString,
             proto_dot_rwmanager__pb2.GetHwidSettingsResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RevokeUserSubscription(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/rwmanager.RwManager/RevokeUserSubscription',
+            proto_dot_rwmanager__pb2.RevokeUserSubscriptionRequest.SerializeToString,
+            proto_dot_rwmanager__pb2.UserResponse.FromString,
             options,
             channel_credentials,
             insecure,

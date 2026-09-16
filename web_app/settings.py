@@ -370,6 +370,10 @@ SUPPORT_ATTACHMENT_X_ACCEL_REDIRECT = config(
     default=not config("DEBUG", default=False, cast=bool),
     cast=bool,
 )
+# Ссылка на Telegram-канал проекта (экран «Аккаунт → Ссылки» мобильного кабинета)
+TELEGRAM_CHANNEL_URL = config(
+    "TELEGRAM_CHANNEL_URL", default="https://t.me/monkeyisland_news"
+)
 SUPPORT_TELEGRAM_URL = config(
     "SUPPORT_TELEGRAM_URL",
     default="https://t.me/monkeyislandsupportbot",
