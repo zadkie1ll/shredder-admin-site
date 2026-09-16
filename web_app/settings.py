@@ -582,6 +582,11 @@ STATICFILES_BACKEND = (
     if "test" in sys.argv
     else PRODUCTION_STATICFILES_BACKEND
 )
+# Фоновая пересборка кэшей вкладки «Привлечение» (stale-while-revalidate и
+# прогрев при открытии админки). В тестах выключена: фоновые потоки с
+# реальной сессией БД там ни к чему — устаревший кэш пересобирается синхронно.
+ACQ_CACHE_BACKGROUND = "test" not in sys.argv
+
 STORAGES = {
     "default": {
         "BACKEND": "django.core.files.storage.FileSystemStorage",

@@ -1538,6 +1538,88 @@ class AcquisitionRevenueTests(SimpleTestCase):
         with self.assertRaises(ValueError):
             _acq_revenue_days(object(), "2026-09-30", "2026-09-01")
 
+    @mock.patch("engine.views._expiry_load_trial_days", return_value=7)
+    @mock.patch("engine.views._expiry_load_autopay", return_value=set())
+    @mock.patch("engine.views._expiry_load_trial_starts", return_value={})
+    @mock.patch("engine.views._expiry_load_expires", return_value={})
+    @mock.patch("engine.views._expiry_load_payments", return_value=[])
+    def test_cold_revenue_loads_only_payments_and_reuses_them(self, payments_mock, expires_mock, *_mocks):
+        """Холодный старт «Выручки»: график ждёт только запрос оплат;
+        периоды (users + event_logs) собираются отдельно и переиспользуют
+        уже загруженные оплаты, а не грузят их второй раз."""
+        from engine.views import _acq_revenue_days, _acq_summary, _expiry_cache_clear
+
+        _expiry_cache_clear()
+        self.addCleanup(_expiry_cache_clear)
+        _acq_revenue_days(object())
+        self.assertEqual(payments_mock.call_count, 1)
+        self.assertEqual(expires_mock.call_count, 0)
+        _acq_summary(object())
+        self.assertEqual(expires_mock.call_count, 1)
+        self.assertEqual(payments_mock.call_count, 1)
+
+    @override_settings(ACQ_CACHE_BACKGROUND=True)
+    @mock.patch("engine.views._expiry_load_trial_days", return_value=7)
+    @mock.patch("engine.views._expiry_load_autopay", return_value=set())
+    @mock.patch("engine.views._expiry_load_trial_starts", return_value={})
+    @mock.patch("engine.views._expiry_load_expires", return_value={})
+    @mock.patch("engine.views._expiry_load_payments", return_value=[])
+    def test_stale_cache_is_served_and_refreshed_in_background(self, payments_mock, *_mocks):
+        """После TTL устаревший кэш отдаётся сразу; пересборка — одна на
+        процесс, в фоне, со своей сессией (stale-while-revalidate)."""
+        from engine import views
+
+        views._expiry_cache_clear()
+        self.addCleanup(views._expiry_cache_clear)
+        runs = []
+        with mock.patch.object(views, "_ACQ_THREAD_RUNNER", runs.append):
+            views._acq_summary(object())
+            self.assertEqual(payments_mock.call_count, 1)
+            with views._EXPIRY_CACHE_LOCK:
+                views._EXPIRY_CACHE["at"] -= views.EXPIRY_CACHE_TTL + 1
+                views._EXPIRY_CACHE["payments_at"] -= views.EXPIRY_CACHE_TTL + 1
+            views._acq_summary(object())
+            views._acq_revenue_days(object())
+            self.assertEqual(payments_mock.call_count, 1)
+            self.assertEqual(len(runs), 1)
+            with mock.patch.object(views, "session_factory", return_value=mock.MagicMock()):
+                runs[0]()
+            self.assertEqual(payments_mock.call_count, 2)
+            views._acq_summary(object())
+            self.assertEqual(len(runs), 1)
+
+    @override_settings(ACQ_CACHE_BACKGROUND=True)
+    def test_dashboard_open_warms_caches_once(self):
+        import inspect
+
+        from engine import views
+
+        views._expiry_cache_clear()
+        self.addCleanup(views._expiry_cache_clear)
+        runs = []
+        with mock.patch.object(views, "_ACQ_THREAD_RUNNER", runs.append):
+            views._acq_cache_warm()
+            views._acq_cache_warm()
+        # Периоды и жизненный цикл — по одному фоновому прогреву, повтор не плодит.
+        self.assertEqual(len(runs), 2)
+        self.assertIn("_acq_cache_warm()", inspect.getsource(views.support_admin_tickets))
+
+    def test_background_refresh_is_disabled_under_tests(self):
+        # В тестах фон выключен настройкой — потоки с реальной сессией не стартуют,
+        # устаревший кэш пересобирается синхронно.
+        from engine import views
+
+        self.assertFalse(settings.ACQ_CACHE_BACKGROUND)
+        self.assertFalse(views._acq_background("expiry", lambda _s: None))
+
+    def test_template_renders_revenue_blocks_independently(self):
+        template = template_source("engine/templates/admin_dashboard.html")
+        # График и плитки не ждут недельную сводку: три запроса рисуются
+        # по мере ответов, ошибка одного блока не гасит остальные.
+        self.assertIn("Promise.allSettled([daysReq, kpisReq, weeklyReq])", template)
+        self.assertIn("Недельная сводка считается по периодам подписок", template)
+        self.assertNotIn("Собираем оплаты и периоды — первый раз до минуты", template)
+
     def test_summary_weeks_revenue_renewal_and_base(self):
         from engine.views import _acq_summary_weeks
 

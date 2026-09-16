@@ -789,28 +789,25 @@
             const loading = document.getElementById('acq-revenue-loading');
             const loadingText = document.getElementById('acq-revenue-loading-text');
             body?.classList.add('is-loading');
-            if (loading) { loading.hidden = false; if (loadingText) loadingText.textContent = revenueState.res ? 'Пересчитываем…' : 'Собираем оплаты и периоды — первый раз до минуты, дальше быстро.'; }
-            try {
-                const [res, kpiRes, weekly] = await Promise.all([
-                    acqFetch('revenue_days', {start: startEl.value, end: endEl.value}, {timeoutMs: 120000}),
-                    acqFetch('revenue_kpis', {start: expiryIsoShift(-60), end: expiryIsoShift(0)}, {timeoutMs: 120000}),
-                    acqFetch('summary', {weeks: 12}, {timeoutMs: 120000}),
-                ]);
-                revenueState.res = res;
-                revenueState.weekly = weekly;
-                renderRevenueKpis(kpiRes);
-                renderRevenueChart(res);
-                renderRevenueTable(res);
-                renderWeekly(weekly);
-            } catch (error) {
-                if (error?.name === 'AbortError') return;
-                const table = document.getElementById('acq-revenue-table');
-                if (table) table.innerHTML = `<p class="acq-ads-summary-note is-error">Не удалось загрузить данные: ${escapeHtml(error.message || String(error))}</p>`;
-                throw error;
-            } finally {
-                body?.classList.remove('is-loading');
-                if (loading) loading.hidden = true;
-            }
+            if (loading) { loading.hidden = false; if (loadingText) loadingText.textContent = revenueState.res ? 'Пересчитываем…' : 'Собираем оплаты…'; }
+            const weeklySummary = document.getElementById('acq-weekly-summary');
+            if (weeklySummary && !revenueState.weekly) weeklySummary.innerHTML = '<span class="acq-expiry-spinner" aria-hidden="true"></span> Недельная сводка считается по периодам подписок — первый раз дольше, дальше из кэша.';
+            const failNote = (id, error) => { const el = document.getElementById(id); if (el) el.innerHTML = `<p class="acq-ads-summary-note is-error">Не удалось загрузить данные: ${escapeHtml(error?.message || String(error))}</p>`; };
+            const hideLoading = () => { body?.classList.remove('is-loading'); if (loading) loading.hidden = true; };
+            // Три запроса идут параллельно, и каждый блок рисуется, как только
+            // пришёл его ответ: график и плитки не ждут тяжёлую недельную сводку
+            // (она собирает периоды подписок и на холодном кэше идёт дольше).
+            const daysReq = acqFetch('revenue_days', {start: startEl.value, end: endEl.value}, {timeoutMs: 120000})
+                .then((res) => { revenueState.res = res; renderRevenueChart(res); renderRevenueTable(res); })
+                .finally(hideLoading);
+            const kpisReq = acqFetch('revenue_kpis', {start: expiryIsoShift(-60), end: expiryIsoShift(0)}, {timeoutMs: 120000}).then(renderRevenueKpis);
+            const weeklyReq = acqFetch('summary', {weeks: 12}, {timeoutMs: 120000})
+                .then((weekly) => { revenueState.weekly = weekly; renderWeekly(weekly); });
+            const results = await Promise.allSettled([daysReq, kpisReq, weeklyReq]);
+            const targets = ['acq-revenue-table', 'acq-revenue-kpis', 'acq-weekly-summary'];
+            const failures = results.map((r, i) => (r.status === 'rejected' && r.reason?.name !== 'AbortError') ? {reason: r.reason, target: targets[i]} : null).filter(Boolean);
+            failures.forEach((f) => failNote(f.target, f.reason));
+            if (failures.length) throw failures[0].reason;
         }
 
         // ===== Путь когорты =====

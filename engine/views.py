@@ -5396,6 +5396,7 @@ def support_admin_tickets(request):
     auth_response = require_support_admin(request)
     if auth_response:
         return auth_response
+    _acq_cache_warm()
 
     status_filter = request.GET.get("status", "open")
     tickets_data = load_support_admin_tickets(status_filter)
@@ -12930,21 +12931,24 @@ def _expiry_load_payments(db_session):
 EXPIRY_EXPIRES_LOOKBACK_DAYS = EXPIRY_MAX_RANGE_DAYS + 30
 
 
-def _expiry_load_expires(db_session):
+def _expiry_load_expires(db_session, payer_ids):
+    """id -> expire_at: у плативших (последний период — реальный срок) и у
+    пробных, чей срок не старше EXPIRY_EXPIRES_LOOKBACK_DAYS. Один простой
+    скэн users; принадлежность к плательщикам — по уже загруженным оплатам,
+    без коррелированного EXISTS по двум платёжным таблицам на каждую строку."""
     return {
         int(r["id"]): r["expire_at"]
         for r in _acq_rows(
             db_session,
             f"""
-            SELECT u.id, u.expire_at FROM users u
+            SELECT u.id, u.expire_at,
+                   (u.expire_at >= now() AT TIME ZONE 'UTC'
+                        - make_interval(days => {int(EXPIRY_EXPIRES_LOOKBACK_DAYS)})) AS recent
+            FROM users u
             WHERE u.expire_at IS NOT NULL
-              AND (
-                u.expire_at >= now() AT TIME ZONE 'UTC'
-                    - make_interval(days => {int(EXPIRY_EXPIRES_LOOKBACK_DAYS)})
-                OR ({PAYS_EXISTS_SQL})
-              )
             """,
         )
+        if r["recent"] or int(r["id"]) in payer_ids
     }
 
 
@@ -12963,20 +12967,15 @@ def _expiry_load_autopay(db_session):
     }
 
 
-def _expiry_load_trial_starts(db_session):
+def _expiry_load_trial_starts(db_session, payer_ids):
     """Старт пробного нужен только плативших: у остальных конец пробного —
-    это их expire_at, событие не требуется."""
+    это их expire_at, событие не требуется. Берём min(subscription_created)
+    по всем (тот же запрос, что у «Пути когорты») и фильтруем в Python —
+    без EXISTS по users и оплатам на каждую строку event_logs."""
     return {
-        int(r["user_id"]): r["started_at"]
-        for r in _acq_rows(
-            db_session,
-            f"""
-            SELECT e.user_id, min(e.timestamp) AS started_at FROM event_logs e
-            WHERE e.event_type = 'subscription_created'
-              AND EXISTS (SELECT 1 FROM users u WHERE u.id = e.user_id AND ({PAYS_EXISTS_SQL}))
-            GROUP BY e.user_id
-            """,
-        )
+        user_id: started_at
+        for user_id, started_at in _lifecycle_load_signups(db_session).items()
+        if user_id in payer_ids
     }
 
 
@@ -13195,52 +13194,165 @@ def _expiry_aggregate(periods, start, end, group, window_days, now, today):
 # списку — мгновенно. Данные внизу меняются медленно (оплаты, сроки), пять
 # минут отставания для этого отчёта не важны; ?refresh=1 сбрасывает кэш.
 EXPIRY_CACHE_TTL = 300
-_EXPIRY_CACHE = {"at": 0.0, "periods": None, "trial_days": None, "payments": None}
+# Кэш процесса (у каждого gunicorn-воркера свой). После TTL данные не
+# выбрасываются: устаревшие отдаются сразу, а пересборка идёт в фоновом
+# потоке со своей сессией (stale-while-revalidate). Сборка — под одним
+# замком: параллельные запросы вкладки ждут одну сборку, а не запускают
+# каждый свою.
+_EXPIRY_CACHE = {
+    "at": 0.0,
+    "periods": None,
+    "trial_days": None,
+    "payments": None,
+    "payments_at": 0.0,
+}
 _EXPIRY_CACHE_LOCK = threading.Lock()
+_EXPIRY_BUILD_LOCK = threading.Lock()
+_ACQ_REFRESHING = {}
 
 
 def _expiry_cache_clear():
     with _EXPIRY_CACHE_LOCK:
-        _EXPIRY_CACHE.update(at=0.0, periods=None, trial_days=None, payments=None)
+        _EXPIRY_CACHE.update(
+            at=0.0, periods=None, trial_days=None, payments=None, payments_at=0.0
+        )
+        _ACQ_REFRESHING.clear()
     _lifecycle_cache_clear()
 
 
+def _acq_thread_runner(run):
+    threading.Thread(target=run, name="acq-cache-refresh", daemon=True).start()
+
+
+# Точка подмены в тестах: запускать фон синхронно или просто записывать.
+_ACQ_THREAD_RUNNER = _acq_thread_runner
+
+
+def _acq_background(name, rebuild):
+    """Пересборка кэша `name` в фоне со своей сессией БД, не больше одной
+    одновременно на имя. False — фон выключен (settings.ACQ_CACHE_BACKGROUND),
+    тогда вызывающий пересобирает сам; True — запущена или уже идёт."""
+    if not getattr(settings, "ACQ_CACHE_BACKGROUND", True):
+        return False
+    with _EXPIRY_CACHE_LOCK:
+        if _ACQ_REFRESHING.get(name):
+            return True
+        _ACQ_REFRESHING[name] = True
+
+    def run():
+        session = session_factory()
+        try:
+            rebuild(session)
+        except Exception:  # noqa: BLE001 — фон не должен ронять воркер
+            logging.exception("acquisition cache %s: background refresh failed", name)
+        finally:
+            try:
+                session.close()
+            except Exception:  # noqa: BLE001
+                pass
+            with _EXPIRY_CACHE_LOCK:
+                _ACQ_REFRESHING[name] = False
+
+    _ACQ_THREAD_RUNNER(run)
+    return True
+
+
+def _expiry_rebuild(db_session, force_payments=False):
+    """Полная сборка периодов под замком. Свежие оплаты (загруженные быстрым
+    путём «Выручки») переиспользуются; force_payments — refresh=1 админом."""
+    with _EXPIRY_BUILD_LOCK:
+        now = _monotonic()
+        with _EXPIRY_CACHE_LOCK:
+            if (
+                not force_payments
+                and _EXPIRY_CACHE["periods"] is not None
+                and now - _EXPIRY_CACHE["at"] < EXPIRY_CACHE_TTL
+            ):
+                return _EXPIRY_CACHE["periods"], _EXPIRY_CACHE["trial_days"]
+            payments = _EXPIRY_CACHE["payments"]
+            payments_at = _EXPIRY_CACHE["payments_at"]
+            payments_fresh = payments is not None and now - payments_at < EXPIRY_CACHE_TTL
+        started = _monotonic()
+        trial_days = _expiry_load_trial_days(db_session)
+        if force_payments or not payments_fresh:
+            payments = _expiry_load_payments(db_session)
+            payments_at = _monotonic()
+        payer_ids = {row[0] for row in payments}
+        periods = _expiry_periods(
+            payments,
+            _expiry_load_expires(db_session, payer_ids),
+            _expiry_load_trial_starts(db_session, payer_ids),
+            trial_days,
+            _expiry_load_autopay(db_session),
+        )
+        logging.info(
+            "acquisition expirations: %s periods rebuilt in %.2fs",
+            len(periods),
+            _monotonic() - started,
+        )
+        with _EXPIRY_CACHE_LOCK:
+            _EXPIRY_CACHE.update(
+                at=_monotonic(),
+                periods=periods,
+                trial_days=trial_days,
+                payments=payments,
+                payments_at=payments_at,
+            )
+        return periods, trial_days
+
+
 def _expiry_periods_cached(db_session, refresh=False):
+    if refresh:
+        return _expiry_rebuild(db_session, force_payments=True)
     now = _monotonic()
     with _EXPIRY_CACHE_LOCK:
-        if (
-            not refresh
-            and _EXPIRY_CACHE["periods"] is not None
-            and now - _EXPIRY_CACHE["at"] < EXPIRY_CACHE_TTL
-        ):
-            return _EXPIRY_CACHE["periods"], _EXPIRY_CACHE["trial_days"]
-    started = _monotonic()
-    trial_days = _expiry_load_trial_days(db_session)
-    payments = _expiry_load_payments(db_session)
-    periods = _expiry_periods(
-        payments,
-        _expiry_load_expires(db_session),
-        _expiry_load_trial_starts(db_session),
-        trial_days,
-        _expiry_load_autopay(db_session),
-    )
-    logging.info(
-        "acquisition expirations: %s periods rebuilt in %.2fs",
-        len(periods),
-        _monotonic() - started,
-    )
-    with _EXPIRY_CACHE_LOCK:
-        _EXPIRY_CACHE.update(
-            at=_monotonic(), periods=periods, trial_days=trial_days, payments=payments
-        )
-    return periods, trial_days
+        periods = _EXPIRY_CACHE["periods"]
+        trial_days = _EXPIRY_CACHE["trial_days"]
+        at = _EXPIRY_CACHE["at"]
+    if periods is not None:
+        # Свежие — отдаём; устаревшие — тоже отдаём, пересборка в фоне.
+        if now - at < EXPIRY_CACHE_TTL or _acq_background("expiry", _expiry_rebuild):
+            return periods, trial_days
+    return _expiry_rebuild(db_session)
 
 
 def _expiry_payments_cached(db_session, refresh=False):
-    """Оплаты той же сборки, что и периоды (с суммами)."""
-    _expiry_periods_cached(db_session, refresh=refresh)
+    """Оплаты той же сборки, что и периоды. Холодный старт грузит только
+    оплаты (быстрый запрос — график «Выручки» не ждёт users и event_logs),
+    периоды досчитываются в фоне и переиспользуют эти оплаты."""
+    if refresh:
+        _expiry_rebuild(db_session, force_payments=True)
+    now = _monotonic()
     with _EXPIRY_CACHE_LOCK:
-        return _EXPIRY_CACHE["payments"] or []
+        payments = _EXPIRY_CACHE["payments"]
+        at = _EXPIRY_CACHE["payments_at"]
+    if payments is not None:
+        if now - at < EXPIRY_CACHE_TTL or _acq_background("expiry", _expiry_rebuild):
+            return payments
+        _expiry_rebuild(db_session)
+        with _EXPIRY_CACHE_LOCK:
+            return _EXPIRY_CACHE["payments"] or []
+    with _EXPIRY_BUILD_LOCK:
+        with _EXPIRY_CACHE_LOCK:
+            if _EXPIRY_CACHE["payments"] is not None:
+                return _EXPIRY_CACHE["payments"]
+        payments = _expiry_load_payments(db_session)
+        with _EXPIRY_CACHE_LOCK:
+            _EXPIRY_CACHE.update(payments=payments, payments_at=_monotonic())
+    _acq_background("expiry", _expiry_rebuild)
+    return payments
+
+
+def _acq_cache_warm():
+    """Открыли админку — греем кэши «Привлечения» в фоне, чтобы первая
+    открытая вкладка не ждала сборку (по воркеру, который отдал страницу)."""
+    with _EXPIRY_CACHE_LOCK:
+        cold_expiry = _EXPIRY_CACHE["periods"] is None
+        cold_lifecycle = _LIFECYCLE_CACHE["signups"] is None
+    if cold_expiry:
+        _acq_background("expiry", _expiry_rebuild)
+    if cold_lifecycle:
+        _acq_background("lifecycle", _lifecycle_rebuild)
 
 
 # --- Жизненный цикл клиента: сводка «почему выручка такая» и «Путь когорты» ---
@@ -13249,6 +13361,7 @@ def _expiry_payments_cached(db_session, refresh=False):
 # следующая оплата пришла не позже EXPIRY_DEFAULT_WINDOW дней после его конца
 # (досрочная — тоже). Пробные периоды в удержание не входят, они — конверсия.
 _LIFECYCLE_CACHE = {"at": 0.0, "signups": None, "connected": None}
+_LIFECYCLE_BUILD_LOCK = threading.Lock()
 
 
 def _lifecycle_cache_clear():
@@ -13285,20 +13398,35 @@ def _lifecycle_load_connected(db_session):
     }
 
 
+def _lifecycle_rebuild(db_session, force=False):
+    with _LIFECYCLE_BUILD_LOCK:
+        now = _monotonic()
+        with _EXPIRY_CACHE_LOCK:
+            if (
+                not force
+                and _LIFECYCLE_CACHE["signups"] is not None
+                and now - _LIFECYCLE_CACHE["at"] < EXPIRY_CACHE_TTL
+            ):
+                return _LIFECYCLE_CACHE["signups"], _LIFECYCLE_CACHE["connected"]
+        signups = _lifecycle_load_signups(db_session)
+        connected = _lifecycle_load_connected(db_session)
+        with _EXPIRY_CACHE_LOCK:
+            _LIFECYCLE_CACHE.update(at=_monotonic(), signups=signups, connected=connected)
+        return signups, connected
+
+
 def _lifecycle_cached(db_session, refresh=False):
+    if refresh:
+        return _lifecycle_rebuild(db_session, force=True)
     now = _monotonic()
     with _EXPIRY_CACHE_LOCK:
-        if (
-            not refresh
-            and _LIFECYCLE_CACHE["signups"] is not None
-            and now - _LIFECYCLE_CACHE["at"] < EXPIRY_CACHE_TTL
-        ):
-            return _LIFECYCLE_CACHE["signups"], _LIFECYCLE_CACHE["connected"]
-    signups = _lifecycle_load_signups(db_session)
-    connected = _lifecycle_load_connected(db_session)
-    with _EXPIRY_CACHE_LOCK:
-        _LIFECYCLE_CACHE.update(at=_monotonic(), signups=signups, connected=connected)
-    return signups, connected
+        signups = _LIFECYCLE_CACHE["signups"]
+        connected = _LIFECYCLE_CACHE["connected"]
+        at = _LIFECYCLE_CACHE["at"]
+    if signups is not None:
+        if now - at < EXPIRY_CACHE_TTL or _acq_background("lifecycle", _lifecycle_rebuild):
+            return signups, connected
+    return _lifecycle_rebuild(db_session)
 
 
 def _msk_week(value_utc):
