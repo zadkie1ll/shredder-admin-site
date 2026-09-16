@@ -97,7 +97,8 @@
 .cm-toggle input:checked + i { background: var(--cm-accent); }
 .cm-toggle input:checked + i::after { transform: translateX(20px); }
 .cm-toggle.is-disabled { opacity: .45; }
-.cm-method-mark { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 50%; background: var(--cm-accent); color: var(--cm-accent-ink); display: inline-flex; align-items: center; justify-content: center; font-size: 17px; }
+/* Кружок способа оплаты — span внутри .cm-row, поэтому перебиваем правило `.cm-row > span` (flex: 1, колонка). */
+.cm-row > .cm-method-mark, .cm-method-mark { width: 40px; height: 40px; flex: 0 0 40px; border-radius: 50%; background: var(--cm-accent); color: var(--cm-accent-ink); display: inline-flex; flex-direction: row; align-items: center; justify-content: center; font-size: 17px; }
 
 /* Рефералы */
 .cm-ref-hero { display: flex; gap: 14px; align-items: flex-start; }
