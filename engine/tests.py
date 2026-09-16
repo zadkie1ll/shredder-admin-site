@@ -6060,6 +6060,16 @@ class ConfigTemplatesAdminUiTests(SimpleTestCase):
         self.assertIn("data-ua-rule-delete=", template)
         self.assertIn("!event.target.closest('[data-ua-rule-delete]')", template)
         self.assertNotIn("<small>Если UA содержит</small>", template)
+        # При hover приоритет сменяется иконками 26px: ячейка держит эту
+        # высоту всегда, иначе строка прыгала.
+        self.assertIn(".ua-rule-prio-wrap { display: flex; align-items: center; justify-content: flex-end; min-height: 26px; }", template)
+
+    def test_json_editor_is_tall(self):
+        template = template_source("engine/templates/admin_dashboard.html")
+        # codemirror.css грузится позже и ставит .CodeMirror { height: 300px };
+        # наш селектор с оболочкой сильнее и растягивает редактор на экран.
+        self.assertIn(".config-json-shell .CodeMirror { height: clamp(480px, 70vh, 960px); }", template)
+        self.assertIn(".json-editor-textarea { min-height: clamp(480px, 70vh, 960px);", template)
 
     def test_json_editor_selection_is_visible(self):
         template = template_source("engine/templates/admin_dashboard.html")
