@@ -9325,7 +9325,8 @@ class CabinetDevicesApiTests(_CabTestCase):
         self.assertEqual(payload["limit"], 15)
         self.assertEqual(payload["devices"][0]["hwid"], "dev-1")
         self.assertEqual(payload["devices"][0]["device_model"], "iPhone 15 Pro")
-        mocked.assert_called_once_with("rw-uuid-1")
+        # Вызов идёт с дедлайном кабинета (медленная панель не держит страницу).
+        mocked.assert_called_once_with("rw-uuid-1", timeout=settings.CABINET_RWMS_TIMEOUT_SECONDS)
 
     def test_devices_list_limit_panel_fallback(self):
         """Без личного hwid_device_limit кабинет показывает глобальный
@@ -16984,12 +16985,23 @@ class CabinetOAuthLinkTests(SimpleTestCase):
         names = {c.name for c in views.OAuthIdentity.__table__.constraints}
         self.assertIn("uq_oauth_identity_subject", names)
 
+    def test_email_login_provider_detection(self):
+        from engine import views
+
+        self.assertEqual(views.email_login_provider("Me@Gmail.com"), "google")
+        self.assertEqual(views.email_login_provider("me@ya.ru"), "yandex")
+        self.assertIsNone(views.email_login_provider("me@mail.ru"))
+        self.assertIsNone(views.email_login_provider(None))
+
     def test_template_login_methods_screen(self):
         template = template_source("engine/templates/dashboard.html")
         for needle in (
             "{% url 'google_login' %}?link=1",
             "{% url 'yandex_login' %}?link=1",
             "{% if oauth_identities.google %}",
+            # gmail/yandex-почта: вход через провайдера уже есть — «Через почту», не «Привязать».
+            "{% elif email_provider == 'google' %}",
+            "{% elif email_provider == 'yandex' %}",
             '<section class="cm-card cm-warn" aria-label="Рекомендация">',
             "Привяжите почту",
             'class="cm-row cm-row-warn" data-cm-go="login"',
@@ -17054,3 +17066,65 @@ class CabinetQrTests(SimpleTestCase):
         self.assertIn("'?kind=' + encodeURIComponent(kind)", script)
         # Клиентский qrcodejs в мобильном кабинете больше не используется.
         self.assertNotIn("new QRCode(", script)
+
+
+class CabinetSubscriptionCacheTests(SimpleTestCase):
+    """Подписка из панели кэшируется на процесс: страница, устройства и QR
+    открываются одним вызовом RWMS вместо четырёх; NOT_FOUND и недоступность
+    не кэшируются; перевыпуск сбрасывает кэш; вызовы идут с дедлайном кабинета."""
+
+    def setUp(self):
+        from engine import views
+
+        views.cabinet_subscription_cache_clear()
+        self.addCleanup(views.cabinet_subscription_cache_clear)
+
+    @override_settings(CABINET_SUBSCRIPTION_CACHE_SECONDS=120, CABINET_RWMS_TIMEOUT_SECONDS=4)
+    def test_positive_lookup_is_cached_and_uses_cabinet_timeout(self):
+        from engine import views
+        import proto.rwmanager_pb2 as proto
+
+        sub = proto.UserResponse(uuid="rw-1", username="u1")
+        with mock.patch.object(views.rwms_client, "get_user_by_username_strict", return_value=sub) as strict:
+            self.assertIs(views.cabinet_rw_subscription_lookup("u1"), sub)
+            self.assertIs(views.cabinet_rw_subscription_lookup("u1"), sub)
+            self.assertEqual(strict.call_count, 1)
+            strict.assert_called_with("u1", timeout=4)
+            # refresh=1 обходит кэш.
+            views.cabinet_rw_subscription_lookup("u1", refresh=True)
+            self.assertEqual(strict.call_count, 2)
+
+    @override_settings(CABINET_SUBSCRIPTION_CACHE_SECONDS=120)
+    def test_not_found_and_unavailable_are_not_cached(self):
+        from engine import views
+
+        with mock.patch.object(views.rwms_client, "get_user_by_username_strict", return_value=None) as strict:
+            self.assertIsNone(views.cabinet_rw_subscription_lookup("u2"))
+            self.assertIsNone(views.cabinet_rw_subscription_lookup("u2"))
+            self.assertEqual(strict.call_count, 2)
+        with mock.patch.object(views.rwms_client, "get_user_by_username_strict",
+                               side_effect=_RwmsUnavailableError("u2", "UNAVAILABLE")) as strict:
+            with self.assertRaises(_RwmsUnavailableError):
+                views.cabinet_rw_subscription_lookup("u2")
+            self.assertEqual(strict.call_count, 1)
+
+    @override_settings(CABINET_SUBSCRIPTION_CACHE_SECONDS=120)
+    def test_reissue_clears_cache(self):
+        from engine import views
+        import proto.rwmanager_pb2 as proto
+
+        sub = proto.UserResponse(uuid="rw-1", username="u42", short_uuid="old")
+        updated = proto.UserResponse(uuid="rw-1", short_uuid="new", subscription_url="https://s/new")
+        request = RequestFactory().post("/api/cabinet/subscription/reissue/")
+        request.user = SimpleNamespace(is_authenticated=True, id=42, username="u42")
+        with mock.patch.object(views.rwms_client, "get_user_by_username_strict", return_value=sub) as strict, \
+                mock.patch.object(views.rwms_client, "revoke_user_subscription", return_value=updated):
+            views.cabinet_rw_subscription_lookup("u42")
+            self.assertEqual(views.cabinet_subscription_reissue(request).status_code, 200)
+            views.cabinet_rw_subscription_lookup("u42")
+            # Первый lookup, reissue берёт из кэша, после сброса — новый вызов.
+            self.assertEqual(strict.call_count, 2)
+
+    def test_cache_disabled_under_tests_by_default(self):
+        self.assertEqual(settings.CABINET_SUBSCRIPTION_CACHE_SECONDS, 0)
+

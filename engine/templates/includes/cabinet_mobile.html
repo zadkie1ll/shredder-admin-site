@@ -108,18 +108,18 @@
             <div class="cm-row cm-row-static">
                 <i class="fab fa-google" aria-hidden="true"></i>
                 <span>Google{% if oauth_identities.google %}<small>{{ oauth_identities.google }}</small>{% endif %}</span>
-                {% if oauth_identities.google %}<em class="cm-tag is-on">Привязано</em>{% else %}<a class="cm-link" href="{% url 'google_login' %}?link=1">Привязать</a>{% endif %}
+                {% if oauth_identities.google %}<em class="cm-tag is-on">Привязано</em>{% elif email_provider == 'google' %}<em class="cm-tag is-on" title="Вход через Google работает по привязанной почте">Через почту</em>{% else %}<a class="cm-link" href="{% url 'google_login' %}?link=1">Привязать</a>{% endif %}
             </div>
             {% endif %}
             {% if yandex_oauth_enabled %}
             <div class="cm-row cm-row-static">
                 <i class="fab fa-yandex" aria-hidden="true"></i>
                 <span>Яндекс{% if oauth_identities.yandex %}<small>{{ oauth_identities.yandex }}</small>{% endif %}</span>
-                {% if oauth_identities.yandex %}<em class="cm-tag is-on">Привязано</em>{% else %}<a class="cm-link" href="{% url 'yandex_login' %}?link=1">Привязать</a>{% endif %}
+                {% if oauth_identities.yandex %}<em class="cm-tag is-on">Привязано</em>{% elif email_provider == 'yandex' %}<em class="cm-tag is-on" title="Вход через Яндекс работает по привязанной почте">Через почту</em>{% else %}<a class="cm-link" href="{% url 'yandex_login' %}?link=1">Привязать</a>{% endif %}
             </div>
             {% endif %}
         </div>
-        <p class="cm-note">Вход по почте — по ссылке из письма. Через Telegram — кнопкой «Личный кабинет» в боте. Google и Яндекс входят по привязанной почте.</p>
+        <p class="cm-note">Вход по почте — по ссылке из письма. Через Telegram — кнопкой «Личный кабинет» в боте. Google и Яндекс входят по привязанной почте: если она уже на gmail.com или yandex.ru, отдельная привязка не нужна. «Привязать» нужно, только если аккаунт Google или Яндекс на другом адресе.</p>
     </section>
 
     {# ===== Оплата ===== #}

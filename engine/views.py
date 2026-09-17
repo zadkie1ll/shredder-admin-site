@@ -2793,6 +2793,22 @@ OAUTH_LINK_PROVIDERS = ("google", "yandex")
 OAUTH_PROVIDER_TITLES = {"google": "Google", "yandex": "Яндекс"}
 
 
+EMAIL_PROVIDER_DOMAINS = {
+    "google": ("gmail.com", "googlemail.com"),
+    "yandex": ("yandex.ru", "yandex.com", "ya.ru", "yandex.by", "yandex.kz"),
+}
+
+
+def email_login_provider(email):
+    """google | yandex | None — чей это почтовый домен: вход через этого
+    провайдера уже работает по привязанной почте без отдельной привязки."""
+    domain = (email or "").rsplit("@", 1)[-1].lower().strip()
+    for provider, domains in EMAIL_PROVIDER_DOMAINS.items():
+        if domain in domains:
+            return provider
+    return None
+
+
 def remember_oauth_link_intent(request, provider):
     if request.GET.get("link") == "1" and request.user.is_authenticated:
         request.session[OAUTH_LINK_SESSION_KEY] = {
@@ -4463,7 +4479,9 @@ def dashboard(request):
     #   «истекла» платящему клиенту из-за недоступности панели.
     rwms_unavailable = False
     try:
-        subscription = rwms_client.get_user_by_username_strict(user.username)
+        subscription = cabinet_rw_subscription_lookup(
+            user.username, refresh=request.GET.get("refresh") == "1"
+        )
     except RwmsUnavailableError as error:
         subscription = None
         rwms_unavailable = True
@@ -4665,6 +4683,9 @@ def dashboard(request):
             "cabinet_discount": cabinet_discount,
             "oauth_identities": oauth_identities,
             "cabinet_flash": request.session.pop("cabinet_flash", None),
+            # Google/Яндекс входят по привязанной почте: gmail/yandex-адресу
+            # отдельная привязка не нужна — экран показывает «Через почту».
+            "email_provider": email_login_provider(user.email),
             "google_oauth_enabled": bool(settings.GOOGLE_OAUTH_CLIENT_ID and settings.GOOGLE_OAUTH_CLIENT_SECRET),
             "yandex_oauth_enabled": bool(settings.YANDEX_OAUTH_CLIENT_ID and settings.YANDEX_OAUTH_CLIENT_SECRET),
             "cabinet_tariffs": cabinet_tariff_cards(runtime_tariffs),
@@ -5155,6 +5176,41 @@ def _hwid_device_to_dict(device) -> dict:
     }
 
 
+# Кэш подписки из панели на процесс: только успешные ответы (NOT_FOUND и
+# недоступность не кэшируются — новый ключ после регистрации должен появиться
+# сразу). Сбрасывается при перевыпуске ключа. TTL — settings.
+_cabinet_subscription_cache = {}
+_cabinet_subscription_cache_lock = threading.Lock()
+
+
+def cabinet_subscription_cache_clear(username=None):
+    with _cabinet_subscription_cache_lock:
+        if username is None:
+            _cabinet_subscription_cache.clear()
+        else:
+            _cabinet_subscription_cache.pop(username, None)
+
+
+def cabinet_rw_subscription_lookup(username, refresh=False):
+    """UserResponse подписки по username с коротким кэшем и дедлайном
+    кабинета. None — достоверный NOT_FOUND; RwmsUnavailableError — панель
+    недоступна или не ответила за CABINET_RWMS_TIMEOUT_SECONDS."""
+    ttl = getattr(settings, "CABINET_SUBSCRIPTION_CACHE_SECONDS", 0) or 0
+    now = monotonic()
+    if ttl and not refresh:
+        with _cabinet_subscription_cache_lock:
+            cached = _cabinet_subscription_cache.get(username)
+        if cached and now - cached[0] < ttl:
+            return cached[1]
+    subscription = rwms_client.get_user_by_username_strict(
+        username, timeout=getattr(settings, "CABINET_RWMS_TIMEOUT_SECONDS", None)
+    )
+    if ttl and subscription is not None:
+        with _cabinet_subscription_cache_lock:
+            _cabinet_subscription_cache[username] = (now, subscription)
+    return subscription
+
+
 def _cabinet_rw_subscription(request):
     """UserResponse подписки текущего пользователя из панели.
 
@@ -5163,7 +5219,7 @@ def _cabinet_rw_subscription(request):
     эндпоинты обязаны отвечать «данные временно недоступны», а не
     «подписки нет» (Политика: БД — истина по времени, панель — истина
     по существованию ключа)."""
-    return rwms_client.get_user_by_username_strict(request.user.username)
+    return cabinet_rw_subscription_lookup(request.user.username)
 
 
 def _cabinet_rwms_unavailable_response():
@@ -5230,7 +5286,9 @@ def cabinet_devices(request):
 
     limit = _cabinet_device_limit(subscription)
 
-    resp = rwms_client.get_user_hwid_devices(subscription.uuid)
+    resp = rwms_client.get_user_hwid_devices(
+        subscription.uuid, timeout=settings.CABINET_RWMS_TIMEOUT_SECONDS
+    )
     if resp is None:
         return JsonResponse(
             {"status": "error", "message": "devices unavailable"}, status=502
@@ -5578,6 +5636,8 @@ def cabinet_subscription_reissue(request):
         updated = rwms_client.revoke_user_subscription(subscription.uuid)
     except RwmsUnavailableError:
         return _cabinet_rwms_unavailable_response()
+    # Старый ответ панели (short_uuid, ссылка) больше не актуален.
+    cabinet_subscription_cache_clear(request.user.username)
     if updated is None:
         return JsonResponse(
             {"status": "error", "message": "subscription not found"}, status=404

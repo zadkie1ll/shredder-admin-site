@@ -201,6 +201,14 @@ CABINET_DOMAINS = config(
 )
 # Продуктовый лимит устройств на подписке для личного кабинета: используется,
 # когда у пользователя в Remnawave не задан hwid_device_limit.
+# Кабинет: дедлайн одного вызова RWMS (страница и API кабинета ждут панель не
+# дольше этого, дальше деградация к БД / «данные временно недоступны») и TTL
+# кэша подписки из панели на процесс (страница, устройства, QR открываются
+# одним вызовом вместо четырёх). В тестах кэш выключен.
+CABINET_RWMS_TIMEOUT_SECONDS = positive_seconds("CABINET_RWMS_TIMEOUT_SECONDS", 4)
+CABINET_SUBSCRIPTION_CACHE_SECONDS = (
+    0 if "test" in sys.argv else config("CABINET_SUBSCRIPTION_CACHE_SECONDS", default=120, cast=int)
+)
 CABINET_DEVICE_LIMIT_FALLBACK = config(
     "CABINET_DEVICE_LIMIT_FALLBACK", default=15, cast=int
 )
