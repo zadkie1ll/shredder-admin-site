@@ -16787,6 +16787,9 @@ class MobileCabinetTemplateTests(SimpleTestCase):
         self.assertNotIn("toast(ok ? 'Ссылка скопирована'", self.script)
         self.assertIn('<span data-cm-copy-label>Скопировать ссылку</span>', self.include)
         self.assertIn(".cm .is-copied", self.css)
+        # Deep-link добавления подписки открывается в новом окне — иначе WebView блокирует happ://.
+        self.assertIn("esc(app.subscriptionUrl) + '\" target=\"_blank\" rel=\"noopener\">'", self.script)
+        self.assertIn("esc(app.alternative.subscriptionUrl) + '\" target=\"_blank\" rel=\"noopener\">", self.script)
         # Для Apple при рекомендованном INCY альтернатива — Happ, а не второй INCY.
         self.assertIn("alternative: { name: 'Happ'", self.script)
         self.assertIn('data-cm-happ-url="{{ happ_subscription_url }}"', self.include)

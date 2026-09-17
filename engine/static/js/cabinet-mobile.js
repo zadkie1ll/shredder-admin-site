@@ -279,8 +279,11 @@
                 (app.fallbackUrl ? ' <a class="cm-btn cm-btn-mini is-ghost" href="' + esc(app.fallbackUrl) + '" target="_blank" rel="noopener">' + esc(app.fallbackText || 'Другой установщик') + '</a>' : '') +
             '</div></div>' +
             '<div class="cm-step"><span class="cm-step-num">2</span><div><p>Добавьте подписку кнопкой «' + esc(addLabel) + '» — или скопируйте ссылку ниже и добавьте её в приложении.</p>' +
-                '<a class="cm-btn cm-btn-mini" href="' + esc(app.subscriptionUrl) + '">' + esc(addLabel) + '</a>' +
-                (app.alternative ? '<p class="cm-note">Альтернатива — <a href="' + esc(app.alternative.installUrl) + '" target="_blank" rel="noopener">' + esc(app.alternative.name) + '</a>: <a href="' + esc(app.alternative.subscriptionUrl) + '">добавить подписку</a>.</p>' : '') +
+                // target=_blank обязателен: ссылки happ:// / incy:// / flclashx:// встроенный
+                // браузер (в т.ч. Telegram Mini App) в том же окне молча блокирует, а
+                // новое окно отдаёт системе — так же открывает их мастер установки.
+                '<a class="cm-btn cm-btn-mini" href="' + esc(app.subscriptionUrl) + '" target="_blank" rel="noopener">' + esc(addLabel) + '</a>' +
+                (app.alternative ? '<p class="cm-note">Альтернатива — <a href="' + esc(app.alternative.installUrl) + '" target="_blank" rel="noopener">' + esc(app.alternative.name) + '</a>: <a href="' + esc(app.alternative.subscriptionUrl) + '" target="_blank" rel="noopener">добавить подписку</a>.</p>' : '') +
             '</div></div>' +
             '<div class="cm-step"><span class="cm-step-num">3</span><div><p>Для подключения нажмите большую кнопку по центру.</p></div></div>';
         var copyBtn = document.getElementById('cm-install-copy');
