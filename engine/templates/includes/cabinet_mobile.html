@@ -47,6 +47,7 @@
             <button type="button" class="cm-btn cm-btn-ghost" data-cm-go="install">Другие платформы</button>
         </section>
 
+        <button type="button" class="cm-btn cm-btn-ghost" onclick="openSettingsFaq()"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-help"></use></svg> Частые вопросы</button>
         <a class="cm-btn cm-btn-soft cm-support" href="{{ support_telegram_url }}" target="_blank" rel="noopener"><i class="fas fa-headset" aria-hidden="true"></i> Написать в поддержку</a>
     </section>
 
@@ -65,6 +66,11 @@
         <div class="cm-list">
             <button type="button" class="cm-row" data-cm-go="referral"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-gift"></use></svg><span>Реферальная программа</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
             <button type="button" class="cm-row" data-cm-go="promo"><i class="fas fa-tag" aria-hidden="true"></i><span>Промокоды</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
+        </div>
+        <h3 class="cm-label">Помощь</h3>
+        <div class="cm-list">
+            <button type="button" class="cm-row" onclick="openSettingsFaq()"><svg class="cabinet-icon" aria-hidden="true"><use href="#cabinet-help"></use></svg><span>Частые вопросы</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></button>
+            <a class="cm-row" href="{{ support_telegram_url }}" target="_blank" rel="noopener"><i class="fas fa-headset" aria-hidden="true"></i><span>Написать в поддержку</span><svg class="cabinet-icon cm-chevron" aria-hidden="true"><use href="#cabinet-chevron"></use></svg></a>
         </div>
         <h3 class="cm-label">Ссылки</h3>
         <div class="cm-list">

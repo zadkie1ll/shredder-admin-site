@@ -16738,6 +16738,9 @@ class MobileCabinetTemplateTests(SimpleTestCase):
             "'/api/cabinet/subscription/reissue/'",
             "'/api/cabinet/devices/'",
             "'/api/cabinet/devices/delete/'",
+            # FAQ из прежнего «Профиля» доступен с главной и из «Аккаунта».
+            'class="cm-row" onclick="openSettingsFaq()"',
+            'class="cm-btn cm-btn-ghost" onclick="openSettingsFaq()"',
             'id="cm-reissue-sheet"',
             "Старый ключ перестанет работать на всех устройствах.",
             'data-cm-sheet="cm-qr-sheet"',
