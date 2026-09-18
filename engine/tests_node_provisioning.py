@@ -267,6 +267,28 @@ class InstallScriptTests(NodeProvisioningDbTestCase):
         self.assertTrue(any("read" in w for w in warnings))
         self.assertEqual(node_provisioning.script_warnings(SCRIPT_BODY), [])
 
+    def test_read_with_own_input_is_not_flagged(self):
+        """read со своим источником ввода при закрытом stdin безопасен.
+
+        Так устроен torrent-block.sh (разбор аргументов через here-string):
+        ложная тревога здесь приучает отмахиваться от предупреждений вообще.
+        """
+        safe = (
+            "#!/usr/bin/env bash\n"
+            'read -ra jump <<<"$(jump_args "$parent")"\n'
+            'read -r line < "$conf"\n'
+            "read -u 3 -r value\n"
+        )
+        self.assertEqual(node_provisioning.script_warnings(safe), [])
+
+    def test_interactive_read_is_still_flagged(self):
+        # Настоящий интерактивный read обязан остаться видимым
+        flagged = node_provisioning.script_warnings(
+            '#!/usr/bin/env bash\nread -p "Продолжить?" -n 1 -r\n'
+        )
+        self.assertEqual(len(flagged), 1)
+        self.assertIn("Строка 2", flagged[0])
+
 
 class CreateRequestTests(NodeProvisioningDbTestCase):
     def test_create_requires_active_script(self):

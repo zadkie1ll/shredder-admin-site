@@ -1630,6 +1630,102 @@ class CapacityTests(InfraDbTestCase):
             )
             self.assertEqual(verdict["level"], expected)
 
+    def test_configured_limit_not_applied_is_its_own_diagnosis(self):
+        """Лимит задан, но не доехал при загрузке — «поднимать» тут вредный совет.
+
+        Ровно случай mi.4vps.fi 17.09.2026: в /etc/sysctl.d стоит 262144,
+        а ядро работает с 65536, потому что systemd-sysctl отработал раньше,
+        чем загрузился модуль nf_conntrack.
+        """
+        verdict = infra.evaluate_capacity(
+            {
+                "conntrack": {
+                    "count": 48401, "max": 65536, "usage_pct": 74,
+                    "configured_max": 262144,
+                    "insert_failed_delta": 0,
+                },
+            },
+            70,
+        )
+        self.assertEqual(verdict["level"], "warn")
+        joined = " ".join(verdict["problems"])
+        self.assertIn("не применилась при загрузке", joined)
+        self.assertNotIn("пора поднимать", joined)
+        self.assertTrue(verdict["not_applied"])
+        # Заданное значение видно в показателях рядом с живым
+        self.assertIn("в /etc/sysctl.d задано: 262144",
+                      " ".join(verdict["details"]))
+
+    def test_not_applied_warns_before_table_fills_up(self):
+        # Занижённый лимит — дефект и при пустой таблице: узнать о нём надо
+        # заранее, а не когда ядро начнёт ронять пакеты
+        verdict = infra.evaluate_capacity(
+            {
+                "conntrack": {
+                    "count": 5116, "max": 65536, "usage_pct": 8,
+                    "configured_max": 262144,
+                    "insert_failed_delta": 0,
+                },
+            },
+            70,
+        )
+        self.assertEqual(verdict["level"], "warn")
+        self.assertTrue(verdict["not_applied"])
+
+    def test_overflow_outranks_not_applied(self):
+        # Таблица уже переполнена: это «критично» независимо от того, почему
+        # лимит оказался занижен — клиенты теряются прямо сейчас
+        verdict = infra.evaluate_capacity(
+            {
+                "conntrack": {
+                    "count": 65500, "max": 65536, "usage_pct": 100,
+                    "configured_max": 262144,
+                    "insert_failed_delta": 42,
+                },
+            },
+            70,
+        )
+        self.assertEqual(verdict["level"], "crit")
+        self.assertIn("переполнен", " ".join(verdict["problems"]))
+        self.assertFalse(verdict["not_applied"])
+
+    def test_configured_below_live_is_not_a_problem(self):
+        """Конфиг ниже живого — ядро само подняло дефолт, это не дефект.
+
+        Так живут ноды с большой памятью (mi.cloud.ru1: в файле 1048576,
+        в ядре 2097152). Тревожить тут не о чем, лимит не занижен.
+        """
+        verdict = infra.evaluate_capacity(
+            {
+                "conntrack": {
+                    "count": 74021, "max": 2097152, "usage_pct": 4,
+                    "configured_max": 1048576,
+                    "insert_failed_delta": 0,
+                },
+            },
+            70,
+        )
+        self.assertEqual(verdict["level"], "ok")
+        self.assertFalse(verdict["not_applied"])
+        # Но расхождение всё равно показываем — оператору полезно знать
+        self.assertIn("в /etc/sysctl.d задано: 1048576",
+                      " ".join(verdict["details"]))
+
+    def test_old_agent_without_configured_max_behaves_as_before(self):
+        # Агенты до v0.4.2 ключа не присылают: старое поведение сохраняется
+        verdict = infra.evaluate_capacity(
+            {
+                "conntrack": {
+                    "count": 48401, "max": 65536, "usage_pct": 74,
+                    "insert_failed_delta": 0,
+                },
+            },
+            70,
+        )
+        self.assertEqual(verdict["level"], "warn")
+        self.assertIn("пора поднимать", " ".join(verdict["problems"]))
+        self.assertFalse(verdict["not_applied"])
+
     def test_record_pluralization(self):
         # «не удалось создать 1 записей» режет глаз в алерте
         for count, expected in ((1, "1 запись"), (3, "3 записи"),
@@ -1754,6 +1850,27 @@ class CapacityTests(InfraDbTestCase):
         text = alert.call_args[0][0]
         self.assertIn("Пора поднять лимиты", text)
         self.assertIn("клиенты не затронуты", text)
+        self.assertIsNotNone(server.capacity_warn_alerted_at)
+
+    def test_not_applied_gets_its_own_headline(self):
+        # Заголовок «Пора поднять лимиты» для этого случая врёт: лимит уже
+        # задан в /etc/sysctl.d, он просто не пережил загрузку
+        server = self.make_server(capacity={
+            "conntrack": {
+                "count": 48401, "max": 65536, "usage_pct": 74,
+                "configured_max": 262144,
+                "insert_failed_delta": 0,
+            },
+        })
+        with mock.patch.object(
+            infra_worker, "_send_alert", return_value=True
+        ) as alert:
+            infra_worker.check_capacity(self.session)
+        alert.assert_called_once()
+        text = alert.call_args[0][0]
+        self.assertIn("Настройка ноды не применилась", text)
+        self.assertNotIn("Пора поднять лимиты", text)
+        self.assertIn("fix-conntrack-persistence.sh", text)
         self.assertIsNotNone(server.capacity_warn_alerted_at)
 
     def test_collision_only_warn_stays_in_card(self):

@@ -183,11 +183,25 @@ def active_script(db_session, node_type):
     )
 
 
+def _read_has_own_input(line: str) -> bool:
+    """У этого read есть собственный источник ввода, а не stdin установки.
+
+    Такой read безопасен при закрытом stdin: `read -ra x <<<"$(cmd)"` берёт
+    here-string, `read x < file` — файл, `read -u 3 x` — отдельный дескриптор.
+    Без этой проверки блоки вроде torrent-block.sh (разбор аргументов через
+    here-string) дают ложную тревогу, а привычка отмахиваться от ложных
+    предупреждений ровно тогда и прячет настоящие.
+    """
+    return "<<<" in line or "<<" in line or "<" in line or " -u" in line
+
+
 def script_warnings(content: str) -> list[str]:
     """Мягкие проверки скрипта при сохранении: только предупреждения.
 
-    Скрипт исполняется без stdin, поэтому интерактивный read либо повесит
-    установку, либо уронит её через set -e.
+    Скрипт исполняется без stdin (раннер зовёт его с `</dev/null`), поэтому
+    интерактивный read либо повесит установку, либо уронит её через set -e.
+    Heredoc'и это НЕ затрагивает: `install /dev/stdin <<'EOF'` переопределяет
+    stdin для своей команды.
     """
     warnings = []
     if not content.startswith("#!"):
@@ -197,6 +211,8 @@ def script_warnings(content: str) -> list[str]:
         if stripped.startswith("#"):
             continue
         if stripped.startswith("read ") or " read " in f" {stripped} ":
+            if _read_has_own_input(stripped):
+                continue
             warnings.append(
                 f"Строка {line_number}: интерактивный read — под автоматической "
                 "установкой stdin закрыт, скрипт повиснет или упадёт."

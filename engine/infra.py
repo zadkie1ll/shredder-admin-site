@@ -635,6 +635,7 @@ def capacity_payload(server, cfg: dict) -> dict | None:
         "problems": verdict["problems"],
         "details": verdict["details"],
         "collision_only": verdict.get("collision_only", False),
+        "not_applied": verdict.get("not_applied", False),
         "raw": server.capacity,
     }
 
@@ -1844,6 +1845,7 @@ def evaluate_capacity(capacity: dict, warn_pct: int) -> dict:
     details: list[str] = []
     level = "ok"
     collision_warn = False
+    not_applied_warn = False
 
     def escalate(new_level):
         nonlocal level
@@ -1854,11 +1856,24 @@ def evaluate_capacity(capacity: dict, warn_pct: int) -> dict:
     conntrack = capacity.get("conntrack") or {}
     usage = conntrack.get("usage_pct")
     insert_failed = conntrack.get("insert_failed_delta") or 0
+    live_max = conntrack.get("max")
+    # Что оператор задал в /etc/sysctl.d. Присылает агент v0.4.2+; у старых
+    # агентов ключа нет, и всё работает как раньше.
+    configured_max = conntrack.get("configured_max")
+    # Лимит задан, но ядро живёт с меньшим: настройка не пережила загрузку
+    # (systemd-sysctl отрабатывает раньше, чем грузится модуль nf_conntrack,
+    # и молча пропускает ветку /proc/sys/net/netfilter). Поднимать потолок
+    # бесполезно — он уже поднят в конфиге, просто не доехал.
+    limit_not_applied = bool(
+        configured_max and live_max and configured_max > live_max
+    )
     if usage is not None:
         details.append(
             f"conntrack: {conntrack.get('count')} / {conntrack.get('max')} "
             f"({usage}%)"
         )
+        if configured_max and live_max and configured_max != live_max:
+            details.append(f"в /etc/sysctl.d задано: {configured_max}")
         table_full = (
             insert_failed > 0 and usage >= CONNTRACK_CRIT_USAGE_PCT
         )
@@ -1879,6 +1894,18 @@ def evaluate_capacity(capacity: dict, warn_pct: int) -> dict:
                 f"{_plural_records(insert_failed)} при заполнении {usage}% — "
                 "переполнением это не объясняется: это гонки вставки, "
                 "поднимать лимиты бесполезно"
+            )
+        elif limit_not_applied:
+            # Заполнение здесь вторично: лимит занижен против намерения
+            # оператора, и знать об этом надо до того, как таблица забьётся.
+            escalate("warn")
+            not_applied_warn = True
+            problems.append(
+                f"nf_conntrack_max = {live_max}, хотя в /etc/sysctl.d задано "
+                f"{configured_max} — настройка не применилась при загрузке "
+                "(модуль nf_conntrack поднялся позже systemd-sysctl). "
+                f"Заполнение {usage}%. Поднимать лимит не нужно, нужно "
+                "закрепить его: fix-conntrack-persistence.sh"
             )
         elif usage >= warn_pct:
             escalate("warn")
@@ -1987,6 +2014,11 @@ def evaluate_capacity(capacity: dict, warn_pct: int) -> dict:
         # NOTRACK/DNS-кэша, а не совет поднимать лимиты.
         "collision_only": (
             level == "warn" and collision_warn and len(problems) == 1
+        ),
+        # Лимит не доехал при загрузке: заголовок «пора поднять лимиты» здесь
+        # врёт — поднимать нечего, нужно закрепить уже заданное значение.
+        "not_applied": (
+            level == "warn" and not_applied_warn and len(problems) == 1
         ),
     }
 
