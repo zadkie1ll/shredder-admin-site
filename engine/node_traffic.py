@@ -2,8 +2,16 @@
 
 Данные для вкладки «Трафик нод» в админке: помогает находить расшаренные
 ("утекшие") подписки по аномально высокому потреблению. Все данные получаются
-через rwms (read-only RPC GetNodes / GetNodeUsersUsage / GetUserByUuid),
-напрямую в панель Remnawave сайт не ходит, ничего не изменяет и не удаляет.
+через rwms (read-only RPC GetNodes / GetNodeUsersUsage / GetUserByUuid /
+GetUserByUsername), напрямую в панель Remnawave сайт не ходит, ничего не
+изменяет и не удаляет.
+
+Панель Remnawave 3.x: строки статистики (`NodeUserUsage`) приходят без
+`username` (и без разбивки по дням) — `user_uuid` несёт числовой id панели.
+Имя пользователя берётся из карточки (`fetch_details`), а служебные подписки
+исключаются по id, который резолвится из username через
+`GetUserByUsername` (`resolve_excluded`). Строки со старым форматом (username
+в строке) по-прежнему поддерживаются.
 """
 
 import os
@@ -202,6 +210,34 @@ def fetch_details(rwms_client: RwmsClientSync, entries: list[UserTraffic], deadl
     # Late futures never mutate rows already being serialized by the request.
     for entry, details in results:
         entry.details = details
+        # Панель 3.x не отдаёт username в статистике — берём из карточки.
+        if details is not None and not entry.username:
+            entry.username = details.username
+
+
+def resolve_excluded(rwms_client: RwmsClientSync, usernames: set[str]) -> dict[str, str]:
+    """Идентификаторы (user_uuid строк статистики) служебных подписок.
+
+    Возвращает {user_uuid: username}. Панель 3.x не отдаёт username в
+    статистике, поэтому исключение идёт по id, полученному из карточки по
+    username (один RPC на имя, имён единицы). NOT_FOUND — подписки нет,
+    исключать нечего; недоступность rwms — предупреждение в лог, отчёт
+    строится без исключения этой подписки (данные останутся в totals).
+    """
+    from common.rwms_client import RwmsUnavailableError
+
+    resolved: dict[str, str] = {}
+    for username in sorted(usernames):
+        try:
+            user = rwms_client.get_user_by_username_strict(username)
+        except RwmsUnavailableError as e:
+            logging.warning(
+                "node traffic: cannot resolve excluded user %s: %s", username, e
+            )
+            continue
+        if user is not None and user.uuid:
+            resolved[user.uuid] = username
+    return resolved
 
 
 def build_report(
@@ -224,8 +260,17 @@ def build_report(
     usage, failed_nodes = collect_usage(rwms_client, nodes, start, end, deadline=deadline)
 
     excluded = excluded_usernames()
-    excluded_entries = [e for e in usage.values() if e.username in excluded]
+    # Строка статистики может нести username (панель 2.x) или только id
+    # (панель 3.x) — исключаем по любому из признаков.
+    excluded_ids = resolve_excluded(rwms_client, excluded) if usage else {}
+    excluded_entries = [
+        e
+        for e in usage.values()
+        if e.username in excluded or e.user_uuid in excluded_ids
+    ]
     for entry in excluded_entries:
+        if not entry.username:
+            entry.username = excluded_ids.get(entry.user_uuid, "")
         del usage[entry.user_uuid]
 
     total_bytes = sum(e.total_bytes for e in usage.values())

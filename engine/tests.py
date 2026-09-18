@@ -6249,10 +6249,13 @@ class NodeTrafficReportTests(SimpleTestCase):
             rw_proto.Node(uuid="n2", name="Швеция", address="2.2.2.2", is_connected=True),
         ]
 
-    def _fake_client(self, usage_by_node, users_by_uuid=None):
+    def _fake_client(self, usage_by_node, users_by_uuid=None, users_by_username=None,
+                     username_lookup_error=None):
         import proto.rwmanager_pb2 as rw_proto
 
         class FakeRwms:
+            username_lookups = []
+
             def get_node_users_usage(self, request, *, timeout=None):
                 rows = usage_by_node.get(request.node_uuid)
                 if rows is None:
@@ -6261,6 +6264,12 @@ class NodeTrafficReportTests(SimpleTestCase):
 
             def get_user_by_uuid(self, uuid):
                 return (users_by_uuid or {}).get(uuid)
+
+            def get_user_by_username_strict(self, username, *, timeout=None):
+                self.username_lookups.append(username)
+                if username_lookup_error is not None:
+                    raise username_lookup_error
+                return (users_by_username or {}).get(username)
 
         return FakeRwms()
 
@@ -6351,6 +6360,116 @@ class NodeTrafficReportTests(SimpleTestCase):
         self.assertEqual(row["status"], "ACTIVE")
         self.assertEqual(row["expire_at"], "2026-08-03")
         self.assertEqual(row["telegram_id"], 111)
+
+    # --- Панель Remnawave 3.x: строки без username, user_uuid = числовой id ---
+
+    def _v3_rows(self):
+        import proto.rwmanager_pb2 as rw_proto
+
+        return {
+            "n1": [
+                rw_proto.NodeUserUsage(user_uuid="900", username="", total_bytes=10**12),
+                rw_proto.NodeUserUsage(user_uuid="1", username="", total_bytes=100),
+            ],
+            "n2": [
+                rw_proto.NodeUserUsage(user_uuid="1", username="", total_bytes=50),
+                rw_proto.NodeUserUsage(user_uuid="2", username="", total_bytes=300),
+            ],
+        }
+
+    def test_v3_rows_take_username_from_details_and_exclude_by_resolved_id(self):
+        import proto.rwmanager_pb2 as rw_proto
+        from datetime import timedelta, timezone as tz
+        from engine import node_traffic
+
+        sys_user = rw_proto.UserResponse(uuid="900", username="SYS-REROUTE")
+        users_by_uuid = {
+            "1": rw_proto.UserResponse(uuid="1", username="111", status=rw_proto.UserStatus.ACTIVE),
+            "2": rw_proto.UserResponse(uuid="2", username="222", status=rw_proto.UserStatus.ACTIVE),
+        }
+        client = self._fake_client(
+            self._v3_rows(), users_by_uuid=users_by_uuid,
+            users_by_username={"SYS-REROUTE": sys_user},
+        )
+        end = datetime(2026, 7, 10, tzinfo=tz.utc)
+
+        report = node_traffic.build_report(
+            client, self._nodes(), end - timedelta(hours=1), end, top=50, min_gib=0,
+        )
+
+        # служебная подписка исключена по id, полученному из карточки по username
+        self.assertEqual(client.username_lookups, ["SYS-REROUTE"])
+        self.assertEqual(report["total_bytes"], 450)
+        self.assertEqual(report["users_with_traffic"], 2)
+        self.assertEqual(report["excluded_users"], [{"username": "SYS-REROUTE", "total_bytes": 10**12}])
+        first, second = report["users"]
+        self.assertEqual((first["username"], first["user_uuid"], first["total_bytes"]), ("222", "2", 300))
+        self.assertEqual((second["username"], second["user_uuid"], second["total_bytes"]), ("111", "1", 150))
+        self.assertEqual(second["top_node"], "Германия")
+        self.assertEqual(first["status"], "ACTIVE")
+
+    def test_v3_rows_without_details_keep_empty_username(self):
+        from datetime import timedelta, timezone as tz
+        from engine import node_traffic
+
+        client = self._fake_client(self._v3_rows(), users_by_username={})
+        end = datetime(2026, 7, 10, tzinfo=tz.utc)
+
+        report = node_traffic.build_report(
+            client, self._nodes(), end - timedelta(hours=1), end,
+            top=50, min_gib=0, with_details=False,
+        )
+
+        # SYS-REROUTE не найден в панели (NOT_FOUND) — исключать нечего,
+        # его трафик остаётся в отчёте; имена без карточек пустые.
+        self.assertEqual(report["excluded_users"], [])
+        self.assertEqual(report["users"][0]["user_uuid"], "900")
+        self.assertEqual(report["users"][0]["username"], "")
+        self.assertFalse(report["details_complete"] is False)
+
+    def test_v3_excluded_lookup_unavailable_degrades_with_warning(self):
+        from datetime import timedelta, timezone as tz
+        from common.rwms_client import RwmsUnavailableError
+        from engine import node_traffic
+
+        client = self._fake_client(
+            self._v3_rows(),
+            username_lookup_error=RwmsUnavailableError("SYS-REROUTE", None, "down"),
+        )
+        end = datetime(2026, 7, 10, tzinfo=tz.utc)
+
+        with self.assertLogs(level="WARNING") as logs:
+            report = node_traffic.build_report(
+                client, self._nodes(), end - timedelta(hours=1), end,
+                top=50, min_gib=0, with_details=False,
+            )
+
+        self.assertTrue(any("cannot resolve excluded user SYS-REROUTE" in m for m in logs.output))
+        self.assertEqual(report["excluded_users"], [])
+        self.assertEqual(report["users_with_traffic"], 3)
+
+    def test_legacy_rows_with_username_still_excluded_without_lookup_match(self):
+        import proto.rwmanager_pb2 as rw_proto
+        from datetime import timedelta, timezone as tz
+        from engine import node_traffic
+
+        usage = {
+            "n1": [
+                rw_proto.NodeUserUsage(user_uuid="sys", username="SYS-REROUTE", total_bytes=10**12),
+                rw_proto.NodeUserUsage(user_uuid="u1", username="111", total_bytes=100),
+            ],
+            "n2": [],
+        }
+        client = self._fake_client(usage, users_by_username={})
+        end = datetime(2026, 7, 10, tzinfo=tz.utc)
+
+        report = node_traffic.build_report(
+            client, self._nodes(), end - timedelta(hours=1), end,
+            top=50, min_gib=0, with_details=False,
+        )
+
+        self.assertEqual(report["total_bytes"], 100)
+        self.assertEqual(report["excluded_users"][0]["username"], "SYS-REROUTE")
 
 
 class NodeTrafficAdminApiTests(SimpleTestCase):
