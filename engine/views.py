@@ -13893,6 +13893,14 @@ _EXPIRY_CACHE = {
 _EXPIRY_CACHE_LOCK = threading.Lock()
 _EXPIRY_BUILD_LOCK = threading.Lock()
 _ACQ_REFRESHING = {}
+# Устаревший кэш отдаётся не дольше этого (в TTL): дальше — синхронная
+# пересборка, чтобы сломанное фоновое обновление не пиннило старые цифры.
+ACQ_STALE_MAX_TTLS = 3
+ACQ_REFRESH_STALE_SECONDS = 600
+
+
+def _acq_stale_ok(age):
+    return age < EXPIRY_CACHE_TTL * ACQ_STALE_MAX_TTLS
 
 
 def _expiry_cache_clear():
@@ -13919,9 +13927,12 @@ def _acq_background(name, rebuild):
     if not getattr(settings, "ACQ_CACHE_BACKGROUND", True):
         return False
     with _EXPIRY_CACHE_LOCK:
-        if _ACQ_REFRESHING.get(name):
+        started = _ACQ_REFRESHING.get(name)
+        # Флаг «идёт пересборка» живёт не дольше ACQ_REFRESH_STALE_SECONDS:
+        # зависший или умерший поток не должен вечно блокировать обновление.
+        if started and _monotonic() - started < ACQ_REFRESH_STALE_SECONDS:
             return True
-        _ACQ_REFRESHING[name] = True
+        _ACQ_REFRESHING[name] = _monotonic()
 
     def run():
         session = session_factory()
@@ -13935,7 +13946,7 @@ def _acq_background(name, rebuild):
             except Exception:  # noqa: BLE001
                 pass
             with _EXPIRY_CACHE_LOCK:
-                _ACQ_REFRESHING[name] = False
+                _ACQ_REFRESHING.pop(name, None)
 
     _ACQ_THREAD_RUNNER(run)
     return True
@@ -13994,8 +14005,11 @@ def _expiry_periods_cached(db_session, refresh=False):
         trial_days = _EXPIRY_CACHE["trial_days"]
         at = _EXPIRY_CACHE["at"]
     if periods is not None:
-        # Свежие — отдаём; устаревшие — тоже отдаём, пересборка в фоне.
-        if now - at < EXPIRY_CACHE_TTL or _acq_background("expiry", _expiry_rebuild):
+        # Свежие — отдаём; устаревшие (не старше ACQ_STALE_MAX_TTLS × TTL) —
+        # тоже отдаём, пересборка в фоне; совсем старые — пересобираем сами.
+        if now - at < EXPIRY_CACHE_TTL:
+            return periods, trial_days
+        if _acq_stale_ok(now - at) and _acq_background("expiry", _expiry_rebuild):
             return periods, trial_days
     return _expiry_rebuild(db_session)
 
@@ -14011,7 +14025,9 @@ def _expiry_payments_cached(db_session, refresh=False):
         payments = _EXPIRY_CACHE["payments"]
         at = _EXPIRY_CACHE["payments_at"]
     if payments is not None:
-        if now - at < EXPIRY_CACHE_TTL or _acq_background("expiry", _expiry_rebuild):
+        if now - at < EXPIRY_CACHE_TTL:
+            return payments
+        if _acq_stale_ok(now - at) and _acq_background("expiry", _expiry_rebuild):
             return payments
         _expiry_rebuild(db_session)
         with _EXPIRY_CACHE_LOCK:
@@ -14108,7 +14124,9 @@ def _lifecycle_cached(db_session, refresh=False):
         connected = _LIFECYCLE_CACHE["connected"]
         at = _LIFECYCLE_CACHE["at"]
     if signups is not None:
-        if now - at < EXPIRY_CACHE_TTL or _acq_background("lifecycle", _lifecycle_rebuild):
+        if now - at < EXPIRY_CACHE_TTL:
+            return signups, connected
+        if _acq_stale_ok(now - at) and _acq_background("lifecycle", _lifecycle_rebuild):
             return signups, connected
     return _lifecycle_rebuild(db_session)
 
@@ -14248,7 +14266,72 @@ def _revenue_empty_day(key):
     }
 
 
-def _acq_revenue_days_rows(payments, start, end):
+REVENUE_PAYMENTS_UNION_SQL = """
+    SELECT wi.user_id AS user_id,
+           (t.payment_time AT TIME ZONE 'UTC') AS paid_at,
+           COALESCE(wi.tariff_id, '') AS tariff,
+           t.amount::numeric AS amount,
+           'wata' AS provider,
+           false AS autopay
+    FROM wata_transactions t
+    JOIN wata_invoices wi ON wi.order_id = t.order_id
+    WHERE t.transaction_status = 'Paid'
+    UNION ALL
+    SELECT p.user_id, p.created_at, p.subscription_period, p.amount::numeric,
+           'yk' AS provider, COALESCE(p.is_autopay, false) AS autopay
+    FROM yk_payments p
+    WHERE p.status = 'succeeded'
+"""
+
+
+def _revenue_load_payments_window(db_session, start, end):
+    """Оплаты за [start, end] (даты МСК) прямым запросом — без кэша, чтобы
+    «Сегодня» на «Выручке» всегда совпадало с базой. Возвращает (payments,
+    first_pay): first_pay — момент первой оплаты за всю историю для каждого
+    плательщика окна (по нему оплата считается «новой»)."""
+    since = datetime.combine(start, time.min) - ADMIN_TZ_OFFSET
+    until = datetime.combine(end + timedelta(days=1), time.min) - ADMIN_TZ_OFFSET
+    payments = [
+        (
+            int(r["user_id"]),
+            r["paid_at"],
+            str(r["tariff"] or ""),
+            float(r["amount"] or 0),
+            str(r["provider"]),
+            bool(r["autopay"]),
+        )
+        for r in _acq_rows(
+            db_session,
+            f"""
+            SELECT user_id, paid_at, tariff, amount, provider, autopay
+            FROM ({REVENUE_PAYMENTS_UNION_SQL}) pays
+            WHERE paid_at >= :since AND paid_at < :until
+            ORDER BY user_id, paid_at
+            """,
+            since=since,
+            until=until,
+        )
+    ]
+    user_ids = sorted({row[0] for row in payments})
+    first_pay = {}
+    if user_ids:
+        first_pay = {
+            int(r["user_id"]): r["first_at"]
+            for r in _acq_rows(
+                db_session,
+                f"""
+                SELECT user_id, min(paid_at) AS first_at
+                FROM ({REVENUE_PAYMENTS_UNION_SQL}) pays
+                WHERE user_id = ANY(:user_ids)
+                GROUP BY user_id
+                """,
+                user_ids=user_ids,
+            )
+        }
+    return payments, first_pay
+
+
+def _acq_revenue_days_rows(payments, start, end, first_pay=None):
     """Выручка по дням МСК с разбивкой: новые/повторные, автоплатёж/вручную,
     провайдер, тарифы. Оплата «новая» = первая успешная оплата пользователя."""
     keys = []
@@ -14258,7 +14341,9 @@ def _acq_revenue_days_rows(payments, start, end):
         cursor += timedelta(days=1)
     index = {key: i for i, key in enumerate(keys)}
     rows = [_revenue_empty_day(key) for key in keys]
-    first_pay = {}
+    # first_pay передаёт загрузчик окна (первая оплата за всю историю); без
+    # него считаем по переданному списку (полная выгрузка оплат).
+    first_pay = dict(first_pay or {})
     for row in payments:
         user_id, paid_at = row[0], row[1]
         if user_id not in first_pay or paid_at < first_pay[user_id]:
@@ -14309,8 +14394,10 @@ def _acq_revenue_days(db_session, start=None, end=None, refresh=False):
     start = date.fromisoformat(start) if start else end - timedelta(days=44)
     if end < start or (end - start).days > REVENUE_MAX_RANGE_DAYS:
         raise ValueError("bad range")
-    payments = _expiry_payments_cached(db_session, refresh=refresh)
-    rows = _acq_revenue_days_rows(payments, start, end)
+    # Без общего кэша периодов: плитки «Сегодня/Вчера/7/30 дней» и график
+    # по дням — прямой запрос за окно, всегда свежие (как «Пуши»).
+    payments, first_pay = _revenue_load_payments_window(db_session, start, end)
+    rows = _acq_revenue_days_rows(payments, start, end, first_pay=first_pay)
     seen = set()
     for row in rows:
         seen.update(row["by_tariff"])

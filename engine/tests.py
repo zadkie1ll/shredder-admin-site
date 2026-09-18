@@ -1532,31 +1532,57 @@ class AcquisitionRevenueTests(SimpleTestCase):
         for key in ("revenue_days", "revenue_kpis", "summary", "cohort_path"):
             self.assertIn(key, ACQ_SECTIONS)
         self.assertNotIn("renew45", ACQ_SECTIONS)
-        res = _acq_revenue_days(object())
+        with mock.patch("engine.views._revenue_load_payments_window", return_value=([], {})) as window:
+            res = _acq_revenue_days(object())
         self.assertEqual(len(res["days"]), 45)
         self.assertEqual(res["tariffs"], [])
+        # Дни выручки — прямой запрос за окно, а не общий кэш периодов.
+        window.assert_called_once()
         with self.assertRaises(ValueError):
             _acq_revenue_days(object(), "2026-09-30", "2026-09-01")
 
-    @mock.patch("engine.views._expiry_load_trial_days", return_value=7)
-    @mock.patch("engine.views._expiry_load_autopay", return_value=set())
-    @mock.patch("engine.views._expiry_load_trial_starts", return_value={})
-    @mock.patch("engine.views._expiry_load_expires", return_value={})
-    @mock.patch("engine.views._expiry_load_payments", return_value=[])
-    def test_cold_revenue_loads_only_payments_and_reuses_them(self, payments_mock, expires_mock, *_mocks):
-        """Холодный старт «Выручки»: график ждёт только запрос оплат;
-        периоды (users + event_logs) собираются отдельно и переиспользуют
-        уже загруженные оплаты, а не грузят их второй раз."""
-        from engine.views import _acq_revenue_days, _acq_summary, _expiry_cache_clear
+    def test_revenue_days_are_fresh_and_new_vs_repeat_uses_history(self):
+        """«Сегодня» на «Выручке» не зависит от кэша периодов: оплаты окна
+        читаются прямым запросом, «новая» оплата определяется по первой
+        оплате пользователя за всю историю (а не только внутри окна)."""
+        from engine.views import _acq_revenue_days, _expiry_cache_clear
 
         _expiry_cache_clear()
         self.addCleanup(_expiry_cache_clear)
-        _acq_revenue_days(object())
-        self.assertEqual(payments_mock.call_count, 1)
-        self.assertEqual(expires_mock.call_count, 0)
-        _acq_summary(object())
-        self.assertEqual(expires_mock.call_count, 1)
-        self.assertEqual(payments_mock.call_count, 1)
+        payments = [
+            (1, datetime(2026, 9, 10, 9), "month", 249.0, "yk", False),
+            (2, datetime(2026, 9, 10, 10), "month", 249.0, "wata", False),
+        ]
+        # У пользователя 1 была оплата до окна — в окне он «повторный».
+        first_pay = {1: datetime(2026, 8, 1, 9), 2: datetime(2026, 9, 10, 10)}
+        with mock.patch("engine.views._revenue_load_payments_window", return_value=(payments, first_pay)) as window, \
+                mock.patch("engine.views._expiry_load_payments") as heavy:
+            res = _acq_revenue_days(object(), "2026-09-10", "2026-09-10")
+        heavy.assert_not_called()
+        (_session, start, end), _ = window.call_args
+        self.assertEqual((start.isoformat(), end.isoformat()), ("2026-09-10", "2026-09-10"))
+        day = res["days"][0]
+        self.assertEqual((day["new_payers"], day["repeat_payers"], day["revenue"]), (1, 1, 498))
+
+    def test_revenue_window_bounds_are_msk_days(self):
+        from engine import views
+
+        calls = []
+
+        def rows(_session, sql, **params):
+            calls.append((sql, params))
+            return []
+
+        with mock.patch("engine.views._acq_rows", side_effect=rows):
+            payments, first_pay = views._revenue_load_payments_window(object(), date(2026, 9, 10), date(2026, 9, 11))
+        self.assertEqual((payments, first_pay), ([], {}))
+        sql, params = calls[0]
+        self.assertIn("WHERE paid_at >= :since AND paid_at < :until", sql)
+        # Сутки МСК = UTC−3: 10.09 00:00 МСК → 09.09 21:00 UTC, конец — 11.09 21:00 UTC.
+        self.assertEqual(params["since"], datetime(2026, 9, 9, 21))
+        self.assertEqual(params["until"], datetime(2026, 9, 11, 21))
+        # Без плательщиков в окне второй запрос (первая оплата) не нужен.
+        self.assertEqual(len(calls), 1)
 
     @override_settings(ACQ_CACHE_BACKGROUND=True)
     @mock.patch("engine.views._expiry_load_trial_days", return_value=7)
@@ -1579,12 +1605,42 @@ class AcquisitionRevenueTests(SimpleTestCase):
                 views._EXPIRY_CACHE["at"] -= views.EXPIRY_CACHE_TTL + 1
                 views._EXPIRY_CACHE["payments_at"] -= views.EXPIRY_CACHE_TTL + 1
             views._acq_summary(object())
-            views._acq_revenue_days(object())
             self.assertEqual(payments_mock.call_count, 1)
             self.assertEqual(len(runs), 1)
             with mock.patch.object(views, "session_factory", return_value=mock.MagicMock()):
                 runs[0]()
             self.assertEqual(payments_mock.call_count, 2)
+            views._acq_summary(object())
+            self.assertEqual(len(runs), 1)
+
+    @override_settings(ACQ_CACHE_BACKGROUND=True)
+    @mock.patch("engine.views._expiry_load_trial_days", return_value=7)
+    @mock.patch("engine.views._expiry_load_autopay", return_value=set())
+    @mock.patch("engine.views._expiry_load_trial_starts", return_value={})
+    @mock.patch("engine.views._expiry_load_expires", return_value={})
+    @mock.patch("engine.views._expiry_load_payments", return_value=[])
+    def test_very_stale_cache_rebuilds_synchronously_and_stuck_refresh_expires(self, payments_mock, *_mocks):
+        """Сломанное фоновое обновление не пиннит старые цифры: старше
+        ACQ_STALE_MAX_TTLS × TTL — синхронная пересборка; флаг «идёт
+        пересборка» старше ACQ_REFRESH_STALE_SECONDS игнорируется."""
+        from engine import views
+
+        views._expiry_cache_clear()
+        self.addCleanup(views._expiry_cache_clear)
+        runs = []
+        with mock.patch.object(views, "_ACQ_THREAD_RUNNER", runs.append):
+            views._acq_summary(object())
+            with views._EXPIRY_CACHE_LOCK:
+                views._EXPIRY_CACHE["at"] -= views.EXPIRY_CACHE_TTL * views.ACQ_STALE_MAX_TTLS + 1
+                views._EXPIRY_CACHE["payments_at"] -= views.EXPIRY_CACHE_TTL * views.ACQ_STALE_MAX_TTLS + 1
+            views._acq_summary(object())
+            # Совсем старый кэш пересобран в самом запросе, фон не нужен.
+            self.assertEqual(payments_mock.call_count, 2)
+            self.assertEqual(len(runs), 0)
+            # Зависший фоновый флаг: устаревший (10 мин) — запускаем заново.
+            with views._EXPIRY_CACHE_LOCK:
+                views._EXPIRY_CACHE["at"] -= views.EXPIRY_CACHE_TTL + 1
+                views._ACQ_REFRESHING["expiry"] = views._monotonic() - views.ACQ_REFRESH_STALE_SECONDS - 1
             views._acq_summary(object())
             self.assertEqual(len(runs), 1)
 
