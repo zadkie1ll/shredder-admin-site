@@ -3206,6 +3206,78 @@ class ProcessAnomalyTests(InfraDbTestCase):
         alert.assert_not_called()
         self.assertEqual(self.session.query(InfraIpReplacement).count(), 0)
 
+    def test_dismissed_anomaly_snoozes_detector_escalating(self):
+        """Чистый вердикт — детектор на паузе, с каждой чистой аномалией
+        подряд втрое дольше: 24 ч → 72 ч, потолок из настройки."""
+        server = self.make_server()
+        run = self.make_run("185.10.0.10", ok_probes=20, blocked_probes=0)
+        anomaly = self.make_anomaly(
+            server, {"185.10.0.10|ya.ru": run.id}, status="checking_sni"
+        )
+        with mock.patch.object(infra_worker, "_send_alert"):
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(server)
+        self.session.refresh(anomaly)
+        self.assertEqual(anomaly.status, "dismissed")
+        self.assertEqual(anomaly.details["clean_snooze_hours"], 24)
+        self.assertGreater(server.anomaly_suppressed_until, utcnow() + timedelta(hours=23))
+
+        second = self.make_anomaly(
+            server, {"185.10.0.10|ya.ru": run.id}, status="checking_sni"
+        )
+        with mock.patch.object(infra_worker, "_send_alert"):
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(second)
+        self.session.refresh(server)
+        self.assertEqual(second.details["clean_snooze_hours"], 72)
+        self.assertGreater(server.anomaly_suppressed_until, utcnow() + timedelta(hours=71))
+        # Потолок
+        self.session.add(SystemSetting(key="infra_anomaly_clean_snooze_max_hours", value="48"))
+        self.session.commit()
+        cfg = infra.get_settings(self.session)
+        self.assertEqual(infra.clean_anomaly_snooze_hours(self.session, server.id, cfg), 48)
+
+    def test_unproven_name_marked_unprobeable_and_alerted_once(self):
+        """Имя, ни разу не прошедшее пробу (Reality), помечается
+        непроверяемым: алерт один раз, дальше не проверяется и не алертится."""
+        server = self.make_server()
+        self.make_ip(server, "185.10.0.10", on_interface=True)
+        self.make_domain(server, "us.example.xyz")
+        ip_run = self.make_run("185.10.0.10", ok_probes=20, blocked_probes=0)
+        sni_run = self.make_run(
+            "185.10.0.10", ok_probes=0, blocked_probes=20, sni="us.example.xyz"
+        )
+        self.make_anomaly(
+            server, {"185.10.0.10|ya.ru": ip_run.id},
+            sni_runs={"185.10.0.10|us.example.xyz": sni_run.id},
+            status="checking_sni",
+        )
+        with mock.patch.object(infra_worker, "_send_alert", return_value=True) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        texts = [call[0][0] for call in alert.call_args_list]
+        self.assertEqual(len([x for x in texts if "ни разу не проходило" in x]), 1)
+        self.assertIn("Помечены непроверяемыми", texts[0])
+        cfg = infra.get_settings(self.session)
+        self.assertEqual(infra.unprobeable_snis(cfg), {"us.example.xyz"})
+        # Больше в пробы не идёт
+        _ips, names, dropped = infra.server_probe_targets(self.session, server)
+        self.assertEqual((names, dropped), ([], []))
+        # Повторная аномалия с тем же результатом — без алерта, в evidence пометка
+        second = self.make_anomaly(
+            server, {"185.10.0.10|ya.ru": ip_run.id},
+            sni_runs={"185.10.0.10|us.example.xyz": sni_run.id},
+            status="checking_sni",
+        )
+        with mock.patch.object(infra_worker, "_send_alert", return_value=True) as alert:
+            infra_worker.process_anomalies(self.session)
+        self.session.commit()
+        self.session.refresh(second)
+        self.assertFalse(any("ни разу не проходило" in call[0][0] for call in alert.call_args_list))
+        self.assertTrue(any(item.get("step") == "sni_skipped" for item in second.details["evidence"]))
+
     def test_auto_replace_disabled_only_alerts(self):
         self.session.add(
             SystemSetting(key="infra_auto_replace_enabled", value="false")

@@ -123,6 +123,20 @@ INFRA_SETTINGS = {
         "Диагностика: выгоревшие контрольные имена (через запятую) — "
         "заполняется автоматически, очистите, чтобы вернуть имя в работу",
         None),
+    "infra_unprobeable_snis": (
+        "", str,
+        "Диагностика: имена, которые зонд проверить не может (инбаунд Reality "
+        "и т.п.; через запятую) — заполняется автоматически после первого "
+        "«ни разу не проходило», такие имена больше не проверяются и не "
+        "алертятся; очистите, чтобы проверить заново",
+        None),
+    "infra_anomaly_clean_snooze_hours": (
+        24, int,
+        "Аномалия: пауза детектора после «чистого» вердикта, часов "
+        "(каждая следующая чистая аномалия подряд — втрое дольше)",
+        None),
+    "infra_anomaly_clean_snooze_max_hours": (
+        168, int, "Аномалия: максимум паузы после чистых вердиктов, часов", None),
     "infra_capacity_warn_pct": (
         70, int, "Лимиты ноды: порог предупреждения, %", None),
     "infra_capacity_alert_cooldown_minutes": (
@@ -287,6 +301,68 @@ def active_control_names(cfg: dict) -> list[str]:
     burned = set(parse_control_names(cfg.get("infra_control_names_burned")))
     alive = [name for name in names if name not in burned]
     return alive or names
+
+
+def unprobeable_snis(cfg: dict) -> set:
+    """Имена, которые проба проверить не может (ведут на инбаунд Reality,
+    рвутся молча): не проверяются и не алертятся, пока админ не очистит
+    infra_unprobeable_snis."""
+    return set(parse_control_names(cfg.get("infra_unprobeable_snis")))
+
+
+def mark_snis_unprobeable(db_session, names: list) -> list:
+    """Помечает имена непроверяемыми. Возвращает список НОВЫХ пометок.
+
+    Как и выгоревшие контрольные имена, живёт в system_settings: список
+    короткий, виден и снимается в админке.
+    """
+    cfg = get_settings(db_session)
+    known = parse_control_names(cfg.get("infra_unprobeable_snis"))
+    added = []
+    for raw in names or []:
+        name = (raw or "").strip().strip(".").lower()
+        if name and name not in known and name not in added:
+            added.append(name)
+    if not added:
+        return []
+    value = ",".join(known + added)
+    row = db_session.get(SystemSetting, "infra_unprobeable_snis")
+    if row is None:
+        db_session.add(SystemSetting(key="infra_unprobeable_snis", value=value))
+    else:
+        row.value = value
+    db_session.flush()
+    log.warning("infra: names marked unprobeable: %s (all: %s)", added, value)
+    return added
+
+
+def clean_anomaly_snooze_hours(db_session, server_id, cfg: dict, exclude_anomaly_id=None) -> int:
+    """Сколько часов молчать детектору после аномалии с чистым вердиктом.
+
+    Трафик упал, а ТСПУ ни при чём (нода выведена из DNS, слив нагрузки,
+    изменение маршрутов): повторный замер через кулдаун ничего нового не
+    скажет и только жжёт кредиты Atlas. Пауза растёт втрое с каждой чистой
+    аномалией подряд — 24 ч, 72 ч, 168 ч (потолок), пока baseline не
+    перестроится или не случится настоящий бан (он пауз не сбрасывает —
+    после паузы детектор снова смотрит на трафик).
+    """
+    base = int(cfg.get("infra_anomaly_clean_snooze_hours") or 0)
+    if base <= 0:
+        return 0
+    cap = int(cfg.get("infra_anomaly_clean_snooze_max_hours") or base)
+    query = (
+        db_session.query(InfraAnomaly.status)
+        .filter(InfraAnomaly.server_id == server_id)
+        .order_by(InfraAnomaly.created_at.desc(), InfraAnomaly.id.desc())
+    )
+    if exclude_anomaly_id is not None:
+        query = query.filter(InfraAnomaly.id != exclude_anomaly_id)
+    streak = 0
+    for (status,) in query.limit(10).all():
+        if status != "dismissed":
+            break
+        streak += 1
+    return min(base * (3 ** streak), max(cap, base))
 
 
 def mark_control_name_burned(db_session, name: str) -> bool:
@@ -2234,6 +2310,10 @@ def server_probe_targets(db_session, server) -> tuple:
     # имя не пройдёт НИКОГДА, сколько кредитов в него ни вложи, и вердикта
     # по нему всё равно не будет: лимит должен тратиться на имена, которые
     # способны дать ответ.
+    # Имена, помеченные непроверяемыми (ни разу не прошли — Reality и т.п.),
+    # в пробы не идут вовсе: ответа от них не будет никогда
+    skip = unprobeable_snis(get_settings(db_session))
+    ordered = [name for name in ordered if name.lower() not in skip]
     known_good = names_ever_seen_passing(db_session, ordered)
     ordered.sort(key=lambda name: name not in known_good)
     limit = max_probe_names(db_session)

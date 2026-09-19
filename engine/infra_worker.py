@@ -941,10 +941,19 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
     # Проверяются клиентские имена, а не домены A-записей: домен, у которого
     # есть своё имя, в рукопожатие не попадает и под фильтр не может. Имена
     # дедуплицируются — одно имя на нескольких доменах проверяется один раз
+    # Непроверяемые имена (помечены после «ни разу не проходило») в вердикт
+    # не входят: ответа от них не будет, а каждый раз «неизвестно» — шум
+    skip_names = infra.unprobeable_snis(cfg)
     probe_names: list[str] = []
+    skipped_names: list[str] = []
     for item in all_domains:
         for name in diag.domain_snis(item):
-            if name and name not in probe_names:
+            if not name:
+                continue
+            if name.lower() in skip_names:
+                if name not in skipped_names:
+                    skipped_names.append(name)
+            elif name not in probe_names:
                 probe_names.append(name)
     # Имена общие для нескольких нод: что известно о них по соседним
     # серверам той же волны, входит в вердикт
@@ -999,6 +1008,19 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
                 ),
             }
         )
+    if skipped_names:
+        verdict["evidence"].append(
+            {
+                "step": "sni_skipped", "result": "info", "snis": skipped_names,
+                "text": (
+                    "Имена " + ", ".join(skipped_names)
+                    + ": помечены непроверяемыми (ни разу не проходили пробу — "
+                    "инбаунд Reality или имя, которого нода не обслуживает), "
+                    "не проверялись; снять пометку — очистить "
+                    "infra_unprobeable_snis"
+                ),
+            }
+        )
     evidence_text = diag.evidence_text(verdict["evidence"])
     details["evidence"] = verdict["evidence"]
     details["verdict"] = {
@@ -1017,13 +1039,19 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
 
     _handle_control_burn(db_session, verdict, details, title, evidence_text)
 
-    if unproven_snis:
+    # Такое имя помечается непроверяемым и алертится один раз: дальше оно
+    # не проверяется и не попадает в «ни разу не проходило» на каждой аномалии
+    newly_marked = infra.mark_snis_unprobeable(db_session, unproven_snis) if unproven_snis else []
+    if newly_marked:
         _send_alert(
             "🟡 <b>ТСПУ: имя ни разу не проходило</b>\n\n"
             f"Сервер: <b>{title}</b>\n"
             "Имена: "
-            + ", ".join(f"<code>{n}</code>" for n in unproven_snis)
-            + "\n\nНи одного успешного замера за всю историю. Вердикт "
+            + ", ".join(f"<code>{n}</code>" for n in newly_marked)
+            + "\n\nПомечены непроверяемыми: больше не проверяются и не "
+            "алертятся. Если имя должно проверяться — очистите "
+            "<code>infra_unprobeable_snis</code> в настройках.\n\n"
+            "Ни одного успешного замера за всю историю. Вердикт "
             "«забанено» намеренно НЕ вынесен — у такой картины есть причины "
             "помимо ТСПУ:\n\n"
             "1. <b>Имя ведёт на инбаунд Reality.</b> Проба — обычный "
@@ -1069,10 +1097,22 @@ def _finalize_anomaly(db_session, anomaly, server, title, details) -> None:
 
     if not blocked_ips and not blocked_snis:
         anomaly.status = "dismissed"
+        # Трафик упал, а ТСПУ ни при чём — детектор молчит всё дольше с
+        # каждой чистой аномалией подряд (24 ч → 72 ч → 168 ч): нода,
+        # выведенная из DNS, не гоняет замеры каждый кулдаун
+        snooze_hours = infra.clean_anomaly_snooze_hours(
+            db_session, anomaly.server_id, cfg, exclude_anomaly_id=anomaly.id
+        )
+        if server is not None and snooze_hours > 0:
+            until = now + timedelta(hours=snooze_hours)
+            if server.anomaly_suppressed_until is None or server.anomaly_suppressed_until < until:
+                server.anomaly_suppressed_until = until
+            details["clean_snooze_hours"] = snooze_hours
+            anomaly.details = dict(details)
         log.info(
             "infra: anomaly dismissed server=%s (адреса и имена чисты; "
-            "бан пары: %s)",
-            title, pair_blocked or "нет",
+            "бан пары: %s; детектор на паузе %s ч)",
+            title, pair_blocked or "нет", snooze_hours,
         )
         return
 
