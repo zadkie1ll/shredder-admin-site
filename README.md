@@ -1,4 +1,40 @@
-# Monkey Island Website
+# Shredder Admin Site
+
+Отдельная административная панель Shredder, основанная на форке Monkey Island
+Website. Клиентский сайт Shredder остаётся самостоятельным FastAPI-сервисом и
+этим репозиторием не заменяется.
+
+Текущий этап отделяет административную поверхность от клиентских маршрутов:
+
+- доступны только `/`, `/health/` и `/support-admin/**`;
+- используется отдельный WSGI entry point без неявного запуска фоновых
+  Monkey Island workers;
+- переменные окружения имеют префикс `SHREDDER_ADMIN_*`;
+- миграции общего product database автоматически не применяются;
+- исходный `common` пока сохранён только как временная совместимость и не должен
+  подключаться к production Shredder DB до завершения модельных адаптеров.
+
+Локальный контейнер:
+
+```bash
+cd docker/admin
+cp .env.example .env
+docker compose up --build
+```
+
+Подробный статус интеграции и границы безопасности:
+[docs/SHREDDER_ADAPTATION.md](docs/SHREDDER_ADAPTATION.md).
+
+## Источник форка
+
+Upstream: `https://github.com/andrascii/monkey-island-website`.
+
+Ниже сохранена исходная документация до завершения переноса административных
+модулей.
+
+---
+
+## Исходная документация Monkey Island
 
 Django-приложение для продажи VPN-подписок Monkey Island (xray/VLESS TCP Reality через remnawave панель).
 

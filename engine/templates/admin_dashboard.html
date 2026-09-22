@@ -8,7 +8,7 @@
     <meta name="theme-color" content="#090a0f" id="admin-theme-color">
     <script>
         (() => {
-            const storageKey = 'monkey_island_admin_theme_v1';
+            const storageKey = 'shredder_admin_theme_v1';
             let theme = 'dark';
             try {
                 if (localStorage.getItem(storageKey) === 'light') theme = 'light';
@@ -18,7 +18,7 @@
             document.getElementById('admin-theme-color')?.setAttribute('content', theme === 'light' ? '#f4f5f7' : '#090a0f');
         })();
     </script>
-    <title>Админ-панель Monkey Island</title>
+    <title>Админ-панель Shredder</title>
     <link rel="icon" type="image/png" sizes="192x192" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="shortcut icon" type="image/png" href="{% static 'icons/icon-192x192.png' %}">
     <link rel="apple-touch-icon" href="{% static 'icons/icon-192x192.png' %}">
@@ -46,11 +46,11 @@
             <span class="admin-theme-track" aria-hidden="true"><span class="admin-theme-thumb"></span></span>
             <i class="fas fa-sun admin-theme-icon admin-theme-icon-light" aria-hidden="true"></i>
         </button>
-        <span class="mobile-topbar-brand">MONKEY ISLAND</span>
+        <span class="mobile-topbar-brand">SHREDDER</span>
     </header>
     <div class="drawer-overlay" id="drawer-overlay"></div>
     <aside class="sidebar">
-        <div class="admin-wordmark">Monkey <span>Island</span></div>
+        <div class="admin-wordmark">SHREDDER</div>
         <nav class="sidebar-nav" aria-label="Разделы админки">
             <span class="nav-section-label">Обзор</span>
             {% if support_admin_is_full_admin or support_admin_is_marketer %}
@@ -128,7 +128,7 @@
         data-full-admin="{% if support_admin_is_full_admin %}1{% endif %}"
     >
         <header class="admin-topbar">
-            <div class="admin-topbar-title"><i class="fas fa-signal"></i><span>Monkey Island Control</span></div>
+            <div class="admin-topbar-title"><i class="fas fa-signal"></i><span>Shredder Control</span></div>
             <div class="admin-topbar-actions">
                 <button class="admin-theme-switch" type="button" role="switch" aria-checked="false" aria-label="Включить светлую тему" title="Включить светлую тему" data-admin-theme-toggle>
                     <span class="admin-theme-switch-label" data-admin-theme-label>Тёмная</span>
@@ -2953,7 +2953,7 @@
                     <div class="config-field">
                         <label class="config-field-label" for="config-additional-headers">Дополнительные заголовки</label>
                         <div class="config-field-hint">JSON-объект с HTTP-заголовками, которые нужно добавить к конфигу. Если заголовки не нужны, оставьте пустой объект {}.</div>
-                        <textarea class="input reply-template-body" id="config-additional-headers" name="additional_headers" rows="3" placeholder='Например {"X-App": "Monkey Island"}'>{}</textarea>
+                        <textarea class="input reply-template-body" id="config-additional-headers" name="additional_headers" rows="3" placeholder='Например {"X-App": "Shredder"}'>{}</textarea>
                     </div>
                     <div class="reply-template-toolbar">
                         <label class="reply-template-active">

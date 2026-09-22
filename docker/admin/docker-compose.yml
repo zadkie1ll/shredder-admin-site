@@ -1,0 +1,10 @@
+services:
+  shredder-admin-site:
+    build:
+      context: ../..
+      dockerfile: docker/admin/Dockerfile
+    image: shredder-admin-site:dev
+    restart: unless-stopped
+    env_file:
+      - .env
+    network_mode: host
