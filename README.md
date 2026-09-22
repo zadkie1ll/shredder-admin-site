@@ -11,8 +11,9 @@ Website. Клиентский сайт Shredder остаётся самосто�
   Monkey Island workers;
 - переменные окружения имеют префикс `SHREDDER_ADMIN_*`;
 - миграции общего product database автоматически не применяются;
-- исходный `common` пока сохранён только как временная совместимость и не должен
-  подключаться к production Shredder DB до завершения модельных адаптеров.
+- submodule заменён на `zadkie1ll/shredder-common`, но приложение остаётся
+  fail-closed до завершения модельных адаптеров и пока не должно подключаться к
+  production Shredder DB.
 
 Локальный контейнер:
 
@@ -24,6 +25,8 @@ docker compose up --build
 
 Подробный статус интеграции и границы безопасности:
 [docs/SHREDDER_ADAPTATION.md](docs/SHREDDER_ADAPTATION.md).
+Автоматизированный аудит совместимости:
+[docs/SHREDDER_COMMON_COMPATIBILITY.md](docs/SHREDDER_COMMON_COMPATIBILITY.md).
 
 ## Источник форка
 

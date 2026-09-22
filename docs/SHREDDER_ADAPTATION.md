@@ -15,9 +15,9 @@ payment entry points are intentionally not routed by `web_app.admin_urls`.
 - The container exposes only `/`, `/health/` and `/support-admin/**`.
 - Common/Alembic migrations are never applied by the container.
 
-The source `common` submodule is still pinned temporarily so the fork remains
-bootable while model adapters are implemented. It must not be pointed at a
-production Shredder database until the compatibility work below is complete.
+The `common` submodule now points to `zadkie1ll/shredder-common@1576d60`.
+The application deliberately remains fail-closed until model adapters are
+implemented. See [SHREDDER_COMMON_COMPATIBILITY.md](SHREDDER_COMMON_COMPATIBILITY.md).
 
 ## Compatibility work
 
