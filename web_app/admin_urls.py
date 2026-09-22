@@ -1,26 +1,20 @@
-"""URL surface for the standalone Shredder administration service."""
+"""Read-only URL surface backed exclusively by shredder-common."""
 
-from django.http import JsonResponse
-from django.shortcuts import redirect
 from django.urls import path
 
-from engine.urls import urlpatterns as engine_urlpatterns
-
-
-def admin_root(_request):
-    return redirect("support_admin_tickets")
-
-
-def health(_request):
-    return JsonResponse({"status": "ok", "service": "shredder-admin-site"})
-
+from engine import shredder_admin_views as views
 
 urlpatterns = [
-    path("", admin_root, name="admin_root"),
-    path("health/", health, name="health"),
-    *[
-        pattern
-        for pattern in engine_urlpatterns
-        if str(pattern.pattern).startswith("support-admin/")
-    ],
+    path("", views.root, name="admin_root"),
+    path("health/", views.health, name="health"),
+    path("support-admin/login/", views.login_view, name="support_admin_login"),
+    path("support-admin/logout/", views.logout_view, name="support_admin_logout"),
+    path("support-admin/", views.dashboard, name="support_admin_dashboard"),
+    path("support-admin/api/stats/", views.api_stats, name="support_admin_api_stats"),
+    path("support-admin/api/users/", views.api_users, name="support_admin_api_users"),
+    path(
+        "support-admin/api/users/<int:user_id>/",
+        views.api_user,
+        name="support_admin_api_user",
+    ),
 ]

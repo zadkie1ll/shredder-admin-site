@@ -7,7 +7,6 @@ module, so it can coexist with the rest of the local infrastructure.
 
 import os
 
-
 _ENV_ALIASES = {
     "SECRET_KEY": "SHREDDER_ADMIN_SITE_SECRET_KEY",
     "DEBUG": "SHREDDER_ADMIN_SITE_DEBUG",
@@ -57,9 +56,10 @@ for _name, _default in _ADMIN_ONLY_DEFAULTS.items():
 
 from .settings import *  # noqa: E402,F403
 
-
 ROOT_URLCONF = "web_app.admin_urls"
 WSGI_APPLICATION = "web_app.admin_wsgi.application"
+SHREDDER_ADMIN_SITE_USERNAME = os.getenv("SHREDDER_ADMIN_SITE_USERNAME", "admin")
+SHREDDER_ADMIN_READ_ONLY = True
 
 # The standalone admin neither exposes the customer mobile API nor evaluates
 # customer account blocks in middleware. Administrative authorization remains

@@ -16,8 +16,9 @@ payment entry points are intentionally not routed by `web_app.admin_urls`.
 - Common/Alembic migrations are never applied by the container.
 
 The `common` submodule now points to `zadkie1ll/shredder-common@1576d60`.
-The application deliberately remains fail-closed until model adapters are
-implemented. See [SHREDDER_COMMON_COMPATIBILITY.md](SHREDDER_COMMON_COMPATIBILITY.md).
+The active URL surface uses a dedicated read-only repository and does not
+import the incompatible legacy views. See
+[SHREDDER_COMMON_COMPATIBILITY.md](SHREDDER_COMMON_COMPATIBILITY.md).
 
 ## Compatibility work
 
@@ -25,9 +26,9 @@ implemented. See [SHREDDER_COMMON_COMPATIBILITY.md](SHREDDER_COMMON_COMPATIBILIT
 | --- | --- | --- |
 | Admin shell and role checks | isolated | Replace bootstrap shared passwords with Shredder admin accounts |
 | Config templates | pending | Preserve the existing `shredder-admin` rotation, Lagom and WL-01 behavior |
-| Users | blocked | Map Shredder nullable username, mandatory telegram id, bot instance and site identities |
-| Payments | pending | Keep Shredder YooKassa tables and service semantics |
-| Referrals and analytics | pending | Rewrite queries against Shredder models and event names |
+| Users | read-only | Search by Telegram ID/username/site email; Shredder fields preserved |
+| Payments | read-only | YooKassa history, LTV and recurrent state use Shredder models |
+| Referrals and analytics | read-only core | Counts, bonus days and referred users are available |
 | Subscription mutations | blocked | Add explicit DB/RWMS reconciliation and audit before enabling writes |
 | Broadcasts | pending | Map queues and message contracts to `shredder-vpn-bot` |
 | Device management | blocked | Current Shredder RWMS does not expose HWID RPC methods |
@@ -35,7 +36,6 @@ implemented. See [SHREDDER_COMMON_COMPATIBILITY.md](SHREDDER_COMMON_COMPATIBILIT
 
 ## Safety boundary
 
-Until the blocked rows are resolved, run this service only against disposable
-development databases. Do not apply the source common migrations to the shared
-Shredder database and do not enable subscription mutation endpoints in
-production.
+The active endpoints issue SELECT queries only and can use the shared Shredder
+database after normal deployment review. Do not expose dormant legacy routes,
+apply source common migrations, or enable subscription mutation endpoints.

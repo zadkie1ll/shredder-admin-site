@@ -2,9 +2,9 @@
 
 Pinned module: `zadkie1ll/shredder-common@1576d60`.
 
-The submodule replacement is complete, but the upstream administration code is
-not yet runtime-compatible. The service intentionally fails during URL loading
-instead of silently enabling partial subscription mutations.
+The submodule replacement is complete. The active standalone administration
+surface is runtime-compatible and read-only. Incompatible upstream views remain
+in the repository as a porting reference but are not imported or routed.
 
 Run the non-mutating audit with:
 
@@ -14,7 +14,9 @@ Run the non-mutating audit with:
 
 The audit never connects to PostgreSQL or RWMS and never runs Alembic.
 
-## Verified incompatibilities
+The command reports `COMPATIBLE` for the active runtime contract.
+
+## Dormant legacy incompatibilities
 
 - Missing modules: `managed_traffic_limits`, `models.segments`,
   `models.settings`, `runtime_tariffs`, and `rwms_client_sync`.

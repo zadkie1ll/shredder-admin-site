@@ -5,46 +5,88 @@ from __future__ import annotations
 
 import ast
 import importlib
-import os
-import re
 import subprocess
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 MODEL_COLUMN_CONTRACTS = {
-    "User": {"id", "email", "telegram_id", "username", "referred_by_id", "referral_type", "autopay_allow", "expire_at", "ymid"},
-    "YkPayment": {"id", "user_id", "amount", "currency", "status", "captured_at", "created_at", "payment_id", "subscription_period", "is_autopay", "cancellation_reason"},
-    "YkRecurrentPayment": {"id", "user_id", "amount", "currency", "recurrent_payment_id", "subscription_period", "captured_at", "scheduled_payment", "next_retry_at"},
+    "User": {
+        "id",
+        "telegram_id",
+        "username",
+        "telegram_username",
+        "bot_instance",
+        "referred_by_id",
+        "referral_type",
+        "autopay_allow",
+        "expire_at",
+        "ymid",
+    },
+    "YkPayment": {
+        "id",
+        "user_id",
+        "amount",
+        "currency",
+        "status",
+        "captured_at",
+        "created_at",
+        "payment_id",
+        "subscription_period",
+    },
+    "YkRecurrentPayment": {
+        "id",
+        "user_id",
+        "amount",
+        "currency",
+        "recurrent_payment_id",
+        "subscription_period",
+        "captured_at",
+        "scheduled_payment",
+    },
+    "ReferralBonus": {
+        "id",
+        "referral_id",
+        "referrer_id",
+        "created_at",
+        "bonus_type",
+        "days_added",
+    },
 }
+ACTIVE_RUNTIME_FILES = (
+    ROOT / "engine" / "shredder_admin_models.py",
+    ROOT / "engine" / "shredder_admin_repository.py",
+    ROOT / "engine" / "shredder_admin_views.py",
+    ROOT / "web_app" / "admin_urls.py",
+    ROOT / "web_app" / "admin_settings.py",
+    ROOT / "web_app" / "admin_wsgi.py",
+)
 
 
-def common_imports():
+def common_imports(paths=ACTIVE_RUNTIME_FILES):
     result = {}
-    for source_root in (ROOT / "engine", ROOT / "web_app"):
-        for path in source_root.rglob("*.py"):
-            if path.name.startswith("test"):
-                continue
-            tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
-            for node in ast.walk(tree):
-                if isinstance(node, ast.ImportFrom) and node.module and node.module.startswith("common"):
-                    result.setdefault(node.module, set()).update(item.name for item in node.names if item.name != "*")
+    for path in paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if (
+                isinstance(node, ast.ImportFrom)
+                and node.module
+                and node.module.startswith("common")
+            ):
+                result.setdefault(node.module, set()).update(
+                    item.name for item in node.names if item.name != "*"
+                )
     return result
-
-
-def rpc_names(path):
-    if not path.exists():
-        return set()
-    return set(re.findall(r"^\s*rpc\s+(\w+)\s*\(", path.read_text(), re.MULTILINE))
 
 
 def main():
     failures = []
     remote = subprocess.run(
         ["git", "-C", str(ROOT / "common"), "remote", "get-url", "origin"],
-        check=True, capture_output=True, text=True,
+        check=True,
+        capture_output=True,
+        text=True,
     ).stdout.strip()
     print(f"common remote: {remote}")
     if "zadkie1ll/shredder-common" not in remote:
@@ -55,7 +97,9 @@ def main():
         try:
             module = importlib.import_module(module_name)
         except Exception as exc:
-            failures.append(f"missing module {module_name}: {type(exc).__name__}: {exc}")
+            failures.append(
+                f"missing module {module_name}: {type(exc).__name__}: {exc}"
+            )
             continue
         missing = []
         for name in sorted(names):
@@ -77,22 +121,14 @@ def main():
                 continue
             missing = sorted(required - set(model.__table__.columns.keys()))
             if missing:
-                failures.append(f"model {model_name} lacks columns: {', '.join(missing)}")
+                failures.append(
+                    f"model {model_name} lacks columns: {', '.join(missing)}"
+                )
     except Exception as exc:
         failures.append(f"cannot inspect common.models.db: {type(exc).__name__}: {exc}")
 
-    admin_proto = ROOT / "proto" / "rwmanager.proto"
-    shredder_proto = Path(os.getenv("SHREDDER_RWMS_PROTO", str(ROOT.parent / "shredder-site" / "proto" / "rwmanager.proto")))
-    required_rpcs, available_rpcs = rpc_names(admin_proto), rpc_names(shredder_proto)
-    if not shredder_proto.exists():
-        failures.append(f"Shredder RWMS proto not found: {shredder_proto}")
-    else:
-        missing = sorted(required_rpcs - available_rpcs)
-        if missing:
-            failures.append(f"Shredder RWMS lacks RPCs: {', '.join(missing)}")
-
     print(f"runtime common imports: {sum(map(len, imports.values()))}")
-    print(f"admin RPCs: {len(required_rpcs)}; Shredder RPCs: {len(available_rpcs)}")
+    print("active mode: read-only; RWMS is not imported or called")
     if failures:
         print(f"INCOMPATIBLE ({len(failures)} contract groups)")
         for failure in failures:

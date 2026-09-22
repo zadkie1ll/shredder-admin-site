@@ -11,9 +11,17 @@ Website. Клиентский сайт Shredder остаётся самосто�
   Monkey Island workers;
 - переменные окружения имеют префикс `SHREDDER_ADMIN_*`;
 - миграции общего product database автоматически не применяются;
-- submodule заменён на `zadkie1ll/shredder-common`, но приложение остаётся
-  fail-closed до завершения модельных адаптеров и пока не должно подключаться к
-  production Shredder DB.
+- submodule заменён на `zadkie1ll/shredder-common`;
+- активная административная поверхность работает в read-only режиме: сводка,
+  поиск пользователей, карточка, платежи, автоплатёж, LTV и рефералы;
+- исходные изменяющие и инфраструктурные обработчики Monkey Island не
+  подключены к URL и не импортируются.
+
+Read-only API после авторизации:
+
+- `GET /support-admin/api/stats/`;
+- `GET /support-admin/api/users/?q=...`;
+- `GET /support-admin/api/users/<id>/`.
 
 Локальный контейнер:
 
