@@ -32,6 +32,12 @@ class ShredderAdminUrlIsolationTests(SimpleTestCase):
 
     def test_api_requires_authentication(self):
         self.assertEqual(self.client.get("/support-admin/api/users/").status_code, 401)
+        self.assertEqual(
+            self.client.get("/support-admin/api/payments/").status_code, 401
+        )
+        self.assertEqual(
+            self.client.get("/support-admin/api/referrals/").status_code, 401
+        )
 
     @patch("engine.shredder_admin_views.repository.load_stats")
     @override_settings(
@@ -49,3 +55,66 @@ class ShredderAdminUrlIsolationTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["stats"]["users"], 7)
         load_stats.assert_called_once_with()
+
+    @override_settings(
+        SUPPORT_ADMIN_PASSWORD="test-password",
+        SHREDDER_ADMIN_SITE_USERNAME="zadkiel",
+    )
+    def test_authenticated_dashboard_renders_transferred_sections(self):
+        self.client.post(
+            "/support-admin/login/",
+            {"login": "zadkiel", "password": "test-password"},
+        )
+        response = self.client.get("/support-admin/")
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Пользователи")
+        self.assertContains(response, "Платежи")
+        self.assertContains(response, "Рефералы")
+
+    @override_settings(
+        SUPPORT_ADMIN_PASSWORD="test-password",
+        SHREDDER_ADMIN_SITE_USERNAME="zadkiel",
+    )
+    def test_session_is_invalidated_when_credentials_change(self):
+        login = self.client.post(
+            "/support-admin/login/",
+            {"login": "zadkiel", "password": "test-password"},
+        )
+        self.assertEqual(login.status_code, 302)
+        with self.settings(SUPPORT_ADMIN_PASSWORD="rotated-password"):
+            response = self.client.get("/support-admin/api/stats/")
+        self.assertEqual(response.status_code, 401)
+
+    @patch("engine.shredder_admin_views.repository.search_payments")
+    @override_settings(
+        SUPPORT_ADMIN_PASSWORD="test-password",
+        SHREDDER_ADMIN_SITE_USERNAME="zadkiel",
+    )
+    def test_payments_api_forwards_filters(self, search_payments):
+        search_payments.return_value = []
+        self.client.post(
+            "/support-admin/login/",
+            {"login": "zadkiel", "password": "test-password"},
+        )
+        response = self.client.get(
+            "/support-admin/api/payments/?q=payment-1&status=succeeded&limit=500"
+        )
+        self.assertEqual(response.status_code, 200)
+        search_payments.assert_called_once_with(
+            query="payment-1", status="succeeded", limit=100
+        )
+
+    @patch("engine.shredder_admin_views.repository.search_referrers")
+    @override_settings(
+        SUPPORT_ADMIN_PASSWORD="test-password",
+        SHREDDER_ADMIN_SITE_USERNAME="zadkiel",
+    )
+    def test_referrals_api_is_read_only(self, search_referrers):
+        search_referrers.return_value = []
+        self.client.post(
+            "/support-admin/login/",
+            {"login": "zadkiel", "password": "test-password"},
+        )
+        response = self.client.get("/support-admin/api/referrals/?q=42")
+        self.assertEqual(response.status_code, 200)
+        search_referrers.assert_called_once_with(query="42", limit=50)

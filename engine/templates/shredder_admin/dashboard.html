@@ -1,4 +1,58 @@
-<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shredder Admin</title>
-<style>body{margin:0;background:#101215;color:#edf0f3;font:14px Inter,system-ui}.shell{max-width:1280px;margin:auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center}.muted{color:#aeb6c1}.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:24px 0}.card{background:#171a1e;border:1px solid #2a2e34;border-radius:10px;padding:16px}.value{font-size:24px;font-weight:700;margin-top:8px}.search{display:flex;gap:8px}.search input{flex:1}.search input,button{padding:11px;border-radius:7px;border:1px solid #343942;background:#171a1e;color:#fff}button{background:#ffcc24;color:#17130a;font-weight:700}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{text-align:left;padding:11px;border-bottom:1px solid #2a2e34}tr{cursor:pointer}.detail{margin-top:18px;white-space:pre-wrap;overflow:auto}@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}table{font-size:12px}}</style></head>
-<body><main class="shell"><header class="top"><div><h1>Shredder Control</h1><span class="muted">Read-only: пользователи, платежи, рефералы</span></div><a href="{% url 'support_admin_logout' %}" class="muted">Выйти</a></header><section id="stats" class="grid"></section><section class="card"><form id="search" class="search"><input name="q" placeholder="Telegram ID, username или email"><button>Найти</button></form><table><thead><tr><th>ID</th><th>Telegram</th><th>Username</th><th>Email</th><th>Истекает</th></tr></thead><tbody id="users"></tbody></table><pre id="detail" class="card detail" hidden></pre></section></main>
-<script>const esc=v=>String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));async function get(url){const r=await fetch(url);if(!r.ok)throw new Error((await r.json()).message||r.status);return r.json()}async function stats(){const d=(await get('{% url "support_admin_api_stats" %}')).stats;document.querySelector('#stats').innerHTML=Object.entries(d).map(([k,v])=>`<div class="card"><span class="muted">${esc(k)}</span><div class="value">${esc(v)}</div></div>`).join('')}async function users(q=''){const d=await get('{% url "support_admin_api_users" %}?q='+encodeURIComponent(q));document.querySelector('#users').innerHTML=d.users.map(u=>`<tr data-id="${u.id}"><td>${u.id}</td><td>${esc(u.telegram_id)}</td><td>${esc(u.username)}</td><td>${esc(u.email)}</td><td>${esc(u.expire_at)}</td></tr>`).join('')}document.querySelector('#search').onsubmit=e=>{e.preventDefault();users(new FormData(e.target).get('q')).catch(alert)};document.querySelector('#users').onclick=async e=>{const row=e.target.closest('tr');if(!row)return;const d=await get(`{% url "support_admin_api_users" %}${row.dataset.id}/`);const box=document.querySelector('#detail');box.hidden=false;box.textContent=JSON.stringify(d.user,null,2)};stats().catch(alert);users().catch(alert);</script></body></html>
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Shredder Admin</title>
+  <style>
+    :root{color-scheme:dark}body{margin:0;background:#101215;color:#edf0f3;font:14px Inter,system-ui}.shell{max-width:1280px;margin:auto;padding:24px}.top,.tabs,.search{display:flex;gap:10px;align-items:center}.top{justify-content:space-between}.muted{color:#aeb6c1}.grid{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin:24px 0}.card{background:#171a1e;border:1px solid #2a2e34;border-radius:10px;padding:16px}.value{font-size:24px;font-weight:700;margin-top:8px}.tabs{margin:0 0 12px}.tab,.search button{padding:10px 14px;border-radius:7px;border:1px solid #343942;background:#171a1e;color:#fff;cursor:pointer}.tab.active,.search button{background:#ffcc24;color:#17130a;font-weight:700}.search input,.search select{padding:11px;border-radius:7px;border:1px solid #343942;background:#101215;color:#fff}.search input{flex:1}.panel[hidden]{display:none}table{width:100%;border-collapse:collapse;margin-top:16px}th,td{text-align:left;padding:11px;border-bottom:1px solid #2a2e34}.clickable{cursor:pointer}.clickable:hover{background:#20242a}.detail{margin-top:18px;white-space:pre-wrap;overflow:auto}.error{display:none;margin:12px 0;color:#ff8a8f}.pill{display:inline-block;padding:3px 7px;border-radius:999px;background:#292e36}@media(max-width:800px){.grid{grid-template-columns:repeat(2,1fr)}.tabs{overflow:auto}.search{align-items:stretch;flex-direction:column}.table-wrap{overflow:auto}table{font-size:12px}.shell{padding:16px}}
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header class="top">
+      <div><h1>Shredder Control</h1><span class="muted">Read-only административная панель</span></div>
+      <a href="{% url 'support_admin_logout' %}" class="muted">Выйти</a>
+    </header>
+    <section id="stats" class="grid"></section>
+    <div id="error" class="error"></div>
+    <nav class="tabs" aria-label="Разделы">
+      <button class="tab active" data-panel="users-panel">Пользователи</button>
+      <button class="tab" data-panel="payments-panel">Платежи</button>
+      <button class="tab" data-panel="referrals-panel">Рефералы</button>
+    </nav>
+
+    <section id="users-panel" class="card panel">
+      <form id="users-search" class="search"><input name="q" placeholder="Telegram ID, username или email"><button>Найти</button></form>
+      <div class="table-wrap"><table><thead><tr><th>ID</th><th>Telegram</th><th>Username</th><th>Email</th><th>Истекает</th></tr></thead><tbody id="users"></tbody></table></div>
+      <pre id="detail" class="card detail" hidden></pre>
+    </section>
+
+    <section id="payments-panel" class="card panel" hidden>
+      <form id="payments-search" class="search"><input name="q" placeholder="ID платежа, Telegram или email"><select name="status"><option value="">Все статусы</option><option value="succeeded">Успешные</option><option value="pending">Ожидают</option><option value="canceled">Отменены</option></select><button>Найти</button></form>
+      <div class="table-wrap"><table><thead><tr><th>Дата</th><th>Платёж</th><th>Пользователь</th><th>Сумма</th><th>Тариф</th><th>Статус</th></tr></thead><tbody id="payments"></tbody></table></div>
+    </section>
+
+    <section id="referrals-panel" class="card panel" hidden>
+      <form id="referrals-search" class="search"><input name="q" placeholder="Telegram ID, username или email"><button>Найти</button></form>
+      <div class="table-wrap"><table><thead><tr><th>ID</th><th>Telegram</th><th>Username</th><th>Email</th><th>Рефералов</th><th>Бонусных дней</th></tr></thead><tbody id="referrals"></tbody></table></div>
+    </section>
+  </main>
+  <script>
+    const esc=v=>String(v??'—').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    const showError=e=>{const box=document.querySelector('#error');box.textContent=e.message||String(e);box.style.display='block'};
+    async function get(url){const r=await fetch(url,{headers:{Accept:'application/json'}});const d=await r.json();if(!r.ok)throw new Error(d.message||r.status);return d}
+    async function stats(){const labels={users:'Пользователи',active_users:'Активные',successful_payments:'Оплаты',revenue:'Выручка',autopay_users:'Автоплатёж',referred_users:'Рефералы'};const d=(await get('{% url "support_admin_api_stats" %}')).stats;document.querySelector('#stats').innerHTML=Object.entries(d).map(([k,v])=>`<div class="card"><span class="muted">${esc(labels[k]||k)}</span><div class="value">${esc(v)}</div></div>`).join('')}
+    async function users(q=''){const d=await get('{% url "support_admin_api_users" %}?q='+encodeURIComponent(q));document.querySelector('#users').innerHTML=d.users.map(u=>`<tr class="clickable" data-user-id="${esc(u.id)}"><td>${esc(u.id)}</td><td>${esc(u.telegram_id)}</td><td>${esc(u.username)}</td><td>${esc(u.email)}</td><td>${esc(u.expire_at)}</td></tr>`).join('')}
+    async function payments(q='',status=''){const url='{% url "support_admin_api_payments" %}?q='+encodeURIComponent(q)+'&status='+encodeURIComponent(status);const d=await get(url);document.querySelector('#payments').innerHTML=d.payments.map(p=>`<tr class="clickable" data-user-id="${esc(p.user.id)}"><td>${esc(p.created_at)}</td><td>${esc(p.payment_id)}</td><td>${esc(p.user.username||p.user.telegram_id)}</td><td>${esc(p.amount)} ${esc(p.currency)}</td><td>${esc(p.tariff)}</td><td><span class="pill">${esc(p.status)}</span></td></tr>`).join('')}
+    async function referrals(q=''){const d=await get('{% url "support_admin_api_referrals" %}?q='+encodeURIComponent(q));document.querySelector('#referrals').innerHTML=d.referrers.map(r=>`<tr class="clickable" data-user-id="${esc(r.user.id)}"><td>${esc(r.user.id)}</td><td>${esc(r.user.telegram_id)}</td><td>${esc(r.user.username)}</td><td>${esc(r.user.email)}</td><td>${esc(r.referrals_count)}</td><td>${esc(r.bonus_days)}</td></tr>`).join('')}
+    async function showUser(id){const d=await get(`{% url "support_admin_api_users" %}${encodeURIComponent(id)}/`);const box=document.querySelector('#detail');box.hidden=false;box.textContent=JSON.stringify(d.user,null,2);document.querySelector('[data-panel="users-panel"]').click();box.scrollIntoView({behavior:'smooth',block:'nearest'})}
+    document.querySelectorAll('.tab').forEach(button=>button.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('active',x===button));document.querySelectorAll('.panel').forEach(x=>x.hidden=x.id!==button.dataset.panel)});
+    document.querySelector('#users-search').onsubmit=e=>{e.preventDefault();users(new FormData(e.target).get('q')).catch(showError)};
+    document.querySelector('#payments-search').onsubmit=e=>{e.preventDefault();const f=new FormData(e.target);payments(f.get('q'),f.get('status')).catch(showError)};
+    document.querySelector('#referrals-search').onsubmit=e=>{e.preventDefault();referrals(new FormData(e.target).get('q')).catch(showError)};
+    document.querySelector('main').onclick=e=>{const row=e.target.closest('[data-user-id]');if(row)showUser(row.dataset.userId).catch(showError)};
+    stats().catch(showError);users().catch(showError);payments().catch(showError);referrals().catch(showError);
+  </script>
+</body>
+</html>

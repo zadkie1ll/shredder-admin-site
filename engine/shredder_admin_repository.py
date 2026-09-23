@@ -1,8 +1,11 @@
 """Read-only queries against the authoritative Shredder product schema."""
 
 from datetime import datetime
+
 from sqlalchemy import String, cast, func, or_
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import aliased
+
 from common.models.db import ReferralBonus, User, YkPayment, YkRecurrentPayment
 from database import session_factory
 from engine.shredder_admin_models import SiteIdentity
@@ -40,6 +43,23 @@ def serialize_user(user, email=None):
         "expire_at": user.expire_at.isoformat() if user.expire_at else None,
         "autopay_allow": bool(user.autopay_allow),
         "referred_by_id": user.referred_by_id,
+    }
+
+
+def serialize_payment(payment, user, email=None):
+    return {
+        "id": payment.id,
+        "payment_id": payment.payment_id,
+        "user": serialize_user(user, email),
+        "amount": payment.amount,
+        "currency": payment.currency,
+        "status": payment.status,
+        "tariff": payment.subscription_period,
+        "is_trial_promotion": bool(payment.is_trial_promotion),
+        "created_at": payment.created_at.isoformat() if payment.created_at else None,
+        "captured_at": (
+            payment.captured_at.isoformat() if payment.captured_at else None
+        ),
     }
 
 
@@ -159,3 +179,105 @@ def load_user(user_id):
             }
         )
         return payload
+
+
+def search_payments(query="", status="", limit=50):
+    with session_factory() as session:
+        statement = session.query(YkPayment, User).join(
+            User, User.id == YkPayment.user_id
+        )
+        normalized_query = query.strip()
+        if normalized_query:
+            pattern = f"%{normalized_query}%"
+            filters = [
+                YkPayment.payment_id.ilike(pattern),
+                cast(YkPayment.id, String).ilike(pattern),
+                cast(User.telegram_id, String).ilike(pattern),
+                User.username.ilike(pattern),
+                User.telegram_username.ilike(pattern),
+            ]
+            try:
+                identity_ids = [
+                    row[0]
+                    for row in session.query(SiteIdentity.user_id)
+                    .filter(SiteIdentity.login.ilike(pattern))
+                    .limit(limit)
+                    .all()
+                ]
+                if identity_ids:
+                    filters.append(User.id.in_(identity_ids))
+            except SQLAlchemyError:
+                session.rollback()
+            statement = statement.filter(or_(*filters))
+        if status.strip():
+            statement = statement.filter(YkPayment.status == status.strip())
+        rows = (
+            statement.order_by(YkPayment.created_at.desc(), YkPayment.id.desc())
+            .limit(limit)
+            .all()
+        )
+        emails = _identity_emails(session, [user.id for _, user in rows])
+        return [
+            serialize_payment(payment, user, emails.get(user.id))
+            for payment, user in rows
+        ]
+
+
+def search_referrers(query="", limit=50):
+    with session_factory() as session:
+        referrer = aliased(User)
+        referral = aliased(User)
+        statement = (
+            session.query(referrer, func.count(referral.id).label("referrals_count"))
+            .join(referral, referral.referred_by_id == referrer.id)
+            .group_by(referrer.id)
+        )
+        normalized_query = query.strip()
+        if normalized_query:
+            pattern = f"%{normalized_query}%"
+            filters = [
+                cast(referrer.telegram_id, String).ilike(pattern),
+                referrer.username.ilike(pattern),
+                referrer.telegram_username.ilike(pattern),
+            ]
+            try:
+                identity_ids = [
+                    row[0]
+                    for row in session.query(SiteIdentity.user_id)
+                    .filter(SiteIdentity.login.ilike(pattern))
+                    .limit(limit)
+                    .all()
+                ]
+                if identity_ids:
+                    filters.append(referrer.id.in_(identity_ids))
+            except SQLAlchemyError:
+                session.rollback()
+            statement = statement.filter(or_(*filters))
+        rows = (
+            statement.order_by(func.count(referral.id).desc(), referrer.id.desc())
+            .limit(limit)
+            .all()
+        )
+        referrer_ids = [item.id for item, _ in rows]
+        emails = _identity_emails(session, referrer_ids)
+        bonus_days = (
+            dict(
+                session.query(
+                    ReferralBonus.referrer_id,
+                    func.coalesce(func.sum(ReferralBonus.days_added), 0),
+                )
+                .filter(ReferralBonus.referrer_id.in_(referrer_ids))
+                .group_by(ReferralBonus.referrer_id)
+                .all()
+            )
+            if referrer_ids
+            else {}
+        )
+        return [
+            {
+                "user": serialize_user(item, emails.get(item.id)),
+                "referrals_count": count,
+                "bonus_days": bonus_days.get(item.id, 0),
+            }
+            for item, count in rows
+        ]

@@ -17,4 +17,14 @@ urlpatterns = [
         views.api_user,
         name="support_admin_api_user",
     ),
+    path(
+        "support-admin/api/payments/",
+        views.api_payments,
+        name="support_admin_api_payments",
+    ),
+    path(
+        "support-admin/api/referrals/",
+        views.api_referrals,
+        name="support_admin_api_referrals",
+    ),
 ]

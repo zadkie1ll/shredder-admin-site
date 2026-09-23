@@ -34,6 +34,7 @@ MODEL_COLUMN_CONTRACTS = {
         "created_at",
         "payment_id",
         "subscription_period",
+        "is_trial_promotion",
     },
     "YkRecurrentPayment": {
         "id",

@@ -24,11 +24,11 @@ import the incompatible legacy views. See
 
 | Area | State | Required adaptation |
 | --- | --- | --- |
-| Admin shell and role checks | isolated | Replace bootstrap shared passwords with Shredder admin accounts |
+| Admin shell and role checks | single named account | Add multi-account storage and granular roles when a second operator is needed |
 | Config templates | pending | Preserve the existing `shredder-admin` rotation, Lagom and WL-01 behavior |
 | Users | read-only | Search by Telegram ID/username/site email; Shredder fields preserved |
-| Payments | read-only | YooKassa history, LTV and recurrent state use Shredder models |
-| Referrals and analytics | read-only core | Counts, bonus days and referred users are available |
+| Payments | read-only | Searchable YooKassa registry, LTV and recurrent state use Shredder models |
+| Referrals and analytics | read-only | Searchable referrer registry, counts and bonus days are available |
 | Subscription mutations | blocked | Add explicit DB/RWMS reconciliation and audit before enabling writes |
 | Broadcasts | pending | Map queues and message contracts to `shredder-vpn-bot` |
 | Device management | blocked | Current Shredder RWMS does not expose HWID RPC methods |

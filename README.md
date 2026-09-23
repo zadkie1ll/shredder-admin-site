@@ -13,7 +13,10 @@ Website. Клиентский сайт Shredder остаётся самосто�
 - миграции общего product database автоматически не применяются;
 - submodule заменён на `zadkie1ll/shredder-common`;
 - активная административная поверхность работает в read-only режиме: сводка,
-  поиск пользователей, карточка, платежи, автоплатёж, LTV и рефералы;
+  поиск пользователей, карточка, отдельные реестры платежей и рефереров,
+  автоплатёж и LTV;
+- административная сессия привязана к текущей паре логин/пароль и становится
+  недействительной после ротации credentials;
 - исходные изменяющие и инфраструктурные обработчики Monkey Island не
   подключены к URL и не импортируются.
 
@@ -21,7 +24,9 @@ Read-only API после авторизации:
 
 - `GET /support-admin/api/stats/`;
 - `GET /support-admin/api/users/?q=...`;
-- `GET /support-admin/api/users/<id>/`.
+- `GET /support-admin/api/users/<id>/`;
+- `GET /support-admin/api/payments/?q=...&status=...`;
+- `GET /support-admin/api/referrals/?q=...`.
 
 Локальный контейнер:
 
@@ -30,6 +35,11 @@ cd docker/admin
 cp .env.example .env
 docker compose up --build
 ```
+
+Первый локальный администратор задаётся переменными
+`SHREDDER_ADMIN_SITE_USERNAME` и `SHREDDER_ADMIN_SITE_PASSWORD` в
+`docker/admin/.env`. Этот файл исключён из Git; пароль нельзя добавлять в
+`.env.example` или README.
 
 Подробный статус интеграции и границы безопасности:
 [docs/SHREDDER_ADAPTATION.md](docs/SHREDDER_ADAPTATION.md).
